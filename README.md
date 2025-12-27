@@ -1,35 +1,143 @@
 # insurai
-Insurance policy analysis and risk management tools with AI-powered document processing
-1. Project Purpose & Positioning
-Clear explanation of the policy benchmarking & coverage assessment tool
-Target market (users with existing insurance policies)
-Differentiation from B2C price comparison sites
-2. Complete Tech Stack
-Frontend: React 18, TypeScript, Tailwind CSS v4.0, Motion/Framer Motion
-UI Libraries: Recharts, Lucide React, Sonner, React Hook Form
-Design System: Your custom professional palette with blue-600/indigo-600 gradients
-AI Integration Points: Documented (OpenAI, Anthropic, Google Document AI, Azure Form Recognizer)
-3. Detailed Setup Instructions
-Prerequisites (Node.js v18+)
-Figma Make workflow (automatic dependency management)
-Local development option
-Quick start demo with Turkish Kasko sample
-4. Environment Variables
-Current state: No env vars needed (frontend-only with mock data)
-Future integration: Complete .env.local template with:
-OpenAI, Anthropic, Google Cloud, Azure APIs
-Supabase database credentials
-AWS S3 / Cloudinary storage
-Analytics & monitoring
-Feature flags
-Security best practices and warnings
-5. Additional Sections
-Project structure with file explanations
-Design system documentation (colors, components, typography)
-All 10+ key features explained
-21 sample policies catalog
-Development guide for adding new insurance lines
-Roadmap (5 phases from current to enterprise)
-Testing scenarios
-Contributing guidelines
-Common issues troubleshooting
+
+**Insurance policy analysis and benchmarking platform for Turkish market professionals**
+
+A React/TypeScript application for uploading, analyzing, and comparing insurance policies with AI-powered document extraction.
+
+---
+
+## Quick Start
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Open http://localhost:5173
+```
+
+No environment variables required for the current frontend-only version.
+
+---
+
+## What This Is
+
+insurai helps insurance professionals analyze policies by:
+
+1. **Uploading policies** - Drag-and-drop PDF upload with batch processing
+2. **Extracting data** - AI-powered extraction of coverage limits, deductibles, exclusions
+3. **Benchmarking** - Compare coverage against market standards
+4. **Identifying gaps** - Find under/over-insurance across policy portfolios
+
+### Target Users
+
+- Insurance professionals conducting portfolio reviews
+- Corporate risk managers
+- Brokers providing advisory services
+
+### Supported Coverage Types
+
+- Property & Business Interruption
+- Auto (Kasko/Traffic)
+- Life & Health
+- Professional Liability, Cyber, D&O, Marine
+
+---
+
+## Current State
+
+**Phase 1 (Current)**: Frontend-only with sample data
+
+- ✅ UI/UX for policy upload and display
+- ✅ Mock AI extraction and benchmarking
+- ✅ 21 Turkish sample policies
+- ✅ Interactive dashboard with Recharts
+
+**Next**: AI integration (OpenAI, Claude, Gemini) for real document processing
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|------------|
+| Framework | React 18 + TypeScript 5 |
+| Styling | Tailwind CSS v4 |
+| Animation | Framer Motion |
+| Routing | React Router v7 |
+| Charts | Recharts |
+| Forms | React Hook Form + Zod |
+
+---
+
+## Project Structure
+
+```
+src/
+├── components/
+│   ├── ui/           # Base components (buttons, inputs, cards)
+│   ├── dashboard/    # Dashboard widgets
+│   ├── upload/       # Policy upload flow
+│   └── analysis/     # Benchmarking views
+├── lib/
+│   ├── ai/           # AI provider integrations (future)
+│   ├── parsers/      # Document parsing
+│   └── benchmarking/ # Coverage comparison
+├── hooks/            # Custom React hooks
+├── types/            # TypeScript definitions
+├── data/             # Sample policies and mock data
+└── routes/           # Page components
+```
+
+---
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `src/types/policy.ts` | Core policy data structures |
+| `src/lib/parsers/turkish-policy.ts` | Turkish document parser |
+| `src/lib/benchmarking/coverage-analyzer.ts` | Coverage comparison engine |
+| `src/data/sample-policies/` | Demo policy library |
+
+---
+
+## Scripts
+
+```bash
+npm run dev       # Start dev server
+npm run build     # Production build
+npm run preview   # Preview production build
+npm run lint      # Run ESLint
+npm run typecheck # TypeScript check
+npm test          # Run tests
+```
+
+---
+
+## Design Tokens
+
+```css
+/* Primary */
+--color-primary: #2563eb;    /* blue-600 */
+--color-secondary: #4f46e5;  /* indigo-600 */
+
+/* Semantic */
+--color-success: #10b981;
+--color-warning: #f59e0b;
+--color-danger: #ef4444;
+```
+
+**Typography**: Inter (UI), JetBrains Mono (data/code)
+
+---
+
+## Contributing
+
+Internal OYAK project. See `CLAUDE.md` for development conventions when working with Claude Code.
+
+---
+
+© 2025 OYAK - Internal Use Only
