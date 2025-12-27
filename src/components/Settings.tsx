@@ -1,7 +1,9 @@
 import { useState, useId } from 'react'
-import { ArrowLeft, Moon, Sun, Bell, Shield, Globe, Key, LogOut, ChevronRight, Monitor } from 'lucide-react'
+import { ArrowLeft, Moon, Sun, Bell, Shield, Globe, Key, LogOut, ChevronRight, Monitor, Loader2, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { useI18n, useLanguageSelector } from '@/lib/i18n'
 
 interface SettingsProps {
   onBack: () => void
@@ -52,6 +54,8 @@ function ToggleSwitch({ id, label, checked, onChange }: ToggleSwitchProps) {
 }
 
 export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
+  const { t, isRTL } = useI18n()
+  const { currentLocale, locales, setLocale, isLoading, progress } = useLanguageSelector()
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light')
   const [notifications, setNotifications] = useState({
     email: true,
@@ -59,35 +63,46 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
     renewalReminders: true,
     marketUpdates: false,
   })
-  const [language, setLanguage] = useState('tr')
   const baseId = useId()
 
   const themeOptions = [
-    { value: 'light', label: 'Light', icon: Sun },
-    { value: 'dark', label: 'Dark', icon: Moon },
-    { value: 'system', label: 'System', icon: Monitor },
+    { value: 'light', label: t.settings.light, icon: Sun },
+    { value: 'dark', label: t.settings.dark, icon: Moon },
+    { value: 'system', label: t.settings.system, icon: Monitor },
   ]
 
   const notificationLabels: Record<string, string> = {
-    email: 'Email notifications',
-    push: 'Push notifications',
-    renewalReminders: 'Renewal reminders',
-    marketUpdates: 'Market updates',
+    email: t.settings.emailNotifications,
+    push: t.settings.pushNotifications,
+    renewalReminders: t.settings.renewalReminders,
+    marketUpdates: t.settings.marketUpdates,
+  }
+
+  const handleLanguageChange = async (locale: string) => {
+    try {
+      await setLocale(locale)
+      toast.success(t.success.settingsSaved, {
+        description: `Language changed to ${locales.find(l => l.code === locale)?.nativeName}`,
+      })
+    } catch (error) {
+      console.error('Failed to change language:', error)
+      toast.error(t.errors.unknownError)
+    }
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
             onClick={onBack}
             className="p-2 hover:bg-white rounded-lg transition-colors focus-ring"
-            aria-label="Go back"
+            aria-label={t.common.back}
           >
             <ArrowLeft size={24} aria-hidden="true" />
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t.settings.title}</h1>
         </div>
 
         <div className="space-y-6">
@@ -96,16 +111,16 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sun className="text-amber-500" size={20} aria-hidden="true" />
-                Appearance
+                {t.settings.appearance}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <fieldset>
-                <legend className="sr-only">Choose theme</legend>
+                <legend className="sr-only">{t.settings.theme}</legend>
                 <div
                   className="grid grid-cols-3 gap-3"
                   role="radiogroup"
-                  aria-label="Theme selection"
+                  aria-label={t.settings.theme}
                 >
                   {themeOptions.map((option) => {
                     const Icon = option.icon
@@ -143,7 +158,7 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bell className="text-blue-500" size={20} aria-hidden="true" />
-                Notifications
+                {t.settings.notifications}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -161,27 +176,71 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
             </CardContent>
           </Card>
 
-          {/* Language */}
+          {/* Language Selection */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Globe className="text-green-500" size={20} aria-hidden="true" />
-                Language
+                {t.settings.language}
+                {isLoading && (
+                  <Loader2 size={16} className="animate-spin text-blue-500" />
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <label htmlFor={`${baseId}-language`} className="sr-only">
-                Select language
-              </label>
-              <select
-                id={`${baseId}-language`}
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="tr">Turkish (Turkce)</option>
-                <option value="en">English</option>
-              </select>
+              {/* Translation Progress */}
+              {isLoading && progress.status === 'translating' && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-xl">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-blue-700">{progress.message}</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(progress.progress)}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-blue-200 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-blue-600 transition-all duration-300"
+                      style={{ width: `${progress.progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Language Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {locales.map((locale) => {
+                  const isActive = locale.code === currentLocale
+                  return (
+                    <button
+                      key={locale.code}
+                      onClick={() => handleLanguageChange(locale.code)}
+                      disabled={isLoading}
+                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all focus-ring text-left ${
+                        isActive
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      aria-pressed={isActive}
+                    >
+                      <span className="text-xl" aria-hidden="true">{locale.flag}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
+                          {locale.nativeName}
+                        </p>
+                        <p className={`text-xs truncate ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                          {locale.name}
+                        </p>
+                      </div>
+                      {isActive && (
+                        <Check size={16} className="text-blue-600 flex-shrink-0" aria-hidden="true" />
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Info text */}
+              <p className="mt-4 text-xs text-gray-500 text-center">
+                Any language can be used. AI translates new languages automatically and caches them for future use.
+              </p>
             </CardContent>
           </Card>
 
@@ -190,21 +249,21 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="text-purple-500" size={20} aria-hidden="true" />
-                Security
+                {t.settings.security}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
                   <Key size={20} className="text-gray-600" aria-hidden="true" />
-                  <span className="text-gray-700">Change Password</span>
+                  <span className="text-gray-700">{t.settings.changePassword}</span>
                 </div>
                 <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
               </button>
               <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
                   <Shield size={20} className="text-gray-600" aria-hidden="true" />
-                  <span className="text-gray-700">Two-Factor Authentication</span>
+                  <span className="text-gray-700">{t.settings.twoFactor}</span>
                 </div>
                 <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
               </button>
@@ -224,8 +283,8 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
                       <Shield className="text-purple-600" size={20} aria-hidden="true" />
                     </div>
                     <div className="text-left">
-                      <p className="font-semibold text-gray-900">Admin Panel</p>
-                      <p className="text-sm text-gray-500">Manage users, API keys, and system settings</p>
+                      <p className="font-semibold text-gray-900">{t.settings.adminPanel}</p>
+                      <p className="text-sm text-gray-500">{t.settings.adminDescription}</p>
                     </div>
                   </div>
                   <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
@@ -237,7 +296,7 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
           {/* Sign Out */}
           <Button variant="outline" className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={onBack}>
             <LogOut size={18} aria-hidden="true" />
-            Sign Out
+            {t.nav.signOut}
           </Button>
         </div>
       </div>

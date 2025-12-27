@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { I18nProvider, useI18n } from './lib/i18n'
 import { LandingPage } from './components/LandingPage'
 import { PolicyUpload } from './components/PolicyUpload'
 import { PolicyDashboard } from './components/PolicyDashboard'
@@ -18,7 +19,17 @@ import { samplePolicies } from './data/sample-policies'
 
 type Page = 'landing' | 'upload' | 'comparison' | 'policyDetail' | 'dashboard' | 'chat' | 'myAccount' | 'settings' | 'helpCenter' | 'allSamplesDemo'
 
+// Main App component wrapped with providers
 export default function App() {
+  return (
+    <I18nProvider>
+      <AppContent />
+    </I18nProvider>
+  )
+}
+
+// Inner app content that uses i18n hooks
+function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('landing')
   const [analyzedPolicies, setAnalyzedPolicies] = useState<AnalyzedPolicy[]>([])
   const [selectedPolicy, setSelectedPolicy] = useState<AnalyzedPolicy | null>(null)
@@ -138,19 +149,22 @@ export default function App() {
     location: p.location,
   }))
 
-  // Get page title for screen readers
+  // Use i18n for translations
+  const { t } = useI18n()
+
+  // Get page title for screen readers (using translations)
   const getPageTitle = (): string => {
     const titles: Record<Page, string> = {
-      landing: 'Home',
-      upload: 'Upload Policies',
-      comparison: 'Compare Policies',
-      policyDetail: 'Policy Details',
-      dashboard: 'Policy Dashboard',
-      chat: 'Policy Assistant',
-      myAccount: 'My Account',
-      settings: 'Settings',
-      helpCenter: 'Help Center',
-      allSamplesDemo: 'Sample Policies',
+      landing: t.nav.home,
+      upload: t.upload.title,
+      comparison: t.nav.compare,
+      policyDetail: t.policy.policy,
+      dashboard: t.nav.dashboard,
+      chat: t.chat.title,
+      myAccount: t.account.title,
+      settings: t.settings.title,
+      helpCenter: t.help.title,
+      allSamplesDemo: t.policy.policies,
     }
     return titles[currentPage]
   }
@@ -159,7 +173,7 @@ export default function App() {
     <ErrorBoundary>
       {/* Skip to main content link for keyboard users */}
       <a href="#main-content" className="skip-to-main">
-        Skip to main content
+        {t.a11y.skipToContent}
       </a>
 
       {/* Screen reader announcement for page changes */}
@@ -169,7 +183,7 @@ export default function App() {
         aria-atomic="true"
         className="sr-only"
       >
-        {`Now viewing: ${getPageTitle()}`}
+        {`${t.a11y.nowViewing}: ${getPageTitle()}`}
       </div>
 
       <Toaster position="top-right" richColors />
