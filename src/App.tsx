@@ -138,8 +138,40 @@ export default function App() {
     location: p.location,
   }))
 
+  // Get page title for screen readers
+  const getPageTitle = (): string => {
+    const titles: Record<Page, string> = {
+      landing: 'Home',
+      upload: 'Upload Policies',
+      comparison: 'Compare Policies',
+      policyDetail: 'Policy Details',
+      dashboard: 'Policy Dashboard',
+      chat: 'Policy Assistant',
+      myAccount: 'My Account',
+      settings: 'Settings',
+      helpCenter: 'Help Center',
+      allSamplesDemo: 'Sample Policies',
+    }
+    return titles[currentPage]
+  }
+
   return (
     <ErrorBoundary>
+      {/* Skip to main content link for keyboard users */}
+      <a href="#main-content" className="skip-to-main">
+        Skip to main content
+      </a>
+
+      {/* Screen reader announcement for page changes */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        className="sr-only"
+      >
+        {`Now viewing: ${getPageTitle()}`}
+      </div>
+
       <Toaster position="top-right" richColors />
 
       {/* Global Navigation - Show on all pages except landing */}
@@ -159,8 +191,9 @@ export default function App() {
         />
       )}
 
-      <AnimatePresence mode="wait">
-        {currentPage === 'landing' && (
+      <main id="main-content" tabIndex={-1}>
+        <AnimatePresence mode="wait">
+          {currentPage === 'landing' && (
           <PageTransition key="landing">
             <LandingPage
               onPoliciesUploaded={handlePoliciesUploaded}
@@ -245,7 +278,8 @@ export default function App() {
             <AllSamplesDemo onBack={handleBackToHome} />
           </PageTransition>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      </main>
     </ErrorBoundary>
   )
 }

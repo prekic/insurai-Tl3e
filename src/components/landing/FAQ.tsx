@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { ChevronDown } from 'lucide-react'
 
 export function FAQ() {
   const [openIndex, setOpenIndex] = useState<number | null>(0)
+  const baseId = useId()
 
   const faqs = [
     {
@@ -27,11 +28,38 @@ export function FAQ() {
     },
   ]
 
+  const handleKeyDown = (e: React.KeyboardEvent, index: number) => {
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault()
+        if (index < faqs.length - 1) {
+          const nextButton = document.getElementById(`${baseId}-button-${index + 1}`)
+          nextButton?.focus()
+        }
+        break
+      case 'ArrowUp':
+        e.preventDefault()
+        if (index > 0) {
+          const prevButton = document.getElementById(`${baseId}-button-${index - 1}`)
+          prevButton?.focus()
+        }
+        break
+      case 'Home':
+        e.preventDefault()
+        document.getElementById(`${baseId}-button-0`)?.focus()
+        break
+      case 'End':
+        e.preventDefault()
+        document.getElementById(`${baseId}-button-${faqs.length - 1}`)?.focus()
+        break
+    }
+  }
+
   return (
-    <section className="py-24 bg-white">
+    <section className="py-24 bg-white" aria-labelledby="faq-heading">
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-4xl md:text-5xl mb-6 tracking-tight">
+          <h2 id="faq-heading" className="text-4xl md:text-5xl mb-6 tracking-tight">
             Frequently asked <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">questions</span>
           </h2>
           <p className="text-xl text-gray-600">
@@ -39,29 +67,50 @@ export function FAQ() {
           </p>
         </div>
 
-        <div className="max-w-3xl mx-auto space-y-4">
-          {faqs.map((faq, i) => (
-            <div
-              key={i}
-              className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden"
-            >
-              <button
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full flex items-center justify-between p-6 text-left"
+        <div
+          className="max-w-3xl mx-auto space-y-4"
+          role="region"
+          aria-label="Frequently asked questions"
+        >
+          {faqs.map((faq, i) => {
+            const isOpen = openIndex === i
+            const buttonId = `${baseId}-button-${i}`
+            const panelId = `${baseId}-panel-${i}`
+
+            return (
+              <div
+                key={i}
+                className="bg-gray-50 rounded-2xl border border-gray-100 overflow-hidden"
               >
-                <span className="font-semibold text-gray-900">{faq.question}</span>
-                <ChevronDown
-                  className={`text-gray-500 transition-transform ${openIndex === i ? 'rotate-180' : ''}`}
-                  size={20}
-                />
-              </button>
-              {openIndex === i && (
-                <div className="px-6 pb-6 text-gray-600">
-                  {faq.answer}
+                <h3>
+                  <button
+                    id={buttonId}
+                    onClick={() => setOpenIndex(isOpen ? null : i)}
+                    onKeyDown={(e) => handleKeyDown(e, i)}
+                    className="w-full flex items-center justify-between p-6 text-left focus-ring rounded-t-2xl"
+                    aria-expanded={isOpen}
+                    aria-controls={panelId}
+                  >
+                    <span className="font-semibold text-gray-900">{faq.question}</span>
+                    <ChevronDown
+                      className={`text-gray-500 transition-transform flex-shrink-0 ml-4 ${isOpen ? 'rotate-180' : ''}`}
+                      size={20}
+                      aria-hidden="true"
+                    />
+                  </button>
+                </h3>
+                <div
+                  id={panelId}
+                  role="region"
+                  aria-labelledby={buttonId}
+                  hidden={!isOpen}
+                  className={isOpen ? 'px-6 pb-6 text-gray-600' : ''}
+                >
+                  {isOpen && faq.answer}
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </div>
       </div>
     </section>

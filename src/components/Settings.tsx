@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { ArrowLeft, Moon, Sun, Bell, Shield, Globe, Key, LogOut, ChevronRight, Monitor } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -6,6 +6,49 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 interface SettingsProps {
   onBack: () => void
   onNavigateToAdmin?: () => void
+}
+
+// Accessible Toggle Switch Component
+interface ToggleSwitchProps {
+  id: string
+  label: string
+  checked: boolean
+  onChange: (checked: boolean) => void
+}
+
+function ToggleSwitch({ id, label, checked, onChange }: ToggleSwitchProps) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault()
+      onChange(!checked)
+    }
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <label htmlFor={id} className="text-gray-700 cursor-pointer">
+        {label}
+      </label>
+      <button
+        id={id}
+        role="switch"
+        aria-checked={checked}
+        onClick={() => onChange(!checked)}
+        onKeyDown={handleKeyDown}
+        className={`relative w-12 h-6 rounded-full transition-colors focus-ring ${
+          checked ? 'bg-blue-600' : 'bg-gray-300'
+        }`}
+      >
+        <span className="sr-only">{label}</span>
+        <span
+          aria-hidden="true"
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+            checked ? 'translate-x-6' : 'translate-x-0'
+          }`}
+        />
+      </button>
+    </div>
+  )
 }
 
 export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
@@ -17,6 +60,7 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
     marketUpdates: false,
   })
   const [language, setLanguage] = useState('tr')
+  const baseId = useId()
 
   const themeOptions = [
     { value: 'light', label: 'Light', icon: Sun },
@@ -24,13 +68,24 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
     { value: 'system', label: 'System', icon: Monitor },
   ]
 
+  const notificationLabels: Record<string, string> = {
+    email: 'Email notifications',
+    push: 'Push notifications',
+    renewalReminders: 'Renewal reminders',
+    marketUpdates: 'Market updates',
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={onBack} className="p-2 hover:bg-white rounded-lg transition-colors">
-            <ArrowLeft size={24} />
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-white rounded-lg transition-colors focus-ring"
+            aria-label="Go back"
+          >
+            <ArrowLeft size={24} aria-hidden="true" />
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
         </div>
@@ -40,32 +95,46 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sun className="text-amber-500" size={20} />
+                <Sun className="text-amber-500" size={20} aria-hidden="true" />
                 Appearance
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-3 gap-3">
-                {themeOptions.map((option) => {
-                  const Icon = option.icon
-                  return (
-                    <button
-                      key={option.value}
-                      onClick={() => setTheme(option.value as typeof theme)}
-                      className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
-                        theme === option.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <Icon size={24} className={theme === option.value ? 'text-blue-600' : 'text-gray-600'} />
-                      <span className={`text-sm font-medium ${theme === option.value ? 'text-blue-600' : 'text-gray-600'}`}>
-                        {option.label}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              <fieldset>
+                <legend className="sr-only">Choose theme</legend>
+                <div
+                  className="grid grid-cols-3 gap-3"
+                  role="radiogroup"
+                  aria-label="Theme selection"
+                >
+                  {themeOptions.map((option) => {
+                    const Icon = option.icon
+                    const isSelected = theme === option.value
+                    return (
+                      <button
+                        key={option.value}
+                        onClick={() => setTheme(option.value as typeof theme)}
+                        role="radio"
+                        aria-checked={isSelected}
+                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all focus-ring ${
+                          isSelected
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <Icon
+                          size={24}
+                          className={isSelected ? 'text-blue-600' : 'text-gray-600'}
+                          aria-hidden="true"
+                        />
+                        <span className={`text-sm font-medium ${isSelected ? 'text-blue-600' : 'text-gray-600'}`}>
+                          {option.label}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </fieldset>
             </CardContent>
           </Card>
 
@@ -73,27 +142,21 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="text-blue-500" size={20} />
+                <Bell className="text-blue-500" size={20} aria-hidden="true" />
                 Notifications
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               {Object.entries(notifications).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between">
-                  <span className="text-gray-700 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                  <button
-                    onClick={() => setNotifications((prev) => ({ ...prev, [key]: !value }))}
-                    className={`w-12 h-6 rounded-full transition-colors ${
-                      value ? 'bg-blue-600' : 'bg-gray-300'
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                        value ? 'translate-x-6' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </button>
-                </div>
+                <ToggleSwitch
+                  key={key}
+                  id={`${baseId}-${key}`}
+                  label={notificationLabels[key] || key}
+                  checked={value}
+                  onChange={(checked) =>
+                    setNotifications((prev) => ({ ...prev, [key]: checked }))
+                  }
+                />
               ))}
             </CardContent>
           </Card>
@@ -102,12 +165,16 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Globe className="text-green-500" size={20} />
+                <Globe className="text-green-500" size={20} aria-hidden="true" />
                 Language
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <label htmlFor={`${baseId}-language`} className="sr-only">
+                Select language
+              </label>
               <select
+                id={`${baseId}-language`}
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="w-full p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -122,24 +189,24 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="text-purple-500" size={20} />
+                <Shield className="text-purple-500" size={20} aria-hidden="true" />
                 Security
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors">
+              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
-                  <Key size={20} className="text-gray-600" />
+                  <Key size={20} className="text-gray-600" aria-hidden="true" />
                   <span className="text-gray-700">Change Password</span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400" />
+                <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
               </button>
-              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors">
+              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
-                  <Shield size={20} className="text-gray-600" />
+                  <Shield size={20} className="text-gray-600" aria-hidden="true" />
                   <span className="text-gray-700">Two-Factor Authentication</span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400" />
+                <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
               </button>
             </CardContent>
           </Card>
@@ -150,18 +217,18 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
               <CardContent className="pt-6">
                 <button
                   onClick={onNavigateToAdmin}
-                  className="w-full flex items-center justify-between p-4 bg-white rounded-xl hover:shadow-md transition-all"
+                  className="w-full flex items-center justify-between p-4 bg-white rounded-xl hover:shadow-md transition-all focus-ring"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Shield className="text-purple-600" size={20} />
+                      <Shield className="text-purple-600" size={20} aria-hidden="true" />
                     </div>
                     <div className="text-left">
                       <p className="font-semibold text-gray-900">Admin Panel</p>
                       <p className="text-sm text-gray-500">Manage users, API keys, and system settings</p>
                     </div>
                   </div>
-                  <ChevronRight size={20} className="text-gray-400" />
+                  <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
                 </button>
               </CardContent>
             </Card>
@@ -169,7 +236,7 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
 
           {/* Sign Out */}
           <Button variant="outline" className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={onBack}>
-            <LogOut size={18} />
+            <LogOut size={18} aria-hidden="true" />
             Sign Out
           </Button>
         </div>
