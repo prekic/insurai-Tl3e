@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { POLICY_TYPES } from './policy'
-import type { PolicyType, PolicyStatus, Coverage, Policy } from './policy'
+import type { PolicyType, PolicyStatus, Coverage } from './policy'
 
 describe('Policy Types', () => {
   it('has all required policy types', () => {

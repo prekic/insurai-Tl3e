@@ -1,8 +1,10 @@
 import { useState, useCallback } from 'react'
-import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles } from 'lucide-react'
+import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import { validateFiles, ERROR_CODES, getErrorMessage, createAppError, FILE_CONSTRAINTS } from '@/lib/errors'
 
 interface PolicyUploadProps {
   onPoliciesAnalyzed: (policies: AnalyzedPolicy[]) => void
@@ -10,7 +12,7 @@ interface PolicyUploadProps {
   onViewPolicyDetail: (id: string) => void
 }
 
-type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete'
+type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
 interface UploadedFile {
   id: string
@@ -18,6 +20,7 @@ interface UploadedFile {
   status: UploadState
   progress: number
   policy?: AnalyzedPolicy
+  error?: string
 }
 
 export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }: PolicyUploadProps) {
@@ -33,7 +36,31 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
   }, [])
 
   const addFiles = async (newFiles: File[]) => {
-    const uploadedFiles: UploadedFile[] = newFiles.map((file) => ({
+    // Validate files first
+    const { valid, errors } = validateFiles(newFiles)
+
+    // Show error toasts for invalid files
+    errors.forEach((error) => {
+      const errorInfo = getErrorMessage(error.code)
+      toast.error(errorInfo.title, {
+        description: error.details || errorInfo.description,
+        duration: 5000,
+      })
+    })
+
+    // If no valid files, return early
+    if (valid.length === 0) {
+      return
+    }
+
+    // Show success toast if some files were valid
+    if (errors.length > 0 && valid.length > 0) {
+      toast.info(`${valid.length} file(s) accepted`, {
+        description: `${errors.length} file(s) were rejected due to validation errors.`,
+      })
+    }
+
+    const uploadedFiles: UploadedFile[] = valid.map((file) => ({
       id: `file-${Date.now()}-${Math.random()}`,
       file,
       status: 'uploading' as UploadState,
@@ -42,45 +69,96 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
 
     setFiles((prev) => [...prev, ...uploadedFiles])
 
-    // Simulate upload and analysis for each file
+    // Process each file
     for (const uploadedFile of uploadedFiles) {
       await simulateUploadAndAnalysis(uploadedFile.id)
     }
   }
 
   const simulateUploadAndAnalysis = async (fileId: string) => {
-    // Simulate upload progress
-    for (let i = 0; i <= 100; i += 20) {
-      await new Promise((resolve) => setTimeout(resolve, 200))
+    try {
+      // Simulate upload progress
+      for (let i = 0; i <= 100; i += 20) {
+        await new Promise((resolve) => setTimeout(resolve, 200))
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId ? { ...f, progress: i } : f
+          )
+        )
+      }
+
+      // Switch to analyzing state
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === fileId ? { ...f, progress: i } : f
+          f.id === fileId ? { ...f, status: 'analyzing', progress: 100 } : f
         )
       )
-    }
 
-    // Switch to analyzing state
+      // Simulate AI analysis with random failure (10% chance for demo)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Simulate random failure for demonstration
+      const shouldFail = Math.random() < 0.1 // 10% failure rate
+
+      if (shouldFail) {
+        throw new Error('AI analysis service temporarily unavailable')
+      }
+
+      // Complete with a sample policy
+      const randomPolicy = samplePolicies[Math.floor(Math.random() * samplePolicies.length)]
+      const newPolicy: AnalyzedPolicy = {
+        ...randomPolicy,
+        id: `policy-${Date.now()}`,
+      }
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId ? { ...f, status: 'complete', policy: newPolicy } : f
+        )
+      )
+
+      // Get the file name for the toast
+      const file = files.find((f) => f.id === fileId) || { file: { name: 'Policy' } }
+      toast.success('Analysis complete', {
+        description: `${file.file.name} has been successfully analyzed.`,
+      })
+    } catch (error) {
+      const appError = createAppError(error, ERROR_CODES.AI_ANALYSIS_FAILED)
+      const errorInfo = getErrorMessage(appError.code)
+
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, status: 'error', error: errorInfo.description }
+            : f
+        )
+      )
+
+      toast.error(errorInfo.title, {
+        description: errorInfo.description,
+        action: {
+          label: 'Retry',
+          onClick: () => retryFile(fileId),
+        },
+      })
+    }
+  }
+
+  const retryFile = async (fileId: string) => {
+    // Reset the file status and retry
     setFiles((prev) =>
       prev.map((f) =>
-        f.id === fileId ? { ...f, status: 'analyzing', progress: 100 } : f
+        f.id === fileId
+          ? { ...f, status: 'uploading', progress: 0, error: undefined }
+          : f
       )
     )
 
-    // Simulate AI analysis
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    toast.info('Retrying...', {
+      description: 'Attempting to process the file again.',
+    })
 
-    // Complete with a sample policy
-    const randomPolicy = samplePolicies[Math.floor(Math.random() * samplePolicies.length)]
-    const newPolicy: AnalyzedPolicy = {
-      ...randomPolicy,
-      id: `policy-${Date.now()}`,
-    }
-
-    setFiles((prev) =>
-      prev.map((f) =>
-        f.id === fileId ? { ...f, status: 'complete', policy: newPolicy } : f
-      )
-    )
+    await simulateUploadAndAnalysis(fileId)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -88,24 +166,47 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
     if (selectedFiles.length > 0) {
       addFiles(selectedFiles)
     }
+    // Reset input value so same file can be selected again
+    e.target.value = ''
   }
 
   const removeFile = (fileId: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== fileId))
+    toast.info('File removed', {
+      description: 'The file has been removed from the upload queue.',
+    })
   }
 
   const handleAnalyzeAll = () => {
     const analyzedPolicies = files
       .filter((f) => f.status === 'complete' && f.policy)
       .map((f) => f.policy!)
+
+    if (analyzedPolicies.length === 0) {
+      toast.error('No policies to analyze', {
+        description: 'Please wait for at least one policy to complete processing.',
+      })
+      return
+    }
+
     onPoliciesAnalyzed(analyzedPolicies)
   }
 
   const useSamplePolicies = () => {
+    toast.success('Sample policies loaded', {
+      description: `${samplePolicies.length} sample Turkish insurance policies have been loaded.`,
+    })
     onPoliciesAnalyzed(samplePolicies)
   }
 
+  const retryAllFailed = () => {
+    const failedFiles = files.filter((f) => f.status === 'error')
+    failedFiles.forEach((f) => retryFile(f.id))
+  }
+
   const completedCount = files.filter((f) => f.status === 'complete').length
+  const errorCount = files.filter((f) => f.status === 'error').length
+  const processingCount = files.filter((f) => f.status === 'uploading' || f.status === 'analyzing').length
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -115,6 +216,7 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
           <button
             onClick={onBack}
             className="p-2 hover:bg-white rounded-lg transition-colors"
+            aria-label="Go back"
           >
             <ArrowLeft size={24} />
           </button>
@@ -143,10 +245,13 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
               <p className="text-xl font-semibold text-gray-900">Drop your policies here</p>
               <p className="text-gray-500 mt-1">or click to browse your files</p>
             </div>
-            <p className="text-sm text-gray-400">PDF, Word, or images up to 10MB each</p>
+            <div className="text-sm text-gray-400 space-y-1">
+              <p>Supported: {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}</p>
+              <p>Maximum size: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file</p>
+            </div>
             <input
               type="file"
-              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
               multiple
               onChange={handleFileSelect}
               className="hidden"
@@ -172,13 +277,49 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
           </div>
         </div>
 
+        {/* Error Summary */}
+        {errorCount > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
+                  <AlertTriangle className="text-red-600" size={20} />
+                </div>
+                <div>
+                  <p className="font-semibold text-red-800">
+                    {errorCount} file{errorCount !== 1 ? 's' : ''} failed to process
+                  </p>
+                  <p className="text-sm text-red-600">
+                    Click retry to try again or remove the files
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={retryAllFailed}
+                variant="outline"
+                className="text-red-600 border-red-300 hover:bg-red-100"
+              >
+                <RefreshCw size={16} className="mr-2" />
+                Retry All
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* File List */}
         {files.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-8">
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="font-semibold text-gray-900">
-                Uploaded Files ({completedCount}/{files.length} analyzed)
-              </h3>
+              <div>
+                <h3 className="font-semibold text-gray-900">
+                  Uploaded Files ({completedCount}/{files.length} analyzed)
+                </h3>
+                {processingCount > 0 && (
+                  <p className="text-sm text-gray-500">
+                    {processingCount} file{processingCount !== 1 ? 's' : ''} processing...
+                  </p>
+                )}
+              </div>
               {completedCount > 0 && (
                 <Button onClick={handleAnalyzeAll}>
                   View Analysis ({completedCount})
@@ -187,9 +328,24 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
             </div>
             <div className="divide-y divide-gray-100">
               {files.map((uploadedFile) => (
-                <div key={uploadedFile.id} className="p-4 flex items-center gap-4">
-                  <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                    <FileText className="text-gray-600" size={24} />
+                <div
+                  key={uploadedFile.id}
+                  className={`p-4 flex items-center gap-4 ${
+                    uploadedFile.status === 'error' ? 'bg-red-50' : ''
+                  }`}
+                >
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      uploadedFile.status === 'error'
+                        ? 'bg-red-100'
+                        : 'bg-gray-100'
+                    }`}
+                  >
+                    {uploadedFile.status === 'error' ? (
+                      <AlertTriangle className="text-red-600" size={24} />
+                    ) : (
+                      <FileText className="text-gray-600" size={24} />
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-gray-900 truncate">{uploadedFile.file.name}</p>
@@ -217,13 +373,31 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
                           Analysis complete
                         </span>
                       )}
+                      {uploadedFile.status === 'error' && (
+                        <span className="text-red-600 flex items-center gap-1">
+                          <AlertTriangle size={14} />
+                          {uploadedFile.error || 'Processing failed'}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    {uploadedFile.status === 'error' && (
+                      <button
+                        onClick={() => retryFile(uploadedFile.id)}
+                        className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                        aria-label="Retry upload"
+                        title="Retry"
+                      >
+                        <RefreshCw size={18} />
+                      </button>
+                    )}
                     {uploadedFile.status === 'complete' && uploadedFile.policy && (
                       <button
                         onClick={() => onViewPolicyDetail(uploadedFile.policy!.id)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        aria-label="View policy details"
+                        title="View"
                       >
                         <Eye size={18} />
                       </button>
@@ -231,6 +405,8 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
                     <button
                       onClick={() => removeFile(uploadedFile.id)}
                       className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      aria-label="Remove file"
+                      title="Remove"
                     >
                       <X size={18} />
                     </button>

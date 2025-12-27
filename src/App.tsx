@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { AnimatePresence } from 'framer-motion'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { LandingPage } from './components/LandingPage'
 import { PolicyUpload } from './components/PolicyUpload'
 import { PolicyDashboard } from './components/PolicyDashboard'
@@ -79,7 +80,23 @@ export default function App() {
   }
 
   const handleDeletePolicy = (policyId: string) => {
+    const policyToDelete = analyzedPolicies.find((p) => p.id === policyId)
     setAnalyzedPolicies((prev) => prev.filter((p) => p.id !== policyId))
+
+    if (policyToDelete) {
+      toast.success('Policy deleted', {
+        description: `${policyToDelete.provider} ${policyToDelete.typeTr} policy has been removed.`,
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            setAnalyzedPolicies((prev) => [...prev, policyToDelete])
+            toast.info('Policy restored', {
+              description: 'The policy has been restored to your dashboard.',
+            })
+          },
+        },
+      })
+    }
   }
 
   const handleNavigateToChat = () => {
@@ -122,7 +139,7 @@ export default function App() {
   }))
 
   return (
-    <>
+    <ErrorBoundary>
       <Toaster position="top-right" richColors />
 
       {/* Global Navigation - Show on all pages except landing */}
@@ -229,6 +246,6 @@ export default function App() {
           </PageTransition>
         )}
       </AnimatePresence>
-    </>
+    </ErrorBoundary>
   )
 }
