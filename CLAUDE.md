@@ -10,7 +10,7 @@
 
 **Current state**: Frontend-only with mock data. Building toward AI-powered document extraction.
 
-**Owner**: Erdem @ OYAK Insurance & Risk Management
+**Owner**: Erdem (personal project)
 
 ---
 
@@ -298,4 +298,4 @@ npm run build && npx vite-bundle-visualizer
 
 ## Questions?
 
-This is an internal OYAK project. Contact Erdem for domain questions or architecture decisions.
+Personal project by Erdem. See the codebase and this file for context.
