@@ -136,8 +136,8 @@ npm test          # Run tests
 
 ## Contributing
 
-Internal OYAK project. See `CLAUDE.md` for development conventions when working with Claude Code.
+Personal project. See `CLAUDE.md` for development conventions when working with Claude Code.
 
 ---
 
-© 2025 OYAK - Internal Use Only
+© 2025 Erdem. All rights reserved.
