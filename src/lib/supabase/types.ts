@@ -8,28 +8,37 @@
  * npx supabase gen types typescript --project-id YOUR_PROJECT_ID > src/lib/supabase/types.ts
  */
 
-// Policy types (matching existing frontend types)
-export type PolicyType = 'auto' | 'home' | 'health' | 'life' | 'business' | 'travel'
+// Policy types (matching existing frontend types in src/types/policy.ts)
+export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business'
 
-export type PolicyStatus = 'active' | 'expiring' | 'expired'
+export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
+
+// Coverage interface (matching src/types/policy.ts)
+export interface Coverage {
+  name: string
+  nameTr: string
+  limit: number
+  deductible: number
+  included: boolean
+  description?: string
+}
 
 // Raw policy data from AI extraction
 export interface RawPolicyData {
   extractedText?: string
   confidence?: number
   fields?: Record<string, unknown>
-  coverages?: Array<{
-    name: string
-    nameTr: string
-    limit: number
-    included: boolean
-    details?: string
-  }>
-  gaps?: Array<{
-    issue: string
-    severity: 'low' | 'medium' | 'high'
-    recommendation: string
-  }>
+  coverages?: Coverage[]
+  aiConfidence?: number
+  aiInsights?: string[]
+  exclusions?: string[]
+  specialConditions?: string[]
+  insuranceLine?: string
+  marketComparison?: {
+    averagePremium: number
+    averageCoverage: number
+    percentile: number
+  }
 }
 
 // Policy row type

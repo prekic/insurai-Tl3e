@@ -246,6 +246,34 @@ export interface TranslationDictionary {
     notSelected: string
     policyStats: string
   }
+
+  // Authentication
+  auth: {
+    signIn: string
+    signUp: string
+    signOut: string
+    email: string
+    password: string
+    confirmPassword: string
+    fullName: string
+    forgotPassword: string
+    resetPassword: string
+    noAccount: string
+    hasAccount: string
+    createAccount: string
+    orContinueWith: string
+    google: string
+    github: string
+    passwordMismatch: string
+    invalidEmail: string
+    passwordTooShort: string
+    signInError: string
+    signUpError: string
+    signUpSuccess: string
+    checkEmail: string
+    welcomeBack: string
+    createYourAccount: string
+  }
 }
 
 // Base English translations
@@ -458,6 +486,33 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     notSelected: 'Not selected',
     policyStats: 'Policy statistics',
   },
+
+  auth: {
+    signIn: 'Sign In',
+    signUp: 'Sign Up',
+    signOut: 'Sign Out',
+    email: 'Email',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    fullName: 'Full Name',
+    forgotPassword: 'Forgot password?',
+    resetPassword: 'Reset Password',
+    noAccount: "Don't have an account?",
+    hasAccount: 'Already have an account?',
+    createAccount: 'Create Account',
+    orContinueWith: 'Or continue with',
+    google: 'Google',
+    github: 'GitHub',
+    passwordMismatch: 'Passwords do not match',
+    invalidEmail: 'Please enter a valid email',
+    passwordTooShort: 'Password must be at least 6 characters',
+    signInError: 'Failed to sign in. Please check your credentials.',
+    signUpError: 'Failed to create account. Please try again.',
+    signUpSuccess: 'Account created successfully!',
+    checkEmail: 'Check your email to confirm your account.',
+    welcomeBack: 'Welcome back',
+    createYourAccount: 'Create your account',
+  },
 }
 
 // Turkish translations (pre-loaded for the Turkish market focus)
@@ -669,6 +724,33 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     selected: 'Seçili',
     notSelected: 'Seçili değil',
     policyStats: 'Poliçe istatistikleri',
+  },
+
+  auth: {
+    signIn: 'Giriş Yap',
+    signUp: 'Kayıt Ol',
+    signOut: 'Çıkış Yap',
+    email: 'E-posta',
+    password: 'Şifre',
+    confirmPassword: 'Şifreyi Onayla',
+    fullName: 'Ad Soyad',
+    forgotPassword: 'Şifremi unuttum',
+    resetPassword: 'Şifreyi Sıfırla',
+    noAccount: 'Hesabınız yok mu?',
+    hasAccount: 'Zaten hesabınız var mı?',
+    createAccount: 'Hesap Oluştur',
+    orContinueWith: 'Veya şununla devam edin',
+    google: 'Google',
+    github: 'GitHub',
+    passwordMismatch: 'Şifreler eşleşmiyor',
+    invalidEmail: 'Geçerli bir e-posta adresi girin',
+    passwordTooShort: 'Şifre en az 6 karakter olmalıdır',
+    signInError: 'Giriş başarısız. Lütfen bilgilerinizi kontrol edin.',
+    signUpError: 'Hesap oluşturulamadı. Lütfen tekrar deneyin.',
+    signUpSuccess: 'Hesap başarıyla oluşturuldu!',
+    checkEmail: 'Hesabınızı onaylamak için e-postanızı kontrol edin.',
+    welcomeBack: 'Tekrar hoş geldiniz',
+    createYourAccount: 'Hesabınızı oluşturun',
   },
 }
 

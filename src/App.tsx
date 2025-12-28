@@ -5,9 +5,11 @@ import { Toaster } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { I18nProvider, useI18n } from './lib/i18n'
 import { PolicyProvider } from './lib/policy-context'
+import { AuthProvider } from './lib/supabase/auth-context'
 import { GlobalNavigation } from './components/GlobalNavigation'
 import { PageTransition } from './components/animations/AnimatedComponents'
 import { PageLoader } from './components/PageLoader'
+import { ProtectedRoute } from './components/ProtectedRoute'
 
 // Lazy-loaded route components for code splitting
 const LandingPage = lazy(() =>
@@ -40,10 +42,14 @@ const AllSamplesDemo = lazy(() =>
 const NotFound = lazy(() =>
   import('./components/NotFound').then((m) => ({ default: m.NotFound }))
 )
+const AuthPage = lazy(() =>
+  import('./components/AuthPage').then((m) => ({ default: m.AuthPage }))
+)
 
 // Route configuration
 const ROUTES = {
   home: '/',
+  auth: '/auth',
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
@@ -59,9 +65,11 @@ export default function App() {
   return (
     <BrowserRouter>
       <I18nProvider>
-        <PolicyProvider>
-          <AppContent />
-        </PolicyProvider>
+        <AuthProvider>
+          <PolicyProvider>
+            <AppContent />
+          </PolicyProvider>
+        </AuthProvider>
       </I18nProvider>
     </BrowserRouter>
   )
@@ -72,6 +80,8 @@ function AppContent() {
   const location = useLocation()
   const { t } = useI18n()
   const isLandingPage = location.pathname === '/'
+  const isAuthPage = location.pathname === '/auth'
+  const hideNavigation = isLandingPage || isAuthPage
 
   // Get page title for screen readers
   const getPageTitle = (): string => {
@@ -107,8 +117,8 @@ function AppContent() {
 
       <Toaster position="top-right" richColors />
 
-      {/* Global Navigation - Show on all pages except landing */}
-      {!isLandingPage && <GlobalNavigation />}
+      {/* Global Navigation - Show on all pages except landing and auth */}
+      {!hideNavigation && <GlobalNavigation />}
 
       <main id="main-content" tabIndex={-1}>
         <Suspense fallback={<PageLoader />}>
@@ -123,51 +133,71 @@ function AppContent() {
                 }
               />
               <Route
-                path="/upload"
+                path="/auth"
                 element={
                   <PageTransition>
-                    <PolicyUpload />
+                    <AuthPage />
                   </PageTransition>
+                }
+              />
+              <Route
+                path="/upload"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PolicyUpload />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/dashboard"
                 element={
-                  <PageTransition>
-                    <PolicyDashboard />
-                  </PageTransition>
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PolicyDashboard />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/policy/:id"
                 element={
-                  <PageTransition>
-                    <PolicyDetailView />
-                  </PageTransition>
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PolicyDetailView />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/chat"
                 element={
-                  <PageTransition>
-                    <PolicyChat />
-                  </PageTransition>
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <PolicyChat />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/account"
                 element={
-                  <PageTransition>
-                    <MyAccount />
-                  </PageTransition>
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <MyAccount />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route
                 path="/settings"
                 element={
-                  <PageTransition>
-                    <Settings />
-                  </PageTransition>
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <Settings />
+                    </PageTransition>
+                  </ProtectedRoute>
                 }
               />
               <Route

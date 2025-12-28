@@ -7,6 +7,7 @@ export type {
   Database,
   PolicyType,
   PolicyStatus,
+  Coverage,
   RawPolicyData,
   PolicyWithUser,
   PolicyRow,
