@@ -45,7 +45,7 @@ export function Testimonials() {
                   <Star key={j} className="text-yellow-400 fill-yellow-400" size={20} />
                 ))}
               </div>
-              <p className="text-gray-700 mb-6 italic">"{testimonial.content}"</p>
+              <p className="text-gray-700 mb-6 italic">&ldquo;{testimonial.content}&rdquo;</p>
               <div>
                 <p className="font-semibold text-gray-900">{testimonial.name}</p>
                 <p className="text-sm text-gray-500">{testimonial.role}{testimonial.company && `, ${testimonial.company}`}</p>

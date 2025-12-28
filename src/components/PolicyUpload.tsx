@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -25,13 +25,13 @@ export function PolicyUpload() {
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
 
     const droppedFiles = Array.from(e.dataTransfer.files)
     addFiles(droppedFiles)
-  }, [])
+  }
 
   const addFiles = async (newFiles: File[]) => {
     // Validate files first
@@ -177,8 +177,8 @@ export function PolicyUpload() {
 
   const handleAnalyzeAll = () => {
     const analyzedPolicies = files
-      .filter((f) => f.status === 'complete' && f.policy)
-      .map((f) => f.policy!)
+      .filter((f): f is UploadedFile & { policy: AnalyzedPolicy } => f.status === 'complete' && f.policy !== undefined)
+      .map((f) => f.policy)
 
     if (analyzedPolicies.length === 0) {
       toast.error('No policies to analyze', {
@@ -398,7 +398,7 @@ export function PolicyUpload() {
                     )}
                     {uploadedFile.status === 'complete' && uploadedFile.policy && (
                       <button
-                        onClick={() => handleViewPolicy(uploadedFile.policy!.id)}
+                        onClick={() => handleViewPolicy(uploadedFile.policy?.id ?? '')}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         aria-label="View policy details"
                         title="View"

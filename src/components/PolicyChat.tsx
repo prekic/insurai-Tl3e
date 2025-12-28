@@ -187,7 +187,9 @@ export function PolicyChat() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-4">
-          {messages.map((message) => (
+          {messages.map((message) => {
+            const retryPayload = message.retryPayload
+            return (
             <div
               key={message.id}
               className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -220,9 +222,9 @@ export function PolicyChat() {
                 }>
                   {message.content}
                 </p>
-                {message.role === 'error' && message.retryPayload && (
+                {message.role === 'error' && retryPayload && (
                   <button
-                    onClick={() => handleRetry(message.retryPayload!)}
+                    onClick={() => handleRetry(retryPayload)}
                     className="mt-2 flex items-center gap-1 text-sm text-red-600 hover:text-red-700 font-medium"
                   >
                     <RefreshCw size={14} />
@@ -247,7 +249,8 @@ export function PolicyChat() {
                 </div>
               )}
             </div>
-          ))}
+          )})}
+
 
           {isTyping && (
             <div className="flex gap-3">

@@ -7,7 +7,9 @@ describe('cn (classnames utility)', () => {
   })
 
   it('handles conditional classes', () => {
-    expect(cn('base', true && 'active', false && 'inactive')).toBe('base active')
+    const isActive = true
+    const isInactive = false
+    expect(cn('base', isActive && 'active', isInactive && 'inactive')).toBe('base active')
   })
 
   it('merges Tailwind classes correctly', () => {

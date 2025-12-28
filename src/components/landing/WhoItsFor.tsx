@@ -27,7 +27,7 @@ export function WhoItsFor() {
             Built for <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">insurance professionals</span>
           </h2>
           <p className="text-xl text-gray-600">
-            Whether you're a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.
+            Whether you&apos;re a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.
           </p>
         </div>
 

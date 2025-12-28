@@ -1,5 +1,5 @@
 import { Upload, FileText, AlertCircle } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
@@ -14,7 +14,7 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
+  const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
     setError(null)
@@ -23,7 +23,7 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
     if (files.length > 0) {
       handleFiles(files)
     }
-  }, [])
+  }
 
   const handleFiles = async (files: File[]) => {
     setError(null)
