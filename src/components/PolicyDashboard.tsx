@@ -6,6 +6,7 @@ import { Badge } from './ui/badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
+import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
 
 export function PolicyDashboard() {
   const navigate = useNavigate()
@@ -17,11 +18,15 @@ export function PolicyDashboard() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const baseId = useId()
 
+  // Sanitize search query for safe filtering
+  const sanitizedQuery = sanitizeSearchQuery(searchQuery).toLowerCase()
+
   const filteredPolicies = uploadedPolicies.filter((policy) => {
     const matchesSearch =
-      policy.policyNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      policy.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      policy.type.toLowerCase().includes(searchQuery.toLowerCase())
+      !sanitizedQuery ||
+      policy.policyNumber.toLowerCase().includes(sanitizedQuery) ||
+      policy.provider.toLowerCase().includes(sanitizedQuery) ||
+      policy.type.toLowerCase().includes(sanitizedQuery)
 
     const matchesStatus = statusFilter === 'all' || policy.status === statusFilter
 
@@ -50,7 +55,10 @@ export function PolicyDashboard() {
   }
 
   const handleViewPolicy = (id: string) => {
-    navigate(`/policy/${id}`)
+    const safeId = sanitizeId(id)
+    if (safeId) {
+      navigate(`/policy/${safeId}`)
+    }
   }
 
   const handleUploadPolicy = () => {

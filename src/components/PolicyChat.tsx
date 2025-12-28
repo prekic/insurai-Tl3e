@@ -4,6 +4,7 @@ import { Send, Bot, User, ArrowLeft, AlertTriangle, RefreshCw } from 'lucide-rea
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { usePolicies } from '@/lib/policy-context'
+import { sanitizeMessage } from '@/lib/sanitize'
 
 interface Message {
   id: string
@@ -59,7 +60,11 @@ export function PolicyChat() {
   }
 
   const handleSend = async (messageToSend?: string) => {
-    const question = messageToSend || input.trim()
+    const rawQuestion = messageToSend || input.trim()
+    if (!rawQuestion) return
+
+    // Sanitize user input to prevent XSS
+    const question = sanitizeMessage(rawQuestion)
     if (!question) return
 
     // Clear any previous connection error

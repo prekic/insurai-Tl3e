@@ -7,6 +7,7 @@ import { AnalyzedPolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
 import { usePolicies } from '@/lib/policy-context'
 import { validateFiles, ERROR_CODES, getErrorMessage, createAppError, FILE_CONSTRAINTS } from '@/lib/errors'
+import { sanitizeFileName, sanitizeId } from '@/lib/sanitize'
 
 type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
@@ -116,9 +117,10 @@ export function PolicyUpload() {
       )
 
       // Get the file name for the toast
-      const file = files.find((f) => f.id === fileId) || { file: { name: 'Policy' } }
+      const file = files.find((f) => f.id === fileId)
+      const displayName = file ? sanitizeFileName(file.file.name) : 'Policy'
       toast.success('Analysis complete', {
-        description: `${file.file.name} has been successfully analyzed.`,
+        description: `${displayName} has been successfully analyzed.`,
       })
     } catch (error) {
       const appError = createAppError(error, ERROR_CODES.AI_ANALYSIS_FAILED)
@@ -205,7 +207,15 @@ export function PolicyUpload() {
   }
 
   const handleViewPolicy = (policyId: string) => {
-    navigate(`/policy/${policyId}`)
+    const safeId = sanitizeId(policyId)
+    if (safeId) {
+      navigate(`/policy/${safeId}`)
+    }
+  }
+
+  // Safely get display name for file
+  const getDisplayFileName = (file: File): string => {
+    return sanitizeFileName(file.name)
   }
 
   const completedCount = files.filter((f) => f.status === 'complete').length
@@ -352,7 +362,7 @@ export function PolicyUpload() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{uploadedFile.file.name}</p>
+                    <p className="font-medium text-gray-900 truncate">{getDisplayFileName(uploadedFile.file)}</p>
                     <div className="flex items-center gap-2 text-sm">
                       {uploadedFile.status === 'uploading' && (
                         <>
