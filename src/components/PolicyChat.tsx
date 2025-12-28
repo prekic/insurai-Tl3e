@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Send, Bot, User, ArrowLeft, AlertTriangle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
+import { usePolicies } from '@/lib/policy-context'
 
 interface Message {
   id: string
@@ -11,26 +13,15 @@ interface Message {
   retryPayload?: string // Store the original question for retry
 }
 
-interface DashboardPolicy {
-  id: string
-  policyNumber: string
-  provider: string
-  type: string
-  coverage: number
-  premium: number
-}
+export function PolicyChat() {
+  const navigate = useNavigate()
+  const { policies } = usePolicies()
 
-interface PolicyChatProps {
-  uploadedPolicies: DashboardPolicy[]
-  onBack: () => void
-}
-
-export function PolicyChat({ uploadedPolicies, onBack }: PolicyChatProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       role: 'assistant',
-      content: `Hello! I'm your AI insurance assistant. I can help you understand your ${uploadedPolicies.length} uploaded policies. Ask me anything about your coverage, compare policies, or get recommendations.`,
+      content: `Hello! I'm your AI insurance assistant. I can help you understand your ${policies.length} uploaded policies. Ask me anything about your coverage, compare policies, or get recommendations.`,
       timestamp: new Date(),
     },
   ])
@@ -149,7 +140,7 @@ export function PolicyChat({ uploadedPolicies, onBack }: PolicyChatProps) {
       <div className="bg-white border-b border-gray-200 p-4">
         <div className="max-w-4xl mx-auto flex items-center gap-4">
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Go back"
           >
@@ -162,7 +153,7 @@ export function PolicyChat({ uploadedPolicies, onBack }: PolicyChatProps) {
             <div>
               <h1 className="font-semibold text-gray-900">Policy Assistant</h1>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">{uploadedPolicies.length} policies loaded</p>
+                <p className="text-xs text-gray-500">{policies.length} policies loaded</p>
                 {connectionError && (
                   <span className="text-xs text-red-500 flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />

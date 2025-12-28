@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Eye, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
@@ -5,17 +6,15 @@ import { Button } from './ui/button'
 import { samplePolicies } from '@/data/sample-policies'
 import { formatCurrency } from '@/lib/utils'
 
-interface AllSamplesDemoProps {
-  onBack: () => void
-}
+export function AllSamplesDemo() {
+  const navigate = useNavigate()
 
-export function AllSamplesDemo({ onBack }: AllSamplesDemoProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={onBack} className="p-2 hover:bg-white rounded-lg transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-lg transition-colors">
             <ArrowLeft size={24} />
           </button>
           <div>

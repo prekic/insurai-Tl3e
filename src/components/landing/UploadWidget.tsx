@@ -1,25 +1,15 @@
 import { Upload, FileText, AlertCircle } from 'lucide-react'
 import { useCallback, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
-type Policy = {
-  id: string
-  name: string
-  provider: string
-  type: string
-  premium: number
-  coverage: number
-  deductible: number
-  uploadedAt: Date
-}
-
 interface UploadWidgetProps {
-  onPoliciesUploaded: (policies: Policy[]) => void
   compact?: boolean
 }
 
-export function UploadWidget({ onPoliciesUploaded, compact = false }: UploadWidgetProps) {
+export function UploadWidget({ compact = false }: UploadWidgetProps) {
+  const navigate = useNavigate()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -73,22 +63,12 @@ export function UploadWidget({ onPoliciesUploaded, compact = false }: UploadWidg
         }, 1500)
       })
 
-      const mockPolicies: Policy[] = valid.map((file, index) => ({
-        id: `policy-${Date.now()}-${index}`,
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        provider: ['Allianz', 'AXA', 'Anadolu Sigorta', 'Mapfre'][Math.floor(Math.random() * 4)],
-        type: ['Kasko', 'Trafik', 'Konut', 'Sağlık'][Math.floor(Math.random() * 4)],
-        premium: Math.floor(Math.random() * 5000) + 1000,
-        coverage: Math.floor(Math.random() * 500000) + 100000,
-        deductible: Math.floor(Math.random() * 5000) + 500,
-        uploadedAt: new Date(),
-      }))
-
       setIsUploading(false)
       toast.success('Files uploaded successfully', {
         description: `${valid.length} policy document(s) are being analyzed.`,
       })
-      onPoliciesUploaded(mockPolicies)
+      // Navigate to upload page for full analysis
+      navigate('/upload')
     } catch (err) {
       setIsUploading(false)
       const message = err instanceof Error ? err.message : 'Upload failed'

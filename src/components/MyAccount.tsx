@@ -1,15 +1,13 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, User, Mail, Phone, MapPin, Calendar, Edit2, Save, Camera, FileText, CreditCard } from 'lucide-react'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
 
-interface MyAccountProps {
-  onBack: () => void
-}
-
-export function MyAccount({ onBack }: MyAccountProps) {
+export function MyAccount() {
+  const navigate = useNavigate()
   const [isEditing, setIsEditing] = useState(false)
   const [profile, setProfile] = useState({
     name: 'John Doe',
@@ -31,7 +29,7 @@ export function MyAccount({ onBack }: MyAccountProps) {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={onBack} className="p-2 hover:bg-white rounded-lg transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-lg transition-colors">
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-3xl font-bold text-gray-900">My Account</h1>

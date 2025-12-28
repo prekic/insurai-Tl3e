@@ -1,44 +1,18 @@
 import { useState, useId } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 
-interface DashboardPolicy {
-  id: string
-  policyNumber: string
-  provider: string
-  logo: string
-  type: string
-  coverage: number
-  premium: number
-  deductible: number
-  startDate: string
-  expiryDate: string
-  status: 'active' | 'expiring' | 'expired' | 'pending'
-  uploadDate: string
-  documentType: string
-  insuredPerson?: string
-  location?: string
-}
-
-interface PolicyDashboardProps {
-  uploadedPolicies: DashboardPolicy[]
-  onUploadPolicy: () => void
-  onViewPolicy: (id: string) => void
-  onEditPolicy: (id: string) => void
-  onDeletePolicy: (id: string) => void
-  onBack: () => void
-}
-
-export function PolicyDashboard({
-  uploadedPolicies,
-  onUploadPolicy,
-  onViewPolicy,
-  onDeletePolicy,
-}: PolicyDashboardProps) {
+export function PolicyDashboard() {
+  const navigate = useNavigate()
   const { t, isRTL } = useI18n()
+  const { deletePolicy } = usePolicies()
+  const uploadedPolicies = useDashboardPolicies()
+
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const baseId = useId()
@@ -75,6 +49,14 @@ export function PolicyDashboard({
     }
   }
 
+  const handleViewPolicy = (id: string) => {
+    navigate(`/policy/${id}`)
+  }
+
+  const handleUploadPolicy = () => {
+    navigate('/upload')
+  }
+
   return (
     <div className="min-h-screen bg-slate-50" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -84,7 +66,7 @@ export function PolicyDashboard({
             <h1 className="text-3xl font-bold text-gray-900">{t.dashboard.title}</h1>
             <p className="text-gray-600">{t.dashboard.subtitle}</p>
           </div>
-          <Button onClick={onUploadPolicy} className="gap-2">
+          <Button onClick={handleUploadPolicy} className="gap-2">
             <Plus size={18} aria-hidden="true" />
             {t.upload.uploadPolicy}
           </Button>
@@ -183,7 +165,7 @@ export function PolicyDashboard({
                 : t.dashboard.uploadFirstPolicy}
             </p>
             {!searchQuery && statusFilter === 'all' && (
-              <Button onClick={onUploadPolicy} className="gap-2">
+              <Button onClick={handleUploadPolicy} className="gap-2">
                 <Plus size={18} aria-hidden="true" />
                 {t.upload.uploadPolicy}
               </Button>
@@ -236,14 +218,14 @@ export function PolicyDashboard({
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => onViewPolicy(policy.id)}
+                            onClick={() => handleViewPolicy(policy.id)}
                             className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.view} ${policy.provider} ${policy.type}`}
                           >
                             <Eye size={18} aria-hidden="true" />
                           </button>
                           <button
-                            onClick={() => onDeletePolicy(policy.id)}
+                            onClick={() => deletePolicy(policy.id)}
                             className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.delete} ${policy.provider} ${policy.type}`}
                           >

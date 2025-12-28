@@ -1,16 +1,12 @@
 import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import { usePolicies } from '@/lib/policy-context'
 import { validateFiles, ERROR_CODES, getErrorMessage, createAppError, FILE_CONSTRAINTS } from '@/lib/errors'
-
-interface PolicyUploadProps {
-  onPoliciesAnalyzed: (policies: AnalyzedPolicy[]) => void
-  onBack: () => void
-  onViewPolicyDetail: (id: string) => void
-}
 
 type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
@@ -23,7 +19,9 @@ interface UploadedFile {
   error?: string
 }
 
-export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }: PolicyUploadProps) {
+export function PolicyUpload() {
+  const navigate = useNavigate()
+  const { addPolicies } = usePolicies()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
 
@@ -189,19 +187,25 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
       return
     }
 
-    onPoliciesAnalyzed(analyzedPolicies)
+    addPolicies(analyzedPolicies)
+    navigate('/dashboard')
   }
 
   const useSamplePolicies = () => {
     toast.success('Sample policies loaded', {
       description: `${samplePolicies.length} sample Turkish insurance policies have been loaded.`,
     })
-    onPoliciesAnalyzed(samplePolicies)
+    addPolicies(samplePolicies)
+    navigate('/dashboard')
   }
 
   const retryAllFailed = () => {
     const failedFiles = files.filter((f) => f.status === 'error')
     failedFiles.forEach((f) => retryFile(f.id))
+  }
+
+  const handleViewPolicy = (policyId: string) => {
+    navigate(`/policy/${policyId}`)
   }
 
   const completedCount = files.filter((f) => f.status === 'complete').length
@@ -214,7 +218,7 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-white rounded-lg transition-colors"
             aria-label="Go back"
           >
@@ -394,7 +398,7 @@ export function PolicyUpload({ onPoliciesAnalyzed, onBack, onViewPolicyDetail }:
                     )}
                     {uploadedFile.status === 'complete' && uploadedFile.policy && (
                       <button
-                        onClick={() => onViewPolicyDetail(uploadedFile.policy!.id)}
+                        onClick={() => handleViewPolicy(uploadedFile.policy!.id)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         aria-label="View policy details"
                         title="View"

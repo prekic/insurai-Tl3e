@@ -1,49 +1,25 @@
 import { Shield, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, HelpCircle } from 'lucide-react'
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { UploadWidget } from './UploadWidget'
 import { StaggeredList, AnimatedButton, NumberCounter, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
 import { LanguageToggle } from './LanguageToggle'
+import { usePolicies } from '@/lib/policy-context'
 
-type Policy = {
-  id: string
-  name: string
-  provider: string
-  type: string
-  premium: number
-  coverage: number
-  deductible: number
-  uploadedAt: Date
-}
+export function Hero() {
+  const navigate = useNavigate()
+  const { policies } = usePolicies()
+  const policyCount = policies.length
 
-type HeroProps = {
-  onPoliciesUploaded: (policies: Policy[]) => void
-  onNavigateToComparison: () => void
-  onNavigateToUpload: () => void
-  onNavigateToDashboard?: () => void
-  onNavigateToChat?: () => void
-  onNavigateToHelpCenter?: () => void
-  onNavigateToMyAccount?: () => void
-  onNavigateToSettings?: () => void
-  onNavigateToLanding?: () => void
-  onNavigateToAllSamplesDemo?: () => void
-  policyCount?: number
-}
-
-export function Hero({
-  onPoliciesUploaded,
-  onNavigateToComparison,
-  onNavigateToDashboard,
-  onNavigateToChat,
-  onNavigateToHelpCenter,
-  onNavigateToMyAccount,
-  onNavigateToSettings,
-  onNavigateToLanding,
-  onNavigateToAllSamplesDemo,
-  policyCount = 0
-}: HeroProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+
+  const handleMenuClick = (path: string) => {
+    setShowProfileMenu(false)
+    setMobileMenuOpen(false)
+    navigate(path)
+  }
 
   return (
     <div className="relative bg-gradient-to-b from-slate-50 to-white overflow-hidden">
@@ -76,12 +52,12 @@ export function Hero({
                   <span className="hidden sm:inline">1-855-555-0123</span>
                   <span className="sm:hidden">Call Us</span>
                 </a>
-                <button
-                  onClick={() => onNavigateToHelpCenter?.()}
+                <Link
+                  to="/help"
                   className="text-gray-600 hover:text-slate-900 transition-colors"
                 >
                   Help
-                </button>
+                </Link>
               </div>
             </div>
           </div>
@@ -91,7 +67,7 @@ export function Hero({
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-3">
               <ScaleOnHover>
                 <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl flex items-center justify-center shadow-md">
                   <Shield className="text-white" size={18} />
@@ -101,36 +77,34 @@ export function Hero({
                 <div className="font-bold text-gray-900">InsurAI</div>
                 <div className="text-xs text-gray-500">Policy Analysis Platform</div>
               </div>
-            </div>
+            </Link>
 
             {/* Desktop Navigation Items */}
             <div className="hidden md:flex items-center gap-1">
-              {onNavigateToDashboard && (
-                <button
-                  onClick={onNavigateToDashboard}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
-                >
-                  <span>Dashboard</span>
-                  {policyCount > 0 && (
-                    <span className="ml-1 px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded-full font-semibold">
-                      {policyCount > 9 ? '9+' : policyCount}
-                    </span>
-                  )}
-                </button>
-              )}
-              <button
-                onClick={onNavigateToComparison}
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
+              >
+                <span>Dashboard</span>
+                {policyCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded-full font-semibold">
+                    {policyCount > 9 ? '9+' : policyCount}
+                  </span>
+                )}
+              </Link>
+              <Link
+                to="/upload"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
               >
                 <span>Compare</span>
-              </button>
-              {onNavigateToChat && policyCount > 0 && (
-                <button
-                  onClick={onNavigateToChat}
+              </Link>
+              {policyCount > 0 && (
+                <Link
+                  to="/chat"
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
                 >
                   <span>Chat</span>
-                </button>
+                </Link>
               )}
             </div>
 
@@ -142,13 +116,13 @@ export function Hero({
               <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell size={20} />
               </button>
-              <button
-                onClick={onNavigateToComparison}
+              <Link
+                to="/upload"
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
               >
                 <Upload size={18} />
                 <span>Upload Policy</span>
-              </button>
+              </Link>
 
               {/* Profile Menu */}
               <div className="relative">
@@ -171,21 +145,21 @@ export function Hero({
                         <p className="text-xs text-gray-500">john@example.com</p>
                       </div>
                       <button
-                        onClick={() => { setShowProfileMenu(false); onNavigateToMyAccount?.() }}
+                        onClick={() => handleMenuClick('/account')}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                       >
                         <User size={16} />
                         <span>My Account</span>
                       </button>
                       <button
-                        onClick={() => { setShowProfileMenu(false); onNavigateToSettings?.() }}
+                        onClick={() => handleMenuClick('/settings')}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                       >
                         <Settings size={16} />
                         <span>Settings</span>
                       </button>
                       <button
-                        onClick={() => { setShowProfileMenu(false); onNavigateToHelpCenter?.() }}
+                        onClick={() => handleMenuClick('/help')}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
                       >
                         <HelpCircle size={16} />
@@ -193,7 +167,7 @@ export function Hero({
                       </button>
                       <div className="border-t border-gray-100 mt-2 pt-2">
                         <button
-                          onClick={() => { setShowProfileMenu(false); onNavigateToLanding?.() }}
+                          onClick={() => handleMenuClick('/')}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
                         >
                           <LogOut size={16} />
@@ -218,22 +192,20 @@ export function Hero({
           {/* Mobile Menu */}
           {mobileMenuOpen && (
             <div className="md:hidden py-4 space-y-2 bg-white border-t border-gray-200">
-              {onNavigateToDashboard && (
-                <button
-                  onClick={onNavigateToDashboard}
-                  className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
-                >
-                  Dashboard
-                </button>
-              )}
               <button
-                onClick={onNavigateToComparison}
+                onClick={() => handleMenuClick('/dashboard')}
+                className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
+              >
+                Dashboard
+              </button>
+              <button
+                onClick={() => handleMenuClick('/upload')}
                 className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
               >
                 Compare
               </button>
               <button
-                onClick={onNavigateToComparison}
+                onClick={() => handleMenuClick('/upload')}
                 className="block w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-center"
               >
                 Upload Policy
@@ -279,9 +251,9 @@ export function Hero({
               </div>,
 
               <div key="ctas" className="flex flex-col sm:flex-row gap-4 pt-4">
-                <UploadWidget onPoliciesUploaded={onPoliciesUploaded} compact={true} />
+                <UploadWidget compact={true} />
                 <AnimatedButton
-                  onClick={onNavigateToComparison}
+                  onClick={() => navigate('/upload')}
                   className="group inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-medium"
                 >
                   <span>Try with sample policies</span>
@@ -289,26 +261,24 @@ export function Hero({
                 </AnimatedButton>
               </div>,
 
-              onNavigateToAllSamplesDemo && (
-                <div key="samples-cta" className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="text-2xl">📋</div>
-                      <div>
-                        <div className="font-bold text-gray-900 text-sm">Sample Policies Collection</div>
-                        <div className="text-xs text-gray-600">See all Turkish insurance line samples</div>
-                      </div>
+              <div key="samples-cta" className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">📋</div>
+                    <div>
+                      <div className="font-bold text-gray-900 text-sm">Sample Policies Collection</div>
+                      <div className="text-xs text-gray-600">See all Turkish insurance line samples</div>
                     </div>
-                    <button
-                      onClick={onNavigateToAllSamplesDemo}
-                      className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold whitespace-nowrap"
-                    >
-                      View All
-                      <ArrowRight size={16} />
-                    </button>
                   </div>
+                  <Link
+                    to="/samples"
+                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-slate-700 to-slate-900 text-white rounded-xl hover:shadow-lg transition-all text-sm font-semibold whitespace-nowrap"
+                  >
+                    View All
+                    <ArrowRight size={16} />
+                  </Link>
                 </div>
-              ),
+              </div>,
 
               <div key="trust" className="pt-8 flex items-center gap-8 text-sm text-gray-500">
                 <div>

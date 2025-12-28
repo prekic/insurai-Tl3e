@@ -1,23 +1,37 @@
+import { useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { AnalyzedPolicy } from '@/types/policy'
+import { usePolicies } from '@/lib/policy-context'
 
-interface PolicyDetailViewProps {
-  policy: AnalyzedPolicy
-  onBack: () => void
-}
+export function PolicyDetailView() {
+  const navigate = useNavigate()
+  const { id } = useParams<{ id: string }>()
+  const { getPolicyById } = usePolicies()
 
-export function PolicyDetailView({ policy, onBack }: PolicyDetailViewProps) {
+  const policy = id ? getPolicyById(id) : undefined
+
+  if (!policy) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Policy not found</h2>
+          <p className="text-gray-600 mb-4">The policy you're looking for doesn't exist.</p>
+          <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-white rounded-lg transition-colors"
           >
             <ArrowLeft size={24} />

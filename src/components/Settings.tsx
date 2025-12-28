@@ -1,14 +1,10 @@
 import { useState, useId } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Moon, Sun, Bell, Shield, Globe, Key, LogOut, ChevronRight, Monitor, Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { useI18n, useLanguageSelector } from '@/lib/i18n'
-
-interface SettingsProps {
-  onBack: () => void
-  onNavigateToAdmin?: () => void
-}
 
 // Accessible Toggle Switch Component
 interface ToggleSwitchProps {
@@ -53,7 +49,8 @@ function ToggleSwitch({ id, label, checked, onChange }: ToggleSwitchProps) {
   )
 }
 
-export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
+export function Settings() {
+  const navigate = useNavigate()
   const { t, isRTL } = useI18n()
   const { currentLocale, locales, setLocale, isLoading, progress } = useLanguageSelector()
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light')
@@ -96,7 +93,7 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button
-            onClick={onBack}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-white rounded-lg transition-colors focus-ring"
             aria-label={t.common.back}
           >
@@ -270,31 +267,9 @@ export function Settings({ onBack, onNavigateToAdmin }: SettingsProps) {
             </CardContent>
           </Card>
 
-          {/* Admin Panel Link */}
-          {onNavigateToAdmin && (
-            <Card className="border-purple-200 bg-purple-50">
-              <CardContent className="pt-6">
-                <button
-                  onClick={onNavigateToAdmin}
-                  className="w-full flex items-center justify-between p-4 bg-white rounded-xl hover:shadow-md transition-all focus-ring"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Shield className="text-purple-600" size={20} aria-hidden="true" />
-                    </div>
-                    <div className="text-left">
-                      <p className="font-semibold text-gray-900">{t.settings.adminPanel}</p>
-                      <p className="text-sm text-gray-500">{t.settings.adminDescription}</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
-                </button>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Sign Out */}
-          <Button variant="outline" className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={onBack}>
+          <Button variant="outline" className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => navigate('/')}>
             <LogOut size={18} aria-hidden="true" />
             {t.nav.signOut}
           </Button>

@@ -1,14 +1,11 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Search, Book, MessageSquare, FileText, HelpCircle, ChevronRight, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Button } from './ui/button'
 
-interface HelpCenterProps {
-  onBack: () => void
-  onNavigateToChat?: () => void
-}
-
-export function HelpCenter({ onBack, onNavigateToChat }: HelpCenterProps) {
+export function HelpCenter() {
+  const navigate = useNavigate()
   const [searchQuery, setSearchQuery] = useState('')
 
   const categories = [
@@ -51,7 +48,7 @@ export function HelpCenter({ onBack, onNavigateToChat }: HelpCenterProps) {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button onClick={onBack} className="p-2 hover:bg-white rounded-lg transition-colors">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-lg transition-colors">
             <ArrowLeft size={24} />
           </button>
           <h1 className="text-3xl font-bold text-gray-900">Help Center</h1>
@@ -120,12 +117,10 @@ export function HelpCenter({ onBack, onNavigateToChat }: HelpCenterProps) {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Still need help?</h3>
               <p className="text-gray-600 mb-4">Chat with our AI assistant or contact support</p>
               <div className="flex gap-3 justify-center">
-                {onNavigateToChat && (
-                  <Button onClick={onNavigateToChat} className="gap-2">
-                    <MessageSquare size={18} />
-                    Chat with AI
-                  </Button>
-                )}
+                <Button onClick={() => navigate('/chat')} className="gap-2">
+                  <MessageSquare size={18} />
+                  Chat with AI
+                </Button>
                 <Button variant="outline">Contact Support</Button>
               </div>
             </div>

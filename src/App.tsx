@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { Toaster, toast } from 'sonner'
+import { Toaster } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { I18nProvider, useI18n } from './lib/i18n'
+import { PolicyProvider } from './lib/policy-context'
 import { LandingPage } from './components/LandingPage'
 import { PolicyUpload } from './components/PolicyUpload'
 import { PolicyDashboard } from './components/PolicyDashboard'
@@ -14,160 +16,58 @@ import { Settings } from './components/Settings'
 import { HelpCenter } from './components/HelpCenter'
 import { AllSamplesDemo } from './components/AllSamplesDemo'
 import { PageTransition } from './components/animations/AnimatedComponents'
-import { AnalyzedPolicy } from './types/policy'
-import { samplePolicies } from './data/sample-policies'
 
-type Page = 'landing' | 'upload' | 'comparison' | 'policyDetail' | 'dashboard' | 'chat' | 'myAccount' | 'settings' | 'helpCenter' | 'allSamplesDemo'
+// Route configuration
+const ROUTES = {
+  home: '/',
+  upload: '/upload',
+  dashboard: '/dashboard',
+  policy: '/policy/:id',
+  chat: '/chat',
+  account: '/account',
+  settings: '/settings',
+  help: '/help',
+  samples: '/samples',
+} as const
 
 // Main App component wrapped with providers
 export default function App() {
   return (
-    <I18nProvider>
-      <AppContent />
-    </I18nProvider>
+    <BrowserRouter>
+      <I18nProvider>
+        <PolicyProvider>
+          <AppContent />
+        </PolicyProvider>
+      </I18nProvider>
+    </BrowserRouter>
   )
 }
 
-// Inner app content that uses i18n hooks
+// Inner app content that handles routing
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('landing')
-  const [analyzedPolicies, setAnalyzedPolicies] = useState<AnalyzedPolicy[]>([])
-  const [selectedPolicy, setSelectedPolicy] = useState<AnalyzedPolicy | null>(null)
-
-  // Load sample policies on mount
-  useEffect(() => {
-    setAnalyzedPolicies(samplePolicies)
-  }, [])
-
-  const handlePoliciesUploaded = () => {
-    setCurrentPage('comparison')
-  }
-
-  const handleNavigateToUpload = () => {
-    setCurrentPage('comparison')
-  }
-
-  const handleNavigateToComparison = () => {
-    setCurrentPage('comparison')
-  }
-
-  const handleBackToHome = () => {
-    setCurrentPage('landing')
-    setSelectedPolicy(null)
-  }
-
-  const handlePoliciesAnalyzed = (policies: AnalyzedPolicy[]) => {
-    setAnalyzedPolicies((prev) => [...prev, ...policies])
-    setCurrentPage('dashboard')
-  }
-
-  const handleViewPolicyDetail = (policyId: string) => {
-    const policy = analyzedPolicies.find((p) => p.id === policyId)
-    if (policy) {
-      setSelectedPolicy(policy)
-      setCurrentPage('policyDetail')
-    }
-  }
-
-  const handleBackFromDetail = () => {
-    setSelectedPolicy(null)
-    setCurrentPage('dashboard')
-  }
-
-  const handleNavigateToDashboard = () => {
-    setCurrentPage('dashboard')
-  }
-
-  const handleViewPolicy = (policyId: string) => {
-    const policy = analyzedPolicies.find((p) => p.id === policyId)
-    if (policy) {
-      setSelectedPolicy(policy)
-      setCurrentPage('policyDetail')
-    }
-  }
-
-  const handleEditPolicy = (policyId: string) => {
-    handleViewPolicy(policyId)
-  }
-
-  const handleDeletePolicy = (policyId: string) => {
-    const policyToDelete = analyzedPolicies.find((p) => p.id === policyId)
-    setAnalyzedPolicies((prev) => prev.filter((p) => p.id !== policyId))
-
-    if (policyToDelete) {
-      toast.success('Policy deleted', {
-        description: `${policyToDelete.provider} ${policyToDelete.typeTr} policy has been removed.`,
-        action: {
-          label: 'Undo',
-          onClick: () => {
-            setAnalyzedPolicies((prev) => [...prev, policyToDelete])
-            toast.info('Policy restored', {
-              description: 'The policy has been restored to your dashboard.',
-            })
-          },
-        },
-      })
-    }
-  }
-
-  const handleNavigateToChat = () => {
-    setCurrentPage('chat')
-  }
-
-  const handleNavigateToMyAccount = () => {
-    setCurrentPage('myAccount')
-  }
-
-  const handleNavigateToSettings = () => {
-    setCurrentPage('settings')
-  }
-
-  const handleNavigateToHelpCenter = () => {
-    setCurrentPage('helpCenter')
-  }
-
-  const handleNavigateToAllSamplesDemo = () => {
-    setCurrentPage('allSamplesDemo')
-  }
-
-  // Convert analyzed policies to dashboard format
-  const dashboardPolicies = analyzedPolicies.map((p) => ({
-    id: p.id,
-    policyNumber: p.policyNumber,
-    provider: p.provider,
-    logo: p.logo,
-    type: p.typeTr,
-    coverage: p.coverage,
-    premium: p.premium,
-    deductible: p.deductible,
-    startDate: p.startDate,
-    expiryDate: p.expiryDate,
-    status: p.status,
-    uploadDate: p.uploadDate,
-    documentType: p.documentType,
-    insuredPerson: p.insuredPerson,
-    location: p.location,
-  }))
-
-  // Use i18n for translations
+  const location = useLocation()
   const { t } = useI18n()
+  const isLandingPage = location.pathname === '/'
 
-  // Get page title for screen readers (using translations)
+  // Get page title for screen readers
   const getPageTitle = (): string => {
-    const titles: Record<Page, string> = {
-      landing: t.nav.home,
-      upload: t.upload.title,
-      comparison: t.nav.compare,
-      policyDetail: t.policy.policy,
-      dashboard: t.nav.dashboard,
-      chat: t.chat.title,
-      myAccount: t.account.title,
-      settings: t.settings.title,
-      helpCenter: t.help.title,
-      allSamplesDemo: t.policy.policies,
-    }
-    return titles[currentPage]
+    const path = location.pathname
+    if (path === '/') return t.nav.home
+    if (path === '/upload') return t.upload.title
+    if (path === '/dashboard') return t.nav.dashboard
+    if (path.startsWith('/policy/')) return t.policy.policy
+    if (path === '/chat') return t.chat.title
+    if (path === '/account') return t.account.title
+    if (path === '/settings') return t.settings.title
+    if (path === '/help') return t.help.title
+    if (path === '/samples') return t.policy.policies
+    return t.nav.home
   }
+
+  // Scroll to top on route change
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [location.pathname])
 
   return (
     <ErrorBoundary>
@@ -189,111 +89,89 @@ function AppContent() {
       <Toaster position="top-right" richColors />
 
       {/* Global Navigation - Show on all pages except landing */}
-      {currentPage !== 'landing' && (
-        <GlobalNavigation
-          currentPage={currentPage}
-          onNavigateToLanding={handleBackToHome}
-          onNavigateToComparison={handleNavigateToComparison}
-          onNavigateToDashboard={handleNavigateToDashboard}
-          onNavigateToChat={handleNavigateToChat}
-          onNavigateToMyAccount={handleNavigateToMyAccount}
-          onNavigateToSettings={handleNavigateToSettings}
-          onNavigateToHelpCenter={handleNavigateToHelpCenter}
-          policyCount={analyzedPolicies.length}
-          policies={analyzedPolicies}
-          onViewPolicy={handleViewPolicyDetail}
-        />
-      )}
+      {!isLandingPage && <GlobalNavigation />}
 
       <main id="main-content" tabIndex={-1}>
         <AnimatePresence mode="wait">
-          {currentPage === 'landing' && (
-          <PageTransition key="landing">
-            <LandingPage
-              onPoliciesUploaded={handlePoliciesUploaded}
-              onNavigateToComparison={handleNavigateToComparison}
-              onNavigateToUpload={handleNavigateToUpload}
-              onNavigateToDashboard={handleNavigateToDashboard}
-              onNavigateToChat={handleNavigateToChat}
-              onNavigateToHelpCenter={handleNavigateToHelpCenter}
-              onNavigateToMyAccount={handleNavigateToMyAccount}
-              onNavigateToSettings={handleNavigateToSettings}
-              onNavigateToLanding={handleBackToHome}
-              onNavigateToAllSamplesDemo={handleNavigateToAllSamplesDemo}
-              policyCount={analyzedPolicies.length}
+          <Routes location={location} key={location.pathname}>
+            <Route
+              path="/"
+              element={
+                <PageTransition>
+                  <LandingPage />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'comparison' && (
-          <PageTransition key="comparison">
-            <PolicyUpload
-              onPoliciesAnalyzed={handlePoliciesAnalyzed}
-              onBack={handleBackToHome}
-              onViewPolicyDetail={handleViewPolicyDetail}
+            <Route
+              path="/upload"
+              element={
+                <PageTransition>
+                  <PolicyUpload />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'policyDetail' && selectedPolicy && (
-          <PageTransition key="policyDetail">
-            <PolicyDetailView
-              policy={selectedPolicy}
-              onBack={handleBackFromDetail}
+            <Route
+              path="/dashboard"
+              element={
+                <PageTransition>
+                  <PolicyDashboard />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'dashboard' && (
-          <PageTransition key="dashboard">
-            <PolicyDashboard
-              uploadedPolicies={dashboardPolicies}
-              onUploadPolicy={() => setCurrentPage('comparison')}
-              onViewPolicy={handleViewPolicy}
-              onEditPolicy={handleEditPolicy}
-              onDeletePolicy={handleDeletePolicy}
-              onBack={handleBackToHome}
+            <Route
+              path="/policy/:id"
+              element={
+                <PageTransition>
+                  <PolicyDetailView />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'chat' && (
-          <PageTransition key="chat">
-            <PolicyChat
-              uploadedPolicies={dashboardPolicies}
-              onBack={handleBackToHome}
+            <Route
+              path="/chat"
+              element={
+                <PageTransition>
+                  <PolicyChat />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'myAccount' && (
-          <PageTransition key="myAccount">
-            <MyAccount onBack={handleBackToHome} />
-          </PageTransition>
-        )}
-
-        {currentPage === 'settings' && (
-          <PageTransition key="settings">
-            <Settings onBack={handleBackToHome} />
-          </PageTransition>
-        )}
-
-        {currentPage === 'helpCenter' && (
-          <PageTransition key="helpCenter">
-            <HelpCenter
-              onBack={handleBackToHome}
-              onNavigateToChat={handleNavigateToChat}
+            <Route
+              path="/account"
+              element={
+                <PageTransition>
+                  <MyAccount />
+                </PageTransition>
+              }
             />
-          </PageTransition>
-        )}
-
-        {currentPage === 'allSamplesDemo' && (
-          <PageTransition key="allSamplesDemo">
-            <AllSamplesDemo onBack={handleBackToHome} />
-          </PageTransition>
-        )}
+            <Route
+              path="/settings"
+              element={
+                <PageTransition>
+                  <Settings />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/help"
+              element={
+                <PageTransition>
+                  <HelpCenter />
+                </PageTransition>
+              }
+            />
+            <Route
+              path="/samples"
+              element={
+                <PageTransition>
+                  <AllSamplesDemo />
+                </PageTransition>
+              }
+            />
+          </Routes>
         </AnimatePresence>
       </main>
     </ErrorBoundary>
   )
 }
+
+// Export routes for use in other components
+export { ROUTES }

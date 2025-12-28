@@ -1,39 +1,24 @@
 import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { usePolicies } from '@/lib/policy-context'
 
-interface GlobalNavigationProps {
-  currentPage: string
-  onNavigateToLanding: () => void
-  onNavigateToComparison: () => void
-  onNavigateToDashboard: () => void
-  onNavigateToChat: () => void
-  onNavigateToMyAccount: () => void
-  onNavigateToSettings: () => void
-  onNavigateToHelpCenter: () => void
-  policyCount: number
-  policies: unknown[]
-  onViewPolicy: (id: string) => void
-}
+export function GlobalNavigation() {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { policies } = usePolicies()
+  const policyCount = policies.length
 
-export function GlobalNavigation({
-  currentPage,
-  onNavigateToLanding,
-  onNavigateToComparison,
-  onNavigateToDashboard,
-  onNavigateToChat,
-  onNavigateToMyAccount,
-  onNavigateToSettings,
-  onNavigateToHelpCenter,
-  policyCount,
-}: GlobalNavigationProps) {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
 
+  const currentPage = location.pathname
+
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, onClick: onNavigateToDashboard },
-    { id: 'comparison', label: 'Compare', icon: Upload, onClick: onNavigateToComparison },
-    { id: 'chat', label: 'Chat', icon: MessageSquare, onClick: onNavigateToChat, showCount: true },
+    { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/upload', label: 'Compare', icon: Upload },
+    { id: '/chat', label: 'Chat', icon: MessageSquare, showCount: true },
   ]
 
   // Handle keyboard navigation in profile menu
@@ -49,7 +34,7 @@ export function GlobalNavigation({
       // Handle arrow key navigation within menu
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
         e.preventDefault()
-        const menuItems = profileMenuRef.current?.querySelectorAll('button')
+        const menuItems = profileMenuRef.current?.querySelectorAll('button, a')
         if (!menuItems) return
 
         const currentIndex = Array.from(menuItems).findIndex(
@@ -63,7 +48,7 @@ export function GlobalNavigation({
           nextIndex = currentIndex > 0 ? currentIndex - 1 : menuItems.length - 1
         }
 
-        menuItems[nextIndex]?.focus()
+        ;(menuItems[nextIndex] as HTMLElement)?.focus()
       }
     }
 
@@ -74,10 +59,15 @@ export function GlobalNavigation({
   // Focus first menu item when menu opens
   useEffect(() => {
     if (showProfileMenu) {
-      const firstMenuItem = profileMenuRef.current?.querySelector('button')
+      const firstMenuItem = profileMenuRef.current?.querySelector('button, a') as HTMLElement
       setTimeout(() => firstMenuItem?.focus(), 0)
     }
   }, [showProfileMenu])
+
+  const handleMenuItemClick = (path: string) => {
+    setShowProfileMenu(false)
+    navigate(path)
+  }
 
   return (
     <nav
@@ -88,8 +78,8 @@ export function GlobalNavigation({
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <button
-            onClick={onNavigateToLanding}
+          <Link
+            to="/"
             className="flex items-center gap-3 focus-ring rounded-lg"
             aria-label="Go to home page"
           >
@@ -100,7 +90,7 @@ export function GlobalNavigation({
               <div className="font-bold text-gray-900">InsurAI</div>
               <div className="text-xs text-gray-500">Policy Analysis</div>
             </div>
-          </button>
+          </Link>
 
           {/* Main Navigation */}
           <div className="hidden md:flex items-center gap-1" role="menubar">
@@ -108,9 +98,9 @@ export function GlobalNavigation({
               const Icon = item.icon
               const isActive = currentPage === item.id
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={item.onClick}
+                  to={item.id}
                   role="menuitem"
                   aria-current={isActive ? 'page' : undefined}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm transition-all focus-ring ${
@@ -129,7 +119,7 @@ export function GlobalNavigation({
                       {policyCount > 9 ? '9+' : policyCount}
                     </span>
                   )}
-                </button>
+                </Link>
               )
             })}
           </div>
@@ -154,13 +144,13 @@ export function GlobalNavigation({
                 />
               )}
             </button>
-            <button
-              onClick={onNavigateToComparison}
+            <Link
+              to="/upload"
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2 focus-ring"
             >
               <Upload size={18} aria-hidden="true" />
               <span>Upload</span>
-            </button>
+            </Link>
 
             {/* Profile Menu */}
             <div className="relative">
@@ -201,7 +191,7 @@ export function GlobalNavigation({
                       <p className="text-xs text-gray-500">john@example.com</p>
                     </div>
                     <button
-                      onClick={() => { setShowProfileMenu(false); onNavigateToMyAccount() }}
+                      onClick={() => handleMenuItemClick('/account')}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
                       role="menuitem"
                     >
@@ -209,7 +199,7 @@ export function GlobalNavigation({
                       <span>My Account</span>
                     </button>
                     <button
-                      onClick={() => { setShowProfileMenu(false); onNavigateToSettings() }}
+                      onClick={() => handleMenuItemClick('/settings')}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
                       role="menuitem"
                     >
@@ -217,7 +207,7 @@ export function GlobalNavigation({
                       <span>Settings</span>
                     </button>
                     <button
-                      onClick={() => { setShowProfileMenu(false); onNavigateToHelpCenter() }}
+                      onClick={() => handleMenuItemClick('/help')}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
                       role="menuitem"
                     >
@@ -226,7 +216,7 @@ export function GlobalNavigation({
                     </button>
                     <div className="border-t border-gray-100 mt-2 pt-2">
                       <button
-                        onClick={() => { setShowProfileMenu(false); onNavigateToLanding() }}
+                        onClick={() => handleMenuItemClick('/')}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left focus-ring"
                         role="menuitem"
                       >
