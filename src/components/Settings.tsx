@@ -1,10 +1,42 @@
-import { useState, useId } from 'react'
+import { useState, useId, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Moon, Sun, Bell, Shield, Globe, Key, LogOut, ChevronRight, Monitor, Loader2, Check } from 'lucide-react'
+import {
+  ArrowLeft,
+  Moon,
+  Sun,
+  Bell,
+  Shield,
+  Globe,
+  Key,
+  LogOut,
+  ChevronRight,
+  Monitor,
+  Loader2,
+  Check,
+  Eye,
+  EyeOff,
+  Cpu,
+  Database,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Trash2,
+  AlertCircle,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { Input } from './ui/input'
 import { useI18n, useLanguageSelector } from '@/lib/i18n'
+import { usePolicies } from '@/lib/policy-context'
+import { exportToCSV, exportPoliciesToPDF } from '@/lib/export'
+import { isSupabaseConfigured } from '@/lib/supabase'
+import { useAuth } from '@/lib/supabase/auth-context'
+
+// Local storage keys for API keys
+const API_KEY_STORAGE = {
+  OPENAI: 'insurai_openai_key',
+} as const
 
 // Accessible Toggle Switch Component
 interface ToggleSwitchProps {
@@ -49,10 +81,100 @@ function ToggleSwitch({ id, label, checked, onChange }: ToggleSwitchProps) {
   )
 }
 
+// API Key Input Component
+interface APIKeyInputProps {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  onSave: () => void
+  onClear: () => void
+  isConfigured: boolean
+}
+
+function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isConfigured }: APIKeyInputProps) {
+  const [showKey, setShowKey] = useState(false)
+  const [isEditing, setIsEditing] = useState(!isConfigured)
+
+  const maskedValue = value ? '•'.repeat(Math.min(value.length, 40)) + value.slice(-4) : ''
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="text-sm font-medium text-gray-700">{label}</label>
+        {isConfigured && (
+          <span className="flex items-center gap-1 text-xs text-green-600">
+            <Check size={12} />
+            Configured
+          </span>
+        )}
+      </div>
+
+      {isEditing ? (
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Input
+              type={showKey ? 'text' : 'password'}
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder={placeholder}
+              className="pr-10 font-mono text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(!showKey)}
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
+            >
+              {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => {
+              onSave()
+              setIsEditing(false)
+            }}
+            disabled={!value.trim()}
+          >
+            Save
+          </Button>
+          {isConfigured && (
+            <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-2">
+          <div className="flex-1 px-3 py-2 bg-gray-100 rounded-lg font-mono text-sm text-gray-600 truncate">
+            {maskedValue || 'Not configured'}
+          </div>
+          <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
+            Edit
+          </Button>
+          {isConfigured && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+              onClick={onClear}
+            >
+              <Trash2 size={16} />
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function Settings() {
   const navigate = useNavigate()
   const { t, isRTL } = useI18n()
   const { currentLocale, locales, setLocale, isLoading, progress } = useLanguageSelector()
+  const { policies, clearAllPolicies } = usePolicies()
+  const { user, signOut } = useAuth()
+
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light')
   const [notifications, setNotifications] = useState({
     email: true,
@@ -61,6 +183,24 @@ export function Settings() {
     marketUpdates: false,
   })
   const baseId = useId()
+
+  // API Key state
+  const [openaiKey, setOpenaiKey] = useState('')
+  const [openaiConfigured, setOpenaiConfigured] = useState(false)
+
+  // Load saved API key on mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem(API_KEY_STORAGE.OPENAI)
+    if (savedKey) {
+      setOpenaiKey(savedKey)
+      setOpenaiConfigured(true)
+    }
+    // Also check env var
+    const envKey = import.meta.env.VITE_OPENAI_API_KEY
+    if (envKey && envKey !== 'sk-...') {
+      setOpenaiConfigured(true)
+    }
+  }, [])
 
   const themeOptions = [
     { value: 'light', label: t.settings.light, icon: Sun },
@@ -79,7 +219,7 @@ export function Settings() {
     try {
       await setLocale(locale)
       toast.success(t.success.settingsSaved, {
-        description: `Language changed to ${locales.find(l => l.code === locale)?.nativeName}`,
+        description: `Language changed to ${locales.find((l) => l.code === locale)?.nativeName}`,
       })
     } catch (error) {
       console.error('Failed to change language:', error)
@@ -87,11 +227,65 @@ export function Settings() {
     }
   }
 
+  const handleSaveOpenAIKey = () => {
+    if (openaiKey.trim()) {
+      localStorage.setItem(API_KEY_STORAGE.OPENAI, openaiKey.trim())
+      setOpenaiConfigured(true)
+      toast.success('OpenAI API key saved', {
+        description: 'AI-powered extraction is now enabled.',
+      })
+    }
+  }
+
+  const handleClearOpenAIKey = () => {
+    localStorage.removeItem(API_KEY_STORAGE.OPENAI)
+    setOpenaiKey('')
+    setOpenaiConfigured(false)
+    toast.success('OpenAI API key removed')
+  }
+
+  const handleExportCSV = () => {
+    if (policies.length === 0) {
+      toast.error('No policies to export')
+      return
+    }
+    exportToCSV(policies, 'insurai-policies')
+    toast.success('Policies exported', {
+      description: `${policies.length} policies exported to CSV`,
+    })
+  }
+
+  const handleExportPDF = () => {
+    if (policies.length === 0) {
+      toast.error('No policies to export')
+      return
+    }
+    exportPoliciesToPDF(policies, 'Insurance Portfolio Report')
+    toast.success('PDF report generated', {
+      description: 'Print dialog will open to save as PDF',
+    })
+  }
+
+  const handleClearData = () => {
+    if (confirm('Are you sure you want to clear all policies? This cannot be undone.')) {
+      clearAllPolicies()
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      navigate('/')
+    } catch {
+      navigate('/')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="max-w-3xl mx-auto px-4 py-8">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-4 mb-6 sm:mb-8">
           <button
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-white rounded-lg transition-colors focus-ring"
@@ -99,10 +293,97 @@ export function Settings() {
           >
             <ArrowLeft size={24} aria-hidden="true" />
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">{t.settings.title}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t.settings.title}</h1>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
+          {/* AI Configuration */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Cpu className="text-purple-500" size={20} aria-hidden="true" />
+                AI Configuration
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <APIKeyInput
+                label="OpenAI API Key"
+                value={openaiKey}
+                onChange={setOpenaiKey}
+                placeholder="sk-proj-..."
+                onSave={handleSaveOpenAIKey}
+                onClear={handleClearOpenAIKey}
+                isConfigured={openaiConfigured}
+              />
+              <p className="text-xs text-gray-500">
+                Your API key is stored locally and never sent to our servers. Get your key from{' '}
+                <a
+                  href="https://platform.openai.com/api-keys"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  OpenAI Platform
+                </a>
+                .
+              </p>
+
+              {/* AI Status */}
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50">
+                <div className={`w-2 h-2 rounded-full ${openaiConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
+                <span className="text-sm text-gray-700">
+                  AI Extraction: <strong>{openaiConfigured ? 'Enabled' : 'Disabled (Demo Mode)'}</strong>
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Data & Export */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Download className="text-indigo-500" size={20} aria-hidden="true" />
+                Data & Export
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Export buttons */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button variant="outline" className="justify-start gap-2" onClick={handleExportCSV}>
+                  <FileSpreadsheet size={18} className="text-green-600" />
+                  Export to Excel (CSV)
+                </Button>
+                <Button variant="outline" className="justify-start gap-2" onClick={handleExportPDF}>
+                  <FileText size={18} className="text-red-600" />
+                  Export to PDF
+                </Button>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                Export your {policies.length} policies to Excel or PDF format for backup or sharing.
+              </p>
+
+              {/* Storage info */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <Database size={16} className="text-gray-500" />
+                  <span className="text-sm text-gray-700">
+                    Storage: <strong>{isSupabaseConfigured() ? 'Cloud (Supabase)' : 'Local Browser'}</strong>
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 w-full sm:w-auto"
+                  onClick={handleClearData}
+                >
+                  <Trash2 size={14} className="mr-1" />
+                  Clear All Data
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Appearance */}
           <Card>
             <CardHeader>
@@ -114,11 +395,7 @@ export function Settings() {
             <CardContent>
               <fieldset>
                 <legend className="sr-only">{t.settings.theme}</legend>
-                <div
-                  className="grid grid-cols-3 gap-3"
-                  role="radiogroup"
-                  aria-label={t.settings.theme}
-                >
+                <div className="grid grid-cols-3 gap-2 sm:gap-3" role="radiogroup" aria-label={t.settings.theme}>
                   {themeOptions.map((option) => {
                     const Icon = option.icon
                     const isSelected = theme === option.value
@@ -128,18 +405,18 @@ export function Settings() {
                         onClick={() => setTheme(option.value as typeof theme)}
                         role="radio"
                         aria-checked={isSelected}
-                        className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all focus-ring ${
-                          isSelected
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
+                        className={`flex flex-col items-center gap-1 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all focus-ring ${
+                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
                         }`}
                       >
                         <Icon
-                          size={24}
+                          size={20}
                           className={isSelected ? 'text-blue-600' : 'text-gray-600'}
                           aria-hidden="true"
                         />
-                        <span className={`text-sm font-medium ${isSelected ? 'text-blue-600' : 'text-gray-600'}`}>
+                        <span
+                          className={`text-xs sm:text-sm font-medium ${isSelected ? 'text-blue-600' : 'text-gray-600'}`}
+                        >
                           {option.label}
                         </span>
                       </button>
@@ -165,9 +442,7 @@ export function Settings() {
                   id={`${baseId}-${key}`}
                   label={notificationLabels[key] || key}
                   checked={value}
-                  onChange={(checked) =>
-                    setNotifications((prev) => ({ ...prev, [key]: checked }))
-                  }
+                  onChange={(checked) => setNotifications((prev) => ({ ...prev, [key]: checked }))}
                 />
               ))}
             </CardContent>
@@ -179,9 +454,7 @@ export function Settings() {
               <CardTitle className="flex items-center gap-2">
                 <Globe className="text-green-500" size={20} aria-hidden="true" />
                 {t.settings.language}
-                {isLoading && (
-                  <Loader2 size={16} className="animate-spin text-blue-500" />
-                )}
+                {isLoading && <Loader2 size={16} className="animate-spin text-blue-500" />}
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -210,25 +483,25 @@ export function Settings() {
                       key={locale.code}
                       onClick={() => handleLanguageChange(locale.code)}
                       disabled={isLoading}
-                      className={`flex items-center gap-3 p-3 rounded-xl border-2 transition-all focus-ring text-left ${
-                        isActive
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl border-2 transition-all focus-ring text-left ${
+                        isActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                       } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       aria-pressed={isActive}
                     >
-                      <span className="text-xl" aria-hidden="true">{locale.flag}</span>
+                      <span className="text-lg sm:text-xl" aria-hidden="true">
+                        {locale.flag}
+                      </span>
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
+                        <p
+                          className={`text-xs sm:text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}
+                        >
                           {locale.nativeName}
                         </p>
-                        <p className={`text-xs truncate ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                        <p className={`text-xs truncate hidden sm:block ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
                           {locale.name}
                         </p>
                       </div>
-                      {isActive && (
-                        <Check size={16} className="text-blue-600 flex-shrink-0" aria-hidden="true" />
-                      )}
+                      {isActive && <Check size={14} className="text-blue-600 flex-shrink-0" aria-hidden="true" />}
                     </button>
                   )
                 })}
@@ -236,7 +509,7 @@ export function Settings() {
 
               {/* Info text */}
               <p className="mt-4 text-xs text-gray-500 text-center">
-                Any language can be used. AI translates new languages automatically and caches them for future use.
+                Any language can be used. AI translates new languages automatically.
               </p>
             </CardContent>
           </Card>
@@ -250,26 +523,52 @@ export function Settings() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
+              <button className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
-                  <Key size={20} className="text-gray-600" aria-hidden="true" />
-                  <span className="text-gray-700">{t.settings.changePassword}</span>
+                  <Key size={18} className="text-gray-600" aria-hidden="true" />
+                  <span className="text-sm sm:text-base text-gray-700">{t.settings.changePassword}</span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
+                <ChevronRight size={18} className="text-gray-400" aria-hidden="true" />
               </button>
-              <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
+              <button className="w-full flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 rounded-xl transition-colors focus-ring">
                 <div className="flex items-center gap-3">
-                  <Shield size={20} className="text-gray-600" aria-hidden="true" />
-                  <span className="text-gray-700">{t.settings.twoFactor}</span>
+                  <Shield size={18} className="text-gray-600" aria-hidden="true" />
+                  <span className="text-sm sm:text-base text-gray-700">{t.settings.twoFactor}</span>
                 </div>
-                <ChevronRight size={20} className="text-gray-400" aria-hidden="true" />
+                <ChevronRight size={18} className="text-gray-400" aria-hidden="true" />
               </button>
             </CardContent>
           </Card>
 
+          {/* Account Info */}
+          {user && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertCircle className="text-gray-500" size={20} aria-hidden="true" />
+                  Account
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-semibold">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
+                    <p className="text-xs text-gray-500">Signed in</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Sign Out */}
-          <Button variant="outline" className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => navigate('/')}>
+          <Button
+            variant="outline"
+            className="w-full gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+            onClick={handleSignOut}
+          >
             <LogOut size={18} aria-hidden="true" />
             {t.nav.signOut}
           </Button>
