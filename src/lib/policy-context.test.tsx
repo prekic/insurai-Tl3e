@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PolicyProvider, usePolicies, useDashboardPolicies } from './policy-context'
 import { samplePolicies } from '@/data/sample-policies'
@@ -63,7 +63,7 @@ function TestConsumer() {
     deletePolicy,
     selectPolicy,
     clearSelectedPolicy,
-    getPolicyById,
+    // getPolicyById is available but not used in current tests
     clearAllPolicies,
     resetToSamplePolicies,
     refreshPolicies,

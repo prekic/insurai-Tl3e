@@ -4,6 +4,41 @@ import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { PolicyUpload } from './PolicyUpload'
 
+// Mock AI extraction service (before component import to prevent pdfjs-dist loading)
+vi.mock('@/lib/ai', () => ({
+  extractPolicyFromDocument: vi.fn().mockResolvedValue({
+    success: true,
+    policy: {
+      id: 'extracted-1',
+      policyNumber: 'POL-EXT-001',
+      provider: 'Extracted Insurance',
+      typeTr: 'Konut Sigortası',
+      type: 'home',
+      coverage: 500000,
+      premium: 2500,
+      deductible: 1000,
+      startDate: '2024-01-01',
+      expiryDate: '2025-01-01',
+      status: 'active',
+      insuredPerson: 'Test User',
+      documentType: 'policy',
+      uploadDate: '2024-01-01',
+      logo: '',
+      fileName: 'test.pdf',
+      coverages: [],
+      exclusions: [],
+      specialConditions: [],
+      insuranceLine: 'Property',
+      aiConfidence: 0.95,
+      aiInsights: [],
+      monthlyPremium: 208,
+    },
+    extractedData: {},
+    source: 'fallback',
+  }),
+  isAIConfigured: vi.fn().mockReturnValue(false),
+}))
+
 // Mock hooks and dependencies
 const mockNavigate = vi.fn()
 const mockAddPolicies = vi.fn()

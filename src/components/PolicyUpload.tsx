@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud } from 'lucide-react'
+import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
@@ -10,6 +10,7 @@ import { validateFiles, ERROR_CODES, getErrorMessage, createAppError, FILE_CONST
 import { sanitizeFileName, sanitizeId } from '@/lib/sanitize'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { isSupabaseConfigured, uploadPolicyDocument } from '@/lib/supabase'
+import { extractPolicyFromDocument, isAIConfigured } from '@/lib/ai'
 
 type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
@@ -20,6 +21,8 @@ interface UploadedFile {
   progress: number
   policy?: AnalyzedPolicy
   error?: string
+  extractionSource?: 'ai' | 'fallback'
+  aiConfidence?: number
 }
 
 export function PolicyUpload() {
@@ -75,18 +78,15 @@ export function PolicyUpload() {
 
     // Process each file
     for (const uploadedFile of uploadedFiles) {
-      await simulateUploadAndAnalysis(uploadedFile.id)
+      await processFileAsync(uploadedFile.id, uploadedFile.file)
     }
   }
 
-  const simulateUploadAndAnalysis = async (fileId: string) => {
-    const uploadedFile = files.find((f) => f.id === fileId)
-    if (!uploadedFile) return
-
+  const processFileAsync = async (fileId: string, file: File) => {
     try {
-      // Simulate upload progress (or actual upload to Supabase Storage)
-      for (let i = 0; i <= 100; i += 20) {
-        await new Promise((resolve) => setTimeout(resolve, 200))
+      // Update to uploading state with progress
+      for (let i = 0; i <= 100; i += 25) {
+        await new Promise((resolve) => setTimeout(resolve, 100))
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileId ? { ...f, progress: i } : f
@@ -101,29 +101,19 @@ export function PolicyUpload() {
         )
       )
 
-      // Simulate AI analysis with random failure (10% chance for demo)
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      // Use real AI extraction
+      const result = await extractPolicyFromDocument(file, { useFallback: true })
 
-      // Simulate random failure for demonstration
-      const shouldFail = Math.random() < 0.1 // 10% failure rate
-
-      if (shouldFail) {
-        throw new Error('AI analysis service temporarily unavailable')
+      if (!result.success) {
+        throw new Error(result.error.message)
       }
 
-      // Complete with a sample policy
-      const randomPolicy = samplePolicies[Math.floor(Math.random() * samplePolicies.length)]
-      const newPolicy: AnalyzedPolicy = {
-        ...randomPolicy,
-        id: `policy-${Date.now()}`,
-      }
+      const { policy, source, extractedData } = result
 
       // If using Supabase, upload the document to storage
-      // Note: In production, this would happen after the policy is saved to the database
-      // and we have the real policy ID. For now, we'll use the generated ID.
-      if (useSupabase && uploadedFile.file) {
+      if (useSupabase) {
         try {
-          await uploadPolicyDocument(newPolicy.id, uploadedFile.file)
+          await uploadPolicyDocument(policy.id, file)
         } catch (uploadError) {
           console.warn('Failed to upload document to storage:', uploadError)
           // Don't fail the whole process if storage upload fails
@@ -132,15 +122,27 @@ export function PolicyUpload() {
 
       setFiles((prev) =>
         prev.map((f) =>
-          f.id === fileId ? { ...f, status: 'complete', policy: newPolicy } : f
+          f.id === fileId
+            ? {
+                ...f,
+                status: 'complete',
+                policy,
+                extractionSource: source,
+                aiConfidence: extractedData.confidence.overall,
+              }
+            : f
         )
       )
 
       // Get the file name for the toast
-      const displayName = sanitizeFileName(uploadedFile.file.name)
+      const displayName = sanitizeFileName(file.name)
       const storageNote = useSupabase ? ' (saved to cloud)' : ''
+      const aiNote = source === 'ai'
+        ? ` (${Math.round(extractedData.confidence.overall * 100)}% confidence)`
+        : ' (demo mode)'
+
       toast.success('Analysis complete', {
-        description: `${displayName} has been successfully analyzed${storageNote}.`,
+        description: `${displayName} has been analyzed${aiNote}${storageNote}.`,
       })
     } catch (error) {
       const appError = createAppError(error, ERROR_CODES.AI_ANALYSIS_FAILED)
@@ -165,11 +167,15 @@ export function PolicyUpload() {
   }
 
   const retryFile = async (fileId: string) => {
+    // Find the file to get its File object
+    const fileToRetry = files.find((f) => f.id === fileId)
+    if (!fileToRetry) return
+
     // Reset the file status and retry
     setFiles((prev) =>
       prev.map((f) =>
         f.id === fileId
-          ? { ...f, status: 'uploading', progress: 0, error: undefined }
+          ? { ...f, status: 'uploading', progress: 0, error: undefined, extractionSource: undefined }
           : f
       )
     )
@@ -178,7 +184,7 @@ export function PolicyUpload() {
       description: 'Attempting to process the file again.',
     })
 
-    await simulateUploadAndAnalysis(fileId)
+    await processFileAsync(fileId, fileToRetry.file)
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -260,13 +266,26 @@ export function PolicyUpload() {
           </div>
         </div>
 
-        {/* Cloud Storage Badge */}
-        {useSupabase && (
-          <div className="flex items-center gap-2 mb-4 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-            <Cloud size={16} />
-            <span>Cloud storage enabled - your policies will be securely saved to your account</span>
-          </div>
-        )}
+        {/* Status Badges */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          {isAIConfigured() ? (
+            <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
+              <Cpu size={16} />
+              <span>AI extraction enabled - documents will be analyzed using GPT-4</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
+              <Zap size={16} />
+              <span>Demo mode - using sample data (configure VITE_OPENAI_API_KEY for real AI)</span>
+            </div>
+          )}
+          {useSupabase && (
+            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
+              <Cloud size={16} />
+              <span>Cloud storage enabled</span>
+            </div>
+          )}
+        </div>
 
         {/* Upload Area */}
         <div
@@ -412,7 +431,18 @@ export function PolicyUpload() {
                       {uploadedFile.status === 'complete' && (
                         <span className="text-green-600 flex items-center gap-1">
                           <Check size={14} />
-                          Analysis complete
+                          {uploadedFile.extractionSource === 'ai' ? (
+                            <>
+                              AI extracted
+                              {uploadedFile.aiConfidence !== undefined && (
+                                <span className="text-gray-500 ml-1">
+                                  ({Math.round(uploadedFile.aiConfidence * 100)}%)
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            'Demo data'
+                          )}
                         </span>
                       )}
                       {uploadedFile.status === 'error' && (

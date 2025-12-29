@@ -341,7 +341,7 @@ describe('Policy Service', () => {
       // Mock database delete
       mockEq.mockReturnValueOnce({ error: null })
 
-      await deletePolicyDocument('doc-1')
+      await deletePolicyDocument('doc-1', 'policy-documents/test/file.pdf')
 
       expect(mockRemove).toHaveBeenCalled()
     })

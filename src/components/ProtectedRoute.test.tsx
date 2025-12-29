@@ -141,9 +141,6 @@ describe('ProtectedRoute', () => {
         isConfigured: true,
       })
 
-      let navigatedToPath = ''
-      let stateFrom = ''
-
       render(
         <MemoryRouter initialEntries={['/settings']}>
           <Routes>
