@@ -1,9 +1,11 @@
-import { getOpenAIClient, isAIConfigured, AI_CONFIG } from './config'
+import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
 import { extractTextFromPDF, isPDFFile } from './pdf-parser'
+import { isLikelyScannedPDF, performOCR } from './ocr'
+import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
+import { extractWithOpenAI } from './providers/openai'
+import { extractWithClaude } from './providers/claude'
 import {
   ExtractedPolicyData,
-  EXTRACTION_JSON_SCHEMA,
-  EXTRACTION_SYSTEM_PROMPT,
 } from './extraction-schema'
 import type { AnalyzedPolicy, PolicyType, Coverage } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
@@ -13,13 +15,19 @@ export interface ExtractionResult {
   success: true
   policy: AnalyzedPolicy
   extractedData: ExtractedPolicyData
-  source: 'ai' | 'fallback'
+  source: 'ai' | 'fallback' | 'ocr'
+  // Multi-model consensus info
+  consensus?: {
+    providers: AIProvider[]
+    agreement: number
+    score: number
+  }
 }
 
 export interface ExtractionError {
   success: false
   error: {
-    code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE'
+    code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE' | 'OCR_ERROR'
     message: string
     details?: string
   }
@@ -28,15 +36,30 @@ export interface ExtractionError {
 
 export type ExtractionResponse = ExtractionResult | ExtractionError
 
+export interface ExtractionOptions {
+  useFallback?: boolean
+  useOCR?: boolean
+  useConsensus?: boolean
+  primaryProvider?: AIProvider
+  providers?: AIProvider[]
+}
+
 /**
  * Extract policy data from a document file
  * Uses AI when available, falls back to sample data otherwise
+ * Supports multi-model consensus and OCR for scanned documents
  */
 export async function extractPolicyFromDocument(
   file: File,
-  options: { useFallback?: boolean } = {}
+  options: ExtractionOptions = {}
 ): Promise<ExtractionResponse> {
-  const { useFallback = true } = options
+  const {
+    useFallback = true,
+    useOCR = true,
+    useConsensus = true,
+    primaryProvider,
+    providers,
+  } = options
 
   // Validate file type
   if (!isPDFFile(file)) {
@@ -61,7 +84,7 @@ export async function extractPolicyFromDocument(
       error: {
         code: 'NO_AI_CONFIG',
         message: 'AI extraction is not configured',
-        details: 'Set VITE_OPENAI_API_KEY in your environment variables',
+        details: 'Set VITE_OPENAI_API_KEY or VITE_ANTHROPIC_API_KEY in your environment variables',
       },
       fallbackAvailable: false,
     }
@@ -69,25 +92,91 @@ export async function extractPolicyFromDocument(
 
   // Extract text from PDF
   const parseResult = await extractTextFromPDF(file)
+  let documentText: string
+  let usedOCR = false
 
   if (!parseResult.success) {
-    if (useFallback) {
-      return createFallbackResult(file)
+    // Check if we should try OCR
+    if (useOCR && isOCRConfigured()) {
+      const ocrResult = await performOCR(file)
+      if (ocrResult.success && ocrResult.data.text.length > 50) {
+        documentText = ocrResult.data.text
+        usedOCR = true
+      } else {
+        if (useFallback) {
+          return createFallbackResult(file)
+        }
+        return {
+          success: false,
+          error: {
+            code: 'PDF_PARSE_ERROR',
+            message: parseResult.error.message,
+            details: parseResult.error.code,
+          },
+          fallbackAvailable: false,
+        }
+      }
+    } else {
+      if (useFallback) {
+        return createFallbackResult(file)
+      }
+      return {
+        success: false,
+        error: {
+          code: 'PDF_PARSE_ERROR',
+          message: parseResult.error.message,
+          details: parseResult.error.code,
+        },
+        fallbackAvailable: false,
+      }
     }
-    return {
-      success: false,
-      error: {
-        code: 'PDF_PARSE_ERROR',
-        message: parseResult.error.message,
-        details: parseResult.error.code,
-      },
-      fallbackAvailable: false,
+  } else {
+    // Check if PDF appears to be scanned and OCR is available
+    if (
+      useOCR &&
+      isOCRConfigured() &&
+      isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
+    ) {
+      const ocrResult = await performOCR(file)
+      if (ocrResult.success && ocrResult.data.text.length > parseResult.data.text.length) {
+        documentText = ocrResult.data.text
+        usedOCR = true
+      } else {
+        documentText = parseResult.data.text
+      }
+    } else {
+      documentText = parseResult.data.text
     }
   }
 
-  // Call OpenAI for extraction
+  // Call AI for extraction
   try {
-    const extractedData = await callOpenAIExtraction(parseResult.data.text)
+    const configuredProviders = getConfiguredProviders()
+    const useMultiProvider = useConsensus && configuredProviders.length > 1
+
+    let extractedData: ExtractedPolicyData
+    let consensusInfo: ExtractionResult['consensus'] | undefined
+
+    if (useMultiProvider) {
+      // Use multi-model consensus
+      const consensusResult: ConsensusResult = await extractWithConsensus(documentText, {
+        providers,
+        primaryProvider,
+      })
+
+      extractedData = consensusResult.data
+      consensusInfo = {
+        providers: consensusResult.providerResults
+          .filter((r) => !r.error)
+          .map((r) => r.provider),
+        agreement: consensusResult.consensus.agreement,
+        score: consensusResult.consensus.score,
+      }
+    } else {
+      // Use single provider
+      const provider = primaryProvider || configuredProviders[0]
+      extractedData = await extractWithProvider(provider, documentText)
+    }
 
     // Check confidence threshold
     if (extractedData.confidence.overall < AI_CONFIG.minConfidence) {
@@ -115,7 +204,8 @@ export async function extractPolicyFromDocument(
       success: true,
       policy,
       extractedData,
-      source: 'ai',
+      source: usedOCR ? 'ocr' : 'ai',
+      consensus: consensusInfo,
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
@@ -138,49 +228,17 @@ export async function extractPolicyFromDocument(
 }
 
 /**
- * Call OpenAI API for policy extraction
+ * Extract using a specific provider
  */
-async function callOpenAIExtraction(documentText: string): Promise<ExtractedPolicyData> {
-  const client = getOpenAIClient()
-
-  if (!client) {
-    throw new Error('OpenAI client not available')
+async function extractWithProvider(provider: AIProvider, documentText: string): Promise<ExtractedPolicyData> {
+  switch (provider) {
+    case 'openai':
+      return extractWithOpenAI(documentText)
+    case 'anthropic':
+      return extractWithClaude(documentText)
+    default:
+      throw new Error(`Unknown provider: ${provider}`)
   }
-
-  // Truncate very long documents to fit context window
-  const maxChars = 30000
-  const truncatedText =
-    documentText.length > maxChars
-      ? documentText.slice(0, maxChars) + '\n\n[Document truncated...]'
-      : documentText
-
-  const response = await client.chat.completions.create({
-    model: AI_CONFIG.extractionModel,
-    messages: [
-      {
-        role: 'system',
-        content: EXTRACTION_SYSTEM_PROMPT,
-      },
-      {
-        role: 'user',
-        content: `Please extract the insurance policy information from this document:\n\n${truncatedText}`,
-      },
-    ],
-    response_format: {
-      type: 'json_schema',
-      json_schema: EXTRACTION_JSON_SCHEMA,
-    },
-    max_tokens: AI_CONFIG.maxTokens,
-    temperature: AI_CONFIG.temperature,
-  })
-
-  const content = response.choices[0]?.message?.content
-
-  if (!content) {
-    throw new Error('No response from AI model')
-  }
-
-  return JSON.parse(content) as ExtractedPolicyData
 }
 
 /**

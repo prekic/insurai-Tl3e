@@ -21,7 +21,7 @@ interface UploadedFile {
   progress: number
   policy?: AnalyzedPolicy
   error?: string
-  extractionSource?: 'ai' | 'fallback'
+  extractionSource?: 'ai' | 'fallback' | 'ocr'
   aiConfidence?: number
 }
 

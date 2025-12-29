@@ -36,6 +36,8 @@ import { useAuth } from '@/lib/supabase/auth-context'
 // Local storage keys for API keys
 const API_KEY_STORAGE = {
   OPENAI: 'insurai_openai_key',
+  ANTHROPIC: 'insurai_anthropic_key',
+  GOOGLE_CLOUD: 'insurai_google_cloud_key',
 } as const
 
 // Accessible Toggle Switch Component
@@ -187,18 +189,44 @@ export function Settings() {
   // API Key state
   const [openaiKey, setOpenaiKey] = useState('')
   const [openaiConfigured, setOpenaiConfigured] = useState(false)
+  const [anthropicKey, setAnthropicKey] = useState('')
+  const [anthropicConfigured, setAnthropicConfigured] = useState(false)
+  const [googleCloudKey, setGoogleCloudKey] = useState('')
+  const [googleCloudConfigured, setGoogleCloudConfigured] = useState(false)
 
-  // Load saved API key on mount
+  // Load saved API keys on mount
   useEffect(() => {
-    const savedKey = localStorage.getItem(API_KEY_STORAGE.OPENAI)
-    if (savedKey) {
-      setOpenaiKey(savedKey)
+    // OpenAI
+    const savedOpenai = localStorage.getItem(API_KEY_STORAGE.OPENAI)
+    if (savedOpenai) {
+      setOpenaiKey(savedOpenai)
       setOpenaiConfigured(true)
     }
-    // Also check env var
-    const envKey = import.meta.env.VITE_OPENAI_API_KEY
-    if (envKey && envKey !== 'sk-...') {
+    const envOpenai = import.meta.env.VITE_OPENAI_API_KEY
+    if (envOpenai && envOpenai !== 'sk-...') {
       setOpenaiConfigured(true)
+    }
+
+    // Anthropic
+    const savedAnthropic = localStorage.getItem(API_KEY_STORAGE.ANTHROPIC)
+    if (savedAnthropic) {
+      setAnthropicKey(savedAnthropic)
+      setAnthropicConfigured(true)
+    }
+    const envAnthropic = import.meta.env.VITE_ANTHROPIC_API_KEY
+    if (envAnthropic && envAnthropic !== 'sk-ant-...') {
+      setAnthropicConfigured(true)
+    }
+
+    // Google Cloud
+    const savedGoogle = localStorage.getItem(API_KEY_STORAGE.GOOGLE_CLOUD)
+    if (savedGoogle) {
+      setGoogleCloudKey(savedGoogle)
+      setGoogleCloudConfigured(true)
+    }
+    const envGoogle = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY
+    if (envGoogle) {
+      setGoogleCloudConfigured(true)
     }
   }, [])
 
@@ -242,6 +270,40 @@ export function Settings() {
     setOpenaiKey('')
     setOpenaiConfigured(false)
     toast.success('OpenAI API key removed')
+  }
+
+  const handleSaveAnthropicKey = () => {
+    if (anthropicKey.trim()) {
+      localStorage.setItem(API_KEY_STORAGE.ANTHROPIC, anthropicKey.trim())
+      setAnthropicConfigured(true)
+      toast.success('Claude API key saved', {
+        description: 'Multi-model consensus is now available.',
+      })
+    }
+  }
+
+  const handleClearAnthropicKey = () => {
+    localStorage.removeItem(API_KEY_STORAGE.ANTHROPIC)
+    setAnthropicKey('')
+    setAnthropicConfigured(false)
+    toast.success('Claude API key removed')
+  }
+
+  const handleSaveGoogleCloudKey = () => {
+    if (googleCloudKey.trim()) {
+      localStorage.setItem(API_KEY_STORAGE.GOOGLE_CLOUD, googleCloudKey.trim())
+      setGoogleCloudConfigured(true)
+      toast.success('Google Cloud API key saved', {
+        description: 'OCR for scanned documents is now enabled.',
+      })
+    }
+  }
+
+  const handleClearGoogleCloudKey = () => {
+    localStorage.removeItem(API_KEY_STORAGE.GOOGLE_CLOUD)
+    setGoogleCloudKey('')
+    setGoogleCloudConfigured(false)
+    toast.success('Google Cloud API key removed')
   }
 
   const handleExportCSV = () => {
@@ -305,36 +367,104 @@ export function Settings() {
                 AI Configuration
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <APIKeyInput
-                label="OpenAI API Key"
-                value={openaiKey}
-                onChange={setOpenaiKey}
-                placeholder="sk-proj-..."
-                onSave={handleSaveOpenAIKey}
-                onClear={handleClearOpenAIKey}
-                isConfigured={openaiConfigured}
-              />
-              <p className="text-xs text-gray-500">
-                Your API key is stored locally and never sent to our servers. Get your key from{' '}
-                <a
-                  href="https://platform.openai.com/api-keys"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline"
-                >
-                  OpenAI Platform
-                </a>
-                .
-              </p>
-
-              {/* AI Status */}
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50">
-                <div className={`w-2 h-2 rounded-full ${openaiConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
-                <span className="text-sm text-gray-700">
-                  AI Extraction: <strong>{openaiConfigured ? 'Enabled' : 'Disabled (Demo Mode)'}</strong>
-                </span>
+            <CardContent className="space-y-6">
+              {/* OpenAI */}
+              <div className="space-y-2">
+                <APIKeyInput
+                  label="OpenAI API Key (GPT-4)"
+                  value={openaiKey}
+                  onChange={setOpenaiKey}
+                  placeholder="sk-proj-..."
+                  onSave={handleSaveOpenAIKey}
+                  onClear={handleClearOpenAIKey}
+                  isConfigured={openaiConfigured}
+                />
+                <p className="text-xs text-gray-500">
+                  Primary AI for document extraction.{' '}
+                  <a
+                    href="https://platform.openai.com/api-keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Get key
+                  </a>
+                </p>
               </div>
+
+              {/* Anthropic */}
+              <div className="space-y-2">
+                <APIKeyInput
+                  label="Claude API Key (Anthropic)"
+                  value={anthropicKey}
+                  onChange={setAnthropicKey}
+                  placeholder="sk-ant-..."
+                  onSave={handleSaveAnthropicKey}
+                  onClear={handleClearAnthropicKey}
+                  isConfigured={anthropicConfigured}
+                />
+                <p className="text-xs text-gray-500">
+                  Backup AI for multi-model consensus.{' '}
+                  <a
+                    href="https://console.anthropic.com/settings/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Get key
+                  </a>
+                </p>
+              </div>
+
+              {/* Google Cloud */}
+              <div className="space-y-2">
+                <APIKeyInput
+                  label="Google Cloud API Key (OCR)"
+                  value={googleCloudKey}
+                  onChange={setGoogleCloudKey}
+                  placeholder="AIza..."
+                  onSave={handleSaveGoogleCloudKey}
+                  onClear={handleClearGoogleCloudKey}
+                  isConfigured={googleCloudConfigured}
+                />
+                <p className="text-xs text-gray-500">
+                  For scanned document OCR.{' '}
+                  <a
+                    href="https://console.cloud.google.com/apis/credentials"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Get key
+                  </a>
+                </p>
+              </div>
+
+              {/* AI Status Summary */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 rounded-lg bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${openaiConfigured || anthropicConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span className="text-xs text-gray-700">
+                    Extraction: <strong>{openaiConfigured || anthropicConfigured ? 'On' : 'Demo'}</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${openaiConfigured && anthropicConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span className="text-xs text-gray-700">
+                    Consensus: <strong>{openaiConfigured && anthropicConfigured ? 'On' : 'Off'}</strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${googleCloudConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
+                  <span className="text-xs text-gray-700">
+                    OCR: <strong>{googleCloudConfigured ? 'On' : 'Off'}</strong>
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-500">
+                API keys are stored locally and never sent to our servers.
+              </p>
             </CardContent>
           </Card>
 
