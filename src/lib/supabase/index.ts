@@ -7,6 +7,7 @@ export type {
   Database,
   PolicyType,
   PolicyStatus,
+  VersionChangeType,
   Coverage,
   RawPolicyData,
   PolicyWithUser,
@@ -15,6 +16,9 @@ export type {
   PolicyUpdate,
   PolicyDocumentRow,
   PolicyDocumentInsert,
+  PolicyVersionRow,
+  PolicyVersionInsert,
+  PolicySearchResult,
   UserRow,
   UserInsert,
   NewPolicy,
@@ -46,4 +50,13 @@ export {
   uploadPolicyDocument,
   getPolicyDocuments,
   deletePolicyDocument,
+  // Search
+  searchPolicies,
+  // Versioning
+  getPolicyHistory,
+  getPolicyVersion,
+  createPolicyVersion,
+  restorePolicyVersion,
+  // Statistics
+  getPolicyStats,
 } from './policies'

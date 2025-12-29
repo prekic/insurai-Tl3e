@@ -13,6 +13,8 @@ export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'das
 
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
 
+export type VersionChangeType = 'created' | 'updated' | 'extracted' | 'manual_edit'
+
 // Coverage interface (matching src/types/policy.ts)
 export interface Coverage {
   name: string
@@ -143,6 +145,11 @@ export interface Database {
         Insert: PolicyDocumentInsert
         Update: Partial<PolicyDocumentInsert>
       }
+      policy_versions: {
+        Row: PolicyVersionRow
+        Insert: PolicyVersionInsert
+        Update: Partial<PolicyVersionInsert>
+      }
       users: {
         Row: UserRow
         Insert: UserInsert
@@ -153,11 +160,25 @@ export interface Database {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      search_policies: {
+        Args: { search_query: string }
+        Returns: PolicyRow[]
+      }
+      get_policy_history: {
+        Args: { p_policy_id: string }
+        Returns: {
+          version_number: number
+          change_type: VersionChangeType
+          change_summary: string | null
+          changed_at: string
+          new_data: Record<string, unknown>
+        }[]
+      }
     }
     Enums: {
       policy_type: PolicyType
       policy_status: PolicyStatus
+      version_change_type: VersionChangeType
     }
   }
 }
@@ -165,6 +186,35 @@ export interface Database {
 // Helper type for policy with user info
 export type PolicyWithUser = PolicyRow & {
   user?: UserRow
+}
+
+// Policy version row type (for history tracking)
+export interface PolicyVersionRow {
+  id: string
+  policy_id: string
+  version_number: number
+  change_type: VersionChangeType
+  change_summary: string | null
+  previous_data: Record<string, unknown> | null
+  new_data: Record<string, unknown>
+  changed_by: string | null
+  changed_at: string
+}
+
+// Policy version insert type
+export interface PolicyVersionInsert {
+  policy_id: string
+  version_number: number
+  change_type: VersionChangeType
+  change_summary?: string | null
+  previous_data?: Record<string, unknown> | null
+  new_data: Record<string, unknown>
+  changed_by?: string | null
+}
+
+// Search result with relevance
+export interface PolicySearchResult extends PolicyRow {
+  relevance?: number
 }
 
 // Aliases for convenience

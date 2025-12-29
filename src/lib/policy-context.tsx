@@ -7,6 +7,7 @@ import {
   fetchPolicies as fetchSupabasePolicies,
   createPolicy as createSupabasePolicy,
   deleteSupabasePolicy,
+  searchPolicies as searchSupabasePolicies,
   type PolicyRow,
   type PolicyInsert,
 } from '@/lib/supabase'
@@ -22,6 +23,8 @@ interface PolicyContextValue {
   policies: AnalyzedPolicy[]
   selectedPolicy: AnalyzedPolicy | null
   isLoading: boolean
+  searchQuery: string
+  searchResults: AnalyzedPolicy[] | null
   addPolicies: (policies: AnalyzedPolicy[]) => void
   deletePolicy: (id: string) => void
   selectPolicy: (id: string) => AnalyzedPolicy | null
@@ -30,6 +33,8 @@ interface PolicyContextValue {
   clearAllPolicies: () => void
   resetToSamplePolicies: () => void
   refreshPolicies: () => Promise<void>
+  searchPolicies: (query: string) => Promise<void>
+  clearSearch: () => void
 }
 
 const PolicyContext = createContext<PolicyContextValue | null>(null)
@@ -126,6 +131,8 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
   const [policies, setPolicies] = useState<AnalyzedPolicy[]>([])
   const [selectedPolicy, setSelectedPolicy] = useState<AnalyzedPolicy | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<AnalyzedPolicy[] | null>(null)
   const { user, isConfigured: authConfigured } = useAuth()
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
@@ -293,12 +300,62 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
     })
   }, [])
 
+  const searchPolicies = useCallback(
+    async (query: string) => {
+      setSearchQuery(query)
+
+      if (!query.trim()) {
+        setSearchResults(null)
+        return
+      }
+
+      if (useSupabase) {
+        // Search via Supabase
+        try {
+          const rows = await searchSupabasePolicies(query)
+          const results = rows.map(policyRowToAnalyzedPolicy)
+          setSearchResults(results)
+        } catch (error) {
+          console.error('Search failed:', error)
+          // Fallback to local search
+          const results = policies.filter(
+            (p) =>
+              p.policyNumber.toLowerCase().includes(query.toLowerCase()) ||
+              p.provider.toLowerCase().includes(query.toLowerCase()) ||
+              p.insuredPerson?.toLowerCase().includes(query.toLowerCase()) ||
+              p.typeTr.toLowerCase().includes(query.toLowerCase())
+          )
+          setSearchResults(results)
+        }
+      } else {
+        // Local search
+        const results = policies.filter(
+          (p) =>
+            p.policyNumber.toLowerCase().includes(query.toLowerCase()) ||
+            p.provider.toLowerCase().includes(query.toLowerCase()) ||
+            p.insuredPerson?.toLowerCase().includes(query.toLowerCase()) ||
+            p.typeTr.toLowerCase().includes(query.toLowerCase()) ||
+            p.location?.toLowerCase().includes(query.toLowerCase())
+        )
+        setSearchResults(results)
+      }
+    },
+    [useSupabase, policies]
+  )
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery('')
+    setSearchResults(null)
+  }, [])
+
   return (
     <PolicyContext.Provider
       value={{
         policies,
         selectedPolicy,
         isLoading,
+        searchQuery,
+        searchResults,
         addPolicies,
         deletePolicy,
         selectPolicy,
@@ -307,6 +364,8 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
         clearAllPolicies,
         resetToSamplePolicies,
         refreshPolicies,
+        searchPolicies,
+        clearSearch,
       }}
     >
       {children}
