@@ -10,6 +10,8 @@ import {
 import type { AnalyzedPolicy, PolicyType, Coverage } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import { generateMarketComparisonData } from '@/lib/market-data/service'
+import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
 
 export interface ExtractionResult {
   success: true
@@ -398,74 +400,118 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
 }
 
 /**
- * Generate policy gaps based on extracted data
+ * Generate policy gaps based on extracted data and market benchmarks
  */
 function generateGaps(data: ExtractedPolicyData): string[] {
   const gaps: string[] = []
+  const policyType = (data.policyType ?? 'home') as PolicyType
+  const benchmark = MARKET_BENCHMARKS[policyType]
 
+  // Check for high exclusion count
   if (data.exclusions.length > 5) {
     gaps.push('Multiple exclusions may limit coverage in certain scenarios')
   }
 
-  if (data.coverages.some((c) => c.deductible && c.deductible > 10000)) {
+  // Check for high deductibles compared to market
+  const avgDeductible = benchmark.commonCoverages.reduce(
+    (sum, c) => sum + c.typicalDeductible,
+    0
+  ) / benchmark.commonCoverages.length
+
+  if (data.coverages.some((c) => c.deductible && c.deductible > avgDeductible * 2)) {
     gaps.push('High deductibles may result in significant out-of-pocket costs')
   }
 
-  if (data.coverages.length < 3) {
+  // Check for limited coverage areas
+  const criticalCoverages = benchmark.commonCoverages.filter(c => c.inclusionRate >= 90)
+  if (data.coverages.length < criticalCoverages.length) {
     gaps.push('Limited coverage areas - consider additional protection')
   }
 
-  return gaps
+  // Check for missing critical coverages
+  for (const critical of criticalCoverages) {
+    const hasCoverage = data.coverages.some(c =>
+      c.name.toLowerCase().includes(critical.name.toLowerCase()) ||
+      c.name.toLowerCase().includes(critical.nameTr.toLowerCase())
+    )
+    if (!hasCoverage) {
+      gaps.push(`Missing common coverage: ${critical.nameTr}`)
+    }
+  }
+
+  // Check for underinsured coverages
+  const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
+  if (totalCoverage < benchmark.coverageRange.average * 0.5) {
+    gaps.push('Total coverage significantly below market average')
+  }
+
+  // DASK check for home policies
+  if (policyType === 'home') {
+    const hasDaskMention = data.coverages.some(c =>
+      c.name.toLowerCase().includes('deprem') ||
+      c.name.toLowerCase().includes('dask') ||
+      c.name.toLowerCase().includes('earthquake')
+    )
+    if (!hasDaskMention) {
+      gaps.push('Consider adding DASK earthquake insurance if not included')
+    }
+  }
+
+  return gaps.slice(0, 5) // Limit to top 5 gaps
 }
 
 /**
- * Generate recommendations based on extracted data
+ * Generate recommendations based on extracted data and market benchmarks
  */
 function generateRecommendations(data: ExtractedPolicyData): string[] {
   const recommendations: string[] = []
+  const policyType = (data.policyType ?? 'home') as PolicyType
+  const benchmark = MARKET_BENCHMARKS[policyType]
 
-  if (data.policyType === 'home' && !data.coverages.some((c) => c.name.toLowerCase().includes('deprem'))) {
-    recommendations.push('Consider adding DASK earthquake insurance if not included')
+  // Premium comparison recommendation
+  if (data.premium && data.premium > benchmark.premiumRange.percentile75) {
+    recommendations.push('Premium is above 75th percentile - compare with other providers')
   }
 
-  if (data.premium && data.premium > 5000) {
-    recommendations.push('Review annual premium - consider comparing with other providers')
+  // Coverage limit recommendation
+  const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
+  if (totalCoverage < benchmark.coverageRange.median) {
+    recommendations.push('Coverage below market median - consider increasing limits')
   }
 
-  if (data.coverages.length > 0) {
-    recommendations.push('Review coverage limits annually to ensure adequate protection')
+  // Market trend awareness
+  if (benchmark.trends.premiumChangeYoY > 30) {
+    recommendations.push(`Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`)
   }
 
-  return recommendations
+  // Annual review recommendation
+  recommendations.push('Review coverage limits annually to ensure adequate protection')
+
+  // Specific policy type recommendations
+  if (policyType === 'kasko') {
+    recommendations.push('Consider bundling with traffic insurance for discounts')
+  } else if (policyType === 'health') {
+    recommendations.push('Review network hospitals and coverage scope before renewal')
+  } else if (policyType === 'business') {
+    if (!data.coverages.some(c => c.name.toLowerCase().includes('siber') || c.name.toLowerCase().includes('cyber'))) {
+      recommendations.push('Consider cyber insurance for digital business risks')
+    }
+  }
+
+  return recommendations.slice(0, 4) // Limit to top 4 recommendations
 }
 
 /**
- * Generate market comparison data
+ * Generate market comparison data using real market benchmarks
  */
 function generateMarketComparison(data: ExtractedPolicyData): AnalyzedPolicy['marketComparison'] {
   const premium = data.premium ?? 0
-
-  // Simulated market data (in production, this would come from a database)
-  const marketData = {
-    kasko: { avgPremium: 15000, avgCoverage: 500000, minPremium: 8000, maxPremium: 35000 },
-    traffic: { avgPremium: 3500, avgCoverage: 100000, minPremium: 2000, maxPremium: 6000 },
-    home: { avgPremium: 4500, avgCoverage: 300000, minPremium: 2000, maxPremium: 12000 },
-    health: { avgPremium: 25000, avgCoverage: 1000000, minPremium: 10000, maxPremium: 80000 },
-    life: { avgPremium: 8000, avgCoverage: 500000, minPremium: 3000, maxPremium: 30000 },
-    dask: { avgPremium: 500, avgCoverage: 200000, minPremium: 200, maxPremium: 2000 },
-    business: { avgPremium: 20000, avgCoverage: 1000000, minPremium: 5000, maxPremium: 100000 },
-  }
-
   const policyType = (data.policyType ?? 'home') as PolicyType
-  const market = marketData[policyType] ?? marketData.home
+  const location = data.insuredAddress ?? undefined
 
-  // Calculate percentile
-  const range = market.maxPremium - market.minPremium
-  const percentile = Math.min(100, Math.max(0, ((premium - market.minPremium) / range) * 100))
+  // Calculate total coverage from coverages
+  const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
 
-  return {
-    averagePremium: market.avgPremium,
-    averageCoverage: market.avgCoverage,
-    percentile: Math.round(percentile),
-  }
+  // Use the new market data service for accurate benchmarking
+  return generateMarketComparisonData(premium, totalCoverage, policyType, location)
 }

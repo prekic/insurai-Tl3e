@@ -1,16 +1,28 @@
 /**
  * Policy comparison module
  * Compare two or more policies to identify differences and similarities
+ * Enhanced with market benchmarking integration
  */
 
 import type { AnalyzedPolicy } from '@/types/policy'
 import { formatCurrency } from '@/lib/utils'
+import { MarketDataService } from '@/lib/market-data/service'
+import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import type { BenchmarkInsight, MarketComparison } from '@/types/market-data'
 
 export interface PolicyComparisonResult {
   policies: AnalyzedPolicy[]
   summary: ComparisonSummary
   differences: ComparisonDifference[]
   recommendations: string[]
+  marketBenchmarks?: PolicyMarketBenchmark[]
+}
+
+export interface PolicyMarketBenchmark {
+  policyId: string
+  provider: string
+  marketComparison: MarketComparison
+  insights: BenchmarkInsight[]
 }
 
 export interface ComparisonSummary {
@@ -40,21 +52,104 @@ export interface ComparisonDifference {
 /**
  * Compare multiple policies and generate analysis
  */
-export function comparePolicies(policies: AnalyzedPolicy[]): PolicyComparisonResult {
+export function comparePolicies(
+  policies: AnalyzedPolicy[],
+  options: { includeMarketBenchmarks?: boolean } = {}
+): PolicyComparisonResult {
   if (policies.length < 2) {
     throw new Error('At least 2 policies required for comparison')
   }
 
+  const { includeMarketBenchmarks = true } = options
+
   const summary = calculateSummary(policies)
   const differences = findDifferences(policies)
   const recommendations = generateRecommendations(policies, summary, differences)
+
+  // Add market benchmarks if requested
+  let marketBenchmarks: PolicyMarketBenchmark[] | undefined
+  if (includeMarketBenchmarks) {
+    marketBenchmarks = generateMarketBenchmarks(policies)
+    // Add benchmark-based recommendations
+    const benchmarkRecs = generateBenchmarkRecommendations(policies, marketBenchmarks)
+    recommendations.push(...benchmarkRecs)
+  }
 
   return {
     policies,
     summary,
     differences,
     recommendations,
+    marketBenchmarks,
   }
+}
+
+/**
+ * Generate market benchmarks for each policy
+ */
+function generateMarketBenchmarks(policies: AnalyzedPolicy[]): PolicyMarketBenchmark[] {
+  return policies.map(policy => {
+    const marketComparison = MarketDataService.getMarketComparison(policy)
+    const benchmarkResult = MarketDataService.analyzePolicyBenchmark(policy)
+
+    return {
+      policyId: policy.id,
+      provider: policy.provider,
+      marketComparison,
+      insights: benchmarkResult.insights,
+    }
+  })
+}
+
+/**
+ * Generate recommendations based on market benchmarks
+ */
+function generateBenchmarkRecommendations(
+  policies: AnalyzedPolicy[],
+  benchmarks: PolicyMarketBenchmark[]
+): string[] {
+  const recommendations: string[] = []
+
+  // Find the best positioned policy in market
+  const bestPremiumPosition = benchmarks.reduce((best, current) =>
+    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile ? current : best
+  )
+
+  const policy = policies.find(p => p.id === bestPremiumPosition.policyId)
+  if (policy && bestPremiumPosition.marketComparison.premiumPercentile < 40) {
+    recommendations.push(
+      `📊 Pazar analizi: ${policy.provider} piyasa ortalamasının altında prim sunuyor (${bestPremiumPosition.marketComparison.premiumPercentile}. yüzdelik)`
+    )
+  }
+
+  // Check for market trends
+  const policyTypes = [...new Set(policies.map(p => p.type))]
+  for (const policyType of policyTypes) {
+    const benchmark = MARKET_BENCHMARKS[policyType]
+    if (benchmark.trends.premiumChangeYoY > 30) {
+      recommendations.push(
+        `📈 ${benchmark.typeTr} primleri yıllık %${Math.round(benchmark.trends.premiumChangeYoY)} arttı - erken yenileme düşünün`
+      )
+    }
+  }
+
+  // Value analysis
+  const bestValue = benchmarks.reduce((best, current) =>
+    current.marketComparison.valueRating === 'excellent' ||
+    (current.marketComparison.valueRating === 'good' && best.marketComparison.valueRating !== 'excellent')
+      ? current : best
+  )
+
+  if (bestValue.marketComparison.valueRating === 'excellent' || bestValue.marketComparison.valueRating === 'good') {
+    const valuePolicy = policies.find(p => p.id === bestValue.policyId)
+    if (valuePolicy) {
+      recommendations.push(
+        `💎 ${valuePolicy.provider} prim/teminat oranında "${bestValue.marketComparison.valueRating === 'excellent' ? 'mükemmel' : 'iyi'}" değer sunuyor`
+      )
+    }
+  }
+
+  return recommendations
 }
 
 /**
@@ -399,6 +494,21 @@ export function generateComparisonReport(result: PolicyComparisonResult): string
   lines.push(`Muafiyet aralığı: ${formatCurrency(result.summary.deductibleRange.min)} - ${formatCurrency(result.summary.deductibleRange.max)}`)
   lines.push('')
 
+  // Market Benchmarks section
+  if (result.marketBenchmarks && result.marketBenchmarks.length > 0) {
+    lines.push('-'.repeat(40))
+    lines.push('PAZAR KARŞILAŞTIRMASI')
+    lines.push('-'.repeat(40))
+    for (const benchmark of result.marketBenchmarks) {
+      const mc = benchmark.marketComparison
+      lines.push(`${benchmark.provider}:`)
+      lines.push(`  Prim: ${formatCurrency(mc.userPremium)} (piyasa ort: ${formatCurrency(mc.marketAverage)})`)
+      lines.push(`  Piyasa konumu: ${mc.premiumPercentile}. yüzdelik dilim`)
+      lines.push(`  Değer notu: ${translateValueRating(mc.valueRating)}`)
+      lines.push('')
+    }
+  }
+
   // Recommendations
   if (result.recommendations.length > 0) {
     lines.push('-'.repeat(40))
@@ -432,4 +542,17 @@ export function generateComparisonReport(result: PolicyComparisonResult): string
   lines.push('='.repeat(60))
 
   return lines.join('\n')
+}
+
+/**
+ * Translate value rating to Turkish
+ */
+function translateValueRating(rating: string): string {
+  const translations: Record<string, string> = {
+    excellent: 'Mükemmel',
+    good: 'İyi',
+    average: 'Ortalama',
+    poor: 'Zayıf',
+  }
+  return translations[rating] || rating
 }
