@@ -14,6 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:coverage:open": "vitest run --coverage && open coverage/index.html",
     "validate": "npm run typecheck && npm run lint && npm run test"
   },
   "dependencies": {
@@ -52,6 +54,7 @@
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.20",
     "dotenv": "^17.2.3",
     "eslint": "^9.17.0",

@@ -42,5 +42,26 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'text-summary', 'html', 'lcov'],
+      reportsDirectory: './coverage',
+      exclude: [
+        'node_modules/',
+        'src/test/',
+        '**/*.d.ts',
+        '**/*.test.{ts,tsx}',
+        '**/index.ts',
+        'src/main.tsx',
+        'src/vite-env.d.ts',
+      ],
+      // Coverage thresholds - adjust as coverage improves
+      thresholds: {
+        statements: 20,
+        branches: 60,
+        functions: 50,
+        lines: 20,
+      },
+    },
   },
 })
