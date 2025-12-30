@@ -13,6 +13,7 @@ import { samplePolicies } from '@/data/sample-policies'
 import { generateMarketComparisonData } from '@/lib/market-data/service'
 import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { RiskAssessmentService } from '@/lib/ml'
+import { GapDetectionService } from '@/lib/gap-detection'
 
 export interface ExtractionResult {
   success: true
@@ -331,6 +332,27 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     basePolicy.riskActions = actionItems
   } catch {
     // Risk scoring is optional, continue without it
+  }
+
+  // Perform comprehensive gap analysis
+  try {
+    const gapAnalysis = GapDetectionService.analyzePolicy(basePolicy)
+    const actionItems = GapDetectionService.getActionItems(basePolicy)
+
+    basePolicy.gapAnalysis = {
+      overallScore: gapAnalysis.overallScore,
+      criticalCount: gapAnalysis.gapCount.critical,
+      highCount: gapAnalysis.gapCount.high,
+      totalCount: gapAnalysis.gapCount.total,
+      topIssue: gapAnalysis.prioritizedGaps[0]?.gap.title ?? null,
+      topIssueTr: gapAnalysis.prioritizedGaps[0]?.gap.titleTr ?? null,
+      financialExposure: gapAnalysis.financialSummary.totalExpectedLoss,
+      remediationCost: gapAnalysis.financialSummary.estimatedRemediationCost,
+    }
+
+    basePolicy.gapActions = actionItems
+  } catch {
+    // Gap analysis is optional, continue without it
   }
 
   return basePolicy

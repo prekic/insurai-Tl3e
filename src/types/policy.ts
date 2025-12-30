@@ -63,6 +63,24 @@ export interface AnalyzedPolicy extends Policy {
   }>
   // Address for analysis
   insuredAddress?: string
+  // Comprehensive gap analysis
+  gapAnalysis?: {
+    overallScore: number // 0-100 (0 = no gaps, 100 = severe gaps)
+    criticalCount: number
+    highCount: number
+    totalCount: number
+    topIssue: string | null
+    topIssueTr: string | null
+    financialExposure: number
+    remediationCost: number
+  }
+  // Gap action items
+  gapActions?: Array<{
+    priority: 'critical' | 'high' | 'medium' | 'low'
+    action: string
+    actionTr: string
+    estimatedCost: number | null
+  }>
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {
