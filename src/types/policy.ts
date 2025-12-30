@@ -49,6 +49,20 @@ export interface AnalyzedPolicy extends Policy {
     averageCoverage: number
     percentile: number
   }
+  // ML-based risk assessment
+  riskScore?: {
+    overall: number
+    level: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high'
+    topIssue: string | null
+    confidence: number
+  }
+  // Risk mitigation actions
+  riskActions?: Array<{
+    priority: 'critical' | 'high' | 'medium' | 'low'
+    action: string
+  }>
+  // Address for analysis
+  insuredAddress?: string
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {

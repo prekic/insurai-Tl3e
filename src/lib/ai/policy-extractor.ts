@@ -12,6 +12,7 @@ import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
 import { generateMarketComparisonData } from '@/lib/market-data/service'
 import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { RiskAssessmentService } from '@/lib/ml'
 
 export interface ExtractionResult {
   success: true
@@ -280,7 +281,8 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
   const policyType = data.policyType ?? 'home'
   const typeInfo = POLICY_TYPES[policyType]
 
-  return {
+  // Build the base policy first for risk assessment
+  const basePolicy: AnalyzedPolicy = {
     id: `policy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
     policyNumber: data.policyNumber ?? `POL-${Date.now()}`,
     type: policyType,
@@ -300,6 +302,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     documentUrl: URL.createObjectURL(file),
     insuredPerson: data.insuredName ?? undefined,
     location: data.insuredAddress ?? undefined,
+    insuredAddress: data.insuredAddress ?? undefined,
     coverages,
     exclusions: data.exclusions,
     specialConditions: data.specialConditions,
@@ -312,6 +315,25 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     ],
     marketComparison: generateMarketComparison(data),
   }
+
+  // Calculate ML-based risk score
+  try {
+    const quickRisk = RiskAssessmentService.getQuickRiskScore(basePolicy)
+    const actionItems = RiskAssessmentService.getActionItems(basePolicy)
+
+    basePolicy.riskScore = {
+      overall: quickRisk.score,
+      level: quickRisk.level,
+      topIssue: quickRisk.topIssue,
+      confidence: data.confidence.overall,
+    }
+
+    basePolicy.riskActions = actionItems
+  } catch {
+    // Risk scoring is optional, continue without it
+  }
+
+  return basePolicy
 }
 
 /**
