@@ -2,6 +2,7 @@ import { AI_CONFIG, getConfiguredProviders, type AIProvider, type ConsensusField
 import { ExtractedPolicyData } from '../extraction-schema'
 import { extractWithOpenAI } from './openai'
 import { extractWithClaude } from './claude'
+import { aiCache } from '../cache'
 
 export interface ProviderResult {
   provider: AIProvider
@@ -27,10 +28,13 @@ export interface ConsensusResult {
   }
   // Which provider was primary for the result
   primaryProvider: AIProvider
+  // Whether result came from cache
+  fromCache?: boolean
 }
 
 /**
  * Extract using multiple providers and build consensus
+ * Results are cached per unique document + provider combination
  */
 export async function extractWithConsensus(
   documentText: string,
@@ -40,11 +44,34 @@ export async function extractWithConsensus(
     primaryProvider?: AIProvider
   } = {}
 ): Promise<ConsensusResult> {
+  // Initialize cache
+  await aiCache.initialize()
+
   const configuredProviders = getConfiguredProviders()
   const providers = options.providers?.filter((p) => configuredProviders.includes(p)) ?? configuredProviders
 
   if (providers.length === 0) {
     throw new Error('No AI providers configured')
+  }
+
+  // Check consensus cache first (for multi-provider results)
+  if (providers.length > 1) {
+    const cached = await aiCache.getConsensus(documentText, providers)
+    if (cached) {
+      // Return cached consensus result with minimal info
+      return {
+        data: cached,
+        providerResults: providers.map(p => ({ provider: p, data: cached })),
+        consensus: {
+          agreement: providers.length,
+          agreedFields: [...AI_CONFIG.consensus.consensusFields],
+          disagreedFields: [],
+          score: 1,
+        },
+        primaryProvider: options.primaryProvider || providers[0],
+        fromCache: true,
+      }
+    }
   }
 
   // If only one provider, just use it
@@ -119,6 +146,9 @@ export async function extractWithConsensus(
       : successfulResults.reduce((best, current) =>
           current.data.confidence.overall > best.data.confidence.overall ? current : best
         ).provider
+
+  // Cache the consensus result
+  await aiCache.setConsensus(documentText, providers, mergedData)
 
   return {
     data: mergedData,

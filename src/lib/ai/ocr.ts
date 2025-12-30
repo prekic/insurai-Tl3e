@@ -1,9 +1,11 @@
 /**
  * OCR module for scanned PDF documents
  * Uses Google Document AI or Vision API for text extraction
+ * Implements caching for cost reduction on repeated documents
  */
 
 import { getGoogleCloudApiKey, isOCRConfigured } from './config'
+import { aiCache } from './cache'
 
 export interface OCRResult {
   text: string
@@ -32,10 +34,20 @@ export function isLikelyScannedPDF(extractedText: string, pageCount: number): bo
 
 /**
  * Perform OCR on a scanned document using Google Document AI
+ * Implements caching to avoid repeated OCR on same documents
  */
 export async function performOCR(
   file: File
 ): Promise<{ success: true; data: OCRResult } | { success: false; error: OCRError }> {
+  // Initialize cache
+  await aiCache.initialize()
+
+  // Check cache first
+  const cached = await aiCache.getOCR(file)
+  if (cached) {
+    return { success: true, data: cached }
+  }
+
   if (!isOCRConfigured()) {
     return {
       success: false,
@@ -130,14 +142,19 @@ export async function performOCR(
 
     const avgConfidence = blockCount > 0 ? totalConfidence / blockCount : 0.8
 
+    const ocrResult: OCRResult = {
+      text: annotation.text || '',
+      confidence: avgConfidence,
+      pageCount: pages.length || 1,
+      isScanned: true,
+    }
+
+    // Cache the result
+    await aiCache.setOCR(file, ocrResult)
+
     return {
       success: true,
-      data: {
-        text: annotation.text || '',
-        confidence: avgConfidence,
-        pageCount: pages.length || 1,
-        isScanned: true,
-      },
+      data: ocrResult,
     }
   } catch (error) {
     return {
