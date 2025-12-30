@@ -1,22 +1,46 @@
-import { getOpenAIClient, AI_CONFIG } from '../config'
-import { ExtractedPolicyData, EXTRACTION_JSON_SCHEMA, EXTRACTION_SYSTEM_PROMPT } from '../extraction-schema'
+import {
+  getOpenAIClient,
+  AI_CONFIG,
+  isProxyConfigured,
+  extractViaProxy,
+} from '../config'
+import {
+  ExtractedPolicyData,
+  EXTRACTION_JSON_SCHEMA,
+  EXTRACTION_SYSTEM_PROMPT,
+} from '../extraction-schema'
 
 /**
  * Extract policy data using OpenAI GPT-4
+ * Uses secure backend proxy in production, direct API in development
  */
 export async function extractWithOpenAI(documentText: string): Promise<ExtractedPolicyData> {
-  const client = getOpenAIClient()
-
-  if (!client) {
-    throw new Error('OpenAI client not available')
-  }
-
   // Truncate very long documents to fit context window
   const maxChars = 30000
   const truncatedText =
     documentText.length > maxChars
       ? documentText.slice(0, maxChars) + '\n\n[Document truncated...]'
       : documentText
+
+  const userMessage = `Please extract the insurance policy information from this document:\n\n${truncatedText}`
+
+  // Use proxy if configured (production)
+  if (isProxyConfigured()) {
+    const result = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT)
+
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'OpenAI extraction via proxy failed')
+    }
+
+    return result.data as unknown as ExtractedPolicyData
+  }
+
+  // Fall back to direct API (development)
+  const client = getOpenAIClient()
+
+  if (!client) {
+    throw new Error('OpenAI client not available')
+  }
 
   const response = await client.chat.completions.create({
     model: AI_CONFIG.openai.extractionModel,
@@ -27,7 +51,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       },
       {
         role: 'user',
-        content: `Please extract the insurance policy information from this document:\n\n${truncatedText}`,
+        content: userMessage,
       },
     ],
     response_format: {

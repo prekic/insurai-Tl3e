@@ -29,6 +29,13 @@ function createMockPolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
     exclusions: [],
     specialConditions: [],
     insuranceLine: 'Home',
+    aiConfidence: 0.95,
+    aiInsights: ['Good coverage'],
+    marketComparison: {
+      averagePremium: 5500,
+      averageCoverage: 110000,
+      percentile: 60,
+    },
     ...overrides,
   }
 }

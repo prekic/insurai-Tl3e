@@ -6,12 +6,53 @@ const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 const GOOGLE_CLOUD_API_KEY = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY
 
+// API proxy configuration (for secure production use)
+const API_PROXY_URL = import.meta.env.VITE_API_PROXY_URL
+
 // API key storage key (for user-configured keys)
 const STORAGE_KEYS = {
   OPENAI: 'insurai_openai_key',
   ANTHROPIC: 'insurai_anthropic_key',
   GOOGLE_CLOUD: 'insurai_google_cloud_key',
 } as const
+
+/**
+ * Check if the secure API proxy is configured
+ * When enabled, API calls go through the backend server instead of directly from browser
+ */
+export function isProxyConfigured(): boolean {
+  return !!API_PROXY_URL
+}
+
+/**
+ * Get the API proxy URL
+ */
+export function getProxyUrl(): string | null {
+  return API_PROXY_URL || null
+}
+
+/**
+ * Check which providers are available via the proxy
+ * Makes a request to the health endpoint
+ */
+export async function checkProxyProviders(): Promise<{
+  openai: boolean
+  anthropic: boolean
+  google: boolean
+} | null> {
+  if (!API_PROXY_URL) return null
+
+  try {
+    const response = await fetch(`${API_PROXY_URL}/api/ai/providers`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
+    if (!response.ok) return null
+    return await response.json()
+  } catch {
+    return null
+  }
+}
 
 /**
  * Get API key from environment or localStorage
@@ -35,8 +76,18 @@ function getApiKey(envKey: string | undefined, storageKey: string): string | nul
 
 /**
  * Check if a specific AI provider is configured
+ * Returns true if either:
+ * 1. API proxy is configured (keys are on server)
+ * 2. Direct API key is available (development mode)
  */
 export function isProviderConfigured(provider: 'openai' | 'anthropic' | 'google'): boolean {
+  // If proxy is configured, assume providers are available
+  // (actual availability will be checked at runtime)
+  if (isProxyConfigured()) {
+    return true
+  }
+
+  // Fall back to direct key check
   switch (provider) {
     case 'openai':
       return !!getApiKey(OPENAI_API_KEY, STORAGE_KEYS.OPENAI)
@@ -74,10 +125,16 @@ export function getConfiguredProviders(): ('openai' | 'anthropic')[] {
 }
 
 /**
- * Get OpenAI client instance
- * Note: In production, API calls should go through a backend to protect the API key
+ * Get OpenAI client instance (for direct API access in development)
+ * In production, use extractViaProxy() instead
  */
 export function getOpenAIClient(): OpenAI | null {
+  // Don't return client if proxy is configured - use proxy instead
+  if (isProxyConfigured()) {
+    console.warn('OpenAI client requested but proxy is configured. Use extractViaProxy() instead.')
+    return null
+  }
+
   const apiKey = getApiKey(OPENAI_API_KEY, STORAGE_KEYS.OPENAI)
   if (!apiKey) {
     return null
@@ -90,10 +147,18 @@ export function getOpenAIClient(): OpenAI | null {
 }
 
 /**
- * Get Anthropic client instance
- * Note: In production, API calls should go through a backend to protect the API key
+ * Get Anthropic client instance (for direct API access in development)
+ * In production, use extractViaProxy() instead
  */
 export function getAnthropicClient(): Anthropic | null {
+  // Don't return client if proxy is configured - use proxy instead
+  if (isProxyConfigured()) {
+    console.warn(
+      'Anthropic client requested but proxy is configured. Use extractViaProxy() instead.'
+    )
+    return null
+  }
+
   const apiKey = getApiKey(ANTHROPIC_API_KEY, STORAGE_KEYS.ANTHROPIC)
   if (!apiKey) {
     return null
@@ -101,15 +166,116 @@ export function getAnthropicClient(): Anthropic | null {
 
   return new Anthropic({
     apiKey,
-    // Note: Anthropic SDK doesn't need dangerouslyAllowBrowser flag
   })
 }
 
 /**
- * Get Google Cloud API key for Document AI
+ * Get Google Cloud API key for Document AI (for direct API access in development)
+ * In production, use ocrViaProxy() instead
  */
 export function getGoogleCloudApiKey(): string | null {
+  // Don't return key if proxy is configured - use proxy instead
+  if (isProxyConfigured()) {
+    console.warn(
+      'Google Cloud API key requested but proxy is configured. Use ocrViaProxy() instead.'
+    )
+    return null
+  }
+
   return getApiKey(GOOGLE_CLOUD_API_KEY, STORAGE_KEYS.GOOGLE_CLOUD)
+}
+
+/**
+ * Extract policy data via secure backend proxy
+ */
+export async function extractViaProxy(
+  provider: 'openai' | 'anthropic',
+  documentText: string,
+  systemPrompt: string
+): Promise<{
+  success: boolean
+  data?: Record<string, unknown>
+  error?: string
+  usage?: { input_tokens?: number; output_tokens?: number }
+}> {
+  const proxyUrl = getProxyUrl()
+  if (!proxyUrl) {
+    return { success: false, error: 'Proxy not configured' }
+  }
+
+  try {
+    const response = await fetch(`${proxyUrl}/api/ai/extract/${provider}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documentText,
+        systemPrompt,
+        model:
+          provider === 'openai' ? AI_CONFIG.openai.extractionModel : AI_CONFIG.anthropic.extractionModel,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || `HTTP ${response.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      data: result.data,
+      usage: result.usage,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    }
+  }
+}
+
+/**
+ * Perform OCR via secure backend proxy
+ */
+export async function ocrViaProxy(imageBase64: string): Promise<{
+  success: boolean
+  data?: { text: string; confidence: number; pageCount: number }
+  error?: string
+}> {
+  const proxyUrl = getProxyUrl()
+  if (!proxyUrl) {
+    return { success: false, error: 'Proxy not configured' }
+  }
+
+  try {
+    const response = await fetch(`${proxyUrl}/api/ai/ocr`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64 }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || `HTTP ${response.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      data: result.data,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    }
+  }
 }
 
 /**

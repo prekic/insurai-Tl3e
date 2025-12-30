@@ -1,4 +1,9 @@
-import { getAnthropicClient, AI_CONFIG } from '../config'
+import {
+  getAnthropicClient,
+  AI_CONFIG,
+  isProxyConfigured,
+  extractViaProxy,
+} from '../config'
 import { ExtractedPolicyData, EXTRACTION_SYSTEM_PROMPT } from '../extraction-schema'
 
 /**
@@ -45,14 +50,9 @@ Do not include any text before or after the JSON. Only output valid JSON.`
 
 /**
  * Extract policy data using Anthropic Claude
+ * Uses secure backend proxy in production, direct API in development
  */
 export async function extractWithClaude(documentText: string): Promise<ExtractedPolicyData> {
-  const client = getAnthropicClient()
-
-  if (!client) {
-    throw new Error('Anthropic client not available')
-  }
-
   // Truncate very long documents to fit context window
   const maxChars = 100000 // Claude has larger context window
   const truncatedText =
@@ -60,13 +60,33 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       ? documentText.slice(0, maxChars) + '\n\n[Document truncated...]'
       : documentText
 
+  const userMessage = `${CLAUDE_JSON_PROMPT}\n\nPlease extract the insurance policy information from this document:\n\n${truncatedText}`
+
+  // Use proxy if configured (production)
+  if (isProxyConfigured()) {
+    const result = await extractViaProxy('anthropic', userMessage, EXTRACTION_SYSTEM_PROMPT)
+
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'Claude extraction via proxy failed')
+    }
+
+    return result.data as unknown as ExtractedPolicyData
+  }
+
+  // Fall back to direct API (development)
+  const client = getAnthropicClient()
+
+  if (!client) {
+    throw new Error('Anthropic client not available')
+  }
+
   const response = await client.messages.create({
     model: AI_CONFIG.anthropic.extractionModel,
     max_tokens: AI_CONFIG.maxTokens,
     messages: [
       {
         role: 'user',
-        content: `${CLAUDE_JSON_PROMPT}\n\nPlease extract the insurance policy information from this document:\n\n${truncatedText}`,
+        content: userMessage,
       },
     ],
   })

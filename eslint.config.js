@@ -8,7 +8,7 @@ import globals from 'globals'
 export default tseslint.config(
   // Ignore patterns
   {
-    ignores: ['dist/**', 'node_modules/**', '*.config.js', '*.config.ts'],
+    ignores: ['dist/**', 'dist-server/**', 'node_modules/**', '*.config.js', '*.config.ts'],
   },
 
   // Base JavaScript recommended rules
@@ -102,6 +102,21 @@ export default tseslint.config(
     files: ['src/lib/env.ts'],
     rules: {
       'no-console': 'off',
+    },
+  },
+
+  // Backend server - Node.js environment with relaxed rules
+  {
+    files: ['server/**/*.ts'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2020,
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 
