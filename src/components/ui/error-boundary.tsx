@@ -137,7 +137,7 @@ export function PageErrorBoundary({ children }: { children: ReactNode }) {
             <div className="space-y-3">
               <h1 className="text-2xl font-bold text-gray-900">Page Error</h1>
               <p className="text-gray-600">
-                This page encountered an error and couldn't be displayed. Our team has been
+                This page encountered an error and could not be displayed. Our team has been
                 notified.
               </p>
             </div>

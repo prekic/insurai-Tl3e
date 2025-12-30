@@ -69,7 +69,7 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
       // General rules
-      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-console': ['warn', { allow: ['warn', 'error', 'group', 'groupEnd'] }],
       'no-debugger': 'warn',
       'prefer-const': 'error',
       'no-var': 'error',
@@ -82,6 +82,25 @@ export default tseslint.config(
     files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}', '**/test/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      'no-console': 'off',
+    },
+  },
+
+  // Scripts directory - CLI tools need console.log and more lenient rules
+  {
+    files: ['scripts/**/*.{ts,js}'],
+    rules: {
+      'no-console': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  // Environment config - development logging is intentional
+  {
+    files: ['src/lib/env.ts'],
+    rules: {
       'no-console': 'off',
     },
   },
