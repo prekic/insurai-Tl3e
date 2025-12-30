@@ -1,6 +1,6 @@
 /**
  * Security Module
- * Rate limiting and audit logging for production readiness
+ * Rate limiting, audit logging, key management, and security monitoring
  */
 
 // Rate Limiter
@@ -20,6 +20,23 @@ export {
   createTimedAudit,
 } from './audit-logger'
 
+// Secure Key Manager
+export {
+  secureKeyManager,
+  validateKeyFormat,
+  maskApiKey,
+  migrateOldKeys,
+} from './key-manager'
+export type { APIKeyProvider } from './key-manager'
+
+// Security Monitor
+export {
+  securityMonitor,
+  inputSanitizer,
+  isSecureContext,
+  generateSecurityReport,
+} from './security-monitor'
+
 // Re-export types
 export type {
   RateLimitedOperation,
@@ -36,17 +53,31 @@ export type {
   PolicyAuditDetails,
   AuthAuditDetails,
   ExportAuditDetails,
+  SecurityAlert,
+  SecurityAlertThresholds,
 } from '@/types/security'
 
 // Integration with rate limiter violations
 import { rateLimiter } from './rate-limiter'
 import { auditLogger } from './audit-logger'
+import { securityMonitor } from './security-monitor'
+import { migrateOldKeys } from './key-manager'
 
 /**
  * Initialize security module
- * Sets up rate limit violation logging
+ * Sets up rate limit violation logging, security monitoring, and key migration
  */
-export function initializeSecurity(): void {
+export async function initializeSecurity(): Promise<void> {
+  // Migrate old API keys to encrypted storage
+  try {
+    await migrateOldKeys()
+  } catch {
+    console.warn('Failed to migrate old API keys')
+  }
+
+  // Initialize security monitor
+  securityMonitor.initialize()
+
   // Log rate limit violations
   rateLimiter.onViolation((violation) => {
     auditLogger.logSecurity('security.rate_limit_exceeded', {
