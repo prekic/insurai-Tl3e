@@ -10,6 +10,7 @@ import {
   EXTRACTION_SYSTEM_PROMPT,
 } from '../extraction-schema'
 import { aiCache } from '../cache'
+import { costTracker, estimateTokens } from '../cost-tracking'
 import { rateLimiter, auditLogger, createTimedAudit } from '@/lib/security'
 
 /**
@@ -32,10 +33,11 @@ function getCurrentUserId(): string {
  * Extract policy data using OpenAI GPT-4
  * Uses secure backend proxy in production, direct API in development
  * Implements caching for cost reduction (~60% savings on repeated documents)
- * Includes rate limiting and audit logging for production readiness
+ * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
 export async function extractWithOpenAI(documentText: string): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
+  const model = AI_CONFIG.openai.extractionModel
 
   // Check rate limit
   const rateLimitResult = rateLimiter.consume('ai_extraction', userId)
@@ -58,8 +60,11 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     documentLength: documentText.length,
   }, { userId })
 
-  // Initialize cache if not already done
-  await aiCache.initialize()
+  // Initialize cache and cost tracker
+  await Promise.all([
+    aiCache.initialize(),
+    costTracker.initialize(),
+  ])
 
   // Truncate very long documents to fit context window
   const maxChars = 30000
@@ -68,9 +73,28 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       ? documentText.slice(0, maxChars) + '\n\n[Document truncated...]'
       : documentText
 
+  // Build the user message
+  const userMessage = `Please extract the insurance policy information from this document:\n\n${truncatedText}`
+
+  // Estimate input tokens for cost tracking
+  const estimatedInputTokens = estimateTokens(EXTRACTION_SYSTEM_PROMPT + userMessage)
+
   // Check cache first
   const cached = await aiCache.getExtraction(truncatedText, 'openai')
   if (cached) {
+    // Track cached request (shows cost savings)
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model,
+      operation: 'extraction',
+      inputTokens: estimatedInputTokens,
+      outputTokens: 0,
+      cacheHit: true,
+      documentLength: truncatedText.length,
+      success: true,
+      userId,
+    })
+
     await auditLogger.logAI('ai.extraction_cached', {
       provider: 'openai',
       documentLength: truncatedText.length,
@@ -80,9 +104,10 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     return cached
   }
 
-  const userMessage = `Please extract the insurance policy information from this document:\n\n${truncatedText}`
-
+  const startTime = Date.now()
   let result: ExtractedPolicyData
+  let actualInputTokens = estimatedInputTokens
+  let actualOutputTokens = 0
 
   try {
     // Use proxy if configured (production)
@@ -94,6 +119,8 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
+      // Estimate output tokens from response
+      actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
       // Fall back to direct API (development)
       const client = getOpenAIClient()
@@ -103,7 +130,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       }
 
       const response = await client.chat.completions.create({
-        model: AI_CONFIG.openai.extractionModel,
+        model,
         messages: [
           {
             role: 'system',
@@ -129,21 +156,63 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       }
 
       result = JSON.parse(content) as ExtractedPolicyData
+
+      // Use actual token counts from response if available
+      if (response.usage) {
+        actualInputTokens = response.usage.prompt_tokens
+        actualOutputTokens = response.usage.completion_tokens
+      } else {
+        actualOutputTokens = estimateTokens(content)
+      }
     }
+
+    const durationMs = Date.now() - startTime
+
+    // Track successful API call with cost
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model,
+      operation: 'extraction',
+      inputTokens: actualInputTokens,
+      outputTokens: actualOutputTokens,
+      cacheHit: false,
+      documentLength: truncatedText.length,
+      durationMs,
+      success: true,
+      userId,
+    })
 
     // Cache the result
     await aiCache.setExtraction(truncatedText, 'openai', result)
 
-    // Log successful extraction
+    // Log successful extraction with cost info
     await timedAudit.complete({
       provider: 'openai',
       confidence: result.confidence.overall,
       cacheHit: false,
-      estimatedCost: 0.03,
+      inputTokens: actualInputTokens,
+      outputTokens: actualOutputTokens,
     })
 
     return result
   } catch (error) {
+    const durationMs = Date.now() - startTime
+
+    // Track failed request
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model,
+      operation: 'extraction',
+      inputTokens: actualInputTokens,
+      outputTokens: 0,
+      cacheHit: false,
+      documentLength: truncatedText.length,
+      durationMs,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      userId,
+    })
+
     // Log failed extraction
     await timedAudit.fail(error instanceof Error ? error : new Error(String(error)), {
       provider: 'openai',

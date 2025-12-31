@@ -53,3 +53,34 @@ export {
   type ComparisonSummary,
   type ComparisonDifference,
 } from './comparison'
+
+// Response caching
+export {
+  aiCache,
+  hashContent,
+  hashFile,
+  generateCacheKey,
+  type CacheConfig,
+  type CacheStats,
+  type CacheType,
+} from './cache'
+
+// Cost tracking
+export {
+  costTracker,
+  trackAIUsage,
+  getUsageStats,
+  getBudgetStatus,
+  checkBudgetLimit,
+  getCostByModel,
+  setMonthlyBudget,
+  initializeCostTracking,
+  formatCost,
+  formatTokens,
+  calculateCost,
+  estimateTokens,
+  MODEL_PRICING,
+  type UsageRecord,
+  type UsageStats,
+  type CostBudget,
+} from './cost-tracking'

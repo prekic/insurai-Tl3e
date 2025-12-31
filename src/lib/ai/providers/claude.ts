@@ -6,6 +6,7 @@ import {
 } from '../config'
 import { ExtractedPolicyData, EXTRACTION_SYSTEM_PROMPT } from '../extraction-schema'
 import { aiCache } from '../cache'
+import { costTracker, estimateTokens } from '../cost-tracking'
 import { rateLimiter, auditLogger, createTimedAudit } from '@/lib/security'
 
 /**
@@ -67,10 +68,11 @@ function getCurrentUserId(): string {
  * Extract policy data using Anthropic Claude
  * Uses secure backend proxy in production, direct API in development
  * Implements caching for cost reduction (~60% savings on repeated documents)
- * Includes rate limiting and audit logging for production readiness
+ * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
 export async function extractWithClaude(documentText: string): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
+  const model = AI_CONFIG.anthropic.extractionModel
 
   // Check rate limit
   const rateLimitResult = rateLimiter.consume('ai_extraction', userId)
@@ -93,8 +95,11 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
     documentLength: documentText.length,
   }, { userId })
 
-  // Initialize cache if not already done
-  await aiCache.initialize()
+  // Initialize cache and cost tracker
+  await Promise.all([
+    aiCache.initialize(),
+    costTracker.initialize(),
+  ])
 
   // Truncate very long documents to fit context window
   const maxChars = 100000 // Claude has larger context window
@@ -103,9 +108,28 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       ? documentText.slice(0, maxChars) + '\n\n[Document truncated...]'
       : documentText
 
+  // Build the user message
+  const userMessage = `${CLAUDE_JSON_PROMPT}\n\nPlease extract the insurance policy information from this document:\n\n${truncatedText}`
+
+  // Estimate input tokens for cost tracking
+  const estimatedInputTokens = estimateTokens(userMessage)
+
   // Check cache first
   const cached = await aiCache.getExtraction(truncatedText, 'anthropic')
   if (cached) {
+    // Track cached request (shows cost savings)
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model,
+      operation: 'extraction',
+      inputTokens: estimatedInputTokens,
+      outputTokens: 0,
+      cacheHit: true,
+      documentLength: truncatedText.length,
+      success: true,
+      userId,
+    })
+
     await auditLogger.logAI('ai.extraction_cached', {
       provider: 'anthropic',
       documentLength: truncatedText.length,
@@ -115,9 +139,10 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
     return cached
   }
 
-  const userMessage = `${CLAUDE_JSON_PROMPT}\n\nPlease extract the insurance policy information from this document:\n\n${truncatedText}`
-
+  const startTime = Date.now()
   let result: ExtractedPolicyData
+  let actualInputTokens = estimatedInputTokens
+  let actualOutputTokens = 0
 
   try {
     // Use proxy if configured (production)
@@ -129,6 +154,8 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
+      // Estimate output tokens from response
+      actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
       // Fall back to direct API (development)
       const client = getAnthropicClient()
@@ -138,7 +165,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       }
 
       const response = await client.messages.create({
-        model: AI_CONFIG.anthropic.extractionModel,
+        model,
         max_tokens: AI_CONFIG.maxTokens,
         messages: [
           {
@@ -178,21 +205,63 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
           throw new Error(`Failed to parse Claude response as JSON: ${parseError}`)
         }
       }
+
+      // Use actual token counts from response if available
+      if (response.usage) {
+        actualInputTokens = response.usage.input_tokens
+        actualOutputTokens = response.usage.output_tokens
+      } else {
+        actualOutputTokens = estimateTokens(content)
+      }
     }
+
+    const durationMs = Date.now() - startTime
+
+    // Track successful API call with cost
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model,
+      operation: 'extraction',
+      inputTokens: actualInputTokens,
+      outputTokens: actualOutputTokens,
+      cacheHit: false,
+      documentLength: truncatedText.length,
+      durationMs,
+      success: true,
+      userId,
+    })
 
     // Cache the result
     await aiCache.setExtraction(truncatedText, 'anthropic', result)
 
-    // Log successful extraction
+    // Log successful extraction with cost info
     await timedAudit.complete({
       provider: 'anthropic',
       confidence: result.confidence.overall,
       cacheHit: false,
-      estimatedCost: 0.03,
+      inputTokens: actualInputTokens,
+      outputTokens: actualOutputTokens,
     })
 
     return result
   } catch (error) {
+    const durationMs = Date.now() - startTime
+
+    // Track failed request
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model,
+      operation: 'extraction',
+      inputTokens: actualInputTokens,
+      outputTokens: 0,
+      cacheHit: false,
+      documentLength: truncatedText.length,
+      durationMs,
+      success: false,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      userId,
+    })
+
     // Log failed extraction
     await timedAudit.fail(error instanceof Error ? error : new Error(String(error)), {
       provider: 'anthropic',
