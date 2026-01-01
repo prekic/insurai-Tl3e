@@ -193,11 +193,18 @@ router.post('/ocr', async (req: Request, res: Response) => {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData = (await response.json().catch(() => ({}))) as { error?: { message?: string } }
       throw new Error(errorData.error?.message || `API error: ${response.status}`)
     }
 
-    const result = await response.json()
+    const result = (await response.json()) as {
+      responses?: Array<{
+        fullTextAnnotation?: {
+          text?: string
+          pages?: Array<{ blocks?: Array<{ confidence?: number }> }>
+        }
+      }>
+    }
     const annotation = result.responses?.[0]?.fullTextAnnotation
 
     res.json({
