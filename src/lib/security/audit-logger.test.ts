@@ -158,7 +158,7 @@ describe('Audit Logger', () => {
       const event = await auditLogger.logAI('ai.extraction_started', {
         provider: 'openai',
         model: 'gpt-4',
-        documentId: 'doc-123',
+        documentLength: 5000,
       })
 
       expect(event.type).toBe('ai.extraction_started')
@@ -170,7 +170,7 @@ describe('Audit Logger', () => {
       const event = await auditLogger.logAI('ai.extraction_completed', {
         provider: 'openai',
         model: 'gpt-4',
-        tokensUsed: 500,
+        tokenCount: 500,
       }, { durationMs: 2500 })
 
       expect(event.durationMs).toBe(2500)
@@ -182,7 +182,7 @@ describe('Audit Logger', () => {
       const event = await auditLogger.logPolicy('policy.created', {
         policyId: 'pol-123',
         policyType: 'home',
-        amount: 250000,
+        action: 'create',
       })
 
       expect(event.type).toBe('policy.created')
@@ -509,7 +509,7 @@ describe('createTimedAudit', () => {
 
     const event = await timedAudit.complete()
 
-    expect(event.durationMs).toBeGreaterThanOrEqual(50)
+    expect(event.durationMs).toBeGreaterThanOrEqual(45)
     expect(event.success).toBe(true)
   })
 

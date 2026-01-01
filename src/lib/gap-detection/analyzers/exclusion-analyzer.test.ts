@@ -9,7 +9,6 @@ import { DEFAULT_GAP_CONFIG } from '@/types/gap'
 import {
   createMockPolicy,
   EXCLUSION_HEAVY_POLICY,
-  WELL_COVERED_KASKO_POLICY,
 } from '../__tests__/fixtures'
 
 describe('Exclusion Gap Analyzer', () => {

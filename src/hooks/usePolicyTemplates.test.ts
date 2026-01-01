@@ -3,7 +3,7 @@
  * Tests for policy template library and knowledge base hooks
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
 // Create mock data using vi.hoisted
@@ -39,10 +39,13 @@ const {
   ]
 
   const mockRecommendation = {
-    templates: mockTemplates,
-    bestMatch: mockTemplate,
-    score: 0.85,
-    reasons: ['Matches budget', 'Good coverage'],
+    primary: {
+      template: mockTemplate,
+      matchScore: 0.85,
+      reasons: ['Matches budget', 'Good coverage'],
+      reasonsTr: ['Bütçeye uygun', 'İyi kapsam'],
+    },
+    alternatives: [],
   }
 
   const mockGap = {
@@ -218,21 +221,28 @@ describe('useTemplateRecommendations', () => {
 
     act(() => {
       result.current.getRecommendations({
-        policyType: 'home',
-        budget: 2500,
-        coverageNeeds: ['fire', 'theft'],
+        audience: 'individual',
+        homeOwnership: 'owner',
+        riskTolerance: 'medium',
+        budgetConstraint: 'moderate',
+        useCase: 'first_time_buyer',
       })
     })
 
     expect(result.current.recommendation).toBeDefined()
-    expect(result.current.recommendation?.bestMatch).toBeDefined()
+    expect(result.current.recommendation?.primary?.template).toBeDefined()
   })
 
   it('should provide reset function', () => {
     const { result } = renderHook(() => useTemplateRecommendations())
 
     act(() => {
-      result.current.getRecommendations({ policyType: 'home' })
+      result.current.getRecommendations({
+        audience: 'individual',
+        riskTolerance: 'medium',
+        budgetConstraint: 'moderate',
+        useCase: 'first_time_buyer',
+      })
     })
 
     act(() => {

@@ -36,10 +36,16 @@ const {
   const mockPremiumBenchmark = {
     region: 'marmara',
     policyType: 'home',
-    minPremium: 1500,
-    maxPremium: 8000,
-    avgPremium: 3500,
-    medianPremium: 3200,
+    premium: {
+      min: 1500,
+      max: 8000,
+      average: 3500,
+      median: 3200,
+      percentile10: 1200,
+      percentile25: 2000,
+      percentile75: 5000,
+      percentile90: 7000,
+    },
   }
 
   const mockRankedRegions = [
@@ -61,20 +67,42 @@ const {
   const mockLocationAnalysis = {
     address: 'Istanbul, Marmara',
     region: 'marmara',
-    province: { code: '34', name: 'Istanbul', nameTr: 'İstanbul', region: 'marmara' },
+    province: {
+      code: '34',
+      name: 'Istanbul',
+      nameTr: 'İstanbul',
+      region: 'marmara',
+      population: 16000000,
+      area: 5461,
+      density: 2930,
+      urbanRatio: 0.99,
+      coordinates: { lat: 41.0082, lng: 28.9784 },
+    },
     riskFactors: ['earthquake', 'density'],
   }
 
   const mockNearbyComparison = {
-    centerProvince: { code: '34', name: 'Istanbul', nameTr: 'İstanbul', region: 'marmara' },
+    currentProvince: {
+      code: '34',
+      name: 'Istanbul',
+      nameTr: 'İstanbul',
+      region: 'marmara',
+      population: 16000000,
+      area: 5461,
+      density: 2930,
+      urbanRatio: 0.99,
+      coordinates: { lat: 41.0082, lng: 28.9784 },
+    },
     nearbyProvinces: [],
-    premiumComparison: [],
   }
 
   const mockNationalStats = {
     totalPolicies: 10000000,
-    averagePremium: 3000,
-    totalClaims: 500000,
+    totalPremiumVolume: 30000000000,
+    marketPenetration: 0.35,
+    avgPremiumPerCapita: 3000,
+    byRegion: {},
+    byPolicyType: {},
   }
 
   const mockRankings = {
@@ -197,7 +225,7 @@ describe('useRegionalPremiums', () => {
     const { result } = renderHook(() => useRegionalPremiums('marmara', 'home'))
 
     expect(result.current).toBeDefined()
-    expect(result.current.avgPremium).toBe(3500)
+    expect(result.current.premium.average).toBe(3500)
   })
 })
 
@@ -277,11 +305,21 @@ describe('useNearbyComparison', () => {
   })
 
   it('should compare nearby provinces', () => {
-    const province = { code: '34', name: 'Istanbul', nameTr: 'İstanbul', region: 'marmara' as const }
+    const province = {
+      code: '34' as const,
+      name: 'Istanbul',
+      nameTr: 'İstanbul',
+      region: 'marmara' as const,
+      population: 16000000,
+      area: 5461,
+      density: 2930,
+      urbanRatio: 0.99,
+      coordinates: { lat: 41.0082, lng: 28.9784 },
+    }
     const { result } = renderHook(() => useNearbyComparison(province, 'home'))
 
     expect(result.current).toBeDefined()
-    expect(result.current?.centerProvince).toBeDefined()
+    expect(result.current?.currentProvince).toBeDefined()
   })
 })
 
@@ -320,7 +358,7 @@ describe('useNationalStatistics', () => {
 
     expect(result.current).toBeDefined()
     expect(result.current.totalPolicies).toBeGreaterThan(0)
-    expect(result.current.averagePremium).toBeGreaterThan(0)
+    expect(result.current.avgPremiumPerCapita).toBeGreaterThan(0)
   })
 })
 

@@ -152,10 +152,10 @@ describe('useCostTracking', () => {
     })
 
     act(() => {
-      result.current.setBudget({ monthly: 200 })
+      result.current.setBudget({ monthlyLimit: 200 })
     })
 
-    expect(mockSetBudget).toHaveBeenCalledWith({ monthly: 200 })
+    expect(mockSetBudget).toHaveBeenCalledWith({ monthlyLimit: 200 })
   })
 
   it('should handle errors', async () => {

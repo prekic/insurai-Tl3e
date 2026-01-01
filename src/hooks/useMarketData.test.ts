@@ -24,7 +24,7 @@ vi.mock('@/lib/data-repository', () => ({
       lastUpdated: '2024-01-15',
     }),
     getBenchmark: vi.fn().mockResolvedValue({
-      policyType: 'home',
+      type: 'home',
       premiumRange: { min: 1000, max: 5000, average: 2500 },
       coverageRange: { min: 100000, max: 500000, recommended: 250000 },
     }),
@@ -53,14 +53,20 @@ vi.mock('@/lib/data-repository', () => ({
       riskFactor: 1.2,
     }),
     calculateRegionalAdjustment: vi.fn().mockResolvedValue({
-      adjustedPremium: 3000,
-      factor: 1.2,
-      reason: 'High risk zone',
+      region: 'marmara',
+      baseFactor: 1.2,
+      riskMultiplier: 1.0,
+      adjustedValue: 3000,
     }),
     compareToBenchmark: vi.fn().mockResolvedValue({
-      comparison: 'above',
+      policyType: 'home',
+      field: 'premium',
+      currentValue: 3000,
+      marketMin: 1000,
+      marketMax: 5000,
+      marketAverage: 2500,
       percentile: 75,
-      difference: 500,
+      assessment: 'above_market',
     }),
     refresh: vi.fn().mockResolvedValue(undefined),
     validateData: vi.fn().mockResolvedValue({ valid: true, errors: [] }),
@@ -110,7 +116,7 @@ describe('useMarketData', () => {
     const benchmark = await result.current.getBenchmark('home')
 
     expect(benchmark).toBeDefined()
-    expect(benchmark?.policyType).toBe('home')
+    expect(benchmark?.type).toBe('home')
   })
 
   it('should provide getPremiumRange function', async () => {
@@ -188,7 +194,7 @@ describe('useMarketData', () => {
     const adjustment = await result.current.calculateRegionalAdjustment(2500, 'marmara', 'home')
 
     expect(adjustment).toBeDefined()
-    expect(adjustment.factor).toBeGreaterThan(1)
+    expect(adjustment.baseFactor).toBeGreaterThan(1)
   })
 
   it('should provide compareToBenchmark function', async () => {
@@ -201,7 +207,7 @@ describe('useMarketData', () => {
     const comparison = await result.current.compareToBenchmark('home', 'premium', 3000)
 
     expect(comparison).toBeDefined()
-    expect(comparison?.comparison).toBe('above')
+    expect(comparison?.assessment).toBe('above_market')
   })
 
   it('should support refresh', async () => {
@@ -271,16 +277,20 @@ describe('usePolicyBenchmark', () => {
   })
 
   it('should update when policy type changes', async () => {
-    const { result, rerender } = renderHook(
+    type TestPolicyType = 'home' | 'kasko' | 'traffic' | 'health' | 'life' | 'dask' | 'business'
+    const { result, rerender } = renderHook<
+      ReturnType<typeof usePolicyBenchmark>,
+      { policyType: TestPolicyType }
+    >(
       ({ policyType }) => usePolicyBenchmark(policyType),
-      { initialProps: { policyType: 'home' as const } }
+      { initialProps: { policyType: 'home' } }
     )
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)
     })
 
-    rerender({ policyType: 'kasko' as const })
+    rerender({ policyType: 'kasko' })
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false)

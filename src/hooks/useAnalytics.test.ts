@@ -25,10 +25,12 @@ const {
   mockInitialize: vi.fn(),
   mockDestroy: vi.fn(),
   mockGetSessionInfo: vi.fn().mockReturnValue({
-    sessionId: 'session-123',
-    startTime: Date.now(),
+    id: 'session-123',
+    startedAt: Date.now(),
+    lastActivityAt: Date.now(),
     pageViews: 5,
-    features: ['dashboard', 'policies'],
+    events: 10,
+    duration: 60000,
   }),
   mockGetStats: vi.fn().mockResolvedValue({
     totalEvents: 100,
@@ -160,7 +162,7 @@ describe('useSession', () => {
     const { result } = renderHook(() => useSession())
 
     expect(result.current).toBeDefined()
-    expect(result.current?.sessionId).toBe('session-123')
+    expect(result.current?.id).toBe('session-123')
   })
 
   it('should update periodically', () => {
@@ -240,25 +242,25 @@ describe('useFeatureTracking', () => {
   })
 
   it('should provide trackSuccess function', () => {
-    const { result } = renderHook(() => useFeatureTracking('upload'))
+    const { result } = renderHook(() => useFeatureTracking('policy_upload'))
 
     act(() => {
       result.current.trackSuccess({ fileSize: 1024 })
     })
 
-    expect(mockTrackFeature).toHaveBeenCalledWith('upload', 'submit', expect.objectContaining({
+    expect(mockTrackFeature).toHaveBeenCalledWith('policy_upload', 'submit', expect.objectContaining({
       success: true,
     }))
   })
 
   it('should provide trackFailure function', () => {
-    const { result } = renderHook(() => useFeatureTracking('upload'))
+    const { result } = renderHook(() => useFeatureTracking('policy_upload'))
 
     act(() => {
       result.current.trackFailure(new Error('Upload failed'))
     })
 
-    expect(mockTrackFeature).toHaveBeenCalledWith('upload', 'submit', expect.objectContaining({
+    expect(mockTrackFeature).toHaveBeenCalledWith('policy_upload', 'submit', expect.objectContaining({
       success: false,
     }))
     expect(mockTrackError).toHaveBeenCalled()

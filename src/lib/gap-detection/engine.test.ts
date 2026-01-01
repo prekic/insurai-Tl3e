@@ -158,7 +158,8 @@ describe('Gap Detection Engine', () => {
         },
       })
 
-      // Custom config with stricter thresholds might find more gaps
+      // Both analyses should be valid
+      expect(defaultAnalysis.analyzedAt).toBeDefined()
       expect(customAnalysis.analyzedAt).toBeDefined()
     })
 

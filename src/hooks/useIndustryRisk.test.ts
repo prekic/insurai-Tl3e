@@ -43,9 +43,9 @@ const {
   }
 
   const mockAssessment = {
-    business: { sector: 'technology', size: 'small', revenue: 5000000 },
+    business: { sector: 'technology', size: 'small', annualRevenue: 5000000 },
     overallScore: 0.6,
-    riskLevel: 'medium',
+    overallRiskLevel: 'medium',
     recommendations: [],
     premiumEstimate: 18000,
   }
@@ -177,14 +177,13 @@ describe('useBusinessRiskAssessment', () => {
       result.current.assess({
         sector: 'technology',
         size: 'small',
-        revenue: 5000000,
-        employees: 25,
-        region: 'marmara',
+        annualRevenue: 5000000,
+        employeeCount: 25,
       })
     })
 
     expect(result.current.assessment).toBeDefined()
-    expect(result.current.assessment?.riskLevel).toBe('medium')
+    expect(result.current.assessment?.overallRiskLevel).toBe('medium')
   })
 
   it('should provide reset function', () => {
@@ -194,9 +193,8 @@ describe('useBusinessRiskAssessment', () => {
       result.current.assess({
         sector: 'technology',
         size: 'small',
-        revenue: 5000000,
-        employees: 25,
-        region: 'marmara',
+        annualRevenue: 5000000,
+        employeeCount: 25,
       })
     })
 

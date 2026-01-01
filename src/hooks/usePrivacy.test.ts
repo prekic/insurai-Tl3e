@@ -19,16 +19,16 @@ vi.mock('@/lib/privacy/consent-manager', () => ({
     initialize: vi.fn().mockResolvedValue(undefined),
     recordConsent: vi.fn().mockResolvedValue({
       id: 'consent-123',
-      type: 'essential',
+      type: 'data_processing',
       granted: true,
       timestamp: Date.now(),
     }),
     revokeConsent: vi.fn().mockResolvedValue(undefined),
   },
   CONSENT_REQUIREMENTS: [
-    { type: 'essential', required: true, name: 'Essential' },
-    { type: 'analytics', required: false, name: 'Analytics' },
-    { type: 'marketing', required: false, name: 'Marketing' },
+    { type: 'terms_of_service', required: true, name: 'Terms of Service' },
+    { type: 'data_processing', required: false, name: 'Data Processing' },
+    { type: 'marketing_email', required: false, name: 'Marketing Email' },
   ],
   checkRequiredConsents: vi.fn().mockResolvedValue({
     allGranted: true,
@@ -37,8 +37,8 @@ vi.mock('@/lib/privacy/consent-manager', () => ({
   getUserConsentStatus: vi.fn().mockResolvedValue({
     userId: 'user-123',
     consents: {
-      essential: { granted: true, timestamp: Date.now() },
-      analytics: { granted: false, timestamp: null },
+      data_processing: { granted: true, timestamp: Date.now() },
+      marketing_email: { granted: false, timestamp: null },
     },
   }),
 }))
@@ -119,7 +119,7 @@ describe('useConsent', () => {
     })
 
     await act(async () => {
-      const record = await result.current.grantConsent('essential')
+      const record = await result.current.grantConsent('data_processing')
       expect(record).toBeDefined()
     })
   })
@@ -132,7 +132,7 @@ describe('useConsent', () => {
     })
 
     await act(async () => {
-      const success = await result.current.withdrawConsent('analytics')
+      const success = await result.current.withdrawConsent('data_processing')
       expect(typeof success).toBe('boolean')
     })
   })
@@ -144,8 +144,8 @@ describe('useConsent', () => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(result.current.hasConsent('essential')).toBe(true)
-    expect(result.current.hasConsent('marketing')).toBe(false)
+    expect(result.current.hasConsent('data_processing')).toBe(true)
+    expect(result.current.hasConsent('marketing_email')).toBe(false)
   })
 
   it('should provide refresh function', async () => {
@@ -178,11 +178,11 @@ describe('useConsentRequirements', () => {
     expect(result.current.optionalConsents.length).toBeGreaterThan(0)
   })
 
-  it('should have essential in required consents', () => {
+  it('should have terms_of_service in required consents', () => {
     const { result } = renderHook(() => useConsentRequirements())
 
-    const essential = result.current.requiredConsents.find(c => c.type === 'essential')
-    expect(essential).toBeDefined()
+    const tos = result.current.requiredConsents.find(c => c.type === 'terms_of_service')
+    expect(tos).toBeDefined()
   })
 })
 
