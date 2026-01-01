@@ -18,9 +18,67 @@ dotenv.config()
 
 const app = express()
 const PORT = process.env.API_PORT || 3001
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
-// Security middleware
-app.use(helmet())
+// Security middleware with CSP configuration
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          // Sentry for error tracking
+          'https://*.sentry.io',
+          'https://*.sentry-cdn.com',
+          // Allow inline scripts in development (Vite HMR)
+          ...(IS_PRODUCTION ? [] : ["'unsafe-inline'", "'unsafe-eval'"]),
+        ],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'", // Required for Tailwind and inline styles
+          'https://fonts.googleapis.com',
+        ],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          // Supabase storage
+          'https://*.supabase.co',
+        ],
+        connectSrc: [
+          "'self'",
+          // Backend API proxy
+          process.env.FRONTEND_URL || 'http://localhost:5173',
+          // Supabase
+          'https://*.supabase.co',
+          'wss://*.supabase.co',
+          // Sentry
+          'https://*.sentry.io',
+          'https://*.ingest.sentry.io',
+          // Development WebSocket (Vite HMR)
+          ...(IS_PRODUCTION ? [] : ['ws://localhost:*', 'wss://localhost:*']),
+        ],
+        frameSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
+        frameAncestors: ["'none'"],
+        workerSrc: ["'self'", 'blob:'],
+        childSrc: ["'self'", 'blob:'],
+        mediaSrc: ["'self'"],
+        manifestSrc: ["'self'"],
+        upgradeInsecureRequests: IS_PRODUCTION ? [] : null,
+      },
+      reportOnly: false,
+    },
+    // Additional security headers
+    crossOriginEmbedderPolicy: false, // Disable for Supabase compatibility
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+)
 
 // CORS configuration
 const corsOptions = {

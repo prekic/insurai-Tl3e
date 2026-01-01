@@ -7,6 +7,10 @@ import App from './App.tsx'
 import { initSentry } from './lib/sentry'
 initSentry()
 
+// Set up CSP violation monitoring
+import { setupCSPViolationListener } from './lib/security/csp'
+setupCSPViolationListener()
+
 // Validate environment on startup
 import { validateEnvironment } from './lib/env'
 validateEnvironment()
