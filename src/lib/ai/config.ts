@@ -74,6 +74,10 @@ function getApiKey(envKey: string | undefined, storageKey: string): string | nul
   return null
 }
 
+// Valid provider names
+const VALID_PROVIDERS = ['openai', 'anthropic', 'google'] as const
+type ValidProvider = (typeof VALID_PROVIDERS)[number]
+
 /**
  * Check if a specific AI provider is configured
  * Returns true if either:
@@ -81,7 +85,12 @@ function getApiKey(envKey: string | undefined, storageKey: string): string | nul
  * 2. Direct API key is available (development mode)
  */
 export function isProviderConfigured(provider: 'openai' | 'anthropic' | 'google'): boolean {
-  // If proxy is configured, assume providers are available
+  // Validate provider is a known value
+  if (!VALID_PROVIDERS.includes(provider as ValidProvider)) {
+    return false
+  }
+
+  // If proxy is configured, assume known providers are available
   // (actual availability will be checked at runtime)
   if (isProxyConfigured()) {
     return true
