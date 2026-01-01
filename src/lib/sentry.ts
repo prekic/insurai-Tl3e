@@ -146,7 +146,9 @@ export function captureMessage(
   level: 'info' | 'warning' | 'error' = 'info'
 ): void {
   if (!SENTRY_DSN) {
-    console.log(`[${level}] ${message}`)
+    // Fallback to console when Sentry isn't configured
+    // eslint-disable-next-line no-console
+    console.info(`[${level}] ${message}`)
     return
   }
 

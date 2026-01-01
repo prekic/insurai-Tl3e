@@ -20,6 +20,7 @@ export function sanitizeString(input: string): string {
     // Remove null bytes
     .replace(/\0/g, '')
     // Remove control characters (except newlines and tabs)
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     // Trim excessive whitespace
     .trim()
@@ -34,6 +35,7 @@ export function sanitizeDocumentText(input: string): string {
     // Remove null bytes
     .replace(/\0/g, '')
     // Remove most control characters (keep newlines, tabs, carriage returns)
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
     // Limit length to prevent abuse (10MB text limit)
     .slice(0, 10 * 1024 * 1024)

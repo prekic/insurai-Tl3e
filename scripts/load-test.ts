@@ -171,7 +171,7 @@ async function testRateLimiting(): Promise<void> {
   })
 
   const notes: string[] = []
-  let passed = true
+  const passed = true
 
   // We expect some 429 responses under heavy load
   if (result.non2xx > 0) {
@@ -297,7 +297,7 @@ async function main(): Promise<void> {
       throw new Error(`Health check failed: ${response.status}`)
     }
     console.log('   Server status: ✅ Running')
-  } catch (error) {
+  } catch (_error) {
     console.error('   Server status: ❌ Not reachable')
     console.error(`   Please start the server with: npm run dev:server`)
     process.exit(1)

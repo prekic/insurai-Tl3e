@@ -1,0 +1,103 @@
+# =============================================================================
+# InsurAI Docker Ignore
+# Exclude files not needed for Docker builds
+# =============================================================================
+
+# Dependencies - Will be installed fresh in container
+node_modules
+.pnp
+.pnp.js
+
+# Build outputs - Will be generated in container
+dist
+dist-server
+build
+.next
+out
+
+# Development files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Testing
+coverage
+.nyc_output
+*.lcov
+__tests__
+__mocks__
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+vitest.config.ts
+playwright.config.ts
+playwright-report
+test-results
+
+# IDE and editor files
+.idea
+.vscode
+*.swp
+*.swo
+*.swn
+.DS_Store
+*.sublime-workspace
+*.sublime-project
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs
+CHANGELOG
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Supabase local development
+supabase/.branches
+supabase/.temp
+
+# Scripts and configs not needed in container
+.eslintrc*
+.prettierrc*
+.editorconfig
+.nvmrc
+.tool-versions
+
+# GitHub
+.github
+
+# Docker files (avoid recursive issues)
+docker-compose*.yml
+Dockerfile*
+.dockerignore
+
+# Load testing
+load-tests
+k6
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+.parcel-cache
+
+# Secrets (should never be in image)
+.env
+.env.*
+!.env.example
+secrets
+credentials
+*.pem
+*.key

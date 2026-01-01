@@ -1,0 +1,47 @@
+# InsurAI Docker Compose - Development
+# Run: docker-compose up -d
+
+version: '3.8'
+
+services:
+  # Frontend + Backend combined
+  app:
+    build:
+      context: .
+      target: fullstack
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_API_PROXY_URL: ${VITE_API_PROXY_URL:-http://localhost:3001}
+        VITE_APP_URL: ${VITE_APP_URL:-http://localhost}
+        VITE_SENTRY_DSN: ${VITE_SENTRY_DSN:-}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-dev}
+    ports:
+      - "80:80"
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - API_PORT=3001
+      - FRONTEND_URL=http://localhost
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_CLOUD_API_KEY=${GOOGLE_CLOUD_API_KEY}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Optional: Redis for session/cache (future use)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   restart: unless-stopped
+
+# volumes:
+#   redis_data:
