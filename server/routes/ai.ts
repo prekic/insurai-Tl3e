@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import { aiExtractionLimiter, ocrLimiter } from '../middleware/rate-limit'
 
 const router = Router()
 
@@ -34,8 +35,9 @@ function getAnthropicClient(): Anthropic | null {
 /**
  * POST /api/ai/extract/openai
  * Proxy for OpenAI policy extraction
+ * Rate limited: 20 requests per hour
  */
-router.post('/extract/openai', async (req: Request, res: Response) => {
+router.post('/extract/openai', aiExtractionLimiter, async (req: Request, res: Response) => {
   try {
     const client = getOpenAIClient()
     if (!client) {
@@ -93,8 +95,9 @@ router.post('/extract/openai', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/extract/anthropic
  * Proxy for Anthropic/Claude policy extraction
+ * Rate limited: 20 requests per hour
  */
-router.post('/extract/anthropic', async (req: Request, res: Response) => {
+router.post('/extract/anthropic', aiExtractionLimiter, async (req: Request, res: Response) => {
   try {
     const client = getAnthropicClient()
     if (!client) {
@@ -158,8 +161,9 @@ router.post('/extract/anthropic', async (req: Request, res: Response) => {
 /**
  * POST /api/ai/ocr
  * Proxy for Google Cloud Vision OCR
+ * Rate limited: 30 requests per hour
  */
-router.post('/ocr', async (req: Request, res: Response) => {
+router.post('/ocr', ocrLimiter, async (req: Request, res: Response) => {
   try {
     const apiKey = process.env.GOOGLE_CLOUD_API_KEY
     if (!apiKey) {

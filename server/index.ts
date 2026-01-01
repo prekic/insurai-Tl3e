@@ -8,10 +8,14 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 
 import aiRoutes from './routes/ai'
+import {
+  generalLimiter,
+  healthLimiter,
+  rateLimitConfig,
+} from './middleware/rate-limit'
 
 // Load environment variables
 dotenv.config()
@@ -89,21 +93,16 @@ const corsOptions = {
 }
 app.use(cors(corsOptions))
 
-// Rate limiting - 100 requests per 15 minutes per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: { error: 'Too many requests, please try again later' },
-  standardHeaders: true,
-  legacyHeaders: false,
-})
-app.use('/api/', limiter)
+// Rate limiting - tiered limits for different endpoints
+// General API: 100 requests per 15 minutes
+// AI endpoints have stricter limits (configured in routes)
+app.use('/api/', generalLimiter)
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 
-// Health check endpoint
-app.get('/api/health', (_req, res) => {
+// Health check endpoint (with separate, more permissive limiter)
+app.get('/api/health', healthLimiter, (_req, res) => {
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -111,6 +110,20 @@ app.get('/api/health', (_req, res) => {
       openai: !!process.env.OPENAI_API_KEY,
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       google: !!process.env.GOOGLE_CLOUD_API_KEY,
+    },
+    rateLimits: {
+      general: {
+        windowMs: rateLimitConfig.general.windowMs,
+        max: rateLimitConfig.general.max,
+      },
+      ai: {
+        windowMs: rateLimitConfig.ai.windowMs,
+        max: rateLimitConfig.ai.max,
+      },
+      ocr: {
+        windowMs: rateLimitConfig.ocr.windowMs,
+        max: rateLimitConfig.ocr.max,
+      },
     },
   })
 })
