@@ -3,6 +3,7 @@ import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles,
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
+import { PolicyDocuments } from './PolicyDocuments'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { usePolicies } from '@/lib/policy-context'
 
@@ -186,6 +187,9 @@ export function PolicyDetailView() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Policy Documents */}
+            <PolicyDocuments policyId={policy.id} />
 
             {/* AI Insights */}
             <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
