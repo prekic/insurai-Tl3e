@@ -102,6 +102,7 @@ export async function deletePolicy(id: string): Promise<void> {
 
 /**
  * Upload a policy document to storage
+ * Path format: policy-documents/{user_id}/{policy_id}/{timestamp}.{ext}
  */
 export async function uploadPolicyDocument(
   policyId: string,
@@ -111,9 +112,17 @@ export async function uploadPolicyDocument(
     throw new Error('Supabase is not configured')
   }
 
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${policyId}/${Date.now()}.${fileExt}`
-  const filePath = `policy-documents/${fileName}`
+  // Get current user for user-scoped path
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    throw new Error('User must be authenticated to upload documents')
+  }
+
+  const fileExt = file.name.split('.').pop()?.toLowerCase() || 'pdf'
+  // Path format: policy-documents/{user_id}/{policy_id}/{timestamp}.{ext}
+  const filePath = `policy-documents/${user.id}/${policyId}/${Date.now()}.${fileExt}`
 
   const { error: uploadError } = await supabase.storage
     .from('documents')
@@ -124,11 +133,14 @@ export async function uploadPolicyDocument(
 
   if (uploadError) throw uploadError
 
-  const { data } = supabase.storage
+  // Get signed URL for private bucket (not public URL)
+  const { data: signedUrlData, error: signedUrlError } = await supabase.storage
     .from('documents')
-    .getPublicUrl(filePath)
+    .createSignedUrl(filePath, 3600) // 1 hour expiry
 
-  // Also store reference in policy_documents table
+  if (signedUrlError) throw signedUrlError
+
+  // Store reference in policy_documents table
   const docInsert: PolicyDocumentInsert = {
     policy_id: policyId,
     file_name: file.name,
@@ -145,7 +157,7 @@ export async function uploadPolicyDocument(
 
   return {
     path: filePath,
-    url: data.publicUrl,
+    url: signedUrlData.signedUrl,
   }
 }
 
@@ -165,6 +177,47 @@ export async function getPolicyDocuments(policyId: string): Promise<PolicyDocume
 
   if (error) throw error
   return (data as PolicyDocumentRow[]) || []
+}
+
+/**
+ * Get a signed URL for a document (for private bucket access)
+ */
+export async function getDocumentSignedUrl(
+  filePath: string,
+  expiresIn: number = 3600
+): Promise<string | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  const { data, error } = await supabase.storage
+    .from('documents')
+    .createSignedUrl(filePath, expiresIn)
+
+  if (error) {
+    console.error('Failed to create signed URL:', error.message)
+    return null
+  }
+
+  return data.signedUrl
+}
+
+/**
+ * Get documents with signed URLs for a policy
+ */
+export async function getPolicyDocumentsWithUrls(
+  policyId: string
+): Promise<Array<PolicyDocumentRow & { signedUrl: string | null }>> {
+  const documents = await getPolicyDocuments(policyId)
+
+  const docsWithUrls = await Promise.all(
+    documents.map(async (doc) => ({
+      ...doc,
+      signedUrl: await getDocumentSignedUrl(doc.file_path),
+    }))
+  )
+
+  return docsWithUrls
 }
 
 /**

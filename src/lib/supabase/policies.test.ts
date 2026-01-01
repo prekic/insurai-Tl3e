@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Use vi.hoisted to define mocks before module hoisting
-const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
+const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
   const mockFrom = vi.fn()
   const mockSelect = vi.fn()
   const mockInsert = vi.fn()
@@ -13,6 +13,8 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
   const mockUpload = vi.fn()
   const mockRemove = vi.fn()
   const mockGetPublicUrl = vi.fn()
+  const mockCreateSignedUrl = vi.fn()
+  const mockGetUser = vi.fn()
   const mockIsConfigured = vi.fn(() => true)
 
   const mockSupabase = {
@@ -22,11 +24,15 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
         upload: mockUpload,
         remove: mockRemove,
         getPublicUrl: mockGetPublicUrl,
+        createSignedUrl: mockCreateSignedUrl,
       })),
+    },
+    auth: {
+      getUser: mockGetUser,
     },
   }
 
-  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockSupabase, mockIsConfigured }
+  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockSupabase, mockIsConfigured }
 })
 
 vi.mock('./client', () => ({
@@ -87,6 +93,16 @@ describe('Policy Service', () => {
     // Setup getPublicUrl mock
     mockGetPublicUrl.mockReturnValue({
       data: { publicUrl: 'https://example.com/test.pdf' },
+    })
+    // Setup createSignedUrl mock
+    mockCreateSignedUrl.mockResolvedValue({
+      data: { signedUrl: 'https://example.com/signed/test.pdf' },
+      error: null,
+    })
+    // Setup getUser mock
+    mockGetUser.mockResolvedValue({
+      data: { user: { id: 'user-123', email: 'test@example.com' } },
+      error: null,
     })
   })
 
@@ -265,13 +281,13 @@ describe('Policy Service', () => {
   })
 
   describe('uploadPolicyDocument', () => {
-    it('should upload a file to storage', async () => {
+    it('should upload a file to storage with user-scoped path', async () => {
       const mockFile = new File(['test content'], 'test.pdf', {
         type: 'application/pdf',
       })
 
       mockUpload.mockResolvedValue({
-        data: { path: 'policy-documents/1/123.pdf' },
+        data: { path: 'policy-documents/user-123/1/123.pdf' },
         error: null,
       })
 
@@ -292,7 +308,21 @@ describe('Policy Service', () => {
 
       expect(result).toHaveProperty('path')
       expect(result).toHaveProperty('url')
-      expect(result.url).toBe('https://example.com/test.pdf')
+      expect(result.path).toContain('policy-documents/user-123/1/')
+      expect(result.url).toBe('https://example.com/signed/test.pdf')
+    })
+
+    it('should throw error when user is not authenticated', async () => {
+      const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+
+      mockGetUser.mockResolvedValueOnce({
+        data: { user: null },
+        error: null,
+      })
+
+      await expect(uploadPolicyDocument('1', mockFile)).rejects.toThrow(
+        'User must be authenticated to upload documents'
+      )
     })
 
     it('should throw error on upload failure', async () => {

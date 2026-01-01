@@ -47,8 +47,11 @@ export {
   createPolicy,
   updatePolicy,
   deletePolicy as deleteSupabasePolicy,
+  // Document storage
   uploadPolicyDocument,
   getPolicyDocuments,
+  getDocumentSignedUrl,
+  getPolicyDocumentsWithUrls,
   deletePolicyDocument,
   // Search
   searchPolicies,
