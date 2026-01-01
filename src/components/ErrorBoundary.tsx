@@ -1,6 +1,7 @@
 import { Component, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
 import { Button } from './ui/button'
+import { captureError, addBreadcrumb } from '@/lib/sentry'
 
 interface Props {
   children: ReactNode
@@ -11,15 +12,16 @@ interface Props {
 interface State {
   hasError: boolean
   error: Error | null
+  eventId: string | null
 }
 
 export class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false, error: null, eventId: null }
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { hasError: true, error }
   }
 
@@ -27,17 +29,30 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log error to console in development
     console.error('ErrorBoundary caught an error:', error, errorInfo)
 
-    // In production, you would send this to an error reporting service
-    // logErrorToService(error, errorInfo)
+    // Report to Sentry in production
+    const eventId = captureError(error, {
+      componentStack: errorInfo.componentStack,
+      errorBoundary: 'AppErrorBoundary',
+    })
+
+    if (eventId) {
+      this.setState({ eventId })
+    }
+
+    // Add breadcrumb for context
+    addBreadcrumb('Error boundary triggered', 'error', {
+      errorMessage: error.message,
+      componentStack: errorInfo.componentStack?.slice(0, 500),
+    })
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: null })
+    this.setState({ hasError: false, error: null, eventId: null })
     this.props.onReset?.()
   }
 
   handleGoHome = () => {
-    this.setState({ hasError: false, error: null })
+    this.setState({ hasError: false, error: null, eventId: null })
     window.location.href = '/'
   }
 

@@ -2,9 +2,28 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Sentry source map upload (only when auth token is configured)
+    ...(process.env.SENTRY_AUTH_TOKEN
+      ? [
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG || 'insurai',
+            project: process.env.SENTRY_PROJECT || 'insurai-web',
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            sourcemaps: {
+              assets: './dist/**',
+            },
+            // Only upload in production builds
+            disable: process.env.NODE_ENV !== 'production',
+          }),
+        ]
+      : []),
+  ],
   resolve: {
     alias: {
       '@': '/src',
