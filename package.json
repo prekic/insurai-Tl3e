@@ -20,7 +20,10 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:coverage:open": "vitest run --coverage && open coverage/index.html",
-    "validate": "npm run typecheck && npm run lint && npm run test"
+    "validate": "npm run typecheck && npm run lint && npm run test",
+    "loadtest": "tsx scripts/load-test.ts",
+    "loadtest:quick": "LOAD_TEST_DURATION=5 tsx scripts/load-test.ts",
+    "loadtest:stress": "LOAD_TEST_DURATION=30 LOAD_TEST_CONNECTIONS=100 tsx scripts/load-test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",
@@ -62,12 +65,14 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.1.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/autocannon": "^7.12.7",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "@vitest/coverage-v8": "^2.1.9",
+    "autocannon": "^8.0.0",
     "autoprefixer": "^10.4.20",
     "concurrently": "^9.1.0",
     "dotenv": "^17.2.3",
