@@ -195,8 +195,10 @@ Configure in GitHub Settings → Secrets:
 
 | Secret | Description |
 |--------|-------------|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `STAGING_SUPABASE_URL` | Supabase project URL (staging) |
+| `STAGING_SUPABASE_ANON_KEY` | Supabase anonymous key (staging) |
+| `STAGING_API_URL` | Backend API URL (staging) |
+| `STAGING_APP_URL` | Frontend URL (staging) |
 | `VERCEL_TOKEN` | Vercel deployment token |
 | `VERCEL_ORG_ID` | Vercel organization ID |
 | `VERCEL_PROJECT_ID` | Vercel project ID |
@@ -204,6 +206,9 @@ Configure in GitHub Settings → Secrets:
 | `OPENAI_API_KEY` | OpenAI API key |
 | `ANTHROPIC_API_KEY` | Anthropic API key |
 | `SENTRY_DSN` | Sentry error tracking DSN |
+| `SENTRY_AUTH_TOKEN` | Sentry auth token for source maps |
+| `SENTRY_ORG` | Sentry organization slug |
+| `SENTRY_PROJECT` | Sentry project slug |
 
 ---
 
@@ -217,7 +222,8 @@ Configure in GitHub Settings → Secrets:
 | `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anonymous key |
 | `VITE_API_PROXY_URL` | Yes | Backend API URL |
 | `VITE_APP_URL` | No | Frontend URL (for CORS) |
-| `VITE_SENTRY_DSN` | No | Sentry error tracking |
+| `VITE_SENTRY_DSN` | No | Sentry error tracking DSN |
+| `VITE_SENTRY_ENVIRONMENT` | No | Sentry environment tag |
 | `VITE_APP_VERSION` | No | App version for tracking |
 | `VITE_DEBUG_MODE` | No | Enable debug features |
 
@@ -231,6 +237,9 @@ Configure in GitHub Settings → Secrets:
 | `OPENAI_API_KEY` | No* | OpenAI API key |
 | `ANTHROPIC_API_KEY` | No* | Anthropic API key |
 | `GOOGLE_CLOUD_API_KEY` | No* | Google Cloud API key |
+| `SENTRY_DSN` | No | Sentry error tracking DSN |
+| `SENTRY_ENVIRONMENT` | No | Sentry environment tag |
+| `APP_VERSION` | No | App version for Sentry releases |
 
 *At least one AI provider key required for AI features.
 

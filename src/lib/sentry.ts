@@ -11,6 +11,40 @@ const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN
 const IS_PRODUCTION = import.meta.env.PROD
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.1.0'
 
+// Environment detection: use explicit env var or infer from build mode
+const SENTRY_ENVIRONMENT =
+  import.meta.env.VITE_SENTRY_ENVIRONMENT ||
+  (IS_PRODUCTION ? 'production' : 'development')
+
+const IS_STAGING = SENTRY_ENVIRONMENT === 'staging'
+
+// Sample rates differ by environment
+// Production: conservative to reduce costs
+// Staging: higher for debugging
+// Development: full sampling
+const getSampleRates = () => {
+  if (IS_STAGING) {
+    return {
+      traces: 0.5, // 50% of transactions
+      replaysSession: 0.3, // 30% of sessions
+      replaysOnError: 1.0, // 100% on error
+    }
+  }
+  if (IS_PRODUCTION) {
+    return {
+      traces: 0.1, // 10% of transactions
+      replaysSession: 0.1, // 10% of sessions
+      replaysOnError: 1.0, // 100% on error
+    }
+  }
+  // Development
+  return {
+    traces: 1.0,
+    replaysSession: 0,
+    replaysOnError: 1.0,
+  }
+}
+
 /**
  * Initialize Sentry error tracking
  * Call this at app startup before rendering
@@ -24,19 +58,21 @@ export function initSentry(): void {
     return
   }
 
+  const sampleRates = getSampleRates()
+
   Sentry.init({
     dsn: SENTRY_DSN,
 
     // Environment and release tracking
-    environment: IS_PRODUCTION ? 'production' : 'development',
+    environment: SENTRY_ENVIRONMENT,
     release: `insurai@${APP_VERSION}`,
 
-    // Performance monitoring (sample 10% of transactions in production)
-    tracesSampleRate: IS_PRODUCTION ? 0.1 : 1.0,
+    // Performance monitoring
+    tracesSampleRate: sampleRates.traces,
 
-    // Session replay for debugging (sample 10% of sessions, 100% on error)
-    replaysSessionSampleRate: IS_PRODUCTION ? 0.1 : 0,
-    replaysOnErrorSampleRate: 1.0,
+    // Session replay for debugging
+    replaysSessionSampleRate: sampleRates.replaysSession,
+    replaysOnErrorSampleRate: sampleRates.replaysOnError,
 
     // Integration configuration
     integrations: [
@@ -62,8 +98,9 @@ export function initSentry(): void {
       'AbortError',
     ],
 
-    // Don't send errors in development unless explicitly enabled
-    enabled: IS_PRODUCTION || import.meta.env.VITE_SENTRY_DEBUG === 'true',
+    // Enable in production and staging, or development with debug flag
+    enabled:
+      IS_PRODUCTION || IS_STAGING || import.meta.env.VITE_SENTRY_DEBUG === 'true',
 
     // Sanitize sensitive data
     beforeSend(event) {

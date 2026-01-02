@@ -77,7 +77,13 @@ jobs:
           VITE_API_PROXY_URL: ${{ secrets.STAGING_API_URL }}
           VITE_APP_URL: ${{ secrets.STAGING_APP_URL }}
           VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          VITE_SENTRY_ENVIRONMENT: staging
           VITE_APP_VERSION: ${{ github.sha }}
+          # Sentry source map upload
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+          NODE_ENV: production
         run: npm run build
 
       - name: Build server

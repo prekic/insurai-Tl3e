@@ -10,19 +10,34 @@ import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
 
+// Load environment variables first (before Sentry init)
+dotenv.config()
+
 import aiRoutes from './routes/ai'
 import {
   generalLimiter,
   healthLimiter,
   rateLimitConfig,
 } from './middleware/rate-limit'
+import {
+  initServerSentry,
+  sentryRequestHandler,
+  sentryErrorHandler,
+  captureServerError,
+} from './lib/sentry'
 
-// Load environment variables
-dotenv.config()
+// Initialize Sentry for error tracking
+initServerSentry()
 
 const app = express()
 const PORT = process.env.API_PORT || 3001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+const IS_STAGING = process.env.NODE_ENV === 'staging'
+
+// Sentry request handler must be first middleware
+if (IS_PRODUCTION || IS_STAGING) {
+  app.use(sentryRequestHandler())
+}
 
 // Security middleware with CSP configuration
 app.use(
@@ -136,9 +151,21 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
 
+// Sentry error handler must be before other error handlers
+if (IS_PRODUCTION || IS_STAGING) {
+  app.use(sentryErrorHandler())
+}
+
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  // Log error (also captured by Sentry in production/staging)
   console.error('Server error:', err)
+
+  // Capture to Sentry if not already handled by sentryErrorHandler
+  if (process.env.NODE_ENV === 'development') {
+    captureServerError(err)
+  }
+
   res.status(500).json({
     error: 'Internal server error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined,
