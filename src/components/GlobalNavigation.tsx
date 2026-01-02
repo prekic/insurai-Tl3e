@@ -2,11 +2,13 @@ import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upl
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { usePolicies } from '@/lib/policy-context'
+import { useAuth } from '@/lib/supabase/auth-context'
 
 export function GlobalNavigation() {
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
+  const { user, signOut } = useAuth()
   const policyCount = policies.length
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
@@ -67,6 +69,17 @@ export function GlobalNavigation() {
   const handleMenuItemClick = (path: string) => {
     setShowProfileMenu(false)
     navigate(path)
+  }
+
+  const handleSignOut = async () => {
+    setShowProfileMenu(false)
+    try {
+      await signOut()
+      navigate('/')
+    } catch {
+      // Navigate anyway on error
+      navigate('/')
+    }
   }
 
   return (
@@ -187,8 +200,10 @@ export function GlobalNavigation() {
                     aria-label="User menu"
                   >
                     <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="font-semibold text-gray-900">John Doe</p>
-                      <p className="text-xs text-gray-500">john@example.com</p>
+                      <p className="font-semibold text-gray-900">
+                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
                     </div>
                     <button
                       onClick={() => handleMenuItemClick('/account')}
@@ -216,7 +231,7 @@ export function GlobalNavigation() {
                     </button>
                     <div className="border-t border-gray-100 mt-2 pt-2">
                       <button
-                        onClick={() => handleMenuItemClick('/')}
+                        onClick={handleSignOut}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left focus-ring"
                         role="menuitem"
                       >
