@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Use vi.hoisted to define mocks before module hoisting
-const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
+const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockLimit, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
   const mockFrom = vi.fn()
   const mockSelect = vi.fn()
   const mockInsert = vi.fn()
@@ -15,10 +15,14 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
   const mockGetPublicUrl = vi.fn()
   const mockCreateSignedUrl = vi.fn()
   const mockGetUser = vi.fn()
+  const mockRpc = vi.fn()
+  const mockOr = vi.fn()
+  const mockLimit = vi.fn()
   const mockIsConfigured = vi.fn(() => true)
 
   const mockSupabase = {
     from: mockFrom,
+    rpc: mockRpc,
     storage: {
       from: vi.fn(() => ({
         upload: mockUpload,
@@ -32,7 +36,7 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
     },
   }
 
-  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockSupabase, mockIsConfigured }
+  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockLimit, mockSupabase, mockIsConfigured }
 })
 
 vi.mock('./client', () => ({
@@ -50,8 +54,16 @@ import {
   uploadPolicyDocument,
   getPolicyDocuments,
   deletePolicyDocument,
+  getDocumentSignedUrl,
+  getPolicyDocumentsWithUrls,
+  searchPolicies,
+  getPolicyHistory,
+  getPolicyVersion,
+  createPolicyVersion,
+  restorePolicyVersion,
+  getPolicyStats,
 } from './policies'
-import type { PolicyInsert, PolicyUpdate } from './types'
+import type { PolicyInsert, PolicyUpdate, PolicyRow, PolicyVersionRow, PolicyDocumentRow } from './types'
 
 describe('Policy Service', () => {
   beforeEach(() => {
@@ -87,6 +99,8 @@ describe('Policy Service', () => {
     })
     mockEq.mockReturnValue({
       select: mockSelect,
+      order: mockOrder,
+      single: mockSingle,
       data: null,
       error: null,
     })
@@ -374,6 +388,741 @@ describe('Policy Service', () => {
       await deletePolicyDocument('doc-1', 'policy-documents/test/file.pdf')
 
       expect(mockRemove).toHaveBeenCalled()
+    })
+
+    it('should throw when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      await expect(deletePolicyDocument('doc-1', 'path/file.pdf')).rejects.toThrow(
+        'Supabase is not configured'
+      )
+    })
+
+    it('should throw on storage delete failure', async () => {
+      mockRemove.mockResolvedValue({ error: { message: 'Storage error' } })
+
+      await expect(deletePolicyDocument('doc-1', 'path/file.pdf')).rejects.toThrow()
+    })
+
+    it('should throw on database delete failure', async () => {
+      mockRemove.mockResolvedValue({ error: null })
+      // First mockEq is for policy_documents delete
+      mockFrom.mockReturnValueOnce({
+        delete: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({ error: { message: 'Database error' } }),
+        }),
+      })
+
+      await expect(deletePolicyDocument('doc-1', 'path/file.pdf')).rejects.toThrow()
+    })
+  })
+
+  // ===========================================================================
+  // fetchPolicy edge cases
+  // ===========================================================================
+
+  describe('fetchPolicy edge cases', () => {
+    it('should return null when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await fetchPolicy('1')
+
+      expect(result).toBeNull()
+    })
+
+    it('should return null for PGRST116 (not found) error', async () => {
+      mockSelect.mockReturnValue({
+        eq: vi.fn().mockReturnValue({
+          single: vi.fn().mockReturnValue({
+            data: null,
+            error: { code: 'PGRST116', message: 'Not found' },
+          }),
+        }),
+      })
+
+      const result = await fetchPolicy('nonexistent')
+
+      expect(result).toBeNull()
+    })
+  })
+
+  // ===========================================================================
+  // getDocumentSignedUrl Tests
+  // ===========================================================================
+
+  describe('getDocumentSignedUrl', () => {
+    it('should return signed URL for a document', async () => {
+      mockCreateSignedUrl.mockResolvedValue({
+        data: { signedUrl: 'https://example.com/signed/doc.pdf' },
+        error: null,
+      })
+
+      const result = await getDocumentSignedUrl('path/to/doc.pdf')
+
+      expect(result).toBe('https://example.com/signed/doc.pdf')
+    })
+
+    it('should return null when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await getDocumentSignedUrl('path/to/doc.pdf')
+
+      expect(result).toBeNull()
+    })
+
+    it('should return null on error', async () => {
+      mockCreateSignedUrl.mockResolvedValue({
+        data: null,
+        error: { message: 'Failed to create signed URL' },
+      })
+
+      const result = await getDocumentSignedUrl('path/to/doc.pdf')
+
+      expect(result).toBeNull()
+    })
+
+    it('should use custom expiry time', async () => {
+      mockCreateSignedUrl.mockResolvedValue({
+        data: { signedUrl: 'https://example.com/signed/doc.pdf' },
+        error: null,
+      })
+
+      await getDocumentSignedUrl('path/to/doc.pdf', 7200)
+
+      expect(mockCreateSignedUrl).toHaveBeenCalledWith('path/to/doc.pdf', 7200)
+    })
+  })
+
+  // ===========================================================================
+  // getPolicyDocumentsWithUrls Tests
+  // ===========================================================================
+
+  describe('getPolicyDocumentsWithUrls', () => {
+    it('should return documents with signed URLs', async () => {
+      const mockDocuments: Partial<PolicyDocumentRow>[] = [
+        { id: 'doc-1', file_name: 'policy.pdf', file_path: 'path/doc1.pdf', policy_id: '1' },
+        { id: 'doc-2', file_name: 'addendum.pdf', file_path: 'path/doc2.pdf', policy_id: '1' },
+      ]
+
+      // Override the full chain for policy_documents query
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({ data: mockDocuments, error: null }),
+        }),
+      })
+
+      mockCreateSignedUrl.mockResolvedValue({
+        data: { signedUrl: 'https://example.com/signed/doc.pdf' },
+        error: null,
+      })
+
+      const result = await getPolicyDocumentsWithUrls('1')
+
+      expect(result.length).toBe(2)
+      expect(result[0].signedUrl).toBe('https://example.com/signed/doc.pdf')
+      expect(result[1].signedUrl).toBe('https://example.com/signed/doc.pdf')
+    })
+
+    it('should return null signedUrl when URL creation fails', async () => {
+      const mockDocuments: Partial<PolicyDocumentRow>[] = [
+        { id: 'doc-1', file_name: 'policy.pdf', file_path: 'path/doc1.pdf', policy_id: '1' },
+      ]
+
+      // Override the full chain for policy_documents query
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({ data: mockDocuments, error: null }),
+        }),
+      })
+
+      mockCreateSignedUrl.mockResolvedValue({
+        data: null,
+        error: { message: 'Failed' },
+      })
+
+      const result = await getPolicyDocumentsWithUrls('1')
+
+      expect(result[0].signedUrl).toBeNull()
+    })
+  })
+
+  // ===========================================================================
+  // searchPolicies Tests
+  // ===========================================================================
+
+  describe('searchPolicies', () => {
+    it('should return empty array when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await searchPolicies('test')
+
+      expect(result).toEqual([])
+    })
+
+    it('should return all policies for empty query', async () => {
+      const mockPolicies = [
+        { id: '1', policy_number: 'POL-001' },
+        { id: '2', policy_number: 'POL-002' },
+      ]
+      mockOrder.mockReturnValue({ data: mockPolicies, error: null })
+
+      const result = await searchPolicies('')
+
+      expect(mockFrom).toHaveBeenCalledWith('policies')
+      expect(result).toEqual(mockPolicies)
+    })
+
+    it('should search using RPC function', async () => {
+      const mockPolicies = [{ id: '1', policy_number: 'POL-001' }]
+      mockRpc.mockResolvedValue({ data: mockPolicies, error: null })
+
+      const result = await searchPolicies('POL-001')
+
+      expect(mockRpc).toHaveBeenCalledWith('search_policies', { search_query: 'POL-001' })
+      expect(result).toEqual(mockPolicies)
+    })
+
+    it('should fall back to ILIKE search when RPC fails', async () => {
+      mockRpc.mockResolvedValue({ data: null, error: { message: 'Function not found' } })
+
+      const mockPolicies = [{ id: '1', policy_number: 'POL-001' }]
+      mockOr.mockReturnValue({
+        order: vi.fn().mockReturnValue({ data: mockPolicies, error: null }),
+      })
+      mockSelect.mockReturnValue({ or: mockOr })
+
+      const result = await searchPolicies('POL-001')
+
+      expect(result).toEqual(mockPolicies)
+    })
+
+    it('should trim whitespace from query', async () => {
+      mockRpc.mockResolvedValue({ data: [], error: null })
+
+      await searchPolicies('  test  ')
+
+      expect(mockRpc).toHaveBeenCalledWith('search_policies', { search_query: 'test' })
+    })
+  })
+
+  // ===========================================================================
+  // getPolicyHistory Tests
+  // ===========================================================================
+
+  describe('getPolicyHistory', () => {
+    it('should return empty array when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await getPolicyHistory('1')
+
+      expect(result).toEqual([])
+    })
+
+    it('should fetch version history ordered by version number', async () => {
+      const mockVersions = [
+        { id: 'v1', policy_id: '1', version_number: 2, change_type: 'updated' },
+        { id: 'v2', policy_id: '1', version_number: 1, change_type: 'created' },
+      ]
+
+      // Override the full chain for policy_versions query
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({ data: mockVersions, error: null }),
+        }),
+      })
+
+      const result = await getPolicyHistory('1')
+
+      expect(mockFrom).toHaveBeenCalledWith('policy_versions')
+      expect(result).toEqual(mockVersions)
+    })
+
+    it('should throw on error', async () => {
+      // Override the full chain for policy_versions query with error
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({ data: null, error: { message: 'Database error' } }),
+        }),
+      })
+
+      await expect(getPolicyHistory('1')).rejects.toThrow()
+    })
+  })
+
+  // ===========================================================================
+  // getPolicyVersion Tests
+  // ===========================================================================
+
+  describe('getPolicyVersion', () => {
+    it('should return null when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await getPolicyVersion('1', 1)
+
+      expect(result).toBeNull()
+    })
+
+    it('should fetch specific version by policy ID and version number', async () => {
+      const mockVersion = {
+        id: 'v1',
+        policy_id: '1',
+        version_number: 2,
+        change_type: 'updated',
+        new_data: { premium: 5000 },
+      }
+
+      // Override the full chain for policy_versions query with double eq
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({ data: mockVersion, error: null }),
+          }),
+        }),
+      })
+
+      const result = await getPolicyVersion('1', 2)
+
+      expect(mockFrom).toHaveBeenCalledWith('policy_versions')
+      expect(result).toEqual(mockVersion)
+    })
+
+    it('should return null for PGRST116 (not found) error', async () => {
+      // Override the full chain for policy_versions query with error
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({
+              data: null,
+              error: { code: 'PGRST116', message: 'Not found' },
+            }),
+          }),
+        }),
+      })
+
+      const result = await getPolicyVersion('1', 99)
+
+      expect(result).toBeNull()
+    })
+
+    it('should throw on other errors', async () => {
+      // Override the full chain for policy_versions query with error
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({
+              data: null,
+              error: { code: 'OTHER', message: 'Database error' },
+            }),
+          }),
+        }),
+      })
+
+      await expect(getPolicyVersion('1', 1)).rejects.toThrow()
+    })
+  })
+
+  // ===========================================================================
+  // createPolicyVersion Tests
+  // ===========================================================================
+
+  describe('createPolicyVersion', () => {
+    it('should throw when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      await expect(
+        createPolicyVersion('1', 'updated', 'Test change', null, { premium: 5000 })
+      ).rejects.toThrow('Supabase is not configured')
+    })
+
+    it('should create version with next version number', async () => {
+      // Mock fetching existing versions with full chain
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              data: [{ version_number: 3 }],
+              error: null,
+            }),
+          }),
+        }),
+      })
+
+      // Mock insert
+      const newVersion = {
+        id: 'v4',
+        policy_id: '1',
+        version_number: 4,
+        change_type: 'manual_edit',
+        change_summary: 'Updated premium',
+        previous_data: { premium: 4000 },
+        new_data: { premium: 5000 },
+      }
+
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockReturnValue({ data: newVersion, error: null }),
+        }),
+      })
+
+      const result = await createPolicyVersion(
+        '1',
+        'manual_edit',
+        'Updated premium',
+        { premium: 4000 },
+        { premium: 5000 }
+      )
+
+      expect(result).toEqual(newVersion)
+    })
+
+    it('should start at version 1 when no versions exist', async () => {
+      // Mock no existing versions with full chain
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              data: [],
+              error: null,
+            }),
+          }),
+        }),
+      })
+
+      const newVersion = {
+        id: 'v1',
+        policy_id: '1',
+        version_number: 1,
+        change_type: 'created',
+      }
+
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockReturnValue({ data: newVersion, error: null }),
+        }),
+      })
+
+      const result = await createPolicyVersion('1', 'created', 'Initial version', null, {})
+
+      expect(result.version_number).toBe(1)
+    })
+
+    it('should throw on insert error', async () => {
+      // Mock fetching existing versions with full chain
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            limit: vi.fn().mockReturnValue({
+              data: [],
+              error: null,
+            }),
+          }),
+        }),
+      })
+
+      mockInsert.mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          single: vi.fn().mockReturnValue({
+            data: null,
+            error: { message: 'Insert failed' },
+          }),
+        }),
+      })
+
+      await expect(
+        createPolicyVersion('1', 'updated', 'Test', null, {})
+      ).rejects.toThrow()
+    })
+  })
+
+  // ===========================================================================
+  // restorePolicyVersion Tests
+  // ===========================================================================
+
+  describe('restorePolicyVersion', () => {
+    it('should throw when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      await expect(restorePolicyVersion('1', 1)).rejects.toThrow(
+        'Supabase is not configured'
+      )
+    })
+
+    it('should throw when version not found', async () => {
+      // Mock getPolicyVersion returning not found
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({
+              data: null,
+              error: { code: 'PGRST116', message: 'Not found' },
+            }),
+          }),
+        }),
+      })
+
+      await expect(restorePolicyVersion('1', 99)).rejects.toThrow(
+        'Version 99 not found for policy 1'
+      )
+    })
+
+    it('should restore policy to previous version', async () => {
+      const versionData = {
+        id: 'v2',
+        policy_id: '1',
+        version_number: 2,
+        new_data: {
+          policy_number: 'POL-001',
+          provider: 'Old Insurance',
+          premium: 4000,
+          coverage: 400000,
+          type: 'home',
+          type_tr: 'Konut',
+          start_date: '2024-01-01',
+          expiry_date: '2025-01-01',
+          status: 'active',
+          insured_person: 'Test User',
+          location: 'Istanbul',
+          deductible: 1000,
+          raw_data: null,
+        },
+      }
+
+      // Mock getPolicyVersion with full chain
+      mockSelect.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({ data: versionData, error: null }),
+          }),
+        }),
+      })
+
+      // Mock updatePolicy with full chain from update
+      const updatedPolicy = {
+        id: '1',
+        ...versionData.new_data,
+      }
+      mockUpdate.mockReturnValueOnce({
+        eq: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue({
+            single: vi.fn().mockReturnValue({ data: updatedPolicy, error: null }),
+          }),
+        }),
+      })
+
+      const result = await restorePolicyVersion('1', 2)
+
+      expect(mockUpdate).toHaveBeenCalled()
+      expect(result).toEqual(updatedPolicy)
+    })
+  })
+
+  // ===========================================================================
+  // getPolicyStats Tests
+  // ===========================================================================
+
+  describe('getPolicyStats', () => {
+    it('should return empty stats when Supabase is not configured', async () => {
+      mockIsConfigured.mockReturnValueOnce(false)
+
+      const result = await getPolicyStats()
+
+      expect(result).toEqual({
+        total: 0,
+        active: 0,
+        expiring: 0,
+        expired: 0,
+        byType: {},
+        totalCoverage: 0,
+        totalPremium: 0,
+      })
+    })
+
+    it('should calculate stats from policies', async () => {
+      const mockPolicies: Partial<PolicyRow>[] = [
+        { id: '1', status: 'active', type: 'home', coverage: 500000, premium: 2500 },
+        { id: '2', status: 'active', type: 'home', coverage: 300000, premium: 1500 },
+        { id: '3', status: 'expiring', type: 'kasko', coverage: 100000, premium: 3000 },
+        { id: '4', status: 'expired', type: 'traffic', coverage: 50000, premium: 500 },
+      ]
+
+      mockOrder.mockReturnValue({ data: mockPolicies, error: null })
+
+      const result = await getPolicyStats()
+
+      expect(result.total).toBe(4)
+      expect(result.active).toBe(2)
+      expect(result.expiring).toBe(1)
+      expect(result.expired).toBe(1)
+      expect(result.byType).toEqual({ home: 2, kasko: 1, traffic: 1 })
+      expect(result.totalCoverage).toBe(950000)
+      expect(result.totalPremium).toBe(7500)
+    })
+
+    it('should handle empty policy list', async () => {
+      mockOrder.mockReturnValue({ data: [], error: null })
+
+      const result = await getPolicyStats()
+
+      expect(result.total).toBe(0)
+      expect(result.active).toBe(0)
+      expect(result.byType).toEqual({})
+      expect(result.totalCoverage).toBe(0)
+      expect(result.totalPremium).toBe(0)
+    })
+  })
+
+  // ===========================================================================
+  // Edge Cases and Error Handling
+  // ===========================================================================
+
+  describe('Edge Cases', () => {
+    describe('createPolicy edge cases', () => {
+      it('should throw when Supabase is not configured', async () => {
+        mockIsConfigured.mockReturnValueOnce(false)
+
+        const newPolicy: PolicyInsert = {
+          user_id: 'user-123',
+          policy_number: 'POL-001',
+          provider: 'Test',
+          type: 'home',
+          type_tr: 'Konut',
+          coverage: 100000,
+          premium: 1000,
+          start_date: '2024-01-01',
+          expiry_date: '2025-01-01',
+          insured_person: 'Test',
+        }
+
+        await expect(createPolicy(newPolicy)).rejects.toThrow('Supabase is not configured')
+      })
+    })
+
+    describe('updatePolicy edge cases', () => {
+      it('should throw when Supabase is not configured', async () => {
+        mockIsConfigured.mockReturnValueOnce(false)
+
+        await expect(updatePolicy('1', { premium: 5000 })).rejects.toThrow(
+          'Supabase is not configured'
+        )
+      })
+
+      it('should throw on update error', async () => {
+        // Mock update chain with error
+        mockUpdate.mockReturnValueOnce({
+          eq: vi.fn().mockReturnValue({
+            select: vi.fn().mockReturnValue({
+              single: vi.fn().mockReturnValue({
+                data: null,
+                error: { message: 'Update failed' },
+              }),
+            }),
+          }),
+        })
+
+        await expect(updatePolicy('1', { premium: 5000 })).rejects.toThrow()
+      })
+    })
+
+    describe('deletePolicy edge cases', () => {
+      it('should throw when Supabase is not configured', async () => {
+        mockIsConfigured.mockReturnValueOnce(false)
+
+        await expect(deletePolicy('1')).rejects.toThrow('Supabase is not configured')
+      })
+    })
+
+    describe('uploadPolicyDocument edge cases', () => {
+      it('should throw when Supabase is not configured', async () => {
+        mockIsConfigured.mockReturnValueOnce(false)
+
+        const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+
+        await expect(uploadPolicyDocument('1', mockFile)).rejects.toThrow(
+          'Supabase is not configured'
+        )
+      })
+
+      it('should handle file without extension', async () => {
+        // Files without extension use the filename as extension (not ideal but that's the current behavior)
+        const mockFile = new File(['test'], 'testfile', { type: 'application/pdf' })
+
+        mockUpload.mockResolvedValue({
+          data: { path: 'policy-documents/user-123/1/123.testfile' },
+          error: null,
+        })
+
+        mockFrom.mockImplementation((table: string) => {
+          if (table === 'policy_documents') {
+            return { insert: vi.fn().mockReturnValue({ error: null }) }
+          }
+          return {
+            select: mockSelect,
+            insert: mockInsert,
+            update: mockUpdate,
+            delete: mockDelete,
+          }
+        })
+
+        const result = await uploadPolicyDocument('1', mockFile)
+
+        // Files without '.' use the whole filename as extension
+        expect(result.path).toContain('testfile')
+      })
+
+      it('should throw on signed URL creation failure', async () => {
+        const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+
+        mockUpload.mockResolvedValue({
+          data: { path: 'path/test.pdf' },
+          error: null,
+        })
+
+        mockCreateSignedUrl.mockResolvedValueOnce({
+          data: null,
+          error: { message: 'Failed to create signed URL' },
+        })
+
+        await expect(uploadPolicyDocument('1', mockFile)).rejects.toThrow()
+      })
+
+      it('should throw on document insert failure', async () => {
+        const mockFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
+
+        mockUpload.mockResolvedValue({
+          data: { path: 'path/test.pdf' },
+          error: null,
+        })
+
+        mockFrom.mockImplementation((table: string) => {
+          if (table === 'policy_documents') {
+            return { insert: vi.fn().mockReturnValue({ error: { message: 'Insert failed' } }) }
+          }
+          return { select: mockSelect }
+        })
+
+        await expect(uploadPolicyDocument('1', mockFile)).rejects.toThrow()
+      })
+    })
+
+    describe('getPolicyDocuments edge cases', () => {
+      it('should return empty array when Supabase is not configured', async () => {
+        mockIsConfigured.mockReturnValueOnce(false)
+
+        const result = await getPolicyDocuments('1')
+
+        expect(result).toEqual([])
+      })
+
+      it('should throw on query error', async () => {
+        mockEq.mockReturnValue({
+          order: vi.fn().mockReturnValue({
+            data: null,
+            error: { message: 'Query failed' },
+          }),
+        })
+
+        await expect(getPolicyDocuments('1')).rejects.toThrow()
+      })
     })
   })
 })
