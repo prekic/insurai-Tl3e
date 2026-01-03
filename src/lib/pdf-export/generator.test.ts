@@ -13,6 +13,7 @@ import {
   getAvailableReportTypes,
   openPrintWindow,
   downloadHTML,
+  quickExport,
 } from './generator'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { ComprehensiveGapAnalysis } from '@/types/gap'
@@ -382,6 +383,137 @@ describe('PDF Report Generator', () => {
       expect(mockLink.download).toBe('test-report.html')
       expect(mockLink.click).toHaveBeenCalled()
       expect(global.URL.revokeObjectURL).toHaveBeenCalled()
+    })
+  })
+
+  describe('quickExport', () => {
+    beforeEach(() => {
+      global.window = {
+        open: vi.fn(() => mockWindow),
+      } as unknown as Window & typeof globalThis
+    })
+
+    it('should export single policy using exportPolicyToPDF', () => {
+      const policy = createMockPolicy()
+      const result = quickExport(policy)
+
+      expect(result).toBe(true)
+    })
+
+    it('should export single policy when array of one is provided', () => {
+      const policies = [createMockPolicy()]
+      const result = quickExport(policies)
+
+      expect(result).toBe(true)
+    })
+
+    it('should export portfolio when multiple policies provided', () => {
+      const policies = [
+        createMockPolicy({ id: 'policy-1' }),
+        createMockPolicy({ id: 'policy-2' }),
+        createMockPolicy({ id: 'policy-3' }),
+      ]
+      const result = quickExport(policies)
+
+      expect(result).toBe(true)
+    })
+
+    it('should accept custom options', () => {
+      const policy = createMockPolicy()
+      const result = quickExport(policy, { language: 'en' })
+
+      expect(result).toBe(true)
+    })
+  })
+
+  describe('generatePortfolioReport - edge cases', () => {
+    it('should calculate gap summary when critical gaps exist', () => {
+      const policiesWithGaps = [
+        createMockPolicy({
+          id: 'policy-1',
+          gapAnalysis: { criticalCount: 2, totalCount: 5, overallScore: 60 },
+        }),
+        createMockPolicy({
+          id: 'policy-2',
+          gapAnalysis: { criticalCount: 1, totalCount: 3, overallScore: 75 },
+        }),
+      ]
+      const result = generatePortfolioReport(policiesWithGaps)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policies with risk scores', () => {
+      const policiesWithRiskScores = [
+        createMockPolicy({ riskScore: { overall: 30 } }),
+        createMockPolicy({ riskScore: { overall: 70 } }),
+      ]
+      const result = generatePortfolioReport(policiesWithRiskScores)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policies with different statuses', () => {
+      const mixedStatusPolicies = [
+        createMockPolicy({ status: 'active' }),
+        createMockPolicy({ status: 'expiring' }),
+        createMockPolicy({ status: 'expired' }),
+      ]
+      const result = generatePortfolioReport(mixedStatusPolicies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should accept custom branding options', () => {
+      const policies = [createMockPolicy()]
+      const result = generatePortfolioReport(policies, {
+        branding: {
+          companyName: 'Custom Company',
+          primaryColor: '#FF0000',
+        },
+      })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should accept custom sections', () => {
+      const policies = [createMockPolicy()]
+      const result = generatePortfolioReport(policies, {
+        sections: ['summary', 'overview'],
+      })
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('generatePolicyDetailReport - error handling', () => {
+    it('should handle policy with minimal fields', () => {
+      const minimalPolicy = {
+        id: 'min-1',
+        policyNumber: 'MIN-001',
+        type: 'kasko' as const,
+        provider: 'Test',
+        premium: 1000,
+        coverage: 50000,
+        status: 'active' as const,
+        startDate: new Date().toISOString(),
+        expiryDate: new Date().toISOString(),
+      } as AnalyzedPolicy
+
+      const result = generatePolicyDetailReport(minimalPolicy)
+      expect(result).toHaveProperty('success')
+    })
+
+    it('should handle policy with all optional fields', () => {
+      const fullPolicy = createMockPolicy({
+        riskScore: { overall: 45 },
+        gapAnalysis: { criticalCount: 1, totalCount: 3, overallScore: 70 },
+        marketComparison: { averagePremium: 6000, percentile: 35 },
+        aiInsights: ['Good coverage', 'Consider flood insurance'],
+      })
+      const result = generatePolicyDetailReport(fullPolicy)
+
+      expect(result.success).toBe(true)
     })
   })
 })

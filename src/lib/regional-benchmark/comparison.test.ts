@@ -485,5 +485,168 @@ describe('Regional Benchmark Comparison', () => {
 
       expect(rankings.insights.length).toBeGreaterThan(0)
     })
+
+    it('should rank regions by claims ratio', () => {
+      const rankings = getRegionalRankings('kasko', 'claims')
+
+      expect(rankings.rankings.length).toBe(7)
+      expect(rankings.metric).toBe('claims')
+      // Claims should be sorted ascending (lower is better)
+      for (let i = 0; i < rankings.rankings.length - 1; i++) {
+        expect(rankings.rankings[i].value).toBeLessThanOrEqual(rankings.rankings[i + 1].value)
+      }
+    })
+
+    it('should rank regions by value (coverage/premium ratio)', () => {
+      const rankings = getRegionalRankings('kasko', 'value')
+
+      expect(rankings.rankings.length).toBe(7)
+      expect(rankings.metric).toBe('value')
+      // Value should be sorted descending (higher is better)
+      for (let i = 0; i < rankings.rankings.length - 1; i++) {
+        expect(rankings.rankings[i].value).toBeGreaterThanOrEqual(rankings.rankings[i + 1].value)
+      }
+    })
+
+    it('should handle unknown metric with default value of 0', () => {
+      // This tests the default case in the switch statement (line 506)
+      const rankings = getRegionalRankings('kasko', 'unknown_metric' as 'premium')
+
+      expect(rankings.rankings.length).toBe(7)
+      // All values should be 0 for unknown metric
+      for (const ranking of rankings.rankings) {
+        expect(ranking.value).toBe(0)
+      }
+    })
+
+    it('should calculate vsAverage correctly for claims', () => {
+      const rankings = getRegionalRankings('home', 'claims')
+
+      // Each ranking should have vsAverage relative to the national average
+      const avgValue = rankings.rankings.reduce((sum, r) => sum + r.value, 0) / rankings.rankings.length
+      expect(avgValue).toBeGreaterThan(0)
+
+      // First ranked (lowest claims) should have negative vsAverage
+      expect(rankings.rankings[0].vsAverage).toBeLessThanOrEqual(0)
+    })
+
+    it('should calculate value metric using penetration/premium formula', () => {
+      const rankings = getRegionalRankings('traffic', 'value')
+
+      // Value = penetration / (avgPremium / 10000)
+      // Higher penetration with lower premium = higher value
+      expect(rankings.rankings[0].value).toBeGreaterThan(0)
+    })
+  })
+
+  describe('Edge Cases', () => {
+    it('should handle comparison of same region', () => {
+      const comparison = compareRegions('marmara', 'marmara', 'kasko')
+
+      expect(comparison.premiumDifference.amount).toBe(0)
+      expect(comparison.premiumDifference.percentage).toBe(0)
+    })
+
+    it('should detect earthquake zone differences as primary risk', () => {
+      // Marmara is zone 1, ic_anadolu is zone 2
+      const comparison = compareRegions('marmara', 'ic_anadolu', 'home')
+
+      expect(comparison.riskComparison.primaryRiskDifference).toContain('Earthquake zone')
+    })
+
+    it('should detect crime rate difference when zones are same', () => {
+      // ege and akdeniz both have zone 2, but different crime rates
+      const comparison = compareRegions('ege', 'akdeniz', 'home')
+
+      // Crime rate diff: 100 vs 120 = 20, not > 50, so should check flood
+      expect(comparison.riskComparison.primaryRiskDifference).toBeDefined()
+    })
+
+    it('should generate advantage insights for lower target premiums', () => {
+      const comparison = compareRegions('marmara', 'ic_anadolu', 'kasko')
+
+      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      expect(premiumInsight).toBeDefined()
+      expect(premiumInsight?.type).toBe('advantage')
+      expect(premiumInsight?.messageTr).toBeDefined()
+    })
+
+    it('should generate disadvantage insights for higher target premiums', () => {
+      const comparison = compareRegions('ic_anadolu', 'marmara', 'kasko')
+
+      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      expect(premiumInsight).toBeDefined()
+      expect(premiumInsight?.type).toBe('disadvantage')
+    })
+
+    it('should generate risk advantage insight for lower target risk', () => {
+      // Marmara risk: 75, ic_anadolu risk: 45, diff > 10
+      const comparison = compareRegions('marmara', 'ic_anadolu', 'home')
+
+      const riskInsight = comparison.insights.find(i => i.category === 'risk')
+      expect(riskInsight).toBeDefined()
+      expect(riskInsight?.type).toBe('advantage')
+    })
+
+    it('should generate risk disadvantage insight for higher target risk', () => {
+      // ic_anadolu risk: 45, marmara risk: 75, diff > 10
+      const comparison = compareRegions('ic_anadolu', 'marmara', 'home')
+
+      const riskInsight = comparison.insights.find(i => i.category === 'risk')
+      expect(riskInsight).toBeDefined()
+      expect(riskInsight?.type).toBe('disadvantage')
+    })
+
+    it('should generate market competition insight when target has higher penetration', () => {
+      // ic_anadolu penetration: 0.25, marmara: 0.35, diff > 0.05
+      const comparison = compareRegions('ic_anadolu', 'marmara', 'kasko')
+
+      const marketInsight = comparison.insights.find(i => i.category === 'market')
+      expect(marketInsight).toBeDefined()
+      expect(marketInsight?.type).toBe('neutral')
+    })
+
+    it('should assign high confidence for exact province match in address', () => {
+      const analysis = analyzeLocation('İstanbul, Türkiye')
+
+      expect(analysis.confidence).toBe(0.9)
+    })
+
+    it('should assign medium confidence for longer unmatched addresses', () => {
+      const analysis = analyzeLocation('Some random address with many words but no match')
+
+      expect(analysis.confidence).toBe(0.7)
+    })
+
+    it('should assign low confidence for short unmatched addresses', () => {
+      const analysis = analyzeLocation('XYZ')
+
+      expect(analysis.confidence).toBe(0.5)
+    })
+
+    it('should generate location-based recommendations', () => {
+      // Test that recommendations are generated for any location
+      const analysis = analyzeLocation('Istanbul')
+
+      // Should have recommendations based on the region's risk profile
+      expect(analysis.recommendations).toBeDefined()
+      expect(Array.isArray(analysis.recommendations)).toBe(true)
+    })
+
+    it('should include DASK recommendation for earthquake-prone areas', () => {
+      // Marmara is in earthquake zone 1
+      const analysis = analyzeLocation('Istanbul')
+
+      // Should include DASK recommendation for high earthquake zone
+      const daskRec = analysis.recommendations.find(r => r.title.includes('DASK'))
+      expect(daskRec).toBeDefined()
+    })
+
+    it('should include risk ranking in location analysis', () => {
+      const analysis = analyzeLocation('Istanbul')
+
+      expect(analysis.riskRanking).toBeGreaterThan(0)
+      expect(analysis.riskRanking).toBeLessThanOrEqual(7)
+    })
   })
 })

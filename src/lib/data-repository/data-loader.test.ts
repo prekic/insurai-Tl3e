@@ -543,3 +543,118 @@ describe('Data Quality', () => {
     expect(result.metadata?.quality.issues).toEqual([])
   })
 })
+
+// =============================================================================
+// Freshness Check Edge Cases
+// =============================================================================
+
+describe('Freshness Check Edge Cases', () => {
+  let loader: MarketDataLoader
+
+  beforeEach(() => {
+    loader = new MarketDataLoader()
+    invalidateDataCache()
+  })
+
+  it('should return not fresh when load fails', async () => {
+    // Create a new loader and invalidate to ensure fresh state
+    const freshLoader = new MarketDataLoader()
+
+    // Override loadRepository to simulate failure
+    const originalLoad = freshLoader.loadRepository.bind(freshLoader)
+    freshLoader.loadRepository = vi.fn().mockResolvedValueOnce({
+      success: false,
+      data: null,
+      metadata: null,
+      source: 'embedded',
+      loadedAt: Date.now(),
+    })
+
+    const result = await freshLoader.checkFreshness()
+
+    expect(result.fresh).toBe(false)
+    expect(result.freshnessScore).toBe(0)
+    expect(result.recommendation).toContain('reload required')
+    expect(result.lastUpdated).toBeNull()
+  })
+
+  it('should return recommendation to update when data needs refresh', async () => {
+    const { needsRefresh } = await import('@/types/data-repository')
+    vi.mocked(needsRefresh).mockReturnValueOnce(true)
+
+    const result = await loader.checkFreshness()
+
+    expect(result.recommendation).toContain('should be updated')
+  })
+
+  it('should include lastUpdated from metadata', async () => {
+    const result = await loader.checkFreshness()
+
+    expect(result.lastUpdated).toBeDefined()
+    expect(typeof result.lastUpdated).toBe('string')
+  })
+})
+
+// =============================================================================
+// Cache Invalidation
+// =============================================================================
+
+describe('Cache Invalidation', () => {
+  let loader: MarketDataLoader
+
+  beforeEach(() => {
+    loader = new MarketDataLoader()
+    invalidateDataCache()
+  })
+
+  it('should reset internal state on invalidation', async () => {
+    // Load data
+    await loader.loadRepository()
+
+    // Invalidate
+    loader.invalidateCache()
+
+    // Next load should be from source
+    const result = await loader.loadRepository()
+    expect(result.source).toBe('embedded')
+  })
+
+  it('should allow multiple invalidations', () => {
+    // Should not throw
+    loader.invalidateCache()
+    loader.invalidateCache()
+    loader.invalidateCache()
+  })
+})
+
+// =============================================================================
+// Concurrent Loading
+// =============================================================================
+
+describe('Concurrent Loading', () => {
+  let loader: MarketDataLoader
+
+  beforeEach(() => {
+    loader = new MarketDataLoader()
+    invalidateDataCache()
+  })
+
+  it('should handle concurrent load requests', async () => {
+    // Start multiple loads simultaneously
+    const [result1, result2, result3] = await Promise.all([
+      loader.loadRepository(),
+      loader.loadRepository(),
+      loader.loadRepository(),
+    ])
+
+    // All should succeed
+    expect(result1.success).toBe(true)
+    expect(result2.success).toBe(true)
+    expect(result3.success).toBe(true)
+
+    // All should return valid sources (cache or embedded)
+    expect(['cache', 'embedded', 'remote']).toContain(result1.source)
+    expect(['cache', 'embedded', 'remote']).toContain(result2.source)
+    expect(['cache', 'embedded', 'remote']).toContain(result3.source)
+  })
+})

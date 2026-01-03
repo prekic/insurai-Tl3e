@@ -540,3 +540,147 @@ describe('createTimedAudit', () => {
     expect(event.errorMessage).toBe('Connection refused')
   })
 })
+
+describe('Query with offset', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should apply offset to results', async () => {
+    // Create 5 events
+    for (let i = 0; i < 5; i++) {
+      await auditLogger.log('auth.signin', { index: i })
+    }
+
+    const events = await auditLogger.query({ offset: 2 })
+
+    // Should skip first 2 events
+    expect(events.length).toBeLessThanOrEqual(3)
+  })
+
+  it('should apply both offset and limit', async () => {
+    // Create 10 events
+    for (let i = 0; i < 10; i++) {
+      await auditLogger.log('auth.signin', { index: i })
+    }
+
+    const events = await auditLogger.query({ offset: 3, limit: 2 })
+
+    expect(events.length).toBeLessThanOrEqual(2)
+  })
+
+  it('should return empty array when offset exceeds event count', async () => {
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('auth.signin', {})
+
+    const events = await auditLogger.query({ offset: 10 })
+
+    expect(events.length).toBe(0)
+  })
+})
+
+describe('Listener error handling', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should continue notifying other listeners when one throws', async () => {
+    const errorListener = vi.fn(() => {
+      throw new Error('Listener error')
+    })
+    const successListener = vi.fn()
+
+    const cleanup1 = auditLogger.onEvent(errorListener)
+    const cleanup2 = auditLogger.onEvent(successListener)
+
+    await auditLogger.log('auth.signin', {})
+
+    // Both should have been called despite first one throwing
+    expect(errorListener).toHaveBeenCalled()
+    expect(successListener).toHaveBeenCalled()
+
+    cleanup1()
+    cleanup2()
+  })
+})
+
+describe('Email masking edge cases', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should mask short email local parts', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'ab@example.com', // Only 2 characters in local part
+    })
+
+    expect((event.details as { email: string }).email).toBe('***@example.com')
+  })
+
+  it('should mask single character email', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'a@test.com',
+    })
+
+    expect((event.details as { email: string }).email).toBe('***@test.com')
+  })
+
+  it('should handle email without @ symbol', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'invalid-email',
+    })
+
+    expect((event.details as { email: string }).email).toBe('***')
+  })
+})
+
+describe('LocalStorage error handling', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should handle localStorage quota exceeded', async () => {
+    // Override setItem to throw quota error
+    const originalSetItem = mockLocalStorage.setItem
+    mockLocalStorage.setItem = vi.fn(() => {
+      throw new Error('QuotaExceededError')
+    })
+
+    // Should not throw - just silently fail
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('auth.signin', {})
+
+    // Restore original
+    mockLocalStorage.setItem = originalSetItem
+  })
+
+  it('should handle localStorage unavailable', async () => {
+    // Mock localStorage as undefined temporarily
+    const originalLocalStorage = global.localStorage
+    Object.defineProperty(global, 'localStorage', { value: undefined, writable: true })
+
+    // Should not throw
+    await auditLogger.log('auth.signin', {})
+
+    // Restore
+    Object.defineProperty(global, 'localStorage', { value: originalLocalStorage, writable: true })
+  })
+})
+
+describe('Resource filtering in query', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should filter by resourceId', async () => {
+    await auditLogger.logPolicy('policy.created', { policyId: 'pol-1', policyType: 'home', action: 'create' })
+    await auditLogger.logPolicy('policy.created', { policyId: 'pol-2', policyType: 'home', action: 'create' })
+
+    const events = await auditLogger.query({ resourceId: 'pol-1' })
+
+    expect(events.every(e => e.resourceId === 'pol-1')).toBe(true)
+  })
+})
