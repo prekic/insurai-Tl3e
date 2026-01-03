@@ -124,6 +124,38 @@ describe('useConsent', () => {
     })
   })
 
+  it('should return null when granting consent without userId', async () => {
+    const { result } = renderHook(() => useConsent(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const record = await result.current.grantConsent('data_processing')
+      expect(record).toBeNull()
+    })
+  })
+
+  it('should handle error when granting consent fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.recordConsent).mockRejectedValueOnce(new Error('Grant failed'))
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const record = await result.current.grantConsent('data_processing')
+      expect(record).toBeNull()
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Grant failed')
+  })
+
   it('should provide withdrawConsent function', async () => {
     const { result } = renderHook(() => useConsent('user-123'))
 
@@ -137,6 +169,57 @@ describe('useConsent', () => {
     })
   })
 
+  it('should return false when withdrawing consent without userId', async () => {
+    const { result } = renderHook(() => useConsent(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const success = await result.current.withdrawConsent('data_processing')
+      expect(success).toBe(false)
+    })
+  })
+
+  it('should handle error when withdrawing consent fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.revokeConsent).mockRejectedValueOnce(new Error('Revoke failed'))
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const success = await result.current.withdrawConsent('data_processing')
+      expect(success).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Revoke failed')
+  })
+
+  it('should handle non-Error object when withdrawing consent fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.revokeConsent).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const success = await result.current.withdrawConsent('data_processing')
+      expect(success).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Failed to revoke consent')
+  })
+
   it('should provide hasConsent function', async () => {
     const { result } = renderHook(() => useConsent('user-123'))
 
@@ -146,6 +229,16 @@ describe('useConsent', () => {
 
     expect(result.current.hasConsent('data_processing')).toBe(true)
     expect(result.current.hasConsent('marketing_email')).toBe(false)
+  })
+
+  it('should return false for hasConsent when consentStatus is null', async () => {
+    const { result } = renderHook(() => useConsent(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.hasConsent('data_processing')).toBe(false)
   })
 
   it('should provide refresh function', async () => {
@@ -160,6 +253,51 @@ describe('useConsent', () => {
     })
 
     expect(result.current.loading).toBe(false)
+  })
+
+  it('should handle error when loading consent status fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.initialize).mockRejectedValueOnce(new Error('Init failed'))
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+  })
+
+  it('should handle non-Error object when loading fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.initialize).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Failed to load consent status')
+  })
+
+  it('should handle non-Error object when granting consent fails', async () => {
+    const { consentManager } = await import('@/lib/privacy/consent-manager')
+    vi.mocked(consentManager.recordConsent).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useConsent('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const record = await result.current.grantConsent('data_processing')
+      expect(record).toBeNull()
+    })
+
+    expect(result.current.error?.message).toBe('Failed to grant consent')
   })
 })
 
@@ -223,6 +361,23 @@ describe('useDataSubjectRights', () => {
     expect(Array.isArray(result.current.completedRequests)).toBe(true)
   })
 
+  it('should filter in_progress requests as pending', async () => {
+    const { getUserDataRequests } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(getUserDataRequests).mockResolvedValueOnce([
+      { id: 'req-1', type: 'access', status: 'in_progress' } as any,
+      { id: 'req-2', type: 'erasure', status: 'rejected' } as any,
+    ])
+
+    const { result } = renderHook(() => useDataSubjectRights('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.pendingRequests.length).toBe(1)
+    expect(result.current.completedRequests.length).toBe(1)
+  })
+
   it('should provide submitRequest function', async () => {
     const { result } = renderHook(() => useDataSubjectRights('user-123'))
 
@@ -234,6 +389,84 @@ describe('useDataSubjectRights', () => {
       const request = await result.current.submitRequest('test@example.com', 'access')
       expect(request).toBeDefined()
     })
+  })
+
+  it('should return null when submitting request without userId', async () => {
+    const { result } = renderHook(() => useDataSubjectRights(undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.submitRequest('test@example.com', 'access')
+      expect(request).toBeNull()
+    })
+  })
+
+  it('should handle error when submitting request fails', async () => {
+    const { dataSubjectRightsManager } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(dataSubjectRightsManager.submitRequest).mockRejectedValueOnce(new Error('Submit failed'))
+
+    const { result } = renderHook(() => useDataSubjectRights('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.submitRequest('test@example.com', 'access')
+      expect(request).toBeNull()
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Submit failed')
+  })
+
+  it('should handle non-Error object when submitting request fails', async () => {
+    const { dataSubjectRightsManager } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(dataSubjectRightsManager.submitRequest).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useDataSubjectRights('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.submitRequest('test@example.com', 'access')
+      expect(request).toBeNull()
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Failed to submit request')
+  })
+
+  it('should handle error when loading requests fails', async () => {
+    const { dataSubjectRightsManager } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(dataSubjectRightsManager.initialize).mockRejectedValueOnce(new Error('Init failed'))
+
+    const { result } = renderHook(() => useDataSubjectRights('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+  })
+
+  it('should handle non-Error object when loading fails', async () => {
+    const { dataSubjectRightsManager } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(dataSubjectRightsManager.initialize).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useDataSubjectRights('user-123'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Failed to load requests')
   })
 
   it('should provide refresh function', async () => {
@@ -288,6 +521,49 @@ describe('useDataExport', () => {
     expect(result.current.exporting).toBe(false)
   })
 
+  it('should handle error when exporting fails', async () => {
+    const { exportUserData } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(exportUserData).mockRejectedValueOnce(new Error('Export failed'))
+
+    const { result } = renderHook(() => useDataExport('user-123'))
+
+    await act(async () => {
+      const data = await result.current.exportData()
+      expect(data).toBeNull()
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Export failed')
+  })
+
+  it('should handle non-Error object when exporting fails', async () => {
+    const { exportUserData } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(exportUserData).mockRejectedValueOnce('string error')
+
+    const { result } = renderHook(() => useDataExport('user-123'))
+
+    await act(async () => {
+      const data = await result.current.exportData()
+      expect(data).toBeNull()
+    })
+
+    expect(result.current.error).toBeDefined()
+    expect(result.current.error?.message).toBe('Failed to export data')
+  })
+
+  it('should reset exporting state after error', async () => {
+    const { exportUserData } = await import('@/lib/privacy/data-subject-rights')
+    vi.mocked(exportUserData).mockRejectedValueOnce(new Error('Export failed'))
+
+    const { result } = renderHook(() => useDataExport('user-123'))
+
+    await act(async () => {
+      await result.current.exportData()
+    })
+
+    expect(result.current.exporting).toBe(false)
+  })
+
   it('should provide downloadExport function', async () => {
     // Save original URL methods
     const originalCreateObjectURL = URL.createObjectURL
@@ -306,6 +582,23 @@ describe('useDataExport', () => {
     // Restore URL methods
     URL.createObjectURL = originalCreateObjectURL
     URL.revokeObjectURL = originalRevokeObjectURL
+  })
+
+  it('should not download when export returns no data', async () => {
+    const { result } = renderHook(() => useDataExport(undefined))
+
+    // Save original URL methods
+    const originalCreateObjectURL = URL.createObjectURL
+    URL.createObjectURL = vi.fn()
+
+    await act(async () => {
+      await result.current.downloadExport()
+    })
+
+    expect(URL.createObjectURL).not.toHaveBeenCalled()
+
+    // Restore
+    URL.createObjectURL = originalCreateObjectURL
   })
 })
 
@@ -350,6 +643,19 @@ describe('usePrivacy', () => {
     })
   })
 
+  it('should return null from requestAccess when email is not provided', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.requestAccess()
+      expect(request).toBeNull()
+    })
+  })
+
   it('should provide requestDeletion function', async () => {
     const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
 
@@ -363,6 +669,19 @@ describe('usePrivacy', () => {
     })
   })
 
+  it('should return null from requestDeletion when email is not provided', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.requestDeletion('Reason')
+      expect(request).toBeNull()
+    })
+  })
+
   it('should provide requestPortability function', async () => {
     const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
 
@@ -373,6 +692,19 @@ describe('usePrivacy', () => {
     await act(async () => {
       const request = await result.current.requestPortability()
       expect(request).toBeDefined()
+    })
+  })
+
+  it('should return null from requestPortability when email is not provided', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.requestPortability()
+      expect(request).toBeNull()
     })
   })
 
@@ -411,5 +743,67 @@ describe('usePrivacy', () => {
     })
 
     expect(result.current.loading).toBe(false)
+  })
+
+  it('should work with undefined userId and email', async () => {
+    const { result } = renderHook(() => usePrivacy(undefined, undefined))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.consentStatus).toBeNull()
+    expect(result.current.requests).toEqual([])
+    expect(result.current.hasAllRequiredConsents).toBe(true) // No missing consents when empty
+  })
+
+  it('should provide grantConsent function', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const record = await result.current.grantConsent('data_processing')
+      expect(record).toBeDefined()
+    })
+  })
+
+  it('should provide withdrawConsent function', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const success = await result.current.withdrawConsent('data_processing')
+      expect(success).toBe(true)
+    })
+  })
+
+  it('should provide hasConsent function', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    expect(result.current.hasConsent('data_processing')).toBe(true)
+    expect(result.current.hasConsent('marketing_email')).toBe(false)
+  })
+
+  it('should provide submitRequest function', async () => {
+    const { result } = renderHook(() => usePrivacy('user-123', 'test@example.com'))
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false)
+    })
+
+    await act(async () => {
+      const request = await result.current.submitRequest('test@example.com', 'objection', 'I object')
+      expect(request).toBeDefined()
+    })
   })
 })
