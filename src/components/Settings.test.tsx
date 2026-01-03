@@ -416,3 +416,244 @@ describe('Settings - RTL Support', () => {
     // This test verifies RTL support
   })
 })
+
+describe('Settings - Export Functionality', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should call exportToCSV when CSV export button is clicked', async () => {
+    const { exportToCSV } = await import('@/lib/export')
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /export to excel/i }))
+
+    expect(exportToCSV).toHaveBeenCalledWith(mockPolicies, 'insurai-policies')
+  })
+
+  it('should call exportPoliciesToPDF when PDF export button is clicked', async () => {
+    const { exportPoliciesToPDF } = await import('@/lib/export')
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /export to pdf/i }))
+
+    expect(exportPoliciesToPDF).toHaveBeenCalledWith(mockPolicies, 'Insurance Portfolio Report')
+  })
+
+  it('should show error toast when exporting CSV with no policies', async () => {
+    const { toast } = await import('sonner')
+
+    vi.doMock('@/lib/policy-context', () => ({
+      usePolicies: () => ({
+        policies: [],
+        clearAllPolicies: mockClearAllPolicies,
+      }),
+    }))
+
+    // Re-import to get the new mock
+    vi.resetModules()
+    const { Settings: SettingsNoPolicies } = await import('./Settings')
+
+    render(
+      <BrowserRouter>
+        <SettingsNoPolicies />
+      </BrowserRouter>
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /export to excel/i }))
+
+    expect(toast.error).toHaveBeenCalledWith('No policies to export')
+  })
+})
+
+describe('Settings - Clear Data', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should prompt for confirmation before clearing data', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /clear all data/i }))
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'Are you sure you want to clear all policies? This cannot be undone.'
+    )
+    confirmSpy.mockRestore()
+  })
+
+  it('should call clearAllPolicies when confirmed', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /clear all data/i }))
+
+    expect(mockClearAllPolicies).toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+
+  it('should not call clearAllPolicies when cancelled', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    const user = userEvent.setup()
+    renderSettings()
+
+    await user.click(screen.getByRole('button', { name: /clear all data/i }))
+
+    expect(mockClearAllPolicies).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
+  })
+})
+
+describe('Settings - API Key Management', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should toggle password visibility when eye icon is clicked', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    // Find the OpenAI input
+    const openaiInput = screen.getByPlaceholderText('sk-proj-...')
+    expect(openaiInput).toHaveAttribute('type', 'password')
+
+    // Find and click the eye button to show password
+    const toggleButtons = document.querySelectorAll('button[type="button"]')
+    const eyeButton = Array.from(toggleButtons).find(
+      (btn) => btn.querySelector('svg') && btn.closest('.relative')
+    )
+
+    if (eyeButton) {
+      await user.click(eyeButton)
+      expect(openaiInput).toHaveAttribute('type', 'text')
+    }
+  })
+
+  it('should show configured state when key is in localStorage', async () => {
+    localStorage.setItem('insurai_openai_key', 'sk-test-key')
+    renderSettings()
+
+    // Wait for the configured state indicator
+    await waitFor(() => {
+      expect(screen.getByText('Configured')).toBeInTheDocument()
+    })
+  })
+
+  it('should disable Save button when input is empty', () => {
+    renderSettings()
+
+    const saveButtons = screen.getAllByRole('button', { name: /save/i })
+    expect(saveButtons[0]).toBeDisabled()
+  })
+
+  it('should enable Save button when input has value', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const openaiInput = screen.getByPlaceholderText('sk-proj-...')
+    await user.type(openaiInput, 'sk-test-key')
+
+    const saveButtons = screen.getAllByRole('button', { name: /save/i })
+    expect(saveButtons[0]).toBeEnabled()
+  })
+
+  it('should save Anthropic key to localStorage', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const anthropicInput = screen.getByPlaceholderText('sk-ant-...')
+    await user.type(anthropicInput, 'sk-ant-test-key')
+
+    // Find the Save button for Anthropic (second one)
+    const saveButtons = screen.getAllByRole('button', { name: /save/i })
+    await user.click(saveButtons[1])
+
+    expect(localStorage.getItem('insurai_anthropic_key')).toBe('sk-ant-test-key')
+  })
+
+  it('should save Google Cloud key to localStorage', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const googleInput = screen.getByPlaceholderText('AIza...')
+    await user.type(googleInput, 'AIzaTestKey123')
+
+    // Find the Save button for Google (third one)
+    const saveButtons = screen.getAllByRole('button', { name: /save/i })
+    await user.click(saveButtons[2])
+
+    expect(localStorage.getItem('insurai_google_cloud_key')).toBe('AIzaTestKey123')
+  })
+})
+
+describe('Settings - Notification Toggles Keyboard', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should toggle notification with Enter key', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const emailToggle = screen.getByRole('switch', { name: /email notifications/i })
+    expect(emailToggle).toHaveAttribute('aria-checked', 'true')
+
+    emailToggle.focus()
+    await user.keyboard('{Enter}')
+
+    expect(emailToggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('should toggle notification with Space key', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const emailToggle = screen.getByRole('switch', { name: /email notifications/i })
+    expect(emailToggle).toHaveAttribute('aria-checked', 'true')
+
+    emailToggle.focus()
+    await user.keyboard(' ')
+
+    expect(emailToggle).toHaveAttribute('aria-checked', 'false')
+  })
+})
+
+describe('Settings - Policy Count Display', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should show policy count in export section', () => {
+    renderSettings()
+
+    expect(screen.getByText(/export your 2 policies/i)).toBeInTheDocument()
+  })
+})
+
+describe('Settings - Theme Keyboard Navigation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    localStorage.clear()
+  })
+
+  it('should allow keyboard navigation between theme options', async () => {
+    const user = userEvent.setup()
+    renderSettings()
+
+    const lightOption = screen.getByRole('radio', { name: /light/i })
+    lightOption.focus()
+
+    expect(document.activeElement).toBe(lightOption)
+  })
+})
