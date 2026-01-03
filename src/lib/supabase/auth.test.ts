@@ -312,4 +312,67 @@ describe('Auth Functions', () => {
       expect(result).toEqual(mockResult)
     })
   })
+
+  describe('when Supabase is not configured', () => {
+    beforeEach(() => {
+      mockIsConfigured.mockReturnValue(false)
+    })
+
+    it('updateProfile should throw error when not configured', async () => {
+      await expect(updateProfile({ fullName: 'Test User' }))
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('onAuthStateChange should return dummy subscription when not configured', () => {
+      const callback = vi.fn()
+      const result = onAuthStateChange(callback)
+
+      expect(mockSupabaseAuth.onAuthStateChange).not.toHaveBeenCalled()
+      expect(result.data.subscription.unsubscribe).toBeDefined()
+      // Verify the dummy unsubscribe function works
+      expect(() => result.data.subscription.unsubscribe()).not.toThrow()
+    })
+
+    it('resetPassword should throw error when not configured', async () => {
+      await expect(resetPassword('test@example.com'))
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('updatePassword should throw error when not configured', async () => {
+      await expect(updatePassword('newpassword123'))
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('getSession should return null when not configured', async () => {
+      const result = await getSession()
+      expect(result).toBeNull()
+      expect(mockSupabaseAuth.getSession).not.toHaveBeenCalled()
+    })
+
+    it('getUser should return null when not configured', async () => {
+      const result = await getUser()
+      expect(result).toBeNull()
+      expect(mockSupabaseAuth.getUser).not.toHaveBeenCalled()
+    })
+
+    it('signIn should throw error when not configured', async () => {
+      await expect(signIn('test@example.com', 'password'))
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('signInWithProvider should throw error when not configured', async () => {
+      await expect(signInWithProvider('google'))
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('signOut should throw error when not configured', async () => {
+      await expect(signOut())
+        .rejects.toThrow('Supabase is not configured')
+    })
+
+    it('signUp should throw error when not configured', async () => {
+      await expect(signUp('test@example.com', 'password123'))
+        .rejects.toThrow('Supabase is not configured')
+    })
+  })
 })

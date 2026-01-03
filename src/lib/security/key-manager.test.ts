@@ -251,6 +251,53 @@ describe('SecureKeyManager', () => {
         expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
       )
     })
+
+    it('should return error when encryption fails', async () => {
+      // Mock encrypt to throw an error
+      mockSubtle.encrypt.mockRejectedValueOnce(new Error('Encryption failed'))
+
+      const result = await secureKeyManager.setKey(
+        'openai',
+        'sk-1234567890abcdefghijklmnopqrstuvwxyz'
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Failed to store API key securely')
+    })
+
+    it('should handle non-Error exceptions in setKey', async () => {
+      // Mock encrypt to throw a non-Error
+      mockSubtle.encrypt.mockRejectedValueOnce('String error')
+
+      const result = await secureKeyManager.setKey(
+        'openai',
+        'sk-1234567890abcdefghijklmnopqrstuvwxyz'
+      )
+
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Failed to store API key securely')
+    })
+
+    it('should fallback to base64 encoding when crypto is unavailable', async () => {
+      // Temporarily mock crypto as unavailable
+      const originalCrypto = global.crypto
+      Object.defineProperty(global, 'crypto', { value: undefined, configurable: true })
+
+      const result = await secureKeyManager.setKey(
+        'openai',
+        'sk-1234567890abcdefghijklmnopqrstuvwxyz'
+      )
+
+      // Restore crypto
+      Object.defineProperty(global, 'crypto', { value: originalCrypto, configurable: true })
+
+      expect(result.success).toBe(true)
+      // Key should be stored as base64 (not encrypted)
+      expect(mockLocalStorage.setItem).toHaveBeenCalledWith(
+        'insurai_secure_openai_encrypted',
+        'false'
+      )
+    })
   })
 
   describe('getKey', () => {
@@ -280,6 +327,79 @@ describe('SecureKeyManager', () => {
       // getItem should only be called once for the key (cached after first call)
       // This is hard to test with mocking, so just verify it returns
       expect(true).toBe(true)
+    })
+
+    it('should decode base64 key when not encrypted', async () => {
+      // Directly set a base64-encoded key in localStorage (simulating old storage)
+      const originalKey = 'sk-testkey12345'
+      const base64Key = btoa(originalKey)
+      mockLocalStorage.store['insurai_secure_openai'] = base64Key
+      mockLocalStorage.store['insurai_secure_openai_encrypted'] = 'false'
+
+      // Clear cache to force re-read
+      await secureKeyManager.clearAllKeys()
+      mockLocalStorage.store['insurai_secure_openai'] = base64Key
+      mockLocalStorage.store['insurai_secure_openai_encrypted'] = 'false'
+
+      const retrieved = await secureKeyManager.getKey('openai')
+
+      expect(retrieved).toBe(originalKey)
+    })
+
+    it('should fallback to plain text when base64 decode fails', async () => {
+      // Set a non-base64 string that will fail atob()
+      const plainTextKey = 'plain-text-key-not-base64-%%%%'
+      mockLocalStorage.store['insurai_secure_anthropic'] = plainTextKey
+      mockLocalStorage.store['insurai_secure_anthropic_encrypted'] = 'false'
+
+      // Clear cache
+      await secureKeyManager.clearAllKeys()
+      mockLocalStorage.store['insurai_secure_anthropic'] = plainTextKey
+      mockLocalStorage.store['insurai_secure_anthropic_encrypted'] = 'false'
+
+      const retrieved = await secureKeyManager.getKey('anthropic')
+
+      expect(retrieved).toBe(plainTextKey)
+    })
+
+    it('should return null when key was encrypted but crypto unavailable', async () => {
+      // Store an "encrypted" key
+      mockLocalStorage.store['insurai_secure_google'] = 'encrypted-data'
+      mockLocalStorage.store['insurai_secure_google_encrypted'] = 'true'
+
+      // Clear cache
+      await secureKeyManager.clearAllKeys()
+      mockLocalStorage.store['insurai_secure_google'] = 'encrypted-data'
+      mockLocalStorage.store['insurai_secure_google_encrypted'] = 'true'
+
+      // Temporarily mock crypto as unavailable
+      const originalCrypto = global.crypto
+      Object.defineProperty(global, 'crypto', { value: undefined, configurable: true })
+
+      const retrieved = await secureKeyManager.getKey('google')
+
+      // Restore crypto
+      Object.defineProperty(global, 'crypto', { value: originalCrypto, configurable: true })
+
+      expect(retrieved).toBeNull()
+    })
+
+    it('should return null when getKey throws an error', async () => {
+      // Store a key
+      mockLocalStorage.store['insurai_secure_openai'] = 'some-value'
+      mockLocalStorage.store['insurai_secure_openai_encrypted'] = 'true'
+
+      // Clear cache
+      await secureKeyManager.clearAllKeys()
+      mockLocalStorage.store['insurai_secure_openai'] = 'some-value'
+      mockLocalStorage.store['insurai_secure_openai_encrypted'] = 'true'
+
+      // Mock decrypt to throw an error
+      mockSubtle.decrypt.mockRejectedValueOnce(new Error('Decryption failed'))
+
+      const retrieved = await secureKeyManager.getKey('openai')
+
+      expect(retrieved).toBeNull()
     })
   })
 
