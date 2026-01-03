@@ -542,3 +542,1086 @@ describe('Format Functions Edge Cases', () => {
     })
   })
 })
+
+// =============================================================================
+// CostTracker recordUsage Tests
+// =============================================================================
+
+describe('costTracker.recordUsage', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+  })
+
+  it('should record basic usage', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    expect(record).toBeDefined()
+    expect(record.id).toMatch(/^usage_/)
+    expect(record.provider).toBe('openai')
+    expect(record.model).toBe('gpt-4o')
+    expect(record.operation).toBe('extraction')
+    expect(record.inputTokens).toBe(1000)
+    expect(record.outputTokens).toBe(500)
+    expect(record.totalTokens).toBe(1500)
+  })
+
+  it('should calculate cost correctly', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    expect(record.inputCost).toBe(0.0025)
+    expect(record.outputCost).toBe(0.005)
+    expect(record.totalCost).toBe(0.0075)
+  })
+
+  it('should estimate tokens from inputText when not provided', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputText: 'This is a sample text for token estimation testing.',
+    })
+
+    expect(record.inputTokens).toBeGreaterThan(0)
+    expect(record.outputTokens).toBeGreaterThan(0)
+  })
+
+  it('should handle cache hit', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheHit: true,
+    })
+
+    expect(record.cacheHit).toBe(true)
+    expect(record.totalCost).toBe(0) // No cost for cache hit
+    expect(record.cacheSavings).toBe(0.0075) // What would have been spent
+  })
+
+  it('should record anthropic provider', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      operation: 'analysis',
+      inputTokens: 2000,
+      outputTokens: 1000,
+    })
+
+    expect(record.provider).toBe('anthropic')
+    expect(record.model).toBe('claude-3-5-sonnet-20241022')
+    expect(record.inputCost).toBe(0.006) // 2000 * 0.003 / 1000
+    expect(record.outputCost).toBe(0.015) // 1000 * 0.015 / 1000
+  })
+
+  it('should record ocr operation', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'ocr',
+      inputTokens: 500,
+      outputTokens: 200,
+      pageCount: 3,
+    })
+
+    expect(record.operation).toBe('ocr')
+    expect(record.pageCount).toBe(3)
+  })
+
+  it('should record consensus operation', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'consensus',
+      inputTokens: 1500,
+      outputTokens: 800,
+    })
+
+    expect(record.operation).toBe('consensus')
+  })
+
+  it('should record optional fields', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      documentLength: 5000,
+      pageCount: 2,
+      durationMs: 1500,
+      userId: 'user-123',
+      sessionId: 'session-456',
+    })
+
+    expect(record.documentLength).toBe(5000)
+    expect(record.pageCount).toBe(2)
+    expect(record.durationMs).toBe(1500)
+    expect(record.userId).toBe('user-123')
+    expect(record.sessionId).toBe('session-456')
+  })
+
+  it('should record failed request', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 0,
+      success: false,
+      errorMessage: 'Rate limit exceeded',
+    })
+
+    expect(record.success).toBe(false)
+    expect(record.errorMessage).toBe('Rate limit exceeded')
+  })
+
+  it('should generate unique IDs', async () => {
+    const record1 = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    const record2 = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    expect(record1.id).not.toBe(record2.id)
+  })
+
+  it('should default success to true', async () => {
+    const record = await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    expect(record.success).toBe(true)
+  })
+})
+
+// =============================================================================
+// CostTracker getStats Tests
+// =============================================================================
+
+describe('costTracker.getStats', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+  })
+
+  it('should return stats for empty records', async () => {
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalRequests).toBe(0)
+    expect(stats.totalCost).toBe(0)
+    expect(stats.netCost).toBe(0)
+  })
+
+  it('should calculate total requests', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 200,
+      outputTokens: 100,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalRequests).toBe(2)
+  })
+
+  it('should sum total tokens', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 2000,
+      outputTokens: 1000,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalInputTokens).toBe(3000)
+    expect(stats.totalOutputTokens).toBe(1500)
+    expect(stats.totalTokens).toBe(4500)
+  })
+
+  it('should sum total cost', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalCost).toBe(0.015) // 0.0075 * 2
+  })
+
+  it('should count successful and failed requests', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      success: true,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 0,
+      success: false,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.successfulRequests).toBe(1)
+    expect(stats.failedRequests).toBe(1)
+  })
+
+  it('should count cached requests', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheHit: true,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheHit: false,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.cachedRequests).toBe(1)
+  })
+
+  it('should calculate total savings from cache hits', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheHit: true,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalSavings).toBe(0.0075)
+    expect(stats.netCost).toBe(stats.totalCost - stats.totalSavings)
+  })
+
+  it('should track stats by provider', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.byProvider.openai.requests).toBe(1)
+    expect(stats.byProvider.anthropic.requests).toBe(1)
+    expect(stats.byProvider.openai.tokens).toBe(1500)
+  })
+
+  it('should track stats by operation', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'ocr',
+      inputTokens: 200,
+      outputTokens: 100,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.byOperation['extraction'].requests).toBe(2)
+    expect(stats.byOperation['ocr'].requests).toBe(1)
+  })
+
+  it('should calculate average duration', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      durationMs: 1000,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      durationMs: 2000,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.avgDurationMs).toBe(1500)
+  })
+
+  it('should calculate p95 duration', async () => {
+    // Add 20 records with varying durations
+    for (let i = 1; i <= 20; i++) {
+      await costTracker.recordUsage({
+        provider: 'openai',
+        model: 'gpt-4o',
+        operation: 'extraction',
+        inputTokens: 100,
+        outputTokens: 50,
+        durationMs: i * 100,
+      })
+    }
+
+    const stats = await costTracker.getStats()
+
+    // p95 should be around the 95th percentile
+    expect(stats.p95DurationMs).toBeGreaterThanOrEqual(1900)
+  })
+
+  it('should track daily costs', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.dailyCosts.length).toBeGreaterThan(0)
+    expect(stats.dailyCosts[0]).toHaveProperty('date')
+    expect(stats.dailyCosts[0]).toHaveProperty('cost')
+  })
+
+  it('should filter by date range', async () => {
+    const now = new Date()
+    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    // Stats for today only
+    const stats = await costTracker.getStats(
+      new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+      now
+    )
+
+    expect(stats.totalRequests).toBe(1)
+  })
+
+  it('should filter by userId', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      userId: 'user-1',
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+      userId: 'user-2',
+    })
+
+    const stats = await costTracker.getStats(undefined, undefined, 'user-1')
+
+    expect(stats.totalRequests).toBe(1)
+  })
+})
+
+// =============================================================================
+// CostTracker getCurrentMonthStatus Tests
+// =============================================================================
+
+describe('costTracker.getCurrentMonthStatus', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  it('should return zero spent for no records', async () => {
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.spent).toBe(0)
+    expect(status.isOverBudget).toBe(false)
+    expect(status.isWarning).toBe(false)
+  })
+
+  it('should calculate spent amount', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.spent).toBeGreaterThan(0)
+  })
+
+  it('should return budget limit', async () => {
+    costTracker.setBudget({ monthlyLimit: 200 })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.budget).toBe(200)
+  })
+
+  it('should calculate percent used', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.015 }) // Set low limit
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.percentUsed).toBeGreaterThan(0)
+  })
+
+  it('should calculate remaining budget', async () => {
+    costTracker.setBudget({ monthlyLimit: 100 })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.remaining).toBeLessThan(100)
+    expect(status.remaining).toBeGreaterThan(0)
+  })
+
+  it('should detect warning threshold', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.0075, warningThreshold: 0.5 })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.isWarning).toBe(true)
+  })
+
+  it('should detect over budget', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.005 })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.isOverBudget).toBe(true)
+  })
+
+  it('should calculate days remaining in month', async () => {
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.daysRemaining).toBeGreaterThanOrEqual(0)
+    expect(status.daysRemaining).toBeLessThanOrEqual(31)
+  })
+
+  it('should project month end cost', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 10000,
+      outputTokens: 5000,
+    })
+
+    const status = await costTracker.getCurrentMonthStatus()
+
+    expect(status.projectedMonthEnd).toBeGreaterThanOrEqual(status.spent)
+  })
+})
+
+// =============================================================================
+// CostTracker checkBudget Tests
+// =============================================================================
+
+describe('costTracker.checkBudget', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  it('should allow requests when under budget', async () => {
+    const result = await costTracker.checkBudget()
+
+    expect(result.allowed).toBe(true)
+    expect(result.reason).toBeUndefined()
+  })
+
+  it('should block when hard limit is enabled and over budget', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.005, hardLimit: true })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const result = await costTracker.checkBudget()
+
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toContain('Monthly budget')
+  })
+
+  it('should allow when over budget but hard limit disabled', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.005, hardLimit: false })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const result = await costTracker.checkBudget()
+
+    expect(result.allowed).toBe(true)
+  })
+
+  it('should return current spend and limit', async () => {
+    costTracker.setBudget({ monthlyLimit: 100 })
+
+    const result = await costTracker.checkBudget()
+
+    expect(result.currentSpend).toBeDefined()
+    expect(result.limit).toBe(100)
+  })
+
+  it('should check per-user daily limit', async () => {
+    costTracker.setBudget({ perUserDaily: 0.005, hardLimit: true })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      userId: 'user-1',
+    })
+
+    const result = await costTracker.checkBudget('user-1')
+
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toContain('Daily per-user')
+  })
+
+  it('should check per-user monthly limit', async () => {
+    costTracker.setBudget({ perUserDaily: 1000, perUserMonthly: 0.005, hardLimit: true })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      userId: 'user-1',
+    })
+
+    const result = await costTracker.checkBudget('user-1')
+
+    expect(result.allowed).toBe(false)
+    expect(result.reason).toContain('Monthly per-user')
+  })
+
+  it('should allow other users when one user hits limit', async () => {
+    costTracker.setBudget({ perUserDaily: 0.005 })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      userId: 'user-1',
+    })
+
+    const result = await costTracker.checkBudget('user-2')
+
+    expect(result.allowed).toBe(true)
+  })
+})
+
+// =============================================================================
+// CostTracker getCostByModel Tests
+// =============================================================================
+
+describe('costTracker.getCostByModel', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+  })
+
+  it('should return empty object for no records', async () => {
+    const result = await costTracker.getCostByModel()
+
+    expect(Object.keys(result).length).toBe(0)
+  })
+
+  it('should group by model', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const result = await costTracker.getCostByModel()
+
+    expect(result['gpt-4o']).toBeDefined()
+    expect(result['claude-3-5-sonnet-20241022']).toBeDefined()
+  })
+
+  it('should count requests per model', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o-mini',
+      operation: 'extraction',
+      inputTokens: 100,
+      outputTokens: 50,
+    })
+
+    const result = await costTracker.getCostByModel()
+
+    expect(result['gpt-4o'].requests).toBe(2)
+    expect(result['gpt-4o-mini'].requests).toBe(1)
+  })
+
+  it('should sum tokens per model', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 2000,
+      outputTokens: 1000,
+    })
+
+    const result = await costTracker.getCostByModel()
+
+    expect(result['gpt-4o'].inputTokens).toBe(3000)
+    expect(result['gpt-4o'].outputTokens).toBe(1500)
+  })
+
+  it('should sum cost per model', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const result = await costTracker.getCostByModel()
+
+    expect(result['gpt-4o'].cost).toBe(0.015) // 0.0075 * 2
+  })
+
+  it('should calculate average cost per request', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const result = await costTracker.getCostByModel()
+
+    expect(result['gpt-4o'].avgCostPerRequest).toBe(0.0075)
+  })
+
+  it('should filter by date range', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    const now = new Date()
+    const future = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+
+    const result = await costTracker.getCostByModel(future)
+
+    expect(Object.keys(result).length).toBe(0)
+  })
+})
+
+// =============================================================================
+// CostTracker clearRecords Tests
+// =============================================================================
+
+describe('costTracker.clearRecords', () => {
+  it('should clear all records', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    let stats = await costTracker.getStats()
+    expect(stats.totalRequests).toBe(1)
+
+    await costTracker.clearRecords()
+
+    stats = await costTracker.getStats()
+    expect(stats.totalRequests).toBe(0)
+  })
+
+  it('should clear stats cache', async () => {
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    // Get stats to populate cache
+    await costTracker.getStats()
+
+    await costTracker.clearRecords()
+
+    const stats = await costTracker.getStats()
+    expect(stats.totalRequests).toBe(0)
+  })
+})
+
+// =============================================================================
+// CostTracker Initialize Tests
+// =============================================================================
+
+describe('costTracker.initialize', () => {
+  it('should initialize successfully', async () => {
+    // initialize should not throw
+    await expect(costTracker.initialize()).resolves.not.toThrow()
+  })
+
+  it('should be idempotent', async () => {
+    await costTracker.initialize()
+    await costTracker.initialize()
+    await costTracker.initialize()
+
+    // Should not throw and should work normally
+    const budget = costTracker.getBudget()
+    expect(budget).toBeDefined()
+  })
+})
+
+// =============================================================================
+// CostTracker Integration Tests
+// =============================================================================
+
+describe('CostTracker Integration', () => {
+  beforeEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  afterEach(async () => {
+    await costTracker.clearRecords()
+    costTracker.setBudget(DEFAULT_BUDGET)
+  })
+
+  it('should track full workflow', async () => {
+    // Record multiple operations
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      userId: 'user-1',
+    })
+
+    await costTracker.recordUsage({
+      provider: 'anthropic',
+      model: 'claude-3-5-sonnet-20241022',
+      operation: 'consensus',
+      inputTokens: 2000,
+      outputTokens: 1000,
+      userId: 'user-1',
+    })
+
+    // Check stats
+    const stats = await costTracker.getStats()
+    expect(stats.totalRequests).toBe(2)
+    expect(stats.byProvider.openai.requests).toBe(1)
+    expect(stats.byProvider.anthropic.requests).toBe(1)
+
+    // Check budget
+    const budgetCheck = await costTracker.checkBudget('user-1')
+    expect(budgetCheck.allowed).toBe(true)
+
+    // Check month status
+    const monthStatus = await costTracker.getCurrentMonthStatus()
+    expect(monthStatus.spent).toBeGreaterThan(0)
+
+    // Check cost by model
+    const byModel = await costTracker.getCostByModel()
+    expect(byModel['gpt-4o']).toBeDefined()
+    expect(byModel['claude-3-5-sonnet-20241022']).toBeDefined()
+  })
+
+  it('should enforce budget limits', async () => {
+    costTracker.setBudget({ monthlyLimit: 0.01, hardLimit: true })
+
+    // First request
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    let check = await costTracker.checkBudget()
+    expect(check.allowed).toBe(true)
+
+    // Second request should push over budget
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+    })
+
+    check = await costTracker.checkBudget()
+    expect(check.allowed).toBe(false)
+  })
+
+  it('should calculate cache savings correctly', async () => {
+    // Regular request
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheHit: false,
+    })
+
+    // Cached request
+    await costTracker.recordUsage({
+      provider: 'openai',
+      model: 'gpt-4o',
+      operation: 'extraction',
+      inputTokens: 1000,
+      outputTokens: 500,
+      cacheHit: true,
+    })
+
+    const stats = await costTracker.getStats()
+
+    expect(stats.totalCost).toBe(0.0075) // Only non-cached request
+    expect(stats.totalSavings).toBe(0.0075) // Cached request savings
+    expect(stats.netCost).toBe(0) // totalCost - totalSavings
+  })
+})
