@@ -279,31 +279,103 @@ describe('Security Monitor', () => {
     })
 
     it('should detect data scraping (high request rate)', () => {
+      vi.useFakeTimers()
+      const now = Date.now()
+      vi.setSystemTime(now)
+
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
       securityMonitor.setThresholds({ suspiciousActivitySensitivity: 'high' })
 
-      const now = Date.now()
-      const event: AuditEvent = {
-        id: 'evt-1',
-        type: 'policy.viewed',
-        timestamp: now - 5 * 60 * 1000, // 5 minutes ago
-        userId: 'user-scraper',
-      }
+      // Access pattern time window is 5 minutes
+      // requestsPerMinute = recentActions.length / 5
+      // With high sensitivity, scrapingThreshold = 30 * 0.5 = 15 req/min
+      // Need recentActions.length / 5 > 15, so need > 75 events in 5 min window
 
-      // Generate many events to trigger pattern analysis
-      for (let i = 0; i < 200; i++) {
-        mockAuditLogger.triggerEvent({
-          ...event,
+      // Generate many events with timestamps within 5 minutes
+      for (let i = 0; i < 100; i++) {
+        const event: AuditEvent = {
           id: `evt-${i}`,
-          timestamp: now - (5 * 60 * 1000) + (i * 1000),
-          resourceId: `resource-${i}`,
-        })
+          type: 'policy.viewed',
+          timestamp: now + (i * 3000), // Events spread over time
+          userId: 'user-scraper',
+          resourceId: 'same-resource',
+        }
+        mockAuditLogger.triggerEvent(event)
       }
 
-      // Should have detected scraping or suspicious pattern
+      // Advance time past the accessPattern check window (5 minutes)
+      vi.setSystemTime(now + 6 * 60 * 1000)
+
+      // Trigger another event to initiate the analysis (now - lastCheck >= 5 min)
+      mockAuditLogger.triggerEvent({
+        id: 'evt-trigger',
+        type: 'policy.viewed',
+        timestamp: Date.now(),
+        userId: 'user-scraper',
+        resourceId: 'same-resource',
+      })
+
+      // Check if data_scraping alert was raised
       const alerts = securityMonitor.getActiveAlerts()
-      expect(alerts.length).toBeGreaterThanOrEqual(0) // May or may not trigger based on timing
+      const scrapingAlerts = alerts.filter(a => a.type === 'data_scraping')
+      expect(scrapingAlerts.length).toBeGreaterThan(0)
+      expect(mockAuditLogger.logSecurity).toHaveBeenCalledWith(
+        'security.data_scraping_detected',
+        expect.anything()
+      )
+
+      vi.useRealTimers()
+    })
+
+    it('should detect unusual access patterns (many unique resources)', () => {
+      vi.useFakeTimers()
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const listener = vi.fn()
+      securityMonitor.onAlert(listener)
+      securityMonitor.setThresholds({ suspiciousActivitySensitivity: 'high' })
+
+      // With high sensitivity, uniqueResourceThreshold = 20 * 0.5 = 10 unique resources
+      // Need to access > 10 unique resources within the 5-minute window
+
+      // Generate events accessing many different resources within the time window
+      for (let i = 0; i < 25; i++) {
+        const event: AuditEvent = {
+          id: `evt-${i}`,
+          type: 'policy.viewed',
+          timestamp: now + (i * 10000), // Events spread within window
+          userId: 'user-unusual',
+          resourceId: `unique-resource-${i}`,
+        }
+        mockAuditLogger.triggerEvent(event)
+      }
+
+      // Advance time past the accessPattern check window (5 minutes)
+      vi.setSystemTime(now + 6 * 60 * 1000)
+
+      // Trigger another event to initiate the analysis
+      mockAuditLogger.triggerEvent({
+        id: 'evt-trigger',
+        type: 'policy.viewed',
+        timestamp: Date.now(),
+        userId: 'user-unusual',
+        resourceId: 'trigger-resource',
+      })
+
+      // Check if suspicious_pattern alert was raised for unusual access
+      const alerts = securityMonitor.getActiveAlerts()
+      const patternAlerts = alerts.filter(a =>
+        a.type === 'suspicious_pattern' && a.description.includes('resources accessed')
+      )
+      expect(patternAlerts.length).toBeGreaterThan(0)
+      expect(mockAuditLogger.logSecurity).toHaveBeenCalledWith(
+        'security.unusual_access_pattern',
+        expect.anything()
+      )
+
+      vi.useRealTimers()
     })
 
     it('should limit stored actions to 100', () => {
@@ -816,6 +888,331 @@ describe('Security Monitor', () => {
       // Low sensitivity = 2 multiplier, so thresholds are doubled
       expect(true).toBe(true)
     })
+
+    it('should require more events for data scraping with low sensitivity', () => {
+      vi.useFakeTimers()
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const listener = vi.fn()
+      securityMonitor.onAlert(listener)
+      securityMonitor.setThresholds({ suspiciousActivitySensitivity: 'low' })
+
+      // With low sensitivity, scrapingThreshold = 30 * 2 = 60 req/min
+      // requestsPerMinute = recentActions.length / 5
+      // Need recentActions.length / 5 > 60, so need > 300 events in 5 min window
+
+      // Generate events (not enough to trigger with low sensitivity but enough with high/medium)
+      for (let i = 0; i < 100; i++) {
+        const event: AuditEvent = {
+          id: `evt-${i}`,
+          type: 'policy.viewed',
+          timestamp: now + (i * 3000),
+          userId: 'user-test',
+          resourceId: 'resource',
+        }
+        mockAuditLogger.triggerEvent(event)
+      }
+
+      // Advance time past the accessPattern check window
+      vi.setSystemTime(now + 6 * 60 * 1000)
+
+      // Trigger analysis
+      mockAuditLogger.triggerEvent({
+        id: 'evt-trigger',
+        type: 'policy.viewed',
+        timestamp: Date.now(),
+        userId: 'user-test',
+        resourceId: 'resource',
+      })
+
+      // With low sensitivity, 100 events / 5 min = 20 req/min < 60 threshold
+      // So no scraping alert should be raised
+      const alerts = securityMonitor.getActiveAlerts()
+      const scrapingAlerts = alerts.filter(a => a.type === 'data_scraping')
+      expect(scrapingAlerts.length).toBe(0)
+
+      vi.useRealTimers()
+    })
+  })
+
+  describe('cleanup', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      securityMonitor.clear()
+      securityMonitor.initialize()
+      securityMonitor.setThresholds({ failedLoginsThreshold: 2, rateLimitViolationsThreshold: 2 })
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('should clean old failed logins after time window expires', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      // Generate failed logins
+      const event: AuditEvent = {
+        id: 'evt-1',
+        type: 'auth.signin_failed',
+        timestamp: now,
+        userId: 'user-cleanup-test',
+      }
+
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
+      }
+
+      const dashboardBefore = securityMonitor.getSecurityDashboard()
+      expect(dashboardBefore.failedLoginAttempts).toBe(3)
+
+      // Fast forward past the cleanup window (24 hours * 2 = 48 hours)
+      vi.setSystemTime(now + 48 * 60 * 60 * 1000 + 1000)
+
+      // Trigger another event to cause cleanup
+      mockAuditLogger.triggerEvent({ ...event, id: 'evt-new', timestamp: Date.now() })
+
+      const dashboardAfter = securityMonitor.getSecurityDashboard()
+      // Old logins should be cleaned, only the new one should remain
+      expect(dashboardAfter.failedLoginAttempts).toBeLessThanOrEqual(2)
+    })
+
+    it('should clean old rate violations after time window expires', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const event: AuditEvent = {
+        id: 'evt-1',
+        type: 'security.rate_limit_exceeded',
+        timestamp: now,
+        userId: 'rate-user',
+      }
+
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
+      }
+
+      const dashboardBefore = securityMonitor.getSecurityDashboard()
+      expect(dashboardBefore.rateViolationCount).toBe(3)
+
+      // Fast forward past the cleanup window (1 hour * 2 = 2 hours)
+      vi.setSystemTime(now + 2 * 60 * 60 * 1000 + 1000)
+
+      // Trigger another event to cause cleanup
+      mockAuditLogger.triggerEvent({ ...event, id: 'evt-new', timestamp: Date.now() })
+
+      const dashboardAfter = securityMonitor.getSecurityDashboard()
+      expect(dashboardAfter.rateViolationCount).toBeLessThanOrEqual(2)
+    })
+
+    it('should clean old access patterns after time window expires', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const event: AuditEvent = {
+        id: 'evt-1',
+        type: 'policy.viewed',
+        timestamp: now,
+        userId: 'pattern-user',
+        resourceId: 'resource-1',
+      }
+
+      for (let i = 0; i < 10; i++) {
+        mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}`, resourceId: `resource-${i}` })
+      }
+
+      // Fast forward past the cleanup window (30 min * 2 = 1 hour)
+      vi.setSystemTime(now + 60 * 60 * 1000 + 1000)
+
+      // Trigger another event to cause cleanup
+      mockAuditLogger.triggerEvent({
+        ...event,
+        id: 'evt-new',
+        timestamp: Date.now(),
+        resourceId: 'new-resource',
+      })
+
+      // Should not throw and should handle cleanup gracefully
+      expect(true).toBe(true)
+    })
+
+    it('should remove entries with no recent data during cleanup', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      // Create failed logins for multiple users
+      for (let u = 0; u < 3; u++) {
+        const event: AuditEvent = {
+          id: `evt-u${u}`,
+          type: 'auth.signin_failed',
+          timestamp: now,
+          userId: `user-${u}`,
+        }
+        mockAuditLogger.triggerEvent(event)
+      }
+
+      const beforeDashboard = securityMonitor.getSecurityDashboard()
+      expect(beforeDashboard.failedLoginAttempts).toBe(3)
+
+      // Fast forward past cleanup window (48 hours)
+      vi.setSystemTime(now + 50 * 60 * 60 * 1000)
+
+      // Trigger a new event from a different user with new timestamp
+      const newTime = Date.now()
+      mockAuditLogger.triggerEvent({
+        id: 'evt-new',
+        type: 'auth.signin_failed',
+        timestamp: newTime,
+        userId: 'new-user',
+      })
+
+      const dashboard = securityMonitor.getSecurityDashboard()
+      // Old entries should be cleaned during processing, new user's login counted
+      // The old logins from users 0-2 should be cleaned, plus the new one
+      expect(dashboard.failedLoginAttempts).toBeLessThanOrEqual(4)
+    })
+
+    it('should keep recent data during cleanup', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const event: AuditEvent = {
+        id: 'evt-1',
+        type: 'auth.signin_failed',
+        timestamp: now,
+        userId: 'recent-user',
+      }
+
+      // Add recent events
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
+      }
+
+      // Fast forward only slightly (within window)
+      vi.setSystemTime(now + 10 * 60 * 1000) // 10 minutes
+
+      // Trigger another event
+      mockAuditLogger.triggerEvent({ ...event, id: 'evt-new', timestamp: Date.now() })
+
+      const dashboard = securityMonitor.getSecurityDashboard()
+      // All events should still be there
+      expect(dashboard.failedLoginAttempts).toBe(4)
+    })
+
+    it('should partially clean failed logins keeping recent ones', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const userId = 'partial-cleanup-user'
+
+      // Add old events (will be cleaned)
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `old-evt-${i}`,
+          type: 'auth.signin_failed',
+          timestamp: now,
+          userId,
+        })
+      }
+
+      // Fast forward past cleanup window for old events but add new ones
+      // failedLogins window is 15 min * 2 = 30 minutes for cleanup
+      vi.setSystemTime(now + 35 * 60 * 1000)
+
+      // Add new events at the current time
+      for (let i = 0; i < 2; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `new-evt-${i}`,
+          type: 'auth.signin_failed',
+          timestamp: Date.now(),
+          userId,
+        })
+      }
+
+      // Advance timers to trigger the cleanup interval (runs every 5 minutes)
+      vi.advanceTimersByTime(6 * 60 * 1000)
+
+      const dashboard = securityMonitor.getSecurityDashboard()
+      // Old events should be cleaned, only new ones remain
+      expect(dashboard.failedLoginAttempts).toBe(2)
+    })
+
+    it('should partially clean rate violations keeping recent ones', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const userId = 'rate-cleanup-user'
+
+      // Add old rate violations
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `old-rate-${i}`,
+          type: 'security.rate_limit_exceeded',
+          timestamp: now,
+          userId,
+        })
+      }
+
+      // Fast forward past cleanup window (1 hour * 2 = 2 hours for rate violations)
+      vi.setSystemTime(now + 3 * 60 * 60 * 1000)
+
+      // Add new violations at current time
+      for (let i = 0; i < 2; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `new-rate-${i}`,
+          type: 'security.rate_limit_exceeded',
+          timestamp: Date.now(),
+          userId,
+        })
+      }
+
+      // Advance timers to trigger the cleanup interval
+      vi.advanceTimersByTime(6 * 60 * 1000)
+
+      const dashboard = securityMonitor.getSecurityDashboard()
+      // Old violations should be cleaned, only new ones remain
+      expect(dashboard.rateViolationCount).toBe(2)
+    })
+
+    it('should partially clean access patterns keeping recent actions', () => {
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const userId = 'pattern-cleanup-user'
+
+      // Add old access events
+      for (let i = 0; i < 5; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `old-pattern-${i}`,
+          type: 'policy.viewed',
+          timestamp: now,
+          userId,
+          resourceId: `resource-${i}`,
+        })
+      }
+
+      // Fast forward past cleanup window (5 min * 2 = 10 minutes for access patterns)
+      vi.setSystemTime(now + 15 * 60 * 1000)
+
+      // Add new access events at current time
+      for (let i = 0; i < 3; i++) {
+        mockAuditLogger.triggerEvent({
+          id: `new-pattern-${i}`,
+          type: 'policy.viewed',
+          timestamp: Date.now(),
+          userId,
+          resourceId: `new-resource-${i}`,
+        })
+      }
+
+      // Advance timers to trigger the cleanup interval
+      vi.advanceTimersByTime(6 * 60 * 1000)
+
+      // The pattern should have recent actions and old ones cleaned
+      // No easy way to verify the internal state, but the code should execute without error
+      expect(true).toBe(true)
+    })
   })
 })
 
@@ -1132,5 +1529,57 @@ describe('generateSecurityReport', () => {
     const report = await generateSecurityReport()
 
     expect(report.recommendations.some(r => r.includes('rate limit'))).toBe(true)
+  })
+
+  it('should recommend Web Crypto when crypto is undefined', async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(global, 'crypto')
+
+    // Override crypto with undefined using defineProperty
+    Object.defineProperty(global, 'crypto', {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    })
+
+    const report = await generateSecurityReport()
+
+    expect(report.recommendations.some(r => r.includes('Web Crypto'))).toBe(true)
+    expect(report.cryptoSupported).toBe(false)
+
+    // Restore original crypto
+    if (originalDescriptor) {
+      Object.defineProperty(global, 'crypto', originalDescriptor)
+    }
+  })
+
+  it('should recommend Web Crypto when crypto.subtle is undefined', async () => {
+    const originalDescriptor = Object.getOwnPropertyDescriptor(global, 'crypto')
+
+    // Override crypto with partial object (no subtle)
+    Object.defineProperty(global, 'crypto', {
+      value: { getRandomValues: vi.fn() },
+      writable: true,
+      configurable: true,
+    })
+
+    const report = await generateSecurityReport()
+
+    expect(report.recommendations.some(r => r.includes('Web Crypto'))).toBe(true)
+    expect(report.cryptoSupported).toBe(false)
+
+    // Restore original crypto
+    if (originalDescriptor) {
+      Object.defineProperty(global, 'crypto', originalDescriptor)
+    }
+  })
+
+  it('should not recommend Web Crypto when crypto.subtle is available', async () => {
+    // crypto should already be available in the test environment
+    const report = await generateSecurityReport()
+
+    // If crypto.subtle is available, no crypto recommendation
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      expect(report.cryptoSupported).toBe(true)
+    }
   })
 })

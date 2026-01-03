@@ -485,6 +485,159 @@ describe('OCR Module', () => {
         expect(result.data.confidence).toBe(0.8)
       }
     })
+
+    it('should handle undefined pages array in annotation', async () => {
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          responses: [
+            {
+              fullTextAnnotation: {
+                text: 'Text with no pages',
+                // pages is undefined
+              },
+            },
+          ],
+        }),
+      })
+
+      const file = createMockFile()
+      const result = await performOCR(file)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toBe('Text with no pages')
+        expect(result.data.confidence).toBe(0.8) // Default when no pages
+        expect(result.data.pageCount).toBe(1) // Default when pages.length is 0
+      }
+    })
+
+    it('should handle undefined blocks array in page', async () => {
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          responses: [
+            {
+              fullTextAnnotation: {
+                text: 'Text with page but no blocks',
+                pages: [
+                  {}, // blocks is undefined
+                ],
+              },
+            },
+          ],
+        }),
+      })
+
+      const file = createMockFile()
+      const result = await performOCR(file)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toBe('Text with page but no blocks')
+        expect(result.data.confidence).toBe(0.8) // Default when no blocks
+        expect(result.data.pageCount).toBe(1)
+      }
+    })
+
+    it('should handle undefined text in annotation', async () => {
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          responses: [
+            {
+              fullTextAnnotation: {
+                // text is undefined
+                pages: [{ blocks: [{ confidence: 0.9 }] }],
+              },
+            },
+          ],
+        }),
+      })
+
+      const file = createMockFile()
+      const result = await performOCR(file)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toBe('') // Defaults to empty string
+        expect(result.data.confidence).toBe(0.9)
+        expect(result.data.pageCount).toBe(1)
+      }
+    })
+
+    it('should handle empty pages array (pageCount defaults to 1)', async () => {
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          responses: [
+            {
+              fullTextAnnotation: {
+                text: 'Some text',
+                pages: [], // Empty array, length is 0 (falsy)
+              },
+            },
+          ],
+        }),
+      })
+
+      const file = createMockFile()
+      const result = await performOCR(file)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toBe('Some text')
+        expect(result.data.pageCount).toBe(1) // Defaults to 1 when pages.length is 0
+        expect(result.data.confidence).toBe(0.8) // Default when no blocks
+      }
+    })
+
+    it('should handle block without confidence property', async () => {
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          responses: [
+            {
+              fullTextAnnotation: {
+                text: 'Text with blocks but no confidence',
+                pages: [
+                  {
+                    blocks: [
+                      { boundingBox: {} }, // No confidence
+                      { confidence: 0.85 }, // Has confidence
+                      { boundingBox: {} }, // No confidence
+                    ],
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+      })
+
+      const file = createMockFile()
+      const result = await performOCR(file)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.confidence).toBe(0.85) // Only counts the one with confidence
+      }
+    })
   })
 
   describe('performMultiPageOCR', () => {
