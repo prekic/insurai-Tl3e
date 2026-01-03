@@ -4,7 +4,7 @@
  * Tests for AI proxy endpoints including validation and error handling.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 
@@ -162,6 +162,26 @@ describe('AI Routes', () => {
       expect(response.status).toBe(400)
       expect(response.body.code).toBe('VALIDATION_ERROR')
     })
+
+    it('should return 415 for non-JSON content type', async () => {
+      const response = await request(app)
+        .post('/api/ai/extract/anthropic')
+        .set('Content-Type', 'text/plain')
+        .send('Test document')
+
+      expect(response.status).toBe(415)
+      expect(response.body.code).toBe('INVALID_CONTENT_TYPE')
+    })
+
+    it('should return 400 for empty documentText', async () => {
+      const response = await request(app)
+        .post('/api/ai/extract/anthropic')
+        .set('Content-Type', 'application/json')
+        .send({ documentText: '' })
+
+      expect(response.status).toBe(400)
+      expect(response.body.code).toBe('VALIDATION_ERROR')
+    })
   })
 
   describe('POST /api/ai/ocr', () => {
@@ -198,6 +218,16 @@ describe('AI Routes', () => {
 
       expect(response.status).toBe(400)
       expect(response.body.code).toBe('VALIDATION_ERROR')
+    })
+
+    it('should return 415 for non-JSON content type', async () => {
+      const response = await request(app)
+        .post('/api/ai/ocr')
+        .set('Content-Type', 'text/plain')
+        .send('base64data')
+
+      expect(response.status).toBe(415)
+      expect(response.body.code).toBe('INVALID_CONTENT_TYPE')
     })
   })
 
