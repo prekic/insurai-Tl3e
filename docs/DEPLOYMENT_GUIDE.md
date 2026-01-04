@@ -298,7 +298,7 @@ server {
     ssl_certificate_key /etc/letsencrypt/live/api.your-domain.com/privkey.pem;
 
     location / {
-        proxy_pass http://localhost:3001;
+        proxy_pass http://localhost:4001;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
@@ -352,7 +352,7 @@ VITE_APP_VERSION=0.1.0
 # BACKEND (Server-side only - NEVER exposed)
 # =============================================================================
 NODE_ENV=production
-API_PORT=3001
+API_PORT=4001
 FRONTEND_URL=https://your-domain.com
 
 # AI Provider Keys (server-side only)
@@ -398,7 +398,7 @@ NODE_ENV=production npm run start:server
 
 # Or use Docker (if Dockerfile exists)
 docker build -t insurai .
-docker run -p 3001:3001 --env-file .env insurai
+docker run -p 4001:4001 --env-file .env insurai
 ```
 
 ---

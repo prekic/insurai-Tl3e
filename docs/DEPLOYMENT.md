@@ -102,13 +102,13 @@ docker build \
 docker run -p 80:80 insurai-frontend
 
 # Backend only
-docker run -p 3001:3001 \
+docker run -p 4001:4001 \
   -e OPENAI_API_KEY=sk-xxx \
   -e ANTHROPIC_API_KEY=sk-ant-xxx \
   insurai-backend
 
 # Full stack
-docker run -p 80:80 -p 3001:3001 \
+docker run -p 80:80 -p 4001:4001 \
   -e OPENAI_API_KEY=sk-xxx \
   -e ANTHROPIC_API_KEY=sk-ant-xxx \
   insurai
@@ -166,7 +166,7 @@ fly secrets set OPENAI_API_KEY=sk-xxx ANTHROPIC_API_KEY=sk-ant-xxx
 
 2. Create ECS task definition with environment variables
 
-3. Configure Application Load Balancer for ports 80/3001
+3. Configure Application Load Balancer for ports 80/4001
 
 ---
 
@@ -232,7 +232,7 @@ Configure in GitHub Settings → Secrets:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `NODE_ENV` | Yes | `development`, `staging`, `production` |
-| `API_PORT` | No | Server port (default: 3001) |
+| `API_PORT` | No | Server port (default: 4001) |
 | `FRONTEND_URL` | Yes | Frontend URL for CORS |
 | `OPENAI_API_KEY` | No* | OpenAI API key |
 | `ANTHROPIC_API_KEY` | No* | Anthropic API key |
@@ -306,7 +306,7 @@ docker exec insurai-app env | grep -E "(VITE_|NODE_)"
 **API connection refused**
 - Verify `VITE_API_PROXY_URL` matches backend URL
 - Check CORS configuration (`FRONTEND_URL`)
-- Ensure firewall allows port 3001
+- Ensure firewall allows port 4001
 
 **Supabase connection fails**
 - Verify Supabase URL and key are correct

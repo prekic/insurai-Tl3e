@@ -30,7 +30,7 @@ import {
 initServerSentry()
 
 const app = express()
-const PORT = process.env.API_PORT || 3001
+const PORT = process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 const IS_STAGING = process.env.NODE_ENV === 'staging'
 

@@ -6,14 +6,14 @@
  *
  * Prerequisites:
  * - Start the server: npm run dev:server
- * - Server should be running on http://localhost:3001
+ * - Server should be running on http://localhost:4001
  */
 
 import autocannon from 'autocannon'
 type Result = autocannon.Result
 
 // Configuration
-const BASE_URL = process.env.LOAD_TEST_URL || 'http://localhost:3001'
+const BASE_URL = process.env.LOAD_TEST_URL || 'http://localhost:4001'
 const DEFAULT_DURATION = parseInt(process.env.LOAD_TEST_DURATION || '10', 10)
 const DEFAULT_CONNECTIONS = parseInt(process.env.LOAD_TEST_CONNECTIONS || '10', 10)
 
