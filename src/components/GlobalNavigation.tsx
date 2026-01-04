@@ -1,6 +1,7 @@
-import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut } from 'lucide-react'
+import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 
@@ -73,10 +74,20 @@ export function GlobalNavigation() {
 
   const handleSignOut = async () => {
     setShowProfileMenu(false)
+
+    // If not logged in, redirect to login
+    if (!user) {
+      navigate('/auth')
+      return
+    }
+
     try {
       await signOut()
+      toast.success('Signed out successfully')
       navigate('/')
-    } catch {
+    } catch (error) {
+      console.error('Sign out error:', error)
+      toast.error('Failed to sign out')
       // Navigate anyway on error
       navigate('/')
     }
@@ -230,14 +241,25 @@ export function GlobalNavigation() {
                       <span>Help Center</span>
                     </button>
                     <div className="border-t border-gray-100 mt-2 pt-2">
-                      <button
-                        onClick={handleSignOut}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left focus-ring"
-                        role="menuitem"
-                      >
-                        <LogOut size={16} aria-hidden="true" />
-                        <span>Sign Out</span>
-                      </button>
+                      {user ? (
+                        <button
+                          onClick={handleSignOut}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left focus-ring"
+                          role="menuitem"
+                        >
+                          <LogOut size={16} aria-hidden="true" />
+                          <span>Sign Out</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleMenuItemClick('/auth')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors text-left focus-ring"
+                          role="menuitem"
+                        >
+                          <LogIn size={16} aria-hidden="true" />
+                          <span>Sign In</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </>
