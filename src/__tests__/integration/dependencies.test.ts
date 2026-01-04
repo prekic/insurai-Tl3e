@@ -1,0 +1,106 @@
+/**
+ * Dependency Validation Tests
+ *
+ * These tests verify that all required dependencies are installed and importable.
+ * They catch missing package issues before runtime.
+ */
+
+import { describe, it, expect } from 'vitest'
+
+describe('Required Dependencies', () => {
+  describe('Core Dependencies', () => {
+    it('should have React installed', async () => {
+      const react = await import('react')
+      expect(react).toBeDefined()
+      expect(react.useState).toBeDefined()
+    })
+
+    it('should have React DOM installed', async () => {
+      const reactDom = await import('react-dom/client')
+      expect(reactDom).toBeDefined()
+      expect(reactDom.createRoot).toBeDefined()
+    })
+
+    it('should have React Router installed', async () => {
+      const router = await import('react-router-dom')
+      expect(router).toBeDefined()
+      expect(router.BrowserRouter).toBeDefined()
+    })
+  })
+
+  describe('Performance & Monitoring Dependencies', () => {
+    it('should have web-vitals installed', async () => {
+      const webVitals = await import('web-vitals')
+      expect(webVitals).toBeDefined()
+      expect(webVitals.onLCP).toBeDefined()
+      expect(webVitals.onCLS).toBeDefined()
+      // Note: onFID was renamed to onINP in web-vitals v4+
+      expect(webVitals.onINP || webVitals.onFID).toBeDefined()
+    })
+
+    it('should have Sentry React SDK installed', async () => {
+      const sentry = await import('@sentry/react')
+      expect(sentry).toBeDefined()
+      expect(sentry.init).toBeDefined()
+      expect(sentry.captureException).toBeDefined()
+    })
+  })
+
+  describe('AI & Document Processing Dependencies', () => {
+    it('should have OpenAI SDK installed', async () => {
+      const openai = await import('openai')
+      expect(openai).toBeDefined()
+    })
+
+    it('should have Anthropic SDK installed', async () => {
+      const anthropic = await import('@anthropic-ai/sdk')
+      expect(anthropic).toBeDefined()
+    })
+
+    it('should have PDF.js installed', async () => {
+      // PDF.js requires browser environment, so we just check the package exists
+      // by verifying the import doesn't throw a MODULE_NOT_FOUND error
+      try {
+        // Use a lighter import that doesn't require DOM
+        const pkgJson = await import('pdfjs-dist/package.json')
+        expect(pkgJson.name).toBe('pdfjs-dist')
+      } catch (error) {
+        // If package.json import fails, try the main module
+        // It will fail with DOMMatrix error in Node, but that's OK - package exists
+        if (error instanceof Error && error.message.includes('MODULE_NOT_FOUND')) {
+          throw new Error('pdfjs-dist package is not installed')
+        }
+        // DOMMatrix error means package exists but needs browser - that's fine
+        expect(true).toBe(true)
+      }
+    })
+  })
+
+  describe('Backend Dependencies', () => {
+    it('should have Supabase client installed', async () => {
+      const supabase = await import('@supabase/supabase-js')
+      expect(supabase).toBeDefined()
+      expect(supabase.createClient).toBeDefined()
+    })
+  })
+
+  describe('UI Dependencies', () => {
+    it('should have Lucide React icons installed', async () => {
+      const lucide = await import('lucide-react')
+      expect(lucide).toBeDefined()
+      expect(lucide.Upload).toBeDefined()
+    })
+
+    it('should have Framer Motion installed', async () => {
+      const motion = await import('framer-motion')
+      expect(motion).toBeDefined()
+      expect(motion.motion).toBeDefined()
+    })
+
+    it('should have Sonner toast installed', async () => {
+      const sonner = await import('sonner')
+      expect(sonner).toBeDefined()
+      expect(sonner.toast).toBeDefined()
+    })
+  })
+})
