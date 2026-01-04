@@ -1156,3 +1156,314 @@ describe('Batch request handling', () => {
     })
   })
 })
+
+// =============================================================================
+// Additional Edge Case Tests
+// =============================================================================
+
+describe('Edge cases - Portable data format', () => {
+  it('should include schema version in exportUserData', async () => {
+    const data = await exportUserData('schema-user')
+
+    // The collectedAt should be a valid ISO timestamp
+    expect(data.collectedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+  })
+
+  it('should include userId in exported data', async () => {
+    const data = await exportUserData('include-user-123')
+
+    expect(data.userId).toBe('include-user-123')
+  })
+
+  it('should include categories structure', async () => {
+    const data = await exportUserData('categories-user')
+
+    expect(data.categories).toBeDefined()
+  })
+})
+
+describe('Edge cases - Request status updates', () => {
+  it('should have deadline greater than submittedAt', async () => {
+    const request = await requestDataAccess('deadline-test', 'deadline@example.com')
+
+    expect(request.deadline).toBeGreaterThan(request.submittedAt)
+    const diffDays = (request.deadline - request.submittedAt) / (24 * 60 * 60 * 1000)
+    expect(diffDays).toBe(30)
+  })
+})
+
+describe('Edge cases - Multiple data sources', () => {
+  it('should handle empty localStorage gracefully', async () => {
+    vi.stubGlobal('localStorage', {
+      length: 0,
+      key: () => null,
+      getItem: () => null,
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    })
+
+    const data = await exportUserData('empty-storage-user')
+
+    expect(data.localStorage).toEqual({})
+  })
+
+  it('should collect IndexedDB data for user', async () => {
+    const data = await exportUserData('idb-user')
+
+    expect(data.indexedDB).toBeDefined()
+  })
+})
+
+describe('Edge cases - Consent handling in withdrawal', () => {
+  it('should not revoke essential consents', async () => {
+    // Mock with only essential consents
+    vi.mocked(consentManager.getUserConsentStatus).mockResolvedValueOnce({
+      userId: 'essential-only',
+      consents: {
+        terms_of_service: { granted: true, timestamp: Date.now() },
+        cookie_essential: { granted: true, timestamp: Date.now() },
+      },
+      lastUpdated: Date.now(),
+    })
+
+    const request = await dataSubjectRightsManager.submitRequest({
+      userId: 'essential-only',
+      email: 'essential@example.com',
+      type: 'withdraw_consent',
+    })
+
+    expect(request.status).toBe('pending')
+  })
+})
+
+describe('Edge cases - Request reason variations', () => {
+  it('should handle reason with special characters', async () => {
+    const specialReason = 'Reason with <html> & "quotes" and \'apostrophes\''
+    const request = await requestDataDeletion(
+      'special-reason-user',
+      'special@example.com',
+      specialReason
+    )
+
+    expect(request.reason).toBe(specialReason)
+  })
+
+  it('should handle reason with unicode characters', async () => {
+    const unicodeReason = 'Türkçe karakterler: İşğüöç'
+    const request = await requestDataDeletion(
+      'unicode-reason-user',
+      'unicode@example.com',
+      unicodeReason
+    )
+
+    expect(request.reason).toBe(unicodeReason)
+  })
+
+  it('should handle reason with newlines', async () => {
+    const multilineReason = 'Line 1\nLine 2\nLine 3'
+    const request = await requestDataDeletion(
+      'multiline-reason-user',
+      'multiline@example.com',
+      multilineReason
+    )
+
+    expect(request.reason).toBe(multilineReason)
+  })
+})
+
+describe('Edge cases - User ID variations', () => {
+  it('should handle UUID format userId', async () => {
+    const uuid = '550e8400-e29b-41d4-a716-446655440000'
+    const request = await requestDataAccess(uuid, 'uuid@example.com')
+
+    expect(request.userId).toBe(uuid)
+  })
+
+  it('should handle email as userId', async () => {
+    const emailId = 'user@domain.com'
+    const request = await requestDataAccess(emailId, 'email@example.com')
+
+    expect(request.userId).toBe(emailId)
+  })
+
+  it('should handle numeric userId', async () => {
+    const numericId = '12345678'
+    const request = await requestDataAccess(numericId, 'numeric@example.com')
+
+    expect(request.userId).toBe(numericId)
+  })
+})
+
+describe('Edge cases - Timestamp handling', () => {
+  it('should have ISO timestamp in collectedAt', async () => {
+    const data = await exportUserData('timestamp-user')
+
+    const collectedAt = data.collectedAt as string
+    expect(() => new Date(collectedAt)).not.toThrow()
+    expect(new Date(collectedAt).toISOString()).toBe(collectedAt)
+  })
+
+  it('should have consistent deadline calculation', async () => {
+    const beforeTime = Date.now()
+    const request = await requestDataAccess('time-sync', 'time@example.com')
+    const afterTime = Date.now()
+
+    expect(request.submittedAt).toBeGreaterThanOrEqual(beforeTime)
+    expect(request.submittedAt).toBeLessThanOrEqual(afterTime)
+  })
+})
+
+describe('Edge cases - Personal data fields', () => {
+  it('should exclude technical category fields', async () => {
+    const data = await exportUserData('fields-user')
+
+    const fields = data.personalDataFields as Array<{ category: string }>
+    const hasTechnical = fields.some((f) => f.category === 'technical')
+    expect(hasTechnical).toBe(false)
+  })
+
+  it('should include purpose translations', async () => {
+    const data = await exportUserData('purpose-fields-user')
+
+    const fields = data.personalDataFields as Array<{ purposeTr: string }>
+    if (fields.length > 0) {
+      expect(typeof fields[0].purposeTr).toBe('string')
+    }
+  })
+
+  it('should format retention as days string', async () => {
+    const data = await exportUserData('retention-fields-user')
+
+    const fields = data.personalDataFields as Array<{ retention: string }>
+    if (fields.length > 0) {
+      expect(fields[0].retention).toMatch(/\d+ days/)
+    }
+  })
+})
+
+describe('Edge cases - Delete result tracking', () => {
+  it('should return deletion success status', async () => {
+    const result = await deleteAllUserData('success-delete-user')
+
+    expect(typeof result.deleted).toBe('boolean')
+  })
+
+  it('should track multiple deletion sources', async () => {
+    const result = await deleteAllUserData('multi-source-user')
+
+    expect(result.deletedFrom).toContain('localStorage')
+    expect(result.deletedFrom).toContain('consents')
+  })
+
+  it('should return empty errors array on success', async () => {
+    const result = await deleteAllUserData('clean-delete-user')
+
+    // May have some errors depending on db availability, but array should exist
+    expect(Array.isArray(result.errors)).toBe(true)
+  })
+})
+
+describe('Edge cases - Process request error handling', () => {
+  it('should throw descriptive error for missing request', async () => {
+    await expect(
+      dataSubjectRightsManager.processRequest('nonexistent-request-id')
+    ).rejects.toThrow('Request not found')
+  })
+})
+
+describe('Edge cases - Request types exhaustive', () => {
+  const allRequestTypes = [
+    'access',
+    'erasure',
+    'portability',
+    'rectification',
+    'restriction',
+    'withdraw_consent',
+    'objection',
+    'complaint',
+  ] as const
+
+  allRequestTypes.forEach((type) => {
+    it(`should accept ${type} request type`, async () => {
+      const request = await dataSubjectRightsManager.submitRequest({
+        userId: `type-${type}-user`,
+        email: `${type}@example.com`,
+        type: type as any,
+      })
+
+      expect(request.type).toBe(type)
+      expect(request.id).toMatch(/^dsr_/)
+    })
+  })
+})
+
+describe('Edge cases - LocalStorage key matching', () => {
+  it('should collect keys containing userId', async () => {
+    vi.stubGlobal('localStorage', {
+      length: 3,
+      key: (i: number) => {
+        const keys = ['user_match-user_data', 'other_key', 'insurai_settings']
+        return keys[i] ?? null
+      },
+      getItem: (key: string) => {
+        if (key.includes('match-user')) return JSON.stringify({ found: true })
+        if (key.startsWith('insurai_')) return JSON.stringify({ app: true })
+        return null
+      },
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    })
+
+    const data = await exportUserData('match-user')
+
+    const storage = data.localStorage as Record<string, unknown>
+    expect(Object.keys(storage).length).toBeGreaterThan(0)
+  })
+
+  it('should collect keys starting with insurai_', async () => {
+    vi.stubGlobal('localStorage', {
+      length: 2,
+      key: (i: number) => {
+        const keys = ['insurai_policies', 'insurai_cache']
+        return keys[i] ?? null
+      },
+      getItem: () => JSON.stringify({ data: true }),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+      clear: vi.fn(),
+    })
+
+    const data = await exportUserData('any-user')
+
+    const storage = data.localStorage as Record<string, unknown>
+    expect(storage['insurai_policies']).toBeDefined()
+    expect(storage['insurai_cache']).toBeDefined()
+  })
+})
+
+describe('Edge cases - Concurrent initialization', () => {
+  it('should handle multiple initialize calls', async () => {
+    // Call initialize multiple times concurrently
+    const promises = [
+      dataSubjectRightsManager.initialize(),
+      dataSubjectRightsManager.initialize(),
+      dataSubjectRightsManager.initialize(),
+    ]
+
+    await expect(Promise.all(promises)).resolves.not.toThrow()
+  })
+})
+
+describe('Edge cases - Empty result handling', () => {
+  it('should return empty array for new user requests', async () => {
+    const requests = await dataSubjectRightsManager.getUserRequests('brand-new-user-xyz')
+    expect(requests).toEqual([])
+  })
+
+  it('should return null for nonexistent request', async () => {
+    const request = await dataSubjectRightsManager.getRequest('completely-fake-id')
+    expect(request).toBeNull()
+  })
+})

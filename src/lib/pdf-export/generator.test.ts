@@ -516,4 +516,248 @@ describe('PDF Report Generator', () => {
       expect(result.success).toBe(true)
     })
   })
+
+  describe('generatePolicyDetailReport - market comparison edge cases', () => {
+    it('should handle policy without marketComparison', () => {
+      const policy = createMockPolicy({ marketComparison: undefined })
+      const result = generatePolicyDetailReport(policy)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policy with partial marketComparison', () => {
+      const policy = createMockPolicy({
+        marketComparison: { averagePremium: 5000 } as typeof createMockPolicy extends (...args: unknown[]) => infer R ? R['marketComparison'] : never,
+      })
+      const result = generatePolicyDetailReport(policy)
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('generateGapAnalysisReport - edge cases', () => {
+    it('should handle gap analysis with empty topRecommendations', () => {
+      const policy = createMockPolicy()
+      const gapAnalysis = {
+        ...createMockGapAnalysis(),
+        topRecommendations: [],
+      }
+      const result = generateGapAnalysisReport(policy, gapAnalysis)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle gap analysis with undefined topRecommendations', () => {
+      const policy = createMockPolicy()
+      const gapAnalysis = {
+        ...createMockGapAnalysis(),
+        topRecommendations: undefined,
+      }
+      const result = generateGapAnalysisReport(policy, gapAnalysis)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle recommendations without estimatedCost', () => {
+      const policy = createMockPolicy()
+      const gapAnalysis = {
+        ...createMockGapAnalysis(),
+        topRecommendations: [
+          {
+            title: 'Add Coverage',
+            titleTr: 'Teminat Ekle',
+            description: 'Add missing coverage',
+            descriptionTr: 'Eksik teminat ekleyin',
+            priority: 1,
+            // No estimatedCost
+          },
+        ],
+      }
+      const result = generateGapAnalysisReport(policy, gapAnalysis)
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('generatePortfolioReport - edge cases', () => {
+    it('should handle policies without riskScore', () => {
+      const policies = [
+        createMockPolicy({ id: 'p1', riskScore: undefined }),
+        createMockPolicy({ id: 'p2', riskScore: undefined }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policies with zero coverage', () => {
+      const policies = [
+        createMockPolicy({ coverage: 0 }),
+        createMockPolicy({ coverage: 0 }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policies with zero premium', () => {
+      const policies = [
+        createMockPolicy({ premium: 0 }),
+        createMockPolicy({ premium: 0 }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle policies without gapAnalysis', () => {
+      const policies = [
+        createMockPolicy({ gapAnalysis: undefined }),
+        createMockPolicy({ gapAnalysis: undefined }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle single policy with critical gaps', () => {
+      const policies = [
+        createMockPolicy({
+          gapAnalysis: {
+            criticalCount: 3,
+            totalCount: 5,
+            overallScore: 50,
+            topIssue: 'Major coverage gap',
+            financialExposure: 50000,
+          },
+        }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle multiple policy types', () => {
+      const policies = [
+        createMockPolicy({ type: 'kasko' }),
+        createMockPolicy({ type: 'home' }),
+        createMockPolicy({ type: 'life' }),
+        createMockPolicy({ type: 'health' }),
+        createMockPolicy({ type: 'business' }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle all expired policies', () => {
+      const policies = [
+        createMockPolicy({ status: 'expired' }),
+        createMockPolicy({ status: 'expired' }),
+      ]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle large number of policies', () => {
+      const policies = Array.from({ length: 50 }, (_, i) =>
+        createMockPolicy({ id: `policy-${i}` })
+      )
+      const result = generatePortfolioReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('generatePolicySummaryReport - edge cases', () => {
+    it('should handle empty policy array', () => {
+      const result = generatePolicySummaryReport([])
+      expect(result.success).toBe(true)
+    })
+
+    it('should handle large number of policies', () => {
+      const policies = Array.from({ length: 100 }, (_, i) =>
+        createMockPolicy({ id: `summary-policy-${i}` })
+      )
+      const result = generatePolicySummaryReport(policies)
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('Report filename generation', () => {
+    it('should generate policy_detail filename with policy number', () => {
+      const policy = createMockPolicy({ policyNumber: 'POL-12345' })
+      const result = generatePolicyDetailReport(policy)
+
+      expect(result.filename).toContain('policy')
+    })
+
+    it('should generate gap_analysis filename', () => {
+      const policy = createMockPolicy()
+      const gapAnalysis = createMockGapAnalysis()
+      const result = generateGapAnalysisReport(policy, gapAnalysis)
+
+      expect(result.filename).toContain('gap')
+    })
+
+    it('should generate portfolio filename', () => {
+      const policies = [createMockPolicy()]
+      const result = generatePortfolioReport(policies)
+
+      expect(result.filename).toContain('portfolio')
+    })
+  })
+
+  describe('Report options handling', () => {
+    it('should apply English language option', () => {
+      const policy = createMockPolicy()
+      const result = generatePolicyDetailReport(policy, { language: 'en' })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should apply Turkish language option', () => {
+      const policy = createMockPolicy()
+      const result = generatePolicyDetailReport(policy, { language: 'tr' })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should apply format option', () => {
+      const policy = createMockPolicy()
+      const result = generatePolicyDetailReport(policy, { format: 'pdf' })
+
+      expect(result.success).toBe(true)
+    })
+
+    it('should apply custom branding', () => {
+      const policy = createMockPolicy()
+      const result = generatePolicyDetailReport(policy, {
+        branding: {
+          companyName: 'Custom Corp',
+          primaryColor: '#123456',
+          showBranding: true,
+        },
+      })
+
+      expect(result.success).toBe(true)
+    })
+  })
+
+  describe('Export functions - edge cases', () => {
+    beforeEach(() => {
+      global.window = {
+        open: vi.fn(() => null),
+      } as unknown as Window & typeof globalThis
+    })
+
+    it('should return false when print window fails to open for policy', () => {
+      const policy = createMockPolicy()
+      const result = quickExport(policy)
+
+      expect(result).toBe(false)
+    })
+  })
 })
