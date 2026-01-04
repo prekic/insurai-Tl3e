@@ -284,7 +284,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
 
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
-    id: `policy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: crypto.randomUUID(),
     policyNumber: data.policyNumber ?? `POL-${Date.now()}`,
     type: policyType,
     typeTr: typeInfo.labelTr,
@@ -371,7 +371,7 @@ function createFallbackResult(
   // Create a new policy based on sample
   const policy: AnalyzedPolicy = {
     ...samplePolicy,
-    id: `policy-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    id: crypto.randomUUID(),
     documentUrl: URL.createObjectURL(file),
     uploadDate: new Date().toISOString().split('T')[0],
     aiConfidence: partialData?.confidence.overall ?? 0.5,
