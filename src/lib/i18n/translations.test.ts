@@ -44,7 +44,7 @@ describe('COMMON_LOCALES', () => {
   it('should not mark other languages as RTL', () => {
     const nonRTL: CommonLocale[] = ['en', 'tr', 'de', 'fr', 'es']
     for (const locale of nonRTL) {
-      expect(COMMON_LOCALES[locale].rtl).toBeUndefined()
+      expect((COMMON_LOCALES[locale] as any).rtl ?? false).toBe(false)
     }
   })
 

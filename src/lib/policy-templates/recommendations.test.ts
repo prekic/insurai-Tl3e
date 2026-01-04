@@ -2,11 +2,10 @@
  * Tests for Policy Template Recommendations
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import type { Policy } from '@/types/policy'
 import type {
   UserProfile,
-  PolicyTemplate,
   TemplateSearchCriteria,
 } from '@/types/policy-template'
 import {
@@ -35,21 +34,19 @@ const createMockPolicy = (overrides: Partial<Policy> = {}): Policy => ({
   id: 'test-policy-1',
   policyNumber: 'POL-TEST-001',
   type: 'home',
+  typeTr: 'Konut',
   provider: 'Test Insurance',
-  providerLogo: '',
+  logo: '',
   status: 'active',
   premium: 3000,
+  monthlyPremium: 250,
   coverage: 500000,
+  deductible: 1000,
   startDate: '2024-01-01',
-  endDate: '2024-12-31',
-  holder: {
-    name: 'Test User',
-    tcNumber: '12345678901',
-    address: 'Test Address',
-    phone: '5551234567',
-    email: 'test@example.com',
-  },
-  insuredItems: [{ name: 'House', value: 500000 }],
+  expiryDate: '2024-12-31',
+  uploadDate: '2024-01-01',
+  fileName: 'test-policy.pdf',
+  documentType: 'application/pdf',
   coverages: [
     {
       name: 'Fire',
@@ -68,8 +65,9 @@ const createMockPolicy = (overrides: Partial<Policy> = {}): Policy => ({
       description: 'Theft coverage',
     },
   ],
-  documents: [],
-  notes: '',
+  exclusions: [],
+  specialConditions: [],
+  insuranceLine: 'Property',
   ...overrides,
 })
 

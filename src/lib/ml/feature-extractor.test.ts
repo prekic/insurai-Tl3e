@@ -33,9 +33,13 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   id: 'policy-1',
   policyNumber: 'POL-001',
   type: 'kasko',
+  typeTr: 'Kasko',
   provider: 'Allianz',
+  logo: 'allianz-logo.png',
   premium: 5000,
+  monthlyPremium: 416,
   coverage: 100000,
+  deductible: 1000,
   coverages: [
     { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000, included: true },
     { name: 'Hırsızlık', nameTr: 'Hırsızlık', limit: 30000, deductible: 500, included: true },
@@ -44,9 +48,15 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   status: 'active',
   startDate: new Date().toISOString(),
   expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+  uploadDate: new Date().toISOString(),
+  fileName: 'test-policy.pdf',
+  documentType: 'pdf',
+  insuranceLine: 'auto',
   insuredAddress: 'Istanbul, Beşiktaş',
   exclusions: ['deprem hasarları', 'terör olayları'],
   specialConditions: ['Yaş sınırı: 25+'],
+  aiConfidence: 0.95,
+  aiInsights: ['Standard kasko coverage detected', 'Premium within market range'],
   ...overrides,
 })
 
@@ -96,17 +106,18 @@ describe('Feature Extractor', () => {
       expect(features.deductibleToPremiumRatio).toBe(0.1) // 500 / 5000
     })
 
-    it('should handle policies with no deductibles', () => {
+    it('should handle policies with zero deductibles', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Coverage1', nameTr: 'Teminat1', limit: 10000, deductible: null },
+          { name: 'Coverage1', nameTr: 'Teminat1', limit: 10000, deductible: 0, included: true },
         ],
       })
       const features = extractFeatures(policy)
 
-      expect(features.averageDeductible).toBeNull()
-      expect(features.maxDeductible).toBeNull()
-      expect(features.deductibleToPremiumRatio).toBeNull()
+      // A deductible of 0 is still a valid deductible (no out-of-pocket)
+      expect(features.averageDeductible).toBe(0)
+      expect(features.maxDeductible).toBe(0)
+      expect(features.deductibleToPremiumRatio).toBe(0)
     })
 
     it('should extract provider metrics', () => {
@@ -433,8 +444,8 @@ describe('Feature Extractor', () => {
   })
 
   describe('edge cases', () => {
-    it('should handle null provider', () => {
-      const policy = createMockPolicy({ provider: null })
+    it('should handle unknown provider', () => {
+      const policy = createMockPolicy({ provider: 'Unknown Company' })
       const features = extractFeatures(policy)
 
       expect(features.providerRating).toBeNull()

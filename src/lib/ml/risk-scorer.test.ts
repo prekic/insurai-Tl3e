@@ -68,9 +68,13 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   id: 'policy-1',
   policyNumber: 'POL-001',
   type: 'kasko',
+  typeTr: 'Kasko',
   provider: 'Allianz',
+  logo: 'allianz-logo.png',
   premium: 5000,
+  monthlyPremium: 416,
   coverage: 100000,
+  deductible: 1000,
   coverages: [
     { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000, included: true },
     { name: 'Hırsızlık', nameTr: 'Hırsızlık', limit: 30000, deductible: 500, included: true },
@@ -78,6 +82,14 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   status: 'active',
   startDate: new Date().toISOString(),
   expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+  uploadDate: new Date().toISOString(),
+  fileName: 'test-policy.pdf',
+  documentType: 'pdf',
+  insuranceLine: 'auto',
+  exclusions: ['deprem hasarları', 'terör olayları'],
+  specialConditions: ['Yaş sınırı: 25+'],
+  aiConfidence: 0.95,
+  aiInsights: ['Standard kasko coverage detected', 'Premium within market range'],
   ...overrides,
 })
 
@@ -395,7 +407,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.coverage_gaps).toBeDefined()
-      expect(score.categories.coverage_gaps.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.coverage_gaps?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect pricing risks', () => {
@@ -403,7 +415,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.pricing).toBeDefined()
-      expect(score.categories.pricing.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.pricing?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect provider risks', () => {
@@ -411,7 +423,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.provider).toBeDefined()
-      expect(score.categories.provider.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.provider?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect temporal risks', () => {
@@ -419,7 +431,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.temporal).toBeDefined()
-      expect(score.categories.temporal.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.temporal?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect geographic risks', () => {
@@ -427,7 +439,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.geographic).toBeDefined()
-      expect(score.categories.geographic.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.geographic?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect concentration risks', () => {
@@ -435,7 +447,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.concentration).toBeDefined()
-      expect(score.categories.concentration.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.concentration?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect deductible risks', () => {
@@ -443,7 +455,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.deductible).toBeDefined()
-      expect(score.categories.deductible.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.deductible?.score).toBeGreaterThanOrEqual(0)
     })
 
     it('should detect exclusion risks', () => {
@@ -451,7 +463,7 @@ describe('Risk Scorer', () => {
       const score = calculateRiskScore(policy)
 
       expect(score.categories.exclusions).toBeDefined()
-      expect(score.categories.exclusions.score).toBeGreaterThanOrEqual(0)
+      expect(score.categories.exclusions?.score).toBeGreaterThanOrEqual(0)
     })
   })
 
@@ -1320,7 +1332,7 @@ describe('Risk Scorer', () => {
 
       // With minimal risk features (no triggering conditions), all category
       // scores should be 0, and overall score should be very low
-      for (const [category, data] of Object.entries(score.categories)) {
+      for (const [_category, data] of Object.entries(score.categories)) {
         expect(data.score).toBe(0)
         expect(data.factors.length).toBe(0)
       }

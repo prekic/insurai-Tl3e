@@ -333,8 +333,6 @@ describe('handleCSPViolation', () => {
 
 describe('setupCSPViolationListener', () => {
   let addEventListenerSpy: ReturnType<typeof vi.spyOn>
-  let originalDocument: typeof document | undefined
-
   beforeEach(() => {
     // Mock document for browser environment
     addEventListenerSpy = vi.fn()

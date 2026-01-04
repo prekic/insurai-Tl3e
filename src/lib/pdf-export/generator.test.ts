@@ -80,34 +80,83 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   premium: 5000,
   coverage: 100000,
   coverages: [
-    { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000 },
+    { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000, included: true },
   ],
   status: 'active',
   startDate: new Date().toISOString(),
   expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+  logo: '',
+  typeTr: 'Kasko',
+  monthlyPremium: 417,
+  deductible: 1000,
+  uploadDate: new Date().toISOString(),
+  fileName: 'test.pdf',
+  documentType: 'pdf',
+  exclusions: [],
+  specialConditions: [],
+  insuranceLine: 'auto',
+  aiConfidence: 0.95,
+  aiInsights: [],
   ...overrides,
 })
 
 const createMockGapAnalysis = (): ComprehensiveGapAnalysis => ({
   policyId: 'policy-1',
-  analyzedAt: Date.now(),
+  policyType: 'kasko',
+  analyzedAt: new Date().toISOString(),
   overallScore: 75,
-  criticalCount: 1,
-  moderateCount: 2,
-  minorCount: 3,
-  totalCount: 6,
+  gapCount: {
+    total: 6,
+    critical: 1,
+    high: 2,
+    medium: 2,
+    low: 1,
+    info: 0,
+  },
   gaps: [],
+  gapsByCategory: {
+    coverage: [],
+    limit: [],
+    deductible: [],
+    exclusion: [],
+    temporal: [],
+    compliance: [],
+    portfolio: [],
+  },
+  gapsBySeverity: {
+    critical: [],
+    high: [],
+    medium: [],
+    low: [],
+    info: [],
+  },
+  financialSummary: {
+    totalPotentialLoss: 10000,
+    totalExpectedLoss: 5000,
+    estimatedRemediationCost: 500,
+    costBenefitRatio: 10,
+  },
+  prioritizedGaps: [],
   topRecommendations: [
     {
+      id: 'rec-1',
       title: 'Add Coverage',
       titleTr: 'Teminat Ekle',
       description: 'Add missing coverage',
       descriptionTr: 'Eksik teminat ekleyin',
-      priority: 1,
+      addressesGaps: [],
+      impactScore: 80,
+      gapsResolved: 1,
+      riskReduction: 25,
       estimatedCost: 500,
+      expectedSavings: 5000,
+      roi: 9,
+      difficulty: 'easy',
+      timeframe: '1-2 weeks',
+      priority: 1,
     },
   ],
-  financialExposure: 10000,
+  confidence: 0.9,
 })
 
 describe('PDF Report Generator', () => {
@@ -139,7 +188,7 @@ describe('PDF Report Generator', () => {
       const policy = createMockPolicy()
       const result = generatePolicyDetailReport(policy, {
         language: 'en',
-        sections: ['summary'],
+        sections: { showPolicyDetails: true },
       })
 
       expect(result.success).toBe(true)
@@ -431,11 +480,29 @@ describe('PDF Report Generator', () => {
       const policiesWithGaps = [
         createMockPolicy({
           id: 'policy-1',
-          gapAnalysis: { criticalCount: 2, totalCount: 5, overallScore: 60 },
+          gapAnalysis: {
+            overallScore: 60,
+            criticalCount: 2,
+            highCount: 1,
+            totalCount: 5,
+            topIssue: 'Missing coverage',
+            topIssueTr: 'Eksik teminat',
+            financialExposure: 15000,
+            remediationCost: 1000,
+          },
         }),
         createMockPolicy({
           id: 'policy-2',
-          gapAnalysis: { criticalCount: 1, totalCount: 3, overallScore: 75 },
+          gapAnalysis: {
+            overallScore: 75,
+            criticalCount: 1,
+            highCount: 1,
+            totalCount: 3,
+            topIssue: 'Low limit',
+            topIssueTr: 'Düşük limit',
+            financialExposure: 10000,
+            remediationCost: 500,
+          },
         }),
       ]
       const result = generatePortfolioReport(policiesWithGaps)
@@ -445,8 +512,8 @@ describe('PDF Report Generator', () => {
 
     it('should handle policies with risk scores', () => {
       const policiesWithRiskScores = [
-        createMockPolicy({ riskScore: { overall: 30 } }),
-        createMockPolicy({ riskScore: { overall: 70 } }),
+        createMockPolicy({ riskScore: { overall: 30, level: 'low', topIssue: null, confidence: 0.85 } }),
+        createMockPolicy({ riskScore: { overall: 70, level: 'high', topIssue: 'High deductible', confidence: 0.9 } }),
       ]
       const result = generatePortfolioReport(policiesWithRiskScores)
 
@@ -469,7 +536,17 @@ describe('PDF Report Generator', () => {
       const result = generatePortfolioReport(policies, {
         branding: {
           companyName: 'Custom Company',
-          primaryColor: '#FF0000',
+          colors: {
+            primary: '#FF0000',
+            secondary: '#0000FF',
+            text: '#000000',
+            textLight: '#666666',
+            background: '#FFFFFF',
+            accent: '#00FF00',
+            success: '#22c55e',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+          },
         },
       })
 
@@ -479,7 +556,7 @@ describe('PDF Report Generator', () => {
     it('should accept custom sections', () => {
       const policies = [createMockPolicy()]
       const result = generatePortfolioReport(policies, {
-        sections: ['summary', 'overview'],
+        sections: { showPolicyDetails: true, showCoverages: true },
       })
 
       expect(result.success).toBe(true)
@@ -506,9 +583,18 @@ describe('PDF Report Generator', () => {
 
     it('should handle policy with all optional fields', () => {
       const fullPolicy = createMockPolicy({
-        riskScore: { overall: 45 },
-        gapAnalysis: { criticalCount: 1, totalCount: 3, overallScore: 70 },
-        marketComparison: { averagePremium: 6000, percentile: 35 },
+        riskScore: { overall: 45, level: 'moderate', topIssue: 'Coverage limit', confidence: 0.88 },
+        gapAnalysis: {
+          overallScore: 70,
+          criticalCount: 1,
+          highCount: 1,
+          totalCount: 3,
+          topIssue: 'Missing critical coverage',
+          topIssueTr: 'Kritik teminat eksik',
+          financialExposure: 12000,
+          remediationCost: 800,
+        },
+        marketComparison: { averagePremium: 6000, averageCoverage: 120000, percentile: 35 },
         aiInsights: ['Good coverage', 'Consider flood insurance'],
       })
       const result = generatePolicyDetailReport(fullPolicy)
@@ -527,7 +613,7 @@ describe('PDF Report Generator', () => {
 
     it('should handle policy with partial marketComparison', () => {
       const policy = createMockPolicy({
-        marketComparison: { averagePremium: 5000 } as typeof createMockPolicy extends (...args: unknown[]) => infer R ? R['marketComparison'] : never,
+        marketComparison: { averagePremium: 5000, averageCoverage: 100000, percentile: 50 },
       })
       const result = generatePolicyDetailReport(policy)
 
@@ -549,9 +635,10 @@ describe('PDF Report Generator', () => {
 
     it('should handle gap analysis with undefined topRecommendations', () => {
       const policy = createMockPolicy()
-      const gapAnalysis = {
-        ...createMockGapAnalysis(),
-        topRecommendations: undefined,
+      const baseAnalysis = createMockGapAnalysis()
+      const gapAnalysis: ComprehensiveGapAnalysis = {
+        ...baseAnalysis,
+        topRecommendations: [],
       }
       const result = generateGapAnalysisReport(policy, gapAnalysis)
 
@@ -560,16 +647,26 @@ describe('PDF Report Generator', () => {
 
     it('should handle recommendations without estimatedCost', () => {
       const policy = createMockPolicy()
-      const gapAnalysis = {
-        ...createMockGapAnalysis(),
+      const baseAnalysis = createMockGapAnalysis()
+      const gapAnalysis: ComprehensiveGapAnalysis = {
+        ...baseAnalysis,
         topRecommendations: [
           {
+            id: 'rec-2',
             title: 'Add Coverage',
             titleTr: 'Teminat Ekle',
             description: 'Add missing coverage',
             descriptionTr: 'Eksik teminat ekleyin',
+            addressesGaps: [],
+            impactScore: 70,
+            gapsResolved: 1,
+            riskReduction: 20,
+            estimatedCost: 0,
+            expectedSavings: 0,
+            roi: 0,
+            difficulty: 'easy',
+            timeframe: '1 week',
             priority: 1,
-            // No estimatedCost
           },
         ],
       }
@@ -624,11 +721,14 @@ describe('PDF Report Generator', () => {
       const policies = [
         createMockPolicy({
           gapAnalysis: {
-            criticalCount: 3,
-            totalCount: 5,
             overallScore: 50,
+            criticalCount: 3,
+            highCount: 2,
+            totalCount: 5,
             topIssue: 'Major coverage gap',
+            topIssueTr: 'Önemli teminat açığı',
             financialExposure: 50000,
+            remediationCost: 2000,
           },
         }),
       ]
@@ -737,8 +837,17 @@ describe('PDF Report Generator', () => {
       const result = generatePolicyDetailReport(policy, {
         branding: {
           companyName: 'Custom Corp',
-          primaryColor: '#123456',
-          showBranding: true,
+          colors: {
+            primary: '#123456',
+            secondary: '#654321',
+            text: '#000000',
+            textLight: '#666666',
+            background: '#FFFFFF',
+            accent: '#00AAFF',
+            success: '#22c55e',
+            warning: '#f59e0b',
+            danger: '#ef4444',
+          },
         },
       })
 

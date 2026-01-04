@@ -922,10 +922,10 @@ describe('Edge cases - logAuth without email', () => {
 
   it('should handle auth event without email field', async () => {
     const event = await auditLogger.logAuth('auth.signin', {
-      method: 'sso',
+      method: 'google',
     })
 
-    expect(event.details).toHaveProperty('method', 'sso')
+    expect(event.details).toHaveProperty('method', 'google')
     expect((event.details as any).email).toBeUndefined()
   })
 
@@ -1041,7 +1041,7 @@ describe('Edge cases - Category mapping', () => {
   })
 
   it('should map settings events to settings category', async () => {
-    const event = await auditLogger.log('settings.updated', {})
+    const event = await auditLogger.log('settings.preference_changed', {})
     expect(event.category).toBe('settings')
   })
 })

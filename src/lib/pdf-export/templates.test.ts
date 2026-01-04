@@ -3,15 +3,15 @@
  * Tests HTML template generation for various report types
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   generatePolicyDetailHTML,
   generateGapAnalysisHTML,
   generatePortfolioHTML,
   generatePolicySummaryHTML,
 } from './templates'
-import type { AnalyzedPolicy, Coverage } from '@/types/policy'
-import type { DetectedGap } from '@/types/gap'
+import type { AnalyzedPolicy } from '@/types/policy'
+import type { DetectedGap, ComprehensiveGapAnalysis } from '@/types/gap'
 import type {
   BrandingConfig,
   ReportOptions,
@@ -31,13 +31,13 @@ vi.mock('./branding', () => ({
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 8px; text-align: left; border-bottom: 1px solid #e5e7eb; }
   `),
-  generateHeaderHTML: vi.fn((branding, title, subtitle) => `
+  generateHeaderHTML: vi.fn((_branding, title, subtitle) => `
     <header>
       <h1>${title}</h1>
       ${subtitle ? `<p>${subtitle}</p>` : ''}
     </header>
   `),
-  generateFooterHTML: vi.fn((branding, lang) => `
+  generateFooterHTML: vi.fn((_branding, lang) => `
     <footer>
       <p>${lang === 'tr' ? 'Oluşturulma tarihi' : 'Generated'}: ${new Date().toISOString().split('T')[0]}</p>
     </footer>
@@ -90,8 +90,8 @@ function createMockPolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
     aiInsights: ['✓ Good coverage levels', '⚠ Consider DASK', '💡 Review annually'],
     marketComparison: {
       percentile: 65,
-      avgPremium: 3000,
-      avgCoverage: 450000,
+      averagePremium: 3000,
+      averageCoverage: 450000,
     },
     riskScore: {
       overall: 35,
@@ -105,21 +105,25 @@ function createMockPolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
 
 function createMockBranding(): BrandingConfig {
   return {
-    logo: '/logo.png',
-    primaryColor: '#3b82f6',
-    secondaryColor: '#10b981',
-    fontFamily: 'Inter, sans-serif',
     companyName: 'InsurAI',
-    contactInfo: 'info@insurai.com',
+    colors: {
+      primary: '#3b82f6',
+      secondary: '#10b981',
+      text: '#1a1a1a',
+      textLight: '#6b7280',
+      background: '#ffffff',
+      accent: '#0ea5e9',
+      success: '#22c55e',
+      warning: '#f59e0b',
+      danger: '#ef4444',
+    },
   }
 }
 
 function createMockOptions(overrides: Partial<ReportOptions> = {}): ReportOptions {
   return {
+    type: 'policy_detail',
     language: 'en',
-    includeHeader: true,
-    includeFooter: true,
-    includeWatermark: false,
     ...overrides,
   }
 }
@@ -132,15 +136,26 @@ function createMockGap(overrides: Partial<DetectedGap> = {}): DetectedGap {
     description: 'Property is in flood-prone area without coverage',
     descriptionTr: 'Mülk sel riski yüksek bölgede ancak teminat yok',
     severity: 'high',
+    severityScore: 75,
     category: 'coverage',
-    policyTypes: ['home'],
+    subCategory: 'missing_critical',
     financialImpact: {
       potentialLoss: 50000,
       probability: 0.15,
       expectedLoss: 7500,
     },
+    remediation: {
+      action: 'Add flood coverage',
+      actionTr: 'Sel teminatı ekleyin',
+      estimatedCost: 500,
+      difficulty: 'easy',
+      timeToResolve: '1-2 days',
+      steps: ['Contact insurance provider', 'Review policy options', 'Add coverage'],
+      stepsTr: ['Sigorta sağlayıcısıyla iletişime geçin', 'Poliçe seçeneklerini inceleyin', 'Teminat ekleyin'],
+    },
+    detectedAt: new Date().toISOString(),
     confidence: 0.8,
-    detectedAt: Date.now(),
+    source: 'coverage',
     ...overrides,
   }
 }
@@ -328,19 +343,38 @@ describe('generateGapAnalysisHTML', () => {
   const options = createMockOptions()
   const policy = createMockPolicy()
 
-  const gapAnalysis = {
+  const gapAnalysis: ComprehensiveGapAnalysis = {
     overallScore: 45,
-    gapCount: { critical: 1, high: 2, medium: 3, low: 1, total: 7 },
+    gapCount: { critical: 1, high: 2, medium: 3, low: 1, info: 0, total: 7 },
+    gaps: [],
+    gapsByCategory: {
+      coverage: [],
+      limit: [],
+      deductible: [],
+      exclusion: [],
+      temporal: [],
+      compliance: [],
+      portfolio: [],
+    },
     gapsBySeverity: {
       critical: [createMockGap({ severity: 'critical', title: 'Critical Gap' })],
       high: [createMockGap({ severity: 'high' }), createMockGap({ severity: 'high', title: 'Second High Gap' })],
       medium: [createMockGap({ severity: 'medium' })],
       low: [createMockGap({ severity: 'low' })],
+      info: [],
     },
     financialSummary: {
+      totalPotentialLoss: 100000,
       totalExpectedLoss: 75000,
       estimatedRemediationCost: 5000,
+      costBenefitRatio: 15,
     },
+    prioritizedGaps: [],
+    topRecommendations: [],
+    analyzedAt: new Date().toISOString(),
+    policyId: 'policy-1',
+    policyType: 'home',
+    confidence: 0.85,
   }
 
   it('should generate valid HTML document', () => {
@@ -425,6 +459,7 @@ describe('generateGapAnalysisHTML', () => {
   it('should include recommendations when provided', () => {
     const recommendations = [
       {
+        priority: 1,
         action: 'Add flood coverage',
         actionTr: 'Sel teminatı ekleyin',
         impact: 'Reduces risk exposure by 50%',
@@ -442,6 +477,7 @@ describe('generateGapAnalysisHTML', () => {
   it('should show Turkish recommendations in Turkish', () => {
     const recommendations = [
       {
+        priority: 1,
         action: 'Add flood coverage',
         actionTr: 'Sel teminatı ekleyin',
         impact: 'Reduces risk',
@@ -458,7 +494,7 @@ describe('generateGapAnalysisHTML', () => {
   })
 
   it('should include page break class', () => {
-    const recommendations = [{ action: 'Test', actionTr: 'Test', impact: '', impactTr: '' }]
+    const recommendations = [{ priority: 1, action: 'Test', actionTr: 'Test', impact: '', impactTr: '' }]
     const data: GapAnalysisReportData = { policy, gapAnalysis, recommendations }
     const html = generateGapAnalysisHTML(data, branding, options)
 
@@ -487,16 +523,27 @@ describe('generatePortfolioHTML', () => {
     expiredPolicies: 0,
     totalCoverage: 1000000,
     totalPremium: 16500,
+    avgRiskScore: 35,
+    criticalGaps: 0,
   }
 
   const byType = {
     home: { count: 1, totalCoverage: 500000, totalPremium: 3500 },
     kasko: { count: 1, totalCoverage: 300000, totalPremium: 8000 },
     health: { count: 1, totalCoverage: 200000, totalPremium: 5000 },
+    traffic: { count: 0, totalCoverage: 0, totalPremium: 0 },
+    life: { count: 0, totalCoverage: 0, totalPremium: 0 },
+    dask: { count: 0, totalCoverage: 0, totalPremium: 0 },
+    business: { count: 0, totalCoverage: 0, totalPremium: 0 },
   }
 
+  const timeline = [
+    { date: '2025-01-01', event: 'Policy renewal', eventTr: 'Poliçe yenileme', policyId: '1' },
+    { date: '2025-02-01', event: 'Policy expiring', eventTr: 'Poliçe bitiyor', policyId: '3' },
+  ]
+
   it('should generate valid HTML document', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('<!DOCTYPE html>')
@@ -504,7 +551,7 @@ describe('generatePortfolioHTML', () => {
   })
 
   it('should include portfolio title', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('Portfolio Analysis Report')
@@ -512,28 +559,28 @@ describe('generatePortfolioHTML', () => {
 
   it('should show Turkish title in Turkish', () => {
     const trOptions = createMockOptions({ language: 'tr' })
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, trOptions)
 
     expect(html).toContain('Portföy Analiz Raporu')
   })
 
   it('should include total policies count', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('3') // Total policies
   })
 
   it('should include active policies count', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('2') // Active policies
   })
 
   it('should include total coverage', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     // Turkish locale uses period as thousands separator
@@ -541,7 +588,7 @@ describe('generatePortfolioHTML', () => {
   })
 
   it('should include total premium', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     // Turkish locale uses period as thousands separator
@@ -549,7 +596,7 @@ describe('generatePortfolioHTML', () => {
   })
 
   it('should show expiring policies alert', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('1 policies are expiring soon')
@@ -557,14 +604,14 @@ describe('generatePortfolioHTML', () => {
 
   it('should show Turkish expiring alert in Turkish', () => {
     const trOptions = createMockOptions({ language: 'tr' })
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, trOptions)
 
     expect(html).toContain('poliçenin süresi yakında doluyor')
   })
 
   it('should include policies by type table', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('Policies by Type')
@@ -574,7 +621,7 @@ describe('generatePortfolioHTML', () => {
   })
 
   it('should include policy list table', () => {
-    const data: PortfolioReportData = { policies, summary, byType }
+    const data: PortfolioReportData = { policies, summary, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('Policy List')
@@ -585,11 +632,12 @@ describe('generatePortfolioHTML', () => {
 
   it('should show gap summary alert when critical gaps exist', () => {
     const gapSummary = {
+      totalGaps: 7,
       criticalGaps: 3,
       estimatedExposure: 100000,
       topIssues: ['Missing flood coverage', 'Low liability limits'],
     }
-    const data: PortfolioReportData = { policies, summary, byType, gapSummary }
+    const data: PortfolioReportData = { policies, summary, byType, timeline, gapSummary }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('Critical Gaps')
@@ -598,11 +646,12 @@ describe('generatePortfolioHTML', () => {
 
   it('should include top issues from gap summary', () => {
     const gapSummary = {
+      totalGaps: 5,
       criticalGaps: 2,
       estimatedExposure: 50000,
       topIssues: ['Missing flood coverage', 'Low liability limits'],
     }
-    const data: PortfolioReportData = { policies, summary, byType, gapSummary }
+    const data: PortfolioReportData = { policies, summary, byType, timeline, gapSummary }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).toContain('Missing flood coverage')
@@ -611,7 +660,7 @@ describe('generatePortfolioHTML', () => {
 
   it('should not show expiring alert when no policies expiring', () => {
     const noExpiringSum = { ...summary, expiringPolicies: 0 }
-    const data: PortfolioReportData = { policies, summary: noExpiringSum, byType }
+    const data: PortfolioReportData = { policies, summary: noExpiringSum, byType, timeline }
     const html = generatePortfolioHTML(data, branding, options)
 
     expect(html).not.toContain('expiring soon')
@@ -773,7 +822,7 @@ describe('Template Helper Functions', () => {
 
     it('should display top issue when present', () => {
       const policy = createMockPolicy({
-        riskScore: { overall: 60, level: 'elevated', topIssue: 'Missing flood coverage', confidence: 0.8 },
+        riskScore: { overall: 60, level: 'high', topIssue: 'Missing flood coverage', confidence: 0.8 },
       })
       const data: PolicyDetailReportData = { policy }
       const html = generatePolicyDetailHTML(data, branding, options)

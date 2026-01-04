@@ -331,6 +331,7 @@ function createMockBusiness(overrides: Partial<BusinessInfo> = {}): BusinessInfo
     employeeCount: 50,
     annualRevenue: 10000000,
     yearsInOperation: 5,
+    size: 'medium',
     ...overrides,
   }
 }

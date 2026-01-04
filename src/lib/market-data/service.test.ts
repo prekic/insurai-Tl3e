@@ -91,13 +91,25 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   id: 'policy-1',
   policyNumber: 'POL-001',
   type: 'home',
+  typeTr: 'Konut Sigortası',
   provider: 'AXA Sigorta',
+  logo: '/logos/axa.png',
   premium: 2500,
+  monthlyPremium: 208,
   coverage: 500000,
+  deductible: 2000,
   coverages: [],
   status: 'active',
   startDate: new Date().toISOString(),
   expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+  uploadDate: new Date().toISOString(),
+  fileName: 'policy-home.pdf',
+  documentType: 'policy',
+  exclusions: [],
+  specialConditions: [],
+  insuranceLine: 'Konut',
+  aiConfidence: 0.92,
+  aiInsights: ['Policy analyzed successfully'],
   ...overrides,
 })
 
@@ -253,7 +265,14 @@ describe('MarketDataService', () => {
 
   describe('getGapInsights', () => {
     it('should return insights array', () => {
-      const gaps = { critical: [], recommended: [], optional: [], score: 80 }
+      const gaps = {
+        missingCoverages: [],
+        underinsuredCoverages: [],
+        highDeductibles: [],
+        exclusionWarnings: [],
+        gapScore: 80,
+        estimatedCostToClose: 0,
+      }
       const result = MarketDataService.getGapInsights(gaps)
 
       expect(Array.isArray(result)).toBe(true)

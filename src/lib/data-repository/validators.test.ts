@@ -47,14 +47,18 @@ const createValidRegions = () => ({
 })
 
 const createValidRepository = (): BenchmarkDataRepository => ({
-  benchmarks: createValidBenchmarks() as BenchmarkDataRepository['benchmarks'],
-  providers: createValidProviders() as BenchmarkDataRepository['providers'],
-  regionalFactors: createValidRegions() as BenchmarkDataRepository['regionalFactors'],
+  benchmarks: createValidBenchmarks() as unknown as BenchmarkDataRepository['benchmarks'],
+  providers: createValidProviders() as unknown as BenchmarkDataRepository['providers'],
+  regionalFactors: createValidRegions() as unknown as BenchmarkDataRepository['regionalFactors'],
   metadata: {
     lastUpdated: new Date().toISOString(),
     version: '1.0.0',
-    source: 'test',
-  },
+    source: {
+      name: 'Test Data',
+      type: 'official',
+      confidence: 1.0,
+    },
+  } as unknown as BenchmarkDataRepository['metadata'],
 })
 
 // =============================================================================
@@ -489,7 +493,7 @@ describe('validateRepository', () => {
     // Add invalid data
     repository.providers = {
       allianz: { website: 'https://allianz.com.tr' }, // Missing name - error
-    } as BenchmarkDataRepository['providers']
+    } as unknown as BenchmarkDataRepository['providers']
 
     const report = validateRepository(repository)
 
@@ -523,7 +527,7 @@ describe('quickValidate', () => {
     const repository = createValidRepository()
     repository.benchmarks = {
       home: { commonCoverages: [] }, // Missing required coverages
-    } as BenchmarkDataRepository['benchmarks']
+    } as unknown as BenchmarkDataRepository['benchmarks']
 
     const result = quickValidate(repository)
 
@@ -534,7 +538,7 @@ describe('quickValidate', () => {
     const repository = createValidRepository()
     repository.providers = {
       allianz: {}, // Missing name
-    } as BenchmarkDataRepository['providers']
+    } as unknown as BenchmarkDataRepository['providers']
 
     const result = quickValidate(repository)
 
@@ -545,7 +549,7 @@ describe('quickValidate', () => {
     const repository = createValidRepository()
     repository.regionalFactors = {
       istanbul: { baseFactor: 1.0, population: -1000 }, // Negative population
-    } as BenchmarkDataRepository['regionalFactors']
+    } as unknown as BenchmarkDataRepository['regionalFactors']
 
     const result = quickValidate(repository)
 

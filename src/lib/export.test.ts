@@ -29,11 +29,11 @@ const mockWindow = {
     close: mockWindowClose,
   },
   print: mockWindowPrint,
-  set onload(handler: () => void) {
+  set onload(handler: (() => void) | null) {
     mockOnload = handler
   },
   get onload() {
-    return mockOnload
+    return mockOnload as (() => void) | null
   },
 }
 
@@ -51,7 +51,7 @@ describe('Export Module', () => {
       ...originalURL,
       createObjectURL: mockCreateObjectURL,
       revokeObjectURL: mockRevokeObjectURL,
-    } as typeof URL
+    } as unknown as typeof URL
 
     // Setup document mocks
     vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
@@ -69,7 +69,7 @@ describe('Export Module', () => {
     vi.spyOn(document.body, 'removeChild').mockImplementation(mockRemoveChild as unknown as typeof document.body.removeChild)
 
     // Setup window.open mock
-    global.window.open = mockWindowOpen as typeof window.open
+    global.window.open = mockWindowOpen as unknown as typeof window.open
     global.alert = vi.fn()
   })
 
@@ -94,6 +94,7 @@ describe('Export Module', () => {
     expiryDate: '2025-01-01',
     status: 'active',
     uploadDate: '2024-01-01',
+    fileName: 'policy-001.pdf',
     documentType: 'policy',
     aiConfidence: 0.95,
     insuredPerson: 'Ahmet Yılmaz',
@@ -103,10 +104,13 @@ describe('Export Module', () => {
         name: 'Fire',
         nameTr: 'Yangın',
         limit: 500000,
+        deductible: 0,
         included: true,
       },
     ],
-    gaps: [],
+    exclusions: [],
+    specialConditions: [],
+    insuranceLine: 'property',
     aiInsights: ['Policy provides comprehensive coverage'],
     ...overrides,
   })
@@ -127,7 +131,7 @@ describe('Export Module', () => {
 
       exportToCSV(policies)
 
-      const blobCall = mockCreateObjectURL.mock.calls[0][0] as Blob
+      const blobCall = (mockCreateObjectURL.mock.calls as unknown as [[Blob]])[0][0]
       expect(blobCall.type).toBe('text/csv;charset=utf-8;')
     })
 
@@ -137,7 +141,7 @@ describe('Export Module', () => {
       exportToCSV(policies)
 
       // The blob should contain BOM character
-      const blobCall = mockCreateObjectURL.mock.calls[0][0] as Blob
+      const blobCall = (mockCreateObjectURL.mock.calls as unknown as [[Blob]])[0][0]
       expect(blobCall).toBeInstanceOf(Blob)
     })
 
@@ -313,7 +317,7 @@ describe('Export Module', () => {
     })
 
     it('should alert if popup is blocked', () => {
-      mockWindowOpen.mockReturnValueOnce(null)
+      mockWindowOpen.mockReturnValueOnce(null as unknown as typeof mockWindow)
       const policy = createMockPolicy()
 
       exportToPDF(policy)
@@ -411,7 +415,7 @@ describe('Export Module', () => {
     })
 
     it('should alert if popup is blocked', () => {
-      mockWindowOpen.mockReturnValueOnce(null)
+      mockWindowOpen.mockReturnValueOnce(null as unknown as typeof mockWindow)
       const policies = [createMockPolicy()]
 
       exportPoliciesToPDF(policies)

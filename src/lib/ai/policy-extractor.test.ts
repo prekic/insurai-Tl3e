@@ -481,6 +481,7 @@ describe('AI Extraction', () => {
         agreedFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
         disagreedFields: [],
       },
+      primaryProvider: 'openai',
       providerResults: [
         { provider: 'openai', data: { policyNumber: 'CONS-001', provider: 'Consensus Provider', policyType: 'home', insuredName: 'Test User', insuredAddress: 'Ankara', startDate: '2024-01-01', endDate: '2025-01-01', premium: 4000, currency: 'TRY', paymentFrequency: 'annual', coverages: [], specialConditions: [], exclusions: [], confidence: { overall: 0.9, policyNumber: 0.95, provider: 0.9, dates: 0.9, premium: 0.85, coverages: 0.85 } } },
         { provider: 'anthropic', data: { policyNumber: 'CONS-001', provider: 'Consensus Provider', policyType: 'home', insuredName: 'Test User', insuredAddress: 'Ankara', startDate: '2024-01-01', endDate: '2025-01-01', premium: 4000, currency: 'TRY', paymentFrequency: 'annual', coverages: [], specialConditions: [], exclusions: [], confidence: { overall: 0.9, policyNumber: 0.95, provider: 0.9, dates: 0.9, premium: 0.85, coverages: 0.85 } } },

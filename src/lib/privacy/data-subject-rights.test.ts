@@ -237,7 +237,7 @@ describe('DataSubjectRightsManager', () => {
       vi.stubGlobal('indexedDB', undefined)
 
       // Create a new instance to test initialization without IndexedDB
-      const { DataSubjectRightsManager } = await import('./data-subject-rights')
+      await import('./data-subject-rights')
         .catch(() => ({ DataSubjectRightsManager: null }))
 
       // Should not throw even when IndexedDB is unavailable
@@ -719,7 +719,7 @@ describe('IndexedDB database operations', () => {
         setTimeout(() => {
           // Trigger upgrade
           if (request.onupgradeneeded) {
-            request.onupgradeneeded({ target: request } as unknown as IDBVersionChangeEvent)
+            request.onupgradeneeded({ target: request })
           }
           request.result = db
           request.onsuccess?.()
@@ -913,12 +913,19 @@ describe('Consent withdrawal handling', () => {
     vi.mocked(consentManager.getUserConsentStatus).mockResolvedValueOnce({
       userId: 'multi-consent-user',
       consents: {
-        terms_of_service: { granted: true, timestamp: Date.now() },
-        cookie_essential: { granted: true, timestamp: Date.now() },
-        cookie_analytics: { granted: true, timestamp: Date.now() },
-        cookie_marketing: { granted: true, timestamp: Date.now() },
-        data_processing: { granted: true, timestamp: Date.now() },
-        third_party_sharing: { granted: true, timestamp: Date.now() },
+        terms_of_service: { granted: true, grantedAt: Date.now() },
+        cookie_essential: { granted: true, grantedAt: Date.now() },
+        cookie_analytics: { granted: true, grantedAt: Date.now() },
+        cookie_marketing: { granted: true, grantedAt: Date.now() },
+        data_processing: { granted: true, grantedAt: Date.now() },
+        third_party_sharing: { granted: true, grantedAt: Date.now() },
+        analytics: { granted: true, grantedAt: Date.now() },
+        privacy_policy: { granted: true, grantedAt: Date.now() },
+        marketing_email: { granted: true, grantedAt: Date.now() },
+        marketing_sms: { granted: true, grantedAt: Date.now() },
+        ai_processing: { granted: true, grantedAt: Date.now() },
+        cross_border_transfer: { granted: true, grantedAt: Date.now() },
+        cookie_functional: { granted: true, grantedAt: Date.now() },
       },
       lastUpdated: Date.now(),
     })
@@ -1221,8 +1228,19 @@ describe('Edge cases - Consent handling in withdrawal', () => {
     vi.mocked(consentManager.getUserConsentStatus).mockResolvedValueOnce({
       userId: 'essential-only',
       consents: {
-        terms_of_service: { granted: true, timestamp: Date.now() },
-        cookie_essential: { granted: true, timestamp: Date.now() },
+        terms_of_service: { granted: true, grantedAt: Date.now() },
+        cookie_essential: { granted: true, grantedAt: Date.now() },
+        cookie_analytics: { granted: false },
+        cookie_marketing: { granted: false },
+        data_processing: { granted: false },
+        third_party_sharing: { granted: false },
+        analytics: { granted: false },
+        privacy_policy: { granted: true, grantedAt: Date.now() },
+        marketing_email: { granted: false },
+        marketing_sms: { granted: false },
+        ai_processing: { granted: false },
+        cross_border_transfer: { granted: false },
+        cookie_functional: { granted: false },
       },
       lastUpdated: Date.now(),
     })

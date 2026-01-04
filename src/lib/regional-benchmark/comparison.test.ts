@@ -209,7 +209,7 @@ vi.mock('./data', () => ({
       },
     },
   },
-  getRegionalPremiumBenchmarks: vi.fn((policyType: PolicyType) => {
+  getRegionalPremiumBenchmarks: vi.fn((_policyType: PolicyType) => {
     const benchmarks: Record<TurkishRegion, { vsNational: { ranking: number } }> = {
       marmara: { vsNational: { ranking: 7 } },
       ege: { vsNational: { ranking: 4 } },
@@ -370,12 +370,15 @@ describe('Regional Benchmark Comparison', () => {
   describe('compareNearbyProvinces', () => {
     it('should find and compare nearby provinces', () => {
       const province = {
-        code: '34',
+        code: '34' as const,
         name: 'Istanbul',
         nameTr: 'İstanbul',
         region: 'marmara' as TurkishRegion,
         population: 15500000,
         coordinates: { lat: 41.0082, lng: 28.9784 },
+        area: 5461,
+        density: 2838,
+        urbanRatio: 0.99,
       }
 
       const comparison = compareNearbyProvinces(province, 'kasko')
@@ -386,12 +389,15 @@ describe('Regional Benchmark Comparison', () => {
 
     it('should calculate distances', () => {
       const province = {
-        code: '34',
+        code: '34' as const,
         name: 'Istanbul',
         nameTr: 'İstanbul',
         region: 'marmara' as TurkishRegion,
         population: 15500000,
         coordinates: { lat: 41.0082, lng: 28.9784 },
+        area: 5461,
+        density: 2838,
+        urbanRatio: 0.99,
       }
 
       const comparison = compareNearbyProvinces(province, 'kasko')

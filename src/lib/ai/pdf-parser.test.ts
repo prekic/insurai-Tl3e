@@ -279,7 +279,7 @@ describe('extractTextFromPDF', () => {
   })
 
   it('should return EMPTY_PDF error for PDF with 0 pages', async () => {
-    const mockPdf = { numPages: 0 }
+    const mockPdf = { numPages: 0, getPage: vi.fn(), getMetadata: vi.fn() }
     mockGetDocument.mockReturnValue({ promise: Promise.resolve(mockPdf) })
 
     const file = createMockFile({ name: 'empty.pdf' })

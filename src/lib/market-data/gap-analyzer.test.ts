@@ -60,9 +60,13 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   id: 'policy-1',
   policyNumber: 'POL-001',
   type: 'kasko',
+  typeTr: 'Kasko',
   provider: 'Allianz',
+  logo: '/logos/allianz.png',
   premium: 5000,
+  monthlyPremium: 417,
   coverage: 100000,
+  deductible: 1000,
   coverages: [
     { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
     { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500, included: true },
@@ -70,7 +74,14 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   status: 'active',
   startDate: new Date().toISOString(),
   expiryDate: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000).toISOString(),
+  uploadDate: new Date().toISOString(),
+  fileName: 'policy-kasko.pdf',
+  documentType: 'policy',
   exclusions: [],
+  specialConditions: [],
+  insuranceLine: 'Otomobil',
+  aiConfidence: 0.95,
+  aiInsights: ['Policy analyzed successfully'],
   ...overrides,
 })
 

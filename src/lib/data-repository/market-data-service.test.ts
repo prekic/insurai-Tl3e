@@ -17,7 +17,7 @@ const {
   const mockBenchmarkRepository = {
     benchmarks: {
       kasko: {
-        policyType: 'kasko',
+        type: 'kasko',
         premiumRange: { min: 1000, max: 5000, average: 3000 },
         coverageRange: { min: 50000, max: 500000, median: 200000 },
         commonCoverages: [
@@ -27,7 +27,7 @@ const {
         ],
       },
       home: {
-        policyType: 'home',
+        type: 'home',
         premiumRange: { min: 500, max: 3000, average: 1500 },
         coverageRange: { min: 100000, max: 1000000, median: 400000 },
         commonCoverages: [
@@ -36,13 +36,13 @@ const {
         ],
       },
       traffic: {
-        policyType: 'traffic',
+        type: 'traffic',
         premiumRange: { min: 200, max: 800 },
         coverageRange: { min: 10000, max: 100000 },
         commonCoverages: [],
       },
       dask: {
-        policyType: 'dask',
+        type: 'dask',
         premiumRange: { min: 100, max: 500 },
         coverageRange: { min: 50000, max: 300000 },
         commonCoverages: [],
@@ -86,8 +86,8 @@ const {
       },
     },
     regionalFactors: {
-      istanbul: {
-        region: 'istanbul',
+      marmara: {
+        region: 'marmara',
         baseFactor: 1.2,
         riskProfile: {
           earthquake: 'high',
@@ -96,8 +96,8 @@ const {
           traffic: 'high',
         },
       },
-      ankara: {
-        region: 'ankara',
+      ic_anadolu: {
+        region: 'ic_anadolu',
         baseFactor: 1.0,
         riskProfile: {
           earthquake: 'medium',
@@ -106,24 +106,14 @@ const {
           traffic: 'medium',
         },
       },
-      izmir: {
-        region: 'izmir',
+      ege: {
+        region: 'ege',
         baseFactor: 1.1,
         riskProfile: {
           earthquake: 'very_high',
           flood: 'high',
           theft: 'medium',
           traffic: 'medium',
-        },
-      },
-      marmara: {
-        region: 'marmara',
-        baseFactor: 1.15,
-        riskProfile: {
-          earthquake: 'very_high',
-          flood: 'medium',
-          theft: 'low',
-          traffic: 'low',
         },
       },
     },
@@ -287,7 +277,7 @@ describe('MarketDataService', () => {
 
       const benchmark = await marketDataService.getBenchmark('kasko')
       expect(benchmark).toBeDefined()
-      expect(benchmark?.policyType).toBe('kasko')
+      expect(benchmark?.type).toBe('kasko')
       expect(benchmark?.premiumRange).toBeDefined()
     })
 
@@ -474,14 +464,14 @@ describe('MarketDataService', () => {
       await marketDataService.initialize()
 
       const regions = await marketDataService.getAllRegions()
-      expect(Object.keys(regions)).toHaveLength(4)
+      expect(Object.keys(regions)).toHaveLength(3)
     })
 
     it('should get specific region', async () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const region = await marketDataService.getRegion('istanbul')
+      const region = await marketDataService.getRegion('marmara')
       expect(region).toBeDefined()
       expect(region?.baseFactor).toBe(1.2)
     })
@@ -500,8 +490,8 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'istanbul', 'home')
-      expect(adjustment.region).toBe('istanbul')
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'marmara', 'home')
+      expect(adjustment.region).toBe('marmara')
       expect(adjustment.baseFactor).toBe(1.2)
       expect(adjustment.riskMultiplier).toBeGreaterThan(1) // High earthquake risk
       expect(adjustment.adjustedValue).toBeGreaterThan(1000)
@@ -511,7 +501,7 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'istanbul', 'kasko')
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'marmara', 'kasko')
       expect(adjustment.riskMultiplier).toBeGreaterThan(1) // High theft and traffic risk
     })
 
@@ -519,7 +509,7 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'istanbul', 'traffic')
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'marmara', 'traffic')
       expect(adjustment.riskMultiplier).toBeGreaterThan(1) // High traffic risk
     })
 
@@ -527,7 +517,7 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'izmir', 'dask')
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'ege', 'dask')
       expect(adjustment.riskMultiplier).toBeGreaterThan(1) // Very high earthquake risk
     })
 
@@ -545,7 +535,7 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'istanbul', 'life' as any)
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'marmara', 'life' as any)
       expect(adjustment.riskMultiplier).toBe(1.0) // No special risk for life insurance
     })
 
@@ -553,7 +543,7 @@ describe('MarketDataService', () => {
       const { marketDataService } = await import('./market-data-service')
       await marketDataService.initialize()
 
-      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'ankara', 'home')
+      const adjustment = await marketDataService.calculateRegionalAdjustment(1000, 'ic_anadolu', 'home')
       expect(adjustment.riskMultiplier).toBeLessThanOrEqual(1.0) // Low flood risk
     })
   })
@@ -659,7 +649,7 @@ describe('MarketDataService', () => {
         benchmarks: {
           ...mockBenchmarkRepository.benchmarks,
           test: {
-            policyType: 'test',
+            type: 'test',
             commonCoverages: [{ name: 'Test', inclusionRate: 150 }],
           },
         },
@@ -712,7 +702,7 @@ describe('MarketDataService', () => {
       const stats = await marketDataService.getStats()
       expect(stats.policyTypes).toBe(4)
       expect(stats.providers).toBe(6)
-      expect(stats.regions).toBe(4)
+      expect(stats.regions).toBe(3)
       expect(stats.totalCoverages).toBe(5) // 3 + 2 + 0 + 0
       expect(stats.freshnessScore).toBe(85)
       expect(stats.qualityScore).toBe(90)

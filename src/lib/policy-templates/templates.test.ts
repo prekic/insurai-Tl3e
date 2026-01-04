@@ -14,7 +14,6 @@ import {
   getTemplatesByTier,
   getAllTemplates,
 } from './templates'
-import type { PolicyTemplate, CoverageTier } from '@/types/policy-template'
 
 // =============================================================================
 // Template Data Structure Tests
