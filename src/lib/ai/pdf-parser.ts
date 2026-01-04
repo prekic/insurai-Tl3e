@@ -1,8 +1,21 @@
 import * as pdfjsLib from 'pdfjs-dist'
 
 // Configure PDF.js worker
-// Using CDN for worker to avoid bundling issues
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+// Using unpkg CDN which mirrors npm packages directly (more reliable than cdnjs)
+const PDFJS_VERSION = pdfjsLib.version
+
+// Try multiple CDN sources for reliability
+const WORKER_URLS = [
+  // unpkg mirrors npm directly - most reliable
+  `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`,
+  // jsdelivr also mirrors npm
+  `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`,
+  // cdnjs as fallback (may not have latest versions)
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`,
+]
+
+// Use the first URL - unpkg is most reliable for npm packages
+pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URLS[0]
 
 export interface PDFParseResult {
   text: string

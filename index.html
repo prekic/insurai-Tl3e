@@ -9,16 +9,16 @@
     <!-- Content Security Policy -->
     <meta http-equiv="Content-Security-Policy" content="
       default-src 'self';
-      script-src 'self' blob: https://*.sentry.io https://*.sentry-cdn.com https://cdnjs.cloudflare.com;
+      script-src 'self' blob: https://*.sentry.io https://*.sentry-cdn.com https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
       font-src 'self' https://fonts.gstatic.com data:;
       img-src 'self' data: blob: https://*.supabase.co;
-      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://cdnjs.cloudflare.com;
+      connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io https://*.ingest.sentry.io https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       frame-src 'self';
       object-src 'none';
       base-uri 'self';
       form-action 'self';
-      worker-src 'self' blob: https://cdnjs.cloudflare.com;
+      worker-src 'self' blob: https://unpkg.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com;
       child-src 'self' blob:;
     ">
 
