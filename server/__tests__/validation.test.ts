@@ -4,7 +4,7 @@
  * Tests for input validation, sanitization, and security checks.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { Request, Response, NextFunction } from 'express'
 import {
   sanitizeString,

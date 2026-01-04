@@ -40,7 +40,7 @@ const createMockIndexedDB = () => {
                 const result = resultFn()
                 Object.defineProperty(request, 'result', { value: result, writable: true })
                 fn({ target: request })
-              } catch (error) {
+              } catch (_error) {
                 if (onerrorFn) onerrorFn()
               }
             }, 0)

@@ -4,7 +4,7 @@
  * Tests for AI proxy endpoints including validation and error handling.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 
