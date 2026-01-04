@@ -213,7 +213,7 @@ describe('Analytics Tracker', () => {
     it('should track feature with options', async () => {
       await initializeAnalytics({ enabled: true, flushInterval: 0 })
 
-      trackFeature('ai_extraction', 'complete', {
+      trackFeature('ai_extraction', 'submit', {
         success: true,
         duration: 1500,
         metadata: { provider: 'openai' },
@@ -377,7 +377,7 @@ describe('Analytics Tracker', () => {
       await initializeAnalytics({ enabled: true, flushInterval: 0 })
 
       trackPageView('/home')
-      trackFeature('test', 'view')
+      trackFeature('dashboard', 'view')
 
       await analytics.clearData()
 
@@ -451,7 +451,7 @@ describe('Analytics Tracker', () => {
       // With 0% sample rate, events are not recorded to buffer
       // But pageViews counter is still incremented (it tracks method calls)
       trackPageView('/home')
-      trackFeature('test', 'view')
+      trackFeature('dashboard', 'view')
 
       await analytics.flush()
 
@@ -472,9 +472,9 @@ describe('Analytics Tracker', () => {
 
       const session = analytics.getSessionInfo()
 
-      expect(session.device.type).toBe('desktop')
-      expect(session.device.browser).toBe('Chrome')
-      expect(session.device.os).toBe('Windows')
+      expect(session.device?.type).toBe('desktop')
+      expect(session.device?.browser).toBe('Chrome')
+      expect(session.device?.os).toBe('Windows')
     })
 
     it('should detect mobile browser', async () => {
@@ -490,7 +490,7 @@ describe('Analytics Tracker', () => {
 
       const session = freshModule.analytics.getSessionInfo()
 
-      expect(session.device.type).toBe('mobile')
+      expect(session.device?.type).toBe('mobile')
       freshModule.analytics.destroy()
     })
   })

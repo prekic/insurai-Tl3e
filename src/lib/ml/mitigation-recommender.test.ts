@@ -270,7 +270,7 @@ describe('Mitigation Recommender', () => {
           issue: 'Issue 1',
           recommendation: 'Rec 1',
           expectedImpact: 20,
-          difficulty: 'difficult',
+          difficulty: 'complex',
         },
         {
           priority: 'high',
@@ -320,7 +320,7 @@ describe('Mitigation Recommender', () => {
           issue: 'Issue 1',
           recommendation: 'Rec 1',
           expectedImpact: 20,
-          difficulty: 'difficult',
+          difficulty: 'complex',
         },
       ]
 

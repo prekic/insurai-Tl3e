@@ -72,8 +72,8 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   premium: 5000,
   coverage: 100000,
   coverages: [
-    { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000 },
-    { name: 'Hırsızlık', nameTr: 'Hırsızlık', limit: 30000, deductible: 500 },
+    { name: 'Hasar', nameTr: 'Hasar Teminatı', limit: 50000, deductible: 1000, included: true },
+    { name: 'Hırsızlık', nameTr: 'Hırsızlık', limit: 30000, deductible: 500, included: true },
   ],
   status: 'active',
   startDate: new Date().toISOString(),
