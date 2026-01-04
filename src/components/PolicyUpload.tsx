@@ -6,7 +6,7 @@ import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
 import { usePolicies } from '@/lib/policy-context'
-import { validateFiles, ERROR_CODES, getErrorMessage, createAppError, FILE_CONSTRAINTS } from '@/lib/errors'
+import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { sanitizeFileName, sanitizeId } from '@/lib/sanitize'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { isSupabaseConfigured, uploadPolicyDocument } from '@/lib/supabase'
@@ -101,8 +101,8 @@ export function PolicyUpload() {
         )
       )
 
-      // Use real AI extraction
-      const result = await extractPolicyFromDocument(file, { useFallback: true })
+      // Use real AI extraction - no silent fallback to demo data
+      const result = await extractPolicyFromDocument(file, { useFallback: false })
 
       if (!result.success) {
         throw new Error(result.error.message)
@@ -145,19 +145,33 @@ export function PolicyUpload() {
         description: `${displayName} has been analyzed${aiNote}${storageNote}.`,
       })
     } catch (error) {
-      const appError = createAppError(error, ERROR_CODES.AI_ANALYSIS_FAILED)
-      const errorInfo = getErrorMessage(appError.code)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      // Provide user-friendly error messages based on the error
+      let userMessage = errorMessage
+      let userTitle = 'Analysis Failed'
+
+      if (errorMessage.includes('not configured') || errorMessage.includes('NO_AI_CONFIG')) {
+        userTitle = 'AI Not Configured'
+        userMessage = 'The AI service is not available. Please ensure the backend server is running with valid API keys.'
+      } else if (errorMessage.includes('PDF_PARSE_ERROR')) {
+        userTitle = 'PDF Processing Error'
+        userMessage = 'Could not read the PDF file. The file may be corrupted or password-protected.'
+      } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
+        userTitle = 'Rate Limit Exceeded'
+        userMessage = 'Too many requests. Please wait a moment and try again.'
+      }
 
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
-            ? { ...f, status: 'error', error: errorInfo.description }
+            ? { ...f, status: 'error', error: userMessage }
             : f
         )
       )
 
-      toast.error(errorInfo.title, {
-        description: errorInfo.description,
+      toast.error(userTitle, {
+        description: userMessage,
         action: {
           label: 'Retry',
           onClick: () => retryFile(fileId),
