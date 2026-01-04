@@ -998,7 +998,6 @@ describe('costTracker.getStats', () => {
 
   it('should filter by date range', async () => {
     const now = new Date()
-    const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
 
     await costTracker.recordUsage({
       provider: 'openai',

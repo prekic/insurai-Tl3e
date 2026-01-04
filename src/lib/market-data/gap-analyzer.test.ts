@@ -64,8 +64,8 @@ const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPoli
   premium: 5000,
   coverage: 100000,
   coverages: [
-    { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
-    { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500 },
+    { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
+    { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500, included: true },
   ],
   status: 'active',
   startDate: new Date().toISOString(),
@@ -95,7 +95,7 @@ describe('Gap Analyzer', () => {
     it('should identify missing coverages', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
           // Missing: Theft, Glass, IMM
         ],
       })
@@ -107,7 +107,7 @@ describe('Gap Analyzer', () => {
     it('should categorize missing coverages by importance', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
         ],
       })
       const analysis = analyzeGaps(policy)
@@ -124,8 +124,8 @@ describe('Gap Analyzer', () => {
     it('should identify underinsured coverages', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 30000, deductible: 1000 }, // Way below 100000 typical
-          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 30000, deductible: 1000, included: true }, // Way below 100000 typical
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500, included: true },
         ],
       })
       const analysis = analyzeGaps(policy)
@@ -142,8 +142,8 @@ describe('Gap Analyzer', () => {
     it('should categorize underinsured coverage risk levels', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 25000, deductible: 1000 }, // <40% of typical = high
-          { name: 'Theft', nameTr: 'Hırsızlık', limit: 40000, deductible: 500 }, // ~50% of typical = medium
+          { name: 'Damage', nameTr: 'Hasar', limit: 25000, deductible: 1000, included: true }, // <40% of typical = high
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: 40000, deductible: 500, included: true }, // ~50% of typical = medium
         ],
       })
       const analysis = analyzeGaps(policy)
@@ -155,8 +155,8 @@ describe('Gap Analyzer', () => {
     it('should identify high deductibles', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 5000 }, // Way above 1000 typical (>1.5x)
-          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 5000, included: true }, // Way above 1000 typical (>1.5x)
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500, included: true },
         ],
       })
       const analysis = analyzeGaps(policy)
@@ -167,7 +167,7 @@ describe('Gap Analyzer', () => {
     it('should calculate percentile rank for deductibles', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 2500 }, // High
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 2500, included: true }, // High
         ],
       })
       const analysis = analyzeGaps(policy)
@@ -209,17 +209,17 @@ describe('Gap Analyzer', () => {
     it('should calculate higher gap score for more issues', () => {
       const goodPolicy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
-          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500 },
-          { name: 'Glass', nameTr: 'Cam', limit: 10000, deductible: 0 },
-          { name: 'IMM', nameTr: 'İMM', limit: 50000, deductible: 0 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
+          { name: 'Theft', nameTr: 'Hırsızlık', limit: 80000, deductible: 500, included: true },
+          { name: 'Glass', nameTr: 'Cam', limit: 10000, deductible: 0, included: true },
+          { name: 'IMM', nameTr: 'İMM', limit: 50000, deductible: 0, included: true },
         ],
         exclusions: [],
       })
 
       const badPolicy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 20000, deductible: 5000 }, // Underinsured, high deductible
+          { name: 'Damage', nameTr: 'Hasar', limit: 20000, deductible: 5000, included: true }, // Underinsured, high deductible
         ],
         exclusions: ['deprem', 'sel', 'hırsızlık'],
       })
@@ -233,7 +233,7 @@ describe('Gap Analyzer', () => {
     it('should estimate cost to close gaps', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
           // Missing coverages
         ],
       })
@@ -245,7 +245,7 @@ describe('Gap Analyzer', () => {
     it('should apply regional factors to cost estimate', () => {
       const policy = createMockPolicy({
         coverages: [
-          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000 },
+          { name: 'Damage', nameTr: 'Hasar', limit: 100000, deductible: 1000, included: true },
         ],
       })
 
@@ -278,7 +278,7 @@ describe('Gap Analyzer', () => {
       const gaps: GapAnalysis = {
         missingCoverages: [
           {
-            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
+            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, minLimit: 50000, maxLimit: 120000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
             importance: 'critical',
             estimatedCost: 800,
           },
@@ -299,7 +299,7 @@ describe('Gap Analyzer', () => {
       const gaps: GapAnalysis = {
         missingCoverages: [
           {
-            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
+            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, minLimit: 50000, maxLimit: 120000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
             importance: 'critical',
             estimatedCost: 800,
           },
@@ -385,7 +385,7 @@ describe('Gap Analyzer', () => {
       const gaps: GapAnalysis = {
         missingCoverages: [
           {
-            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
+            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, minLimit: 50000, maxLimit: 120000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
             importance: 'critical',
             estimatedCost: 800,
           },
@@ -427,7 +427,7 @@ describe('Gap Analyzer', () => {
       const gaps: GapAnalysis = {
         missingCoverages: [
           {
-            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
+            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, minLimit: 50000, maxLimit: 120000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
             importance: 'critical',
             estimatedCost: 800,
           },
@@ -465,7 +465,7 @@ describe('Gap Analyzer', () => {
       const gaps: GapAnalysis = {
         missingCoverages: [
           {
-            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
+            coverage: { name: 'Theft', nameTr: 'Hırsızlık', typicalLimit: 80000, minLimit: 50000, maxLimit: 120000, typicalDeductible: 500, minDeductible: 0, maxDeductible: 1500, inclusionRate: 90 },
             importance: 'critical',
             estimatedCost: 800,
           },

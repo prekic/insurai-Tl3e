@@ -3,14 +3,14 @@
  * Tests business risk assessment and comparison utilities
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   assessBusinessRisk,
   compareIndustries,
   getIndustryRankings,
   findSimilarIndustries,
 } from './assessment'
-import type { BusinessInfo, IndustrySector, BusinessRiskAssessment } from '@/types/industry-risk'
+import type { BusinessInfo, IndustrySector } from '@/types/industry-risk'
 
 // Mock the profiles module
 vi.mock('./profiles', () => ({

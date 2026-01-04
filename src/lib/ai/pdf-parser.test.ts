@@ -6,7 +6,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 // Define mocks using vi.hoisted
-const { mockGetDocument, mockLoadingTask } = vi.hoisted(() => {
+const { mockGetDocument } = vi.hoisted(() => {
   const mockLoadingTask = {
     promise: Promise.resolve({
       numPages: 1,

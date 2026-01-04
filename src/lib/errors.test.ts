@@ -4,7 +4,7 @@
  * Tests for error creation, validation, and recovery utilities
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   ERROR_CODES,
   ERROR_MESSAGES,
@@ -14,7 +14,7 @@ import {
   getErrorMessage,
   createAppError,
 } from './errors'
-import type { ErrorCode, AppError } from './errors'
+import type { ErrorCode } from './errors'
 
 describe('Error Codes', () => {
   it('should have all required error codes defined', () => {

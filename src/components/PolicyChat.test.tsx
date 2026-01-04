@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { PolicyChat } from './PolicyChat'
@@ -183,7 +183,6 @@ describe('PolicyChat', () => {
 
     it('should not send empty message', async () => {
       vi.useRealTimers()
-      const user = userEvent.setup()
       renderChat()
 
       const sendButton = screen.getByRole('button', { name: /send/i })

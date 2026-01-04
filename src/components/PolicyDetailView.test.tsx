@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { BrowserRouter, MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { PolicyDetailView } from './PolicyDetailView'
 import type { AnalyzedPolicy } from '@/types/policy'
 
@@ -46,8 +46,8 @@ const mockPolicy: AnalyzedPolicy = {
   monthlyPremium: 208,
   marketComparison: {
     averagePremium: 3000,
+    averageCoverage: 100000,
     percentile: 25,
-    similarPolicies: 150,
   },
 }
 

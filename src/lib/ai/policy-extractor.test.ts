@@ -19,7 +19,7 @@ vi.mock('./pdf-parser', () => ({
   extractTextFromPDF: vi.fn(() =>
     Promise.resolve({
       success: true,
-      data: { text: 'Sample policy text with coverage details', pageCount: 5 },
+      data: { text: 'Sample policy text with coverage details', pageCount: 5, metadata: {} },
     })
   ),
   isPDFFile: vi.fn((file: File) => file.type === 'application/pdf'),
@@ -30,7 +30,7 @@ vi.mock('./ocr', () => ({
   performOCR: vi.fn(() =>
     Promise.resolve({
       success: true,
-      data: { text: 'OCR extracted text' },
+      data: { text: 'OCR extracted text', confidence: 0.85, pageCount: 1, isScanned: true },
     })
   ),
 }))
@@ -383,7 +383,7 @@ describe('AI Extraction', () => {
       currency: 'TRY',
       paymentFrequency: 'annual',
       coverages: [
-        { name: 'Fire', limit: 500000, deductible: 1000 },
+        { name: 'Fire', limit: 500000, deductible: 1000, description: 'Fire coverage' },
       ],
       specialConditions: ['Special condition 1'],
       exclusions: ['Exclusion 1'],
@@ -475,10 +475,15 @@ describe('AI Extraction', () => {
           coverages: 0.85,
         },
       },
-      consensus: { agreement: 0.9, score: 0.92 },
+      consensus: {
+        agreement: 0.9,
+        score: 0.92,
+        agreedFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
+        disagreedFields: [],
+      },
       providerResults: [
-        { provider: 'openai', error: null },
-        { provider: 'anthropic', error: null },
+        { provider: 'openai', data: { policyNumber: 'CONS-001', provider: 'Consensus Provider', policyType: 'home', insuredName: 'Test User', insuredAddress: 'Ankara', startDate: '2024-01-01', endDate: '2025-01-01', premium: 4000, currency: 'TRY', paymentFrequency: 'annual', coverages: [], specialConditions: [], exclusions: [], confidence: { overall: 0.9, policyNumber: 0.95, provider: 0.9, dates: 0.9, premium: 0.85, coverages: 0.85 } } },
+        { provider: 'anthropic', data: { policyNumber: 'CONS-001', provider: 'Consensus Provider', policyType: 'home', insuredName: 'Test User', insuredAddress: 'Ankara', startDate: '2024-01-01', endDate: '2025-01-01', premium: 4000, currency: 'TRY', paymentFrequency: 'annual', coverages: [], specialConditions: [], exclusions: [], confidence: { overall: 0.9, policyNumber: 0.95, provider: 0.9, dates: 0.9, premium: 0.85, coverages: 0.85 } } },
       ],
     })
 
@@ -586,14 +591,14 @@ describe('OCR Processing', () => {
     const pdfParser = await import('./pdf-parser')
     vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
       success: true,
-      data: { text: '', pageCount: 5 }, // Empty text suggests scanned
+      data: { text: '', pageCount: 5, metadata: {} }, // Empty text suggests scanned
     })
 
     const ocr = await import('./ocr')
     vi.mocked(ocr.isLikelyScannedPDF).mockReturnValue(true)
     vi.mocked(ocr.performOCR).mockResolvedValue({
       success: true,
-      data: { text: 'OCR extracted policy content with details' },
+      data: { text: 'OCR extracted policy content with details', confidence: 0.85, pageCount: 5, isScanned: true },
     })
 
     const openai = await import('./providers/openai')
@@ -627,14 +632,14 @@ describe('OCR Processing', () => {
     const pdfParser = await import('./pdf-parser')
     vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
       success: true,
-      data: { text: 'Long text content from PDF parsing with many words', pageCount: 5 },
+      data: { text: 'Long text content from PDF parsing with many words', pageCount: 5, metadata: {} },
     })
 
     const ocr = await import('./ocr')
     vi.mocked(ocr.isLikelyScannedPDF).mockReturnValue(true)
     vi.mocked(ocr.performOCR).mockResolvedValue({
       success: true,
-      data: { text: 'Short' }, // Less content
+      data: { text: 'Short', confidence: 0.8, pageCount: 5, isScanned: true }, // Less content
     })
 
     const openai = await import('./providers/openai')
@@ -694,7 +699,7 @@ describe('Policy Conversion', () => {
       paymentFrequency: 'annual',
       coverages: [
         { name: 'Yangın', limit: 750000, deductible: 2000, description: 'Fire coverage' },
-        { name: 'Hırsızlık', limit: 100000, deductible: 500 },
+        { name: 'Hırsızlık', limit: 100000, deductible: 500, description: null },
       ],
       specialConditions: ['24 saat destek'],
       exclusions: ['Savaş hasarları', 'Deprem (DASK kapsamında)'],
@@ -806,9 +811,9 @@ describe('Policy Conversion', () => {
       currency: 'TRY',
       paymentFrequency: null,
       coverages: [
-        { name: 'Fire', limit: 500000, deductible: 1000 },
-        { name: 'Theft', limit: 200000, deductible: 500 },
-        { name: 'Water', limit: 100000, deductible: 500 },
+        { name: 'Fire', limit: 500000, deductible: 1000, description: null },
+        { name: 'Theft', limit: 200000, deductible: 500, description: null },
+        { name: 'Water', limit: 100000, deductible: 500, description: null },
       ],
       specialConditions: [],
       exclusions: [],
@@ -838,10 +843,10 @@ describe('Policy Conversion', () => {
       currency: 'TRY',
       paymentFrequency: null,
       coverages: [
-        { name: 'Fire', limit: 600000, deductible: 0 },
-        { name: 'Theft', limit: 300000, deductible: 0 },
-        { name: 'Water', limit: 200000, deductible: 0 },
-        { name: 'Glass', limit: 50000, deductible: 0 },
+        { name: 'Fire', limit: 600000, deductible: 0, description: null },
+        { name: 'Theft', limit: 300000, deductible: 0, description: null },
+        { name: 'Water', limit: 200000, deductible: 0, description: null },
+        { name: 'Glass', limit: 50000, deductible: 0, description: null },
       ],
       specialConditions: ['24 hour support'],
       exclusions: [],
@@ -886,7 +891,7 @@ describe('Market Comparison', () => {
       premium: 3000,
       currency: 'TRY',
       paymentFrequency: null,
-      coverages: [{ name: 'Fire', limit: 500000, deductible: 1000 }],
+      coverages: [{ name: 'Fire', limit: 500000, deductible: 1000, description: null }],
       specialConditions: [],
       exclusions: [],
       confidence: { overall: 0.85, policyNumber: 0.9, provider: 0.8, dates: 0.85, premium: 0.8, coverages: 0.85 },

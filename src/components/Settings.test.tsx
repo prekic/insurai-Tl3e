@@ -648,7 +648,6 @@ describe('Settings - Theme Keyboard Navigation', () => {
   })
 
   it('should allow keyboard navigation between theme options', async () => {
-    const user = userEvent.setup()
     renderSettings()
 
     const lightOption = screen.getByRole('radio', { name: /light/i })

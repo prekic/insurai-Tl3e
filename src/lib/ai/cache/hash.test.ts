@@ -30,7 +30,7 @@ describe('hashContent', () => {
     // Mock crypto.subtle.digest
     vi.stubGlobal('crypto', {
       subtle: {
-        digest: vi.fn().mockImplementation(async (_algorithm: string, data: BufferSource) => {
+        digest: vi.fn().mockImplementation(async (_algorithm: string, _data: BufferSource) => {
           // Return consistent hash based on input length for testing
           const mockHash = KNOWN_TEST_HASH
           return createMockHashBuffer(mockHash)

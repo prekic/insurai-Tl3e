@@ -21,7 +21,7 @@ const createMockIndexedDB = () => {
   }
   initStores()
 
-  const createMockStore = (storeName: string, mode: string) => {
+  const createMockStore = (storeName: string, _mode: string) => {
     const storeData = stores.get(storeName) || new Map()
 
     const createRequest = <T>(resultFn: () => T) => {
@@ -178,8 +178,7 @@ const createMockIndexedDB = () => {
   }
 
   const db = {
-    transaction(storeNames: string | string[], mode: IDBTransactionMode = 'readonly') {
-      const name = Array.isArray(storeNames) ? storeNames[0] : storeNames
+    transaction(_storeNames: string | string[], mode: IDBTransactionMode = 'readonly') {
       return {
         objectStore(storeName: string) {
           return createMockStore(storeName, mode)
@@ -191,7 +190,7 @@ const createMockIndexedDB = () => {
         return stores.has(name)
       },
     },
-    createObjectStore(name: string, options: { keyPath: string }) {
+    createObjectStore(name: string, _options: { keyPath: string }) {
       stores.set(name, new Map())
       return {
         createIndex: vi.fn(),
@@ -201,7 +200,7 @@ const createMockIndexedDB = () => {
   }
 
   const mockIndexedDB = {
-    open(name: string, version?: number) {
+    open(_name: string, _version?: number) {
       let onsuccessFn: ((event: unknown) => void) | null = null
       let onerrorFn: (() => void) | null = null
       let onupgradeneededFn: ((event: unknown) => void) | null = null

@@ -7,7 +7,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { MarketDataService, generateMarketComparisonData } from './service'
 import type { AnalyzedPolicy, PolicyType } from '@/types/policy'
-import type { TurkishRegion } from '@/types/market-data'
 
 // Mock dependencies
 vi.mock('@/data/market-data/benchmarks', () => ({

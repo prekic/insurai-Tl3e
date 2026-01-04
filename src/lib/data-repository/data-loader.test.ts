@@ -6,7 +6,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   MarketDataLoader,
-  marketDataLoader,
   loadMarketData,
   getBenchmark,
   getProviderInfo,
@@ -561,7 +560,6 @@ describe('Freshness Check Edge Cases', () => {
     const freshLoader = new MarketDataLoader()
 
     // Override loadRepository to simulate failure
-    const originalLoad = freshLoader.loadRepository.bind(freshLoader)
     freshLoader.loadRepository = vi.fn().mockResolvedValueOnce({
       success: false,
       data: null,

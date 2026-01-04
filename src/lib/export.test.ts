@@ -16,7 +16,6 @@ const mockRemoveChild = vi.fn()
 
 // Store original values
 const originalURL = global.URL
-const originalDocument = global.document
 
 // Mock window.open
 const mockWindowWrite = vi.fn()
