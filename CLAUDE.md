@@ -178,6 +178,157 @@ User → Supabase Auth → Session stored in localStorage
 
 ---
 
+## Landing Page Architecture
+
+### Section Components (`src/components/landing/`)
+
+| Component | Purpose |
+|-----------|---------|
+| `Hero.tsx` | Main hero with gradient bg, nav, upload widget, comparison mock |
+| `Benefits.tsx` | Feature grid with icons (AI extraction, benchmarking, etc.) |
+| `HowItWorks.tsx` | 3-step process (Upload → Analyze → Compare) |
+| `Stats.tsx` | Key metrics (policies analyzed, time saved, etc.) |
+| `WhoItsFor.tsx` | Target audience cards (brokers, risk managers, etc.) |
+| `WhyChooseUs.tsx` | Differentiators vs competitors |
+| `CompareSection.tsx` | Interactive policy comparison demo |
+| `ComparisonMock.tsx` | Visual comparison result mockup |
+| `Testimonials.tsx` | Customer quotes carousel |
+| `FAQ.tsx` | Accordion with common questions |
+| `Footer.tsx` | Links, legal, social |
+| `LanguageToggle.tsx` | TR/EN language switcher |
+| `UploadWidget.tsx` | Drag-drop upload in hero |
+
+### Design Tokens
+
+```css
+/* Colors (from Figma) */
+--primary: #2563eb      /* blue-600 - main actions */
+--secondary: #4f46e5    /* indigo-600 - accents */
+--success: #10b981      /* green - positive states */
+--warning: #f59e0b      /* amber - warnings */
+--danger: #ef4444       /* red - errors, gaps */
+
+/* Gradients */
+Hero bg: from-slate-50 to-white
+Decorative blobs: blue-100/40 to purple-100/40
+
+/* Typography */
+Headings: font-bold text-gray-900
+Body: text-gray-600
+```
+
+### Figma Design Reference
+- Source file: `MERGED_CODEBASE_FIGMA_DESIGN_DRAFTS.md`
+- Contains 138 component designs from original Figma export
+- Key components: AdminPanel, InsuranceComparison, CoverageDetails
+
+---
+
+## Gap Detection System
+
+### Architecture (`src/lib/gap-detection/`)
+
+```
+analyzeGapsComprehensive(policy, options)
+├── analyzeCoverageGaps()    # Missing coverage types
+├── analyzeLimitGaps()       # Under/over-insured limits
+├── analyzeDeductibleGaps()  # Deductible analysis
+├── analyzeExclusionGaps()   # Dangerous exclusions
+├── analyzeTemporalGaps()    # Coverage period issues
+└── analyzeComplianceGaps()  # Regulatory compliance
+```
+
+### Gap Severity Levels
+```typescript
+type GapSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
+```
+
+### Gap Categories
+- `coverage` - Missing protection types
+- `limit` - Insufficient coverage amounts
+- `deductible` - High out-of-pocket costs
+- `exclusion` - Risky policy exclusions
+- `temporal` - Gaps in coverage dates
+- `compliance` - Regulatory issues (DASK, etc.)
+
+### Output: ComprehensiveGapAnalysis
+```typescript
+{
+  gaps: DetectedGap[]
+  gapCount: { total, critical, high, medium, low, info }
+  overallScore: number  // 0-100
+  financialSummary: { potentialExposure, recommendedIncrease }
+  prioritizedGaps: PrioritizedGap[]
+  recommendations: GapRecommendation[]
+}
+```
+
+---
+
+## Regional Benchmarking
+
+### Turkish Regions (`src/lib/regional-benchmark/`)
+
+| Region Code | Name | Key Characteristics |
+|-------------|------|---------------------|
+| `marmara` | Marmara | Highest risk (İstanbul), earthquake zone 1 |
+| `ege` | Aegean | Tourism, earthquake risk |
+| `akdeniz` | Mediterranean | Tourism, flood risk |
+| `ic_anadolu` | Central Anatolia | Lower risk, agricultural |
+| `karadeniz` | Black Sea | Flood/landslide risk |
+| `dogu_anadolu` | Eastern Anatolia | Lower premiums, rural |
+| `guneydogu` | Southeastern | Mixed risk profile |
+
+### Province Data
+- 17 major provinces with full data
+- Population, density, urban ratio
+- Earthquake zone (1-5 scale)
+- Risk profiles by insurance type
+
+### Risk Factors (from AFAD data)
+```typescript
+RegionalRiskProfile {
+  earthquake: { zone, level, historicalEvents, avgMagnitude }
+  flood: { level, annualEvents }
+  fire: { level, wildfireRisk }
+  traffic: { level, accidentRate }
+  crime: { level, theftRate }
+}
+```
+
+### Premium Benchmarks
+- Regional averages by policy type
+- Comparison to national average
+- Risk-adjusted premium recommendations
+
+---
+
+## Supported Policy Types
+
+### Turkish Insurance Lines
+
+| Type | Turkish Name | Key Coverages |
+|------|--------------|---------------|
+| `auto_kasko` | Kasko | Vehicle damage, theft, natural disasters |
+| `auto_traffic` | Trafik Sigortası | Mandatory liability (MTPL) |
+| `fire` | Yangın | Building, contents, business interruption |
+| `earthquake` | DASK | Mandatory earthquake for buildings |
+| `health` | Sağlık | Medical expenses, hospitalization |
+| `life` | Hayat | Death benefit, savings component |
+| `personal_accident` | Ferdi Kaza | Accident death/disability |
+| `engineering` | İnşaat/Montaj | CAR/EAR for construction |
+| `agricultural` | Tarım | Crop, livestock, equipment |
+| `credit_life` | Kredi Hayat | Loan protection |
+
+### Policy Type Components (`src/components/insurance-lines/`)
+- `TurkishKaskoDetails.tsx` - Auto comprehensive details
+- `TurkishTrafficDetails.tsx` - MTPL details
+- `TurkishFireDetails.tsx` - Fire/property details
+- `TurkishHealthDetails.tsx` - Health coverage details
+- `TurkishEngineeringDetails.tsx` - Construction coverage
+
+---
+
 ## Domain Knowledge
 
 ### Turkish Insurance Terms
