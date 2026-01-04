@@ -126,14 +126,13 @@ describe('Environment Configuration', () => {
       expect(typeof env.hasAI).toBe('boolean')
     })
 
-    it('should have hasOCR property', () => {
-      expect('hasOCR' in env).toBe(true)
-      expect(typeof env.hasOCR).toBe('boolean')
+    it('should have hasProxy property', () => {
+      expect('hasProxy' in env).toBe(true)
+      expect(typeof env.hasProxy).toBe('boolean')
     })
 
-    it('should have hasConsensus property', () => {
-      expect('hasConsensus' in env).toBe(true)
-      expect(typeof env.hasConsensus).toBe('boolean')
+    it('should have proxyUrl property', () => {
+      expect('proxyUrl' in env).toBe(true)
     })
 
     it('should have config property', () => {

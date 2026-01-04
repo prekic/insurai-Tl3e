@@ -111,15 +111,27 @@ export function isProviderConfigured(provider: 'openai' | 'anthropic' | 'google'
 
 /**
  * Check if any AI extraction is configured
+ * Returns true if either:
+ * 1. API proxy is configured (server handles AI calls)
+ * 2. Direct API keys are available (frontend has keys - not recommended for production)
  */
 export function isAIConfigured(): boolean {
+  // If proxy is configured, AI should be available via the proxy
+  if (isProxyConfigured()) {
+    return true
+  }
+  // Fallback to direct key check (for local development without server)
   return isProviderConfigured('openai') || isProviderConfigured('anthropic')
 }
 
 /**
  * Check if OCR is available (Google Document AI)
+ * Returns true if proxy is configured (server handles OCR) or direct key is available
  */
 export function isOCRConfigured(): boolean {
+  if (isProxyConfigured()) {
+    return true // Assume proxy has OCR capability
+  }
   return isProviderConfigured('google')
 }
 

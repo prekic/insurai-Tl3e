@@ -9,7 +9,11 @@ interface EnvConfig {
   supabaseAnonKey: string | null
   isSupabaseConfigured: boolean
 
-  // AI Providers
+  // API Proxy (secure server-side AI calls)
+  apiProxyUrl: string | null
+  isProxyConfigured: boolean
+
+  // Direct AI Keys (for local dev without server - not recommended)
   openaiKey: string | null
   anthropicKey: string | null
   googleCloudKey: string | null
@@ -39,7 +43,11 @@ function parseEnv(): EnvConfig {
   const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || null
   const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
 
-  // AI Providers
+  // API Proxy (secure server-side AI calls - recommended for production)
+  const apiProxyUrl = import.meta.env.VITE_API_PROXY_URL || null
+  const isProxyConfigured = !!apiProxyUrl
+
+  // Direct AI Keys (for local dev without server - not recommended for production)
   const openaiKey = import.meta.env.VITE_OPENAI_API_KEY || null
   const anthropicKey = import.meta.env.VITE_ANTHROPIC_API_KEY || null
   const googleCloudKey = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY || null
@@ -52,13 +60,18 @@ function parseEnv(): EnvConfig {
     return true
   }
 
+  // AI is configured if proxy is available OR direct keys are set
   const isAIConfigured =
-    isValidKey(openaiKey, 'sk-') || isValidKey(anthropicKey, 'sk-ant-')
+    isProxyConfigured ||
+    isValidKey(openaiKey, 'sk-') ||
+    isValidKey(anthropicKey, 'sk-ant-')
 
   return {
     supabaseUrl,
     supabaseAnonKey,
     isSupabaseConfigured,
+    apiProxyUrl,
+    isProxyConfigured,
     openaiKey: isValidKey(openaiKey, 'sk-') ? openaiKey : null,
     anthropicKey: isValidKey(anthropicKey, 'sk-ant-') ? anthropicKey : null,
     googleCloudKey: googleCloudKey || null,
@@ -84,31 +97,27 @@ function generateWarnings(config: EnvConfig): EnvWarning[] {
     })
   }
 
-  // AI warnings
+  // AI configuration warnings
   if (!config.isAIConfigured) {
     warnings.push({
-      level: 'warning',
-      message: 'No AI provider configured - using demo mode',
+      level: 'error',
+      message: 'No AI service configured - policy analysis will fail',
       suggestion:
-        'Set VITE_OPENAI_API_KEY or VITE_ANTHROPIC_API_KEY for AI-powered extraction',
+        'Set VITE_API_PROXY_URL and run backend server with: npm run dev:all',
     })
-  } else if (!config.openaiKey) {
+  } else if (config.isProxyConfigured) {
+    // Proxy mode - server handles AI (recommended)
     warnings.push({
       level: 'info',
-      message: 'OpenAI not configured - using Anthropic only',
+      message: `API proxy configured at ${config.apiProxyUrl}`,
+      suggestion: 'Make sure backend server is running: npm run dev:server',
     })
-  } else if (!config.anthropicKey) {
+  } else {
+    // Direct key mode - not recommended for production
     warnings.push({
-      level: 'info',
-      message: 'Anthropic not configured - multi-model consensus unavailable',
-    })
-  }
-
-  // OCR warning
-  if (!config.googleCloudKey) {
-    warnings.push({
-      level: 'info',
-      message: 'Google Cloud not configured - OCR for scanned documents unavailable',
+      level: 'warning',
+      message: 'Using direct API keys (not recommended for production)',
+      suggestion: 'Use API proxy for secure key handling',
     })
   }
 
@@ -141,11 +150,11 @@ function logEnvironmentStatus(config: EnvConfig, warnings: EnvWarning[]): void {
       mode: config.isDevelopment ? 'development' : 'production',
       storage: config.isSupabaseConfigured ? 'cloud' : 'local',
       ai: config.isAIConfigured
-        ? config.openaiKey && config.anthropicKey
-          ? 'multi-model'
-          : 'single-model'
-        : 'demo',
-      ocr: config.googleCloudKey ? 'enabled' : 'disabled',
+        ? config.isProxyConfigured
+          ? 'proxy'
+          : 'direct-keys'
+        : 'NOT CONFIGURED',
+      proxy: config.apiProxyUrl || 'none',
     }
   )
 
@@ -215,9 +224,9 @@ export const env = {
   isDev: envConfig.isDevelopment,
   isProd: envConfig.isProduction,
   hasSupabase: envConfig.isSupabaseConfigured,
+  hasProxy: envConfig.isProxyConfigured,
   hasAI: envConfig.isAIConfigured,
-  hasOCR: !!envConfig.googleCloudKey,
-  hasConsensus: !!(envConfig.openaiKey && envConfig.anthropicKey),
+  proxyUrl: envConfig.apiProxyUrl,
 }
 
 export default env
