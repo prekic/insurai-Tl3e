@@ -38,7 +38,7 @@ import {
   isSecureContext,
   generateSecurityReport,
 } from './security-monitor'
-import type { AuditEvent } from '@/types/security'
+import { createMockAuditEvent } from '@/test/setup'
 
 // Mock window for isSecureContext
 const mockWindow = {
@@ -103,13 +103,12 @@ describe('Security Monitor', () => {
     })
 
     it('should track failed login attempts', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
         ipHash: 'ip-hash-1',
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
       mockAuditLogger.triggerEvent(event)
@@ -122,13 +121,12 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
         ipHash: 'ip-hash-1',
-      }
+      })
 
       // Trigger enough failed logins to exceed threshold
       for (let i = 0; i < 4; i++) {
@@ -146,13 +144,12 @@ describe('Security Monitor', () => {
       securityMonitor.onAlert(listener)
       securityMonitor.setThresholds({ failedLoginsThreshold: 3 })
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
         ipHash: 'ip-hash-1',
-      }
+      })
 
       // Trigger 2x threshold for critical alert
       for (let i = 0; i < 7; i++) {
@@ -167,13 +164,12 @@ describe('Security Monitor', () => {
     })
 
     it('should track signup failures as well', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signup_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
         ipHash: 'ip-hash-1',
-      }
+      })
 
       for (let i = 0; i < 4; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -184,12 +180,11 @@ describe('Security Monitor', () => {
     })
 
     it('should use ipHash when userId is not available', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         ipHash: 'ip-hash-only',
-      }
+      })
 
       for (let i = 0; i < 4; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -200,11 +195,10 @@ describe('Security Monitor', () => {
     })
 
     it('should use unknown key when neither userId nor ipHash available', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
-      }
+      })
 
       for (let i = 0; i < 4; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -222,12 +216,11 @@ describe('Security Monitor', () => {
     })
 
     it('should track rate limit violations', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'security.rate_limit_exceeded',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
       mockAuditLogger.triggerEvent({ ...event, id: 'evt-2' })
@@ -241,12 +234,11 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'security.rate_limit_exceeded',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 6; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -264,13 +256,12 @@ describe('Security Monitor', () => {
     })
 
     it('should track access patterns', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'policy.viewed',
-        timestamp: Date.now(),
         userId: 'user-123',
         resourceId: 'policy-1',
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
       // Access pattern tracked internally, no direct way to verify
@@ -294,13 +285,13 @@ describe('Security Monitor', () => {
 
       // Generate many events with timestamps within 5 minutes
       for (let i = 0; i < 100; i++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-${i}`,
           type: 'policy.viewed',
           timestamp: now + (i * 3000), // Events spread over time
           userId: 'user-scraper',
           resourceId: 'same-resource',
-        }
+        })
         mockAuditLogger.triggerEvent(event)
       }
 
@@ -308,13 +299,13 @@ describe('Security Monitor', () => {
       vi.setSystemTime(now + 6 * 60 * 1000)
 
       // Trigger another event to initiate the analysis (now - lastCheck >= 5 min)
-      mockAuditLogger.triggerEvent({
+      mockAuditLogger.triggerEvent(createMockAuditEvent({
         id: 'evt-trigger',
         type: 'policy.viewed',
         timestamp: Date.now(),
         userId: 'user-scraper',
         resourceId: 'same-resource',
-      })
+      }))
 
       // Check if data_scraping alert was raised
       const alerts = securityMonitor.getActiveAlerts()
@@ -342,13 +333,13 @@ describe('Security Monitor', () => {
 
       // Generate events accessing many different resources within the time window
       for (let i = 0; i < 25; i++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-${i}`,
           type: 'policy.viewed',
           timestamp: now + (i * 10000), // Events spread within window
           userId: 'user-unusual',
           resourceId: `unique-resource-${i}`,
-        }
+        })
         mockAuditLogger.triggerEvent(event)
       }
 
@@ -356,13 +347,13 @@ describe('Security Monitor', () => {
       vi.setSystemTime(now + 6 * 60 * 1000)
 
       // Trigger another event to initiate the analysis
-      mockAuditLogger.triggerEvent({
+      mockAuditLogger.triggerEvent(createMockAuditEvent({
         id: 'evt-trigger',
         type: 'policy.viewed',
         timestamp: Date.now(),
         userId: 'user-unusual',
         resourceId: 'trigger-resource',
-      })
+      }))
 
       // Check if suspicious_pattern alert was raised for unusual access
       const alerts = securityMonitor.getActiveAlerts()
@@ -379,12 +370,11 @@ describe('Security Monitor', () => {
     })
 
     it('should limit stored actions to 100', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'policy.viewed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       // Generate more than 100 events
       for (let i = 0; i < 150; i++) {
@@ -409,15 +399,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'search.performed',
-        timestamp: Date.now(),
         userId: 'user-123',
         details: {
           query: "'; DROP TABLE users; --",
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -431,15 +420,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'search.performed',
-        timestamp: Date.now(),
         userId: 'user-123',
         details: {
           query: '1 UNION SELECT * FROM passwords',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -453,15 +441,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
-        type: 'comment.created',
-        timestamp: Date.now(),
+        type: 'policy.created',
         userId: 'user-123',
         details: {
           content: '<script>alert("xss")</script>',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -475,15 +462,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
-        type: 'link.created',
-        timestamp: Date.now(),
+        type: 'policy.created',
         userId: 'user-123',
         details: {
           url: 'javascript:alert(document.cookie)',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -494,15 +480,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
-        type: 'profile.updated',
-        timestamp: Date.now(),
+        type: 'settings.preference_changed',
         userId: 'user-123',
         details: {
           bio: '<img src=x onerror=alert(1)>',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -513,15 +498,14 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
-        type: 'content.created',
-        timestamp: Date.now(),
+        type: 'policy.created',
         userId: 'user-123',
         details: {
           html: '<iframe src="https://evil.com"></iframe>',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -532,17 +516,16 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'policy.created',
-        timestamp: Date.now(),
         userId: 'user-123',
         details: {
           policyType: 'kasko',
           coverage: 50000,
           notes: 'Standard auto insurance policy',
         },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -564,12 +547,11 @@ describe('Security Monitor', () => {
       const listener = vi.fn()
       securityMonitor.onAlert(listener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       // Trigger multiple alerts for same user
       for (let i = 0; i < 10; i++) {
@@ -587,12 +569,11 @@ describe('Security Monitor', () => {
     it('should upgrade alert severity if more severe', () => {
       securityMonitor.setThresholds({ failedLoginsThreshold: 2 })
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       // First batch - should create warning
       for (let i = 0; i < 3; i++) {
@@ -610,12 +591,11 @@ describe('Security Monitor', () => {
     })
 
     it('should resolve alerts', () => {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -639,12 +619,11 @@ describe('Security Monitor', () => {
       securityMonitor.onAlert(errorListener)
       securityMonitor.onAlert(normalListener)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -659,12 +638,11 @@ describe('Security Monitor', () => {
 
       // Generate many alerts from different users
       for (let i = 0; i < 150; i++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-${i}`,
           type: 'auth.signin_failed',
-          timestamp: Date.now(),
           userId: `user-${i}`,
-        }
+        })
         mockAuditLogger.triggerEvent(event)
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}-2` })
       }
@@ -684,12 +662,11 @@ describe('Security Monitor', () => {
       securityMonitor.initialize()
       securityMonitor.setThresholds({ failedLoginsThreshold: 2 })
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -715,12 +692,12 @@ describe('Security Monitor', () => {
       securityMonitor.setThresholds({ failedLoginsThreshold: 1 })
 
       for (let i = 0; i < 5; i++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-${i}`,
           type: 'auth.signin_failed',
           timestamp: Date.now() + i * 100,
           userId: `user-${i}`,
-        }
+        })
         mockAuditLogger.triggerEvent(event)
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}-2` })
       }
@@ -742,12 +719,11 @@ describe('Security Monitor', () => {
       securityMonitor.initialize()
       securityMonitor.setThresholds({ failedLoginsThreshold: 2 })
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -781,12 +757,11 @@ describe('Security Monitor', () => {
       const cleanup = securityMonitor.onAlert(listener)
       cleanup()
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -812,13 +787,12 @@ describe('Security Monitor', () => {
       securityMonitor.initialize()
 
       // Trigger XSS detection for critical alert
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
-        type: 'content.created',
-        timestamp: Date.now(),
+        type: 'policy.created',
         userId: 'attacker',
         details: { content: '<script>evil()</script>' },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -830,13 +804,12 @@ describe('Security Monitor', () => {
       securityMonitor.initialize()
 
       // Trigger SQL injection for suspicious pattern
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'search.performed',
-        timestamp: Date.now(),
         userId: 'attacker',
         details: { query: 'UNION SELECT * FROM users' },
-      }
+      })
 
       mockAuditLogger.triggerEvent(event)
 
@@ -850,12 +823,11 @@ describe('Security Monitor', () => {
       securityMonitor.initialize()
       securityMonitor.setThresholds({ failedLoginsThreshold: 2 })
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: 'user-123',
-      }
+      })
 
       for (let i = 0; i < 5; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -904,13 +876,13 @@ describe('Security Monitor', () => {
 
       // Generate events (not enough to trigger with low sensitivity but enough with high/medium)
       for (let i = 0; i < 100; i++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-${i}`,
           type: 'policy.viewed',
           timestamp: now + (i * 3000),
           userId: 'user-test',
           resourceId: 'resource',
-        }
+        })
         mockAuditLogger.triggerEvent(event)
       }
 
@@ -918,13 +890,13 @@ describe('Security Monitor', () => {
       vi.setSystemTime(now + 6 * 60 * 1000)
 
       // Trigger analysis
-      mockAuditLogger.triggerEvent({
+      mockAuditLogger.triggerEvent(createMockAuditEvent({
         id: 'evt-trigger',
         type: 'policy.viewed',
         timestamp: Date.now(),
         userId: 'user-test',
         resourceId: 'resource',
-      })
+      }))
 
       // With low sensitivity, 100 events / 5 min = 20 req/min < 60 threshold
       // So no scraping alert should be raised
@@ -953,12 +925,12 @@ describe('Security Monitor', () => {
       vi.setSystemTime(now)
 
       // Generate failed logins
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
         timestamp: now,
         userId: 'user-cleanup-test',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -982,12 +954,12 @@ describe('Security Monitor', () => {
       const now = Date.now()
       vi.setSystemTime(now)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'security.rate_limit_exceeded',
         timestamp: now,
         userId: 'rate-user',
-      }
+      })
 
       for (let i = 0; i < 3; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}` })
@@ -1010,13 +982,13 @@ describe('Security Monitor', () => {
       const now = Date.now()
       vi.setSystemTime(now)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'policy.viewed',
         timestamp: now,
         userId: 'pattern-user',
         resourceId: 'resource-1',
-      }
+      })
 
       for (let i = 0; i < 10; i++) {
         mockAuditLogger.triggerEvent({ ...event, id: `evt-${i}`, resourceId: `resource-${i}` })
@@ -1043,12 +1015,12 @@ describe('Security Monitor', () => {
 
       // Create failed logins for multiple users
       for (let u = 0; u < 3; u++) {
-        const event: AuditEvent = {
+        const event = createMockAuditEvent({
           id: `evt-u${u}`,
           type: 'auth.signin_failed',
           timestamp: now,
           userId: `user-${u}`,
-        }
+        })
         mockAuditLogger.triggerEvent(event)
       }
 
@@ -1060,12 +1032,12 @@ describe('Security Monitor', () => {
 
       // Trigger a new event from a different user with new timestamp
       const newTime = Date.now()
-      mockAuditLogger.triggerEvent({
+      mockAuditLogger.triggerEvent(createMockAuditEvent({
         id: 'evt-new',
         type: 'auth.signin_failed',
         timestamp: newTime,
         userId: 'new-user',
-      })
+      }))
 
       const dashboard = securityMonitor.getSecurityDashboard()
       // Old entries should be cleaned during processing, new user's login counted
@@ -1077,12 +1049,12 @@ describe('Security Monitor', () => {
       const now = Date.now()
       vi.setSystemTime(now)
 
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: 'evt-1',
         type: 'auth.signin_failed',
         timestamp: now,
         userId: 'recent-user',
-      }
+      })
 
       // Add recent events
       for (let i = 0; i < 3; i++) {
@@ -1477,13 +1449,12 @@ describe('generateSecurityReport', () => {
     securityMonitor.initialize()
 
     // Trigger critical alert
-    const event: AuditEvent = {
+    const event = createMockAuditEvent({
       id: 'evt-1',
       type: 'search.performed',
-      timestamp: Date.now(),
       userId: 'attacker',
       details: { query: 'UNION SELECT * FROM passwords' },
-    }
+    })
     mockAuditLogger.triggerEvent(event)
 
     const report = await generateSecurityReport()
@@ -1497,12 +1468,11 @@ describe('generateSecurityReport', () => {
 
     // Generate many failed logins
     for (let i = 0; i < 15; i++) {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: `evt-${i}`,
         type: 'auth.signin_failed',
-        timestamp: Date.now(),
         userId: `user-${i}`,
-      }
+      })
       mockAuditLogger.triggerEvent(event)
     }
 
@@ -1517,12 +1487,11 @@ describe('generateSecurityReport', () => {
 
     // Generate many rate violations
     for (let i = 0; i < 25; i++) {
-      const event: AuditEvent = {
+      const event = createMockAuditEvent({
         id: `evt-${i}`,
         type: 'security.rate_limit_exceeded',
-        timestamp: Date.now(),
         userId: `user-${i}`,
-      }
+      })
       mockAuditLogger.triggerEvent(event)
     }
 

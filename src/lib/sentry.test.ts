@@ -19,7 +19,6 @@ vi.mock('@sentry/react', () => ({
   ErrorBoundary: vi.fn(() => null),
 }))
 
-import * as Sentry from '@sentry/react'
 import {
   initSentry,
   setSentryUser,

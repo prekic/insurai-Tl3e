@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Use vi.hoisted to define mocks before module hoisting
-const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockLimit, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
+const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockSupabase, mockIsConfigured } = vi.hoisted(() => {
   const mockFrom = vi.fn()
   const mockSelect = vi.fn()
   const mockInsert = vi.fn()
@@ -17,7 +17,6 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
   const mockGetUser = vi.fn()
   const mockRpc = vi.fn()
   const mockOr = vi.fn()
-  const mockLimit = vi.fn()
   const mockIsConfigured = vi.fn(() => true)
 
   const mockSupabase = {
@@ -36,7 +35,7 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
     },
   }
 
-  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockLimit, mockSupabase, mockIsConfigured }
+  return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockSupabase, mockIsConfigured }
 })
 
 vi.mock('./client', () => ({
@@ -63,7 +62,7 @@ import {
   restorePolicyVersion,
   getPolicyStats,
 } from './policies'
-import type { PolicyInsert, PolicyUpdate, PolicyRow, PolicyVersionRow, PolicyDocumentRow } from './types'
+import type { PolicyInsert, PolicyUpdate, PolicyRow, PolicyDocumentRow } from './types'
 
 describe('Policy Service', () => {
   beforeEach(() => {

@@ -11,7 +11,7 @@ import {
   BUSINESS_SIZE_DEFINITIONS,
   DEFAULT_INDUSTRY_CATEGORY_WEIGHTS,
 } from './industry-risk'
-import type { BusinessSize, IndustrySector, IndustryRiskCategory } from './industry-risk'
+import type { IndustrySector, IndustryRiskCategory } from './industry-risk'
 
 describe('Industry Risk Types', () => {
   describe('BUSINESS_SIZE_DEFINITIONS', () => {
