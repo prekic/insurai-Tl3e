@@ -7,6 +7,7 @@
     "dev": "vite",
     "dev:server": "tsx watch server/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run dev:server\"",
+    "dev:sync": "git pull origin claude/build-app-from-design-GBWjx && npm install && npm run dev:all",
     "build": "tsc -b && vite build",
     "build:server": "tsc -p server/tsconfig.json",
     "start:server": "node dist-server/index.js",

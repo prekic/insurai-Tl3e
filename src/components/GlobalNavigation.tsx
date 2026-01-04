@@ -212,18 +212,20 @@ export function GlobalNavigation() {
                   >
                     <div className="px-4 py-3 border-b border-gray-100">
                       <p className="font-semibold text-gray-900">
-                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'}
+                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
                       </p>
                       <p className="text-xs text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
                     </div>
-                    <button
-                      onClick={() => handleMenuItemClick('/account')}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
-                      role="menuitem"
-                    >
-                      <User size={16} aria-hidden="true" />
-                      <span>My Account</span>
-                    </button>
+                    {user && (
+                      <button
+                        onClick={() => handleMenuItemClick('/account')}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
+                        role="menuitem"
+                      >
+                        <User size={16} aria-hidden="true" />
+                        <span>My Account</span>
+                      </button>
+                    )}
                     <button
                       onClick={() => handleMenuItemClick('/settings')}
                       className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
