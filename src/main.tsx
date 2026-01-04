@@ -7,6 +7,10 @@ import App from './App.tsx'
 import { initSentry } from './lib/sentry'
 initSentry()
 
+// Initialize Core Web Vitals monitoring
+import { initWebVitals } from './lib/performance'
+initWebVitals()
+
 // Set up CSP violation monitoring
 import { setupCSPViolationListener } from './lib/security/csp'
 setupCSPViolationListener()
