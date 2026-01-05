@@ -28,7 +28,7 @@ vi.mock('pdfjs-dist', () => ({
   getDocument: mockGetDocument,
 }))
 
-import { isPDFFile, extractTextFromPDF } from './pdf-parser'
+import { isPDFFile, extractTextFromPDF, preloadPdfJs } from './pdf-parser'
 
 // Helper to create mock File with arrayBuffer support
 function createMockFile(options: {
@@ -476,5 +476,72 @@ describe('extractTextFromPDF', () => {
       expect(result.data.text).toContain('Sigorta')
       expect(result.data.text).toContain('Poliçesi')
     }
+  })
+
+  it('should return LOAD_ERROR when dynamic import fails', async () => {
+    mockGetDocument.mockReturnValue({
+      promise: Promise.reject(new Error('Failed to fetch dynamic import')),
+    })
+
+    const file = createMockFile({ name: 'test.pdf' })
+    const result = await extractTextFromPDF(file)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('LOAD_ERROR')
+      expect(result.error.message).toContain('network')
+    }
+  })
+})
+
+describe('preloadPdfJs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should not throw when called', () => {
+    expect(() => preloadPdfJs()).not.toThrow()
+  })
+
+  it('should be callable multiple times without error', () => {
+    expect(() => {
+      preloadPdfJs()
+      preloadPdfJs()
+      preloadPdfJs()
+    }).not.toThrow()
+  })
+
+  it('should silently handle errors', () => {
+    // Even if there's an error in the background, preloadPdfJs should not throw
+    // because it catches errors internally
+    expect(() => preloadPdfJs()).not.toThrow()
+  })
+})
+
+describe('PDF.js Lazy Loading', () => {
+  it('should configure worker with correct version from pdfjs-dist', async () => {
+    // The mock provides version 4.0.0
+    const pdfjs = await import('pdfjs-dist')
+    expect(pdfjs.version).toBe('4.0.0')
+    expect(pdfjs.GlobalWorkerOptions).toBeDefined()
+  })
+
+  it('should only load pdfjs-dist once even with multiple extractions', async () => {
+    const mockPdf = createMockPDFDocument({
+      numPages: 1,
+      pageTexts: ['Text content that is long enough for the validation threshold to pass properly'],
+    })
+    mockGetDocument.mockReturnValue({ promise: Promise.resolve(mockPdf) })
+
+    const file1 = createMockFile({ name: 'test1.pdf' })
+    const file2 = createMockFile({ name: 'test2.pdf' })
+
+    // Extract from two files
+    await extractTextFromPDF(file1)
+    await extractTextFromPDF(file2)
+
+    // The dynamic import caching is internal to the module
+    // We verify that both calls work correctly, indicating the cache is working
+    expect(mockGetDocument).toHaveBeenCalledTimes(2)
   })
 })

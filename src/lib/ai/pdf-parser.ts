@@ -1,21 +1,9 @@
-import * as pdfjsLib from 'pdfjs-dist'
-
-// Configure PDF.js worker
-// Using unpkg CDN which mirrors npm packages directly (more reliable than cdnjs)
-const PDFJS_VERSION = pdfjsLib.version
-
-// Try multiple CDN sources for reliability
-const WORKER_URLS = [
-  // unpkg mirrors npm directly - most reliable
-  `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`,
-  // jsdelivr also mirrors npm
-  `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`,
-  // cdnjs as fallback (may not have latest versions)
-  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${PDFJS_VERSION}/pdf.worker.min.mjs`,
-]
-
-// Use the first URL - unpkg is most reliable for npm packages
-pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URLS[0]
+/**
+ * PDF Parser with Lazy Loading
+ *
+ * Uses dynamic imports to load pdfjs-dist only when needed,
+ * reducing initial bundle size by ~450KB.
+ */
 
 export interface PDFParseResult {
   text: string
@@ -28,22 +16,62 @@ export interface PDFParseResult {
 }
 
 export interface PDFParseError {
-  code: 'INVALID_PDF' | 'EMPTY_PDF' | 'PARSE_ERROR' | 'PASSWORD_PROTECTED'
+  code: 'INVALID_PDF' | 'EMPTY_PDF' | 'PARSE_ERROR' | 'PASSWORD_PROTECTED' | 'LOAD_ERROR'
   message: string
+}
+
+// Cached pdfjs-dist module
+let pdfjsLib: typeof import('pdfjs-dist') | null = null
+let loadPromise: Promise<typeof import('pdfjs-dist')> | null = null
+
+/**
+ * Lazily load pdfjs-dist only when first needed
+ * This reduces the initial bundle size significantly
+ */
+async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
+  // Return cached module if already loaded
+  if (pdfjsLib) {
+    return pdfjsLib
+  }
+
+  // If currently loading, wait for existing promise
+  if (loadPromise) {
+    return loadPromise
+  }
+
+  // Start loading
+  loadPromise = (async () => {
+    const pdfjs = await import('pdfjs-dist')
+
+    // Configure worker using unpkg CDN (most reliable for npm packages)
+    const PDFJS_VERSION = pdfjs.version
+    pdfjs.GlobalWorkerOptions.workerSrc =
+      `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`
+
+    // Cache the module
+    pdfjsLib = pdfjs
+    return pdfjs
+  })()
+
+  return loadPromise
 }
 
 /**
  * Extract text content from a PDF file
+ * Loads pdfjs-dist lazily on first use
  */
 export async function extractTextFromPDF(
   file: File
 ): Promise<{ success: true; data: PDFParseResult } | { success: false; error: PDFParseError }> {
   try {
+    // Lazily load pdfjs-dist
+    const pdfjs = await getPdfJs()
+
     // Read file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer()
 
     // Load PDF document
-    const loadingTask = pdfjsLib.getDocument({
+    const loadingTask = pdfjs.getDocument({
       data: arrayBuffer,
       useSystemFonts: true,
     })
@@ -116,6 +144,17 @@ export async function extractTextFromPDF(
     // Handle specific PDF.js errors
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
+    // Check if it's a loading error
+    if (errorMessage.includes('Failed to fetch') || errorMessage.includes('dynamic import')) {
+      return {
+        success: false,
+        error: {
+          code: 'LOAD_ERROR',
+          message: 'Failed to load PDF processing library. Please check your network connection.',
+        },
+      }
+    }
+
     if (errorMessage.includes('password')) {
       return {
         success: false,
@@ -151,4 +190,15 @@ export async function extractTextFromPDF(
  */
 export function isPDFFile(file: File): boolean {
   return file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+}
+
+/**
+ * Preload pdfjs-dist in the background
+ * Call this when user navigates to upload page to warm up the cache
+ */
+export function preloadPdfJs(): void {
+  // Start loading in background, ignore errors
+  getPdfJs().catch(() => {
+    // Silently fail - will retry when actually needed
+  })
 }

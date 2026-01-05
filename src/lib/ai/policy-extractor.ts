@@ -88,7 +88,7 @@ export async function extractPolicyFromDocument(
       error: {
         code: 'NO_AI_CONFIG',
         message: 'AI extraction is not configured',
-        details: 'Set VITE_OPENAI_API_KEY or VITE_ANTHROPIC_API_KEY in your environment variables',
+        details: 'Ensure the backend server is running on port 4001 with OPENAI_API_KEY or ANTHROPIC_API_KEY set in .env (not VITE_ prefixed - API keys must stay server-side)',
       },
       fallbackAvailable: false,
     }

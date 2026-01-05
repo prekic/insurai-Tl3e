@@ -243,7 +243,8 @@ describe('extractPolicyFromDocument', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.details).toContain('VITE_OPENAI_API_KEY')
+        expect(result.error.details).toContain('OPENAI_API_KEY')
+        expect(result.error.details).toContain('backend server')
       }
     })
   })
