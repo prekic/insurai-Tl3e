@@ -741,8 +741,6 @@ describe('PolicyUpload Backend Health Status', () => {
 })
 
 describe('PolicyUpload Detailed Error Messages', () => {
-  const mockExtractPolicyFromDocument = vi.fn()
-
   beforeEach(() => {
     vi.clearAllMocks()
     // Reset to healthy backend
@@ -763,9 +761,6 @@ describe('PolicyUpload Detailed Error Messages', () => {
       extractPolicyFromDocument: vi.fn().mockRejectedValue(new Error('NO_AI_CONFIG: AI is not configured')),
       isAIConfigured: vi.fn().mockReturnValue(true),
     }))
-
-    // Import toast to verify it was called correctly
-    const { toast } = await import('sonner')
 
     renderPolicyUpload()
 
@@ -837,7 +832,6 @@ describe('PolicyUpload Error Retry Functionality', () => {
 
     await waitFor(
       () => {
-        const retryButton = screen.queryByLabelText('Retry upload')
         // The retry button should appear for failed uploads
         expect(screen.getByText('retry-test.pdf')).toBeInTheDocument()
       },
