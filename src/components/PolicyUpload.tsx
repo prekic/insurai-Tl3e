@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server } from 'lucide-react'
 import { toast } from 'sonner'
@@ -9,9 +9,47 @@ import { usePolicies } from '@/lib/policy-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { sanitizeFileName, sanitizeId } from '@/lib/sanitize'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { isSupabaseConfigured, uploadPolicyDocument } from '@/lib/supabase'
-import { extractPolicyFromDocument, isAIConfigured } from '@/lib/ai'
+import { isSupabaseConfigured, uploadPolicyDocument, createPolicy, type PolicyInsert, type PolicyType as SupabasePolicyType } from '@/lib/supabase'
+import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
+
+/**
+ * Convert AnalyzedPolicy to Supabase PolicyInsert format
+ */
+function convertToSupabasePolicy(policy: AnalyzedPolicy, userId: string): PolicyInsert {
+  return {
+    id: policy.id,
+    user_id: userId,
+    policy_number: policy.policyNumber,
+    provider: policy.provider,
+    type: policy.type as SupabasePolicyType,
+    type_tr: policy.typeTr,
+    coverage: policy.coverage,
+    premium: policy.premium,
+    deductible: policy.deductible,
+    start_date: policy.startDate,
+    expiry_date: policy.expiryDate,
+    status: policy.status,
+    insured_person: policy.insuredPerson || 'Unknown',
+    location: policy.location || null,
+    document_type: policy.documentType,
+    upload_date: policy.uploadDate,
+    logo: policy.logo || null,
+    raw_data: {
+      coverages: policy.coverages,
+      exclusions: policy.exclusions,
+      specialConditions: policy.specialConditions,
+      insuranceLine: policy.insuranceLine,
+      aiConfidence: policy.aiConfidence,
+      aiInsights: policy.aiInsights,
+      marketComparison: policy.marketComparison,
+      riskScore: policy.riskScore,
+      gapAnalysis: policy.gapAnalysis,
+      riskActions: policy.riskActions,
+      gapActions: policy.gapActions,
+    },
+  }
+}
 
 type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
@@ -36,6 +74,12 @@ export function PolicyUpload() {
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
   const backendReady = health.status === 'healthy'
+
+  // Preload pdf.js in the background when component mounts
+  // This reduces perceived load time when user uploads a file
+  useEffect(() => {
+    preloadPdfJs()
+  }, [])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -113,13 +157,25 @@ export function PolicyUpload() {
 
       const { policy, source, extractedData } = result
 
-      // If using Supabase, upload the document to storage
-      if (useSupabase) {
+      // If using Supabase, save policy to database and upload document
+      let savedToCloud = false
+      if (useSupabase && user) {
         try {
-          await uploadPolicyDocument(policy.id, file)
-        } catch (uploadError) {
-          console.warn('Failed to upload document to storage:', uploadError)
-          // Don't fail the whole process if storage upload fails
+          // Save policy to Supabase database
+          const supabasePolicy = convertToSupabasePolicy(policy, user.id)
+          await createPolicy(supabasePolicy)
+          savedToCloud = true
+
+          // Also upload the document to storage
+          try {
+            await uploadPolicyDocument(policy.id, file)
+          } catch (uploadError) {
+            console.warn('Failed to upload document to storage:', uploadError)
+            // Don't fail if storage upload fails - policy is already saved
+          }
+        } catch (saveError) {
+          console.warn('Failed to save policy to database:', saveError)
+          // Continue even if save fails - policy is still in local state
         }
       }
 
@@ -139,7 +195,7 @@ export function PolicyUpload() {
 
       // Get the file name for the toast
       const displayName = sanitizeFileName(file.name)
-      const storageNote = useSupabase ? ' (saved to cloud)' : ''
+      const storageNote = savedToCloud ? ' (saved to cloud)' : ''
       const aiNote = source === 'ai'
         ? ` (${Math.round(extractedData.confidence.overall * 100)}% confidence)`
         : ' (demo mode)'
