@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap } from 'lucide-react'
+import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
@@ -11,6 +11,7 @@ import { sanitizeFileName, sanitizeId } from '@/lib/sanitize'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { isSupabaseConfigured, uploadPolicyDocument } from '@/lib/supabase'
 import { extractPolicyFromDocument, isAIConfigured } from '@/lib/ai'
+import { useBackendHealth } from '@/hooks/useBackendHealth'
 
 type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
 
@@ -31,8 +32,10 @@ export function PolicyUpload() {
   const { user, isConfigured: authConfigured } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
+  const { health, checkHealth } = useBackendHealth()
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
+  const backendReady = health.status === 'healthy'
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -150,28 +153,53 @@ export function PolicyUpload() {
       // Provide user-friendly error messages based on the error
       let userMessage = errorMessage
       let userTitle = 'Analysis Failed'
+      let troubleshootingTip = ''
 
       if (errorMessage.includes('not configured') || errorMessage.includes('NO_AI_CONFIG')) {
         userTitle = 'AI Not Configured'
-        userMessage = 'The AI service is not available. Please ensure the backend server is running with valid API keys.'
-      } else if (errorMessage.includes('PDF_PARSE_ERROR')) {
+        userMessage = 'The AI service is not available.'
+        troubleshootingTip = 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env'
+      } else if (errorMessage.includes('PDF_PARSE_ERROR') || errorMessage.includes('PDF processing')) {
         userTitle = 'PDF Processing Error'
-        userMessage = 'Could not read the PDF file. The file may be corrupted or password-protected.'
+        userMessage = 'Could not read the PDF file.'
+        troubleshootingTip = 'The file may be corrupted, password-protected, or in an unsupported format.'
       } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
         userTitle = 'Rate Limit Exceeded'
-        userMessage = 'Too many requests. Please wait a moment and try again.'
+        userMessage = 'Too many requests to the AI service.'
+        troubleshootingTip = 'Please wait a few minutes before trying again.'
+      } else if (errorMessage.includes('proxy') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
+        userTitle = 'Network Error'
+        userMessage = 'Could not connect to the backend server.'
+        troubleshootingTip = 'Check that the backend is running on port 4001 (npm run dev:server)'
+      } else if (errorMessage.includes('PROVIDER_NOT_CONFIGURED') || errorMessage.includes('503')) {
+        userTitle = 'AI Provider Not Ready'
+        userMessage = 'The AI provider is not configured on the server.'
+        troubleshootingTip = 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.'
+      } else if (errorMessage.includes('LOW_CONFIDENCE')) {
+        userTitle = 'Low Extraction Confidence'
+        userMessage = 'The AI could not reliably extract data from this document.'
+        troubleshootingTip = 'The PDF may be scanned or have poor text quality. Try a clearer document.'
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        userTitle = 'Request Timeout'
+        userMessage = 'The request took too long to complete.'
+        troubleshootingTip = 'The document may be too large or the AI service is slow. Try again later.'
       }
+
+      const fullErrorMessage = troubleshootingTip
+        ? `${userMessage} ${troubleshootingTip}`
+        : userMessage
 
       setFiles((prev) =>
         prev.map((f) =>
           f.id === fileId
-            ? { ...f, status: 'error', error: userMessage }
+            ? { ...f, status: 'error', error: fullErrorMessage }
             : f
         )
       )
 
       toast.error(userTitle, {
-        description: userMessage,
+        description: fullErrorMessage,
+        duration: 8000,
         action: {
           label: 'Retry',
           onClick: () => retryFile(fileId),
@@ -280,17 +308,77 @@ export function PolicyUpload() {
           </div>
         </div>
 
+        {/* Backend Status Banner */}
+        {health.status === 'unhealthy' && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <ServerCrash className="text-red-600 mt-0.5 flex-shrink-0" size={20} />
+              <div className="flex-1">
+                <p className="font-semibold text-red-800">Backend Server Unavailable</p>
+                <p className="text-sm text-red-600 mt-1">{health.error}</p>
+                <div className="mt-2 text-sm text-red-700 space-y-1">
+                  <p>To fix this issue:</p>
+                  <ol className="list-decimal ml-4 space-y-0.5">
+                    <li>Run <code className="bg-red-100 px-1 rounded">npm run dev:server</code> in a terminal</li>
+                    <li>Ensure <code className="bg-red-100 px-1 rounded">.env</code> has <code className="bg-red-100 px-1 rounded">OPENAI_API_KEY</code> or <code className="bg-red-100 px-1 rounded">ANTHROPIC_API_KEY</code></li>
+                    <li>Check the server terminal for errors</li>
+                  </ol>
+                </div>
+                <Button
+                  onClick={checkHealth}
+                  variant="outline"
+                  size="sm"
+                  className="mt-3 text-red-600 border-red-300 hover:bg-red-100"
+                >
+                  <RefreshCw size={14} className="mr-2" />
+                  Retry Connection
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {health.status === 'unconfigured' && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800">Backend Proxy Not Configured</p>
+                <p className="text-sm text-amber-600 mt-1">
+                  Set <code className="bg-amber-100 px-1 rounded">VITE_API_PROXY_URL=http://localhost:4001</code> in your .env file
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Status Badges */}
         <div className="flex flex-wrap gap-2 mb-4">
-          {isAIConfigured() ? (
+          {health.status === 'checking' && (
+            <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
+              <Server size={16} className="animate-pulse" />
+              <span>Checking backend server...</span>
+            </div>
+          )}
+          {backendReady && (
             <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
               <Cpu size={16} />
-              <span>AI extraction enabled - documents will be analyzed using GPT-4</span>
+              <span>
+                AI extraction enabled
+                {health.providers.openai && health.providers.anthropic
+                  ? ' (OpenAI + Claude)'
+                  : health.providers.openai
+                    ? ' (OpenAI GPT-4)'
+                    : health.providers.anthropic
+                      ? ' (Claude)'
+                      : ''}
+              </span>
             </div>
-          ) : (
+          )}
+          {!backendReady && health.status !== 'checking' && !isAIConfigured() && (
             <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
               <Zap size={16} />
-              <span>Demo mode - using sample data (configure VITE_OPENAI_API_KEY for real AI)</span>
+              <span>Demo mode - upload will use sample data</span>
             </div>
           )}
           {useSupabase && (
