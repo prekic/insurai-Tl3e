@@ -8,15 +8,18 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { aiExtractionLimiter, ocrLimiter } from '../middleware/rate-limit'
+import { aiExtractionLimiter, ocrLimiter, chatLimiter } from '../middleware/rate-limit'
 import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
   validateOCR,
+  validateChat,
   validateJSON,
   type OpenAIExtractionInput,
   type AnthropicExtractionInput,
   type OCRInput,
+  type ChatInput,
+  type ChatMessage,
 } from '../middleware/validation'
 
 const router = Router()
@@ -342,6 +345,175 @@ router.post(
         code,
         // Only show detailed error info in development/staging for debugging
         ...(process.env.NODE_ENV !== 'production' && { details: message }),
+        timestamp: errorDetails.timestamp,
+      })
+    }
+  }
+)
+
+/**
+ * System prompt for policy chat assistant
+ */
+const CHAT_SYSTEM_PROMPT = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
+
+Key guidelines:
+- Be helpful, professional, and concise
+- When discussing coverage, always mention specific limits and deductibles when available
+- If you're unsure about something, say so rather than making up information
+- Use Turkish insurance terminology when appropriate (e.g., Kasko, DASK, Trafik Sigortası)
+- Currency should be in TRY (Turkish Lira)
+- When comparing policies, highlight key differences in coverage, limits, and exclusions
+- If asked about something outside the scope of the provided policy information, politely redirect to the policy content
+
+If the user provides policy context, use that information to answer questions accurately.`
+
+/**
+ * POST /api/ai/chat
+ * Multi-turn chat endpoint for policy assistant
+ * Rate limited: 60 requests per hour
+ * Supports conversation history for context
+ */
+router.post(
+  '/chat',
+  validateJSON,
+  chatLimiter,
+  validateChat,
+  async (req: Request, res: Response) => {
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+
+    try {
+      const { message, conversationHistory, policyContext, provider } = req.body as ChatInput
+
+      // Try the requested provider, fall back to the other if not available
+      let useProvider = provider
+      if (provider === 'openai' && !process.env.OPENAI_API_KEY) {
+        useProvider = process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai'
+      } else if (provider === 'anthropic' && !process.env.ANTHROPIC_API_KEY) {
+        useProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic'
+      }
+
+      // Build the system prompt with policy context if provided
+      let systemPrompt = CHAT_SYSTEM_PROMPT
+      if (policyContext) {
+        systemPrompt += `\n\nPolicy Information:\n${policyContext}`
+      }
+
+      if (useProvider === 'openai') {
+        const client = getOpenAIClient()
+        if (!client) {
+          return res.status(503).json({
+            error: IS_PRODUCTION ? 'Chat service unavailable' : 'OpenAI not configured',
+            code: 'PROVIDER_NOT_CONFIGURED',
+          })
+        }
+
+        // Build messages array with history
+        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+          { role: 'system', content: systemPrompt },
+          ...conversationHistory.map((msg: ChatMessage) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          })),
+          { role: 'user', content: message },
+        ]
+
+        const response = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages,
+          max_tokens: 1024,
+          temperature: 0.7,
+        })
+
+        const content = response.choices[0]?.message?.content
+        if (!content) {
+          return res.status(500).json({
+            error: IS_PRODUCTION ? 'Unable to generate response' : 'Empty response from OpenAI',
+            code: 'EMPTY_RESPONSE',
+          })
+        }
+
+        return res.json({
+          success: true,
+          response: content,
+          provider: 'openai',
+          usage: response.usage,
+        })
+      } else {
+        // Anthropic
+        const client = getAnthropicClient()
+        if (!client) {
+          return res.status(503).json({
+            error: IS_PRODUCTION ? 'Chat service unavailable' : 'Anthropic not configured',
+            code: 'PROVIDER_NOT_CONFIGURED',
+          })
+        }
+
+        // Build messages array with history
+        const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+          ...conversationHistory.map((msg: ChatMessage) => ({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          })),
+          { role: 'user', content: message },
+        ]
+
+        const response = await client.messages.create({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages,
+        })
+
+        const textBlock = response.content.find((block) => block.type === 'text')
+        if (!textBlock || textBlock.type !== 'text') {
+          return res.status(500).json({
+            error: IS_PRODUCTION ? 'Unable to generate response' : 'Empty response from Anthropic',
+            code: 'EMPTY_RESPONSE',
+          })
+        }
+
+        return res.json({
+          success: true,
+          response: textBlock.text,
+          provider: 'anthropic',
+          usage: {
+            input_tokens: response.usage.input_tokens,
+            output_tokens: response.usage.output_tokens,
+          },
+        })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        provider: (req.body as ChatInput).provider || 'unknown',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message: errorMessage,
+      }
+
+      if (!IS_PRODUCTION) {
+        console.error('[Chat Error]', JSON.stringify(errorDetails, null, 2))
+      }
+
+      // Determine specific error code
+      let code = 'CHAT_FAILED'
+      let userMessage = IS_PRODUCTION ? 'Unable to process your message' : 'Chat request failed'
+
+      if (errorMessage.includes('401') || errorMessage.includes('API key')) {
+        code = 'INVALID_API_KEY'
+        userMessage = IS_PRODUCTION ? 'Chat service temporarily unavailable' : 'API key is invalid'
+      } else if (errorMessage.includes('429') || errorMessage.includes('rate_limit')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Rate limit exceeded'
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
+        code = 'TIMEOUT'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out'
+      }
+
+      res.status(500).json({
+        error: userMessage,
+        code,
+        ...(!IS_PRODUCTION && { details: errorMessage }),
         timestamp: errorDetails.timestamp,
       })
     }

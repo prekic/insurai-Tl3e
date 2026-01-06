@@ -20,6 +20,9 @@ const mockPolicies = [
   { id: '3', policyNumber: 'POL-003', provider: 'Mapfre' },
 ]
 
+// Mock fetch for API calls
+const mockFetch = vi.fn()
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
@@ -56,10 +59,24 @@ describe('PolicyChat', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers({ shouldAdvanceTime: true })
+
+    // Set up default successful fetch response
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          response:
+            'Based on your uploaded policies, your Kasko coverage from Allianz provides comprehensive protection including collision, theft, and natural disaster coverage.',
+          provider: 'openai',
+        }),
+    })
+    global.fetch = mockFetch
   })
 
   afterEach(() => {
     vi.useRealTimers()
+    vi.restoreAllMocks()
   })
 
   describe('Rendering', () => {
@@ -204,7 +221,22 @@ describe('PolicyChat', () => {
     })
 
     it('should show typing indicator while waiting for response', async () => {
+      // Make fetch slow to catch the typing indicator
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                }),
+              500
+            )
+          )
+      )
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -221,6 +253,7 @@ describe('PolicyChat', () => {
 
     it('should receive AI response after sending message', async () => {
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -228,10 +261,10 @@ describe('PolicyChat', () => {
       await user.type(input, 'Test question')
       await user.click(screen.getByRole('button', { name: /send/i }))
 
-      // Wait for AI response (simulated with 1500ms delay)
+      // Wait for AI response from mocked API
       await waitFor(
         () => {
-          const messages = screen.getAllByText(/kasko|portfolio|policies|coverage/i)
+          const messages = screen.getAllByText(/kasko|coverage/i)
           expect(messages.length).toBeGreaterThan(0)
         },
         { timeout: 3000 }
@@ -239,7 +272,22 @@ describe('PolicyChat', () => {
     })
 
     it('should disable send button while typing', async () => {
+      // Make fetch slow to catch the loading state
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                }),
+              500
+            )
+          )
+      )
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -255,7 +303,22 @@ describe('PolicyChat', () => {
     })
 
     it('should disable quick question buttons while typing', async () => {
+      // Make fetch slow to catch the loading state
+      mockFetch.mockImplementationOnce(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  ok: true,
+                  json: () => Promise.resolve({ success: true, response: 'Test response', provider: 'openai' }),
+                }),
+              500
+            )
+          )
+      )
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -310,9 +373,13 @@ describe('PolicyChat', () => {
 
   describe('Error Handling', () => {
     it('should display error message when AI fails', async () => {
-      // We need to mock Math.random to force an error (< 0.1 triggers error)
-      const mockRandom = vi.spyOn(Math, 'random').mockReturnValue(0.05)
+      // Mock a failed fetch response
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'AI service unavailable', code: 'SERVICE_ERROR' }),
+      })
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -328,13 +395,13 @@ describe('PolicyChat', () => {
         },
         { timeout: 3000 }
       )
-
-      mockRandom.mockRestore()
     })
 
     it('should show connection error banner when error occurs', async () => {
-      const mockRandom = vi.spyOn(Math, 'random').mockReturnValue(0.05)
+      // Mock a network error
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -350,13 +417,12 @@ describe('PolicyChat', () => {
         },
         { timeout: 3000 }
       )
-
-      mockRandom.mockRestore()
     })
 
     it('should show retry button on error message', async () => {
-      const mockRandom = vi.spyOn(Math, 'random').mockReturnValue(0.05)
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -370,18 +436,23 @@ describe('PolicyChat', () => {
         },
         { timeout: 3000 }
       )
-
-      mockRandom.mockRestore()
     })
 
     it('should retry sending when retry button is clicked', async () => {
-      let callCount = 0
-      const mockRandom = vi.spyOn(Math, 'random').mockImplementation(() => {
-        callCount++
-        // First call fails, second succeeds
-        return callCount === 1 ? 0.05 : 0.5
-      })
+      // First call fails, second succeeds
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              success: true,
+              response: 'Your Kasko coverage provides comprehensive protection.',
+              provider: 'openai',
+            }),
+        })
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -403,18 +474,17 @@ describe('PolicyChat', () => {
       // Should get AI response this time
       await waitFor(
         () => {
-          const messages = screen.getAllByText(/kasko|portfolio|policies|coverage/i)
+          const messages = screen.getAllByText(/kasko|coverage/i)
           expect(messages.length).toBeGreaterThan(0)
         },
         { timeout: 3000 }
       )
-
-      mockRandom.mockRestore()
     })
 
     it('should allow dismissing connection error banner', async () => {
-      const mockRandom = vi.spyOn(Math, 'random').mockReturnValue(0.05)
+      mockFetch.mockRejectedValueOnce(new Error('Network error'))
       vi.useRealTimers()
+      global.fetch = mockFetch
       const user = userEvent.setup()
       renderChat()
 
@@ -436,8 +506,6 @@ describe('PolicyChat', () => {
       expect(
         screen.queryByText(/Having trouble connecting/)
       ).not.toBeInTheDocument()
-
-      mockRandom.mockRestore()
     })
   })
 

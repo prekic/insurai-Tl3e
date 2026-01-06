@@ -25,6 +25,11 @@ const config = {
     windowMs: parseInt(process.env.RATE_LIMIT_OCR_WINDOW_MS || '3600000', 10), // 1 hour
     max: parseInt(process.env.RATE_LIMIT_OCR_MAX || '30', 10),
   },
+  // Chat limits (moderate - more requests than extraction)
+  chat: {
+    windowMs: parseInt(process.env.RATE_LIMIT_CHAT_WINDOW_MS || '3600000', 10), // 1 hour
+    max: parseInt(process.env.RATE_LIMIT_CHAT_MAX || '60', 10), // 60 per hour
+  },
   // Health check (higher limit for monitoring)
   health: {
     windowMs: 60000, // 1 minute
@@ -148,6 +153,34 @@ export const ocrLimiter: RateLimitRequestHandler = rateLimit({
       error: 'OCR rate limit exceeded',
       code: 'OCR_RATE_LIMIT_EXCEEDED',
       message: 'You have made too many OCR requests. Please try again later.',
+      retryAfter: retryAfter ? parseInt(retryAfter as string, 10) : undefined,
+      limit: res.getHeader('X-RateLimit-Limit'),
+      remaining: 0,
+    })
+  },
+  skip,
+})
+
+/**
+ * Chat rate limiter
+ * 60 requests per hour per IP (more permissive than extraction)
+ */
+export const chatLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: config.chat.windowMs,
+  max: config.chat.max,
+  message: {
+    error: 'Chat rate limit exceeded',
+    code: 'CHAT_RATE_LIMIT_EXCEEDED',
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator,
+  handler: (_req: Request, res: Response) => {
+    const retryAfter = res.getHeader('Retry-After')
+    res.status(429).json({
+      error: 'Chat rate limit exceeded',
+      code: 'CHAT_RATE_LIMIT_EXCEEDED',
+      message: 'You have sent too many messages. Please try again later.',
       retryAfter: retryAfter ? parseInt(retryAfter as string, 10) : undefined,
       limit: res.getHeader('X-RateLimit-Limit'),
       remaining: 0,
