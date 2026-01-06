@@ -99,27 +99,32 @@ router.post(
         message,
         documentTextLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
       }
-      console.error('[OpenAI Extraction Error]', JSON.stringify(errorDetails, null, 2))
+      // Only log full error details in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[OpenAI Extraction Error]', JSON.stringify(errorDetails, null, 2))
+      }
 
-      // Determine specific error code and user-friendly message
+      // Determine specific error code
+      // In production, show generic messages; in dev/staging, show specific ones
+      const IS_PRODUCTION = process.env.NODE_ENV === 'production'
       let code = 'EXTRACTION_FAILED'
-      let userMessage = 'OpenAI extraction failed'
+      let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'OpenAI extraction failed'
 
       if (message.includes('401') || message.includes('Incorrect API key')) {
         code = 'INVALID_API_KEY'
-        userMessage = 'OpenAI API key is invalid'
+        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'OpenAI API key is invalid'
       } else if (message.includes('429')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = 'OpenAI rate limit exceeded - please wait and retry'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'OpenAI rate limit exceeded - please wait and retry'
       } else if (message.includes('insufficient_quota')) {
         code = 'QUOTA_EXCEEDED'
-        userMessage = 'OpenAI API quota exhausted - add credits to your account'
+        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'OpenAI API quota exhausted - add credits to your account'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
-        userMessage = 'Request timed out - try a smaller document'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
       } else if (message.includes('context_length_exceeded')) {
         code = 'DOCUMENT_TOO_LARGE'
-        userMessage = 'Document too large for AI processing'
+        userMessage = IS_PRODUCTION ? 'Document is too large to process' : 'Document too large for AI processing'
       }
 
       res.status(500).json({
@@ -197,24 +202,29 @@ router.post(
         message,
         documentTextLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
       }
-      console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
+      // Only log full error details in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
+      }
 
-      // Determine specific error code and user-friendly message
+      // Determine specific error code
+      // In production, show generic messages; in dev/staging, show specific ones
+      const IS_PRODUCTION = process.env.NODE_ENV === 'production'
       let code = 'EXTRACTION_FAILED'
-      let userMessage = 'Anthropic extraction failed'
+      let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Anthropic extraction failed'
 
       if (message.includes('401') || message.includes('invalid x-api-key') || message.includes('Invalid API Key')) {
         code = 'INVALID_API_KEY'
-        userMessage = 'Anthropic API key is invalid'
+        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic API key is invalid'
       } else if (message.includes('429') || message.includes('rate_limit')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = 'Anthropic rate limit exceeded - please wait and retry'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Anthropic rate limit exceeded - please wait and retry'
       } else if (message.includes('credit') || message.includes('billing') || message.includes('overloaded')) {
         code = 'BILLING_ERROR'
-        userMessage = 'Anthropic billing issue - check your account'
+        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic billing issue - check your account'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
-        userMessage = 'Request timed out - try a smaller document'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
       }
 
       res.status(500).json({
@@ -302,24 +312,29 @@ router.post(
         errorType: error instanceof Error ? error.constructor.name : 'Unknown',
         message,
       }
-      console.error('[OCR Error]', JSON.stringify(errorDetails, null, 2))
+      // Only log full error details in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('[OCR Error]', JSON.stringify(errorDetails, null, 2))
+      }
 
-      // Determine specific error code and user-friendly message
+      // Determine specific error code
+      // In production, show generic messages; in dev/staging, show specific ones
+      const IS_PRODUCTION = process.env.NODE_ENV === 'production'
       let code = 'OCR_FAILED'
-      let userMessage = 'OCR processing failed'
+      let userMessage = IS_PRODUCTION ? 'Unable to process scanned document' : 'OCR processing failed'
 
       if (message.includes('API key not valid') || message.includes('400')) {
         code = 'INVALID_API_KEY'
-        userMessage = 'Google Cloud API key is invalid'
+        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Google Cloud API key is invalid'
       } else if (message.includes('PERMISSION_DENIED')) {
         code = 'API_NOT_ENABLED'
-        userMessage = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Cloud Vision API not enabled - enable it in Google Cloud Console'
       } else if (message.includes('BILLING')) {
         code = 'BILLING_ERROR'
-        userMessage = 'Billing not enabled on Google Cloud project'
+        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Billing not enabled on Google Cloud project'
       } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = 'Google Cloud rate limit exceeded'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Google Cloud rate limit exceeded'
       }
 
       res.status(500).json({
@@ -357,23 +372,51 @@ interface ProviderDiagnostic {
 }
 
 /**
+ * Sanitize diagnostic error message for production
+ * In production, hide technical details like .env file paths and API key names
+ */
+function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
+  if (!isProduction) return error
+
+  // Map technical errors to user-friendly messages for SaaS
+  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect')) {
+    return 'Service configuration error'
+  }
+  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota')) {
+    return 'Service temporarily busy'
+  }
+  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING')) {
+    return 'Service temporarily unavailable'
+  }
+  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled')) {
+    return 'Service not available'
+  }
+  return 'Service error'
+}
+
+/**
  * GET /api/ai/diagnose
  * Test API key validity by making minimal API calls to each provider
  * This helps debug extraction failures by verifying credentials work
+ * In production: Returns sanitized results suitable for end users
+ * In development: Returns detailed diagnostic information for debugging
  */
 router.get('/diagnose', async (_req: Request, res: Response) => {
+  const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+
   const diagnostics: {
     openai: ProviderDiagnostic
     anthropic: ProviderDiagnostic
     google: ProviderDiagnostic
     timestamp: string
-    environment: string
+    environment?: string // Only included in non-production
   } = {
     openai: { configured: false, valid: false },
     anthropic: { configured: false, valid: false },
     google: { configured: false, valid: false },
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development',
+    // Only expose environment in non-production
+    ...(IS_PRODUCTION ? {} : { environment: process.env.NODE_ENV || 'development' }),
   }
 
   // Test OpenAI
@@ -391,20 +434,24 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
         })
         diagnostics.openai.valid = true
         diagnostics.openai.latencyMs = Date.now() - startTime
-        diagnostics.openai.model = response.model
+        // Only show model in non-production
+        if (!IS_PRODUCTION) {
+          diagnostics.openai.model = response.model
+        }
       }
     } catch (error) {
       diagnostics.openai.valid = false
       diagnostics.openai.latencyMs = Date.now() - startTime
-      diagnostics.openai.error = error instanceof Error ? error.message : 'Unknown error'
-      // Provide specific guidance for common errors
-      if (diagnostics.openai.error.includes('401') || diagnostics.openai.error.includes('Incorrect API key')) {
-        diagnostics.openai.error = 'Invalid API key - check OPENAI_API_KEY in .env'
-      } else if (diagnostics.openai.error.includes('429')) {
-        diagnostics.openai.error = 'Rate limit exceeded or quota exhausted'
-      } else if (diagnostics.openai.error.includes('insufficient_quota')) {
-        diagnostics.openai.error = 'API quota exhausted - add credits to your OpenAI account'
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      // Provide specific guidance for common errors (in dev only)
+      if (errorMsg.includes('401') || errorMsg.includes('Incorrect API key')) {
+        errorMsg = 'Invalid API key - check OPENAI_API_KEY in .env'
+      } else if (errorMsg.includes('429')) {
+        errorMsg = 'Rate limit exceeded or quota exhausted'
+      } else if (errorMsg.includes('insufficient_quota')) {
+        errorMsg = 'API quota exhausted - add credits to your OpenAI account'
       }
+      diagnostics.openai.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
     }
   }
 
@@ -423,20 +470,24 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
         })
         diagnostics.anthropic.valid = true
         diagnostics.anthropic.latencyMs = Date.now() - startTime
-        diagnostics.anthropic.model = response.model
+        // Only show model in non-production
+        if (!IS_PRODUCTION) {
+          diagnostics.anthropic.model = response.model
+        }
       }
     } catch (error) {
       diagnostics.anthropic.valid = false
       diagnostics.anthropic.latencyMs = Date.now() - startTime
-      diagnostics.anthropic.error = error instanceof Error ? error.message : 'Unknown error'
-      // Provide specific guidance for common errors
-      if (diagnostics.anthropic.error.includes('401') || diagnostics.anthropic.error.includes('invalid x-api-key')) {
-        diagnostics.anthropic.error = 'Invalid API key - check ANTHROPIC_API_KEY in .env'
-      } else if (diagnostics.anthropic.error.includes('429')) {
-        diagnostics.anthropic.error = 'Rate limit exceeded'
-      } else if (diagnostics.anthropic.error.includes('credit') || diagnostics.anthropic.error.includes('billing')) {
-        diagnostics.anthropic.error = 'Billing issue - check your Anthropic account'
+      let errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      // Provide specific guidance for common errors (in dev only)
+      if (errorMsg.includes('401') || errorMsg.includes('invalid x-api-key')) {
+        errorMsg = 'Invalid API key - check ANTHROPIC_API_KEY in .env'
+      } else if (errorMsg.includes('429')) {
+        errorMsg = 'Rate limit exceeded'
+      } else if (errorMsg.includes('credit') || errorMsg.includes('billing')) {
+        errorMsg = 'Billing issue - check your Anthropic account'
       }
+      diagnostics.anthropic.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
     }
   }
 
@@ -462,35 +513,56 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
 
       if (response.ok) {
         diagnostics.google.valid = true
-        diagnostics.google.model = 'cloud-vision-v1'
+        // Only show model in non-production
+        if (!IS_PRODUCTION) {
+          diagnostics.google.model = 'cloud-vision-v1'
+        }
       } else {
         const errorData = (await response.json().catch(() => ({}))) as { error?: { message?: string; status?: string } }
         diagnostics.google.valid = false
-        const errorMsg = errorData.error?.message || `HTTP ${response.status}`
+        let errorMsg = errorData.error?.message || `HTTP ${response.status}`
         // Provide specific guidance
         if (errorMsg.includes('API key not valid') || response.status === 400) {
-          diagnostics.google.error = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
+          errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
         } else if (errorMsg.includes('PERMISSION_DENIED')) {
-          diagnostics.google.error = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+          errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
         } else if (errorMsg.includes('BILLING')) {
-          diagnostics.google.error = 'Billing not enabled on Google Cloud project'
-        } else {
-          diagnostics.google.error = errorMsg
+          errorMsg = 'Billing not enabled on Google Cloud project'
         }
+        diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
       }
     } catch (error) {
       diagnostics.google.valid = false
       diagnostics.google.latencyMs = Date.now() - startTime
-      diagnostics.google.error = error instanceof Error ? error.message : 'Unknown error'
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
     }
   }
 
-  // Log diagnostic results for debugging
-  console.log('[AI Diagnose] Results:', JSON.stringify(diagnostics, null, 2))
+  // Log diagnostic results for debugging (only in development)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('[AI Diagnose] Results:', JSON.stringify(diagnostics, null, 2))
+  }
 
   // Determine overall status
   const anyValid = diagnostics.openai.valid || diagnostics.anthropic.valid
   const anyConfigured = diagnostics.openai.configured || diagnostics.anthropic.configured
+
+  // Sanitized recommendations for production (SaaS)
+  let recommendation: string
+  if (!anyConfigured) {
+    recommendation = IS_PRODUCTION
+      ? 'AI service not configured - contact support'
+      : 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to .env file'
+  } else if (!anyValid) {
+    recommendation = IS_PRODUCTION
+      ? 'AI service temporarily unavailable - please try again later'
+      : 'API keys are configured but invalid - check the error messages above'
+  } else {
+    recommendation = IS_PRODUCTION
+      ? 'AI services available'
+      : 'All configured providers are working'
+  }
 
   res.json({
     ...diagnostics,
@@ -499,11 +571,7 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
       anyProviderValid: anyValid,
       extractionReady: anyValid,
       ocrReady: diagnostics.google.valid,
-      recommendation: !anyConfigured
-        ? 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to .env file'
-        : !anyValid
-          ? 'API keys are configured but invalid - check the error messages above'
-          : 'All configured providers are working',
+      recommendation,
     },
   })
 })

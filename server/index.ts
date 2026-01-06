@@ -117,8 +117,19 @@ app.use('/api/', generalLimiter)
 app.use(express.json({ limit: '10mb' }))
 
 // Health check endpoint (with separate, more permissive limiter)
+// In production (SaaS): Hide rate limit details to prevent abuse planning
+// In development: Show rate limits for debugging
 app.get('/api/health', healthLimiter, (_req, res) => {
-  res.json({
+  const response: {
+    status: string
+    timestamp: string
+    providers: { openai: boolean; anthropic: boolean; google: boolean }
+    rateLimits?: {
+      general: { windowMs: number; max: number }
+      ai: { windowMs: number; max: number }
+      ocr: { windowMs: number; max: number }
+    }
+  } = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     providers: {
@@ -126,7 +137,11 @@ app.get('/api/health', healthLimiter, (_req, res) => {
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       google: !!process.env.GOOGLE_CLOUD_API_KEY,
     },
-    rateLimits: {
+  }
+
+  // Only expose rate limit configuration in non-production environments
+  if (!IS_PRODUCTION) {
+    response.rateLimits = {
       general: {
         windowMs: rateLimitConfig.general.windowMs,
         max: rateLimitConfig.general.max,
@@ -139,8 +154,10 @@ app.get('/api/health', healthLimiter, (_req, res) => {
         windowMs: rateLimitConfig.ocr.windowMs,
         max: rateLimitConfig.ocr.max,
       },
-    },
-  })
+    }
+  }
+
+  res.json(response)
 })
 
 // AI proxy routes
@@ -175,12 +192,16 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 InsurAI API server running on port ${PORT}`)
-  console.log(`   Health check: http://localhost:${PORT}/api/health`)
-  console.log('')
-  console.log('   Configured providers:')
-  console.log(`   - OpenAI:    ${process.env.OPENAI_API_KEY ? '✓' : '✗'}`)
-  console.log(`   - Anthropic: ${process.env.ANTHROPIC_API_KEY ? '✓' : '✗'}`)
-  console.log(`   - Google:    ${process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '✗'}`)
+  // Only show detailed provider configuration in non-production
+  // to prevent information leakage about server capabilities
+  if (!IS_PRODUCTION) {
+    console.log(`   Health check: http://localhost:${PORT}/api/health`)
+    console.log('')
+    console.log('   Configured providers:')
+    console.log(`   - OpenAI:    ${process.env.OPENAI_API_KEY ? '✓' : '✗'}`)
+    console.log(`   - Anthropic: ${process.env.ANTHROPIC_API_KEY ? '✓' : '✗'}`)
+    console.log(`   - Google:    ${process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '✗'}`)
+  }
 })
 
 export default app

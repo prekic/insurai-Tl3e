@@ -157,7 +157,10 @@ export function validate<T extends ZodSchema>(
 
       next()
     } catch (error) {
-      console.error('Validation middleware error:', error)
+      // Only log validation errors in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Validation middleware error:', error)
+      }
       return res.status(400).json({
         error: 'Invalid request data',
         code: 'VALIDATION_ERROR',
