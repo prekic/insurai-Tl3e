@@ -148,37 +148,250 @@ NODE_ENV=development
 
 ## Architecture
 
-### Frontend-Backend Communication
+### System Overview
 
 ```
-Browser (5173)  →  Vite Proxy  →  Express (4001)  →  AI APIs
-                                        ↓
-                                   Supabase
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React)                             │
+│                         Port 5173 (Vite)                            │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │ PolicyUpload│  │ PolicyChat   │  │ Dashboard   │  │ Landing   │ │
+│  │ (PDF+AI)    │  │ (Multi-turn) │  │ (Analytics) │  │ (Marketing│ │
+│  └──────┬──────┘  └──────┬───────┘  └──────┬──────┘  └───────────┘ │
+│         │                │                  │                        │
+│         └────────────────┼──────────────────┘                        │
+│                          ▼                                           │
+│              ┌─────────────────────┐                                │
+│              │  PolicyContext      │ ← React Context for policies   │
+│              │  AuthContext        │ ← Supabase auth state          │
+│              └──────────┬──────────┘                                │
+├─────────────────────────┼───────────────────────────────────────────┤
+│                         │ Vite Dev Proxy (/api/* → :4001)           │
+├─────────────────────────┼───────────────────────────────────────────┤
+│                         ▼                                           │
+│                   BACKEND (Express)                                 │
+│                      Port 4001                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    Middleware Stack                          │   │
+│  │  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌──────────┐  │   │
+│  │  │ Helmet   │→ │ Rate Limit  │→ │ Validate │→ │ Sanitize │  │   │
+│  │  │ (Security│  │ (per IP)    │  │ (Zod)    │  │ (XSS)    │  │   │
+│  │  └──────────┘  └─────────────┘  └──────────┘  └──────────┘  │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │                      API Routes                                │ │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────┐ ┌───────────┐  │ │
+│  │  │/api/ai/chat  │ │/api/ai/extract│ │/api/ai/ │ │/api/health│  │ │
+│  │  │(PolicyChat)  │ │/openai|claude │ │ocr      │ │(monitoring)│ │ │
+│  │  │60 req/hr     │ │20 req/hr      │ │30 req/hr│ │60 req/min │  │ │
+│  │  └──────┬───────┘ └──────┬────────┘ └────┬────┘ └───────────┘  │ │
+│  └─────────┼────────────────┼───────────────┼────────────────────┘ │
+│            │                │               │                       │
+├────────────┼────────────────┼───────────────┼───────────────────────┤
+│            ▼                ▼               ▼                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                   External Services                          │   │
+│  │  ┌──────────┐  ┌───────────┐  ┌─────────────┐  ┌──────────┐ │   │
+│  │  │ OpenAI   │  │ Anthropic │  │Google Vision│  │ Supabase │ │   │
+│  │  │ gpt-4o   │  │ claude-   │  │ OCR API     │  │ Auth+DB  │ │   │
+│  │  │ gpt-4o-  │  │ 3-5-haiku │  │             │  │ Storage  │ │   │
+│  │  │ mini     │  │           │  │             │  │          │ │   │
+│  │  └──────────┘  └───────────┘  └─────────────┘  └──────────┘ │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-- Frontend calls `/api/*` endpoints
-- Vite proxies to Express backend
-- Backend holds API keys, makes AI calls
-- Supabase handles auth and data persistence
-
-### AI Extraction Flow
+### Data Flow: PDF Upload & Extraction
 
 ```
-PDF Upload → pdf.js (text extraction)
-           → Check if scanned (low text density)
-           → If scanned: Google Vision OCR
-           → OpenAI/Claude extraction
-           → Zod schema validation
-           → Store in Supabase
+┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌──────────┐
+│  User    │───▶│ PolicyUpload  │───▶│ pdf.js       │───▶│ Text     │
+│  drops   │    │ component     │    │ (browser)    │    │ extracted│
+│  PDF     │    │               │    │              │    │          │
+└──────────┘    └───────────────┘    └──────────────┘    └────┬─────┘
+                                                              │
+                     ┌────────────────────────────────────────┘
+                     ▼
+            ┌─────────────────┐
+            │ Check text      │
+            │ density         │
+            └────────┬────────┘
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+   ┌───────────┐          ┌───────────┐
+   │ < 100     │          │ >= 100    │
+   │ chars/page│          │ chars/page│
+   │ (scanned) │          │ (digital) │
+   └─────┬─────┘          └─────┬─────┘
+         │                      │
+         ▼                      │
+   ┌───────────┐                │
+   │ Google    │                │
+   │ Vision OCR│                │
+   │ /api/ai/  │                │
+   │ ocr       │                │
+   └─────┬─────┘                │
+         │                      │
+         └──────────┬───────────┘
+                    ▼
+            ┌─────────────────┐
+            │ AI Extraction   │
+            │ /api/ai/extract │
+            │ OpenAI|Anthropic│
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │ Zod Validation  │
+            │ PolicySchema    │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐    ┌──────────────┐
+            │ PolicyContext   │───▶│ Supabase     │
+            │ (React state)   │    │ policies     │
+            │                 │    │ table        │
+            └─────────────────┘    └──────────────┘
+```
+
+### Data Flow: PolicyChat Conversation
+
+```
+┌──────────┐    ┌───────────────┐    ┌──────────────┐
+│  User    │───▶│ PolicyChat    │───▶│ Build        │
+│  types   │    │ component     │    │ context from │
+│  question│    │               │    │ policies     │
+└──────────┘    └───────────────┘    └──────┬───────┘
+                                            │
+                     ┌──────────────────────┘
+                     ▼
+            ┌─────────────────────────────────────┐
+            │ Request to /api/ai/chat             │
+            │ {                                   │
+            │   message: "What does my Kasko...", │
+            │   conversationHistory: [...],       │
+            │   policyContext: "Policy: POL-001", │
+            │   provider: "openai"                │
+            │ }                                   │
+            └─────────────────┬───────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Rate Limiter    │
+                    │ (60/hr per IP)  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Zod Validation  │
+                    │ chatSchema      │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ System Prompt + │
+                    │ Policy Context  │
+                    │ + History       │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+       ┌─────────────┐              ┌─────────────┐
+       │ OpenAI      │              │ Anthropic   │
+       │ gpt-4o-mini │              │ claude-3-5- │
+       │             │              │ haiku       │
+       └──────┬──────┘              └──────┬──────┘
+              │                            │
+              └──────────────┬─────────────┘
+                             ▼
+                    ┌─────────────────┐
+                    │ Response to UI  │
+                    │ {               │
+                    │   response: "", │
+                    │   provider: "", │
+                    │   usage: {}     │
+                    │ }               │
+                    └─────────────────┘
 ```
 
 ### Authentication Flow
 
 ```
-User → Supabase Auth → Session stored in localStorage
-     → AuthContext provides user state
-     → Protected routes check auth
-     → Backend validates JWT for API calls
+┌──────────┐    ┌───────────────┐    ┌──────────────┐
+│  User    │───▶│ Login/Signup  │───▶│ Supabase     │
+│  clicks  │    │ form          │    │ Auth         │
+│  sign in │    │               │    │              │
+└──────────┘    └───────────────┘    └──────┬───────┘
+                                            │
+                                            ▼
+                                   ┌─────────────────┐
+                                   │ JWT Session     │
+                                   │ stored in       │
+                                   │ localStorage    │
+                                   └────────┬────────┘
+                                            │
+                     ┌──────────────────────┘
+                     ▼
+            ┌─────────────────┐
+            │ AuthContext     │
+            │ provides:       │
+            │ - user object   │
+            │ - isLoading     │
+            │ - signIn()      │
+            │ - signOut()     │
+            └────────┬────────┘
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+   ┌───────────┐          ┌───────────┐
+   │ Protected │          │ Public    │
+   │ Routes    │          │ Routes    │
+   │ /dashboard│          │ /landing  │
+   │ /upload   │          │ /login    │
+   │ /chat     │          │           │
+   └───────────┘          └───────────┘
+```
+
+### Key Architecture Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Monolithic backend** | Simple deployment, single codebase, adequate for current scale |
+| **API keys server-side only** | Security - never expose to browser |
+| **Vite proxy in dev** | Seamless /api/* routing without CORS issues |
+| **Lazy-loaded routes** | Smaller initial bundle, faster FCP |
+| **React Context for state** | Simpler than Redux for current needs |
+| **Supabase for auth+DB** | Managed PostgreSQL, built-in auth, RLS |
+| **Multi-provider AI** | Fallback capability, cost optimization |
+| **Rate limiting per IP** | Protect against abuse, control AI costs |
+
+### File Organization by Layer
+
+```
+Frontend (src/)
+├── components/         # UI components
+│   ├── ui/            # Base components (Button, Card)
+│   ├── landing/       # Marketing page sections
+│   └── insurance-lines/ # Policy type specific UIs
+├── lib/               # Business logic
+│   ├── ai/           # AI extraction orchestration
+│   ├── supabase/     # Auth, database operations
+│   ├── gap-detection/ # Coverage analysis
+│   └── pwa/          # Service worker utilities
+├── hooks/            # Custom React hooks
+├── types/            # TypeScript definitions
+└── __tests__/        # Integration tests
+
+Backend (server/)
+├── index.ts          # Express app setup, graceful shutdown
+├── routes/
+│   └── ai.ts         # All AI endpoints (chat, extract, ocr)
+├── middleware/
+│   ├── validation.ts # Zod schemas, request validation
+│   └── rate-limit.ts # Per-endpoint rate limiters
+└── __tests__/        # API route tests
 ```
 
 ---
