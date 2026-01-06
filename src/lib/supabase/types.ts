@@ -478,6 +478,101 @@ export type PolicyVersion = PolicyVersionRow
 export type User = UserRow
 
 // =============================================================================
+// TABLE TYPES - chat_conversations
+// =============================================================================
+
+/** AI provider type for chat */
+export type ChatProvider = 'openai' | 'anthropic'
+
+/** Chat message role */
+export type ChatMessageRole = 'user' | 'assistant' | 'system'
+
+/** Token usage for AI responses */
+export interface TokenUsage {
+  input_tokens?: number
+  output_tokens?: number
+  total_tokens?: number
+  prompt_tokens?: number
+  completion_tokens?: number
+}
+
+/** Row type for chat_conversations table (SELECT) */
+export interface ChatConversationRow {
+  id: string
+  user_id: string
+  title: string
+  provider: ChatProvider
+  policy_ids: string[]
+  message_count: number
+  last_message_at: string
+  created_at: string
+  updated_at: string
+}
+
+/** Insert type for chat_conversations table (INSERT) */
+export interface ChatConversationInsert {
+  id?: string
+  user_id: string
+  title?: string
+  provider?: ChatProvider
+  policy_ids?: string[]
+  message_count?: number
+  last_message_at?: string
+  created_at?: string
+  updated_at?: string
+}
+
+/** Update type for chat_conversations table (UPDATE) */
+export interface ChatConversationUpdate {
+  id?: string
+  user_id?: string
+  title?: string
+  provider?: ChatProvider
+  policy_ids?: string[]
+  message_count?: number
+  last_message_at?: string
+  updated_at?: string
+}
+
+/** Row type for chat_messages table (SELECT) */
+export interface ChatMessageRow {
+  id: string
+  conversation_id: string
+  role: ChatMessageRole
+  content: string
+  provider: string | null
+  token_usage: TokenUsage | null
+  created_at: string
+}
+
+/** Insert type for chat_messages table (INSERT) */
+export interface ChatMessageInsert {
+  id?: string
+  conversation_id: string
+  role: ChatMessageRole
+  content: string
+  provider?: string | null
+  token_usage?: TokenUsage | null
+  created_at?: string
+}
+
+/** Alias for ChatConversationRow */
+export type ChatConversation = ChatConversationRow
+
+/** Alias for ChatMessageRow */
+export type ChatMessage = ChatMessageRow
+
+/** Check if a value is a valid ChatProvider */
+export function isChatProvider(value: unknown): value is ChatProvider {
+  return typeof value === 'string' && ['openai', 'anthropic'].includes(value)
+}
+
+/** Check if a value is a valid ChatMessageRole */
+export function isChatMessageRole(value: unknown): value is ChatMessageRole {
+  return typeof value === 'string' && ['user', 'assistant', 'system'].includes(value)
+}
+
+// =============================================================================
 // TYPE GUARDS
 // =============================================================================
 
