@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Send, Bot, User, ArrowLeft, AlertTriangle, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
@@ -12,6 +12,25 @@ interface Message {
   content: string
   timestamp: Date
   retryPayload?: string // Store the original question for retry
+}
+
+interface ChatApiResponse {
+  success: boolean
+  response: string
+  provider: string
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+    input_tokens?: number
+    output_tokens?: number
+  }
+}
+
+interface ChatApiError {
+  error: string
+  code: string
+  details?: string
 }
 
 export function PolicyChat() {
@@ -39,24 +58,66 @@ export function PolicyChat() {
     scrollToBottom()
   }, [messages])
 
-  const getAIResponse = async (_question: string): Promise<string> => {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+  // Build policy context from uploaded policies for the AI
+  const policyContext = useMemo(() => {
+    if (policies.length === 0) return undefined
 
-    // Simulate random failure (10% chance for demo)
-    if (Math.random() < 0.1) {
-      throw new Error('Failed to get AI response')
+    return policies
+      .map((p) => {
+        const parts = [
+          `Policy: ${p.policyNumber || 'Unknown'}`,
+          `Provider: ${p.provider || 'Unknown'}`,
+          `Type: ${p.type || 'Unknown'}`,
+        ]
+        if (p.premium) parts.push(`Premium: ${p.premium} TRY`)
+        if (p.startDate) parts.push(`Effective: ${p.startDate}`)
+        if (p.expiryDate) parts.push(`Expires: ${p.expiryDate}`)
+        if (p.coverages && p.coverages.length > 0) {
+          parts.push(`Coverages: ${p.coverages.map((c) => c.name).join(', ')}`)
+        }
+        return parts.join('\n')
+      })
+      .join('\n\n')
+  }, [policies])
+
+  // Get conversation history for API (excluding error messages and the initial greeting)
+  const getConversationHistory = (): Array<{ role: 'user' | 'assistant'; content: string }> => {
+    return messages
+      .filter((m) => m.role !== 'error' && m.id !== '1') // Exclude errors and initial greeting
+      .map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }))
+  }
+
+  const getAIResponse = async (question: string): Promise<string> => {
+    const apiUrl = import.meta.env.VITE_API_PROXY_URL || ''
+    const conversationHistory = getConversationHistory()
+
+    const response = await fetch(`${apiUrl}/api/ai/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: question,
+        conversationHistory,
+        policyContext,
+        provider: 'openai', // Default to OpenAI, can be made configurable
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({}))) as ChatApiError
+      throw new Error(errorData.error || `HTTP ${response.status}`)
     }
 
-    // In a real implementation, _question would be sent to the AI API
-    const responses = [
-      'Based on your uploaded policies, your Kasko coverage from Allianz provides comprehensive protection including collision, theft, and natural disaster coverage.',
-      'Looking at your portfolio, I notice your health insurance policy from Mapfre is expiring soon. Would you like me to help you compare renewal options?',
-      'Your current policies provide a total coverage of over 2 million TL across different insurance lines. The average premium you\'re paying is competitive with market rates.',
-      'I can see you have both mandatory traffic insurance and comprehensive Kasko. This is a good combination for complete vehicle protection.',
-    ]
+    const data = (await response.json()) as ChatApiResponse
+    if (!data.success || !data.response) {
+      throw new Error('Invalid response from chat API')
+    }
 
-    return responses[Math.floor(Math.random() * responses.length)]
+    return data.response
   }
 
   const handleSend = async (messageToSend?: string) => {

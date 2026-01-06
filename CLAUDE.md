@@ -9,8 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction working via backend proxy
-- **Production Readiness**: ~8.2/10 (test coverage 80%+, monitoring configured)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, performance optimizations
+- **Production Readiness**: ~8.5/10 (4100+ tests, PWA support, server hardening)
+- **Last Updated**: January 2026
 
 ---
 
@@ -78,8 +79,12 @@ insurai/
 | `src/lib/supabase/auth-context.tsx` | Authentication context |
 | `src/lib/supabase/policies.ts` | Policy CRUD operations |
 | `src/components/PolicyUpload.tsx` | Upload flow with extraction |
+| `src/components/PolicyChat.tsx` | Multi-turn AI chat for policy questions |
 | `src/components/GlobalNavigation.tsx` | Main nav with auth state |
 | `server/index.ts` | Backend API server (port 4001) |
+| `server/routes/ai.ts` | AI proxy routes (extraction, chat, OCR) |
+| `server/middleware/validation.ts` | Zod schemas for request validation |
+| `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `.env` | Environment configuration |
 
 ---
@@ -143,37 +148,250 @@ NODE_ENV=development
 
 ## Architecture
 
-### Frontend-Backend Communication
+### System Overview
 
 ```
-Browser (5173)  →  Vite Proxy  →  Express (4001)  →  AI APIs
-                                        ↓
-                                   Supabase
+┌─────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React)                             │
+│                         Port 5173 (Vite)                            │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐  ┌───────────┐ │
+│  │ PolicyUpload│  │ PolicyChat   │  │ Dashboard   │  │ Landing   │ │
+│  │ (PDF+AI)    │  │ (Multi-turn) │  │ (Analytics) │  │ (Marketing│ │
+│  └──────┬──────┘  └──────┬───────┘  └──────┬──────┘  └───────────┘ │
+│         │                │                  │                        │
+│         └────────────────┼──────────────────┘                        │
+│                          ▼                                           │
+│              ┌─────────────────────┐                                │
+│              │  PolicyContext      │ ← React Context for policies   │
+│              │  AuthContext        │ ← Supabase auth state          │
+│              └──────────┬──────────┘                                │
+├─────────────────────────┼───────────────────────────────────────────┤
+│                         │ Vite Dev Proxy (/api/* → :4001)           │
+├─────────────────────────┼───────────────────────────────────────────┤
+│                         ▼                                           │
+│                   BACKEND (Express)                                 │
+│                      Port 4001                                      │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                    Middleware Stack                          │   │
+│  │  ┌──────────┐  ┌─────────────┐  ┌──────────┐  ┌──────────┐  │   │
+│  │  │ Helmet   │→ │ Rate Limit  │→ │ Validate │→ │ Sanitize │  │   │
+│  │  │ (Security│  │ (per IP)    │  │ (Zod)    │  │ (XSS)    │  │   │
+│  │  └──────────┘  └─────────────┘  └──────────┘  └──────────┘  │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+│                                                                     │
+│  ┌───────────────────────────────────────────────────────────────┐ │
+│  │                      API Routes                                │ │
+│  │  ┌──────────────┐ ┌──────────────┐ ┌─────────┐ ┌───────────┐  │ │
+│  │  │/api/ai/chat  │ │/api/ai/extract│ │/api/ai/ │ │/api/health│  │ │
+│  │  │(PolicyChat)  │ │/openai|claude │ │ocr      │ │(monitoring)│ │ │
+│  │  │60 req/hr     │ │20 req/hr      │ │30 req/hr│ │60 req/min │  │ │
+│  │  └──────┬───────┘ └──────┬────────┘ └────┬────┘ └───────────┘  │ │
+│  └─────────┼────────────────┼───────────────┼────────────────────┘ │
+│            │                │               │                       │
+├────────────┼────────────────┼───────────────┼───────────────────────┤
+│            ▼                ▼               ▼                       │
+│  ┌─────────────────────────────────────────────────────────────┐   │
+│  │                   External Services                          │   │
+│  │  ┌──────────┐  ┌───────────┐  ┌─────────────┐  ┌──────────┐ │   │
+│  │  │ OpenAI   │  │ Anthropic │  │Google Vision│  │ Supabase │ │   │
+│  │  │ gpt-4o   │  │ claude-   │  │ OCR API     │  │ Auth+DB  │ │   │
+│  │  │ gpt-4o-  │  │ 3-5-haiku │  │             │  │ Storage  │ │   │
+│  │  │ mini     │  │           │  │             │  │          │ │   │
+│  │  └──────────┘  └───────────┘  └─────────────┘  └──────────┘ │   │
+│  └─────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
 ```
 
-- Frontend calls `/api/*` endpoints
-- Vite proxies to Express backend
-- Backend holds API keys, makes AI calls
-- Supabase handles auth and data persistence
-
-### AI Extraction Flow
+### Data Flow: PDF Upload & Extraction
 
 ```
-PDF Upload → pdf.js (text extraction)
-           → Check if scanned (low text density)
-           → If scanned: Google Vision OCR
-           → OpenAI/Claude extraction
-           → Zod schema validation
-           → Store in Supabase
+┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌──────────┐
+│  User    │───▶│ PolicyUpload  │───▶│ pdf.js       │───▶│ Text     │
+│  drops   │    │ component     │    │ (browser)    │    │ extracted│
+│  PDF     │    │               │    │              │    │          │
+└──────────┘    └───────────────┘    └──────────────┘    └────┬─────┘
+                                                              │
+                     ┌────────────────────────────────────────┘
+                     ▼
+            ┌─────────────────┐
+            │ Check text      │
+            │ density         │
+            └────────┬────────┘
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+   ┌───────────┐          ┌───────────┐
+   │ < 100     │          │ >= 100    │
+   │ chars/page│          │ chars/page│
+   │ (scanned) │          │ (digital) │
+   └─────┬─────┘          └─────┬─────┘
+         │                      │
+         ▼                      │
+   ┌───────────┐                │
+   │ Google    │                │
+   │ Vision OCR│                │
+   │ /api/ai/  │                │
+   │ ocr       │                │
+   └─────┬─────┘                │
+         │                      │
+         └──────────┬───────────┘
+                    ▼
+            ┌─────────────────┐
+            │ AI Extraction   │
+            │ /api/ai/extract │
+            │ OpenAI|Anthropic│
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐
+            │ Zod Validation  │
+            │ PolicySchema    │
+            └────────┬────────┘
+                     │
+                     ▼
+            ┌─────────────────┐    ┌──────────────┐
+            │ PolicyContext   │───▶│ Supabase     │
+            │ (React state)   │    │ policies     │
+            │                 │    │ table        │
+            └─────────────────┘    └──────────────┘
+```
+
+### Data Flow: PolicyChat Conversation
+
+```
+┌──────────┐    ┌───────────────┐    ┌──────────────┐
+│  User    │───▶│ PolicyChat    │───▶│ Build        │
+│  types   │    │ component     │    │ context from │
+│  question│    │               │    │ policies     │
+└──────────┘    └───────────────┘    └──────┬───────┘
+                                            │
+                     ┌──────────────────────┘
+                     ▼
+            ┌─────────────────────────────────────┐
+            │ Request to /api/ai/chat             │
+            │ {                                   │
+            │   message: "What does my Kasko...", │
+            │   conversationHistory: [...],       │
+            │   policyContext: "Policy: POL-001", │
+            │   provider: "openai"                │
+            │ }                                   │
+            └─────────────────┬───────────────────┘
+                              │
+                              ▼
+                    ┌─────────────────┐
+                    │ Rate Limiter    │
+                    │ (60/hr per IP)  │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ Zod Validation  │
+                    │ chatSchema      │
+                    └────────┬────────┘
+                             │
+                             ▼
+                    ┌─────────────────┐
+                    │ System Prompt + │
+                    │ Policy Context  │
+                    │ + History       │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              ▼                             ▼
+       ┌─────────────┐              ┌─────────────┐
+       │ OpenAI      │              │ Anthropic   │
+       │ gpt-4o-mini │              │ claude-3-5- │
+       │             │              │ haiku       │
+       └──────┬──────┘              └──────┬──────┘
+              │                            │
+              └──────────────┬─────────────┘
+                             ▼
+                    ┌─────────────────┐
+                    │ Response to UI  │
+                    │ {               │
+                    │   response: "", │
+                    │   provider: "", │
+                    │   usage: {}     │
+                    │ }               │
+                    └─────────────────┘
 ```
 
 ### Authentication Flow
 
 ```
-User → Supabase Auth → Session stored in localStorage
-     → AuthContext provides user state
-     → Protected routes check auth
-     → Backend validates JWT for API calls
+┌──────────┐    ┌───────────────┐    ┌──────────────┐
+│  User    │───▶│ Login/Signup  │───▶│ Supabase     │
+│  clicks  │    │ form          │    │ Auth         │
+│  sign in │    │               │    │              │
+└──────────┘    └───────────────┘    └──────┬───────┘
+                                            │
+                                            ▼
+                                   ┌─────────────────┐
+                                   │ JWT Session     │
+                                   │ stored in       │
+                                   │ localStorage    │
+                                   └────────┬────────┘
+                                            │
+                     ┌──────────────────────┘
+                     ▼
+            ┌─────────────────┐
+            │ AuthContext     │
+            │ provides:       │
+            │ - user object   │
+            │ - isLoading     │
+            │ - signIn()      │
+            │ - signOut()     │
+            └────────┬────────┘
+                     │
+         ┌───────────┴───────────┐
+         ▼                       ▼
+   ┌───────────┐          ┌───────────┐
+   │ Protected │          │ Public    │
+   │ Routes    │          │ Routes    │
+   │ /dashboard│          │ /landing  │
+   │ /upload   │          │ /login    │
+   │ /chat     │          │           │
+   └───────────┘          └───────────┘
+```
+
+### Key Architecture Decisions
+
+| Decision | Rationale |
+|----------|-----------|
+| **Monolithic backend** | Simple deployment, single codebase, adequate for current scale |
+| **API keys server-side only** | Security - never expose to browser |
+| **Vite proxy in dev** | Seamless /api/* routing without CORS issues |
+| **Lazy-loaded routes** | Smaller initial bundle, faster FCP |
+| **React Context for state** | Simpler than Redux for current needs |
+| **Supabase for auth+DB** | Managed PostgreSQL, built-in auth, RLS |
+| **Multi-provider AI** | Fallback capability, cost optimization |
+| **Rate limiting per IP** | Protect against abuse, control AI costs |
+
+### File Organization by Layer
+
+```
+Frontend (src/)
+├── components/         # UI components
+│   ├── ui/            # Base components (Button, Card)
+│   ├── landing/       # Marketing page sections
+│   └── insurance-lines/ # Policy type specific UIs
+├── lib/               # Business logic
+│   ├── ai/           # AI extraction orchestration
+│   ├── supabase/     # Auth, database operations
+│   ├── gap-detection/ # Coverage analysis
+│   └── pwa/          # Service worker utilities
+├── hooks/            # Custom React hooks
+├── types/            # TypeScript definitions
+└── __tests__/        # Integration tests
+
+Backend (server/)
+├── index.ts          # Express app setup, graceful shutdown
+├── routes/
+│   └── ai.ts         # All AI endpoints (chat, extract, ocr)
+├── middleware/
+│   ├── validation.ts # Zod schemas, request validation
+│   └── rate-limit.ts # Per-endpoint rate limiters
+└── __tests__/        # API route tests
 ```
 
 ---
@@ -444,9 +662,132 @@ type PolicyStatus = typeof POLICY_STATUS[keyof typeof POLICY_STATUS]
 
 ### Key Test Files
 - `src/components/GlobalNavigation.test.tsx` - Nav and auth UI
+- `src/components/PolicyChat.test.tsx` - Chat component (29 tests)
 - `src/lib/ai/policy-extractor.test.ts` - AI extraction
 - `src/__tests__/integration/dependencies.test.ts` - CDN checks
 - `src/__tests__/integration/environment-validation.test.ts` - Config checks
+- `src/__tests__/performance/performance.test.ts` - Performance tests (30 tests)
+- `server/__tests__/chat-routes.test.ts` - Chat API tests (18 tests)
+
+### Test Counts (as of Jan 2026)
+- **Total**: 4162 tests across 123 files
+- **Passing**: 4129 (99.2%)
+- **Expected Failures**: 33 (environment/integration tests requiring API keys)
+
+---
+
+## PolicyChat System
+
+### Backend Endpoint (`POST /api/ai/chat`)
+
+Multi-turn conversation endpoint for policy-related questions:
+
+```typescript
+// Request
+{
+  message: string,              // User's question (max 4KB)
+  conversationHistory?: Array<{ role: 'user' | 'assistant', content: string }>,
+  policyContext?: string,       // Policy details for context (max 50KB)
+  provider?: 'openai' | 'anthropic'  // Default: openai
+}
+
+// Response
+{
+  success: boolean,
+  response: string,             // AI response
+  provider: 'openai' | 'anthropic',
+  usage: { input_tokens, output_tokens }
+}
+```
+
+### Rate Limits
+- Chat: 60 requests/hour per IP
+- Extraction: 20 requests/hour
+- OCR: 30 requests/hour
+
+### Frontend Integration (`src/components/PolicyChat.tsx`)
+- Builds policy context from uploaded policies
+- Maintains conversation history for multi-turn context
+- Calls `/api/ai/chat` endpoint
+- Supports retry on failure
+
+### System Prompt
+Expert Turkish insurance assistant with knowledge of:
+- Kasko, DASK, Trafik Sigortası terminology
+- Coverage limits, deductibles, exclusions
+- TRY currency formatting
+
+---
+
+## Performance Optimizations
+
+### Bundle Analysis
+```bash
+npm run build:analyze  # Opens stats.html with bundle visualization
+```
+Uses `rollup-plugin-visualizer` with treemap view.
+
+### Lazy Loading
+All route components lazy-loaded in `App.tsx`:
+```typescript
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
+// etc.
+```
+
+### PWA & Service Worker
+- Service worker: `public/sw.js`
+- PWA utilities: `src/lib/pwa/index.ts`
+- Initialized in production via `main.tsx`
+- Caching strategies: cache-first (static), network-first (API), stale-while-revalidate (images)
+
+### Resource Hints (`index.html`)
+```html
+<link rel="dns-prefetch" href="https://supabase.co">
+<link rel="dns-prefetch" href="https://unpkg.com">
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+```
+
+### Lighthouse Targets (`lighthouserc.js`)
+- FCP: < 2000ms
+- LCP: < 2500ms
+- CLS: < 0.1
+- Performance score: > 0.8
+
+---
+
+## Server Hardening
+
+### Graceful Shutdown (`server/index.ts`)
+- Catches SIGTERM/SIGINT signals
+- Stops accepting new connections
+- Waits for in-flight requests (30s timeout)
+- Closes database connections cleanly
+
+### Request Timeouts
+- Body parsing: 10MB limit
+- Request timeout: 30 seconds
+- Rate limiting on all AI endpoints
+
+### Security Headers (Helmet)
+- CSP configured for PDF.js CDN
+- XSS protection
+- Frame options
+- Content sniffing protection
+
+---
+
+## API Endpoints
+
+| Endpoint | Method | Purpose | Rate Limit |
+|----------|--------|---------|------------|
+| `/api/ai/extract/openai` | POST | Extract policy with GPT-4o | 20/hr |
+| `/api/ai/extract/anthropic` | POST | Extract policy with Claude | 20/hr |
+| `/api/ai/chat` | POST | Multi-turn policy chat | 60/hr |
+| `/api/ai/ocr` | POST | Google Vision OCR | 30/hr |
+| `/api/ai/providers` | GET | Check configured providers | - |
+| `/api/ai/diagnose` | GET | Test API key validity | - |
+| `/api/health` | GET | Server health check | 60/min |
 
 ---
 

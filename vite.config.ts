@@ -3,11 +3,25 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { sentryVitePlugin } from '@sentry/vite-plugin'
+import { visualizer } from 'rollup-plugin-visualizer'
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    // Bundle visualizer - generates stats.html after build
+    // Run: ANALYZE=true npm run build && open stats.html
+    ...(process.env.ANALYZE === 'true'
+      ? [
+          visualizer({
+            filename: 'stats.html',
+            open: true,
+            gzipSize: true,
+            brotliSize: true,
+            template: 'treemap', // 'treemap', 'sunburst', 'network'
+          }),
+        ]
+      : []),
     // Sentry source map upload (only when auth token is configured)
     ...(process.env.SENTRY_AUTH_TOKEN
       ? [

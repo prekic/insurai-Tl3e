@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server } from 'lucide-react'
+import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server, Stethoscope, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
@@ -70,10 +70,40 @@ export function PolicyUpload() {
   const { user, isConfigured: authConfigured } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const { health, checkHealth } = useBackendHealth()
+  const { health, checkHealth, runDiagnostics } = useBackendHealth()
+  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
   const backendReady = health.status === 'healthy'
+  // In production (SaaS), hide technical details from end users
+  const IS_PRODUCTION = import.meta.env.PROD
+
+  const handleRunDiagnostics = async () => {
+    setIsRunningDiagnostics(true)
+    toast.info('Running diagnostics...', {
+      description: 'Testing API key validity with each provider',
+    })
+
+    const result = await runDiagnostics()
+    setIsRunningDiagnostics(false)
+
+    if (result) {
+      if (result.summary.anyProviderValid) {
+        toast.success('Diagnostics complete', {
+          description: result.summary.recommendation,
+        })
+      } else {
+        toast.error('Diagnostics failed', {
+          description: result.summary.recommendation,
+          duration: 10000,
+        })
+      }
+    } else {
+      toast.error('Could not run diagnostics', {
+        description: 'Backend server may not be reachable',
+      })
+    }
+  }
 
   // Preload pdf.js in the background when component mounts
   // This reduces perceived load time when user uploads a file
@@ -170,11 +200,17 @@ export function PolicyUpload() {
           try {
             await uploadPolicyDocument(policy.id, file)
           } catch (uploadError) {
-            console.warn('Failed to upload document to storage:', uploadError)
+            // Only log storage errors in development
+            if (import.meta.env.DEV) {
+              console.warn('Failed to upload document to storage:', uploadError)
+            }
             // Don't fail if storage upload fails - policy is already saved
           }
         } catch (saveError) {
-          console.warn('Failed to save policy to database:', saveError)
+          // Only log save errors in development
+          if (import.meta.env.DEV) {
+            console.warn('Failed to save policy to database:', saveError)
+          }
           // Continue even if save fails - policy is still in local state
         }
       }
@@ -207,6 +243,8 @@ export function PolicyUpload() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
       // Provide user-friendly error messages based on the error
+      // In production (SaaS), hide technical details like .env references
+      const IS_PRODUCTION = import.meta.env.PROD
       let userMessage = errorMessage
       let userTitle = 'Analysis Failed'
       let troubleshootingTip = ''
@@ -214,7 +252,9 @@ export function PolicyUpload() {
       if (errorMessage.includes('not configured') || errorMessage.includes('NO_AI_CONFIG')) {
         userTitle = 'AI Not Configured'
         userMessage = 'The AI service is not available.'
-        troubleshootingTip = 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env'
+        troubleshootingTip = IS_PRODUCTION
+          ? 'Please contact support if this issue persists.'
+          : 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env'
       } else if (errorMessage.includes('PDF_PARSE_ERROR') || errorMessage.includes('PDF processing')) {
         userTitle = 'PDF Processing Error'
         userMessage = 'Could not read the PDF file.'
@@ -226,11 +266,15 @@ export function PolicyUpload() {
       } else if (errorMessage.includes('proxy') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
         userTitle = 'Network Error'
         userMessage = 'Could not connect to the backend server.'
-        troubleshootingTip = 'Check that the backend is running on port 4001 (npm run dev:server)'
+        troubleshootingTip = IS_PRODUCTION
+          ? 'Please check your internet connection and try again.'
+          : 'Check that the backend is running on port 4001 (npm run dev:server)'
       } else if (errorMessage.includes('PROVIDER_NOT_CONFIGURED') || errorMessage.includes('503')) {
         userTitle = 'AI Provider Not Ready'
         userMessage = 'The AI provider is not configured on the server.'
-        troubleshootingTip = 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.'
+        troubleshootingTip = IS_PRODUCTION
+          ? 'Please contact support if this issue persists.'
+          : 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.'
       } else if (errorMessage.includes('LOW_CONFIDENCE')) {
         userTitle = 'Low Extraction Confidence'
         userMessage = 'The AI could not reliably extract data from this document.'
@@ -370,31 +414,107 @@ export function PolicyUpload() {
             <div className="flex items-start gap-3">
               <ServerCrash className="text-red-600 mt-0.5 flex-shrink-0" size={20} />
               <div className="flex-1">
-                <p className="font-semibold text-red-800">Backend Server Unavailable</p>
-                <p className="text-sm text-red-600 mt-1">{health.error}</p>
-                <div className="mt-2 text-sm text-red-700 space-y-1">
-                  <p>To fix this issue:</p>
-                  <ol className="list-decimal ml-4 space-y-0.5">
-                    <li>Run <code className="bg-red-100 px-1 rounded">npm run dev:server</code> in a terminal</li>
-                    <li>Ensure <code className="bg-red-100 px-1 rounded">.env</code> has <code className="bg-red-100 px-1 rounded">OPENAI_API_KEY</code> or <code className="bg-red-100 px-1 rounded">ANTHROPIC_API_KEY</code></li>
-                    <li>Check the server terminal for errors</li>
-                  </ol>
+                <p className="font-semibold text-red-800">
+                  {IS_PRODUCTION ? 'Service Temporarily Unavailable' : 'Backend Server Unavailable'}
+                </p>
+                <p className="text-sm text-red-600 mt-1">
+                  {IS_PRODUCTION
+                    ? 'We are experiencing technical difficulties. Please try again later.'
+                    : health.error}
+                </p>
+                {!IS_PRODUCTION && (
+                  <div className="mt-2 text-sm text-red-700 space-y-1">
+                    <p>To fix this issue:</p>
+                    <ol className="list-decimal ml-4 space-y-0.5">
+                      <li>Run <code className="bg-red-100 px-1 rounded">npm run dev:server</code> in a terminal</li>
+                      <li>Ensure <code className="bg-red-100 px-1 rounded">.env</code> has <code className="bg-red-100 px-1 rounded">OPENAI_API_KEY</code> or <code className="bg-red-100 px-1 rounded">ANTHROPIC_API_KEY</code></li>
+                      <li>Check the server terminal for errors</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* Diagnostic Results - Only show in development */}
+                {!IS_PRODUCTION && health.diagnostics && (
+                  <div className="mt-3 p-3 bg-red-100 rounded-lg">
+                    <p className="font-medium text-red-800 text-sm mb-2">Diagnostic Results:</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.openai.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.openai.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.openai.valid ? 'text-green-700' : 'text-red-700'}>
+                          OpenAI: {health.diagnostics.openai.configured
+                            ? (health.diagnostics.openai.valid ? `Working (${health.diagnostics.openai.latencyMs}ms)` : health.diagnostics.openai.error)
+                            : 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.anthropic.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.anthropic.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.anthropic.valid ? 'text-green-700' : 'text-red-700'}>
+                          Anthropic: {health.diagnostics.anthropic.configured
+                            ? (health.diagnostics.anthropic.valid ? `Working (${health.diagnostics.anthropic.latencyMs}ms)` : health.diagnostics.anthropic.error)
+                            : 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.google.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.google.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.google.valid ? 'text-green-700' : 'text-gray-500'}>
+                          Google OCR: {health.diagnostics.google.configured
+                            ? (health.diagnostics.google.valid ? `Working (${health.diagnostics.google.latencyMs}ms)` : health.diagnostics.google.error)
+                            : 'Not configured (optional)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    onClick={checkHealth}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-300 hover:bg-red-100"
+                  >
+                    <RefreshCw size={14} className="mr-2" />
+                    {IS_PRODUCTION ? 'Try Again' : 'Retry Connection'}
+                  </Button>
+                  {/* Only show Run Diagnostics button in development */}
+                  {!IS_PRODUCTION && (
+                    <Button
+                      onClick={handleRunDiagnostics}
+                      variant="outline"
+                      size="sm"
+                      disabled={isRunningDiagnostics}
+                      className="text-red-600 border-red-300 hover:bg-red-100"
+                    >
+                      <Stethoscope size={14} className={`mr-2 ${isRunningDiagnostics ? 'animate-pulse' : ''}`} />
+                      {isRunningDiagnostics ? 'Testing...' : 'Run Diagnostics'}
+                    </Button>
+                  )}
                 </div>
-                <Button
-                  onClick={checkHealth}
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 text-red-600 border-red-300 hover:bg-red-100"
-                >
-                  <RefreshCw size={14} className="mr-2" />
-                  Retry Connection
-                </Button>
               </div>
             </div>
           </div>
         )}
 
-        {health.status === 'unconfigured' && (
+        {/* Only show configuration errors in development - in production these should never happen */}
+        {health.status === 'unconfigured' && !IS_PRODUCTION && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
             <div className="flex items-start gap-3">
               <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
@@ -402,6 +522,20 @@ export function PolicyUpload() {
                 <p className="font-semibold text-amber-800">Backend Proxy Not Configured</p>
                 <p className="text-sm text-amber-600 mt-1">
                   Set <code className="bg-amber-100 px-1 rounded">VITE_API_PROXY_URL=http://localhost:4001</code> in your .env file
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* In production, show a generic service unavailable message */}
+        {health.status === 'unconfigured' && IS_PRODUCTION && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
+              <div className="flex-1">
+                <p className="font-semibold text-amber-800">Service Configuration Issue</p>
+                <p className="text-sm text-amber-600 mt-1">
+                  The AI service is not properly configured. Please contact support.
                 </p>
               </div>
             </div>

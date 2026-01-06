@@ -157,7 +157,10 @@ export function validate<T extends ZodSchema>(
 
       next()
     } catch (error) {
-      console.error('Validation middleware error:', error)
+      // Only log validation errors in development
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Validation middleware error:', error)
+      }
       return res.status(400).json({
         error: 'Invalid request data',
         code: 'VALIDATION_ERROR',
@@ -305,9 +308,57 @@ export function validateMaxSize(maxBytes: number) {
 }
 
 // =============================================================================
+// Chat Schemas
+// =============================================================================
+
+/**
+ * Schema for chat message
+ */
+export const chatMessageSchema = z.object({
+  role: z.enum(['user', 'assistant', 'system']),
+  content: z
+    .string()
+    .min(1, 'Message content is required')
+    .max(10000, 'Message too long (max 10KB)')
+    .transform(sanitizeString),
+})
+
+/**
+ * Schema for chat request with conversation history
+ */
+export const chatSchema = z.object({
+  message: z
+    .string()
+    .min(1, 'Message is required')
+    .max(4000, 'Message too long (max 4KB)')
+    .transform(sanitizeString),
+  conversationHistory: z
+    .array(chatMessageSchema)
+    .max(50, 'Too many messages in history (max 50)')
+    .optional()
+    .default([]),
+  policyContext: z
+    .string()
+    .max(50000, 'Policy context too long (max 50KB)')
+    .optional()
+    .transform((val) => (val ? sanitizeDocumentText(val) : undefined)),
+  provider: z
+    .enum(['openai', 'anthropic'])
+    .optional()
+    .default('openai'),
+})
+
+/**
+ * Validate chat request
+ */
+export const validateChat = validate(chatSchema)
+
+// =============================================================================
 // Export types
 // =============================================================================
 
 export type OpenAIExtractionInput = z.infer<typeof openAIExtractionSchema>
 export type AnthropicExtractionInput = z.infer<typeof anthropicExtractionSchema>
 export type OCRInput = z.infer<typeof ocrSchema>
+export type ChatInput = z.infer<typeof chatSchema>
+export type ChatMessage = z.infer<typeof chatMessageSchema>

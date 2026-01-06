@@ -1,93 +1,75 @@
-# Session Handoff - January 4, 2026
+# Session Handoff - January 6, 2026
 
 ## Current Status
 
-**Branch**: `claude/build-app-from-design-GBWjx`
+**Branch**: `claude/review-project-docs-QPUp6`
 
 ### What's Working
 - Full-stack app running (Frontend:5173, Backend:4001)
-- AI providers configured (OpenAI, Anthropic, Google)
+- AI extraction via OpenAI/Anthropic backend proxy
+- **NEW**: Multi-turn PolicyChat with conversation history
+- **NEW**: PWA support with service worker for offline
+- **NEW**: Bundle analysis with visualizer
 - Supabase auth and database connected
-- PDF upload and text extraction functional
+- 4100+ tests passing (99.2% pass rate)
 - Sentry error monitoring configured
-- Test coverage at 80%+
-- GitHub Codespaces compatible
 
-### Recent Changes (This Session)
-1. **Sign out button fixed** - Added toast feedback, shows "Sign In" for guests
-2. **Guest display** - Shows "Guest" + "Not signed in" when not authenticated
-3. **dev:sync script** - One command to pull, install, and run
-4. **CLAUDE.md updated** - Comprehensive project documentation
+### Completed This Session
+1. **Performance Optimizations** (commit `0d95e32`)
+   - Added `rollup-plugin-visualizer` for bundle analysis
+   - PWA initialization in production
+   - DNS prefetch hints for faster loading
+   - 30 performance tests
+
+2. **PolicyChat Multi-turn Conversation** (commit `cebb321`)
+   - Backend `/api/ai/chat` endpoint
+   - OpenAI (gpt-4o-mini) and Anthropic (claude-3-5-haiku) support
+   - Conversation history for context
+   - Policy details passed to AI
+   - 18 backend + 29 frontend tests
 
 ---
 
-## Unfinished Tasks / Known Bugs
+## Test Results
 
-### 1. PDF Extraction Failing in Codespaces
-- **Symptom**: "Failed to extract policy data" on upload
-- **Likely Cause**: API keys in .env may not be valid or backend isn't receiving them
-- **Debug**: Check server terminal for detailed error after upload
-- **Files**: `server/index.ts`, `src/lib/ai/policy-extractor.ts`
+```
+Total:    4162 tests across 123 files
+Passing:  4129 (99.2%)
+Failing:  33 (expected - require API keys)
+```
 
-### 2. Cached Auth Session
-- **Symptom**: User appears logged in when they shouldn't be
-- **Fix**: Run `localStorage.clear(); location.reload();` in browser console
-- **Root Cause**: Supabase persists session in localStorage
+Failing tests are environment/integration tests that need:
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SENTRY_DSN`
+- `VITE_API_PROXY_URL`
 
-### 3. Performance (Web Vitals)
-- **FCP/LCP showing as "poor"** (4-5 seconds)
-- **Cause**: Large bundle, CDN dependencies
-- **Next Step**: Bundle analysis, code splitting
+---
+
+## Known Issues
+
+1. **Environment tests fail without .env** - Expected in dev/CI without secrets
+2. **Anthropic SDK browser warning** - Test-only issue with `dangerouslyAllowBrowser`
+3. **Cached auth sessions** - Fix: `localStorage.clear(); location.reload();`
 
 ---
 
 ## Next Logical Steps
 
-### Immediate (High Priority)
-1. **Debug PDF extraction in Codespaces** - Check server logs for actual error
-2. **Verify API keys are valid** - Test each provider individually
-3. **Add extraction error details to UI** - Show specific error message, not just "Failed"
+### High Priority
+1. **E2E tests for PolicyChat** - Add Playwright chat flow tests
+2. **Chat history persistence** - Store conversations in Supabase
+3. **Provider selection UI** - Let users choose AI provider
 
-### Short Term
-1. **Protected routes** - Require auth for /dashboard, /upload
-2. **Policy storage** - Save extracted policies to Supabase
-3. **Error boundary** - Catch and display React errors gracefully
+### Medium Priority
+4. **Streaming responses** - SSE for real-time chat
+5. **Cost tracking** - Track API usage per user
+6. **Mobile optimization** - PolicyChat responsive design
 
-### Medium Term
-1. **Bundle optimization** - Code splitting for routes
-2. **Offline support** - Service worker for cached policies
-3. **Export feature** - Download analysis as PDF/Excel
-
----
-
-## Environment Setup Quick Reference
-
-```bash
-# Codespaces or Local
-git checkout claude/build-app-from-design-GBWjx
-npm install
-
-# Create .env with:
-VITE_SUPABASE_URL=https://exykhfulkbwzatpesruv.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
-VITE_API_PROXY_URL=http://localhost:4001
-API_PORT=4001
-OPENAI_API_KEY=sk-proj-...
-ANTHROPIC_API_KEY=sk-ant-...
-GOOGLE_CLOUD_API_KEY=AIza...
-
-# Run
-npm run dev:all
-```
-
----
-
-## Key Contacts / Resources
-
-- **Owner**: Erdem
-- **Repo**: github.com/prekic/insurai
-- **Supabase Project**: exykhfulkbwzatpesruv
-- **Sentry**: o4510132617216000 (DE region)
+### Lower Priority
+7. **Voice input** - Speech-to-text for chat
+8. **Export chat** - Download as PDF
+9. **Suggested questions** - AI follow-up suggestions
 
 ---
 
@@ -95,7 +77,45 @@ npm run dev:all
 
 | File | Change |
 |------|--------|
-| `src/components/GlobalNavigation.tsx` | Sign out fix, guest display |
-| `package.json` | Added dev:sync script |
-| `CLAUDE.md` | Complete rewrite with current state |
-| `SESSION_HANDOFF.md` | Created (this file) |
+| `CLAUDE.md` | Added PolicyChat, Performance, Server sections |
+| `index.html` | DNS prefetch hints |
+| `package.json` | build:analyze script |
+| `vite.config.ts` | Bundle visualizer plugin |
+| `src/main.tsx` | PWA initialization |
+| `src/components/PolicyChat.tsx` | Backend API integration |
+| `src/components/PolicyChat.test.tsx` | Fetch mocking |
+| `server/routes/ai.ts` | Chat endpoint |
+| `server/middleware/validation.ts` | Chat schema |
+| `server/middleware/rate-limit.ts` | Chat rate limiter |
+| `src/__tests__/performance/performance.test.ts` | New |
+| `server/__tests__/chat-routes.test.ts` | New |
+
+---
+
+## Quick Commands
+
+```bash
+npm run dev:all          # Start frontend + backend
+npm test                 # Run all tests (4100+)
+npm run build:analyze    # Analyze bundle size
+npm run validate         # Typecheck + lint + test
+```
+
+---
+
+## API Endpoints
+
+| Endpoint | Purpose | Rate Limit |
+|----------|---------|------------|
+| `POST /api/ai/chat` | Multi-turn chat | 60/hr |
+| `POST /api/ai/extract/openai` | Extract with GPT | 20/hr |
+| `POST /api/ai/extract/anthropic` | Extract with Claude | 20/hr |
+| `POST /api/ai/ocr` | Google Vision OCR | 30/hr |
+| `GET /api/ai/providers` | Check configured | - |
+| `GET /api/ai/diagnose` | Test API keys | - |
+
+---
+
+## Contact
+
+Personal project by Erdem. See `CLAUDE.md` for full documentation.
