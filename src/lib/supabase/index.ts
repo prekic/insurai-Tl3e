@@ -70,6 +70,15 @@ export {
 } from './auth'
 export type { AuthState } from './auth'
 
+// User profile operations
+export {
+  fetchUserProfile,
+  updateUserProfile,
+  fetchUserStats,
+  deleteUserAccount,
+} from './user-profile'
+export type { UserProfile, UserProfileUpdate, UserStats } from './user-profile'
+
 // Policy operations
 export {
   fetchPolicies,

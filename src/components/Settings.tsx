@@ -27,17 +27,27 @@ import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
+import { ConfirmationDialog, confirmations } from './ui/confirmation-dialog'
 import { useI18n, useLanguageSelector } from '@/lib/i18n'
 import { usePolicies } from '@/lib/policy-context'
 import { exportToCSV, exportPoliciesToPDF } from '@/lib/export'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useAuth } from '@/lib/supabase/auth-context'
 
-// Local storage keys for API keys
-const API_KEY_STORAGE = {
+// Local storage keys
+const STORAGE_KEYS = {
   OPENAI: 'insurai_openai_key',
   ANTHROPIC: 'insurai_anthropic_key',
   GOOGLE_CLOUD: 'insurai_google_cloud_key',
+  THEME: 'insurai_theme',
+  NOTIFICATIONS: 'insurai_notifications',
+} as const
+
+// For backwards compatibility
+const API_KEY_STORAGE = {
+  OPENAI: STORAGE_KEYS.OPENAI,
+  ANTHROPIC: STORAGE_KEYS.ANTHROPIC,
+  GOOGLE_CLOUD: STORAGE_KEYS.GOOGLE_CLOUD,
 } as const
 
 // Accessible Toggle Switch Component
@@ -170,6 +180,22 @@ function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isC
   )
 }
 
+type ThemeOption = 'light' | 'dark' | 'system'
+
+interface NotificationSettings {
+  email: boolean
+  push: boolean
+  renewalReminders: boolean
+  marketUpdates: boolean
+}
+
+const defaultNotifications: NotificationSettings = {
+  email: true,
+  push: true,
+  renewalReminders: true,
+  marketUpdates: false,
+}
+
 export function Settings() {
   const navigate = useNavigate()
   const { t, isRTL } = useI18n()
@@ -177,14 +203,43 @@ export function Settings() {
   const { policies, clearAllPolicies } = usePolicies()
   const { user, signOut } = useAuth()
 
-  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>('light')
-  const [notifications, setNotifications] = useState({
-    email: true,
-    push: true,
-    renewalReminders: true,
-    marketUpdates: false,
+  // Load theme from localStorage
+  const [theme, setTheme] = useState<ThemeOption>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.THEME)
+    return (saved as ThemeOption) || 'light'
   })
+
+  // Load notifications from localStorage
+  const [notifications, setNotifications] = useState<NotificationSettings>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.NOTIFICATIONS)
+    if (saved) {
+      try {
+        return { ...defaultNotifications, ...JSON.parse(saved) }
+      } catch {
+        return defaultNotifications
+      }
+    }
+    return defaultNotifications
+  })
+
   const baseId = useId()
+
+  // Confirmation dialog states
+  const [showClearDataDialog, setShowClearDataDialog] = useState(false)
+  const [showSignOutDialog, setShowSignOutDialog] = useState(false)
+  const [showRemoveApiKeyDialog, setShowRemoveApiKeyDialog] = useState<string | null>(null)
+
+  // Save theme to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.THEME, theme)
+    // Apply theme to document (for future dark mode implementation)
+    document.documentElement.setAttribute('data-theme', theme)
+  }, [theme])
+
+  // Save notifications to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(notifications))
+  }, [notifications])
 
   // API Key state
   const [openaiKey, setOpenaiKey] = useState('')
@@ -266,10 +321,15 @@ export function Settings() {
   }
 
   const handleClearOpenAIKey = () => {
+    setShowRemoveApiKeyDialog('openai')
+  }
+
+  const confirmClearOpenAIKey = () => {
     localStorage.removeItem(API_KEY_STORAGE.OPENAI)
     setOpenaiKey('')
     setOpenaiConfigured(false)
     toast.success('OpenAI API key removed')
+    setShowRemoveApiKeyDialog(null)
   }
 
   const handleSaveAnthropicKey = () => {
@@ -283,10 +343,15 @@ export function Settings() {
   }
 
   const handleClearAnthropicKey = () => {
+    setShowRemoveApiKeyDialog('anthropic')
+  }
+
+  const confirmClearAnthropicKey = () => {
     localStorage.removeItem(API_KEY_STORAGE.ANTHROPIC)
     setAnthropicKey('')
     setAnthropicConfigured(false)
     toast.success('Claude API key removed')
+    setShowRemoveApiKeyDialog(null)
   }
 
   const handleSaveGoogleCloudKey = () => {
@@ -300,10 +365,15 @@ export function Settings() {
   }
 
   const handleClearGoogleCloudKey = () => {
+    setShowRemoveApiKeyDialog('google')
+  }
+
+  const confirmClearGoogleCloudKey = () => {
     localStorage.removeItem(API_KEY_STORAGE.GOOGLE_CLOUD)
     setGoogleCloudKey('')
     setGoogleCloudConfigured(false)
     toast.success('Google Cloud API key removed')
+    setShowRemoveApiKeyDialog(null)
   }
 
   const handleExportCSV = () => {
@@ -329,12 +399,22 @@ export function Settings() {
   }
 
   const handleClearData = () => {
-    if (confirm('Are you sure you want to clear all policies? This cannot be undone.')) {
-      clearAllPolicies()
-    }
+    setShowClearDataDialog(true)
   }
 
-  const handleSignOut = async () => {
+  const confirmClearData = async () => {
+    await clearAllPolicies()
+    toast.success('All data cleared', {
+      description: 'Your policies have been removed.',
+    })
+    setShowClearDataDialog(false)
+  }
+
+  const handleSignOut = () => {
+    setShowSignOutDialog(true)
+  }
+
+  const confirmSignOut = async () => {
     try {
       await signOut()
       navigate('/')
@@ -704,6 +784,51 @@ export function Settings() {
           </Button>
         </div>
       </div>
+
+      {/* Confirmation Dialogs */}
+      <ConfirmationDialog
+        isOpen={showClearDataDialog}
+        onClose={() => setShowClearDataDialog(false)}
+        onConfirm={confirmClearData}
+        {...confirmations.clearAllData}
+      />
+
+      <ConfirmationDialog
+        isOpen={showSignOutDialog}
+        onClose={() => setShowSignOutDialog(false)}
+        onConfirm={confirmSignOut}
+        {...confirmations.signOut}
+      />
+
+      <ConfirmationDialog
+        isOpen={showRemoveApiKeyDialog === 'openai'}
+        onClose={() => setShowRemoveApiKeyDialog(null)}
+        onConfirm={confirmClearOpenAIKey}
+        title="Remove OpenAI API Key"
+        description="Are you sure you want to remove the OpenAI API key? AI-powered extraction will be disabled until you add a new key."
+        confirmText="Remove Key"
+        variant="warning"
+      />
+
+      <ConfirmationDialog
+        isOpen={showRemoveApiKeyDialog === 'anthropic'}
+        onClose={() => setShowRemoveApiKeyDialog(null)}
+        onConfirm={confirmClearAnthropicKey}
+        title="Remove Claude API Key"
+        description="Are you sure you want to remove the Claude API key? Multi-model consensus will be disabled until you add a new key."
+        confirmText="Remove Key"
+        variant="warning"
+      />
+
+      <ConfirmationDialog
+        isOpen={showRemoveApiKeyDialog === 'google'}
+        onClose={() => setShowRemoveApiKeyDialog(null)}
+        onConfirm={confirmClearGoogleCloudKey}
+        title="Remove Google Cloud API Key"
+        description="Are you sure you want to remove the Google Cloud API key? OCR for scanned documents will be disabled until you add a new key."
+        confirmText="Remove Key"
+        variant="warning"
+      />
     </div>
   )
 }
