@@ -6,6 +6,8 @@ import { defineConfig, devices } from '@playwright/test'
  * Run with: npx playwright test
  * Run UI mode: npx playwright test --ui
  * Run fast (Chromium only): npx playwright test --project=chromium
+ * Run Safari only: npx playwright test --project=webkit
+ * Run Mobile Safari: npx playwright test --project="Mobile Safari"
  */
 export default defineConfig({
   testDir: './e2e',
@@ -37,10 +39,20 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    // Mobile testing
+    // Mobile testing - Android
     {
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },
+    },
+    // Safari/WebKit - Desktop
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    // Safari/WebKit - Mobile (iPhone)
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 13'] },
     },
     // Firefox - slower, run last (skip in CI with --project=chromium)
     {

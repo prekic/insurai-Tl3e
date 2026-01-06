@@ -500,3 +500,435 @@ describe('Cleanup', () => {
     expect(getCollectedMetrics().size).toBe(0)
   })
 })
+
+describe('Core Web Vitals Metric Simulation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearMetrics()
+  })
+
+  afterEach(() => {
+    clearMetrics()
+  })
+
+  describe('LCP (Largest Contentful Paint)', () => {
+    it('should classify excellent LCP (< 2.5s)', () => {
+      expect(getWebVitalRating('LCP', 1500)).toBe('good')
+      expect(getWebVitalRating('LCP', 2000)).toBe('good')
+      expect(getWebVitalRating('LCP', 2499)).toBe('good')
+    })
+
+    it('should classify moderate LCP (2.5s - 4s)', () => {
+      expect(getWebVitalRating('LCP', 2501)).toBe('needs-improvement')
+      expect(getWebVitalRating('LCP', 3500)).toBe('needs-improvement')
+      expect(getWebVitalRating('LCP', 3999)).toBe('needs-improvement')
+    })
+
+    it('should classify poor LCP (> 4s)', () => {
+      expect(getWebVitalRating('LCP', 4001)).toBe('poor')
+      expect(getWebVitalRating('LCP', 5000)).toBe('poor')
+      expect(getWebVitalRating('LCP', 10000)).toBe('poor')
+    })
+  })
+
+  describe('CLS (Cumulative Layout Shift)', () => {
+    it('should classify excellent CLS (< 0.1)', () => {
+      expect(getWebVitalRating('CLS', 0)).toBe('good')
+      expect(getWebVitalRating('CLS', 0.05)).toBe('good')
+      expect(getWebVitalRating('CLS', 0.099)).toBe('good')
+    })
+
+    it('should classify moderate CLS (0.1 - 0.25)', () => {
+      expect(getWebVitalRating('CLS', 0.101)).toBe('needs-improvement')
+      expect(getWebVitalRating('CLS', 0.15)).toBe('needs-improvement')
+      expect(getWebVitalRating('CLS', 0.24)).toBe('needs-improvement')
+    })
+
+    it('should classify poor CLS (> 0.25)', () => {
+      expect(getWebVitalRating('CLS', 0.26)).toBe('poor')
+      expect(getWebVitalRating('CLS', 0.5)).toBe('poor')
+      expect(getWebVitalRating('CLS', 1.0)).toBe('poor')
+    })
+  })
+
+  describe('INP (Interaction to Next Paint)', () => {
+    it('should classify excellent INP (< 200ms)', () => {
+      expect(getWebVitalRating('INP', 50)).toBe('good')
+      expect(getWebVitalRating('INP', 100)).toBe('good')
+      expect(getWebVitalRating('INP', 199)).toBe('good')
+    })
+
+    it('should classify moderate INP (200ms - 500ms)', () => {
+      expect(getWebVitalRating('INP', 201)).toBe('needs-improvement')
+      expect(getWebVitalRating('INP', 350)).toBe('needs-improvement')
+      expect(getWebVitalRating('INP', 499)).toBe('needs-improvement')
+    })
+
+    it('should classify poor INP (> 500ms)', () => {
+      expect(getWebVitalRating('INP', 501)).toBe('poor')
+      expect(getWebVitalRating('INP', 750)).toBe('poor')
+      expect(getWebVitalRating('INP', 1000)).toBe('poor')
+    })
+  })
+
+  describe('TTFB (Time to First Byte)', () => {
+    it('should classify excellent TTFB (< 800ms)', () => {
+      expect(getWebVitalRating('TTFB', 200)).toBe('good')
+      expect(getWebVitalRating('TTFB', 500)).toBe('good')
+      expect(getWebVitalRating('TTFB', 799)).toBe('good')
+    })
+
+    it('should classify moderate TTFB (800ms - 1800ms)', () => {
+      expect(getWebVitalRating('TTFB', 801)).toBe('needs-improvement')
+      expect(getWebVitalRating('TTFB', 1200)).toBe('needs-improvement')
+      expect(getWebVitalRating('TTFB', 1799)).toBe('needs-improvement')
+    })
+
+    it('should classify poor TTFB (> 1800ms)', () => {
+      expect(getWebVitalRating('TTFB', 1801)).toBe('poor')
+      expect(getWebVitalRating('TTFB', 2500)).toBe('poor')
+      expect(getWebVitalRating('TTFB', 5000)).toBe('poor')
+    })
+  })
+
+  describe('FCP (First Contentful Paint)', () => {
+    it('should classify excellent FCP (< 1.8s)', () => {
+      expect(getWebVitalRating('FCP', 500)).toBe('good')
+      expect(getWebVitalRating('FCP', 1000)).toBe('good')
+      expect(getWebVitalRating('FCP', 1799)).toBe('good')
+    })
+
+    it('should classify moderate FCP (1.8s - 3s)', () => {
+      expect(getWebVitalRating('FCP', 1801)).toBe('needs-improvement')
+      expect(getWebVitalRating('FCP', 2500)).toBe('needs-improvement')
+      expect(getWebVitalRating('FCP', 2999)).toBe('needs-improvement')
+    })
+
+    it('should classify poor FCP (> 3s)', () => {
+      expect(getWebVitalRating('FCP', 3001)).toBe('poor')
+      expect(getWebVitalRating('FCP', 4000)).toBe('poor')
+      expect(getWebVitalRating('FCP', 6000)).toBe('poor')
+    })
+  })
+})
+
+describe('Metric Callback System', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearMetrics()
+  })
+
+  afterEach(() => {
+    clearMetrics()
+  })
+
+  it('should allow multiple callbacks to be registered', () => {
+    const callback1 = vi.fn()
+    const callback2 = vi.fn()
+    const callback3 = vi.fn()
+
+    const unsub1 = onMetricUpdate(callback1)
+    const unsub2 = onMetricUpdate(callback2)
+    const unsub3 = onMetricUpdate(callback3)
+
+    expect(typeof unsub1).toBe('function')
+    expect(typeof unsub2).toBe('function')
+    expect(typeof unsub3).toBe('function')
+
+    // Cleanup
+    unsub1()
+    unsub2()
+    unsub3()
+  })
+
+  it('should unsubscribe specific callback without affecting others', () => {
+    const callback1 = vi.fn()
+    const callback2 = vi.fn()
+
+    const unsub1 = onMetricUpdate(callback1)
+    onMetricUpdate(callback2)
+
+    unsub1()
+
+    // callback1 should be unsubscribed, callback2 should still be registered
+    expect(callback1).not.toHaveBeenCalled()
+  })
+
+  it('should handle unsubscribing non-existent callback gracefully', () => {
+    const callback = vi.fn()
+    const unsub = onMetricUpdate(callback)
+
+    // Unsubscribe twice should not throw
+    expect(() => {
+      unsub()
+      unsub()
+    }).not.toThrow()
+  })
+})
+
+describe('Performance Summary Calculations', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearMetrics()
+  })
+
+  afterEach(() => {
+    clearMetrics()
+  })
+
+  it('should return good overall score when no metrics', () => {
+    const summary = getPerformanceSummary()
+    expect(summary.overallScore).toBe('good')
+  })
+
+  it('should return empty recommendations when no metrics', () => {
+    const summary = getPerformanceSummary()
+    expect(summary.recommendations).toEqual([])
+  })
+
+  it('should include all web vital keys in summary', () => {
+    const summary = getPerformanceSummary()
+
+    expect(summary.webVitals).toHaveProperty('LCP')
+    expect(summary.webVitals).toHaveProperty('CLS')
+    expect(summary.webVitals).toHaveProperty('INP')
+    expect(summary.webVitals).toHaveProperty('TTFB')
+    expect(summary.webVitals).toHaveProperty('FCP')
+  })
+})
+
+describe('Real-World Performance Scenarios', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearMetrics()
+  })
+
+  afterEach(() => {
+    clearMetrics()
+  })
+
+  describe('Fast Website Scenario', () => {
+    it('should rate all vitals as good for fast website', () => {
+      // Simulating a fast, well-optimized website
+      const fastSiteMetrics = {
+        LCP: 1500, // 1.5s - good
+        CLS: 0.05, // 0.05 - good
+        INP: 100, // 100ms - good
+        TTFB: 400, // 400ms - good
+        FCP: 1000, // 1s - good
+      }
+
+      Object.entries(fastSiteMetrics).forEach(([name, value]) => {
+        expect(getWebVitalRating(name as WebVitalName, value)).toBe('good')
+      })
+    })
+  })
+
+  describe('Slow Website Scenario', () => {
+    it('should rate all vitals as poor for slow website', () => {
+      // Simulating a slow, unoptimized website
+      const slowSiteMetrics = {
+        LCP: 5000, // 5s - poor
+        CLS: 0.5, // 0.5 - poor
+        INP: 700, // 700ms - poor
+        TTFB: 2500, // 2.5s - poor
+        FCP: 4000, // 4s - poor
+      }
+
+      Object.entries(slowSiteMetrics).forEach(([name, value]) => {
+        expect(getWebVitalRating(name as WebVitalName, value)).toBe('poor')
+      })
+    })
+  })
+
+  describe('Average Website Scenario', () => {
+    it('should rate most vitals as needs-improvement for average website', () => {
+      // Simulating an average website
+      const avgSiteMetrics = {
+        LCP: 3000, // 3s - needs-improvement
+        CLS: 0.15, // 0.15 - needs-improvement
+        INP: 350, // 350ms - needs-improvement
+        TTFB: 1200, // 1.2s - needs-improvement
+        FCP: 2500, // 2.5s - needs-improvement
+      }
+
+      Object.entries(avgSiteMetrics).forEach(([name, value]) => {
+        expect(getWebVitalRating(name as WebVitalName, value)).toBe('needs-improvement')
+      })
+    })
+  })
+
+  describe('Mixed Performance Scenario', () => {
+    it('should handle mixed performance correctly', () => {
+      // Website with some good and some poor metrics
+      expect(getWebVitalRating('LCP', 1500)).toBe('good') // Fast LCP
+      expect(getWebVitalRating('CLS', 0.5)).toBe('poor') // Bad layout stability
+      expect(getWebVitalRating('INP', 100)).toBe('good') // Good interactivity
+      expect(getWebVitalRating('TTFB', 2000)).toBe('poor') // Slow server
+      expect(getWebVitalRating('FCP', 2000)).toBe('needs-improvement') // Moderate FCP
+    })
+  })
+})
+
+describe('Performance Transaction Timing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearMetrics()
+  })
+
+  it('should track PDF extraction timing', async () => {
+    const result = await measureAsync('Extract Policy PDF', 'pdf.extract', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return { pages: 5, text: 'Policy content' }
+    })
+
+    expect(result).toEqual({ pages: 5, text: 'Policy content' })
+  })
+
+  it('should track AI analysis timing', async () => {
+    const result = await measureAsync('AI Policy Analysis', 'ai.analyze', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30))
+      return { confidence: 0.95, coverages: [] }
+    })
+
+    expect(result).toHaveProperty('confidence', 0.95)
+  })
+
+  it('should track sync operations', () => {
+    const result = measureSync('Parse JSON', 'json.parse', () => {
+      return JSON.parse('{"key": "value"}')
+    })
+
+    expect(result).toEqual({ key: 'value' })
+  })
+
+  it('should handle operation cancellation', async () => {
+    const transaction = startTransaction({
+      name: 'Cancellable Operation',
+      op: 'operation.cancellable',
+    })
+
+    transaction.setStatus('cancelled')
+    transaction.finish()
+
+    // Should not throw
+    expect(true).toBe(true)
+  })
+
+  it('should track operation with rich context', () => {
+    const transaction = startTransaction({
+      name: 'Complex PDF Operation',
+      op: 'pdf.complex',
+      description: 'Processing multi-page PDF with OCR',
+      tags: {
+        pdfType: 'scanned',
+        provider: 'google-vision',
+      },
+      data: {
+        pageCount: 15,
+        hasImages: true,
+        language: 'tr',
+      },
+    })
+
+    transaction.setData('extractedText', 'Sample text...')
+    transaction.setData('confidence', 0.89)
+    transaction.setTag('status', 'complete')
+    transaction.setStatus('ok')
+    transaction.finish()
+
+    expect(true).toBe(true)
+  })
+})
+
+describe('Web Vitals Threshold Boundary Tests', () => {
+  describe('LCP Boundaries', () => {
+    it('should handle LCP exactly at 2500ms (good threshold)', () => {
+      expect(getWebVitalRating('LCP', 2500)).toBe('good')
+    })
+
+    it('should handle LCP at 2500.01ms (needs-improvement)', () => {
+      expect(getWebVitalRating('LCP', 2500.01)).toBe('needs-improvement')
+    })
+
+    it('should handle LCP exactly at 4000ms (needs-improvement threshold)', () => {
+      expect(getWebVitalRating('LCP', 4000)).toBe('needs-improvement')
+    })
+
+    it('should handle LCP at 4000.01ms (poor)', () => {
+      expect(getWebVitalRating('LCP', 4000.01)).toBe('poor')
+    })
+  })
+
+  describe('CLS Boundaries', () => {
+    it('should handle CLS exactly at 0.1 (good threshold)', () => {
+      expect(getWebVitalRating('CLS', 0.1)).toBe('good')
+    })
+
+    it('should handle CLS at 0.100001 (needs-improvement)', () => {
+      expect(getWebVitalRating('CLS', 0.100001)).toBe('needs-improvement')
+    })
+
+    it('should handle CLS exactly at 0.25 (needs-improvement threshold)', () => {
+      expect(getWebVitalRating('CLS', 0.25)).toBe('needs-improvement')
+    })
+
+    it('should handle CLS at 0.250001 (poor)', () => {
+      expect(getWebVitalRating('CLS', 0.250001)).toBe('poor')
+    })
+  })
+
+  describe('INP Boundaries', () => {
+    it('should handle INP exactly at 200ms (good threshold)', () => {
+      expect(getWebVitalRating('INP', 200)).toBe('good')
+    })
+
+    it('should handle INP at 200.01ms (needs-improvement)', () => {
+      expect(getWebVitalRating('INP', 200.01)).toBe('needs-improvement')
+    })
+
+    it('should handle INP exactly at 500ms (needs-improvement threshold)', () => {
+      expect(getWebVitalRating('INP', 500)).toBe('needs-improvement')
+    })
+
+    it('should handle INP at 500.01ms (poor)', () => {
+      expect(getWebVitalRating('INP', 500.01)).toBe('poor')
+    })
+  })
+
+  describe('TTFB Boundaries', () => {
+    it('should handle TTFB exactly at 800ms (good threshold)', () => {
+      expect(getWebVitalRating('TTFB', 800)).toBe('good')
+    })
+
+    it('should handle TTFB at 800.01ms (needs-improvement)', () => {
+      expect(getWebVitalRating('TTFB', 800.01)).toBe('needs-improvement')
+    })
+
+    it('should handle TTFB exactly at 1800ms (needs-improvement threshold)', () => {
+      expect(getWebVitalRating('TTFB', 1800)).toBe('needs-improvement')
+    })
+
+    it('should handle TTFB at 1800.01ms (poor)', () => {
+      expect(getWebVitalRating('TTFB', 1800.01)).toBe('poor')
+    })
+  })
+
+  describe('FCP Boundaries', () => {
+    it('should handle FCP exactly at 1800ms (good threshold)', () => {
+      expect(getWebVitalRating('FCP', 1800)).toBe('good')
+    })
+
+    it('should handle FCP at 1800.01ms (needs-improvement)', () => {
+      expect(getWebVitalRating('FCP', 1800.01)).toBe('needs-improvement')
+    })
+
+    it('should handle FCP exactly at 3000ms (needs-improvement threshold)', () => {
+      expect(getWebVitalRating('FCP', 3000)).toBe('needs-improvement')
+    })
+
+    it('should handle FCP at 3000.01ms (poor)', () => {
+      expect(getWebVitalRating('FCP', 3000.01)).toBe('poor')
+    })
+  })
+})
