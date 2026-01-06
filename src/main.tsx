@@ -19,6 +19,20 @@ setupCSPViolationListener()
 import { validateEnvironment } from './lib/env'
 validateEnvironment()
 
+// Initialize PWA and service worker for offline support
+// Only in production to avoid caching issues during development
+if (import.meta.env.PROD) {
+  import('./lib/pwa').then(({ initializePWA }) => {
+    initializePWA({
+      swPath: '/sw.js',
+      swScope: '/',
+      enableOfflineAnalytics: true,
+      enableBackgroundSync: true,
+      cacheStrategy: 'aggressive',
+    })
+  })
+}
+
 const rootElement = document.getElementById('root')
 if (!rootElement) {
   throw new Error('Root element not found')
