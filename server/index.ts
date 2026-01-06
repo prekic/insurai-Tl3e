@@ -9,6 +9,7 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
+import type { Server } from 'http'
 
 // Load environment variables first (before Sentry init)
 dotenv.config()
@@ -34,10 +35,52 @@ const PORT = process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 const IS_STAGING = process.env.NODE_ENV === 'staging'
 
+// Server configuration
+const SERVER_CONFIG = {
+  // Request timeout in milliseconds (default: 30 seconds, AI requests: 2 minutes)
+  REQUEST_TIMEOUT: parseInt(process.env.REQUEST_TIMEOUT || '30000', 10),
+  AI_REQUEST_TIMEOUT: parseInt(process.env.AI_REQUEST_TIMEOUT || '120000', 10),
+  // Graceful shutdown timeout (how long to wait for connections to close)
+  SHUTDOWN_TIMEOUT: parseInt(process.env.SHUTDOWN_TIMEOUT || '30000', 10),
+  // Keep-alive timeout (must be greater than load balancer timeout)
+  KEEP_ALIVE_TIMEOUT: parseInt(process.env.KEEP_ALIVE_TIMEOUT || '65000', 10),
+  // Headers timeout (must be greater than keep-alive timeout)
+  HEADERS_TIMEOUT: parseInt(process.env.HEADERS_TIMEOUT || '66000', 10),
+}
+
+// Server instance for graceful shutdown
+let server: Server
+
+// Track active connections for graceful shutdown
+const activeConnections = new Set<import('net').Socket>()
+
 // Sentry request handler must be first middleware
 if (IS_PRODUCTION || IS_STAGING) {
   app.use(sentryRequestHandler())
 }
+
+/**
+ * Request timeout middleware
+ * Sets a timeout on all requests to prevent hanging connections
+ */
+function requestTimeout(timeoutMs: number) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    // Set the request timeout
+    req.setTimeout(timeoutMs, () => {
+      if (!res.headersSent) {
+        res.status(408).json({
+          error: IS_PRODUCTION ? 'Request timed out' : 'Request timeout exceeded',
+          code: 'REQUEST_TIMEOUT',
+          ...(IS_PRODUCTION ? {} : { timeoutMs }),
+        })
+      }
+    })
+    next()
+  }
+}
+
+// Apply default request timeout to all routes
+app.use(requestTimeout(SERVER_CONFIG.REQUEST_TIMEOUT))
 
 // Security middleware with CSP configuration
 app.use(
@@ -160,8 +203,8 @@ app.get('/api/health', healthLimiter, (_req, res) => {
   res.json(response)
 })
 
-// AI proxy routes
-app.use('/api/ai', aiRoutes)
+// AI proxy routes (with longer timeout for AI processing)
+app.use('/api/ai', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), aiRoutes)
 
 // 404 handler
 app.use((_req, res) => {
@@ -190,7 +233,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 })
 
 // Start server
-app.listen(PORT, () => {
+server = app.listen(PORT, () => {
   console.log(`🚀 InsurAI API server running on port ${PORT}`)
   // Only show detailed provider configuration in non-production
   // to prevent information leakage about server capabilities
@@ -201,7 +244,103 @@ app.listen(PORT, () => {
     console.log(`   - OpenAI:    ${process.env.OPENAI_API_KEY ? '✓' : '✗'}`)
     console.log(`   - Anthropic: ${process.env.ANTHROPIC_API_KEY ? '✓' : '✗'}`)
     console.log(`   - Google:    ${process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '✗'}`)
+    console.log('')
+    console.log('   Server configuration:')
+    console.log(`   - Request timeout: ${SERVER_CONFIG.REQUEST_TIMEOUT}ms`)
+    console.log(`   - AI request timeout: ${SERVER_CONFIG.AI_REQUEST_TIMEOUT}ms`)
+    console.log(`   - Shutdown timeout: ${SERVER_CONFIG.SHUTDOWN_TIMEOUT}ms`)
+  }
+})
+
+// Configure server timeouts
+server.keepAliveTimeout = SERVER_CONFIG.KEEP_ALIVE_TIMEOUT
+server.headersTimeout = SERVER_CONFIG.HEADERS_TIMEOUT
+
+// Track connections for graceful shutdown
+server.on('connection', (socket) => {
+  activeConnections.add(socket)
+  socket.on('close', () => {
+    activeConnections.delete(socket)
+  })
+})
+
+/**
+ * Graceful shutdown handler
+ * Ensures all active requests complete before shutting down
+ */
+let isShuttingDown = false
+
+async function gracefulShutdown(signal: string): Promise<void> {
+  if (isShuttingDown) {
+    console.log('Shutdown already in progress...')
+    return
+  }
+
+  isShuttingDown = true
+  console.log(`\n${signal} received. Starting graceful shutdown...`)
+
+  // Stop accepting new connections
+  server.close((err) => {
+    if (err) {
+      console.error('Error closing server:', err)
+      process.exit(1)
+    }
+  })
+
+  // Set a timeout for graceful shutdown
+  const shutdownTimeout = setTimeout(() => {
+    console.error(`Graceful shutdown timed out after ${SERVER_CONFIG.SHUTDOWN_TIMEOUT}ms. Forcing exit.`)
+    // Force close remaining connections
+    activeConnections.forEach((socket) => {
+      socket.destroy()
+    })
+    process.exit(1)
+  }, SERVER_CONFIG.SHUTDOWN_TIMEOUT)
+
+  // Wait for all connections to close
+  const checkConnections = setInterval(() => {
+    if (activeConnections.size === 0) {
+      clearInterval(checkConnections)
+      clearTimeout(shutdownTimeout)
+      console.log('All connections closed. Server shutdown complete.')
+      process.exit(0)
+    } else if (!IS_PRODUCTION) {
+      console.log(`Waiting for ${activeConnections.size} connection(s) to close...`)
+    }
+  }, 1000)
+
+  // Signal to load balancers that we're shutting down
+  // by returning 503 for health checks
+  app.get('/api/health', (_req, res) => {
+    res.status(503).json({
+      status: 'shutting_down',
+      message: 'Server is shutting down',
+    })
+  })
+}
+
+// Handle shutdown signals
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'))
+process.on('SIGINT', () => gracefulShutdown('SIGINT'))
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught exception:', error)
+  captureServerError(error)
+  gracefulShutdown('uncaughtException')
+})
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled rejection at:', promise, 'reason:', reason)
+  if (reason instanceof Error) {
+    captureServerError(reason)
+  }
+  // Don't exit on unhandled rejection in production, just log it
+  if (!IS_PRODUCTION) {
+    gracefulShutdown('unhandledRejection')
   }
 })
 
 export default app
+export { server, gracefulShutdown, SERVER_CONFIG }
