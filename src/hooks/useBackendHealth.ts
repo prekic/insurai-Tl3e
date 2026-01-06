@@ -1,6 +1,29 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getProxyUrl } from '@/lib/ai/config'
 
+export interface ProviderDiagnostic {
+  configured: boolean
+  valid: boolean
+  error?: string
+  latencyMs?: number
+  model?: string
+}
+
+export interface DiagnosticResult {
+  openai: ProviderDiagnostic
+  anthropic: ProviderDiagnostic
+  google: ProviderDiagnostic
+  timestamp: string
+  environment: string
+  summary: {
+    anyProviderConfigured: boolean
+    anyProviderValid: boolean
+    extractionReady: boolean
+    ocrReady: boolean
+    recommendation: string
+  }
+}
+
 export interface BackendHealth {
   status: 'checking' | 'healthy' | 'unhealthy' | 'unconfigured'
   providers: {
@@ -10,6 +33,7 @@ export interface BackendHealth {
   }
   error?: string
   lastChecked?: Date
+  diagnostics?: DiagnosticResult
 }
 
 /**
@@ -72,11 +96,49 @@ export function useBackendHealth(autoCheck = true) {
     }
   }, [])
 
+  /**
+   * Run full diagnostics to test API key validity
+   * This makes actual API calls to each provider to verify credentials
+   */
+  const runDiagnostics = useCallback(async (): Promise<DiagnosticResult | null> => {
+    const proxyUrl = getProxyUrl()
+
+    if (!proxyUrl) {
+      return null
+    }
+
+    try {
+      const response = await fetch(`${proxyUrl}/api/ai/diagnose`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Diagnostic endpoint returned ${response.status}`)
+      }
+
+      const diagnostics = await response.json() as DiagnosticResult
+
+      // Update health state with diagnostic results
+      setHealth(prev => ({
+        ...prev,
+        diagnostics,
+        status: diagnostics.summary.anyProviderValid ? 'healthy' : 'unhealthy',
+        error: diagnostics.summary.anyProviderValid ? undefined : diagnostics.summary.recommendation,
+      }))
+
+      return diagnostics
+    } catch (error) {
+      console.error('Diagnostics failed:', error)
+      return null
+    }
+  }, [])
+
   useEffect(() => {
     if (autoCheck) {
       checkHealth()
     }
   }, [autoCheck, checkHealth])
 
-  return { health, checkHealth }
+  return { health, checkHealth, runDiagnostics }
 }

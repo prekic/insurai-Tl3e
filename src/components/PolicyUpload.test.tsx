@@ -51,6 +51,7 @@ vi.mock('@/lib/ai', () => ({
 
 // Mock the backend health hook
 const mockCheckHealth = vi.fn()
+const mockRunDiagnostics = vi.fn().mockResolvedValue(null)
 vi.mock('@/hooks/useBackendHealth', () => ({
   useBackendHealth: vi.fn(() => ({
     health: {
@@ -59,6 +60,7 @@ vi.mock('@/hooks/useBackendHealth', () => ({
       error: undefined,
     },
     checkHealth: mockCheckHealth,
+    runDiagnostics: mockRunDiagnostics,
   })),
 }))
 
@@ -610,6 +612,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
   })
 
@@ -622,6 +625,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -639,6 +643,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -655,6 +660,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -671,6 +677,7 @@ describe('PolicyUpload Backend Health Status', () => {
         error: undefined,
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -687,6 +694,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -705,6 +713,7 @@ describe('PolicyUpload Backend Health Status', () => {
         error: 'Backend proxy URL not configured',
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -723,6 +732,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -741,6 +751,7 @@ describe('PolicyUpload Backend Health Status', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
 
     renderPolicyUpload()
@@ -761,6 +772,7 @@ describe('PolicyUpload Detailed Error Messages', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
   })
 
@@ -822,6 +834,7 @@ describe('PolicyUpload Error Retry Functionality', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
   })
 
@@ -917,6 +930,7 @@ describe('PolicyUpload Supabase Integration', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
   })
 
@@ -977,6 +991,7 @@ describe('PolicyUpload Supabase with Authenticated User', () => {
         lastChecked: new Date(),
       },
       checkHealth: mockCheckHealth,
+      runDiagnostics: mockRunDiagnostics,
     })
   })
 

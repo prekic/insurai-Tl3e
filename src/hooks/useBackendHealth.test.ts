@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useBackendHealth } from './useBackendHealth'
+import { useBackendHealth, type DiagnosticResult } from './useBackendHealth'
 
 // Mock the config module
 vi.mock('@/lib/ai/config', () => ({
@@ -233,6 +233,217 @@ describe('useBackendHealth', () => {
       })
 
       expect(result.current.health.error).toContain('ETIMEDOUT')
+    })
+  })
+
+  describe('runDiagnostics', () => {
+    it('should return null when proxy is not configured', async () => {
+      mockGetProxyUrl.mockReturnValue(null)
+
+      const { result } = renderHook(() => useBackendHealth(false))
+
+      let diagnosticResult: DiagnosticResult | null = null
+      await act(async () => {
+        diagnosticResult = await result.current.runDiagnostics()
+      })
+
+      expect(diagnosticResult).toBeNull()
+    })
+
+    it('should fetch and return diagnostic results', async () => {
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+
+      const mockDiagnostics: DiagnosticResult = {
+        openai: { configured: true, valid: true, latencyMs: 250, model: 'gpt-4o-mini' },
+        anthropic: { configured: false, valid: false },
+        google: { configured: false, valid: false },
+        timestamp: new Date().toISOString(),
+        environment: 'development',
+        summary: {
+          anyProviderConfigured: true,
+          anyProviderValid: true,
+          extractionReady: true,
+          ocrReady: false,
+          recommendation: 'All configured providers are working',
+        },
+      }
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            providers: { openai: true, anthropic: false, google: false },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockDiagnostics),
+        })
+
+      const { result } = renderHook(() => useBackendHealth(true))
+
+      await waitFor(() => {
+        expect(result.current.health.status).toBe('healthy')
+      })
+
+      let diagnosticResult: DiagnosticResult | null = null
+      await act(async () => {
+        diagnosticResult = await result.current.runDiagnostics()
+      })
+
+      expect(diagnosticResult).not.toBeNull()
+      expect(diagnosticResult?.openai.valid).toBe(true)
+      expect(diagnosticResult?.summary.extractionReady).toBe(true)
+    })
+
+    it('should update health state with diagnostic results showing invalid keys', async () => {
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+
+      const mockDiagnostics: DiagnosticResult = {
+        openai: { configured: true, valid: false, error: 'Invalid API key - check OPENAI_API_KEY in .env' },
+        anthropic: { configured: false, valid: false },
+        google: { configured: false, valid: false },
+        timestamp: new Date().toISOString(),
+        environment: 'development',
+        summary: {
+          anyProviderConfigured: true,
+          anyProviderValid: false,
+          extractionReady: false,
+          ocrReady: false,
+          recommendation: 'API keys are configured but invalid - check the error messages above',
+        },
+      }
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            providers: { openai: true, anthropic: false, google: false },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockDiagnostics),
+        })
+
+      const { result } = renderHook(() => useBackendHealth(true))
+
+      await waitFor(() => {
+        expect(result.current.health.status).toBe('healthy')
+      })
+
+      await act(async () => {
+        await result.current.runDiagnostics()
+      })
+
+      // After diagnostics, status should be updated based on provider validity
+      expect(result.current.health.status).toBe('unhealthy')
+      expect(result.current.health.diagnostics).toBeDefined()
+      expect(result.current.health.diagnostics?.openai.error).toContain('Invalid API key')
+    })
+
+    it('should handle diagnostic endpoint failure gracefully', async () => {
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            providers: { openai: true, anthropic: false, google: false },
+          }),
+        })
+        .mockRejectedValueOnce(new Error('Network error'))
+
+      const { result } = renderHook(() => useBackendHealth(true))
+
+      await waitFor(() => {
+        expect(result.current.health.status).toBe('healthy')
+      })
+
+      let diagnosticResult: DiagnosticResult | null = null
+      await act(async () => {
+        diagnosticResult = await result.current.runDiagnostics()
+      })
+
+      expect(diagnosticResult).toBeNull()
+      // Health status should remain unchanged after failed diagnostics
+      expect(result.current.health.status).toBe('healthy')
+    })
+
+    it('should handle non-ok response from diagnostic endpoint', async () => {
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            providers: { openai: true, anthropic: false, google: false },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+        })
+
+      const { result } = renderHook(() => useBackendHealth(true))
+
+      await waitFor(() => {
+        expect(result.current.health.status).toBe('healthy')
+      })
+
+      let diagnosticResult: DiagnosticResult | null = null
+      await act(async () => {
+        diagnosticResult = await result.current.runDiagnostics()
+      })
+
+      expect(diagnosticResult).toBeNull()
+    })
+
+    it('should show valid providers with latency info', async () => {
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+
+      const mockDiagnostics: DiagnosticResult = {
+        openai: { configured: true, valid: true, latencyMs: 150, model: 'gpt-4o-mini' },
+        anthropic: { configured: true, valid: true, latencyMs: 200, model: 'claude-3-5-haiku' },
+        google: { configured: true, valid: true, latencyMs: 100, model: 'cloud-vision-v1' },
+        timestamp: new Date().toISOString(),
+        environment: 'development',
+        summary: {
+          anyProviderConfigured: true,
+          anyProviderValid: true,
+          extractionReady: true,
+          ocrReady: true,
+          recommendation: 'All configured providers are working',
+        },
+      }
+
+      globalThis.fetch = vi.fn()
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({
+            providers: { openai: true, anthropic: true, google: true },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve(mockDiagnostics),
+        })
+
+      const { result } = renderHook(() => useBackendHealth(true))
+
+      await waitFor(() => {
+        expect(result.current.health.status).toBe('healthy')
+      })
+
+      let diagnosticResult: DiagnosticResult | null = null
+      await act(async () => {
+        diagnosticResult = await result.current.runDiagnostics()
+      })
+
+      expect(diagnosticResult?.openai.latencyMs).toBe(150)
+      expect(diagnosticResult?.anthropic.latencyMs).toBe(200)
+      expect(diagnosticResult?.google.latencyMs).toBe(100)
+      expect(diagnosticResult?.summary.ocrReady).toBe(true)
     })
   })
 })

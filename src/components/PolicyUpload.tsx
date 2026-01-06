@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server } from 'lucide-react'
+import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server, Stethoscope, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { AnalyzedPolicy } from '@/types/policy'
@@ -70,10 +70,38 @@ export function PolicyUpload() {
   const { user, isConfigured: authConfigured } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const { health, checkHealth } = useBackendHealth()
+  const { health, checkHealth, runDiagnostics } = useBackendHealth()
+  const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
   const backendReady = health.status === 'healthy'
+
+  const handleRunDiagnostics = async () => {
+    setIsRunningDiagnostics(true)
+    toast.info('Running diagnostics...', {
+      description: 'Testing API key validity with each provider',
+    })
+
+    const result = await runDiagnostics()
+    setIsRunningDiagnostics(false)
+
+    if (result) {
+      if (result.summary.anyProviderValid) {
+        toast.success('Diagnostics complete', {
+          description: result.summary.recommendation,
+        })
+      } else {
+        toast.error('Diagnostics failed', {
+          description: result.summary.recommendation,
+          duration: 10000,
+        })
+      }
+    } else {
+      toast.error('Could not run diagnostics', {
+        description: 'Backend server may not be reachable',
+      })
+    }
+  }
 
   // Preload pdf.js in the background when component mounts
   // This reduces perceived load time when user uploads a file
@@ -380,15 +408,79 @@ export function PolicyUpload() {
                     <li>Check the server terminal for errors</li>
                   </ol>
                 </div>
-                <Button
-                  onClick={checkHealth}
-                  variant="outline"
-                  size="sm"
-                  className="mt-3 text-red-600 border-red-300 hover:bg-red-100"
-                >
-                  <RefreshCw size={14} className="mr-2" />
-                  Retry Connection
-                </Button>
+
+                {/* Diagnostic Results */}
+                {health.diagnostics && (
+                  <div className="mt-3 p-3 bg-red-100 rounded-lg">
+                    <p className="font-medium text-red-800 text-sm mb-2">Diagnostic Results:</p>
+                    <div className="space-y-1 text-sm">
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.openai.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.openai.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.openai.valid ? 'text-green-700' : 'text-red-700'}>
+                          OpenAI: {health.diagnostics.openai.configured
+                            ? (health.diagnostics.openai.valid ? `Working (${health.diagnostics.openai.latencyMs}ms)` : health.diagnostics.openai.error)
+                            : 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.anthropic.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.anthropic.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.anthropic.valid ? 'text-green-700' : 'text-red-700'}>
+                          Anthropic: {health.diagnostics.anthropic.configured
+                            ? (health.diagnostics.anthropic.valid ? `Working (${health.diagnostics.anthropic.latencyMs}ms)` : health.diagnostics.anthropic.error)
+                            : 'Not configured'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {health.diagnostics.google.valid ? (
+                          <CheckCircle2 size={14} className="text-green-600" />
+                        ) : health.diagnostics.google.configured ? (
+                          <XCircle size={14} className="text-red-600" />
+                        ) : (
+                          <XCircle size={14} className="text-gray-400" />
+                        )}
+                        <span className={health.diagnostics.google.valid ? 'text-green-700' : 'text-gray-500'}>
+                          Google OCR: {health.diagnostics.google.configured
+                            ? (health.diagnostics.google.valid ? `Working (${health.diagnostics.google.latencyMs}ms)` : health.diagnostics.google.error)
+                            : 'Not configured (optional)'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    onClick={checkHealth}
+                    variant="outline"
+                    size="sm"
+                    className="text-red-600 border-red-300 hover:bg-red-100"
+                  >
+                    <RefreshCw size={14} className="mr-2" />
+                    Retry Connection
+                  </Button>
+                  <Button
+                    onClick={handleRunDiagnostics}
+                    variant="outline"
+                    size="sm"
+                    disabled={isRunningDiagnostics}
+                    className="text-red-600 border-red-300 hover:bg-red-100"
+                  >
+                    <Stethoscope size={14} className={`mr-2 ${isRunningDiagnostics ? 'animate-pulse' : ''}`} />
+                    {isRunningDiagnostics ? 'Testing...' : 'Run Diagnostics'}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

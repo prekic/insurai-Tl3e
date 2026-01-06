@@ -91,12 +91,42 @@ router.post(
         model: response.model,
       })
     } catch (error) {
-      console.error('OpenAI extraction error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        provider: 'openai',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message,
+        documentTextLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
+      }
+      console.error('[OpenAI Extraction Error]', JSON.stringify(errorDetails, null, 2))
+
+      // Determine specific error code and user-friendly message
+      let code = 'EXTRACTION_FAILED'
+      let userMessage = 'OpenAI extraction failed'
+
+      if (message.includes('401') || message.includes('Incorrect API key')) {
+        code = 'INVALID_API_KEY'
+        userMessage = 'OpenAI API key is invalid'
+      } else if (message.includes('429')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = 'OpenAI rate limit exceeded - please wait and retry'
+      } else if (message.includes('insufficient_quota')) {
+        code = 'QUOTA_EXCEEDED'
+        userMessage = 'OpenAI API quota exhausted - add credits to your account'
+      } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+        code = 'TIMEOUT'
+        userMessage = 'Request timed out - try a smaller document'
+      } else if (message.includes('context_length_exceeded')) {
+        code = 'DOCUMENT_TOO_LARGE'
+        userMessage = 'Document too large for AI processing'
+      }
+
       res.status(500).json({
-        error: 'OpenAI extraction failed',
-        code: 'EXTRACTION_FAILED',
-        details: process.env.NODE_ENV === 'development' ? message : undefined,
+        error: userMessage,
+        code,
+        details: message, // Always include details for debugging
+        timestamp: errorDetails.timestamp,
       })
     }
   }
@@ -158,12 +188,39 @@ router.post(
         model: response.model,
       })
     } catch (error) {
-      console.error('Anthropic extraction error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        provider: 'anthropic',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message,
+        documentTextLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
+      }
+      console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
+
+      // Determine specific error code and user-friendly message
+      let code = 'EXTRACTION_FAILED'
+      let userMessage = 'Anthropic extraction failed'
+
+      if (message.includes('401') || message.includes('invalid x-api-key') || message.includes('Invalid API Key')) {
+        code = 'INVALID_API_KEY'
+        userMessage = 'Anthropic API key is invalid'
+      } else if (message.includes('429') || message.includes('rate_limit')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = 'Anthropic rate limit exceeded - please wait and retry'
+      } else if (message.includes('credit') || message.includes('billing') || message.includes('overloaded')) {
+        code = 'BILLING_ERROR'
+        userMessage = 'Anthropic billing issue - check your account'
+      } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
+        code = 'TIMEOUT'
+        userMessage = 'Request timed out - try a smaller document'
+      }
+
       res.status(500).json({
-        error: 'Anthropic extraction failed',
-        code: 'EXTRACTION_FAILED',
-        details: process.env.NODE_ENV === 'development' ? message : undefined,
+        error: userMessage,
+        code,
+        details: message, // Always include details for debugging
+        timestamp: errorDetails.timestamp,
       })
     }
   }
@@ -236,12 +293,38 @@ router.post(
         },
       })
     } catch (error) {
-      console.error('OCR error:', error)
       const message = error instanceof Error ? error.message : 'Unknown error'
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        provider: 'google-vision',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message,
+      }
+      console.error('[OCR Error]', JSON.stringify(errorDetails, null, 2))
+
+      // Determine specific error code and user-friendly message
+      let code = 'OCR_FAILED'
+      let userMessage = 'OCR processing failed'
+
+      if (message.includes('API key not valid') || message.includes('400')) {
+        code = 'INVALID_API_KEY'
+        userMessage = 'Google Cloud API key is invalid'
+      } else if (message.includes('PERMISSION_DENIED')) {
+        code = 'API_NOT_ENABLED'
+        userMessage = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+      } else if (message.includes('BILLING')) {
+        code = 'BILLING_ERROR'
+        userMessage = 'Billing not enabled on Google Cloud project'
+      } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = 'Google Cloud rate limit exceeded'
+      }
+
       res.status(500).json({
-        error: 'OCR processing failed',
-        code: 'OCR_FAILED',
-        details: process.env.NODE_ENV === 'development' ? message : undefined,
+        error: userMessage,
+        code,
+        details: message, // Always include details for debugging
+        timestamp: errorDetails.timestamp,
       })
     }
   }
@@ -256,6 +339,169 @@ router.get('/providers', (_req: Request, res: Response) => {
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     google: !!process.env.GOOGLE_CLOUD_API_KEY,
+  })
+})
+
+/**
+ * Diagnostic result for a single provider
+ */
+interface ProviderDiagnostic {
+  configured: boolean
+  valid: boolean
+  error?: string
+  latencyMs?: number
+  model?: string
+}
+
+/**
+ * GET /api/ai/diagnose
+ * Test API key validity by making minimal API calls to each provider
+ * This helps debug extraction failures by verifying credentials work
+ */
+router.get('/diagnose', async (_req: Request, res: Response) => {
+  const diagnostics: {
+    openai: ProviderDiagnostic
+    anthropic: ProviderDiagnostic
+    google: ProviderDiagnostic
+    timestamp: string
+    environment: string
+  } = {
+    openai: { configured: false, valid: false },
+    anthropic: { configured: false, valid: false },
+    google: { configured: false, valid: false },
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+  }
+
+  // Test OpenAI
+  if (process.env.OPENAI_API_KEY) {
+    diagnostics.openai.configured = true
+    const startTime = Date.now()
+    try {
+      const client = getOpenAIClient()
+      if (client) {
+        // Make a minimal API call to verify the key works
+        const response = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: 'Say "OK"' }],
+          max_tokens: 5,
+        })
+        diagnostics.openai.valid = true
+        diagnostics.openai.latencyMs = Date.now() - startTime
+        diagnostics.openai.model = response.model
+      }
+    } catch (error) {
+      diagnostics.openai.valid = false
+      diagnostics.openai.latencyMs = Date.now() - startTime
+      diagnostics.openai.error = error instanceof Error ? error.message : 'Unknown error'
+      // Provide specific guidance for common errors
+      if (diagnostics.openai.error.includes('401') || diagnostics.openai.error.includes('Incorrect API key')) {
+        diagnostics.openai.error = 'Invalid API key - check OPENAI_API_KEY in .env'
+      } else if (diagnostics.openai.error.includes('429')) {
+        diagnostics.openai.error = 'Rate limit exceeded or quota exhausted'
+      } else if (diagnostics.openai.error.includes('insufficient_quota')) {
+        diagnostics.openai.error = 'API quota exhausted - add credits to your OpenAI account'
+      }
+    }
+  }
+
+  // Test Anthropic
+  if (process.env.ANTHROPIC_API_KEY) {
+    diagnostics.anthropic.configured = true
+    const startTime = Date.now()
+    try {
+      const client = getAnthropicClient()
+      if (client) {
+        // Make a minimal API call to verify the key works
+        const response = await client.messages.create({
+          model: 'claude-3-5-haiku-20241022',
+          max_tokens: 5,
+          messages: [{ role: 'user', content: 'Say "OK"' }],
+        })
+        diagnostics.anthropic.valid = true
+        diagnostics.anthropic.latencyMs = Date.now() - startTime
+        diagnostics.anthropic.model = response.model
+      }
+    } catch (error) {
+      diagnostics.anthropic.valid = false
+      diagnostics.anthropic.latencyMs = Date.now() - startTime
+      diagnostics.anthropic.error = error instanceof Error ? error.message : 'Unknown error'
+      // Provide specific guidance for common errors
+      if (diagnostics.anthropic.error.includes('401') || diagnostics.anthropic.error.includes('invalid x-api-key')) {
+        diagnostics.anthropic.error = 'Invalid API key - check ANTHROPIC_API_KEY in .env'
+      } else if (diagnostics.anthropic.error.includes('429')) {
+        diagnostics.anthropic.error = 'Rate limit exceeded'
+      } else if (diagnostics.anthropic.error.includes('credit') || diagnostics.anthropic.error.includes('billing')) {
+        diagnostics.anthropic.error = 'Billing issue - check your Anthropic account'
+      }
+    }
+  }
+
+  // Test Google Cloud Vision (OCR)
+  if (process.env.GOOGLE_CLOUD_API_KEY) {
+    diagnostics.google.configured = true
+    const startTime = Date.now()
+    try {
+      // Make a minimal API call to verify the key works
+      // Using a tiny 1x1 white PNG to minimize cost
+      const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+      const response = await fetch(
+        `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_CLOUD_API_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
+          }),
+        }
+      )
+      diagnostics.google.latencyMs = Date.now() - startTime
+
+      if (response.ok) {
+        diagnostics.google.valid = true
+        diagnostics.google.model = 'cloud-vision-v1'
+      } else {
+        const errorData = (await response.json().catch(() => ({}))) as { error?: { message?: string; status?: string } }
+        diagnostics.google.valid = false
+        const errorMsg = errorData.error?.message || `HTTP ${response.status}`
+        // Provide specific guidance
+        if (errorMsg.includes('API key not valid') || response.status === 400) {
+          diagnostics.google.error = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
+        } else if (errorMsg.includes('PERMISSION_DENIED')) {
+          diagnostics.google.error = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+        } else if (errorMsg.includes('BILLING')) {
+          diagnostics.google.error = 'Billing not enabled on Google Cloud project'
+        } else {
+          diagnostics.google.error = errorMsg
+        }
+      }
+    } catch (error) {
+      diagnostics.google.valid = false
+      diagnostics.google.latencyMs = Date.now() - startTime
+      diagnostics.google.error = error instanceof Error ? error.message : 'Unknown error'
+    }
+  }
+
+  // Log diagnostic results for debugging
+  console.log('[AI Diagnose] Results:', JSON.stringify(diagnostics, null, 2))
+
+  // Determine overall status
+  const anyValid = diagnostics.openai.valid || diagnostics.anthropic.valid
+  const anyConfigured = diagnostics.openai.configured || diagnostics.anthropic.configured
+
+  res.json({
+    ...diagnostics,
+    summary: {
+      anyProviderConfigured: anyConfigured,
+      anyProviderValid: anyValid,
+      extractionReady: anyValid,
+      ocrReady: diagnostics.google.valid,
+      recommendation: !anyConfigured
+        ? 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to .env file'
+        : !anyValid
+          ? 'API keys are configured but invalid - check the error messages above'
+          : 'All configured providers are working',
+    },
   })
 })
 
