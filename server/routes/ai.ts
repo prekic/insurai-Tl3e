@@ -125,7 +125,8 @@ router.post(
       res.status(500).json({
         error: userMessage,
         code,
-        details: message, // Always include details for debugging
+        // Only show detailed error info in development/staging for debugging
+        ...(process.env.NODE_ENV !== 'production' && { details: message }),
         timestamp: errorDetails.timestamp,
       })
     }
@@ -219,7 +220,8 @@ router.post(
       res.status(500).json({
         error: userMessage,
         code,
-        details: message, // Always include details for debugging
+        // Only show detailed error info in development/staging for debugging
+        ...(process.env.NODE_ENV !== 'production' && { details: message }),
         timestamp: errorDetails.timestamp,
       })
     }
@@ -323,7 +325,8 @@ router.post(
       res.status(500).json({
         error: userMessage,
         code,
-        details: message, // Always include details for debugging
+        // Only show detailed error info in development/staging for debugging
+        ...(process.env.NODE_ENV !== 'production' && { details: message }),
         timestamp: errorDetails.timestamp,
       })
     }
