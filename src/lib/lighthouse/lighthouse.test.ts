@@ -4,7 +4,7 @@
  * Tests for performance scoring utilities and budget checking.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   SCORE_THRESHOLDS,
   WEB_VITALS_THRESHOLDS,

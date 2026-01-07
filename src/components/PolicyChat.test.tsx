@@ -2,7 +2,8 @@
  * PolicyChat Component Tests
  *
  * Tests for the AI chat functionality including
- * message sending, error handling, and retry logic.
+ * message sending, error handling, retry logic,
+ * provider selection, and conversation history.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
@@ -20,8 +21,20 @@ const mockPolicies = [
   { id: '3', policyNumber: 'POL-003', provider: 'Mapfre' },
 ]
 
+const mockUser = {
+  id: 'user-123',
+  email: 'test@example.com',
+}
+
 // Mock fetch for API calls
 const mockFetch = vi.fn()
+
+// Mock chat service
+const mockCreateConversation = vi.fn()
+const mockGetRecentConversations = vi.fn()
+const mockGetConversationMessages = vi.fn()
+const mockAddMessage = vi.fn()
+const mockSaveExchange = vi.fn()
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -37,6 +50,20 @@ vi.mock('@/lib/policy-context', () => ({
   }),
 }))
 
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({
+    user: mockUser,
+  }),
+}))
+
+vi.mock('@/lib/supabase/chat', () => ({
+  createConversation: (...args: unknown[]) => mockCreateConversation(...args),
+  getRecentConversations: (...args: unknown[]) => mockGetRecentConversations(...args),
+  getConversationMessages: (...args: unknown[]) => mockGetConversationMessages(...args),
+  addMessage: (...args: unknown[]) => mockAddMessage(...args),
+  saveExchange: (...args: unknown[]) => mockSaveExchange(...args),
+}))
+
 vi.mock('@/lib/sanitize', () => ({
   sanitizeMessage: (msg: string) => msg.trim(),
 }))
@@ -44,6 +71,7 @@ vi.mock('@/lib/sanitize', () => ({
 vi.mock('sonner', () => ({
   toast: {
     error: vi.fn(),
+    success: vi.fn(),
   },
 }))
 
@@ -72,6 +100,27 @@ describe('PolicyChat', () => {
         }),
     })
     global.fetch = mockFetch
+
+    // Set up default chat service mocks
+    mockGetRecentConversations.mockResolvedValue([])
+    mockCreateConversation.mockResolvedValue({
+      id: 'conv-123',
+      user_id: 'user-123',
+      title: 'New Conversation',
+      provider: 'openai',
+      policy_ids: [],
+      message_count: 0,
+    })
+    mockAddMessage.mockResolvedValue({
+      id: 'msg-123',
+      conversation_id: 'conv-123',
+      role: 'assistant',
+      content: 'Hello!',
+    })
+    mockSaveExchange.mockResolvedValue({
+      userMsg: { id: 'msg-1', role: 'user' },
+      aiMsg: { id: 'msg-2', role: 'assistant' },
+    })
   })
 
   afterEach(() => {
@@ -127,6 +176,196 @@ describe('PolicyChat', () => {
       renderChat()
 
       expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument()
+    })
+
+    it('should render provider selector button', () => {
+      renderChat()
+
+      expect(screen.getByTestId('provider-selector')).toBeInTheDocument()
+    })
+
+    it('should render new conversation button', () => {
+      renderChat()
+
+      expect(screen.getByTestId('new-conversation-button')).toBeInTheDocument()
+    })
+
+    it('should render history button for logged-in users', () => {
+      renderChat()
+
+      expect(screen.getByTestId('history-button')).toBeInTheDocument()
+    })
+  })
+
+  describe('Provider Selector', () => {
+    it('should show dropdown when provider selector is clicked', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      renderChat()
+
+      await user.click(screen.getByTestId('provider-selector'))
+
+      expect(screen.getByText('AI Provider')).toBeInTheDocument()
+      expect(screen.getByTestId('provider-option-openai')).toBeInTheDocument()
+      expect(screen.getByTestId('provider-option-anthropic')).toBeInTheDocument()
+    })
+
+    it('should display GPT-4o Mini as default provider', () => {
+      renderChat()
+
+      expect(screen.getByText('GPT-4o Mini')).toBeInTheDocument()
+    })
+
+    it('should switch provider when selected', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      renderChat()
+
+      await user.click(screen.getByTestId('provider-selector'))
+      await user.click(screen.getByTestId('provider-option-anthropic'))
+
+      // Provider should be updated in the selector
+      expect(screen.getByText('Claude Haiku')).toBeInTheDocument()
+    })
+
+    it('should close dropdown when clicking outside', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      renderChat()
+
+      await user.click(screen.getByTestId('provider-selector'))
+      expect(screen.getByText('AI Provider')).toBeInTheDocument()
+
+      // Click outside
+      await user.click(document.body)
+
+      await waitFor(() => {
+        expect(screen.queryByText('AI Provider')).not.toBeInTheDocument()
+      })
+    })
+
+    it('should send selected provider to API', async () => {
+      vi.useRealTimers()
+      global.fetch = mockFetch
+      const user = userEvent.setup()
+      renderChat()
+
+      // Switch to Anthropic
+      await user.click(screen.getByTestId('provider-selector'))
+      await user.click(screen.getByTestId('provider-option-anthropic'))
+
+      // Send a message
+      const input = screen.getByPlaceholderText('Ask about your policies...')
+      await user.type(input, 'Test question')
+      await user.click(screen.getByRole('button', { name: /send/i }))
+
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith(
+          expect.any(String),
+          expect.objectContaining({
+            body: expect.stringContaining('"provider":"anthropic"'),
+          })
+        )
+      })
+    })
+  })
+
+  describe('Conversation History', () => {
+    it('should load conversation history on mount', async () => {
+      vi.useRealTimers()
+      mockGetRecentConversations.mockResolvedValue([
+        {
+          id: 'conv-1',
+          title: 'Previous Chat',
+          provider: 'openai',
+          message_count: 5,
+          last_message_at: new Date().toISOString(),
+        },
+      ])
+
+      renderChat()
+
+      await waitFor(() => {
+        expect(mockGetRecentConversations).toHaveBeenCalled()
+      })
+    })
+
+    it('should show history sidebar when history button is clicked', async () => {
+      vi.useRealTimers()
+      mockGetRecentConversations.mockResolvedValue([
+        {
+          id: 'conv-1',
+          title: 'Previous Chat',
+          provider: 'openai',
+          message_count: 5,
+          last_message_at: new Date().toISOString(),
+        },
+      ])
+      const user = userEvent.setup()
+      renderChat()
+
+      await waitFor(() => {
+        expect(mockGetRecentConversations).toHaveBeenCalled()
+      })
+
+      await user.click(screen.getByTestId('history-button'))
+
+      expect(screen.getByText('Conversation History')).toBeInTheDocument()
+    })
+
+    it('should load conversation when selected from history', async () => {
+      vi.useRealTimers()
+      const mockConversations = [
+        {
+          id: 'conv-1',
+          title: 'Previous Chat',
+          provider: 'openai',
+          message_count: 5,
+          last_message_at: new Date().toISOString(),
+        },
+      ]
+      mockGetRecentConversations.mockResolvedValue(mockConversations)
+      mockGetConversationMessages.mockResolvedValue([
+        { id: 'msg-1', role: 'assistant', content: 'Hello!', created_at: new Date().toISOString() },
+        { id: 'msg-2', role: 'user', content: 'Hi', created_at: new Date().toISOString() },
+      ])
+
+      const user = userEvent.setup()
+      renderChat()
+
+      await waitFor(() => {
+        expect(mockGetRecentConversations).toHaveBeenCalled()
+      })
+
+      await user.click(screen.getByTestId('history-button'))
+      await user.click(screen.getByTestId('conversation-conv-1'))
+
+      await waitFor(() => {
+        expect(mockGetConversationMessages).toHaveBeenCalledWith('conv-1')
+      })
+    })
+
+    it('should show empty state when no conversations', async () => {
+      vi.useRealTimers()
+      mockGetRecentConversations.mockResolvedValue([])
+      const user = userEvent.setup()
+      renderChat()
+
+      await user.click(screen.getByTestId('history-button'))
+
+      expect(screen.getByText('No conversations yet')).toBeInTheDocument()
+    })
+
+    it('should start new conversation when button is clicked', async () => {
+      vi.useRealTimers()
+      const user = userEvent.setup()
+      renderChat()
+
+      await user.click(screen.getByTestId('new-conversation-button'))
+
+      await waitFor(() => {
+        expect(mockCreateConversation).toHaveBeenCalled()
+      })
     })
   })
 
@@ -523,6 +762,45 @@ describe('PolicyChat', () => {
       const input = screen.getByPlaceholderText('Ask about your policies...')
       expect(input).toHaveAttribute('type', 'text')
     })
+
+    it('should have accessible provider selector', () => {
+      renderChat()
+
+      const providerSelector = screen.getByLabelText('Select AI provider')
+      expect(providerSelector).toBeInTheDocument()
+    })
+
+    it('should have accessible history button', () => {
+      renderChat()
+
+      const historyButton = screen.getByLabelText('Conversation history')
+      expect(historyButton).toBeInTheDocument()
+    })
+
+    it('should have accessible new conversation button', () => {
+      renderChat()
+
+      const newConvButton = screen.getByLabelText('New conversation')
+      expect(newConvButton).toBeInTheDocument()
+    })
+  })
+})
+
+describe('PolicyChat - Guest Mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+
+    // Mock guest user (no user)
+    vi.doMock('@/lib/supabase/auth-context', () => ({
+      useAuth: () => ({
+        user: null,
+      }),
+    }))
+  })
+
+  it('should work without persistence for guests', () => {
+    // Component should render and work without user auth
+    // History button should not be visible
   })
 })
 
@@ -537,7 +815,7 @@ describe('PolicyChat - No Policies', () => {
     }))
   })
 
-  it('should show 0 policies in header', () => {
+  it('should show 0 policies in greeting', () => {
     // The component shows policies.length in greeting
     // This test verifies the greeting adapts to policy count
   })

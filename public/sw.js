@@ -1,3 +1,4 @@
+/* global self, caches, fetch, URL, Response, Headers, clients, console */
 /**
  * InsurAI Service Worker
  *

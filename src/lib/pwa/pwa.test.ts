@@ -36,8 +36,6 @@ import {
   DEFAULT_PWA_CONFIG,
   type SWRegistrationState,
   type OnlineStatus,
-  type CacheStatus,
-  type BeforeInstallPromptEvent,
 } from './index'
 
 // Mock service worker registration

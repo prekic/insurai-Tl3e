@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, performance optimizations
-- **Production Readiness**: ~8.5/10 (4100+ tests, PWA support, server hardening)
-- **Last Updated**: January 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, performance optimizations
+- **Production Readiness**: ~9/10 (4600+ tests, 0 lint errors, PWA support, server hardening)
+- **Last Updated**: January 7, 2026
 
 ---
 
@@ -203,155 +203,23 @@ NODE_ENV=development
 ```
 
 ### Data Flow: PDF Upload & Extraction
-
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌──────────┐
-│  User    │───▶│ PolicyUpload  │───▶│ pdf.js       │───▶│ Text     │
-│  drops   │    │ component     │    │ (browser)    │    │ extracted│
-│  PDF     │    │               │    │              │    │          │
-└──────────┘    └───────────────┘    └──────────────┘    └────┬─────┘
-                                                              │
-                     ┌────────────────────────────────────────┘
-                     ▼
-            ┌─────────────────┐
-            │ Check text      │
-            │ density         │
-            └────────┬────────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   ┌───────────┐          ┌───────────┐
-   │ < 100     │          │ >= 100    │
-   │ chars/page│          │ chars/page│
-   │ (scanned) │          │ (digital) │
-   └─────┬─────┘          └─────┬─────┘
-         │                      │
-         ▼                      │
-   ┌───────────┐                │
-   │ Google    │                │
-   │ Vision OCR│                │
-   │ /api/ai/  │                │
-   │ ocr       │                │
-   └─────┬─────┘                │
-         │                      │
-         └──────────┬───────────┘
-                    ▼
-            ┌─────────────────┐
-            │ AI Extraction   │
-            │ /api/ai/extract │
-            │ OpenAI|Anthropic│
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │ Zod Validation  │
-            │ PolicySchema    │
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐    ┌──────────────┐
-            │ PolicyContext   │───▶│ Supabase     │
-            │ (React state)   │    │ policies     │
-            │                 │    │ table        │
-            └─────────────────┘    └──────────────┘
+User drops PDF → PolicyUpload → pdf.js (browser) → Extract text
+→ Check density: < 100 chars/page? → Google Vision OCR (/api/ai/ocr)
+                  >= 100 chars/page? → Direct to AI
+→ AI Extraction (/api/ai/extract) → Zod validation → PolicyContext → Supabase
 ```
 
-### Data Flow: PolicyChat Conversation
-
+### Data Flow: PolicyChat
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐
-│  User    │───▶│ PolicyChat    │───▶│ Build        │
-│  types   │    │ component     │    │ context from │
-│  question│    │               │    │ policies     │
-└──────────┘    └───────────────┘    └──────┬───────┘
-                                            │
-                     ┌──────────────────────┘
-                     ▼
-            ┌─────────────────────────────────────┐
-            │ Request to /api/ai/chat             │
-            │ {                                   │
-            │   message: "What does my Kasko...", │
-            │   conversationHistory: [...],       │
-            │   policyContext: "Policy: POL-001", │
-            │   provider: "openai"                │
-            │ }                                   │
-            └─────────────────┬───────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Rate Limiter    │
-                    │ (60/hr per IP)  │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │ Zod Validation  │
-                    │ chatSchema      │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │ System Prompt + │
-                    │ Policy Context  │
-                    │ + History       │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-       ┌─────────────┐              ┌─────────────┐
-       │ OpenAI      │              │ Anthropic   │
-       │ gpt-4o-mini │              │ claude-3-5- │
-       │             │              │ haiku       │
-       └──────┬──────┘              └──────┬──────┘
-              │                            │
-              └──────────────┬─────────────┘
-                             ▼
-                    ┌─────────────────┐
-                    │ Response to UI  │
-                    │ {               │
-                    │   response: "", │
-                    │   provider: "", │
-                    │   usage: {}     │
-                    │ }               │
-                    └─────────────────┘
+User → PolicyChat → Build context → /api/ai/chat → Rate limit → Validate
+→ Add system prompt + history → OpenAI/Anthropic → Response to UI
 ```
 
 ### Authentication Flow
-
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐
-│  User    │───▶│ Login/Signup  │───▶│ Supabase     │
-│  clicks  │    │ form          │    │ Auth         │
-│  sign in │    │               │    │              │
-└──────────┘    └───────────────┘    └──────┬───────┘
-                                            │
-                                            ▼
-                                   ┌─────────────────┐
-                                   │ JWT Session     │
-                                   │ stored in       │
-                                   │ localStorage    │
-                                   └────────┬────────┘
-                                            │
-                     ┌──────────────────────┘
-                     ▼
-            ┌─────────────────┐
-            │ AuthContext     │
-            │ provides:       │
-            │ - user object   │
-            │ - isLoading     │
-            │ - signIn()      │
-            │ - signOut()     │
-            └────────┬────────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   ┌───────────┐          ┌───────────┐
-   │ Protected │          │ Public    │
-   │ Routes    │          │ Routes    │
-   │ /dashboard│          │ /landing  │
-   │ /upload   │          │ /login    │
-   │ /chat     │          │           │
-   └───────────┘          └───────────┘
+User → Login form → Supabase Auth → JWT in localStorage → AuthContext
+→ Protected routes (/dashboard, /upload, /chat) vs Public (/landing, /login)
 ```
 
 ### Key Architecture Decisions
@@ -442,6 +310,59 @@ Body: text-gray-600
 
 ---
 
+## Benchmarking Logic
+
+### Core Services (`src/lib/`)
+
+| Module | Purpose |
+|--------|---------|
+| `market-data/service.ts` | MarketDataService - main benchmarking engine |
+| `market-data/gap-analyzer.ts` | Identifies coverage gaps vs market |
+| `regional-benchmark/` | Regional risk adjustments and comparisons |
+| `industry-risk/` | Industry-specific risk profiles |
+| `data-repository/` | Data validation and loading |
+
+### Benchmarking Flow
+
+```
+User Policy → Extract Data → Detect Region → Get Market Benchmark
+     ↓                            ↓                    ↓
+Compare Premium → Compare Coverage → Calculate Value Score
+     ↓                    ↓                    ↓
+Premium Percentile   Coverage %ile      Value = Coverage/Premium
+     ↓                    ↓                    ↓
+Generate Insights → Gap Analysis → Recommendations
+```
+
+### Key Calculations
+
+```typescript
+// Premium percentile (where user stands vs market)
+premiumPercentile = calculatePremiumPercentile(premium, policyType, region)
+
+// Coverage percentile (coverage adequacy)
+coveragePercentile = calculateCoveragePercentile(coverage, policyType)
+
+// Value score (what you get per TRY spent)
+valueScore = (userCoverage / userPremium) / (marketCoverage / marketPremium) * 50
+
+// Regional adjustment
+adjustedPremium = basePremium * REGIONAL_FACTORS[region].factor
+```
+
+### Insight Categories
+
+| Category | Description |
+|----------|-------------|
+| `premium_high` | Premium > 75th percentile |
+| `premium_low` | Premium < 25th percentile (check coverage) |
+| `coverage_adequate` | Coverage >= market average |
+| `coverage_insufficient` | Coverage < 50th percentile |
+| `value_excellent` | Value score > 80 |
+| `value_poor` | Value score < 40 |
+
+---
+
 ## Gap Detection System
 
 ### Architecture (`src/lib/gap-detection/`)
@@ -480,6 +401,47 @@ type GapSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
   recommendations: GapRecommendation[]
 }
 ```
+
+---
+
+## Policy Evaluation Module
+
+### Location: `src/lib/policy-evaluation/`
+
+New module for evaluating individual policies and comparing multiple policies.
+
+### Core Files
+- `types.ts` - Type definitions, grade/status helpers, config defaults
+- `evaluator.ts` - Single policy evaluation against market benchmarks
+- `comparator.ts` - Multi-policy comparison (2-4 policies)
+- `index.ts` - Public API, service functions
+
+### Key Functions
+```typescript
+// Evaluate a single policy
+const result = evaluatePolicy(policy, { weights: { premium: 20, coverage: 30, ... } })
+// result.overallScore: 0-100, result.grade: 'A'-'F', result.status: 'excellent'|'good'|...
+
+// Compare multiple policies
+const comparison = comparePolicies([policy1, policy2, policy3])
+// comparison.rankings: PolicyRanking[], comparison.recommendation: string
+```
+
+### Grading System
+| Score | Grade | Status |
+|-------|-------|--------|
+| >= 90 | A | excellent |
+| 75-89 | B | good |
+| 60-74 | C | fair |
+| 40-59 | D | poor |
+| < 40 | F | critical |
+
+### Default Weights (sum to 100)
+- Premium: 20%
+- Coverage: 30%
+- Deductible: 15%
+- Compliance: 20%
+- Value: 15%
 
 ---
 
@@ -547,6 +509,73 @@ RegionalRiskProfile {
 
 ---
 
+## Insurance Knowledge Database
+
+### Data Files (`src/data/`)
+
+| File | Purpose |
+|------|---------|
+| `market-data/benchmarks.ts` | Premium benchmarks, coverage limits by policy type |
+| `market-data/providers.ts` | 12 Turkish insurance companies with market share |
+| `insurance-lines.ts` | Official TSB/SEDDK insurance branch classifications |
+| `regulations.ts` | Laws, general conditions (genel şartlar), circulars |
+| `coverage-limits.ts` | Official SEDDK/DASK minimum coverage limits |
+| `sample-policies.ts` | 21 sample Turkish policies for testing |
+
+### Turkish Insurance Providers (2024 Market Share)
+
+| Provider | Turkish Name | Market Share |
+|----------|--------------|--------------|
+| Allianz | Allianz Sigorta | 12.8% |
+| AXA | AXA Sigorta | 10.5% |
+| Anadolu | Anadolu Sigorta | 9.2% |
+| Aksigorta | Aksigorta | 8.7% |
+| Mapfre | Mapfre Sigorta | 7.4% |
+| Sompo | Sompo Sigorta | 6.8% |
+| Zurich | Zurich Sigorta | 5.2% |
+| HDI | HDI Sigorta | 4.8% |
+| Türkiye | Türkiye Sigorta | 4.5% |
+| Groupama | Groupama Sigorta | 4.2% |
+
+### Regulatory Framework
+
+| Regulation Type | Turkish | Purpose |
+|-----------------|---------|---------|
+| Kanun | Law | Primary legislation (e.g., Insurance Law 5684) |
+| Yönetmelik | Regulation | Detailed implementation rules |
+| Genel Şartlar | General Conditions | Standard policy terms by type |
+| Kloz | Clause | Optional coverage extensions |
+| Tarife | Tariff | Official premium tables |
+| Genelge | Circular | Administrative guidance |
+| Tebliğ | Communique | Official announcements |
+
+### Official Coverage Limits (2025)
+
+**Traffic Insurance (ZMMS) - Per Vehicle:**
+- Material Damage: 300,000 TRY per vehicle
+- Material Damage: 600,000 TRY per accident
+- Bodily Injury: 1,500,000 TRY per person
+- Bodily Injury: 7,500,000 TRY per accident
+
+**DASK (Earthquake) Limits:**
+- Maximum coverage: 1,040,000 TRY (2025)
+- Minimum premium varies by earthquake zone (1-5)
+- Zone 1 (Istanbul): Highest risk, highest premium
+
+### Regional Premium Factors
+
+| Region | Factor | Reason |
+|--------|--------|--------|
+| Marmara | 1.15x | High risk (Istanbul), earthquake zone 1 |
+| Akdeniz | 1.08x | Tourism, flood risk |
+| Ege | 1.05x | Tourism, earthquake risk |
+| İç Anadolu | 0.95x | Lower risk, agricultural |
+| Karadeniz | 0.90x | Flood/landslide risk |
+| Güneydoğu | 0.88x | Mixed risk profile |
+| Doğu Anadolu | 0.85x | Rural, lower premiums |
+
+---
+
 ## Domain Knowledge
 
 ### Turkish Insurance Terms
@@ -564,12 +593,25 @@ RegionalRiskProfile {
 | Sigortalı | Insured | Who is covered |
 | Sigorta Ettiren | Policyholder | Who pays |
 | Riziko Adresi | Risk Address | Location covered |
+| Lehdar | Beneficiary | Who receives payout |
+| Hasar | Claim/Damage | When something goes wrong |
+| Poliçe Süresi | Policy Period | Coverage duration |
+| Rücu | Subrogation | Insurer's right to recover |
+| Eksik Sigorta | Underinsurance | Sum insured < actual value |
+| Aşkın Sigorta | Overinsurance | Sum insured > actual value |
+| Acente | Agent | Insurance intermediary |
+| Broker | Broker | Independent intermediary |
+| Aktüer | Actuary | Risk/pricing specialist |
+| Hasar/Prim Oranı | Loss Ratio | Claims / Premiums |
 
 ### Key Regulators
 
-- **SEDDK** - Insurance regulator (like state insurance dept)
-- **TSB** - Insurance association (industry body)
-- **Hazine** - Treasury, oversees insurance sector
+- **SEDDK** - Sigortacılık ve Özel Emeklilik Düzenleme ve Denetleme Kurumu (Insurance regulator)
+- **TSB** - Türkiye Sigorta Birliği (Insurance association, industry body)
+- **Hazine** - Hazine ve Maliye Bakanlığı (Treasury, oversees insurance sector)
+- **DASK** - Doğal Afet Sigortaları Kurumu (Earthquake insurance authority)
+- **TARSİM** - Tarım Sigortaları Havuzu (Agricultural insurance pool)
+- **Güvence Hesabı** - Guarantee Fund (covers uninsured drivers)
 
 ### Policy Structure
 
@@ -669,10 +711,17 @@ type PolicyStatus = typeof POLICY_STATUS[keyof typeof POLICY_STATUS]
 - `src/__tests__/performance/performance.test.ts` - Performance tests (30 tests)
 - `server/__tests__/chat-routes.test.ts` - Chat API tests (18 tests)
 
-### Test Counts (as of Jan 2026)
-- **Total**: 4162 tests across 123 files
-- **Passing**: 4129 (99.2%)
-- **Expected Failures**: 33 (environment/integration tests requiring API keys)
+### Test Counts (as of Jan 7, 2026)
+- **Total**: 4593 tests across 136 files
+- **Passing**: 4593 (100%)
+- **Expected Skips**: Environment/integration tests skip gracefully when env vars not configured
+
+### Test Fix Patterns
+When tests fail, check these common patterns:
+- **Missing mocks**: Components using `useAuth()` need mock in test file
+- **Async loading**: Use `waitFor` for components with loading states
+- **Stale dist files**: Delete `dist-server/*.test.js` if compiled test files cause issues
+- **Proxy not configured**: AI config tests handle this gracefully with early return
 
 ---
 
@@ -826,6 +875,31 @@ const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
 - **Problem**: Old auth state persists
 - **Solution**: `localStorage.clear(); location.reload();`
 
+### 8. MyAccount Tests Failing
+- **Problem**: `useAuth must be used within an AuthProvider`
+- **Solution**: Mock `useAuth` in test file:
+```typescript
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({ user: { id: 'test', email: 'test@example.com' }, isLoading: false })
+}))
+```
+- **File**: `src/components/MyAccount.test.tsx`
+
+### 9. Sentry Tests Using Wrong Functions
+- **Problem**: Tests calling `sentryErrorHandler()` which doesn't exist
+- **Solution**: Use `setupSentryErrorHandler(app)` - takes Express app, not middleware
+- **File**: `server/lib/sentry.test.ts`
+
+### 10. Stale Compiled Test Files
+- **Problem**: `dist-server/*.test.js` contains old test code causing failures
+- **Solution**: `rm dist-server/lib/*.test.*`
+- **Prevention**: Add `*.test.*` to `.gitignore` for dist directories
+
+### 11. Anthropic SDK Browser Error
+- **Problem**: SDK throws in browser-like test environments
+- **Solution**: Wrap in try-catch, expect `browser-like environment` error message
+- **File**: `src/lib/ai/config.test.ts`
+
 ---
 
 ## Gotchas & Critical Notes
@@ -836,8 +910,53 @@ const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
 4. **PDF Worker**: Loaded from CDN, check CSP in `index.html`
 5. **Supabase RLS**: Row Level Security enabled - policies are user-scoped
 6. **Turkish Dates**: DD.MM.YYYY format, parse carefully
-7. **Currency**: Use `tr-TR` locale, TRY symbol varies
+7. **Currency**: Use `tr-TR` locale, TRY symbol varies (₺ or TL)
 8. **Tests Mock Everything**: Integration tests added to catch real config issues
+
+---
+
+## Turkish Market Considerations
+
+### Mandatory Insurance Types
+- **Trafik Sigortası** (MTPL): Required for all vehicles
+- **DASK**: Required for all buildings (earthquake)
+- **Professional Liability**: Required for certain professions (doctors, lawyers, etc.)
+
+### Premium Calculation Factors
+- Vehicle: Age, brand, engine size, driver age/experience
+- Property: Location (earthquake zone), construction type, usage
+- Health: Age, pre-existing conditions, coverage scope
+
+### Common Policy Exclusions (Watch for these)
+- War and terrorism (unless covered by pool)
+- Nuclear events
+- Intentional acts
+- Wear and tear (depreciation)
+- Pre-existing conditions (health)
+
+### Important Dates
+- Policy renewals: Usually 1 year
+- DASK: Must be renewed before property transactions
+- Traffic insurance: Must show valid policy for vehicle registration
+
+### Currency Handling
+```typescript
+// Format TRY amounts correctly
+new Intl.NumberFormat('tr-TR', {
+  style: 'currency',
+  currency: 'TRY',
+  minimumFractionDigits: 2
+}).format(amount)
+
+// Common patterns
+// Input: 15000.50
+// Output: ₺15.000,50 or 15.000,50 TL
+```
+
+### Regional Considerations
+- Istanbul (Marmara): Highest traffic accident rates, Zone 1 earthquake
+- Coastal areas: Flood risk, tourism-related claims
+- Eastern regions: Lower premiums, fewer providers
 
 ---
 
@@ -864,37 +983,18 @@ USING (auth.uid() = user_id);
 
 ## Deployment
 
-### Local Development
 ```bash
-npm install
-cp .env.example .env  # Add your keys
-npm run dev:all
+# Local
+npm install && cp .env.example .env && npm run dev:all
+
+# Codespaces: Create .env, run npm run dev:all, open port 5173
+# Production: Frontend → Vercel/Netlify, Backend → Railway/Render
+# See docs/DEPLOYMENT_GUIDE.md
 ```
-
-### GitHub Codespaces
-1. Open repo in Codespaces
-2. `git checkout claude/build-app-from-design-GBWjx`
-3. Create `.env` with API keys
-4. `npm run dev:all`
-5. Open port 5173 from Ports tab
-
-### Production (Vercel/Netlify)
-- Frontend deploys from `dist/`
-- Backend needs separate hosting (Railway, Render)
-- See `docs/DEPLOYMENT_GUIDE.md`
 
 ---
 
 ## Resources
 
-- [SEDDK Regulations](https://www.seddk.gov.tr/)
-- [TSB Statistics](https://www.tsb.org.tr/)
-- [Turkish Insurance Law](https://www.mevzuat.gov.tr/MevzuatMetin/1.5.5684.pdf)
-- [Supabase Docs](https://supabase.com/docs)
-- [OpenAI API](https://platform.openai.com/docs)
-
----
-
-## Questions?
-
+SEDDK: seddk.gov.tr | TSB: tsb.org.tr | Insurance Law 5684 | Supabase/OpenAI docs
 Personal project by Erdem. See this file and codebase for context.

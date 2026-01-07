@@ -25,7 +25,7 @@ describe('useLazySection', () => {
     mockDisconnect.mockClear()
     mockUnobserve.mockClear()
 
-    mockIntersectionObserver.mockImplementation((callback) => ({
+    mockIntersectionObserver.mockImplementation((_callback) => ({
       observe: mockObserve,
       disconnect: mockDisconnect,
       unobserve: mockUnobserve,
@@ -126,7 +126,7 @@ describe('LazySection', () => {
     mockObserve.mockClear()
     mockDisconnect.mockClear()
 
-    mockIntersectionObserver.mockImplementation((callback) => ({
+    mockIntersectionObserver.mockImplementation((_callback) => ({
       observe: mockObserve,
       disconnect: mockDisconnect,
       unobserve: mockUnobserve,

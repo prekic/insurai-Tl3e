@@ -11,5 +11,5 @@ echo "Starting nginx..."
 nginx
 
 # Start Node.js backend
-echo "Starting backend server on port ${API_PORT:-3001}..."
+echo "Starting backend server on port ${API_PORT:-4001}..."
 exec node dist-server/index.js

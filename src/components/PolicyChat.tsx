@@ -1,17 +1,38 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Bot, User, ArrowLeft, AlertTriangle, RefreshCw } from 'lucide-react'
+import {
+  Send,
+  Bot,
+  User,
+  ArrowLeft,
+  AlertTriangle,
+  RefreshCw,
+  MessageSquarePlus,
+  History,
+  ChevronDown,
+  Sparkles,
+  X,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { usePolicies } from '@/lib/policy-context'
+import { useAuth } from '@/lib/supabase/auth-context'
 import { sanitizeMessage } from '@/lib/sanitize'
+import {
+  createConversation,
+  getRecentConversations,
+  getConversationMessages,
+  addMessage,
+  saveExchange,
+} from '@/lib/supabase/chat'
+import type { ChatConversationRow, ChatMessageRow, ChatProvider, TokenUsage } from '@/lib/supabase/types'
 
 interface Message {
   id: string
   role: 'user' | 'assistant' | 'error'
   content: string
   timestamp: Date
-  retryPayload?: string // Store the original question for retry
+  retryPayload?: string
 }
 
 interface ChatApiResponse {
@@ -33,9 +54,33 @@ interface ChatApiError {
   details?: string
 }
 
+const PROVIDER_INFO = {
+  openai: {
+    name: 'GPT-4o Mini',
+    icon: '🤖',
+    description: 'Fast and cost-effective',
+  },
+  anthropic: {
+    name: 'Claude Haiku',
+    icon: '🧠',
+    description: 'Nuanced understanding',
+  },
+} as const
+
 export function PolicyChat() {
   const navigate = useNavigate()
   const { policies } = usePolicies()
+  const { user } = useAuth()
+
+  // Provider state
+  const [selectedProvider, setSelectedProvider] = useState<ChatProvider>('openai')
+  const [showProviderDropdown, setShowProviderDropdown] = useState(false)
+
+  // Conversation state
+  const [currentConversation, setCurrentConversation] = useState<ChatConversationRow | null>(null)
+  const [conversations, setConversations] = useState<ChatConversationRow[]>([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
 
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -49,6 +94,7 @@ export function PolicyChat() {
   const [isTyping, setIsTyping] = useState(false)
   const [connectionError, setConnectionError] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const providerDropdownRef = useRef<HTMLDivElement>(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -57,6 +103,124 @@ export function PolicyChat() {
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (providerDropdownRef.current && !providerDropdownRef.current.contains(event.target as Node)) {
+        setShowProviderDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Load conversation history on mount
+  /* eslint-disable react-hooks/exhaustive-deps -- intentionally only runs when user changes */
+  useEffect(() => {
+    if (user) {
+      loadConversationHistory()
+    }
+  }, [user])
+  /* eslint-enable react-hooks/exhaustive-deps */
+
+  const loadConversationHistory = async () => {
+    if (!user) return
+    setIsLoadingHistory(true)
+    try {
+      const recent = await getRecentConversations(20)
+      setConversations(recent)
+    } catch (error) {
+      console.error('Failed to load conversation history:', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const loadConversation = async (conversation: ChatConversationRow) => {
+    try {
+      const msgs = await getConversationMessages(conversation.id)
+      const formattedMessages: Message[] = msgs.map((m: ChatMessageRow) => ({
+        id: m.id,
+        role: m.role === 'system' ? 'assistant' : m.role as 'user' | 'assistant',
+        content: m.content,
+        timestamp: new Date(m.created_at),
+      }))
+
+      // Add initial greeting if no messages
+      if (formattedMessages.length === 0) {
+        formattedMessages.push({
+          id: '1',
+          role: 'assistant',
+          content: `Hello! I'm your AI insurance assistant. I can help you understand your ${policies.length} uploaded policies.`,
+          timestamp: new Date(),
+        })
+      }
+
+      setMessages(formattedMessages)
+      setCurrentConversation(conversation)
+      setSelectedProvider(conversation.provider)
+      setShowHistory(false)
+    } catch (error) {
+      console.error('Failed to load conversation:', error)
+      toast.error('Failed to load conversation')
+    }
+  }
+
+  const startNewConversation = async () => {
+    if (!user) {
+      // For guests, just reset local state
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: `Hello! I'm your AI insurance assistant. I can help you understand your ${policies.length} uploaded policies.`,
+          timestamp: new Date(),
+        },
+      ])
+      setCurrentConversation(null)
+      setShowHistory(false)
+      return
+    }
+
+    try {
+      const policyIds = policies.map((p) => p.id).filter(Boolean) as string[]
+      const conversation = await createConversation(user.id, {
+        provider: selectedProvider,
+        policyIds,
+      })
+
+      // Add initial greeting to the new conversation
+      const greetingContent = `Hello! I'm your AI insurance assistant. I can help you understand your ${policies.length} uploaded policies.`
+      await addMessage(conversation.id, 'assistant', greetingContent)
+
+      setCurrentConversation(conversation)
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: greetingContent,
+          timestamp: new Date(),
+        },
+      ])
+      setShowHistory(false)
+
+      // Refresh history
+      loadConversationHistory()
+    } catch (error) {
+      console.error('Failed to create conversation:', error)
+      // Fall back to local-only mode
+      setMessages([
+        {
+          id: '1',
+          role: 'assistant',
+          content: `Hello! I'm your AI insurance assistant. I can help you understand your ${policies.length} uploaded policies.`,
+          timestamp: new Date(),
+        },
+      ])
+      setCurrentConversation(null)
+    }
+  }
 
   // Build policy context from uploaded policies for the AI
   const policyContext = useMemo(() => {
@@ -81,16 +245,16 @@ export function PolicyChat() {
   }, [policies])
 
   // Get conversation history for API (excluding error messages and the initial greeting)
-  const getConversationHistory = (): Array<{ role: 'user' | 'assistant'; content: string }> => {
+  const getConversationHistory = useCallback((): Array<{ role: 'user' | 'assistant'; content: string }> => {
     return messages
-      .filter((m) => m.role !== 'error' && m.id !== '1') // Exclude errors and initial greeting
+      .filter((m) => m.role !== 'error' && m.id !== '1')
       .map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       }))
-  }
+  }, [messages])
 
-  const getAIResponse = async (question: string): Promise<string> => {
+  const getAIResponse = async (question: string): Promise<{ response: string; provider: string; usage?: TokenUsage }> => {
     const apiUrl = import.meta.env.VITE_API_PROXY_URL || ''
     const conversationHistory = getConversationHistory()
 
@@ -103,7 +267,7 @@ export function PolicyChat() {
         message: question,
         conversationHistory,
         policyContext,
-        provider: 'openai', // Default to OpenAI, can be made configurable
+        provider: selectedProvider,
       }),
     })
 
@@ -117,18 +281,20 @@ export function PolicyChat() {
       throw new Error('Invalid response from chat API')
     }
 
-    return data.response
+    return {
+      response: data.response,
+      provider: data.provider,
+      usage: data.usage,
+    }
   }
 
   const handleSend = async (messageToSend?: string) => {
     const rawQuestion = messageToSend || input.trim()
     if (!rawQuestion) return
 
-    // Sanitize user input to prevent XSS
     const question = sanitizeMessage(rawQuestion)
     if (!question) return
 
-    // Clear any previous connection error
     setConnectionError(false)
 
     const userMessage: Message = {
@@ -143,7 +309,7 @@ export function PolicyChat() {
     setIsTyping(true)
 
     try {
-      const response = await getAIResponse(question)
+      const { response, provider, usage } = await getAIResponse(question)
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -153,14 +319,25 @@ export function PolicyChat() {
       }
 
       setMessages((prev) => [...prev, aiMessage])
+
+      // Persist to database if user is authenticated and has a conversation
+      if (user && currentConversation) {
+        try {
+          await saveExchange(currentConversation.id, question, response, {
+            provider,
+            tokenUsage: usage,
+          })
+        } catch (error) {
+          console.error('Failed to persist message:', error)
+        }
+      }
     } catch (error) {
       console.error('Chat error:', error)
 
-      // Add error message to chat
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'error',
-        content: 'Sorry, I couldn\'t process your request. Please try again.',
+        content: "Sorry, I couldn't process your request. Please try again.",
         timestamp: new Date(),
         retryPayload: question,
       }
@@ -181,7 +358,6 @@ export function PolicyChat() {
   }
 
   const handleRetry = async (question: string) => {
-    // Remove the error message before retrying
     setMessages((prev) => prev.filter((m) => m.role !== 'error' || m.retryPayload !== question))
     await handleSend(question)
   }
@@ -191,6 +367,12 @@ export function PolicyChat() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleProviderChange = (provider: ChatProvider) => {
+    setSelectedProvider(provider)
+    setShowProviderDropdown(false)
+    toast.success(`Switched to ${PROVIDER_INFO[provider].name}`)
   }
 
   const quickQuestions = [
@@ -204,33 +386,151 @@ export function PolicyChat() {
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={24} />
-          </button>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-              <Bot className="text-white" size={20} />
-            </div>
-            <div>
-              <h1 className="font-semibold text-gray-900">Policy Assistant</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">{policies.length} policies loaded</p>
-                {connectionError && (
-                  <span className="text-xs text-red-500 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                    Connection issue
-                  </span>
-                )}
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={24} />
+            </button>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Bot className="text-white" size={20} />
+              </div>
+              <div>
+                <h1 className="font-semibold text-gray-900">Policy Assistant</h1>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-500">{policies.length} policies loaded</p>
+                  {connectionError && (
+                    <span className="text-xs text-red-500 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+                      Connection issue
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Right side controls */}
+          <div className="flex items-center gap-2">
+            {/* Provider Selector */}
+            <div className="relative" ref={providerDropdownRef}>
+              <button
+                onClick={() => setShowProviderDropdown(!showProviderDropdown)}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors text-sm"
+                aria-label="Select AI provider"
+                data-testid="provider-selector"
+              >
+                <Sparkles size={16} className="text-purple-600" />
+                <span className="hidden sm:inline">{PROVIDER_INFO[selectedProvider].name}</span>
+                <ChevronDown size={16} className={`transition-transform ${showProviderDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {showProviderDropdown && (
+                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase">
+                    AI Provider
+                  </div>
+                  {(Object.keys(PROVIDER_INFO) as ChatProvider[]).map((provider) => (
+                    <button
+                      key={provider}
+                      onClick={() => handleProviderChange(provider)}
+                      className={`w-full px-3 py-2 flex items-center gap-3 hover:bg-gray-50 transition-colors ${
+                        selectedProvider === provider ? 'bg-purple-50' : ''
+                      }`}
+                      data-testid={`provider-option-${provider}`}
+                    >
+                      <span className="text-xl">{PROVIDER_INFO[provider].icon}</span>
+                      <div className="text-left">
+                        <div className="font-medium text-gray-900">{PROVIDER_INFO[provider].name}</div>
+                        <div className="text-xs text-gray-500">{PROVIDER_INFO[provider].description}</div>
+                      </div>
+                      {selectedProvider === provider && (
+                        <div className="ml-auto w-2 h-2 bg-purple-600 rounded-full" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* History Button */}
+            {user && (
+              <button
+                onClick={() => setShowHistory(!showHistory)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors relative"
+                aria-label="Conversation history"
+                data-testid="history-button"
+              >
+                <History size={20} />
+                {conversations.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-purple-600 text-white text-xs rounded-full flex items-center justify-center">
+                    {conversations.length > 9 ? '9+' : conversations.length}
+                  </span>
+                )}
+              </button>
+            )}
+
+            {/* New Conversation Button */}
+            <button
+              onClick={startNewConversation}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="New conversation"
+              data-testid="new-conversation-button"
+            >
+              <MessageSquarePlus size={20} />
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* History Sidebar */}
+      {showHistory && user && (
+        <div className="absolute right-0 top-16 w-80 h-[calc(100vh-4rem)] bg-white border-l border-gray-200 shadow-lg z-40 overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900">Conversation History</h2>
+            <button
+              onClick={() => setShowHistory(false)}
+              className="p-1 hover:bg-gray-100 rounded"
+              aria-label="Close history"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {isLoadingHistory ? (
+              <div className="p-4 text-center text-gray-500">Loading...</div>
+            ) : conversations.length === 0 ? (
+              <div className="p-4 text-center text-gray-500">No conversations yet</div>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => loadConversation(conv)}
+                    className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
+                      currentConversation?.id === conv.id ? 'bg-purple-50' : ''
+                    }`}
+                    data-testid={`conversation-${conv.id}`}
+                  >
+                    <div className="font-medium text-gray-900 truncate">{conv.title}</div>
+                    <div className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                      <span>{PROVIDER_INFO[conv.provider].icon}</span>
+                      <span>{conv.message_count} messages</span>
+                      <span>·</span>
+                      <span>{new Date(conv.last_message_at).toLocaleDateString()}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Connection Error Banner */}
       {connectionError && (
@@ -256,67 +556,69 @@ export function PolicyChat() {
           {messages.map((message) => {
             const retryPayload = message.retryPayload
             return (
-            <div
-              key={message.id}
-              className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {message.role === 'assistant' && (
-                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Bot className="text-white" size={16} />
-                </div>
-              )}
-              {message.role === 'error' && (
-                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <AlertTriangle className="text-red-600" size={16} />
-                </div>
-              )}
               <div
-                className={`max-w-[80%] p-4 rounded-2xl ${
-                  message.role === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : message.role === 'error'
-                      ? 'bg-red-50 border border-red-200'
-                      : 'bg-white border border-gray-200'
-                }`}
+                key={message.id}
+                className={`flex gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <p className={
-                  message.role === 'user'
-                    ? 'text-white'
-                    : message.role === 'error'
-                      ? 'text-red-700'
-                      : 'text-gray-700'
-                }>
-                  {message.content}
-                </p>
-                {message.role === 'error' && retryPayload && (
-                  <button
-                    onClick={() => handleRetry(retryPayload)}
-                    className="mt-2 flex items-center gap-1 text-sm text-red-600 hover:text-red-700 font-medium"
-                  >
-                    <RefreshCw size={14} />
-                    Retry
-                  </button>
+                {message.role === 'assistant' && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Bot className="text-white" size={16} />
+                  </div>
                 )}
-                <p
-                  className={`text-xs mt-2 ${
+                {message.role === 'error' && (
+                  <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <AlertTriangle className="text-red-600" size={16} />
+                  </div>
+                )}
+                <div
+                  className={`max-w-[80%] p-4 rounded-2xl ${
                     message.role === 'user'
-                      ? 'text-blue-200'
+                      ? 'bg-blue-600 text-white'
                       : message.role === 'error'
-                        ? 'text-red-400'
-                        : 'text-gray-400'
+                        ? 'bg-red-50 border border-red-200'
+                        : 'bg-white border border-gray-200'
                   }`}
                 >
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-              {message.role === 'user' && (
-                <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <User className="text-white" size={16} />
+                  <p
+                    className={
+                      message.role === 'user'
+                        ? 'text-white'
+                        : message.role === 'error'
+                          ? 'text-red-700'
+                          : 'text-gray-700'
+                    }
+                  >
+                    {message.content}
+                  </p>
+                  {message.role === 'error' && retryPayload && (
+                    <button
+                      onClick={() => handleRetry(retryPayload)}
+                      className="mt-2 flex items-center gap-1 text-sm text-red-600 hover:text-red-700 font-medium"
+                    >
+                      <RefreshCw size={14} />
+                      Retry
+                    </button>
+                  )}
+                  <p
+                    className={`text-xs mt-2 ${
+                      message.role === 'user'
+                        ? 'text-blue-200'
+                        : message.role === 'error'
+                          ? 'text-red-400'
+                          : 'text-gray-400'
+                    }`}
+                  >
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
-              )}
-            </div>
-          )})}
-
+                {message.role === 'user' && (
+                  <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <User className="text-white" size={16} />
+                  </div>
+                )}
+              </div>
+            )
+          })}
 
           {isTyping && (
             <div className="flex gap-3">
@@ -325,9 +627,18 @@ export function PolicyChat() {
               </div>
               <div className="bg-white border border-gray-200 p-4 rounded-2xl">
                 <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '0ms' }}
+                  />
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '150ms' }}
+                  />
+                  <span
+                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
+                    style={{ animationDelay: '300ms' }}
+                  />
                 </div>
               </div>
             </div>

@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest'
  */
 describe('API Error Response Visibility', () => {
   describe('End User View (Production)', () => {
-    const NODE_ENV = 'production'
+    const _NODE_ENV = 'production' // Documenting environment context
 
     it('should see user-friendly error message only', () => {
       // Simulating what the server returns in production
@@ -54,7 +54,7 @@ describe('API Error Response Visibility', () => {
 
     it('should NOT see raw API error messages', () => {
       // These should be transformed to user-friendly messages
-      const rawErrors = [
+      const _rawErrors = [
         '401 Unauthorized - Incorrect API key provided: sk-proj-xxx',
         'Error: insufficient_quota - You exceeded your current quota',
         'APIError: Connection refused at 127.0.0.1:4001',
@@ -76,7 +76,7 @@ describe('API Error Response Visibility', () => {
   })
 
   describe('Admin/Developer View (Development)', () => {
-    const NODE_ENV = 'development'
+    const _NODE_ENV = 'development' // Documenting environment context
 
     it('should see full error details for debugging', () => {
       // Simulating what the server returns in development
