@@ -9,9 +9,7 @@ import type { PolicyType } from '@/types/policy'
 import type { ExtendedExtractedPolicyData } from './extraction-schema-extended'
 import {
   parseTurkishDate,
-  parseTurkishCurrency,
   parseTurkishPlate,
-  isValidTCKimlik,
   normalizeCoverageName,
 } from './turkish-utils'
 
