@@ -442,6 +442,59 @@ Body: text-gray-600
 
 ---
 
+## Benchmarking Logic
+
+### Core Services (`src/lib/`)
+
+| Module | Purpose |
+|--------|---------|
+| `market-data/service.ts` | MarketDataService - main benchmarking engine |
+| `market-data/gap-analyzer.ts` | Identifies coverage gaps vs market |
+| `regional-benchmark/` | Regional risk adjustments and comparisons |
+| `industry-risk/` | Industry-specific risk profiles |
+| `data-repository/` | Data validation and loading |
+
+### Benchmarking Flow
+
+```
+User Policy → Extract Data → Detect Region → Get Market Benchmark
+     ↓                            ↓                    ↓
+Compare Premium → Compare Coverage → Calculate Value Score
+     ↓                    ↓                    ↓
+Premium Percentile   Coverage %ile      Value = Coverage/Premium
+     ↓                    ↓                    ↓
+Generate Insights → Gap Analysis → Recommendations
+```
+
+### Key Calculations
+
+```typescript
+// Premium percentile (where user stands vs market)
+premiumPercentile = calculatePremiumPercentile(premium, policyType, region)
+
+// Coverage percentile (coverage adequacy)
+coveragePercentile = calculateCoveragePercentile(coverage, policyType)
+
+// Value score (what you get per TRY spent)
+valueScore = (userCoverage / userPremium) / (marketCoverage / marketPremium) * 50
+
+// Regional adjustment
+adjustedPremium = basePremium * REGIONAL_FACTORS[region].factor
+```
+
+### Insight Categories
+
+| Category | Description |
+|----------|-------------|
+| `premium_high` | Premium > 75th percentile |
+| `premium_low` | Premium < 25th percentile (check coverage) |
+| `coverage_adequate` | Coverage >= market average |
+| `coverage_insufficient` | Coverage < 50th percentile |
+| `value_excellent` | Value score > 80 |
+| `value_poor` | Value score < 40 |
+
+---
+
 ## Gap Detection System
 
 ### Architecture (`src/lib/gap-detection/`)
@@ -588,6 +641,73 @@ RegionalRiskProfile {
 
 ---
 
+## Insurance Knowledge Database
+
+### Data Files (`src/data/`)
+
+| File | Purpose |
+|------|---------|
+| `market-data/benchmarks.ts` | Premium benchmarks, coverage limits by policy type |
+| `market-data/providers.ts` | 12 Turkish insurance companies with market share |
+| `insurance-lines.ts` | Official TSB/SEDDK insurance branch classifications |
+| `regulations.ts` | Laws, general conditions (genel şartlar), circulars |
+| `coverage-limits.ts` | Official SEDDK/DASK minimum coverage limits |
+| `sample-policies.ts` | 21 sample Turkish policies for testing |
+
+### Turkish Insurance Providers (2024 Market Share)
+
+| Provider | Turkish Name | Market Share |
+|----------|--------------|--------------|
+| Allianz | Allianz Sigorta | 12.8% |
+| AXA | AXA Sigorta | 10.5% |
+| Anadolu | Anadolu Sigorta | 9.2% |
+| Aksigorta | Aksigorta | 8.7% |
+| Mapfre | Mapfre Sigorta | 7.4% |
+| Sompo | Sompo Sigorta | 6.8% |
+| Zurich | Zurich Sigorta | 5.2% |
+| HDI | HDI Sigorta | 4.8% |
+| Türkiye | Türkiye Sigorta | 4.5% |
+| Groupama | Groupama Sigorta | 4.2% |
+
+### Regulatory Framework
+
+| Regulation Type | Turkish | Purpose |
+|-----------------|---------|---------|
+| Kanun | Law | Primary legislation (e.g., Insurance Law 5684) |
+| Yönetmelik | Regulation | Detailed implementation rules |
+| Genel Şartlar | General Conditions | Standard policy terms by type |
+| Kloz | Clause | Optional coverage extensions |
+| Tarife | Tariff | Official premium tables |
+| Genelge | Circular | Administrative guidance |
+| Tebliğ | Communique | Official announcements |
+
+### Official Coverage Limits (2025)
+
+**Traffic Insurance (ZMMS) - Per Vehicle:**
+- Material Damage: 300,000 TRY per vehicle
+- Material Damage: 600,000 TRY per accident
+- Bodily Injury: 1,500,000 TRY per person
+- Bodily Injury: 7,500,000 TRY per accident
+
+**DASK (Earthquake) Limits:**
+- Maximum coverage: 1,040,000 TRY (2025)
+- Minimum premium varies by earthquake zone (1-5)
+- Zone 1 (Istanbul): Highest risk, highest premium
+
+### Regional Premium Factors
+
+| Region | Factor | Reason |
+|--------|--------|--------|
+| Marmara | 1.15x | High risk (Istanbul), earthquake zone 1 |
+| Akdeniz | 1.08x | Tourism, flood risk |
+| Ege | 1.05x | Tourism, earthquake risk |
+| İç Anadolu | 0.95x | Lower risk, agricultural |
+| Karadeniz | 0.90x | Flood/landslide risk |
+| Güneydoğu | 0.88x | Mixed risk profile |
+| Doğu Anadolu | 0.85x | Rural, lower premiums |
+
+---
+
 ## Domain Knowledge
 
 ### Turkish Insurance Terms
@@ -605,12 +725,25 @@ RegionalRiskProfile {
 | Sigortalı | Insured | Who is covered |
 | Sigorta Ettiren | Policyholder | Who pays |
 | Riziko Adresi | Risk Address | Location covered |
+| Lehdar | Beneficiary | Who receives payout |
+| Hasar | Claim/Damage | When something goes wrong |
+| Poliçe Süresi | Policy Period | Coverage duration |
+| Rücu | Subrogation | Insurer's right to recover |
+| Eksik Sigorta | Underinsurance | Sum insured < actual value |
+| Aşkın Sigorta | Overinsurance | Sum insured > actual value |
+| Acente | Agent | Insurance intermediary |
+| Broker | Broker | Independent intermediary |
+| Aktüer | Actuary | Risk/pricing specialist |
+| Hasar/Prim Oranı | Loss Ratio | Claims / Premiums |
 
 ### Key Regulators
 
-- **SEDDK** - Insurance regulator (like state insurance dept)
-- **TSB** - Insurance association (industry body)
-- **Hazine** - Treasury, oversees insurance sector
+- **SEDDK** - Sigortacılık ve Özel Emeklilik Düzenleme ve Denetleme Kurumu (Insurance regulator)
+- **TSB** - Türkiye Sigorta Birliği (Insurance association, industry body)
+- **Hazine** - Hazine ve Maliye Bakanlığı (Treasury, oversees insurance sector)
+- **DASK** - Doğal Afet Sigortaları Kurumu (Earthquake insurance authority)
+- **TARSİM** - Tarım Sigortaları Havuzu (Agricultural insurance pool)
+- **Güvence Hesabı** - Guarantee Fund (covers uninsured drivers)
 
 ### Policy Structure
 
@@ -909,8 +1042,53 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 4. **PDF Worker**: Loaded from CDN, check CSP in `index.html`
 5. **Supabase RLS**: Row Level Security enabled - policies are user-scoped
 6. **Turkish Dates**: DD.MM.YYYY format, parse carefully
-7. **Currency**: Use `tr-TR` locale, TRY symbol varies
+7. **Currency**: Use `tr-TR` locale, TRY symbol varies (₺ or TL)
 8. **Tests Mock Everything**: Integration tests added to catch real config issues
+
+---
+
+## Turkish Market Considerations
+
+### Mandatory Insurance Types
+- **Trafik Sigortası** (MTPL): Required for all vehicles
+- **DASK**: Required for all buildings (earthquake)
+- **Professional Liability**: Required for certain professions (doctors, lawyers, etc.)
+
+### Premium Calculation Factors
+- Vehicle: Age, brand, engine size, driver age/experience
+- Property: Location (earthquake zone), construction type, usage
+- Health: Age, pre-existing conditions, coverage scope
+
+### Common Policy Exclusions (Watch for these)
+- War and terrorism (unless covered by pool)
+- Nuclear events
+- Intentional acts
+- Wear and tear (depreciation)
+- Pre-existing conditions (health)
+
+### Important Dates
+- Policy renewals: Usually 1 year
+- DASK: Must be renewed before property transactions
+- Traffic insurance: Must show valid policy for vehicle registration
+
+### Currency Handling
+```typescript
+// Format TRY amounts correctly
+new Intl.NumberFormat('tr-TR', {
+  style: 'currency',
+  currency: 'TRY',
+  minimumFractionDigits: 2
+}).format(amount)
+
+// Common patterns
+// Input: 15000.50
+// Output: ₺15.000,50 or 15.000,50 TL
+```
+
+### Regional Considerations
+- Istanbul (Marmara): Highest traffic accident rates, Zone 1 earthquake
+- Coastal areas: Flood risk, tourism-related claims
+- Eastern regions: Lower premiums, fewer providers
 
 ---
 
