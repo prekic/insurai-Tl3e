@@ -49,24 +49,30 @@ export {
   type CoverageLimit,
   type LimitDetail,
   type PremiumRange,
+  type BranchStatistics,
   // Traffic Insurance Limits
   TRAFFIC_INSURANCE_LIMITS_2025,
   TRAFFIC_INSURANCE_LIMITS_2026,
-  // DASK Limits
+  // DASK Limits & Premium Rates
   DASK_LIMITS_2024,
   DASK_MINIMUM_PREMIUMS_2024,
+  DASK_PREMIUM_RATES_2026,
+  calculateDaskPremium,
   // Other Mandatory Insurance Limits
   SEAT_ACCIDENT_LIMITS_2025,
   MEDICAL_MALPRACTICE_LIMITS_2025,
-  // Benchmarks
+  // Benchmarks & Market Data
   PREMIUM_BENCHMARKS,
   MARKET_DATA_2024,
+  BRANCH_STATISTICS_2024,
   ALL_COVERAGE_LIMITS,
   // Helpers
   getCurrentTrafficLimits,
   getCurrentDaskLimits,
   getPremiumBenchmark,
   validateAgainstMinimumLimits,
+  getBranchStatistics,
+  getLossRatioBenchmark,
 } from './coverage-limits'
 
 // =============================================================================
@@ -112,6 +118,7 @@ import {
   ALL_COVERAGE_LIMITS,
   PREMIUM_BENCHMARKS,
   MARKET_DATA_2024,
+  getBranchStatistics,
 } from './coverage-limits'
 import { ALL_REGULATIONS, ALL_CLAUSES, searchRegulations } from './regulations'
 
@@ -190,6 +197,9 @@ export function getInsuranceTypeData(typeCode: string) {
 
   const benchmark = PREMIUM_BENCHMARKS.find((b) => b.insuranceType === typeCode)
 
+  // Get branch statistics for loss analysis
+  const branchStats = getBranchStatistics(typeCode) || getBranchStatistics(category)
+
   return {
     insuranceLine,
     regulations: relatedRegulations,
@@ -197,6 +207,8 @@ export function getInsuranceTypeData(typeCode: string) {
     premiumBenchmark: benchmark,
     marketShare: insuranceLine.marketShare2024,
     avgPremium: insuranceLine.avgPremium2024,
+    branchStatistics: branchStats,
+    lossRatio: branchStats?.lossRatio,
   }
 }
 
@@ -256,4 +268,95 @@ export function getComplianceRequirements(policyType: string) {
   }
 
   return requirements
+}
+
+/**
+ * Get loss analysis benchmarks for a policy
+ * Used to compare actual claims against market benchmarks
+ */
+export function getLossAnalysisBenchmarks(branchCode: string) {
+  const branchStats = getBranchStatistics(branchCode)
+
+  if (!branchStats) {
+    return {
+      available: false,
+      message: 'No benchmark data available for this insurance type',
+    }
+  }
+
+  return {
+    available: true,
+    branchCode: branchStats.code,
+    branchName: branchStats.nameTR,
+    marketData: {
+      totalPremium: branchStats.premiumProduction,
+      totalClaims: branchStats.claimsPaid,
+      lossRatio: branchStats.lossRatio,
+      marketShare: branchStats.marketShare,
+      yoyGrowth: branchStats.yoyGrowth,
+    },
+    benchmarks: {
+      expectedLossRatio: branchStats.lossRatio,
+      warningThreshold: branchStats.lossRatio * 1.2, // 20% above market
+      criticalThreshold: branchStats.lossRatio * 1.5, // 50% above market
+    },
+    interpretation: {
+      low: `< ${(branchStats.lossRatio * 100).toFixed(0)}%: Below market average - healthy`,
+      normal: `${(branchStats.lossRatio * 100).toFixed(0)}% - ${(branchStats.lossRatio * 120).toFixed(0)}%: Within market range`,
+      warning: `${(branchStats.lossRatio * 120).toFixed(0)}% - ${(branchStats.lossRatio * 150).toFixed(0)}%: Above market - review needed`,
+      critical: `> ${(branchStats.lossRatio * 150).toFixed(0)}%: Significantly above market - action required`,
+    },
+  }
+}
+
+/**
+ * Compare a policy's loss ratio against market benchmark
+ */
+export function evaluateLossRatio(
+  branchCode: string,
+  actualClaimsPaid: number,
+  actualPremium: number
+): {
+  actualLossRatio: number
+  benchmarkLossRatio: number
+  status: 'healthy' | 'normal' | 'warning' | 'critical'
+  deviation: number
+  recommendation: string
+  recommendationTR: string
+} {
+  const branchStats = getBranchStatistics(branchCode)
+  const benchmarkLossRatio = branchStats?.lossRatio || 0.5
+  const actualLossRatio = actualPremium > 0 ? actualClaimsPaid / actualPremium : 0
+  const deviation = actualLossRatio - benchmarkLossRatio
+
+  let status: 'healthy' | 'normal' | 'warning' | 'critical'
+  let recommendation: string
+  let recommendationTR: string
+
+  if (actualLossRatio < benchmarkLossRatio) {
+    status = 'healthy'
+    recommendation = 'Loss ratio is below market average. Policy performing well.'
+    recommendationTR = 'Hasar/prim oranı piyasa ortalamasının altında. Poliçe iyi performans gösteriyor.'
+  } else if (actualLossRatio < benchmarkLossRatio * 1.2) {
+    status = 'normal'
+    recommendation = 'Loss ratio is within market range. Continue monitoring.'
+    recommendationTR = 'Hasar/prim oranı piyasa aralığında. İzlemeye devam edin.'
+  } else if (actualLossRatio < benchmarkLossRatio * 1.5) {
+    status = 'warning'
+    recommendation = 'Loss ratio is above market average. Consider reviewing risk factors and premium.'
+    recommendationTR = 'Hasar/prim oranı piyasa ortalamasının üzerinde. Risk faktörlerini ve primi gözden geçirmeyi düşünün.'
+  } else {
+    status = 'critical'
+    recommendation = 'Loss ratio significantly exceeds market average. Immediate action required - review coverage, claims, and pricing.'
+    recommendationTR = 'Hasar/prim oranı piyasa ortalamasını önemli ölçüde aşıyor. Acil eylem gerekli - teminat, hasar ve fiyatlandırmayı gözden geçirin.'
+  }
+
+  return {
+    actualLossRatio,
+    benchmarkLossRatio,
+    status,
+    deviation,
+    recommendation,
+    recommendationTR,
+  }
 }
