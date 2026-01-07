@@ -203,155 +203,23 @@ NODE_ENV=development
 ```
 
 ### Data Flow: PDF Upload & Extraction
-
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐    ┌──────────┐
-│  User    │───▶│ PolicyUpload  │───▶│ pdf.js       │───▶│ Text     │
-│  drops   │    │ component     │    │ (browser)    │    │ extracted│
-│  PDF     │    │               │    │              │    │          │
-└──────────┘    └───────────────┘    └──────────────┘    └────┬─────┘
-                                                              │
-                     ┌────────────────────────────────────────┘
-                     ▼
-            ┌─────────────────┐
-            │ Check text      │
-            │ density         │
-            └────────┬────────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   ┌───────────┐          ┌───────────┐
-   │ < 100     │          │ >= 100    │
-   │ chars/page│          │ chars/page│
-   │ (scanned) │          │ (digital) │
-   └─────┬─────┘          └─────┬─────┘
-         │                      │
-         ▼                      │
-   ┌───────────┐                │
-   │ Google    │                │
-   │ Vision OCR│                │
-   │ /api/ai/  │                │
-   │ ocr       │                │
-   └─────┬─────┘                │
-         │                      │
-         └──────────┬───────────┘
-                    ▼
-            ┌─────────────────┐
-            │ AI Extraction   │
-            │ /api/ai/extract │
-            │ OpenAI|Anthropic│
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐
-            │ Zod Validation  │
-            │ PolicySchema    │
-            └────────┬────────┘
-                     │
-                     ▼
-            ┌─────────────────┐    ┌──────────────┐
-            │ PolicyContext   │───▶│ Supabase     │
-            │ (React state)   │    │ policies     │
-            │                 │    │ table        │
-            └─────────────────┘    └──────────────┘
+User drops PDF → PolicyUpload → pdf.js (browser) → Extract text
+→ Check density: < 100 chars/page? → Google Vision OCR (/api/ai/ocr)
+                  >= 100 chars/page? → Direct to AI
+→ AI Extraction (/api/ai/extract) → Zod validation → PolicyContext → Supabase
 ```
 
-### Data Flow: PolicyChat Conversation
-
+### Data Flow: PolicyChat
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐
-│  User    │───▶│ PolicyChat    │───▶│ Build        │
-│  types   │    │ component     │    │ context from │
-│  question│    │               │    │ policies     │
-└──────────┘    └───────────────┘    └──────┬───────┘
-                                            │
-                     ┌──────────────────────┘
-                     ▼
-            ┌─────────────────────────────────────┐
-            │ Request to /api/ai/chat             │
-            │ {                                   │
-            │   message: "What does my Kasko...", │
-            │   conversationHistory: [...],       │
-            │   policyContext: "Policy: POL-001", │
-            │   provider: "openai"                │
-            │ }                                   │
-            └─────────────────┬───────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │ Rate Limiter    │
-                    │ (60/hr per IP)  │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │ Zod Validation  │
-                    │ chatSchema      │
-                    └────────┬────────┘
-                             │
-                             ▼
-                    ┌─────────────────┐
-                    │ System Prompt + │
-                    │ Policy Context  │
-                    │ + History       │
-                    └────────┬────────┘
-                             │
-              ┌──────────────┴──────────────┐
-              ▼                             ▼
-       ┌─────────────┐              ┌─────────────┐
-       │ OpenAI      │              │ Anthropic   │
-       │ gpt-4o-mini │              │ claude-3-5- │
-       │             │              │ haiku       │
-       └──────┬──────┘              └──────┬──────┘
-              │                            │
-              └──────────────┬─────────────┘
-                             ▼
-                    ┌─────────────────┐
-                    │ Response to UI  │
-                    │ {               │
-                    │   response: "", │
-                    │   provider: "", │
-                    │   usage: {}     │
-                    │ }               │
-                    └─────────────────┘
+User → PolicyChat → Build context → /api/ai/chat → Rate limit → Validate
+→ Add system prompt + history → OpenAI/Anthropic → Response to UI
 ```
 
 ### Authentication Flow
-
 ```
-┌──────────┐    ┌───────────────┐    ┌──────────────┐
-│  User    │───▶│ Login/Signup  │───▶│ Supabase     │
-│  clicks  │    │ form          │    │ Auth         │
-│  sign in │    │               │    │              │
-└──────────┘    └───────────────┘    └──────┬───────┘
-                                            │
-                                            ▼
-                                   ┌─────────────────┐
-                                   │ JWT Session     │
-                                   │ stored in       │
-                                   │ localStorage    │
-                                   └────────┬────────┘
-                                            │
-                     ┌──────────────────────┘
-                     ▼
-            ┌─────────────────┐
-            │ AuthContext     │
-            │ provides:       │
-            │ - user object   │
-            │ - isLoading     │
-            │ - signIn()      │
-            │ - signOut()     │
-            └────────┬────────┘
-                     │
-         ┌───────────┴───────────┐
-         ▼                       ▼
-   ┌───────────┐          ┌───────────┐
-   │ Protected │          │ Public    │
-   │ Routes    │          │ Routes    │
-   │ /dashboard│          │ /landing  │
-   │ /upload   │          │ /login    │
-   │ /chat     │          │           │
-   └───────────┘          └───────────┘
+User → Login form → Supabase Auth → JWT in localStorage → AuthContext
+→ Protected routes (/dashboard, /upload, /chat) vs Public (/landing, /login)
 ```
 
 ### Key Architecture Decisions
@@ -1115,37 +983,18 @@ USING (auth.uid() = user_id);
 
 ## Deployment
 
-### Local Development
 ```bash
-npm install
-cp .env.example .env  # Add your keys
-npm run dev:all
+# Local
+npm install && cp .env.example .env && npm run dev:all
+
+# Codespaces: Create .env, run npm run dev:all, open port 5173
+# Production: Frontend → Vercel/Netlify, Backend → Railway/Render
+# See docs/DEPLOYMENT_GUIDE.md
 ```
-
-### GitHub Codespaces
-1. Open repo in Codespaces
-2. `git checkout claude/build-app-from-design-GBWjx`
-3. Create `.env` with API keys
-4. `npm run dev:all`
-5. Open port 5173 from Ports tab
-
-### Production (Vercel/Netlify)
-- Frontend deploys from `dist/`
-- Backend needs separate hosting (Railway, Render)
-- See `docs/DEPLOYMENT_GUIDE.md`
 
 ---
 
 ## Resources
 
-- [SEDDK Regulations](https://www.seddk.gov.tr/)
-- [TSB Statistics](https://www.tsb.org.tr/)
-- [Turkish Insurance Law](https://www.mevzuat.gov.tr/MevzuatMetin/1.5.5684.pdf)
-- [Supabase Docs](https://supabase.com/docs)
-- [OpenAI API](https://platform.openai.com/docs)
-
----
-
-## Questions?
-
+SEDDK: seddk.gov.tr | TSB: tsb.org.tr | Insurance Law 5684 | Supabase/OpenAI docs
 Personal project by Erdem. See this file and codebase for context.
