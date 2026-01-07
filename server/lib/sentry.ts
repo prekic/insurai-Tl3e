@@ -106,17 +106,13 @@ export function initServerSentry(): void {
 }
 
 /**
- * Express error handler middleware for Sentry
+ * Setup Sentry error handling for Express app
+ * Call this after all routes are defined
+ * @param app Express application instance
  */
-export function sentryErrorHandler() {
-  return Sentry.expressErrorHandler()
-}
-
-/**
- * Express request handler middleware for Sentry
- */
-export function sentryRequestHandler() {
-  return Sentry.expressRequestHandler()
+export function setupSentryErrorHandler(app: import('express').Express): void {
+  if (!SENTRY_DSN) return
+  Sentry.setupExpressErrorHandler(app)
 }
 
 /**

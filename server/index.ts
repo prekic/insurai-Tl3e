@@ -22,8 +22,7 @@ import {
 } from './middleware/rate-limit'
 import {
   initServerSentry,
-  sentryRequestHandler,
-  sentryErrorHandler,
+  setupSentryErrorHandler,
   captureServerError,
 } from './lib/sentry'
 
@@ -33,7 +32,6 @@ initServerSentry()
 const app = express()
 const PORT = process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
-const IS_STAGING = process.env.NODE_ENV === 'staging'
 
 // Server configuration
 const SERVER_CONFIG = {
@@ -54,10 +52,7 @@ let server: Server
 // Track active connections for graceful shutdown
 const activeConnections = new Set<import('net').Socket>()
 
-// Sentry request handler must be first middleware
-if (IS_PRODUCTION || IS_STAGING) {
-  app.use(sentryRequestHandler())
-}
+// Note: Sentry v10+ auto-instruments Express, no request handler needed
 
 /**
  * Request timeout middleware
@@ -211,10 +206,8 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
 
-// Sentry error handler must be before other error handlers
-if (IS_PRODUCTION || IS_STAGING) {
-  app.use(sentryErrorHandler())
-}
+// Setup Sentry error handling (must be before other error handlers)
+setupSentryErrorHandler(app)
 
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
