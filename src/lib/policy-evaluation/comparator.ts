@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- Assertions used after sort/find operations where existence is guaranteed */
 /**
  * Multi-Policy Comparator
  *

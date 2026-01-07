@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- Intentional console output for developer-facing configuration checks */
 /**
  * Preflight Configuration Check
  *

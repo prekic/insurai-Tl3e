@@ -226,6 +226,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 })
 
 // Start server
+// eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling
 server = app.listen(PORT, () => {
   console.log(`🚀 InsurAI API server running on port ${PORT}`)
   // Only show detailed provider configuration in non-production

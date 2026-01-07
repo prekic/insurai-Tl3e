@@ -1,3 +1,4 @@
+/* global module */
 /**
  * Lighthouse CI Configuration
  *

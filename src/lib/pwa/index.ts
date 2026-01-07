@@ -1,3 +1,5 @@
+/* eslint-disable no-console -- Intentional console output for PWA debugging and user feedback */
+/* eslint-disable @typescript-eslint/no-non-null-assertion -- Assertion used after assignment check */
 /**
  * PWA and Offline Experience Module
  *
@@ -423,7 +425,7 @@ export async function isStoragePersistent(): Promise<boolean> {
 
   try {
     return await navigator.storage.persisted()
-  } catch (error) {
+  } catch (_error) {
     return false
   }
 }

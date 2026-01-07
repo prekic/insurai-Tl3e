@@ -2,11 +2,7 @@
  * Tests for Post-Extraction Validation
  */
 import { describe, it, expect } from 'vitest'
-import {
-  validateExtraction,
-  formatValidationIssues,
-  type ValidationResult,
-} from './extraction-validator'
+import { validateExtraction, formatValidationIssues } from './extraction-validator'
 import type { ExtendedExtractedPolicyData } from './extraction-schema-extended'
 
 // Helper to create base policy data

@@ -13,15 +13,13 @@ vi.mock('@sentry/node', () => ({
   setContext: vi.fn(),
   captureException: vi.fn(() => 'test-event-id'),
   captureMessage: vi.fn(),
-  expressErrorHandler: vi.fn(() => vi.fn()),
-  expressRequestHandler: vi.fn(() => vi.fn()),
+  setupExpressErrorHandler: vi.fn(),
 }))
 
 import * as Sentry from '@sentry/node'
 import {
   initServerSentry,
-  sentryErrorHandler,
-  sentryRequestHandler,
+  setupSentryErrorHandler,
   captureServerError,
   captureServerMessage,
   setServerUser,
@@ -43,29 +41,23 @@ describe('Sentry Server', () => {
     })
   })
 
-  describe('sentryErrorHandler', () => {
-    it('should return express middleware', () => {
-      const handler = sentryErrorHandler()
-      expect(handler).toBeDefined()
-      expect(typeof handler).toBe('function')
+  describe('setupSentryErrorHandler', () => {
+    it('should be a callable function', () => {
+      expect(typeof setupSentryErrorHandler).toBe('function')
     })
 
-    it('should call Sentry expressErrorHandler', () => {
-      sentryErrorHandler()
-      expect(Sentry.expressErrorHandler).toHaveBeenCalled()
-    })
-  })
-
-  describe('sentryRequestHandler', () => {
-    it('should return express middleware', () => {
-      const handler = sentryRequestHandler()
-      expect(handler).toBeDefined()
-      expect(typeof handler).toBe('function')
+    it('should accept an Express app without throwing', () => {
+      const mockApp = { use: vi.fn() }
+      // When DSN is not configured, it returns early gracefully
+      expect(() => setupSentryErrorHandler(mockApp as never)).not.toThrow()
     })
 
-    it('should call Sentry expressRequestHandler', () => {
-      sentryRequestHandler()
-      expect(Sentry.expressRequestHandler).toHaveBeenCalled()
+    it('should not call Sentry setupExpressErrorHandler when DSN is not configured', () => {
+      // DSN is not set in test environment, so handler should return early
+      const mockApp = { use: vi.fn() }
+      setupSentryErrorHandler(mockApp as never)
+      // Should NOT be called when DSN is missing
+      expect(Sentry.setupExpressErrorHandler).not.toHaveBeenCalled()
     })
   })
 

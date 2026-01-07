@@ -116,11 +116,13 @@ export function PolicyChat() {
   }, [])
 
   // Load conversation history on mount
+  /* eslint-disable react-hooks/exhaustive-deps -- intentionally only runs when user changes */
   useEffect(() => {
     if (user) {
       loadConversationHistory()
     }
   }, [user])
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   const loadConversationHistory = async () => {
     if (!user) return

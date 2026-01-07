@@ -534,7 +534,7 @@ test.describe('WebKit/Safari Compatibility', () => {
             ok: response.ok || response.status === 404, // 404 is fine, means route exists
             status: response.status,
           }
-        } catch (error) {
+        } catch (_error) {
           // Network error is acceptable if server isn't running
           return { ok: true, status: 0 }
         }

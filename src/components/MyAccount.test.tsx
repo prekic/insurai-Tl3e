@@ -4,8 +4,8 @@
  * Tests for user account profile display and editing
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { MyAccount } from './MyAccount'
 
@@ -19,6 +19,32 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
+// Mock useAuth hook
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({
+    user: {
+      id: 'test-user-id',
+      email: 'john@example.com',
+      user_metadata: {
+        full_name: 'John Doe',
+      },
+    },
+    isLoading: false,
+    isConfigured: false, // Use local storage mode for tests
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    signOut: vi.fn(),
+  }),
+}))
+
+// Mock supabase functions
+vi.mock('@/lib/supabase', () => ({
+  isSupabaseConfigured: () => false,
+  fetchUserProfile: vi.fn(),
+  updateUserProfile: vi.fn(),
+  fetchUserStats: vi.fn(),
+}))
+
 const renderWithRouter = (component: React.ReactElement) => {
   return render(<BrowserRouter>{component}</BrowserRouter>)
 }
@@ -26,105 +52,138 @@ const renderWithRouter = (component: React.ReactElement) => {
 describe('MyAccount', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Set up localStorage with test data (component uses localStorage when not using Supabase)
+    const testProfile = {
+      name: 'John Doe',
+      email: 'john@example.com',
+      phone: '+90 532 123 4567',
+      location: 'Istanbul, Turkey',
+      company: 'ABC Insurance Broker',
+    }
+    localStorage.setItem('insurai_user_profile', JSON.stringify(testProfile))
+  })
+
+  afterEach(() => {
+    localStorage.clear()
   })
 
   describe('Profile Display', () => {
-    it('should render the account page header', () => {
+    it('should render the account page header', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('My Account')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('My Account')).toBeInTheDocument()
+      })
     })
 
-    it('should display user name', () => {
+    it('should display user name after loading', async () => {
       renderWithRouter(<MyAccount />)
 
-      const userNames = screen.getAllByText('John Doe')
-      expect(userNames.length).toBeGreaterThan(0)
+      await waitFor(() => {
+        const userNames = screen.getAllByText('John Doe')
+        expect(userNames.length).toBeGreaterThan(0)
+      })
     })
 
-    it('should display company name', () => {
+    it('should display company name after loading', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('ABC Insurance Broker')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('ABC Insurance Broker')).toBeInTheDocument()
+      })
     })
 
-    it('should display email address', () => {
+    it('should display email address after loading', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('john@example.com')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('john@example.com')).toBeInTheDocument()
+      })
     })
 
-    it('should display phone number', () => {
+    it('should display phone number after loading', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('+90 532 123 4567')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('+90 532 123 4567')).toBeInTheDocument()
+      })
     })
 
-    it('should display location', () => {
+    it('should display location after loading', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Istanbul, Turkey')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Istanbul, Turkey')).toBeInTheDocument()
+      })
     })
 
-    it('should display user initials in avatar', () => {
+    it('should display user initials in avatar', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('JD')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('JD')).toBeInTheDocument()
+      })
     })
 
-    it('should display Pro Plan badge', () => {
+    it('should display storage mode badge', async () => {
       renderWithRouter(<MyAccount />)
 
-      const proPlanElements = screen.getAllByText('Pro Plan')
-      expect(proPlanElements.length).toBeGreaterThan(0)
-    })
-
-    it('should display member since date', () => {
-      renderWithRouter(<MyAccount />)
-
-      expect(screen.getByText(/Member since/)).toBeInTheDocument()
-      expect(screen.getByText(/January 2024/)).toBeInTheDocument()
+      await waitFor(() => {
+        // Component shows "Local Only" when not using Supabase
+        expect(screen.getByText('Local Only')).toBeInTheDocument()
+      })
     })
   })
 
   describe('Usage Statistics', () => {
-    it('should display Usage Statistics section', () => {
+    it('should display Usage Statistics section', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Usage Statistics')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Usage Statistics')).toBeInTheDocument()
+      })
     })
 
-    it('should display policies analyzed count', () => {
+    it('should display policies analyzed label', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('24')).toBeInTheDocument()
-      expect(screen.getByText('Policies Analyzed')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Policies Analyzed')).toBeInTheDocument()
+      })
     })
 
-    it('should display comparisons count', () => {
+    it('should display comparisons label', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('12')).toBeInTheDocument()
-      expect(screen.getByText('Comparisons')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Comparisons')).toBeInTheDocument()
+      })
     })
 
-    it('should display saved reports count', () => {
+    it('should display saved reports label', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('8')).toBeInTheDocument()
-      expect(screen.getByText('Saved Reports')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Saved Reports')).toBeInTheDocument()
+      })
     })
   })
 
   describe('Edit Mode', () => {
-    it('should show Edit Profile button by default', () => {
+    it('should show Edit Profile button by default', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
     })
 
-    it('should toggle to Save button when editing', () => {
+    it('should toggle to Save button when editing', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -132,8 +191,12 @@ describe('MyAccount', () => {
       expect(screen.getByText('Save')).toBeInTheDocument()
     })
 
-    it('should show input fields when in edit mode', () => {
+    it('should show input fields when in edit mode', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -143,8 +206,12 @@ describe('MyAccount', () => {
       expect(inputs.length).toBeGreaterThan(0)
     })
 
-    it('should allow editing name', () => {
+    it('should allow editing name', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -155,8 +222,12 @@ describe('MyAccount', () => {
       expect(screen.getByDisplayValue('Jane Doe')).toBeInTheDocument()
     })
 
-    it('should allow editing email', () => {
+    it('should allow editing email', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -167,8 +238,12 @@ describe('MyAccount', () => {
       expect(screen.getByDisplayValue('jane@example.com')).toBeInTheDocument()
     })
 
-    it('should allow editing phone', () => {
+    it('should allow editing phone', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -179,8 +254,12 @@ describe('MyAccount', () => {
       expect(screen.getByDisplayValue('+90 555 555 5555')).toBeInTheDocument()
     })
 
-    it('should allow editing location', () => {
+    it('should allow editing location', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -191,8 +270,12 @@ describe('MyAccount', () => {
       expect(screen.getByDisplayValue('Ankara, Turkey')).toBeInTheDocument()
     })
 
-    it('should return to view mode when Save is clicked', () => {
+    it('should return to view mode when Save is clicked', async () => {
       renderWithRouter(<MyAccount />)
+
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
 
       const editButton = screen.getByText('Edit Profile')
       fireEvent.click(editButton)
@@ -200,51 +283,65 @@ describe('MyAccount', () => {
       const saveButton = screen.getByText('Save')
       fireEvent.click(saveButton)
 
-      expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+      })
     })
   })
 
   describe('Navigation', () => {
-    it('should navigate back when back button is clicked', () => {
+    it('should navigate back when back button is clicked', async () => {
       renderWithRouter(<MyAccount />)
 
-      // Get all buttons and find the first one (which is the back button)
-      const buttons = screen.getAllByRole('button')
-      const backButton = buttons[0] // First button is the back button
+      await waitFor(() => {
+        expect(screen.getByText('My Account')).toBeInTheDocument()
+      })
+
+      // Get button by aria-label
+      const backButton = screen.getByLabelText('Go back')
       fireEvent.click(backButton)
 
       expect(mockNavigate).toHaveBeenCalledWith(-1)
     })
   })
 
-  describe('Subscription', () => {
-    it('should display subscription card', () => {
+  describe('Storage Info', () => {
+    it('should display storage info card', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Unlimited policy analysis and comparisons')).toBeInTheDocument()
+      await waitFor(() => {
+        // Component shows local storage info when not using Supabase
+        expect(screen.getByText('Local Storage')).toBeInTheDocument()
+      })
     })
 
-    it('should display Manage Subscription button', () => {
+    it('should display sign in prompt for local storage mode', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Manage Subscription')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Sign in to sync your data across devices')).toBeInTheDocument()
+      })
     })
   })
 
   describe('Profile Information Section', () => {
-    it('should display Profile Information header', () => {
+    it('should display Profile Information header', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Profile Information')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Profile Information')).toBeInTheDocument()
+      })
     })
 
-    it('should display field labels', () => {
+    it('should display field labels', async () => {
       renderWithRouter(<MyAccount />)
 
-      expect(screen.getByText('Full Name')).toBeInTheDocument()
-      expect(screen.getByText('Email')).toBeInTheDocument()
-      expect(screen.getByText('Phone')).toBeInTheDocument()
-      expect(screen.getByText('Location')).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Full Name')).toBeInTheDocument()
+        expect(screen.getByText('Email')).toBeInTheDocument()
+        expect(screen.getByText('Phone')).toBeInTheDocument()
+        expect(screen.getByText('Location')).toBeInTheDocument()
+      })
     })
   })
 })

@@ -2,7 +2,7 @@
  * Tests for Policy Evaluator
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { evaluatePolicy } from '../evaluator'
 import type { Policy } from '@/types/policy'
 
