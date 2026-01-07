@@ -100,7 +100,11 @@ CREATE POLICY chat_messages_delete ON chat_messages
 
 -- Function to update conversation stats after message insert
 CREATE OR REPLACE FUNCTION update_conversation_stats()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
 BEGIN
   UPDATE chat_conversations
   SET
@@ -114,7 +118,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger to auto-update conversation stats
 DROP TRIGGER IF EXISTS chat_messages_stats_trigger ON chat_messages;
@@ -125,7 +129,11 @@ CREATE TRIGGER chat_messages_stats_trigger
 
 -- Function to auto-generate conversation title from first user message
 CREATE OR REPLACE FUNCTION generate_conversation_title()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
 BEGIN
   -- Only update if this is the first user message and title is still default
   IF NEW.role = 'user' THEN
@@ -137,7 +145,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 -- Trigger to auto-generate title
 DROP TRIGGER IF EXISTS chat_messages_title_trigger ON chat_messages;
@@ -148,7 +156,11 @@ CREATE TRIGGER chat_messages_title_trigger
 
 -- Function to get recent conversations for a user
 CREATE OR REPLACE FUNCTION get_recent_conversations(p_limit INTEGER DEFAULT 20)
-RETURNS SETOF chat_conversations AS $$
+RETURNS SETOF chat_conversations
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   RETURN QUERY
   SELECT *
@@ -157,7 +169,7 @@ BEGIN
   ORDER BY last_message_at DESC
   LIMIT p_limit;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
 -- Function to get messages for a conversation
 CREATE OR REPLACE FUNCTION get_conversation_messages(p_conversation_id UUID)
@@ -168,7 +180,11 @@ RETURNS TABLE (
   provider TEXT,
   token_usage JSONB,
   created_at TIMESTAMPTZ
-) AS $$
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   -- Verify user owns this conversation
   IF NOT EXISTS (
@@ -191,4 +207,4 @@ BEGIN
   WHERE cm.conversation_id = p_conversation_id
   ORDER BY cm.created_at ASC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;

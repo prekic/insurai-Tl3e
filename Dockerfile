@@ -84,12 +84,12 @@ USER nodejs
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:${API_PORT:-3001}/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:${API_PORT:-4001}/health || exit 1
 
 ENV NODE_ENV=production
-ENV API_PORT=3001
+ENV API_PORT=4001
 
-EXPOSE 3001
+EXPOSE 4001
 CMD ["node", "dist-server/index.js"]
 
 # -----------------------------------------------------------------------------
@@ -117,7 +117,7 @@ COPY docker/start.sh /start.sh
 RUN chmod +x /start.sh
 
 ENV NODE_ENV=production
-ENV API_PORT=3001
+ENV API_PORT=4001
 
-EXPOSE 80 3001
+EXPOSE 80 4001
 CMD ["/start.sh"]
