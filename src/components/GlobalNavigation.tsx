@@ -1,4 +1,4 @@
-import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn } from 'lucide-react'
+import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn, Scale } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -20,7 +20,7 @@ export function GlobalNavigation() {
 
   const navItems = [
     { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: '/upload', label: 'Compare', icon: Upload },
+    { id: '/compare', label: 'Compare', icon: Scale },
     { id: '/chat', label: 'Chat', icon: MessageSquare, showCount: true },
   ]
 

@@ -15,6 +15,7 @@ const mockPolicies = [
     provider: 'Axa Sigorta',
     logo: '',
     type: 'Konut Sigortası',
+    typeTr: 'Konut Sigortası',
     coverage: 500000,
     premium: 2500,
     deductible: 1000,
@@ -32,6 +33,7 @@ const mockPolicies = [
     provider: 'Allianz Türkiye',
     logo: '',
     type: 'Kasko',
+    typeTr: 'Kasko',
     coverage: 300000,
     premium: 1800,
     deductible: 500,
@@ -49,6 +51,7 @@ const mockPolicies = [
     provider: 'Mapfre Sigorta',
     logo: '',
     type: 'Sağlık Sigortası',
+    typeTr: 'Sağlık Sigortası',
     coverage: 100000,
     premium: 3000,
     deductible: 0,
@@ -72,6 +75,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@/lib/policy-context', () => ({
   usePolicies: () => ({
+    policies: mockPolicies,
     deletePolicy: mockDeletePolicy,
     isLoading: false,
   }),
@@ -380,6 +384,7 @@ describe('PolicyDashboard - Loading State', () => {
 
     vi.doMock('@/lib/policy-context', () => ({
       usePolicies: () => ({
+        policies: [],
         deletePolicy: vi.fn(),
         isLoading: true,
       }),
@@ -401,6 +406,7 @@ describe('PolicyDashboard - Empty State', () => {
   it('should show empty state when no policies exist', () => {
     vi.doMock('@/lib/policy-context', () => ({
       usePolicies: () => ({
+        policies: [],
         deletePolicy: vi.fn(),
         isLoading: false,
       }),

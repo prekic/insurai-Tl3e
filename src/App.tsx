@@ -39,6 +39,9 @@ const HelpCenter = lazy(() =>
 const AllSamplesDemo = lazy(() =>
   import('./components/AllSamplesDemo').then((m) => ({ default: m.AllSamplesDemo }))
 )
+const ComparePolicies = lazy(() =>
+  import('./components/ComparePolicies').then((m) => ({ default: m.ComparePolicies }))
+)
 const NotFound = lazy(() =>
   import('./components/NotFound').then((m) => ({ default: m.NotFound }))
 )
@@ -53,6 +56,7 @@ const ROUTES = {
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
+  compare: '/compare',
   chat: '/chat',
   account: '/account',
   settings: '/settings',
@@ -90,6 +94,7 @@ function AppContent() {
     if (path === '/upload') return t.upload.title
     if (path === '/dashboard') return t.nav.dashboard
     if (path.startsWith('/policy/')) return t.policy.policy
+    if (path === '/compare') return t.nav.compare
     if (path === '/chat') return t.chat.title
     if (path === '/account') return t.account.title
     if (path === '/settings') return t.settings.title
@@ -166,6 +171,16 @@ function AppContent() {
                   <ProtectedRoute>
                     <PageTransition>
                       <PolicyDetailView />
+                    </PageTransition>
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/compare"
+                element={
+                  <ProtectedRoute>
+                    <PageTransition>
+                      <ComparePolicies />
                     </PageTransition>
                   </ProtectedRoute>
                 }
