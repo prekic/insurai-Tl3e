@@ -1,18 +1,26 @@
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { PolicyDocuments } from './PolicyDocuments'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { usePolicies } from '@/lib/policy-context'
+import { useI18n } from '@/lib/i18n'
+import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
+import { GradeBadge } from './evaluation/GradeBadge'
+import { StatusIndicator } from './evaluation/StatusIndicator'
+import { ScoreBreakdown } from './evaluation/ScoreBreakdown'
+import { RecommendationCard } from './evaluation/RecommendationCard'
 
 export function PolicyDetailView() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
   const { getPolicyById } = usePolicies()
+  const { locale } = useI18n()
 
   const policy = id ? getPolicyById(id) : undefined
+  const { evaluation, isLoading: isEvaluationLoading } = usePolicyEvaluation(policy)
 
   if (!policy) {
     return (
@@ -187,6 +195,61 @@ export function PolicyDetailView() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Policy Evaluation */}
+            {evaluation && !isEvaluationLoading && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="text-blue-600" size={20} />
+                    {locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Overall Score with Grade */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-3xl font-bold text-gray-900">{evaluation.overallScore}</div>
+                      <div className="text-sm text-gray-500">/100</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <GradeBadge grade={evaluation.grade} size="md" />
+                      <StatusIndicator status={evaluation.status} showLabel size="sm" />
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown */}
+                  <div className="pt-2 border-t">
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
+                    </p>
+                    <ScoreBreakdown
+                      breakdown={evaluation.scoreBreakdown}
+                      variant="full"
+                    />
+                  </div>
+
+                  {/* Top Recommendations */}
+                  {evaluation.recommendations.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-sm font-medium text-gray-700 mb-2">
+                        {locale === 'tr' ? 'Öneriler' : 'Recommendations'}
+                      </p>
+                      <div className="space-y-2">
+                        {evaluation.recommendations.slice(0, 2).map((rec, i) => (
+                          <RecommendationCard key={i} recommendation={rec} compact />
+                        ))}
+                      </div>
+                      {evaluation.recommendations.length > 2 && (
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
             {/* Policy Documents */}
             <PolicyDocuments policyId={policy.id} />

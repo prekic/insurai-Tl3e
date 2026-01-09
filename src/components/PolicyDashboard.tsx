@@ -1,32 +1,60 @@
 import { useState, useId } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check } from 'lucide-react'
+import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check, LayoutGrid, List, Scale, X } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
+import { PolicyCardGrid } from './PolicyCard'
+import { useCompareSelection } from '@/hooks/usePolicyComparison'
 
 export function PolicyDashboard() {
   const navigate = useNavigate()
   const { t, isRTL } = useI18n()
-  const { deletePolicy, isLoading } = usePolicies()
+  const { policies: fullPolicies, deletePolicy, isLoading } = usePolicies()
   const uploadedPolicies = useDashboardPolicies()
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
   const baseId = useId()
+
+  // Compare selection state
+  const { selectedIds, togglePolicy, clearSelection, canCompare, selectionCount } = useCompareSelection()
+
+  // Navigate to compare page with selected policies
+  const handleCompare = () => {
+    if (canCompare) {
+      navigate(`/compare?ids=${selectedIds.join(',')}`)
+    }
+  }
 
   // Sanitize search query for safe filtering
   const sanitizedQuery = sanitizeSearchQuery(searchQuery).toLowerCase()
 
+  // Filter for table view (dashboard format)
   const filteredPolicies = uploadedPolicies.filter((policy) => {
     const matchesSearch =
       !sanitizedQuery ||
       policy.policyNumber.toLowerCase().includes(sanitizedQuery) ||
       policy.provider.toLowerCase().includes(sanitizedQuery) ||
       policy.type.toLowerCase().includes(sanitizedQuery)
+
+    const matchesStatus = statusFilter === 'all' || policy.status === statusFilter
+
+    return matchesSearch && matchesStatus
+  })
+
+  // Filter full policies for card view (includes all data for evaluation)
+  const filteredFullPolicies = fullPolicies.filter((policy) => {
+    const matchesSearch =
+      !sanitizedQuery ||
+      policy.policyNumber.toLowerCase().includes(sanitizedQuery) ||
+      policy.provider.toLowerCase().includes(sanitizedQuery) ||
+      policy.type.toLowerCase().includes(sanitizedQuery) ||
+      policy.typeTr.toLowerCase().includes(sanitizedQuery)
 
     const matchesStatus = statusFilter === 'all' || policy.status === statusFilter
 
@@ -164,6 +192,41 @@ export function PolicyDashboard() {
           </div>
         </section>
 
+        {/* Compare Selection Bar */}
+        {selectionCount > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Scale className="w-5 h-5 text-blue-600" />
+              <span className="font-medium text-blue-900">
+                {selectionCount} {selectionCount === 1 ? 'policy' : 'policies'} selected
+              </span>
+              {selectionCount < 2 && (
+                <span className="text-sm text-blue-700">(select at least 2 to compare)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearSelection}
+                className="gap-1"
+              >
+                <X className="w-4 h-4" />
+                Clear
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleCompare}
+                disabled={!canCompare}
+                className="gap-1"
+              >
+                <Scale className="w-4 h-4" />
+                Compare
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6" role="search">
           <div className="flex flex-col md:flex-row gap-4">
@@ -179,28 +242,58 @@ export function PolicyDashboard() {
                 className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <fieldset className="flex gap-2">
-              <legend className="sr-only">{t.dashboard.filterByStatus}</legend>
-              {[
-                { key: 'all', label: t.common.all },
-                { key: 'active', label: t.dashboard.active },
-                { key: 'expiring', label: t.dashboard.expiringSoon },
-                { key: 'expired', label: t.dashboard.expired },
-              ].map(({ key, label }) => (
+            <div className="flex items-center gap-4">
+              <fieldset className="flex gap-2">
+                <legend className="sr-only">{t.dashboard.filterByStatus}</legend>
+                {[
+                  { key: 'all', label: t.common.all },
+                  { key: 'active', label: t.dashboard.active },
+                  { key: 'expiring', label: t.dashboard.expiringSoon },
+                  { key: 'expired', label: t.dashboard.expired },
+                ].map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => setStatusFilter(key)}
+                    aria-pressed={statusFilter === key}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all focus-ring ${
+                      statusFilter === key
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </fieldset>
+
+              {/* View Toggle */}
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                 <button
-                  key={key}
-                  onClick={() => setStatusFilter(key)}
-                  aria-pressed={statusFilter === key}
-                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all focus-ring ${
-                    statusFilter === key
+                  onClick={() => setViewMode('table')}
+                  aria-pressed={viewMode === 'table'}
+                  aria-label="Table view"
+                  className={`p-2 transition-colors ${
+                    viewMode === 'table'
                       ? 'bg-slate-900 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  {label}
+                  <List size={18} />
                 </button>
-              ))}
-            </fieldset>
+                <button
+                  onClick={() => setViewMode('cards')}
+                  aria-pressed={viewMode === 'cards'}
+                  aria-label="Card view"
+                  className={`p-2 transition-colors ${
+                    viewMode === 'cards'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-white text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <LayoutGrid size={18} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -223,7 +316,26 @@ export function PolicyDashboard() {
               </Button>
             )}
           </div>
+        ) : viewMode === 'cards' ? (
+          /* Card View */
+          <>
+            <PolicyCardGrid
+              policies={filteredFullPolicies}
+              onView={handleViewPolicy}
+              onDelete={deletePolicy}
+              onSelect={togglePolicy}
+              selectedIds={selectedIds}
+              showEvaluation
+            />
+            {/* Screen reader summary */}
+            <div className="sr-only" role="status" aria-live="polite">
+              {t.dashboard.showingPolicies
+                .replace('{shown}', String(filteredFullPolicies.length))
+                .replace('{total}', String(fullPolicies.length))}
+            </div>
+          </>
         ) : (
+          /* Table View */
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full" role="table" aria-label={t.policy.policies}>
