@@ -86,10 +86,16 @@ export const CSP_DIRECTIVES = {
 /**
  * Development-only CSP additions
  * These are less secure but required for hot module replacement
+ * and local backend API calls
  */
 export const CSP_DEV_ADDITIONS = {
   'script-src': ["'unsafe-inline'", "'unsafe-eval'"],
-  'connect-src': ['ws://localhost:*', 'wss://localhost:*'],
+  'connect-src': [
+    'http://localhost:*',
+    'ws://localhost:*',
+    'wss://localhost:*',
+    'https://*.app.github.dev', // GitHub Codespaces
+  ],
 } as const
 
 /**
