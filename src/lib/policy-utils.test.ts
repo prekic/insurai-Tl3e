@@ -322,7 +322,7 @@ describe('policy-utils', () => {
   describe('getSimilarityLabelTr', () => {
     it('should return correct Turkish labels', () => {
       expect(getSimilarityLabelTr('exact')).toBe('Birebir kopya')
-      expect(getSimilarityLabelTr('high')).toBe('Cok benzer')
+      expect(getSimilarityLabelTr('high')).toBe('Çok benzer')
       expect(getSimilarityLabelTr('medium')).toBe('Muhtemel kopya')
     })
   })
