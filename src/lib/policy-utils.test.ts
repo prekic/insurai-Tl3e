@@ -9,6 +9,12 @@ import {
   getSimilarityLabelTr,
   createPolicyTimestamp,
   ensurePolicyTimestamps,
+  normalizeForOCR,
+  levenshteinDistance,
+  stringSimilarity,
+  fuzzyMatchOCR,
+  isPolicyIdentifierMatch,
+  getPolicyIdentifierSimilarity,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -322,7 +328,7 @@ describe('policy-utils', () => {
   describe('getSimilarityLabelTr', () => {
     it('should return correct Turkish labels', () => {
       expect(getSimilarityLabelTr('exact')).toBe('Birebir kopya')
-      expect(getSimilarityLabelTr('high')).toBe('Cok benzer')
+      expect(getSimilarityLabelTr('high')).toBe('Çok benzer')
       expect(getSimilarityLabelTr('medium')).toBe('Muhtemel kopya')
     })
   })
@@ -376,6 +382,167 @@ describe('policy-utils', () => {
       const result = ensurePolicyTimestamps([policy])
 
       expect(result[0].createdAt).toBe(existingTimestamp)
+    })
+  })
+
+  // ========================================================================
+  // FUZZY MATCHING TESTS FOR OCR TOLERANCE
+  // ========================================================================
+
+  describe('normalizeForOCR', () => {
+    it('should normalize common OCR substitutions', () => {
+      // 0 vs O
+      expect(normalizeForOCR('P0L-001')).toBe(normalizeForOCR('POL-OO1'))
+
+      // 1 vs I vs l
+      expect(normalizeForOCR('POL-111')).toBe(normalizeForOCR('POL-lll'))
+      expect(normalizeForOCR('POL-111')).toBe(normalizeForOCR('POL-III'))
+    })
+
+    it('should handle Turkish characters', () => {
+      expect(normalizeForOCR('Şekerbank')).toBe('sekerbank')
+      expect(normalizeForOCR('Güneş Sigorta')).toBe('gunessigorta')
+      // İ (Turkish capital I with dot) maps to 'i', Ö maps to 'o'
+      expect(normalizeForOCR('ÖZEL SİGORTA')).toBe('ozeisigorta')
+    })
+
+    it('should remove special characters', () => {
+      // Note: 0 normalizes to 'o' (OCR confusion), so POL-001 becomes 'poiooi'
+      expect(normalizeForOCR('POL-001/2024')).toBe('poiooi2o24')
+      expect(normalizeForOCR('POL.001.2024')).toBe('poiooi2o24')
+    })
+  })
+
+  describe('levenshteinDistance', () => {
+    it('should return 0 for identical strings', () => {
+      expect(levenshteinDistance('hello', 'hello')).toBe(0)
+    })
+
+    it('should calculate correct distance for single edits', () => {
+      expect(levenshteinDistance('hello', 'hallo')).toBe(1) // substitution
+      expect(levenshteinDistance('hello', 'hell')).toBe(1) // deletion
+      expect(levenshteinDistance('hello', 'helloo')).toBe(1) // insertion
+    })
+
+    it('should handle empty strings', () => {
+      expect(levenshteinDistance('', 'hello')).toBe(5)
+      expect(levenshteinDistance('hello', '')).toBe(5)
+      expect(levenshteinDistance('', '')).toBe(0)
+    })
+  })
+
+  describe('stringSimilarity', () => {
+    it('should return 1 for identical strings', () => {
+      expect(stringSimilarity('hello', 'hello')).toBe(1)
+    })
+
+    it('should return 0 when one string is empty', () => {
+      expect(stringSimilarity('hello', '')).toBe(0)
+      expect(stringSimilarity('', 'hello')).toBe(0)
+    })
+
+    it('should return high similarity for similar strings', () => {
+      const similarity = stringSimilarity('hello', 'hallo')
+      expect(similarity).toBeGreaterThan(0.7)
+    })
+  })
+
+  describe('fuzzyMatchOCR', () => {
+    it('should match identical strings', () => {
+      expect(fuzzyMatchOCR('POL-001', 'POL-001')).toBe(true)
+    })
+
+    it('should match with common OCR errors', () => {
+      // 0 vs O confusion
+      expect(fuzzyMatchOCR('POL-001', 'POL-OO1')).toBe(true)
+
+      // 1 vs I confusion
+      expect(fuzzyMatchOCR('POL-111', 'POL-lll')).toBe(true)
+    })
+
+    it('should match Turkish character variations', () => {
+      expect(fuzzyMatchOCR('Şekerbank Sigorta', 'Sekerbank Sigorta')).toBe(true)
+      expect(fuzzyMatchOCR('Güneş', 'Gunes')).toBe(true)
+    })
+
+    it('should not match completely different strings', () => {
+      expect(fuzzyMatchOCR('POL-001', 'XYZ-999')).toBe(false)
+      expect(fuzzyMatchOCR('Allianz', 'AXA')).toBe(false)
+    })
+
+    it('should handle empty strings', () => {
+      expect(fuzzyMatchOCR('', '')).toBe(true)
+      expect(fuzzyMatchOCR('hello', '')).toBe(false)
+    })
+  })
+
+  describe('isPolicyIdentifierMatch with fuzzy matching', () => {
+    it('should match policies with OCR errors in policy number', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-OO1', provider: 'Allianz' })
+
+      expect(isPolicyIdentifierMatch(policy1, policy2, true)).toBe(true)
+    })
+
+    it('should match policies with Turkish character variations in provider', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Güneş Sigorta' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Gunes Sigorta' })
+
+      expect(isPolicyIdentifierMatch(policy1, policy2, true)).toBe(true)
+    })
+
+    it('should match policies with OCR errors in insured person', () => {
+      const policy1 = createMockPolicy({
+        policyNumber: 'POL-001',
+        provider: 'Allianz',
+        insuredPerson: 'AHMET YILMAZ'
+      })
+      const policy2 = createMockPolicy({
+        policyNumber: 'POL-001',
+        provider: 'Allianz',
+        insuredPerson: 'AHМET YILМAZ' // with Cyrillic characters
+      })
+
+      expect(isPolicyIdentifierMatch(policy1, policy2, true)).toBe(true)
+    })
+
+    it('should not match completely different policies', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'XYZ-999', provider: 'AXA' })
+
+      expect(isPolicyIdentifierMatch(policy1, policy2, true)).toBe(false)
+    })
+
+    it('should use exact matching when fuzzy is disabled', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-OO1', provider: 'Allianz' })
+
+      expect(isPolicyIdentifierMatch(policy1, policy2, false)).toBe(false)
+    })
+  })
+
+  describe('getPolicyIdentifierSimilarity', () => {
+    it('should return 1 for identical policies', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+
+      expect(getPolicyIdentifierSimilarity(policy1, policy2)).toBe(1)
+    })
+
+    it('should return high similarity for policies with minor OCR errors', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-OO1', provider: 'Allianz' })
+
+      const similarity = getPolicyIdentifierSimilarity(policy1, policy2)
+      expect(similarity).toBeGreaterThan(0.9)
+    })
+
+    it('should return low similarity for completely different policies', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Allianz' })
+      const policy2 = createMockPolicy({ policyNumber: 'XYZ-999', provider: 'AXA' })
+
+      const similarity = getPolicyIdentifierSimilarity(policy1, policy2)
+      expect(similarity).toBeLessThan(0.5)
     })
   })
 })

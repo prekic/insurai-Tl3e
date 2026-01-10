@@ -12,6 +12,13 @@ import { useAuth } from '@/lib/supabase/auth-context'
 import { isSupabaseConfigured, uploadPolicyDocument, createPolicy, type PolicyInsert, type PolicyType as SupabasePolicyType } from '@/lib/supabase'
 import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
+import { ConflictResolutionDialog } from './ConflictResolutionDialog'
+import type { PreUploadCheckResult } from '@/lib/policy-utils'
+import {
+  checkPolicyBeforeUpload,
+  handlePolicyAmendment,
+  handleDuplicateResolution,
+} from '@/lib/policy-upload-check'
 
 /**
  * Convert AnalyzedPolicy to Supabase PolicyInsert format
@@ -62,6 +69,19 @@ interface UploadedFile {
   error?: string
   extractionSource?: 'ai' | 'fallback' | 'ocr'
   aiConfidence?: number
+  /** Conflict detected during pre-upload check */
+  conflict?: PreUploadCheckResult
+  /** Whether this file is awaiting conflict resolution */
+  awaitingResolution?: boolean
+}
+
+/** State for the conflict resolution dialog */
+interface ConflictDialogState {
+  isOpen: boolean
+  fileId: string | null
+  conflict: PreUploadCheckResult | null
+  newPolicy: AnalyzedPolicy | null
+  isLoading: boolean
 }
 
 export function PolicyUpload() {
@@ -72,6 +92,15 @@ export function PolicyUpload() {
   const [isDragging, setIsDragging] = useState(false)
   const { health, checkHealth, runDiagnostics } = useBackendHealth()
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
+
+  // Conflict resolution dialog state
+  const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
+    isOpen: false,
+    fileId: null,
+    conflict: null,
+    newPolicy: null,
+    isLoading: false,
+  })
 
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
   const backendReady = health.status === 'healthy'
@@ -186,6 +215,57 @@ export function PolicyUpload() {
       }
 
       const { policy, source, extractedData } = result
+
+      // Check for conflicts before saving (only if using Supabase)
+      let conflictResult: PreUploadCheckResult = { type: 'noConflict' }
+      if (useSupabase && user) {
+        try {
+          conflictResult = await checkPolicyBeforeUpload(policy)
+        } catch (checkError) {
+          // Log in development only
+          if (import.meta.env.DEV) {
+            console.warn('Failed to check for conflicts:', checkError)
+          }
+          // Continue with no conflict (fail open)
+        }
+      }
+
+      // If conflict detected, show resolution dialog instead of saving immediately
+      if (conflictResult.type !== 'noConflict') {
+        setFiles((prev) =>
+          prev.map((f) =>
+            f.id === fileId
+              ? {
+                  ...f,
+                  status: 'complete',
+                  policy,
+                  extractionSource: source,
+                  aiConfidence: extractedData.confidence.overall,
+                  conflict: conflictResult,
+                  awaitingResolution: true,
+                }
+              : f
+          )
+        )
+
+        // Show the conflict resolution dialog
+        setConflictDialog({
+          isOpen: true,
+          fileId,
+          conflict: conflictResult,
+          newPolicy: policy,
+          isLoading: false,
+        })
+
+        const displayName = sanitizeFileName(file.name)
+        toast.warning(
+          conflictResult.type === 'exactDuplicate' ? 'Duplicate detected' : 'Amendment detected',
+          {
+            description: `${displayName} matches an existing policy. Please choose how to proceed.`,
+          }
+        )
+        return // Don't proceed with normal save
+      }
 
       // If using Supabase, save policy to database and upload document
       let savedToCloud = false
@@ -386,9 +466,146 @@ export function PolicyUpload() {
     return sanitizeFileName(file.name)
   }
 
-  const completedCount = files.filter((f) => f.status === 'complete').length
+  const completedCount = files.filter((f) => f.status === 'complete' && !f.awaitingResolution).length
   const errorCount = files.filter((f) => f.status === 'error').length
   const processingCount = files.filter((f) => f.status === 'uploading' || f.status === 'analyzing').length
+
+  // ========== Conflict Resolution Handlers ==========
+
+  const closeConflictDialog = () => {
+    setConflictDialog({
+      isOpen: false,
+      fileId: null,
+      conflict: null,
+      newPolicy: null,
+      isLoading: false,
+    })
+  }
+
+  const handleConflictSkip = () => {
+    const { fileId } = conflictDialog
+    if (!fileId) return
+
+    // Mark file as skipped and remove from list
+    setFiles((prev) => prev.filter((f) => f.id !== fileId))
+    closeConflictDialog()
+
+    toast.info('Upload skipped', {
+      description: 'The policy was not saved as it already exists.',
+    })
+  }
+
+  const handleConflictReplace = async () => {
+    const { fileId, conflict, newPolicy } = conflictDialog
+    if (!fileId || !conflict || !newPolicy || conflict.type === 'noConflict') return
+
+    setConflictDialog((prev) => ({ ...prev, isLoading: true }))
+
+    try {
+      const existingId = conflict.existingPolicy.id
+      const result = await handleDuplicateResolution('replace', existingId, newPolicy)
+
+      if (result.error) {
+        throw new Error(result.error)
+      }
+
+      // Update file state
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, awaitingResolution: false, conflict: undefined }
+            : f
+        )
+      )
+
+      closeConflictDialog()
+      toast.success('Policy updated', {
+        description: 'The existing policy has been updated with the new data.',
+      })
+    } catch (error) {
+      setConflictDialog((prev) => ({ ...prev, isLoading: false }))
+      toast.error('Update failed', {
+        description: error instanceof Error ? error.message : 'Failed to update policy',
+      })
+    }
+  }
+
+  const handleConflictKeepBoth = async () => {
+    const { fileId, newPolicy } = conflictDialog
+    if (!fileId || !newPolicy || !user) return
+
+    setConflictDialog((prev) => ({ ...prev, isLoading: true }))
+
+    try {
+      // Save the new policy as a separate record
+      const supabasePolicy = convertToSupabasePolicy(newPolicy, user.id)
+      await createPolicy(supabasePolicy)
+
+      // Also upload the document
+      const uploadedFile = files.find((f) => f.id === fileId)
+      if (uploadedFile?.file) {
+        try {
+          await uploadPolicyDocument(newPolicy.id, uploadedFile.file)
+        } catch {
+          // Ignore storage errors
+        }
+      }
+
+      // Update file state
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, awaitingResolution: false, conflict: undefined }
+            : f
+        )
+      )
+
+      closeConflictDialog()
+      toast.success('Policy saved', {
+        description: 'The policy has been saved as a separate record.',
+      })
+    } catch (error) {
+      setConflictDialog((prev) => ({ ...prev, isLoading: false }))
+      toast.error('Save failed', {
+        description: error instanceof Error ? error.message : 'Failed to save policy',
+      })
+    }
+  }
+
+  const handleConflictTrackAmendment = async () => {
+    const { fileId, conflict, newPolicy } = conflictDialog
+    if (!fileId || !conflict || !newPolicy || conflict.type !== 'amendment') return
+
+    setConflictDialog((prev) => ({ ...prev, isLoading: true }))
+
+    try {
+      const existingId = conflict.existingPolicy.id
+      const result = await handlePolicyAmendment(existingId, newPolicy, conflict.changes)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to track amendment')
+      }
+
+      // Update file state
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, awaitingResolution: false, conflict: undefined }
+            : f
+        )
+      )
+
+      closeConflictDialog()
+      toast.success('Amendment tracked', {
+        description: `Policy updated to version ${result.versionNumber}. ${result.changes.length} change(s) recorded.`,
+      })
+    } catch (error) {
+      setConflictDialog((prev) => ({ ...prev, isLoading: false }))
+      toast.error('Amendment failed', {
+        description: error instanceof Error ? error.message : 'Failed to track amendment',
+      })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -720,7 +937,15 @@ export function PolicyUpload() {
                           AI analyzing...
                         </span>
                       )}
-                      {uploadedFile.status === 'complete' && (
+                      {uploadedFile.status === 'complete' && uploadedFile.awaitingResolution && (
+                        <span className="text-amber-600 flex items-center gap-1">
+                          <AlertTriangle size={14} />
+                          {uploadedFile.conflict?.type === 'exactDuplicate'
+                            ? 'Duplicate detected - awaiting resolution'
+                            : 'Amendment detected - awaiting resolution'}
+                        </span>
+                      )}
+                      {uploadedFile.status === 'complete' && !uploadedFile.awaitingResolution && (
                         <span className="text-green-600 flex items-center gap-1">
                           <Check size={14} />
                           {uploadedFile.extractionSource === 'ai' ? (
@@ -756,7 +981,29 @@ export function PolicyUpload() {
                         <RefreshCw size={18} />
                       </button>
                     )}
-                    {uploadedFile.status === 'complete' && uploadedFile.policy && (
+                    {uploadedFile.awaitingResolution && uploadedFile.conflict && uploadedFile.policy && (
+                      <button
+                        onClick={() => {
+                          // Safe to access as we checked in the condition above
+                          const conflict = uploadedFile.conflict
+                          const policy = uploadedFile.policy
+                          if (conflict && policy) {
+                            setConflictDialog({
+                              isOpen: true,
+                              fileId: uploadedFile.id,
+                              conflict,
+                              newPolicy: policy,
+                              isLoading: false,
+                            })
+                          }
+                        }}
+                        className="px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
+                        aria-label="Resolve conflict"
+                      >
+                        Resolve
+                      </button>
+                    )}
+                    {uploadedFile.status === 'complete' && uploadedFile.policy && !uploadedFile.awaitingResolution && (
                       <button
                         onClick={() => handleViewPolicy(uploadedFile.policy?.id ?? '')}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
@@ -781,6 +1028,20 @@ export function PolicyUpload() {
           </div>
         )}
       </div>
+
+      {/* Conflict Resolution Dialog */}
+      {conflictDialog.isOpen && conflictDialog.conflict && conflictDialog.newPolicy && (
+        <ConflictResolutionDialog
+          conflict={conflictDialog.conflict}
+          newPolicy={conflictDialog.newPolicy}
+          onSkip={handleConflictSkip}
+          onReplace={handleConflictReplace}
+          onKeepBoth={handleConflictKeepBoth}
+          onTrackAmendment={handleConflictTrackAmendment}
+          onClose={closeConflictDialog}
+          isLoading={conflictDialog.isLoading}
+        />
+      )}
     </div>
   )
 }

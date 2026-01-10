@@ -245,6 +245,121 @@ export async function deletePolicyDocument(documentId: string, filePath: string)
 }
 
 // =============================================================================
+// DUPLICATE/AMENDMENT DETECTION
+// =============================================================================
+
+/**
+ * Find existing policy by identifier (policy number + provider)
+ * Used for pre-upload duplicate/amendment detection
+ *
+ * @param policyNumber - The policy number to search for
+ * @param provider - The insurance provider name
+ * @param insuredPerson - Optional insured person/item for additional matching
+ * @returns Array of matching policies (may be multiple if partial match)
+ */
+export async function findExistingPolicyByIdentifier(
+  policyNumber: string,
+  provider: string,
+  insuredPerson?: string
+): Promise<PolicyRow[]> {
+  if (!isSupabaseConfigured()) {
+    return []
+  }
+
+  if (!policyNumber || !provider) {
+    return []
+  }
+
+  // Normalize for case-insensitive search
+  const normalizedPolicyNumber = policyNumber.trim().toLowerCase().replace(/\s+/g, '')
+  const normalizedProvider = provider.trim().toLowerCase()
+
+  // Build query - use ILIKE for case-insensitive matching
+  // Note: We search for policy_number without spaces to match our normalization
+  let query = supabase
+    .from('policies')
+    .select('*')
+    .ilike('provider', `%${normalizedProvider}%`)
+
+  // For policy number, we need to handle whitespace variations
+  // Using ilike with the pattern to match regardless of internal spaces
+  query = query.filter(
+    'policy_number',
+    'ilike',
+    `%${normalizedPolicyNumber.replace(/(.)/g, '$1%').slice(0, -1)}%`
+  )
+
+  const { data, error } = await query.order('created_at', { ascending: false })
+
+  if (error) {
+    console.error('Error finding existing policy:', error)
+    return []
+  }
+
+  // Further filter results in-memory for exact normalized match
+  const results = (data as PolicyRow[]) || []
+
+  return results.filter((policy) => {
+    const policyNumMatch =
+      policy.policy_number
+        ?.trim()
+        .toLowerCase()
+        .replace(/\s+/g, '') === normalizedPolicyNumber
+
+    const providerMatch = policy.provider?.trim().toLowerCase().includes(normalizedProvider)
+
+    // If insuredPerson is provided, also check for match
+    if (insuredPerson && policyNumMatch && providerMatch) {
+      const normalizedInsured = insuredPerson.trim().toLowerCase()
+      const policyInsured = policy.insured_person?.trim().toLowerCase() || ''
+      const policyLocation = policy.location?.trim().toLowerCase() || ''
+
+      // Match if insuredPerson matches either insured_person or location
+      return (
+        policyInsured.includes(normalizedInsured) ||
+        policyLocation.includes(normalizedInsured) ||
+        normalizedInsured.includes(policyInsured) ||
+        normalizedInsured.includes(policyLocation)
+      )
+    }
+
+    return policyNumMatch && providerMatch
+  })
+}
+
+/**
+ * Check if an exact policy already exists (by all key fields)
+ * More strict than identifier match
+ */
+export async function findExactPolicy(
+  policyNumber: string,
+  provider: string,
+  startDate: string,
+  coverage: number
+): Promise<PolicyRow | null> {
+  if (!isSupabaseConfigured()) {
+    return null
+  }
+
+  const candidates = await findExistingPolicyByIdentifier(policyNumber, provider)
+
+  // Find exact match by also comparing start date and coverage
+  const startTime = new Date(startDate).getTime()
+
+  for (const policy of candidates) {
+    const policyStartTime = new Date(policy.start_date).getTime()
+    const policyCoverage = Math.round(Number(policy.coverage))
+    const targetCoverage = Math.round(coverage)
+
+    if (policyStartTime === startTime && policyCoverage === targetCoverage) {
+      return policy
+    }
+  }
+
+  return null
+}
+
+// =============================================================================
 // SEARCH FUNCTIONS
 // =============================================================================
 
