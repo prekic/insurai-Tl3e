@@ -138,9 +138,38 @@ app.use(
 )
 
 // CORS configuration
-const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-  methods: ['GET', 'POST'],
+// Support multiple origins for local dev and Codespaces
+const allowedOrigins = [
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'http://localhost:5173',
+  'http://localhost:3000',
+]
+
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) {
+      callback(null, true)
+      return
+    }
+    // Allow Codespaces domains (*.app.github.dev)
+    if (origin.endsWith('.app.github.dev')) {
+      callback(null, true)
+      return
+    }
+    // Allow configured origins
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true)
+      return
+    }
+    // In development, allow all origins
+    if (!IS_PRODUCTION) {
+      callback(null, true)
+      return
+    }
+    callback(new Error('Not allowed by CORS'))
+  },
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }
