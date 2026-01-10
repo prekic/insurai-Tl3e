@@ -1,6 +1,6 @@
-import { useState, useId } from 'react'
+import { useState, useId, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check, LayoutGrid, List, Scale, X } from 'lucide-react'
+import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check, LayoutGrid, List, Scale, X, Copy, Sparkles, Merge } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -9,11 +9,21 @@ import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
 import { PolicyCardGrid } from './PolicyCard'
 import { useCompareSelection } from '@/hooks/usePolicyComparison'
+import type { DuplicatePolicy } from '@/types/policy'
 
 export function PolicyDashboard() {
   const navigate = useNavigate()
-  const { t, isRTL } = useI18n()
-  const { policies: fullPolicies, deletePolicy, isLoading } = usePolicies()
+  const { t, isRTL, locale } = useI18n()
+  const {
+    policies: fullPolicies,
+    deletePolicy,
+    isLoading,
+    recentlyAddedIds,
+    isPolicyNew,
+    duplicates,
+    dismissDuplicate,
+    mergeDuplicates,
+  } = usePolicies()
   const uploadedPolicies = useDashboardPolicies()
 
   const [searchQuery, setSearchQuery] = useState('')
@@ -23,6 +33,38 @@ export function PolicyDashboard() {
 
   // Compare selection state
   const { selectedIds, togglePolicy, clearSelection, canCompare, selectionCount } = useCompareSelection()
+
+  // Build duplicate map for quick lookup
+  const duplicateMap = useMemo(() => {
+    const map = new Map<string, DuplicatePolicy>()
+    for (const dup of duplicates) {
+      map.set(dup.policy.id, dup)
+    }
+    return map
+  }, [duplicates])
+
+  // Get new policy IDs that are also in filtered results
+  const newPolicyIds = useMemo(() => {
+    const filteredIds = new Set(fullPolicies.map(p => p.id))
+    const newIds = new Set<string>()
+    for (const id of recentlyAddedIds) {
+      if (filteredIds.has(id)) {
+        newIds.add(id)
+      }
+    }
+    // Also check by timestamp for policies loaded from storage
+    for (const policy of fullPolicies) {
+      if (isPolicyNew(policy)) {
+        newIds.add(policy.id)
+      }
+    }
+    return newIds
+  }, [recentlyAddedIds, fullPolicies, isPolicyNew])
+
+  // Handle merging duplicates
+  const handleMergeDuplicates = async (keepId: string, deleteId: string) => {
+    await mergeDuplicates(keepId, [deleteId])
+  }
 
   // Navigate to compare page with selected policies
   const handleCompare = () => {
@@ -227,6 +269,78 @@ export function PolicyDashboard() {
           </div>
         )}
 
+        {/* Duplicate Policies Warning Banner */}
+        {duplicates.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Copy className="text-amber-600" size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-amber-900 mb-1">
+                  {locale === 'tr' ? 'Kopya Poli\xe7eler Tespit Edildi' : 'Duplicate Policies Detected'}
+                </h3>
+                <p className="text-sm text-amber-700 mb-3">
+                  {locale === 'tr'
+                    ? `${duplicates.length} adet kopya veya \xe7ok benzer poli\xe7e bulundu. Envanter temizli\u011fi i\xe7in birle\u015ftirmeyi veya silmeyi d\xfc\u015f\xfcn\xfcn.`
+                    : `Found ${duplicates.length} duplicate or very similar ${duplicates.length === 1 ? 'policy' : 'policies'}. Consider merging or removing to maintain a clean inventory.`}
+                </p>
+                <div className="space-y-2">
+                  {duplicates.slice(0, 3).map((dup) => (
+                    <div key={dup.policy.id} className="flex items-center justify-between bg-white/60 rounded-lg p-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{dup.policy.logo}</span>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{dup.policy.provider}</p>
+                          <p className="text-xs text-gray-500">
+                            {dup.similarity === 'exact'
+                              ? (locale === 'tr' ? 'Birebir kopya' : 'Exact duplicate')
+                              : dup.similarity === 'high'
+                              ? (locale === 'tr' ? '\xc7ok benzer' : 'Very similar')
+                              : (locale === 'tr' ? 'Muhtemel kopya' : 'Possibly duplicate')}
+                            {' '}&bull;{' '}
+                            {locale === 'tr' ? 'Eslesen alanlar: ' : 'Matched: '}
+                            {dup.matchedFields.slice(0, 3).join(', ')}
+                            {dup.matchedFields.length > 3 && ` +${dup.matchedFields.length - 3}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleMergeDuplicates(dup.duplicateOf.id, dup.policy.id)}
+                          className="text-amber-700 hover:bg-amber-100 gap-1 h-7 px-2"
+                          title={locale === 'tr' ? 'Kopyay\u0131 sil' : 'Remove duplicate'}
+                        >
+                          <Merge className="w-3.5 h-3.5" />
+                          <span className="text-xs">{locale === 'tr' ? 'Birle\u015ftir' : 'Merge'}</span>
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => dismissDuplicate(dup.policy.id)}
+                          className="text-gray-500 hover:bg-gray-100 h-7 px-2"
+                          title={locale === 'tr' ? 'Yoksay' : 'Dismiss'}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {duplicates.length > 3 && (
+                    <p className="text-xs text-amber-600 text-center pt-1">
+                      {locale === 'tr'
+                        ? `+${duplicates.length - 3} daha fazla kopya poli\xe7e`
+                        : `+${duplicates.length - 3} more duplicate ${duplicates.length - 3 === 1 ? 'policy' : 'policies'}`}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6" role="search">
           <div className="flex flex-col md:flex-row gap-4">
@@ -326,6 +440,8 @@ export function PolicyDashboard() {
               onSelect={togglePolicy}
               selectedIds={selectedIds}
               showEvaluation
+              newPolicyIds={newPolicyIds}
+              duplicateMap={duplicateMap}
             />
             {/* Screen reader summary */}
             <div className="sr-only" role="status" aria-live="polite">
@@ -353,13 +469,37 @@ export function PolicyDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredPolicies.map((policy) => (
-                    <tr key={policy.id} className="hover:bg-gray-50 transition-colors">
+                  {filteredPolicies.map((policy) => {
+                    const isNew = newPolicyIds.has(policy.id)
+                    const isDuplicate = duplicateMap.has(policy.id)
+                    return (
+                    <tr
+                      key={policy.id}
+                      className={`transition-colors ${
+                        isNew ? 'bg-green-50/50 hover:bg-green-50' :
+                        isDuplicate ? 'bg-amber-50/50 hover:bg-amber-50' :
+                        'hover:bg-gray-50'
+                      }`}
+                    >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           <span className="text-2xl" aria-hidden="true">{policy.logo}</span>
                           <div>
-                            <p className="font-medium text-gray-900">{policy.provider}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-gray-900">{policy.provider}</p>
+                              {isNew && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full">
+                                  <Sparkles className="w-2.5 h-2.5" />
+                                  {locale === 'tr' ? 'Yeni' : 'New'}
+                                </span>
+                              )}
+                              {isDuplicate && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded-full">
+                                  <Copy className="w-2.5 h-2.5" />
+                                  {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+                                </span>
+                              )}
+                            </div>
                             <p className="text-sm text-gray-500">{policy.policyNumber}</p>
                           </div>
                         </div>
@@ -398,7 +538,7 @@ export function PolicyDashboard() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             </div>

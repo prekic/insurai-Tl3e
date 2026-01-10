@@ -1,7 +1,12 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { AnalyzedPolicy } from '@/types/policy'
+import { AnalyzedPolicy, DuplicatePolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import {
+  findDuplicatePolicies,
+  isNewPolicy,
+  createPolicyTimestamp,
+} from '@/lib/policy-utils'
 import {
   isSupabaseConfigured,
   fetchPolicies as fetchSupabasePolicies,
@@ -60,6 +65,15 @@ interface PolicyContextValue {
   clearSearch: () => void
   // Status
   isUsingSupabase: boolean
+  // New policy tracking
+  recentlyAddedIds: Set<string>
+  sessionStartTime: string
+  isPolicyNew: (policy: AnalyzedPolicy) => boolean
+  // Duplicate detection
+  duplicates: DuplicatePolicy[]
+  getDuplicatesForPolicy: (id: string) => DuplicatePolicy[]
+  dismissDuplicate: (policyId: string) => void
+  mergeDuplicates: (keepId: string, deleteIds: string[]) => Promise<void>
 }
 
 const PolicyContext = createContext<PolicyContextValue | null>(null)
@@ -228,6 +242,12 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
   const [stats, setStats] = useState<PolicyStats | null>(null)
   const { user, isConfigured: authConfigured } = useAuth()
 
+  // Track session start time and recently added policies
+  const sessionStartTimeRef = useRef<string>(createPolicyTimestamp())
+  const [recentlyAddedIds, setRecentlyAddedIds] = useState<Set<string>>(new Set())
+  const [duplicates, setDuplicates] = useState<DuplicatePolicy[]>([])
+  const [dismissedDuplicateIds, setDismissedDuplicateIds] = useState<Set<string>>(new Set())
+
   const useSupabase = authConfigured && isSupabaseConfigured() && !!user
 
   // Fetch policies from Supabase or localStorage
@@ -284,9 +304,20 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
     async (newPolicies: AnalyzedPolicy[]) => {
       setIsSaving(true)
       try {
+        // Add createdAt timestamp to new policies
+        const timestamp = createPolicyTimestamp()
+        const policiesWithTimestamp = newPolicies.map((p) => ({
+          ...p,
+          createdAt: p.createdAt || timestamp,
+        }))
+
+        // Track new policy IDs for highlighting
+        const newIds = policiesWithTimestamp.map((p) => p.id)
+        setRecentlyAddedIds((prev) => new Set([...prev, ...newIds]))
+
         if (useSupabase && user) {
           // Save to Supabase
-          for (const policy of newPolicies) {
+          for (const policy of policiesWithTimestamp) {
             const insert = analyzedPolicyToInsert(policy, user.id)
             await createSupabasePolicy(insert)
           }
@@ -299,7 +330,7 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
           // Save to local state (localStorage will be updated via effect)
           setPolicies((prev) => {
             const existingIds = new Set(prev.map((p) => p.id))
-            const uniqueNew = newPolicies.filter((p) => !existingIds.has(p.id))
+            const uniqueNew = policiesWithTimestamp.filter((p) => !existingIds.has(p.id))
             return [...prev, ...uniqueNew]
           })
         }
@@ -565,6 +596,81 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
     setSearchResults(null)
   }, [])
 
+  // Detect duplicates when policies change
+  useEffect(() => {
+    if (!isLoading && policies.length > 1) {
+      const detected = findDuplicatePolicies(policies)
+      // Filter out dismissed duplicates
+      const activeDuplicates = detected.filter(
+        (d) => !dismissedDuplicateIds.has(d.policy.id)
+      )
+      setDuplicates(activeDuplicates)
+    } else {
+      setDuplicates([])
+    }
+  }, [policies, isLoading, dismissedDuplicateIds])
+
+  // Check if a policy is new (added in current session or within 24h)
+  const isPolicyNewCallback = useCallback(
+    (policy: AnalyzedPolicy): boolean => {
+      // Check if added in current session
+      if (recentlyAddedIds.has(policy.id)) {
+        return true
+      }
+      // Check by timestamp (within 24 hours)
+      return isNewPolicy(policy)
+    },
+    [recentlyAddedIds]
+  )
+
+  // Get duplicates for a specific policy
+  const getDuplicatesForPolicy = useCallback(
+    (id: string): DuplicatePolicy[] => {
+      return duplicates.filter(
+        (d) => d.policy.id === id || d.duplicateOf.id === id
+      )
+    },
+    [duplicates]
+  )
+
+  // Dismiss a duplicate warning
+  const dismissDuplicate = useCallback((policyId: string) => {
+    setDismissedDuplicateIds((prev) => new Set([...prev, policyId]))
+  }, [])
+
+  // Merge duplicates by keeping one and deleting others
+  const mergeDuplicates = useCallback(
+    async (_keepId: string, deleteIds: string[]) => {
+      setIsSaving(true)
+      try {
+        // Delete each duplicate
+        for (const id of deleteIds) {
+          await deletePolicy(id)
+        }
+
+        // Clear from recently added if present
+        setRecentlyAddedIds((prev) => {
+          const next = new Set(prev)
+          deleteIds.forEach((id) => next.delete(id))
+          return next
+        })
+
+        toast.success('Duplicates merged', {
+          description: `${deleteIds.length} duplicate policy(ies) removed.`,
+        })
+      } catch (error) {
+        console.error('Failed to merge duplicates:', error)
+        toast.error('Failed to merge duplicates', {
+          description: error instanceof Error ? error.message : 'Please try again.',
+        })
+        throw error
+      } finally {
+        setIsSaving(false)
+      }
+    },
+    [deletePolicy]
+  )
+
   return (
     <PolicyContext.Provider
       value={{
@@ -594,6 +700,15 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
         clearSearch,
         // Status
         isUsingSupabase: useSupabase,
+        // New policy tracking
+        recentlyAddedIds,
+        sessionStartTime: sessionStartTimeRef.current,
+        isPolicyNew: isPolicyNewCallback,
+        // Duplicate detection
+        duplicates,
+        getDuplicatesForPolicy,
+        dismissDuplicate,
+        mergeDuplicates,
       }}
     >
       {children}
