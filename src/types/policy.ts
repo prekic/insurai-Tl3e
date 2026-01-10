@@ -26,6 +26,7 @@ export interface Policy {
   expiryDate: string
   status: PolicyStatus
   uploadDate: string
+  createdAt?: string // ISO timestamp for tracking when policy was added to system
   fileName: string
   documentType: string
   documentUrl?: string
@@ -39,6 +40,16 @@ export interface Policy {
   exclusions: string[]
   specialConditions: string[]
   insuranceLine: string
+}
+
+/**
+ * Represents a potential duplicate policy with similarity details
+ */
+export interface DuplicatePolicy {
+  policy: Policy
+  duplicateOf: Policy
+  similarity: 'exact' | 'high' | 'medium'
+  matchedFields: string[]
 }
 
 export interface AnalyzedPolicy extends Policy {

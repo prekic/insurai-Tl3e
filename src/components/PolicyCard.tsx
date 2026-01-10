@@ -1,11 +1,11 @@
-import { Eye, Trash2, MessageSquare, CheckSquare, Square } from 'lucide-react'
+import { Eye, Trash2, MessageSquare, CheckSquare, Square, Sparkles, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { Badge } from './ui/badge'
 import { GradeBadge, StatusIndicator, ScoreBreakdown, OverallScore } from './evaluation'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
-import type { AnalyzedPolicy } from '@/types/policy'
+import type { AnalyzedPolicy, DuplicatePolicy } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 
 interface PolicyCardProps {
@@ -19,6 +19,8 @@ interface PolicyCardProps {
   showActions?: boolean
   compact?: boolean
   className?: string
+  isNew?: boolean
+  duplicateInfo?: DuplicatePolicy | null
 }
 
 /**
@@ -36,12 +38,16 @@ export function PolicyCard({
   showActions = true,
   compact = false,
   className,
+  isNew = false,
+  duplicateInfo = null,
 }: PolicyCardProps) {
   const { t, locale } = useI18n()
   const { evaluation } = usePolicyEvaluation(showEvaluation ? policy : undefined)
 
   const policyTypeInfo = POLICY_TYPES[policy.type]
   const typeLabel = locale === 'tr' ? policyTypeInfo?.labelTr || policy.typeTr : policyTypeInfo?.label || policy.type
+
+  const isDuplicate = duplicateInfo !== null
 
   const getStatusBadgeVariant = (status: string): 'success' | 'warning' | 'destructive' | 'default' => {
     switch (status) {
@@ -81,8 +87,10 @@ export function PolicyCard({
     return (
       <div
         className={cn(
-          'bg-white rounded-xl border p-3 transition-all cursor-pointer',
+          'bg-white rounded-xl border p-3 transition-all cursor-pointer relative',
           isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300',
+          isNew && !isSelected && 'border-green-400 bg-green-50/30',
+          isDuplicate && !isSelected && 'border-amber-400 bg-amber-50/30',
           className
         )}
         onClick={handleCardClick}
@@ -90,8 +98,26 @@ export function PolicyCard({
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
-        aria-label={`${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}`}
+        aria-label={`${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}`}
       >
+        {/* New/Duplicate indicator badges */}
+        {(isNew || isDuplicate) && (
+          <div className="absolute -top-2 -right-2 flex gap-1">
+            {isNew && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full shadow-sm">
+                <Sparkles className="w-2.5 h-2.5" />
+                {locale === 'tr' ? 'Yeni' : 'New'}
+              </span>
+            )}
+            {isDuplicate && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded-full shadow-sm">
+                <Copy className="w-2.5 h-2.5" />
+                {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center gap-3">
           {/* Selection indicator */}
           {onSelect && (
@@ -125,9 +151,11 @@ export function PolicyCard({
   return (
     <div
       className={cn(
-        'bg-white rounded-xl border transition-all',
+        'bg-white rounded-xl border transition-all relative',
         isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200',
         onSelect && 'cursor-pointer hover:border-gray-300',
+        isNew && !isSelected && 'border-green-400 ring-1 ring-green-200',
+        isDuplicate && !isSelected && 'border-amber-400 ring-1 ring-amber-200',
         className
       )}
       onClick={onSelect ? handleCardClick : undefined}
@@ -135,8 +163,26 @@ export function PolicyCard({
       role={onSelect ? 'button' : 'article'}
       tabIndex={onSelect ? 0 : undefined}
       aria-pressed={onSelect ? isSelected : undefined}
-      aria-label={onSelect ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}` : undefined}
+      aria-label={onSelect ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}` : undefined}
     >
+      {/* New/Duplicate indicator badges */}
+      {(isNew || isDuplicate) && (
+        <div className="absolute -top-2.5 right-3 flex gap-1.5 z-10">
+          {isNew && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-green-500 text-white rounded-full shadow-sm">
+              <Sparkles className="w-3 h-3" />
+              {locale === 'tr' ? 'Yeni' : 'New'}
+            </span>
+          )}
+          {isDuplicate && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-amber-500 text-white rounded-full shadow-sm">
+              <Copy className="w-3 h-3" />
+              {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-4 border-b border-gray-100">
         <div className="flex items-start gap-3">
@@ -274,6 +320,8 @@ interface PolicyCardGridProps {
   showEvaluation?: boolean
   compact?: boolean
   className?: string
+  newPolicyIds?: Set<string>
+  duplicateMap?: Map<string, DuplicatePolicy>
 }
 
 export function PolicyCardGrid({
@@ -286,6 +334,8 @@ export function PolicyCardGrid({
   showEvaluation = true,
   compact = false,
   className,
+  newPolicyIds = new Set(),
+  duplicateMap = new Map(),
 }: PolicyCardGridProps) {
   if (policies.length === 0) {
     return null
@@ -313,6 +363,8 @@ export function PolicyCardGrid({
           showEvaluation={showEvaluation}
           showActions={!onSelect}
           compact={compact}
+          isNew={newPolicyIds.has(policy.id)}
+          duplicateInfo={duplicateMap.get(policy.id) || null}
         />
       ))}
     </div>

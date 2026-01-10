@@ -78,6 +78,11 @@ vi.mock('@/lib/policy-context', () => ({
     policies: mockPolicies,
     deletePolicy: mockDeletePolicy,
     isLoading: false,
+    recentlyAddedIds: new Set<string>(),
+    isPolicyNew: () => false,
+    duplicates: [],
+    dismissDuplicate: vi.fn(),
+    mergeDuplicates: vi.fn(),
   }),
   useDashboardPolicies: () => mockPolicies,
 }))
