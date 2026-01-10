@@ -12,6 +12,12 @@ import {
   ChevronDown,
   Sparkles,
   X,
+  Copy,
+  ThumbsUp,
+  ThumbsDown,
+  FileText,
+  ChevronRight,
+  Check,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
@@ -33,6 +39,209 @@ interface Message {
   content: string
   timestamp: Date
   retryPayload?: string
+  referencedPolicies?: string[] // Policy names referenced in this response
+  feedback?: 'helpful' | 'not_helpful' | null
+}
+
+/**
+ * Formats AI response content with proper structure:
+ * - Paragraphs with spacing
+ * - Bold text (**text**)
+ * - Numbered lists
+ * - Bullet lists
+ */
+function FormattedContent({ content, className }: { content: string; className?: string }) {
+  // Split content into paragraphs
+  const paragraphs = content.split(/\n\n+/)
+
+  const formatText = (text: string) => {
+    // Handle bold text (**text**)
+    const parts = text.split(/(\*\*[^*]+\*\*)/)
+    return parts.map((part, i) => {
+      if (part.startsWith('**') && part.endsWith('**')) {
+        return (
+          <strong key={i} className="font-semibold">
+            {part.slice(2, -2)}
+          </strong>
+        )
+      }
+      return part
+    })
+  }
+
+  const formatParagraph = (paragraph: string, index: number) => {
+    const lines = paragraph.split('\n')
+
+    // Check if this is a numbered list
+    const isNumberedList = lines.every(
+      (line) => /^\d+\.\s/.test(line.trim()) || line.trim() === ''
+    )
+
+    // Check if this is a bullet list
+    const isBulletList = lines.every(
+      (line) => /^[-•]\s/.test(line.trim()) || line.trim() === ''
+    )
+
+    if (isNumberedList && lines.filter((l) => l.trim()).length > 0) {
+      return (
+        <ol key={index} className="list-decimal list-outside ml-6 space-y-2 my-3">
+          {lines
+            .filter((line) => line.trim())
+            .map((line, i) => (
+              <li key={i} className="pl-2">
+                {formatText(line.replace(/^\d+\.\s*/, ''))}
+              </li>
+            ))}
+        </ol>
+      )
+    }
+
+    if (isBulletList && lines.filter((l) => l.trim()).length > 0) {
+      return (
+        <ul key={index} className="list-disc list-outside ml-6 space-y-2 my-3">
+          {lines
+            .filter((line) => line.trim())
+            .map((line, i) => (
+              <li key={i} className="pl-2">
+                {formatText(line.replace(/^[-•]\s*/, ''))}
+              </li>
+            ))}
+        </ul>
+      )
+    }
+
+    // Regular paragraph - handle inline line breaks
+    return (
+      <p key={index} className="my-2 leading-relaxed">
+        {lines.map((line, i) => (
+          <span key={i}>
+            {formatText(line)}
+            {i < lines.length - 1 && <br />}
+          </span>
+        ))}
+      </p>
+    )
+  }
+
+  return (
+    <div className={className}>
+      {paragraphs.map((para, i) => formatParagraph(para, i))}
+    </div>
+  )
+}
+
+/**
+ * Policy context badge showing which policies are referenced
+ */
+function PolicyContextBadge({
+  policies,
+  expanded,
+  onToggle,
+}: {
+  policies: string[]
+  expanded: boolean
+  onToggle: () => void
+}) {
+  if (policies.length === 0) return null
+
+  return (
+    <button
+      onClick={onToggle}
+      className="flex items-center gap-2 text-xs text-purple-600 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-lg transition-colors mb-2"
+    >
+      <FileText size={14} />
+      <span>Referencing: {policies[0]}</span>
+      {policies.length > 1 && (
+        <span className="text-purple-400">+{policies.length - 1} more</span>
+      )}
+      <ChevronRight
+        size={14}
+        className={`transition-transform ${expanded ? 'rotate-90' : ''}`}
+      />
+    </button>
+  )
+}
+
+/**
+ * Action buttons for AI responses
+ */
+function MessageActions({
+  messageId,
+  content,
+  feedback,
+  onFeedback,
+  onViewPolicy,
+  hasReferencedPolicies,
+}: {
+  messageId: string
+  content: string
+  feedback: 'helpful' | 'not_helpful' | null | undefined
+  onFeedback: (messageId: string, type: 'helpful' | 'not_helpful') => void
+  onViewPolicy?: () => void
+  hasReferencedPolicies: boolean
+}) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopied(true)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      toast.error('Failed to copy')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1 mt-3 pt-2 border-t border-gray-100">
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+        title="Copy to clipboard"
+      >
+        {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+        <span>{copied ? 'Copied' : 'Copy'}</span>
+      </button>
+
+      <button
+        onClick={() => onFeedback(messageId, 'helpful')}
+        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+          feedback === 'helpful'
+            ? 'text-green-600 bg-green-50'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+        }`}
+        title="Helpful"
+      >
+        <ThumbsUp size={14} />
+        <span>Helpful</span>
+      </button>
+
+      <button
+        onClick={() => onFeedback(messageId, 'not_helpful')}
+        className={`flex items-center gap-1 px-2 py-1 text-xs rounded transition-colors ${
+          feedback === 'not_helpful'
+            ? 'text-red-600 bg-red-50'
+            : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+        }`}
+        title="Not helpful"
+      >
+        <ThumbsDown size={14} />
+        <span>Not helpful</span>
+      </button>
+
+      {hasReferencedPolicies && onViewPolicy && (
+        <button
+          onClick={onViewPolicy}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors ml-auto"
+          title="View policy"
+        >
+          <FileText size={14} />
+          <span>View Policy</span>
+        </button>
+      )}
+    </div>
+  )
 }
 
 interface ChatApiResponse {
@@ -375,12 +584,47 @@ export function PolicyChat() {
     toast.success(`Switched to ${PROVIDER_INFO[provider].name}`)
   }
 
-  const quickQuestions = [
-    'What does my Kasko cover?',
-    'Compare my policies',
-    'Any coverage gaps?',
-    'Renewal reminders',
+  // Quick action chips - more descriptive and action-oriented
+  const quickActions = [
+    { label: 'Compare my policies', icon: '⚖️' },
+    { label: 'Find coverage gaps', icon: '🔍' },
+    { label: "What's my deductible?", icon: '💰' },
+    { label: 'Explain my Kasko coverage', icon: '🚗' },
+    { label: 'When do policies expire?', icon: '📅' },
   ]
+
+  // State for expanded policy context per message
+  const [expandedPolicyContext, setExpandedPolicyContext] = useState<Record<string, boolean>>({})
+
+  // Handle feedback on messages
+  const handleFeedback = useCallback((messageId: string, type: 'helpful' | 'not_helpful') => {
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === messageId
+          ? { ...m, feedback: m.feedback === type ? null : type }
+          : m
+      )
+    )
+    toast.success(type === 'helpful' ? 'Thanks for the feedback!' : 'We\'ll try to improve')
+  }, [])
+
+  // Extract referenced policies from AI response content
+  const extractReferencedPolicies = useCallback((content: string): string[] => {
+    const referenced: string[] = []
+    for (const policy of policies) {
+      const policyName = policy.provider || policy.type || 'Unknown Policy'
+      // Check if policy name or type is mentioned in the response
+      if (
+        content.toLowerCase().includes((policy.provider || '').toLowerCase()) ||
+        content.toLowerCase().includes((policy.type || '').toLowerCase())
+      ) {
+        if (!referenced.includes(policyName)) {
+          referenced.push(policyName)
+        }
+      }
+    }
+    return referenced
+  }, [policies])
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
@@ -555,6 +799,12 @@ export function PolicyChat() {
         <div className="max-w-4xl mx-auto space-y-4">
           {messages.map((message) => {
             const retryPayload = message.retryPayload
+            const referencedPolicies =
+              message.role === 'assistant' && message.id !== '1'
+                ? extractReferencedPolicies(message.content)
+                : []
+            const isExpanded = expandedPolicyContext[message.id] || false
+
             return (
               <div
                 key={message.id}
@@ -576,20 +826,53 @@ export function PolicyChat() {
                       ? 'bg-blue-600 text-white'
                       : message.role === 'error'
                         ? 'bg-red-50 border border-red-200'
-                        : 'bg-white border border-gray-200'
+                        : 'bg-white border border-gray-200 shadow-sm'
                   }`}
                 >
-                  <p
-                    className={
-                      message.role === 'user'
-                        ? 'text-white'
-                        : message.role === 'error'
-                          ? 'text-red-700'
-                          : 'text-gray-700'
-                    }
-                  >
-                    {message.content}
-                  </p>
+                  {/* Policy Context Badge - only for AI responses */}
+                  {message.role === 'assistant' && referencedPolicies.length > 0 && (
+                    <PolicyContextBadge
+                      policies={referencedPolicies}
+                      expanded={isExpanded}
+                      onToggle={() =>
+                        setExpandedPolicyContext((prev) => ({
+                          ...prev,
+                          [message.id]: !prev[message.id],
+                        }))
+                      }
+                    />
+                  )}
+
+                  {/* Expanded policy list */}
+                  {isExpanded && referencedPolicies.length > 1 && (
+                    <div className="mb-3 p-2 bg-purple-50 rounded-lg text-xs text-purple-700">
+                      <div className="font-medium mb-1">Referenced Policies:</div>
+                      <ul className="list-disc list-inside space-y-0.5">
+                        {referencedPolicies.map((p, i) => (
+                          <li key={i}>{p}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Message content with formatting for AI responses */}
+                  {message.role === 'assistant' ? (
+                    <FormattedContent
+                      content={message.content}
+                      className="text-gray-700"
+                    />
+                  ) : (
+                    <p
+                      className={
+                        message.role === 'user'
+                          ? 'text-white'
+                          : 'text-red-700'
+                      }
+                    >
+                      {message.content}
+                    </p>
+                  )}
+
                   {message.role === 'error' && retryPayload && (
                     <button
                       onClick={() => handleRetry(retryPayload)}
@@ -599,6 +882,8 @@ export function PolicyChat() {
                       Retry
                     </button>
                   )}
+
+                  {/* Timestamp */}
                   <p
                     className={`text-xs mt-2 ${
                       message.role === 'user'
@@ -610,6 +895,22 @@ export function PolicyChat() {
                   >
                     {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
+
+                  {/* Action buttons for AI responses (not the initial greeting) */}
+                  {message.role === 'assistant' && message.id !== '1' && (
+                    <MessageActions
+                      messageId={message.id}
+                      content={message.content}
+                      feedback={message.feedback}
+                      onFeedback={handleFeedback}
+                      hasReferencedPolicies={referencedPolicies.length > 0}
+                      onViewPolicy={
+                        referencedPolicies.length > 0
+                          ? () => navigate('/dashboard')
+                          : undefined
+                      }
+                    />
+                  )}
                 </div>
                 {message.role === 'user' && (
                   <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -625,20 +926,23 @@ export function PolicyChat() {
               <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center">
                 <Bot className="text-white" size={16} />
               </div>
-              <div className="bg-white border border-gray-200 p-4 rounded-2xl">
-                <div className="flex gap-1">
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: '0ms' }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: '150ms' }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
-                    style={{ animationDelay: '300ms' }}
-                  />
+              <div className="bg-white border border-gray-200 p-4 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-500">AI is thinking</span>
+                  <div className="flex gap-1">
+                    <span
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: '0ms' }}
+                    />
+                    <span
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: '150ms' }}
+                    />
+                    <span
+                      className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"
+                      style={{ animationDelay: '300ms' }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -648,18 +952,19 @@ export function PolicyChat() {
         </div>
       </div>
 
-      {/* Quick Questions */}
+      {/* Quick Action Chips */}
       <div className="bg-white border-t border-gray-200 p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-wrap gap-2 mb-4">
-            {quickQuestions.map((question, i) => (
+            {quickActions.map((action, i) => (
               <button
                 key={i}
-                onClick={() => setInput(question)}
+                onClick={() => handleSend(action.label)}
                 disabled={isTyping}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-sm text-gray-700 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-gray-50 to-gray-100 hover:from-purple-50 hover:to-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed rounded-full text-sm text-gray-700 hover:text-purple-700 border border-gray-200 hover:border-purple-200 transition-all shadow-sm"
               >
-                {question}
+                <span>{action.icon}</span>
+                <span>{action.label}</span>
               </button>
             ))}
           </div>
