@@ -67,6 +67,136 @@ export function normalizePolicyNumber(value: string | undefined | null): string 
 }
 
 // ============================================================================
+// FUZZY MATCHING FOR OCR ERRORS
+// ============================================================================
+
+/**
+ * Common OCR character substitutions
+ * Maps visually similar characters that OCR often confuses
+ */
+const OCR_SUBSTITUTIONS: Record<string, string> = {
+  '0': 'o',
+  'o': 'o',
+  'О': 'o', // Cyrillic O
+  '1': 'i',
+  'l': 'i',
+  'I': 'i',
+  'ı': 'i', // Turkish dotless i
+  'İ': 'i', // Turkish capital I with dot
+  '5': 's',
+  's': 's',
+  'ş': 's', // Turkish ş
+  'Ş': 's',
+  '8': 'b',
+  'b': 'b',
+  'ğ': 'g', // Turkish ğ
+  'Ğ': 'g',
+  'ö': 'o', // Turkish ö
+  'Ö': 'o',
+  'ü': 'u', // Turkish ü
+  'Ü': 'u',
+  'ç': 'c', // Turkish ç
+  'Ç': 'c',
+  'а': 'a', // Cyrillic а
+  'е': 'e', // Cyrillic е
+  'р': 'p', // Cyrillic р
+  'с': 'c', // Cyrillic с
+  'у': 'y', // Cyrillic у
+  'х': 'x', // Cyrillic х
+}
+
+/**
+ * Normalize string for OCR-tolerant comparison
+ * Converts visually similar characters to a canonical form
+ */
+export function normalizeForOCR(value: string): string {
+  if (!value) return ''
+
+  return value
+    .toLowerCase()
+    .split('')
+    .map(char => OCR_SUBSTITUTIONS[char] || char)
+    .join('')
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9]/g, '') // Remove special chars for comparison
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ * Used for fuzzy matching of identifiers
+ */
+export function levenshteinDistance(a: string, b: string): number {
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+
+  const matrix: number[][] = []
+
+  // Initialize first column
+  for (let i = 0; i <= b.length; i++) {
+    matrix[i] = [i]
+  }
+
+  // Initialize first row
+  for (let j = 0; j <= a.length; j++) {
+    matrix[0][j] = j
+  }
+
+  // Fill in the rest of the matrix
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b.charAt(i - 1) === a.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1]
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1, // substitution
+          matrix[i][j - 1] + 1,     // insertion
+          matrix[i - 1][j] + 1      // deletion
+        )
+      }
+    }
+  }
+
+  return matrix[b.length][a.length]
+}
+
+/**
+ * Calculate similarity ratio between two strings (0-1)
+ */
+export function stringSimilarity(a: string, b: string): number {
+  if (!a && !b) return 1
+  if (!a || !b) return 0
+
+  const distance = levenshteinDistance(a, b)
+  const maxLength = Math.max(a.length, b.length)
+
+  return 1 - distance / maxLength
+}
+
+/**
+ * Check if two strings match with OCR tolerance
+ * Returns true if strings are likely the same despite OCR errors
+ */
+export function fuzzyMatchOCR(a: string, b: string, threshold: number = 0.85): boolean {
+  if (!a && !b) return true
+  if (!a || !b) return false
+
+  // First try exact match after normalization
+  const normA = normalizeForOCR(a)
+  const normB = normalizeForOCR(b)
+
+  if (normA === normB) return true
+
+  // For short strings, require higher similarity
+  const minLength = Math.min(normA.length, normB.length)
+  const adjustedThreshold = minLength < 5 ? 0.9 : threshold
+
+  // Check similarity
+  const similarity = stringSimilarity(normA, normB)
+
+  return similarity >= adjustedThreshold
+}
+
+// ============================================================================
 // TOLERANCE-BASED COMPARISON
 // ============================================================================
 
@@ -92,29 +222,81 @@ function compareTolerant(
 // ============================================================================
 
 /**
- * Check if policies have matching identifiers (tolerant comparison)
+ * Check if policies have matching identifiers (tolerant comparison with OCR support)
  * Uses: policyNumber + provider + insuredPerson (or location for property)
+ *
+ * @param a - First policy
+ * @param b - Second policy
+ * @param useFuzzyMatch - Whether to use fuzzy matching for OCR errors (default: true)
  */
-export function isPolicyIdentifierMatch(a: Policy, b: Policy): boolean {
-  // Must match policy number + provider
-  const sameNumber = normalizePolicyNumber(a.policyNumber) === normalizePolicyNumber(b.policyNumber)
-  const sameProvider = normalizeString(a.provider) === normalizeString(b.provider)
+export function isPolicyIdentifierMatch(
+  a: Policy,
+  b: Policy,
+  useFuzzyMatch: boolean = true
+): boolean {
+  // Check policy number match
+  let sameNumber: boolean
+  if (useFuzzyMatch) {
+    sameNumber = fuzzyMatchOCR(a.policyNumber || '', b.policyNumber || '', 0.85)
+  } else {
+    sameNumber = normalizePolicyNumber(a.policyNumber) === normalizePolicyNumber(b.policyNumber)
+  }
 
-  if (!sameNumber || !sameProvider) {
+  if (!sameNumber) {
+    return false
+  }
+
+  // Check provider match (more lenient - just needs to contain similar text)
+  let sameProvider: boolean
+  if (useFuzzyMatch) {
+    sameProvider = fuzzyMatchOCR(a.provider || '', b.provider || '', 0.80)
+  } else {
+    sameProvider = normalizeString(a.provider) === normalizeString(b.provider)
+  }
+
+  if (!sameProvider) {
     return false
   }
 
   // Also check insured person/item (if available)
-  const aInsured = normalizeString(a.insuredPerson) || normalizeString(a.location)
-  const bInsured = normalizeString(b.insuredPerson) || normalizeString(b.location)
+  const aInsured = a.insuredPerson || a.location || ''
+  const bInsured = b.insuredPerson || b.location || ''
 
-  // If both have insured info, they must match
+  // If both have insured info, they must match (with fuzzy tolerance)
   // If neither has it, consider it a match (legacy data)
   if (aInsured && bInsured) {
-    return aInsured === bInsured
+    if (useFuzzyMatch) {
+      return fuzzyMatchOCR(aInsured, bInsured, 0.80)
+    } else {
+      return normalizeString(aInsured) === normalizeString(bInsured)
+    }
   }
 
   return true
+}
+
+/**
+ * Get similarity score between two policies' identifiers (0-1)
+ * Useful for ranking potential matches
+ */
+export function getPolicyIdentifierSimilarity(a: Policy, b: Policy): number {
+  const normA = normalizeForOCR(a.policyNumber || '')
+  const normB = normalizeForOCR(b.policyNumber || '')
+
+  const numberSimilarity = stringSimilarity(normA, normB)
+  const providerSimilarity = stringSimilarity(
+    normalizeForOCR(a.provider || ''),
+    normalizeForOCR(b.provider || '')
+  )
+
+  const aInsured = a.insuredPerson || a.location || ''
+  const bInsured = b.insuredPerson || b.location || ''
+  const insuredSimilarity = aInsured && bInsured
+    ? stringSimilarity(normalizeForOCR(aInsured), normalizeForOCR(bInsured))
+    : 1 // If no insured info, don't penalize
+
+  // Weighted average: policy number is most important
+  return numberSimilarity * 0.5 + providerSimilarity * 0.3 + insuredSimilarity * 0.2
 }
 
 // ============================================================================
