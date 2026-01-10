@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, performance optimizations
 - **Production Readiness**: ~9/10 (4600+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 7, 2026
+- **Last Updated**: January 10, 2026
 
 ---
 
@@ -143,6 +143,59 @@ NODE_ENV=development
 ```
 
 **CRITICAL**: API keys must NEVER have `VITE_` prefix - they stay server-side only.
+
+---
+
+## GitHub Codespaces Setup
+
+When running in GitHub Codespaces, additional configuration is needed:
+
+### 1. Create `.env` with Codespaces URLs
+
+```env
+# Use Codespaces forwarded URL for backend
+VITE_SUPABASE_URL=https://YOUR-PROJECT.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...your-jwt-key
+VITE_API_PROXY_URL=https://YOUR-CODESPACE-NAME-4001.app.github.dev
+
+# Backend
+API_PORT=4001
+FRONTEND_URL=https://YOUR-CODESPACE-NAME-5173.app.github.dev
+NODE_ENV=development
+
+# AI Keys
+OPENAI_API_KEY=sk-proj-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+GOOGLE_CLOUD_API_KEY=AIza-xxx
+```
+
+### 2. Make Ports Public
+
+```bash
+# Make both frontend and backend ports public
+gh codespace ports visibility 5173:public -c $CODESPACE_NAME
+gh codespace ports visibility 4001:public -c $CODESPACE_NAME
+```
+
+### 3. Get Your Codespace URLs
+
+In the Ports panel (VS Code bottom), you'll see forwarded URLs like:
+- Frontend: `https://your-codespace-name-5173.app.github.dev`
+- Backend: `https://your-codespace-name-4001.app.github.dev`
+
+### CSP and CORS Configuration
+
+The project is configured to allow Codespaces domains:
+- **CSP** (`index.html`): `connect-src` includes `https://*.app.github.dev`
+- **CORS** (`server/index.ts`): Dynamic origin allowing `*.app.github.dev`
+
+### Common Codespaces Issues
+
+| Issue | Solution |
+|-------|----------|
+| CSP blocking localhost | Use Codespaces forwarded URL instead of localhost |
+| CORS errors | Ports must be public, CORS allows `*.app.github.dev` |
+| Backend unreachable | Update `VITE_API_PROXY_URL` to Codespaces URL |
 
 ---
 
@@ -760,6 +813,57 @@ Multi-turn conversation endpoint for policy-related questions:
 - Calls `/api/ai/chat` endpoint
 - Supports retry on failure
 
+### PolicyChat UI Features (Added Jan 10, 2026)
+
+#### Formatted Content Component
+AI responses are rendered with proper structure:
+```tsx
+<FormattedContent content={message.content} />
+// Renders:
+// - Paragraphs with leading-relaxed spacing
+// - **Bold text** properly rendered
+// - Numbered lists (1. item) with indentation
+// - Bullet lists (- item) with proper styling
+```
+
+#### Policy Context Badge
+Shows which policies are referenced in the AI response:
+```tsx
+<PolicyContextBadge policies={referencedPolicies} expanded={isExpanded} />
+// Displays: "📋 Referencing: Trafik Sigortası - Anadolu Sigorta"
+// Expandable to show all referenced policies
+```
+
+#### Message Action Buttons
+Each AI response has action buttons:
+```tsx
+<MessageActions
+  onCopy={() => navigator.clipboard.writeText(content)}
+  onFeedback={(type) => handleFeedback(messageId, type)}
+  onViewPolicy={() => navigate('/dashboard')}
+/>
+// Renders: [📋 Copy] [👍 Helpful] [👎 Not helpful] [📄 View Policy]
+```
+
+#### Quick Action Chips
+Pre-defined questions with icons:
+```tsx
+const quickActions = [
+  { label: 'Compare my policies', icon: '⚖️' },
+  { label: 'Find coverage gaps', icon: '🔍' },
+  { label: "What's my deductible?", icon: '💰' },
+  { label: 'Explain my Kasko coverage', icon: '🚗' },
+  { label: 'When do policies expire?', icon: '📅' },
+]
+```
+
+#### Typing Indicator
+Enhanced loading state with text:
+```tsx
+// Shows: "AI is thinking" with purple bouncing dots animation
+{isTyping && <TypingIndicator />}
+```
+
 ### System Prompt
 Expert Turkish insurance assistant with knowledge of:
 - Kasko, DASK, Trafik Sigortası terminology
@@ -900,6 +1004,34 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 - **Solution**: Wrap in try-catch, expect `browser-like environment` error message
 - **File**: `src/lib/ai/config.test.ts`
 
+### 12. CSP Blocking Localhost in Codespaces (Fixed Jan 10, 2026)
+- **Problem**: CSP `connect-src` didn't allow `http://localhost:*` or `*.app.github.dev`
+- **Solution**: Updated CSP in `index.html` to include localhost and Codespaces domains
+- **Files**: `index.html`, `src/lib/security/csp.ts`
+
+### 13. CORS Blocking Codespaces Requests (Fixed Jan 10, 2026)
+- **Problem**: Static CORS origin didn't allow dynamic Codespaces domains
+- **Solution**: Made CORS origin dynamic, checking for `*.app.github.dev` pattern
+- **File**: `server/index.ts`
+- **Code**:
+```typescript
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) { callback(null, true); return }
+    if (origin.endsWith('.app.github.dev')) { callback(null, true); return }
+    if (allowedOrigins.includes(origin)) { callback(null, true); return }
+    if (!IS_PRODUCTION) { callback(null, true); return }
+    callback(new Error('Not allowed by CORS'))
+  },
+  // ...
+}
+```
+
+### 14. Supabase Key Format Confusion
+- **Problem**: New Supabase keys (`sb_publishable_*`) vs legacy JWT keys (`eyJ...`)
+- **Solution**: Use the legacy `anon` key (JWT format) from Supabase dashboard
+- **Note**: The SDK expects the JWT format, not the new publishable key format
+
 ---
 
 ## Gotchas & Critical Notes
@@ -912,6 +1044,8 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 6. **Turkish Dates**: DD.MM.YYYY format, parse carefully
 7. **Currency**: Use `tr-TR` locale, TRY symbol varies (₺ or TL)
 8. **Tests Mock Everything**: Integration tests added to catch real config issues
+9. **Codespaces**: Must use forwarded URLs, not localhost (browser runs on your machine)
+10. **Supabase Keys**: Use legacy JWT key (`eyJ...`), not new `sb_publishable_*` format
 
 ---
 
