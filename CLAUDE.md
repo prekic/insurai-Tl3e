@@ -361,6 +361,82 @@ Body: text-gray-600
 - Contains 138 component designs from original Figma export
 - Key components: AdminPanel, InsuranceComparison, CoverageDetails
 
+### Responsive Breakpoints (Tailwind)
+
+```css
+/* Mobile-first breakpoints */
+sm:  640px   /* Small devices */
+md:  768px   /* Tablets */
+lg:  1024px  /* Laptops */
+xl:  1280px  /* Desktops */
+2xl: 1536px  /* Large screens */
+```
+
+Common responsive patterns:
+```tsx
+// Grid that adapts
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+// Hide on mobile, show on desktop
+<div className="hidden lg:block">
+
+// Stack on mobile, row on desktop
+<div className="flex flex-col md:flex-row gap-4">
+
+// Different text sizes
+<h1 className="text-2xl md:text-4xl lg:text-5xl">
+
+// Responsive padding
+<section className="px-4 md:px-8 lg:px-16">
+```
+
+### Animation Patterns (Framer Motion)
+
+Location: `src/components/animations/`
+
+```tsx
+// Fade in on scroll
+import { motion } from 'framer-motion'
+
+<motion.div
+  initial={{ opacity: 0, y: 20 }}
+  whileInView={{ opacity: 1, y: 0 }}
+  viewport={{ once: true }}
+  transition={{ duration: 0.5 }}
+>
+
+// Staggered list items
+const container = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: { staggerChildren: 0.1 }
+  }
+}
+
+const item = {
+  hidden: { opacity: 0, x: -20 },
+  show: { opacity: 1, x: 0 }
+}
+
+<motion.ul variants={container} initial="hidden" animate="show">
+  {items.map(i => <motion.li key={i} variants={item} />)}
+</motion.ul>
+
+// Hover effects
+<motion.button
+  whileHover={{ scale: 1.05 }}
+  whileTap={{ scale: 0.95 }}
+>
+```
+
+Common animations used:
+- Hero section: Fade up on load
+- Feature cards: Stagger on scroll
+- Buttons: Scale on hover/tap
+- Modals: Fade + scale
+- Page transitions: Cross-fade
+
 ---
 
 ## Benchmarking Logic
@@ -683,6 +759,277 @@ Poliçe (Policy)
 
 ---
 
+## Utility Functions (`src/lib/utils.ts`)
+
+Reusable utilities used throughout the codebase:
+
+```typescript
+// Class name merging with Tailwind support
+import { cn } from '@/lib/utils'
+cn("flex gap-4", isActive && "bg-blue-500", className)
+
+// Currency formatting (Turkish Lira)
+import { formatCurrency } from '@/lib/utils'
+formatCurrency(15000)  // → "₺15.000"
+formatCurrency(15000, 'USD')  // → "$15,000"
+
+// Date formatting (Turkish locale DD.MM.YYYY)
+import { formatDate } from '@/lib/utils'
+formatDate(new Date())  // → "10.01.2026"
+formatDate("2026-01-10")  // → "10.01.2026"
+
+// Number formatting (Turkish locale with thousand separators)
+import { formatNumber } from '@/lib/utils'
+formatNumber(1500000)  // → "1.500.000"
+```
+
+---
+
+## Sanitization Utilities (`src/lib/sanitize.ts`)
+
+Security utilities for input sanitization:
+
+```typescript
+// Chat/message content (preserves newlines, max 10KB)
+import { sanitizeMessage } from '@/lib/sanitize'
+sanitizeMessage(userInput)
+
+// File names (prevents path traversal, removes dangerous chars)
+import { sanitizeFileName } from '@/lib/sanitize'
+sanitizeFileName("../../../etc/passwd")  // → "etc_passwd"
+
+// Search queries (max 200 chars, no newlines)
+import { sanitizeSearchQuery } from '@/lib/sanitize'
+
+// URL validation (blocks javascript:, data:, file:)
+import { sanitizeUrl } from '@/lib/sanitize'
+
+// HTML escaping for XSS prevention
+import { escapeHtml } from '@/lib/sanitize'
+
+// Numeric input with bounds
+import { sanitizeNumber } from '@/lib/sanitize'
+sanitizeNumber("42.5", { min: 0, max: 100 })  // → 42.5
+```
+
+---
+
+## Custom Hooks (`src/hooks/`)
+
+### Core Hooks
+
+| Hook | Purpose | Usage |
+|------|---------|-------|
+| `usePolicyEvaluation(policy)` | Evaluate single policy, returns grade A-F | Dashboard cards |
+| `usePolicyEvaluations(policies)` | Batch evaluate, returns `Map<id, evaluation>` | Policy list views |
+| `usePolicyComparison(policies)` | Compare 2-4 policies side-by-side | Comparison page |
+| `useRegionalBenchmark(region)` | Get regional risk data + benchmarks | Regional insights |
+| `useIndustryRisk(industry)` | Industry-specific risk profiles | Business policies |
+| `useMarketData(policyType)` | Market averages for policy type | Benchmarking |
+
+### Utility Hooks
+
+| Hook | Purpose |
+|------|---------|
+| `useBackendHealth()` | Check backend API availability |
+| `useFileUpload()` | File upload with progress, validation |
+| `usePdfExport()` | Export policies to PDF |
+| `useCostTracking()` | Track AI API usage costs |
+| `useAnalytics()` | User analytics and events |
+| `usePrivacy()` | GDPR/privacy consent management |
+| `usePolicyTemplates()` | Policy template management |
+
+### Hook Pattern Example
+
+```typescript
+// usePolicyEvaluation - memoized evaluation
+const { evaluation, isLoading, error } = usePolicyEvaluation(policy, {
+  config: { weights: { premium: 20, coverage: 30 } },
+  enabled: true
+})
+
+if (evaluation) {
+  console.log(evaluation.grade)        // 'A', 'B', 'C', 'D', 'F'
+  console.log(evaluation.overallScore) // 0-100
+  console.log(evaluation.status)       // 'excellent', 'good', 'fair', 'poor', 'critical'
+}
+```
+
+---
+
+## UI Component Library (`src/components/ui/`)
+
+Base components using shadcn/ui pattern with Tailwind:
+
+### Button Variants
+
+```tsx
+import { Button } from '@/components/ui/button'
+
+<Button variant="default">Primary</Button>
+<Button variant="outline">Outline</Button>
+<Button variant="ghost">Ghost</Button>
+<Button variant="destructive">Delete</Button>
+<Button variant="link">Link</Button>
+
+<Button size="sm">Small</Button>
+<Button size="lg">Large</Button>
+<Button size="icon"><Icon /></Button>
+```
+
+### Other UI Components
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `Button` | `button.tsx` | Action buttons with variants |
+| `Card` | `card.tsx` | Content containers |
+| `Badge` | `badge.tsx` | Status indicators, tags |
+| `Input` | `input.tsx` | Form text inputs |
+| `Progress` | `progress.tsx` | Progress bars |
+| `Loading` | `loading.tsx` | Spinner, skeleton states |
+| `ErrorBoundary` | `error-boundary.tsx` | React error handling |
+| `ConfirmationDialog` | `confirmation-dialog.tsx` | Confirm destructive actions |
+
+---
+
+## Core Data Types (`src/types/policy.ts`)
+
+### Policy Interface
+
+```typescript
+interface Policy {
+  id: string                    // UUID
+  policyNumber: string          // e.g., "POL-2024-12345"
+  provider: string              // e.g., "Allianz Sigorta"
+  logo: string                  // Provider logo URL
+  type: PolicyType              // 'kasko' | 'traffic' | 'home' | ...
+  typeTr: string                // Turkish name
+  coverage: number              // Total coverage in TRY
+  premium: number               // Annual premium in TRY
+  monthlyPremium: number        // Monthly equivalent
+  deductible: number            // Deductible in TRY
+  startDate: string             // ISO date
+  expiryDate: string            // ISO date
+  status: PolicyStatus          // 'active' | 'expiring' | 'expired'
+  coverages: Coverage[]         // Individual coverage items
+  exclusions: string[]          // Policy exclusions
+  specialConditions: string[]   // Special conditions
+}
+
+interface Coverage {
+  name: string        // English name
+  nameTr: string      // Turkish name
+  limit: number       // Coverage limit in TRY
+  deductible: number  // Item deductible
+  included: boolean   // Is this coverage active?
+}
+```
+
+### AnalyzedPolicy (extends Policy)
+
+```typescript
+interface AnalyzedPolicy extends Policy {
+  aiConfidence: number          // 0-100 AI extraction confidence
+  aiInsights: string[]          // AI-generated observations
+  marketComparison?: {
+    averagePremium: number
+    averageCoverage: number
+    percentile: number          // Where policy ranks (0-100)
+  }
+  riskScore?: {
+    overall: number
+    level: 'very_low' | 'low' | 'moderate' | 'high' | 'very_high'
+    topIssue: string | null
+  }
+  gapAnalysis?: {
+    overallScore: number        // 0=no gaps, 100=severe
+    criticalCount: number
+    financialExposure: number
+  }
+}
+```
+
+### Policy Type Constants
+
+```typescript
+type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business'
+
+const POLICY_TYPES = {
+  kasko:   { label: 'Comprehensive Auto', labelTr: 'Kasko', icon: '🚗' },
+  traffic: { label: 'Traffic Liability', labelTr: 'Trafik Sigortası', icon: '🚦' },
+  home:    { label: 'Home Insurance', labelTr: 'Konut Sigortası', icon: '🏠' },
+  health:  { label: 'Health Insurance', labelTr: 'Sağlık Sigortası', icon: '🏥' },
+  life:    { label: 'Life Insurance', labelTr: 'Hayat Sigortası', icon: '💗' },
+  dask:    { label: 'Earthquake Insurance', labelTr: 'DASK', icon: '🏗️' },
+  business:{ label: 'Business Insurance', labelTr: 'İşyeri Sigortası', icon: '🏢' },
+}
+```
+
+---
+
+## State Management (PolicyContext)
+
+### PolicyContext (`src/lib/policy-context.tsx`)
+
+Central state for policy data with Supabase sync:
+
+```typescript
+const {
+  // Data
+  policies,              // All user policies
+  selectedPolicy,        // Currently selected
+  stats,                 // Aggregate statistics
+  isLoading,
+
+  // CRUD
+  addPolicies,           // Add new policies (from upload)
+  updatePolicy,          // Update existing
+  deletePolicy,          // Remove policy
+
+  // Selection
+  selectPolicy,          // Select by ID
+  getPolicyById,         // Get from cache
+  fetchPolicyById,       // Fetch from DB
+
+  // Search
+  searchPolicies,        // Search with query
+  searchResults,         // Current search results
+
+  // Status
+  isUsingSupabase,       // Using real DB or localStorage
+} = usePolicies()
+```
+
+### PolicyStats Interface
+
+```typescript
+interface PolicyStats {
+  total: number
+  active: number
+  expiring: number       // Expiring within 30 days
+  expired: number
+  byType: Record<PolicyType, number>
+  totalCoverage: number  // Sum of all coverage
+  totalPremium: number   // Sum of all premiums
+}
+```
+
+### Storage Strategy
+
+```typescript
+// When Supabase is configured
+if (isSupabaseConfigured()) {
+  // CRUD operations go to Supabase
+  // Real-time sync with RLS (user sees only their policies)
+} else {
+  // Fallback to localStorage
+  // Uses 'insurai_policies' key
+  // Sample policies loaded on first visit
+}
+```
+
+---
+
 ## Code Conventions
 
 ### File Naming
@@ -864,11 +1211,46 @@ Enhanced loading state with text:
 {isTyping && <TypingIndicator />}
 ```
 
-### System Prompt
-Expert Turkish insurance assistant with knowledge of:
-- Kasko, DASK, Trafik Sigortası terminology
-- Coverage limits, deductibles, exclusions
-- TRY currency formatting
+### System Prompt (PolicyChat)
+
+```typescript
+const CHAT_SYSTEM_PROMPT = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
+
+Key guidelines:
+- Be helpful, professional, and concise
+- Use Turkish insurance terminology (Kasko, Trafik Sigortası, DASK, etc.)
+- When discussing money, use Turkish Lira (TRY/₺)
+- Reference specific policy details when available
+- Highlight important exclusions or limitations
+- Suggest improvements when coverage gaps are identified
+- For complex questions, break down the explanation
+- If unsure about policy-specific details, ask for clarification
+
+Common Turkish insurance terms:
+- Kasko: Comprehensive auto insurance
+- Trafik Sigortası: Mandatory traffic/liability insurance
+- DASK: Mandatory earthquake insurance
+- Teminat: Coverage/guarantee
+- Muafiyet: Deductible
+- Prim: Premium
+- Sigortalı: Insured person
+- Lehdar: Beneficiary`
+
+// When policy context is provided, it's appended:
+systemPrompt += `\n\nPolicy Information:\n${policyContext}`
+```
+
+### AI Extraction Prompt Pattern
+
+For policy extraction, the system prompt is passed from the frontend:
+
+```typescript
+// Default extraction prompt
+const systemPrompt = 'Extract policy information as JSON.'
+
+// Full extraction happens in policy-extractor.ts with detailed JSON schema
+// The prompt defines the expected output structure matching the Policy interface
+```
 
 ---
 
@@ -927,6 +1309,70 @@ const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
 - XSS protection
 - Frame options
 - Content sniffing protection
+
+---
+
+## API Error Handling
+
+### Standard Error Response Format
+
+All API endpoints return consistent error responses:
+
+```typescript
+// Error response structure
+interface ApiError {
+  error: string           // User-friendly message
+  code?: string           // Machine-readable code
+  message?: string        // Detailed message (dev only)
+  details?: unknown       // Additional context
+}
+
+// HTTP status codes used
+// 400 - Bad Request (validation failed)
+// 401 - Unauthorized (no/invalid auth)
+// 403 - Forbidden (rate limited, CORS)
+// 404 - Not Found
+// 408 - Request Timeout
+// 429 - Too Many Requests (rate limit exceeded)
+// 500 - Internal Server Error
+```
+
+### Rate Limit Headers
+
+```typescript
+// Response headers for rate-limited endpoints
+'X-RateLimit-Limit': 60        // Max requests
+'X-RateLimit-Remaining': 45    // Requests left
+'X-RateLimit-Reset': 1704844800 // Unix timestamp
+'Retry-After': 3600            // Seconds until reset (when limited)
+```
+
+### Frontend Error Handling
+
+```typescript
+// API call pattern with error handling
+try {
+  const response = await fetch('/api/ai/chat', { ... })
+
+  if (!response.ok) {
+    const error = await response.json()
+    if (response.status === 429) {
+      toast.error('Rate limit exceeded. Please wait.')
+    } else if (response.status === 408) {
+      toast.error('Request timed out. Try again.')
+    } else {
+      toast.error(error.error || 'Something went wrong')
+    }
+    return
+  }
+
+  const data = await response.json()
+  // Handle success
+} catch (error) {
+  // Network error or JSON parse error
+  toast.error('Network error. Check your connection.')
+}
+```
 
 ---
 
