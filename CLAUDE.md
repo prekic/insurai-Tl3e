@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, performance optimizations
-- **Production Readiness**: ~9/10 (4600+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 7, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations
+- **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
+- **Last Updated**: January 11, 2026
 
 ---
 
@@ -39,53 +39,101 @@
 insurai/
 ├── src/
 │   ├── components/           # React components
-│   │   ├── ui/              # Base UI components (Button, Card, etc.)
-│   │   ├── landing/         # Landing page sections
+│   │   ├── ui/              # Base UI components (Button, Card, Dialog, etc.)
+│   │   ├── landing/         # Landing page sections (Hero, Benefits, FAQ, etc.)
+│   │   ├── evaluation/      # Policy evaluation UI (GradeBadge, ScoreBreakdown)
+│   │   ├── insurance-lines/ # Policy type specific details components
 │   │   └── animations/      # Framer Motion components
 │   ├── lib/
-│   │   ├── ai/              # AI extraction (providers, config, OCR)
+│   │   ├── ai/              # AI extraction (providers, config, OCR, caching)
 │   │   │   ├── providers/   # OpenAI, Anthropic adapters
 │   │   │   ├── cache/       # Response caching
 │   │   │   └── cost-tracking/ # API usage tracking
-│   │   ├── supabase/        # Auth, policies, database
-│   │   ├── gap-detection/   # Coverage gap analysis
-│   │   ├── regional-benchmark/ # Turkish regional data
+│   │   ├── supabase/        # Auth, policies, database operations
+│   │   ├── gap-detection/   # Coverage gap analysis engine
+│   │   ├── regional-benchmark/ # Turkish regional data & risk factors
+│   │   ├── policy-evaluation/ # Policy grading and comparison
+│   │   ├── market-data/     # Market benchmarks and gap analyzer
 │   │   ├── i18n/            # Internationalization (TR/EN)
+│   │   ├── privacy/         # GDPR/KVKK compliance utilities
+│   │   ├── pdf-export/      # PDF generation for reports
+│   │   ├── ml/              # Machine learning utilities
 │   │   └── security/        # Audit logging, sanitization
 │   ├── hooks/               # Custom React hooks
 │   ├── types/               # TypeScript definitions
-│   ├── data/                # Sample policies, market data
-│   └── __tests__/           # Integration tests
+│   ├── data/                # Sample policies, market data, regulations
+│   └── __tests__/           # Integration & performance tests
 ├── server/
-│   ├── index.ts             # Express server entry
-│   ├── routes/              # API routes
-│   ├── middleware/          # Auth, rate limiting
-│   └── lib/                 # Server utilities
+│   ├── index.ts             # Express server entry (port 4001)
+│   ├── routes/              # API routes (ai.ts)
+│   ├── middleware/          # Auth, rate limiting, validation
+│   ├── lib/                 # Server utilities (Sentry)
+│   └── __tests__/           # API route tests
 ├── e2e/                     # Playwright E2E tests
 ├── docs/                    # Deployment guides
-└── supabase/                # Database migrations
+├── supabase/                # Database schema & migrations
+├── scripts/                 # Utility scripts (load-test, ai-extraction)
+└── public/                  # Static assets, PWA manifest, service worker
 ```
 
 ---
 
 ## Key Files
 
+### Core Application
 | File | Purpose |
 |------|---------|
-| `src/types/policy.ts` | Core policy data structures |
+| `src/App.tsx` | Main app with routing and lazy-loaded components |
+| `src/types/policy.ts` | Core policy data structures and types |
+| `src/lib/policy-context.tsx` | React Context for policy state management |
+| `src/lib/policy-utils.ts` | **NEW** Duplicate detection, fuzzy matching, policy comparison |
+| `src/lib/policy-upload-check.ts` | **NEW** Pre-upload conflict detection service |
+
+### AI & Extraction
+| File | Purpose |
+|------|---------|
 | `src/lib/ai/policy-extractor.ts` | Main AI extraction orchestrator |
-| `src/lib/ai/config.ts` | AI provider configuration |
+| `src/lib/ai/config.ts` | AI provider configuration & proxy settings |
 | `src/lib/ai/pdf-parser.ts` | PDF text extraction with pdf.js |
-| `src/lib/supabase/auth-context.tsx` | Authentication context |
-| `src/lib/supabase/policies.ts` | Policy CRUD operations |
-| `src/components/PolicyUpload.tsx` | Upload flow with extraction |
-| `src/components/PolicyChat.tsx` | Multi-turn AI chat for policy questions |
-| `src/components/GlobalNavigation.tsx` | Main nav with auth state |
-| `server/index.ts` | Backend API server (port 4001) |
+| `src/lib/ai/prompts.ts` | AI prompts for extraction |
 | `server/routes/ai.ts` | AI proxy routes (extraction, chat, OCR) |
+
+### Components
+| File | Purpose |
+|------|---------|
+| `src/components/PolicyUpload.tsx` | Upload flow with AI extraction & conflict detection |
+| `src/components/PolicyChat.tsx` | Multi-turn AI chat for policy questions |
+| `src/components/PolicyDashboard.tsx` | Main dashboard with policy cards |
+| `src/components/PolicyDetailView.tsx` | Detailed policy view with share/download |
+| `src/components/PolicyDiffViewer.tsx` | **NEW** Visual diff for policy changes |
+| `src/components/ConflictResolutionDialog.tsx` | **NEW** Duplicate/amendment resolution UI |
+| `src/components/GlobalNavigation.tsx` | Main nav with auth state |
+| `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
+
+### Authentication & Database
+| File | Purpose |
+|------|---------|
+| `src/lib/supabase/auth-context.tsx` | Authentication context provider |
+| `src/lib/supabase/auth.ts` | Auth functions (signIn, signUp, signOut) |
+| `src/lib/supabase/policies.ts` | Policy CRUD operations |
+| `src/lib/supabase/client.ts` | Supabase client initialization |
+
+### Server
+| File | Purpose |
+|------|---------|
+| `server/index.ts` | Express server with graceful shutdown |
 | `server/middleware/validation.ts` | Zod schemas for request validation |
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
-| `.env` | Environment configuration |
+| `server/lib/sentry.ts` | Sentry error tracking setup |
+
+### Configuration
+| File | Purpose |
+|------|---------|
+| `.env` | Environment configuration (not committed) |
+| `.env.example` | Environment template |
+| `vite.config.ts` | Vite config with proxy settings |
+| `lighthouserc.js` | Lighthouse CI configuration |
+| `playwright.config.ts` | E2E test configuration |
 
 ---
 
@@ -95,36 +143,44 @@ insurai/
 # Development
 npm run dev           # Frontend only (port 5173)
 npm run dev:server    # Backend only (port 4001)
-npm run dev:all       # Both frontend + backend
+npm run dev:all       # Both frontend + backend (recommended)
 npm run dev:sync      # Pull latest + install + run all
 
 # Build & Deploy
-npm run build         # Production build
+npm run build         # Production build (frontend)
+npm run build:server  # Production build (backend)
+npm run build:analyze # Build with bundle analysis
 npm run preview       # Preview production build
 
 # Testing
-npm test              # Run unit tests
+npm test              # Run all unit tests
 npm run test:watch    # Watch mode
 npm run test:coverage # With coverage report
 npm run test:e2e      # Playwright E2E tests
-npm run validate      # typecheck + lint + test
+npm run test:e2e:fast # E2E with Chromium only
+npm run test:e2e:ui   # E2E with Playwright UI
+npm run validate      # typecheck + lint + test (full validation)
 
 # Code Quality
-npm run lint          # ESLint
-npm run lint:fix      # Auto-fix
-npm run typecheck     # TypeScript check
-npm run format        # Prettier
+npm run lint          # ESLint check
+npm run lint:fix      # Auto-fix lint issues
+npm run typecheck     # TypeScript type check
+npm run format        # Prettier formatting
+npm run format:check  # Check formatting
 
 # Load Testing
-npm run loadtest:quick  # 5s load test
+npm run loadtest:quick  # 5s quick load test
 npm run loadtest:stress # 30s stress test
+
+# Lighthouse
+npm run lighthouse    # Full Lighthouse CI run
 ```
 
 ---
 
 ## Environment Variables
 
-Create `.env` in project root:
+Create `.env` in project root (copy from `.env.example`):
 
 ```env
 # Frontend (VITE_ prefix exposes to browser)
@@ -133,16 +189,20 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 VITE_API_PROXY_URL=http://localhost:4001
 VITE_SENTRY_DSN=https://xxx@sentry.io/xxx
 
-# Backend (server-side only, never exposed)
+# Backend (server-side only, NEVER exposed to browser)
 API_PORT=4001
 FRONTEND_URL=http://localhost:5173
 OPENAI_API_KEY=sk-proj-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=AIza...
 NODE_ENV=development
+SENTRY_DSN=https://xxx@sentry.io/xxx
 ```
 
-**CRITICAL**: API keys must NEVER have `VITE_` prefix - they stay server-side only.
+**CRITICAL RULES**:
+1. API keys must NEVER have `VITE_` prefix - they stay server-side only
+2. Server uses `.env` file (not `.env.local`)
+3. In development, Vite proxy handles `/api/*` requests automatically
 
 ---
 
@@ -207,7 +267,21 @@ NODE_ENV=development
 User drops PDF → PolicyUpload → pdf.js (browser) → Extract text
 → Check density: < 100 chars/page? → Google Vision OCR (/api/ai/ocr)
                   >= 100 chars/page? → Direct to AI
-→ AI Extraction (/api/ai/extract) → Zod validation → PolicyContext → Supabase
+→ AI Extraction (/api/ai/extract) → Zod validation
+→ Pre-upload duplicate check → Conflict resolution if needed
+→ PolicyContext → Supabase (save policy + upload document)
+```
+
+### Data Flow: Duplicate Detection (NEW)
+```
+New Policy Extracted → checkPolicyBeforeUpload()
+→ Find existing by identifier (policy number + provider + insured)
+→ Fuzzy match with OCR tolerance (Levenshtein distance)
+→ If match found:
+   → Calculate diff (significance levels: critical/major/moderate/minor)
+   → Show ConflictResolutionDialog
+   → User chooses: Skip | Replace | Keep Both | Track Amendment
+→ Handle resolution → Save to Supabase
 ```
 
 ### Data Flow: PolicyChat
@@ -234,33 +308,66 @@ User → Login form → Supabase Auth → JWT in localStorage → AuthContext
 | **Supabase for auth+DB** | Managed PostgreSQL, built-in auth, RLS |
 | **Multi-provider AI** | Fallback capability, cost optimization |
 | **Rate limiting per IP** | Protect against abuse, control AI costs |
+| **TEXT with CHECK vs ENUM** | More flexible, easier migrations |
 
-### File Organization by Layer
+---
 
+## Duplicate Detection System (NEW)
+
+### Overview
+Pre-upload detection of duplicate policies with OCR-tolerant fuzzy matching.
+
+### Core Files
+- `src/lib/policy-utils.ts` - Comparison algorithms and fuzzy matching
+- `src/lib/policy-upload-check.ts` - Pre-upload check service
+- `src/components/PolicyDiffViewer.tsx` - Visual diff component
+- `src/components/ConflictResolutionDialog.tsx` - Resolution UI
+
+### Key Functions
+
+```typescript
+// Fuzzy matching for OCR errors
+import { fuzzyMatchOCR, isPolicyIdentifierMatch, normalizeForOCR } from '@/lib/policy-utils'
+
+// Check if two policy numbers match despite OCR errors
+fuzzyMatchOCR('POL-001', 'P0L-OO1', 0.85) // true (O/0 confusion)
+
+// Normalize for OCR comparison (handles Turkish chars, Cyrillic lookalikes)
+normalizeForOCR('İstanbul POL-001') // 'istanbul poiooi'
+
+// Full identifier match with fuzzy tolerance
+isPolicyIdentifierMatch(policyA, policyB, true) // uses fuzzy matching
+
+// Calculate differences between policies
+const diff = calculatePolicyDiff(oldPolicy, newPolicy)
+// Returns: { significantChanges, minorChanges, overallSignificance }
 ```
-Frontend (src/)
-├── components/         # UI components
-│   ├── ui/            # Base components (Button, Card)
-│   ├── landing/       # Marketing page sections
-│   └── insurance-lines/ # Policy type specific UIs
-├── lib/               # Business logic
-│   ├── ai/           # AI extraction orchestration
-│   ├── supabase/     # Auth, database operations
-│   ├── gap-detection/ # Coverage analysis
-│   └── pwa/          # Service worker utilities
-├── hooks/            # Custom React hooks
-├── types/            # TypeScript definitions
-└── __tests__/        # Integration tests
 
-Backend (server/)
-├── index.ts          # Express app setup, graceful shutdown
-├── routes/
-│   └── ai.ts         # All AI endpoints (chat, extract, ocr)
-├── middleware/
-│   ├── validation.ts # Zod schemas, request validation
-│   └── rate-limit.ts # Per-endpoint rate limiters
-└── __tests__/        # API route tests
+### OCR Substitution Map
+```typescript
+const OCR_SUBSTITUTIONS = {
+  '0': 'o', 'O': 'o', 'О': 'o',  // Zero, Latin O, Cyrillic O
+  '1': 'i', 'l': 'i', 'I': 'i',  // One, lowercase L, uppercase I
+  'ı': 'i', 'İ': 'i',            // Turkish dotless i, Turkish I
+  '5': 's', 'ş': 's', 'Ş': 's',  // Five, Turkish ş
+  '8': 'b', 'B': 'b',            // Eight, B
+  // ... more mappings
+}
 ```
+
+### Conflict Resolution Options
+| Option | Behavior |
+|--------|----------|
+| `skip` | Don't save the new policy |
+| `replace` | Replace existing with new |
+| `keep_both` | Save both as separate policies |
+| `track_amendment` | Save as version of existing policy |
+
+### Diff Significance Levels
+- `critical` - Core identifiers changed (policy number, provider)
+- `major` - Coverage or premium changed significantly
+- `moderate` - Dates or deductibles changed
+- `minor` - Display-only changes (formatting, etc.)
 
 ---
 
@@ -310,56 +417,110 @@ Body: text-gray-600
 
 ---
 
-## Benchmarking Logic
+## API Endpoints
 
-### Core Services (`src/lib/`)
+| Endpoint | Method | Purpose | Rate Limit |
+|----------|--------|---------|------------|
+| `/api/ai/extract/openai` | POST | Extract policy with GPT-4o | 20/hr |
+| `/api/ai/extract/anthropic` | POST | Extract policy with Claude | 20/hr |
+| `/api/ai/chat` | POST | Multi-turn policy chat | 60/hr |
+| `/api/ai/ocr` | POST | Google Vision OCR for scanned PDFs | 30/hr |
+| `/api/ai/providers` | GET | Check which AI providers are configured | - |
+| `/api/ai/diagnose` | GET | Test API key validity | - |
+| `/api/health` | GET | Server health check | 60/min |
 
-| Module | Purpose |
-|--------|---------|
-| `market-data/service.ts` | MarketDataService - main benchmarking engine |
-| `market-data/gap-analyzer.ts` | Identifies coverage gaps vs market |
-| `regional-benchmark/` | Regional risk adjustments and comparisons |
-| `industry-risk/` | Industry-specific risk profiles |
-| `data-repository/` | Data validation and loading |
+### Request/Response Examples
 
-### Benchmarking Flow
-
-```
-User Policy → Extract Data → Detect Region → Get Market Benchmark
-     ↓                            ↓                    ↓
-Compare Premium → Compare Coverage → Calculate Value Score
-     ↓                    ↓                    ↓
-Premium Percentile   Coverage %ile      Value = Coverage/Premium
-     ↓                    ↓                    ↓
-Generate Insights → Gap Analysis → Recommendations
-```
-
-### Key Calculations
-
+**Chat Endpoint:**
 ```typescript
-// Premium percentile (where user stands vs market)
-premiumPercentile = calculatePremiumPercentile(premium, policyType, region)
+// POST /api/ai/chat
+// Request
+{
+  message: string,              // User's question (max 4KB)
+  conversationHistory?: Array<{ role: 'user' | 'assistant', content: string }>,
+  policyContext?: string,       // Policy details for context (max 50KB)
+  provider?: 'openai' | 'anthropic'  // Default: openai
+}
 
-// Coverage percentile (coverage adequacy)
-coveragePercentile = calculateCoveragePercentile(coverage, policyType)
-
-// Value score (what you get per TRY spent)
-valueScore = (userCoverage / userPremium) / (marketCoverage / marketPremium) * 50
-
-// Regional adjustment
-adjustedPremium = basePremium * REGIONAL_FACTORS[region].factor
+// Response
+{
+  success: boolean,
+  response: string,             // AI response
+  provider: 'openai' | 'anthropic',
+  usage: { input_tokens: number, output_tokens: number }
+}
 ```
 
-### Insight Categories
+**Extraction Endpoint:**
+```typescript
+// POST /api/ai/extract/openai
+// Request
+{
+  document: string,  // Extracted PDF text
+  prompt: string     // Extraction prompt
+}
 
-| Category | Description |
-|----------|-------------|
-| `premium_high` | Premium > 75th percentile |
-| `premium_low` | Premium < 25th percentile (check coverage) |
-| `coverage_adequate` | Coverage >= market average |
-| `coverage_insufficient` | Coverage < 50th percentile |
-| `value_excellent` | Value score > 80 |
-| `value_poor` | Value score < 40 |
+// Response
+{
+  success: boolean,
+  data: ExtractedPolicy,
+  usage: { input_tokens: number, output_tokens: number }
+}
+```
+
+---
+
+## Database Schema
+
+### Tables
+
+| Table | Purpose |
+|-------|---------|
+| `users` | User profiles (extends auth.users) |
+| `policies` | Extracted policy data |
+| `policy_documents` | Uploaded PDF file references |
+| `chat_conversations` | PolicyChat conversation history |
+
+### Policy Table Schema
+```sql
+CREATE TABLE public.policies (
+  id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+  user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
+  policy_number TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business')),
+  type_tr TEXT NOT NULL,
+  coverage NUMERIC NOT NULL,
+  premium NUMERIC NOT NULL,
+  deductible NUMERIC DEFAULT 0,
+  start_date DATE NOT NULL,
+  expiry_date DATE NOT NULL,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'expiring', 'expired', 'pending')),
+  insured_person TEXT NOT NULL,
+  location TEXT,
+  document_type TEXT DEFAULT 'policy',
+  upload_date DATE DEFAULT CURRENT_DATE,
+  logo TEXT,
+  raw_data JSONB,  -- Stores AI extraction results, coverages, exclusions
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### Migrations
+Located in `supabase/migrations/`:
+- `001_initial_schema.sql` - Base tables and indexes
+- `002_storage_policies.sql` - Storage bucket RLS
+- `003_security_fixes.sql` - Security hardening, handle_new_user trigger
+- `004_chat_conversations.sql` - Chat history storage
+
+### Row Level Security (RLS)
+```sql
+-- Users can only access their own policies
+CREATE POLICY "Users can view their own policies"
+  ON public.policies FOR SELECT
+  USING (auth.uid() = user_id);
+```
 
 ---
 
@@ -382,21 +543,13 @@ analyzeGapsComprehensive(policy, options)
 type GapSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 ```
 
-### Gap Categories
-- `coverage` - Missing protection types
-- `limit` - Insufficient coverage amounts
-- `deductible` - High out-of-pocket costs
-- `exclusion` - Risky policy exclusions
-- `temporal` - Gaps in coverage dates
-- `compliance` - Regulatory issues (DASK, etc.)
-
-### Output: ComprehensiveGapAnalysis
+### Output Structure
 ```typescript
-{
+interface ComprehensiveGapAnalysis {
   gaps: DetectedGap[]
-  gapCount: { total, critical, high, medium, low, info }
+  gapCount: { total: number, critical: number, high: number, medium: number, low: number, info: number }
   overallScore: number  // 0-100
-  financialSummary: { potentialExposure, recommendedIncrease }
+  financialSummary: { potentialExposure: number, recommendedIncrease: number }
   prioritizedGaps: PrioritizedGap[]
   recommendations: GapRecommendation[]
 }
@@ -408,23 +561,20 @@ type GapSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info'
 
 ### Location: `src/lib/policy-evaluation/`
 
-New module for evaluating individual policies and comparing multiple policies.
-
-### Core Files
-- `types.ts` - Type definitions, grade/status helpers, config defaults
-- `evaluator.ts` - Single policy evaluation against market benchmarks
-- `comparator.ts` - Multi-policy comparison (2-4 policies)
-- `index.ts` - Public API, service functions
-
 ### Key Functions
 ```typescript
 // Evaluate a single policy
-const result = evaluatePolicy(policy, { weights: { premium: 20, coverage: 30, ... } })
-// result.overallScore: 0-100, result.grade: 'A'-'F', result.status: 'excellent'|'good'|...
+const result = evaluatePolicy(policy, {
+  weights: { premium: 20, coverage: 30, deductible: 15, compliance: 20, value: 15 }
+})
+// result.overallScore: 0-100
+// result.grade: 'A' | 'B' | 'C' | 'D' | 'F'
+// result.status: 'excellent' | 'good' | 'fair' | 'poor' | 'critical'
 
 // Compare multiple policies
 const comparison = comparePolicies([policy1, policy2, policy3])
-// comparison.rankings: PolicyRanking[], comparison.recommendation: string
+// comparison.rankings: PolicyRanking[]
+// comparison.recommendation: string
 ```
 
 ### Grading System
@@ -436,50 +586,21 @@ const comparison = comparePolicies([policy1, policy2, policy3])
 | 40-59 | D | poor |
 | < 40 | F | critical |
 
-### Default Weights (sum to 100)
-- Premium: 20%
-- Coverage: 30%
-- Deductible: 15%
-- Compliance: 20%
-- Value: 15%
-
 ---
 
 ## Regional Benchmarking
 
 ### Turkish Regions (`src/lib/regional-benchmark/`)
 
-| Region Code | Name | Key Characteristics |
-|-------------|------|---------------------|
-| `marmara` | Marmara | Highest risk (İstanbul), earthquake zone 1 |
-| `ege` | Aegean | Tourism, earthquake risk |
-| `akdeniz` | Mediterranean | Tourism, flood risk |
-| `ic_anadolu` | Central Anatolia | Lower risk, agricultural |
-| `karadeniz` | Black Sea | Flood/landslide risk |
-| `dogu_anadolu` | Eastern Anatolia | Lower premiums, rural |
-| `guneydogu` | Southeastern | Mixed risk profile |
-
-### Province Data
-- 17 major provinces with full data
-- Population, density, urban ratio
-- Earthquake zone (1-5 scale)
-- Risk profiles by insurance type
-
-### Risk Factors (from AFAD data)
-```typescript
-RegionalRiskProfile {
-  earthquake: { zone, level, historicalEvents, avgMagnitude }
-  flood: { level, annualEvents }
-  fire: { level, wildfireRisk }
-  traffic: { level, accidentRate }
-  crime: { level, theftRate }
-}
-```
-
-### Premium Benchmarks
-- Regional averages by policy type
-- Comparison to national average
-- Risk-adjusted premium recommendations
+| Region Code | Name | Risk Factor | Notes |
+|-------------|------|-------------|-------|
+| `marmara` | Marmara | 1.15x | Highest risk (İstanbul), earthquake zone 1 |
+| `ege` | Aegean | 1.05x | Tourism, earthquake risk |
+| `akdeniz` | Mediterranean | 1.08x | Tourism, flood risk |
+| `ic_anadolu` | Central Anatolia | 0.95x | Lower risk, agricultural |
+| `karadeniz` | Black Sea | 0.90x | Flood/landslide risk |
+| `dogu_anadolu` | Eastern Anatolia | 0.85x | Lower premiums, rural |
+| `guneydogu` | Southeastern | 0.88x | Mixed risk profile |
 
 ---
 
@@ -487,145 +608,57 @@ RegionalRiskProfile {
 
 ### Turkish Insurance Lines
 
-| Type | Turkish Name | Key Coverages |
-|------|--------------|---------------|
-| `auto_kasko` | Kasko | Vehicle damage, theft, natural disasters |
-| `auto_traffic` | Trafik Sigortası | Mandatory liability (MTPL) |
-| `fire` | Yangın | Building, contents, business interruption |
-| `earthquake` | DASK | Mandatory earthquake for buildings |
-| `health` | Sağlık | Medical expenses, hospitalization |
-| `life` | Hayat | Death benefit, savings component |
-| `personal_accident` | Ferdi Kaza | Accident death/disability |
-| `engineering` | İnşaat/Montaj | CAR/EAR for construction |
-| `agricultural` | Tarım | Crop, livestock, equipment |
-| `credit_life` | Kredi Hayat | Loan protection |
-
-### Policy Type Components (`src/components/insurance-lines/`)
-- `TurkishKaskoDetails.tsx` - Auto comprehensive details
-- `TurkishTrafficDetails.tsx` - MTPL details
-- `TurkishFireDetails.tsx` - Fire/property details
-- `TurkishHealthDetails.tsx` - Health coverage details
-- `TurkishEngineeringDetails.tsx` - Construction coverage
+| Type | Turkish Name | Database Value |
+|------|--------------|----------------|
+| Auto Comprehensive | Kasko | `kasko` |
+| Traffic/MTPL | Trafik Sigortası | `traffic` |
+| Property/Fire | Yangın | `home` |
+| Earthquake | DASK | `dask` |
+| Health | Sağlık | `health` |
+| Life | Hayat | `life` |
+| Business | İşyeri | `business` |
 
 ---
 
-## Insurance Knowledge Database
+## Testing Strategy
 
-### Data Files (`src/data/`)
-
-| File | Purpose |
-|------|---------|
-| `market-data/benchmarks.ts` | Premium benchmarks, coverage limits by policy type |
-| `market-data/providers.ts` | 12 Turkish insurance companies with market share |
-| `insurance-lines.ts` | Official TSB/SEDDK insurance branch classifications |
-| `regulations.ts` | Laws, general conditions (genel şartlar), circulars |
-| `coverage-limits.ts` | Official SEDDK/DASK minimum coverage limits |
-| `sample-policies.ts` | 21 sample Turkish policies for testing |
-
-### Turkish Insurance Providers (2024 Market Share)
-
-| Provider | Turkish Name | Market Share |
-|----------|--------------|--------------|
-| Allianz | Allianz Sigorta | 12.8% |
-| AXA | AXA Sigorta | 10.5% |
-| Anadolu | Anadolu Sigorta | 9.2% |
-| Aksigorta | Aksigorta | 8.7% |
-| Mapfre | Mapfre Sigorta | 7.4% |
-| Sompo | Sompo Sigorta | 6.8% |
-| Zurich | Zurich Sigorta | 5.2% |
-| HDI | HDI Sigorta | 4.8% |
-| Türkiye | Türkiye Sigorta | 4.5% |
-| Groupama | Groupama Sigorta | 4.2% |
-
-### Regulatory Framework
-
-| Regulation Type | Turkish | Purpose |
-|-----------------|---------|---------|
-| Kanun | Law | Primary legislation (e.g., Insurance Law 5684) |
-| Yönetmelik | Regulation | Detailed implementation rules |
-| Genel Şartlar | General Conditions | Standard policy terms by type |
-| Kloz | Clause | Optional coverage extensions |
-| Tarife | Tariff | Official premium tables |
-| Genelge | Circular | Administrative guidance |
-| Tebliğ | Communique | Official announcements |
-
-### Official Coverage Limits (2025)
-
-**Traffic Insurance (ZMMS) - Per Vehicle:**
-- Material Damage: 300,000 TRY per vehicle
-- Material Damage: 600,000 TRY per accident
-- Bodily Injury: 1,500,000 TRY per person
-- Bodily Injury: 7,500,000 TRY per accident
-
-**DASK (Earthquake) Limits:**
-- Maximum coverage: 1,040,000 TRY (2025)
-- Minimum premium varies by earthquake zone (1-5)
-- Zone 1 (Istanbul): Highest risk, highest premium
-
-### Regional Premium Factors
-
-| Region | Factor | Reason |
-|--------|--------|--------|
-| Marmara | 1.15x | High risk (Istanbul), earthquake zone 1 |
-| Akdeniz | 1.08x | Tourism, flood risk |
-| Ege | 1.05x | Tourism, earthquake risk |
-| İç Anadolu | 0.95x | Lower risk, agricultural |
-| Karadeniz | 0.90x | Flood/landslide risk |
-| Güneydoğu | 0.88x | Mixed risk profile |
-| Doğu Anadolu | 0.85x | Rural, lower premiums |
-
----
-
-## Domain Knowledge
-
-### Turkish Insurance Terms
-
-| Turkish | English | Notes |
-|---------|---------|-------|
-| Kasko | Comprehensive auto | Covers own vehicle damage |
-| Trafik Sigortası | Traffic/liability | Mandatory third-party |
-| Yangın | Fire | Often bundled with property |
-| DASK | Earthquake | Mandatory for buildings |
-| Ferdi Kaza | Personal accident | Individual coverage |
-| Teminat | Coverage/guarantee | The protection provided |
-| Muafiyet | Deductible | Amount policyholder pays |
-| Prim | Premium | Cost of insurance |
-| Sigortalı | Insured | Who is covered |
-| Sigorta Ettiren | Policyholder | Who pays |
-| Riziko Adresi | Risk Address | Location covered |
-| Lehdar | Beneficiary | Who receives payout |
-| Hasar | Claim/Damage | When something goes wrong |
-| Poliçe Süresi | Policy Period | Coverage duration |
-| Rücu | Subrogation | Insurer's right to recover |
-| Eksik Sigorta | Underinsurance | Sum insured < actual value |
-| Aşkın Sigorta | Overinsurance | Sum insured > actual value |
-| Acente | Agent | Insurance intermediary |
-| Broker | Broker | Independent intermediary |
-| Aktüer | Actuary | Risk/pricing specialist |
-| Hasar/Prim Oranı | Loss Ratio | Claims / Premiums |
-
-### Key Regulators
-
-- **SEDDK** - Sigortacılık ve Özel Emeklilik Düzenleme ve Denetleme Kurumu (Insurance regulator)
-- **TSB** - Türkiye Sigorta Birliği (Insurance association, industry body)
-- **Hazine** - Hazine ve Maliye Bakanlığı (Treasury, oversees insurance sector)
-- **DASK** - Doğal Afet Sigortaları Kurumu (Earthquake insurance authority)
-- **TARSİM** - Tarım Sigortaları Havuzu (Agricultural insurance pool)
-- **Güvence Hesabı** - Guarantee Fund (covers uninsured drivers)
-
-### Policy Structure
-
+### Test Organization
 ```
-Poliçe (Policy)
-├── Sigortalı (Insured)
-├── Sigorta Ettiren (Policyholder)
-├── Riziko Adresi (Risk Address)
-├── Teminatlar (Coverages)
-│   ├── Teminat Türü (Type)
-│   ├── Sigorta Bedeli (Sum insured)
-│   └── Muafiyet (Deductible)
-├── Özel Şartlar (Special conditions)
-└── İstisnalar (Exclusions)
+Unit Tests (Vitest):        *.test.ts alongside source files
+Integration Tests:          src/__tests__/integration/
+Performance Tests:          src/__tests__/performance/
+E2E Tests (Playwright):     e2e/
+Server Tests:               server/__tests__/
+```
+
+### Test Counts (as of Jan 11, 2026)
+- **Total**: ~4500 tests across 130+ files
+- **Passing**: 100%
+- **Coverage Target**: 80%+
+
+### Key Test Files
+| File | Tests | Purpose |
+|------|-------|---------|
+| `src/lib/policy-utils.test.ts` | 45 | Duplicate detection, fuzzy matching |
+| `src/components/PolicyChat.test.tsx` | 29 | Chat component |
+| `src/components/PolicyDetailView.test.tsx` | 44 | Policy detail view |
+| `src/__tests__/performance/performance.test.ts` | 30 | Performance metrics |
+| `server/__tests__/chat-routes.test.ts` | 18 | Chat API |
+
+### Running Tests
+```bash
+# All tests
+npm test
+
+# Specific file
+npm test -- --run src/lib/policy-utils.test.ts
+
+# With coverage
+npm run test:coverage
+
+# E2E tests
+npm run test:e2e
+npm run test:e2e:fast  # Chromium only
 ```
 
 ---
@@ -634,7 +667,7 @@ Poliçe (Policy)
 
 ### File Naming
 - `components/PolicyCard.tsx` - PascalCase for components
-- `lib/parse-policy.ts` - kebab-case for utilities
+- `lib/policy-utils.ts` - kebab-case for utilities
 - `hooks/usePolicyUpload.ts` - camelCase with 'use' prefix
 - `types/policy.ts` - lowercase for type files
 
@@ -669,9 +702,9 @@ interface Policy { id: string; type: PolicyType }
 // Use type for unions
 type PolicyType = 'home' | 'auto' | 'life' | 'health' | 'business'
 
-// Avoid enums - use const objects
-const POLICY_STATUS = { ACTIVE: 'active', EXPIRED: 'expired' } as const
-type PolicyStatus = typeof POLICY_STATUS[keyof typeof POLICY_STATUS]
+// Avoid enums - use const objects with CHECK constraints in DB
+const VALID_POLICY_TYPES = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business'] as const
+type PolicyType = typeof VALID_POLICY_TYPES[number]
 ```
 
 ### Tailwind Conventions
@@ -687,164 +720,11 @@ type PolicyStatus = typeof POLICY_STATUS[keyof typeof POLICY_STATUS]
 
 ---
 
-## Testing Strategy
-
-### Unit Tests (Vitest)
-- Location: `*.test.ts` alongside source files
-- Focus: Pure functions, hooks, utilities
-- Coverage target: 80%+
-
-### Integration Tests
-- Location: `src/__tests__/integration/`
-- Focus: Environment validation, API connectivity, CDN availability
-
-### E2E Tests (Playwright)
-- Location: `e2e/`
-- Focus: User flows (upload, auth, navigation)
-
-### Key Test Files
-- `src/components/GlobalNavigation.test.tsx` - Nav and auth UI
-- `src/components/PolicyChat.test.tsx` - Chat component (29 tests)
-- `src/lib/ai/policy-extractor.test.ts` - AI extraction
-- `src/__tests__/integration/dependencies.test.ts` - CDN checks
-- `src/__tests__/integration/environment-validation.test.ts` - Config checks
-- `src/__tests__/performance/performance.test.ts` - Performance tests (30 tests)
-- `server/__tests__/chat-routes.test.ts` - Chat API tests (18 tests)
-
-### Test Counts (as of Jan 7, 2026)
-- **Total**: 4593 tests across 136 files
-- **Passing**: 4593 (100%)
-- **Expected Skips**: Environment/integration tests skip gracefully when env vars not configured
-
-### Test Fix Patterns
-When tests fail, check these common patterns:
-- **Missing mocks**: Components using `useAuth()` need mock in test file
-- **Async loading**: Use `waitFor` for components with loading states
-- **Stale dist files**: Delete `dist-server/*.test.js` if compiled test files cause issues
-- **Proxy not configured**: AI config tests handle this gracefully with early return
-
----
-
-## PolicyChat System
-
-### Backend Endpoint (`POST /api/ai/chat`)
-
-Multi-turn conversation endpoint for policy-related questions:
-
-```typescript
-// Request
-{
-  message: string,              // User's question (max 4KB)
-  conversationHistory?: Array<{ role: 'user' | 'assistant', content: string }>,
-  policyContext?: string,       // Policy details for context (max 50KB)
-  provider?: 'openai' | 'anthropic'  // Default: openai
-}
-
-// Response
-{
-  success: boolean,
-  response: string,             // AI response
-  provider: 'openai' | 'anthropic',
-  usage: { input_tokens, output_tokens }
-}
-```
-
-### Rate Limits
-- Chat: 60 requests/hour per IP
-- Extraction: 20 requests/hour
-- OCR: 30 requests/hour
-
-### Frontend Integration (`src/components/PolicyChat.tsx`)
-- Builds policy context from uploaded policies
-- Maintains conversation history for multi-turn context
-- Calls `/api/ai/chat` endpoint
-- Supports retry on failure
-
-### System Prompt
-Expert Turkish insurance assistant with knowledge of:
-- Kasko, DASK, Trafik Sigortası terminology
-- Coverage limits, deductibles, exclusions
-- TRY currency formatting
-
----
-
-## Performance Optimizations
-
-### Bundle Analysis
-```bash
-npm run build:analyze  # Opens stats.html with bundle visualization
-```
-Uses `rollup-plugin-visualizer` with treemap view.
-
-### Lazy Loading
-All route components lazy-loaded in `App.tsx`:
-```typescript
-const Dashboard = lazy(() => import('./pages/Dashboard'))
-const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
-// etc.
-```
-
-### PWA & Service Worker
-- Service worker: `public/sw.js`
-- PWA utilities: `src/lib/pwa/index.ts`
-- Initialized in production via `main.tsx`
-- Caching strategies: cache-first (static), network-first (API), stale-while-revalidate (images)
-
-### Resource Hints (`index.html`)
-```html
-<link rel="dns-prefetch" href="https://supabase.co">
-<link rel="dns-prefetch" href="https://unpkg.com">
-<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
-```
-
-### Lighthouse Targets (`lighthouserc.js`)
-- FCP: < 2000ms
-- LCP: < 2500ms
-- CLS: < 0.1
-- Performance score: > 0.8
-
----
-
-## Server Hardening
-
-### Graceful Shutdown (`server/index.ts`)
-- Catches SIGTERM/SIGINT signals
-- Stops accepting new connections
-- Waits for in-flight requests (30s timeout)
-- Closes database connections cleanly
-
-### Request Timeouts
-- Body parsing: 10MB limit
-- Request timeout: 30 seconds
-- Rate limiting on all AI endpoints
-
-### Security Headers (Helmet)
-- CSP configured for PDF.js CDN
-- XSS protection
-- Frame options
-- Content sniffing protection
-
----
-
-## API Endpoints
-
-| Endpoint | Method | Purpose | Rate Limit |
-|----------|--------|---------|------------|
-| `/api/ai/extract/openai` | POST | Extract policy with GPT-4o | 20/hr |
-| `/api/ai/extract/anthropic` | POST | Extract policy with Claude | 20/hr |
-| `/api/ai/chat` | POST | Multi-turn policy chat | 60/hr |
-| `/api/ai/ocr` | POST | Google Vision OCR | 30/hr |
-| `/api/ai/providers` | GET | Check configured providers | - |
-| `/api/ai/diagnose` | GET | Test API key validity | - |
-| `/api/health` | GET | Server health check | 60/min |
-
----
-
 ## Known Issues & Solutions
 
 ### 1. Port 3001 Conflicts
 - **Problem**: Port 3001 often in use
-- **Solution**: Changed all ports to 4001
+- **Solution**: All ports changed to 4001
 - **Files**: `server/index.ts`, `.env`, `vite.config.ts`
 
 ### 2. PDF.js Worker 404
@@ -852,66 +732,34 @@ const PolicyUpload = lazy(() => import('./pages/PolicyUpload'))
 - **Solution**: Use unpkg.com as primary CDN
 - **File**: `src/lib/ai/pdf-parser.ts`
 
-### 3. Silent Demo Fallback
-- **Problem**: App showed fake demo data instead of real errors
-- **Solution**: Set `useFallback: false` in PolicyUpload, fixed `isAIConfigured()`
-- **Files**: `src/components/PolicyUpload.tsx`, `src/lib/ai/config.ts`
+### 3. Schema ENUM vs TEXT
+- **Problem**: PostgreSQL ENUM types are inflexible for Turkish policy types
+- **Solution**: Use TEXT with CHECK constraints instead
+- **File**: `supabase/schema.sql` - uses TEXT CHECK (type IN ('kasko', 'traffic', ...))
 
-### 4. UUID Format for Supabase
-- **Problem**: Custom IDs like `policy-123-abc` rejected by Supabase
+### 4. Multiple Elements in Tests
+- **Problem**: `getByText()` fails when multiple elements match
+- **Solution**: Use `getAllByText()` or more specific queries
+- **Example**: `PolicyDetailView.test.tsx` - "Deductible" appears multiple times
+
+### 5. UUID Format for Supabase
+- **Problem**: Custom IDs like `policy-123-abc` rejected
 - **Solution**: Use `crypto.randomUUID()`
 - **File**: `src/lib/ai/policy-extractor.ts`
-
-### 5. Guest User Display
-- **Problem**: Showed "User" when not logged in
-- **Solution**: Show "Guest" + "Not signed in", hide "My Account" for guests
-- **File**: `src/components/GlobalNavigation.tsx`
 
 ### 6. Turkish Character Encoding
 - **Problem**: İ, Ş, Ğ, Ü, Ö, Ç display issues
 - **Solution**: Always use UTF-8, test with Turkish chars
+- **Fuzzy matching**: `normalizeForOCR()` handles Turkish characters
 
 ### 7. Cached Supabase Sessions
 - **Problem**: Old auth state persists
 - **Solution**: `localStorage.clear(); location.reload();`
 
-### 8. MyAccount Tests Failing
-- **Problem**: `useAuth must be used within an AuthProvider`
-- **Solution**: Mock `useAuth` in test file:
-```typescript
-vi.mock('@/lib/supabase/auth-context', () => ({
-  useAuth: () => ({ user: { id: 'test', email: 'test@example.com' }, isLoading: false })
-}))
-```
-- **File**: `src/components/MyAccount.test.tsx`
-
-### 9. Sentry Tests Using Wrong Functions
-- **Problem**: Tests calling `sentryErrorHandler()` which doesn't exist
-- **Solution**: Use `setupSentryErrorHandler(app)` - takes Express app, not middleware
-- **File**: `server/lib/sentry.test.ts`
-
-### 10. Stale Compiled Test Files
-- **Problem**: `dist-server/*.test.js` contains old test code causing failures
-- **Solution**: `rm dist-server/lib/*.test.*`
-- **Prevention**: Add `*.test.*` to `.gitignore` for dist directories
-
-### 11. Anthropic SDK Browser Error
-- **Problem**: SDK throws in browser-like test environments
-- **Solution**: Wrap in try-catch, expect `browser-like environment` error message
-- **File**: `src/lib/ai/config.test.ts`
-
----
-
-## Gotchas & Critical Notes
-
-1. **API Keys**: Never prefix with `VITE_` - they must stay server-side
-2. **dotenv**: Server uses `.env` file (not `.env.local`)
-3. **Ports**: Frontend=5173, Backend=4001 (not 3000/3001)
-4. **PDF Worker**: Loaded from CDN, check CSP in `index.html`
-5. **Supabase RLS**: Row Level Security enabled - policies are user-scoped
-6. **Turkish Dates**: DD.MM.YYYY format, parse carefully
-7. **Currency**: Use `tr-TR` locale, TRY symbol varies (₺ or TL)
-8. **Tests Mock Everything**: Integration tests added to catch real config issues
+### 8. OCR Character Confusion
+- **Problem**: OCR confuses 0/O, 1/l/I, etc.
+- **Solution**: Fuzzy matching with Levenshtein distance (0.85 threshold)
+- **File**: `src/lib/policy-utils.ts`
 
 ---
 
@@ -920,81 +768,149 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 ### Mandatory Insurance Types
 - **Trafik Sigortası** (MTPL): Required for all vehicles
 - **DASK**: Required for all buildings (earthquake)
-- **Professional Liability**: Required for certain professions (doctors, lawyers, etc.)
+- **Professional Liability**: Required for certain professions
 
-### Premium Calculation Factors
-- Vehicle: Age, brand, engine size, driver age/experience
-- Property: Location (earthquake zone), construction type, usage
-- Health: Age, pre-existing conditions, coverage scope
+### Key Regulators
+- **SEDDK** - Insurance regulator
+- **TSB** - Insurance association
+- **DASK** - Earthquake insurance authority
+- **TARSİM** - Agricultural insurance pool
 
-### Common Policy Exclusions (Watch for these)
-- War and terrorism (unless covered by pool)
-- Nuclear events
-- Intentional acts
-- Wear and tear (depreciation)
-- Pre-existing conditions (health)
-
-### Important Dates
-- Policy renewals: Usually 1 year
-- DASK: Must be renewed before property transactions
-- Traffic insurance: Must show valid policy for vehicle registration
+### Turkish Insurance Terms
+| Turkish | English |
+|---------|---------|
+| Kasko | Comprehensive auto |
+| Trafik Sigortası | Traffic/liability |
+| Teminat | Coverage |
+| Muafiyet | Deductible |
+| Prim | Premium |
+| Sigortalı | Insured |
+| Poliçe | Policy |
 
 ### Currency Handling
 ```typescript
-// Format TRY amounts correctly
 new Intl.NumberFormat('tr-TR', {
   style: 'currency',
   currency: 'TRY',
   minimumFractionDigits: 2
-}).format(amount)
-
-// Common patterns
-// Input: 15000.50
-// Output: ₺15.000,50 or 15.000,50 TL
+}).format(15000.50)  // ₺15.000,50
 ```
-
-### Regional Considerations
-- Istanbul (Marmara): Highest traffic accident rates, Zone 1 earthquake
-- Coastal areas: Flood risk, tourism-related claims
-- Eastern regions: Lower premiums, fewer providers
 
 ---
 
-## Supabase Setup
+## Security Considerations
 
-### Tables
-- `policies` - User policies with extracted data
-- `policy_documents` - Uploaded PDF storage references
+### API Key Protection
+- All AI API keys stored server-side only
+- Never use `VITE_` prefix for sensitive keys
+- Vite proxy handles routing in development
 
-### Security (RLS)
-```sql
--- Users can only access their own policies
-CREATE POLICY "Users can view own policies"
-ON policies FOR SELECT
-USING (auth.uid() = user_id);
-```
+### Rate Limiting
+- Chat: 60 requests/hour per IP
+- Extraction: 20 requests/hour per IP
+- OCR: 30 requests/hour per IP
+- Health: 60 requests/minute per IP
 
-### Auth Providers
-- Email/password (enabled)
-- Google OAuth (configured)
-- GitHub OAuth (configured)
+### Security Headers (Helmet)
+- CSP configured for PDF.js CDN and Supabase
+- XSS protection enabled
+- Frame options set
+- Content sniffing protection
+
+### Row Level Security
+- All Supabase tables have RLS enabled
+- Users can only access their own data
+- `handle_new_user` trigger creates user profile on signup
+
+---
+
+## Performance Optimizations
+
+### Bundle Optimization
+- Lazy-loaded routes in `App.tsx`
+- Bundle analysis: `npm run build:analyze`
+- Tree shaking via Vite/Rollup
+
+### PWA & Caching
+- Service worker: `public/sw.js`
+- Cache strategies: cache-first (static), network-first (API)
+- PWA manifest for installability
+
+### Lighthouse Targets
+- FCP: < 2000ms
+- LCP: < 2500ms
+- CLS: < 0.1
+- Performance score: > 0.8
 
 ---
 
 ## Deployment
 
+### Local Development
 ```bash
-# Local
-npm install && cp .env.example .env && npm run dev:all
+npm install
+cp .env.example .env
+# Configure .env with your keys
+npm run dev:all
+```
 
-# Codespaces: Create .env, run npm run dev:all, open port 5173
-# Production: Frontend → Vercel/Netlify, Backend → Railway/Render
-# See docs/DEPLOYMENT_GUIDE.md
+### GitHub Codespaces
+1. Create `.env` file with keys
+2. Run `npm run dev:all`
+3. Open port 5173 in browser
+
+### Production
+- **Frontend**: Vercel or Netlify
+- **Backend**: Railway, Render, or Fly.io
+- **Database**: Supabase (managed)
+- See `docs/DEPLOYMENT_GUIDE.md` for details
+
+---
+
+## CI/CD
+
+### GitHub Actions
+- `staging.yml` - Runs on staging/develop branches and PRs to main
+- Validates: typecheck, lint, tests
+- Uploads coverage to Codecov
+
+### Pre-commit Checks
+```bash
+npm run validate  # typecheck + lint + test
 ```
 
 ---
 
 ## Resources
 
-SEDDK: seddk.gov.tr | TSB: tsb.org.tr | Insurance Law 5684 | Supabase/OpenAI docs
-Personal project by Erdem. See this file and codebase for context.
+- **SEDDK**: seddk.gov.tr (Insurance regulator)
+- **TSB**: tsb.org.tr (Insurance association)
+- **Insurance Law**: 5684
+- **Supabase Docs**: supabase.com/docs
+- **OpenAI API**: platform.openai.com/docs
+
+---
+
+## Quick Reference
+
+```bash
+# Start development
+npm run dev:all
+
+# Run all tests
+npm test
+
+# Full validation before commit
+npm run validate
+
+# Build for production
+npm run build
+
+# Analyze bundle
+npm run build:analyze
+```
+
+**Ports**: Frontend=5173, Backend=4001
+**Branch**: Develop on feature branches, merge to main via PR
+**Tests**: 4500+ tests, all passing
+**Last Updated**: January 11, 2026
