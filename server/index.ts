@@ -36,7 +36,8 @@ import {
 initServerSentry()
 
 const app = express()
-const PORT = process.env.API_PORT || 4001
+// Railway sets PORT automatically, fallback to API_PORT or 4001
+const PORT = process.env.PORT || process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 // Server configuration
