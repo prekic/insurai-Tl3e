@@ -59,6 +59,31 @@ export function normalizeString(value: string | undefined | null): string {
 }
 
 /**
+ * Normalize string for comparison with whitespace and punctuation tolerance
+ * - Collapses multiple whitespace to single space
+ * - Normalizes common punctuation variations (colon spacing, slash spacing)
+ * - Removes extra spaces around punctuation
+ */
+export function normalizeStringTolerant(value: string | undefined | null): string {
+  if (!value) return ''
+  return value
+    .trim()
+    .toLowerCase()
+    // Collapse multiple spaces to single space
+    .replace(/\s+/g, ' ')
+    // Normalize colon spacing (": " or " :" or " : " all become ": ")
+    .replace(/\s*:\s*/g, ':')
+    // Normalize slash spacing ("/ " or " /" or " / " all become "/")
+    .replace(/\s*\/\s*/g, '/')
+    // Normalize comma spacing
+    .replace(/\s*,\s*/g, ',')
+    // Normalize period spacing in addresses
+    .replace(/\s*\.\s*/g, '.')
+    // Final trim
+    .trim()
+}
+
+/**
  * Normalize policy number (case-insensitive, remove whitespace)
  */
 export function normalizePolicyNumber(value: string | undefined | null): string {
@@ -217,6 +242,57 @@ function compareTolerant(
   return normalizeString(a as string) === normalizeString(b as string)
 }
 
+/**
+ * Normalize an array item for comparison
+ * Handles objects with name/description fields or strings
+ */
+function normalizeArrayItem(item: unknown): string {
+  if (!item) return ''
+  if (typeof item === 'string') {
+    return normalizeStringTolerant(item)
+  }
+  if (typeof item === 'object' && item !== null) {
+    const obj = item as Record<string, unknown>
+    // Handle coverage/exclusion objects with name and description
+    const name = normalizeStringTolerant(String(obj.name || obj.title || ''))
+    const desc = normalizeStringTolerant(String(obj.description || obj.value || ''))
+    return `${name}|${desc}`
+  }
+  return String(item).toLowerCase()
+}
+
+/**
+ * Compare two arrays with tolerance for:
+ * - Different ordering
+ * - Minor text differences (whitespace, punctuation)
+ * Returns true if arrays are effectively the same
+ */
+export function arraysEqualTolerant(
+  a: unknown[] | undefined | null,
+  b: unknown[] | undefined | null
+): boolean {
+  // Both empty/null
+  if (!a?.length && !b?.length) return true
+  // One empty, one not
+  if (!a?.length || !b?.length) return false
+  // Different lengths = different
+  if (a.length !== b.length) return false
+
+  // Normalize and sort for comparison
+  const normalizedA = a.map(normalizeArrayItem).sort()
+  const normalizedB = b.map(normalizeArrayItem).sort()
+
+  // Compare normalized arrays
+  for (let i = 0; i < normalizedA.length; i++) {
+    // Use fuzzy matching for each item (allows for OCR errors)
+    if (!fuzzyMatchOCR(normalizedA[i], normalizedB[i], 0.90)) {
+      return false
+    }
+  }
+
+  return true
+}
+
 // ============================================================================
 // POLICY IDENTIFIER MATCHING
 // ============================================================================
@@ -346,8 +422,15 @@ const DIFF_FIELD_CONFIG: Array<{
 ]
 
 /**
+ * Fields that should use fuzzy/tolerant matching (typically addresses, names)
+ * These fields often have OCR errors or formatting differences
+ */
+const FUZZY_MATCH_FIELDS = ['location', 'insuredPerson', 'beneficiary', 'agentName']
+
+/**
  * Calculate field differences between two policies
  * Returns all fields that have changed
+ * Uses tolerant comparison for strings and fuzzy matching for addresses/names
  */
 export function calculatePolicyDiff(
   oldPolicy: Policy,
@@ -359,22 +442,36 @@ export function calculatePolicyDiff(
     const oldVal = oldPolicy[config.field]
     const newVal = newPolicy[config.field]
 
-    // Skip if both are null/undefined/empty
-    const oldNormalized = config.type === 'number'
-      ? normalizeNumber(oldVal as number)
-      : config.type === 'date'
-      ? normalizeDate(oldVal as string)
-      : normalizeString(oldVal as string)
+    let areSame: boolean
 
-    const newNormalized = config.type === 'number'
-      ? normalizeNumber(newVal as number)
-      : config.type === 'date'
-      ? normalizeDate(newVal as string)
-      : normalizeString(newVal as string)
+    if (config.type === 'number') {
+      const oldNorm = normalizeNumber(oldVal as number)
+      const newNorm = normalizeNumber(newVal as number)
+      areSame = oldNorm === newNorm || (oldNorm === null && newNorm === null)
+    } else if (config.type === 'date') {
+      const oldNorm = normalizeDate(oldVal as string)
+      const newNorm = normalizeDate(newVal as string)
+      areSame = oldNorm === newNorm || (oldNorm === null && newNorm === null)
+    } else {
+      // String comparison - use fuzzy matching for address/name fields
+      const oldStr = String(oldVal || '')
+      const newStr = String(newVal || '')
 
-    if (oldNormalized === newNormalized) continue
-    if (oldNormalized === null && newNormalized === null) continue
-    if (oldNormalized === '' && newNormalized === '') continue
+      if (!oldStr && !newStr) {
+        areSame = true
+      } else if (FUZZY_MATCH_FIELDS.includes(config.field)) {
+        // Use fuzzy OCR-tolerant matching for addresses and names
+        // First check with tolerant string normalization
+        const oldNorm = normalizeStringTolerant(oldStr)
+        const newNorm = normalizeStringTolerant(newStr)
+        areSame = oldNorm === newNorm || fuzzyMatchOCR(oldStr, newStr, 0.90)
+      } else {
+        // Use tolerant string normalization for other string fields
+        areSame = normalizeStringTolerant(oldStr) === normalizeStringTolerant(newStr)
+      }
+    }
+
+    if (areSame) continue
 
     diffs.push({
       field: config.field,
@@ -387,8 +484,8 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check coverages array (special handling)
-  if (JSON.stringify(oldPolicy.coverages) !== JSON.stringify(newPolicy.coverages)) {
+  // Check coverages array (with tolerant comparison)
+  if (!arraysEqualTolerant(oldPolicy.coverages, newPolicy.coverages)) {
     diffs.push({
       field: 'coverages',
       fieldLabel: 'Coverage Details',
@@ -400,8 +497,8 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check exclusions array
-  if (JSON.stringify(oldPolicy.exclusions) !== JSON.stringify(newPolicy.exclusions)) {
+  // Check exclusions array (with tolerant comparison)
+  if (!arraysEqualTolerant(oldPolicy.exclusions, newPolicy.exclusions)) {
     diffs.push({
       field: 'exclusions',
       fieldLabel: 'Exclusions',
@@ -413,8 +510,8 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check special conditions array
-  if (JSON.stringify(oldPolicy.specialConditions) !== JSON.stringify(newPolicy.specialConditions)) {
+  // Check special conditions array (with tolerant comparison)
+  if (!arraysEqualTolerant(oldPolicy.specialConditions, newPolicy.specialConditions)) {
     diffs.push({
       field: 'specialConditions',
       fieldLabel: 'Special Conditions',
