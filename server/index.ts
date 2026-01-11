@@ -20,17 +20,17 @@ const __dirname = path.dirname(__filename)
 // Load environment variables first (before Sentry init)
 dotenv.config()
 
-import aiRoutes from './routes/ai'
+import aiRoutes from './routes/ai.js'
 import {
   generalLimiter,
   healthLimiter,
   rateLimitConfig,
-} from './middleware/rate-limit'
+} from './middleware/rate-limit.js'
 import {
   initServerSentry,
   setupSentryErrorHandler,
   captureServerError,
-} from './lib/sentry'
+} from './lib/sentry.js'
 
 // Initialize Sentry for error tracking
 initServerSentry()
