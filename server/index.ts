@@ -9,7 +9,13 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
+import path from 'path'
+import { fileURLToPath } from 'url'
 import type { Server } from 'http'
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 // Load environment variables first (before Sentry init)
 dotenv.config()
@@ -30,7 +36,8 @@ import {
 initServerSentry()
 
 const app = express()
-const PORT = process.env.API_PORT || 4001
+// Railway sets PORT automatically, fallback to API_PORT or 4001
+const PORT = process.env.PORT || process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 // Server configuration
@@ -230,7 +237,22 @@ app.get('/api/health', healthLimiter, (_req, res) => {
 // AI proxy routes (with longer timeout for AI processing)
 app.use('/api/ai', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), aiRoutes)
 
-// 404 handler
+// Serve static files in production
+if (IS_PRODUCTION) {
+  const distPath = path.join(__dirname, '..', 'dist')
+  app.use(express.static(distPath))
+
+  // Handle client-side routing - serve index.html for all non-API routes
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api')) {
+      return next()
+    }
+    res.sendFile(path.join(distPath, 'index.html'))
+  })
+}
+
+// 404 handler (for API routes)
 app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' })
 })
