@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { aiExtractionLimiter, ocrLimiter, chatLimiter } from '../middleware/rate-limit'
+import { aiExtractionLimiter, ocrLimiter, chatLimiter } from '../middleware/rate-limit.js'
 import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
@@ -20,7 +20,7 @@ import {
   type OCRInput,
   type ChatInput,
   type ChatMessage,
-} from '../middleware/validation'
+} from '../middleware/validation.js'
 
 const router = Router()
 
