@@ -4,9 +4,8 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enum types
-CREATE TYPE policy_type AS ENUM ('auto', 'home', 'health', 'life', 'business', 'travel');
-CREATE TYPE policy_status AS ENUM ('active', 'expiring', 'expired');
+-- Note: We use TEXT with CHECK constraints instead of ENUM for flexibility
+-- This matches the migrations and allows Turkish insurance types
 
 -- Users table (extends Supabase auth.users)
 CREATE TABLE public.users (
@@ -25,14 +24,14 @@ CREATE TABLE public.policies (
   user_id UUID REFERENCES public.users(id) ON DELETE CASCADE NOT NULL,
   policy_number TEXT NOT NULL,
   provider TEXT NOT NULL,
-  type policy_type NOT NULL,
+  type TEXT NOT NULL CHECK (type IN ('kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business')),
   type_tr TEXT NOT NULL,
   coverage NUMERIC NOT NULL,
   premium NUMERIC NOT NULL,
   deductible NUMERIC DEFAULT 0,
   start_date DATE NOT NULL,
   expiry_date DATE NOT NULL,
-  status policy_status DEFAULT 'active',
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'expiring', 'expired', 'pending')),
   insured_person TEXT NOT NULL,
   location TEXT,
   document_type TEXT DEFAULT 'policy',

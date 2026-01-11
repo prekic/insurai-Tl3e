@@ -207,8 +207,9 @@ describe('PolicyDetailView', () => {
     it('should display deductible', () => {
       renderPolicyDetailView()
 
-      expect(screen.getByText('Deductible')).toBeInTheDocument()
-      expect(screen.getByText('₺1,000')).toBeInTheDocument()
+      // Use getAllByText since "Deductible" appears in multiple places (overview + coverage details)
+      expect(screen.getAllByText('Deductible').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('₺1,000').length).toBeGreaterThan(0)
     })
 
     it('should show N/A when insured person is not provided', () => {
