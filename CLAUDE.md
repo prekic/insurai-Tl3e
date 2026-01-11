@@ -391,6 +391,53 @@ const OCR_SUBSTITUTIONS = {
 | `LanguageToggle.tsx` | TR/EN language switcher |
 | `UploadWidget.tsx` | Drag-drop upload in hero |
 
+### Hero Component Structure (`src/components/landing/Hero.tsx`)
+
+```tsx
+<Hero>
+  {/* Decorative gradient blobs */}
+  <div className="bg-gradient-to-br from-blue-100/40 to-purple-100/40" />
+
+  {/* Navigation */}
+  <nav>
+    {/* Top utility bar: Secure badge, phone, help link */}
+    {/* Main nav: Logo, Dashboard, Compare, Upload, Profile */}
+  </nav>
+
+  {/* Hero content (2-column on desktop) */}
+  <div className="grid lg:grid-cols-2">
+    {/* Left: Headlines, value props, CTA buttons */}
+    <StaggeredList>
+      <h1>Türkiye'nin #1 Sigorta Analiz Platformu</h1>
+      <UploadWidget />  {/* Drag-drop zone */}
+    </StaggeredList>
+
+    {/* Right: ComparisonMock visual */}
+    <ComparisonMock />
+  </div>
+</Hero>
+```
+
+### Animation Components (`src/components/animations/`)
+
+```tsx
+// Staggered fade-in for lists
+<StaggeredList delay={0.1}>
+  {items.map(item => <div>{item}</div>)}
+</StaggeredList>
+
+// Scale on hover effect
+<ScaleOnHover>
+  <Button>Hover me</Button>
+</ScaleOnHover>
+
+// Animated number counter
+<NumberCounter target={4500} duration={2000} />
+
+// Animated button with loading state
+<AnimatedButton loading={isLoading}>Submit</AnimatedButton>
+```
+
 ### Design Tokens
 
 ```css
@@ -403,17 +450,32 @@ const OCR_SUBSTITUTIONS = {
 
 /* Gradients */
 Hero bg: from-slate-50 to-white
-Decorative blobs: blue-100/40 to purple-100/40
+Decorative blobs: blue-100/40 to-purple-100/40
 
 /* Typography */
 Headings: font-bold text-gray-900
 Body: text-gray-600
+
+/* Shadows */
+Card shadow: shadow-sm hover:shadow-md
+Button shadow: shadow-md
+```
+
+### Responsive Breakpoints
+
+```css
+sm: 640px   /* Mobile landscape */
+md: 768px   /* Tablet */
+lg: 1024px  /* Desktop */
+xl: 1280px  /* Large desktop */
+2xl: 1536px /* Extra large */
 ```
 
 ### Figma Design Reference
 - Source file: `MERGED_CODEBASE_FIGMA_DESIGN_DRAFTS.md`
 - Contains 138 component designs from original Figma export
 - Key components: AdminPanel, InsuranceComparison, CoverageDetails
+- Design system: Tailwind-based with custom UI components in `src/components/ui/`
 
 ---
 
@@ -524,6 +586,115 @@ CREATE POLICY "Users can view their own policies"
 
 ---
 
+## Insurance Knowledge Database
+
+### Location: `src/data/`
+
+The app includes a comprehensive Turkish insurance knowledge base:
+
+| File | Contents | Lines |
+|------|----------|-------|
+| `regulations.ts` | Laws, general conditions (genel şartlar), clauses (klozlar) | 700+ |
+| `insurance-lines.ts` | Official TSB/SEDDK branch classifications | 650+ |
+| `coverage-limits.ts` | Official 2025-2026 coverage limits | 650+ |
+| `sample-policies.ts` | Sample policies for testing | 150+ |
+
+### Regulation Types (`src/data/regulations.ts`)
+```typescript
+type RegulationType =
+  | 'law'              // Kanun
+  | 'regulation'       // Yönetmelik
+  | 'general_condition' // Genel Şartlar
+  | 'clause'           // Kloz
+  | 'tariff'           // Tarife
+  | 'circular'         // Genelge
+  | 'communique'       // Tebliğ
+  | 'guideline'        // Rehber
+```
+
+### Insurance Branch Codes (`src/data/insurance-lines.ts`)
+```typescript
+// Hayat Dışı (Non-Life) Branch Codes
+type InsuranceBranchCode =
+  | 'kara_araclari'           // Kasko (Motor Own Damage)
+  | 'kara_araclari_sorumluluk' // Traffic (Motor Liability)
+  | 'yangin_dogal_afet'       // Fire & Natural Disasters
+  | 'genel_zararlar'          // General Damages
+  | 'kaza'                    // Accident
+  | 'saglik'                  // Health
+  | 'deniz_araclari'          // Marine Hull
+  | 'hava_araclari'           // Aviation
+  | 'nakliyat'                // Cargo/Transportation
+  | 'genel_sorumluluk'        // General Liability
+  | 'kredi'                   // Credit
+  | 'hukuksal_koruma'         // Legal Protection
+  | 'destek'                  // Assistance
+  // ... and more
+```
+
+### Official Coverage Limits 2025 (`src/data/coverage-limits.ts`)
+
+**Traffic Insurance (ZMSS) Limits:**
+| Coverage Type | Per Person | Per Accident | Per Vehicle |
+|--------------|------------|--------------|-------------|
+| Bodily Injury | ₺2,700,000 | ₺13,500,000 | - |
+| Material Damage | - | ₺600,000 | ₺300,000 |
+
+**Source**: SEDDK official tariffs (updated annually)
+
+---
+
+## Market Benchmark Data
+
+### Location: `src/data/market-data/`
+
+| File | Purpose |
+|------|---------|
+| `benchmarks.ts` | Coverage benchmarks by policy type |
+| `providers.ts` | Turkish insurer data (market share, ratings) |
+
+### Major Turkish Insurance Providers
+```typescript
+// From src/data/market-data/providers.ts
+const TOP_PROVIDERS = {
+  allianz:   { marketShare: 12.8%, rating: 4.2, est: 1923 },
+  axa:       { marketShare: 10.5%, rating: 4.0, est: 1893 },
+  anadolu:   { marketShare: 9.2%,  rating: 4.3, est: 1925 },
+  aksigorta: { marketShare: 8.7%,  rating: 4.1, est: 1960 },
+  mapfre:    { marketShare: 7.4%,  rating: 3.9, est: 1992 },
+  sompo:     { marketShare: 6.8%,  rating: 4.0, est: 1993 },
+  zurich:    { marketShare: 5.2%,  rating: 4.1, est: 1986 },
+  hdi:       { marketShare: 4.8%,  rating: 3.8, est: 2002 },
+}
+```
+
+### Coverage Benchmarks (`src/data/market-data/benchmarks.ts`)
+
+Each policy type has benchmark data for gap analysis:
+```typescript
+interface CoverageBenchmark {
+  name: string           // e.g., "Collision Damage"
+  nameTr: string         // e.g., "Çarpma/Çarpışma"
+  typicalLimit: number   // e.g., 500000
+  minLimit: number       // e.g., 100000
+  maxLimit: number       // e.g., 2000000
+  typicalDeductible: number
+  inclusionRate: number  // % of policies that include this (e.g., 95)
+}
+```
+
+**Kasko Coverage Benchmarks:**
+| Coverage | Typical Limit | Inclusion Rate |
+|----------|---------------|----------------|
+| Collision | ₺500,000 | 100% |
+| Theft | ₺500,000 | 100% |
+| Natural Disasters | ₺500,000 | 95% |
+| Fire | ₺500,000 | 100% |
+| Glass Coverage | ₺25,000 | 85% |
+| Personal Accident | ₺100,000 | 70% |
+
+---
+
 ## Gap Detection System
 
 ### Architecture (`src/lib/gap-detection/`)
@@ -537,6 +708,41 @@ analyzeGapsComprehensive(policy, options)
 ├── analyzeTemporalGaps()    # Coverage period issues
 └── analyzeComplianceGaps()  # Regulatory compliance
 ```
+
+### Gap Analyzer Logic (`src/lib/market-data/gap-analyzer.ts`)
+
+The gap analyzer compares policies against market benchmarks:
+
+```typescript
+function analyzeGaps(policy: AnalyzedPolicy, region: TurkishRegion): GapAnalysis {
+  // 1. Find missing coverages (present in >50% of market policies)
+  const missingCoverages = findMissingCoverages(policy.coverages, benchmark.commonCoverages)
+
+  // 2. Find underinsured coverages (below market minimum)
+  const underinsuredCoverages = findUnderinsuredCoverages(...)
+
+  // 3. Find high deductibles (above market typical)
+  const highDeductibles = findHighDeductibles(...)
+
+  // 4. Analyze dangerous exclusions
+  const exclusionWarnings = analyzeExclusions(policy.exclusions, policy.type)
+
+  // 5. Calculate gap score (0-100, higher = more gaps)
+  const gapScore = calculateGapScore(...)
+
+  // 6. Estimate cost to close gaps
+  const estimatedCostToClose = estimateGapClosureCost(...)
+
+  return { missingCoverages, underinsuredCoverages, highDeductibles, exclusionWarnings, gapScore, estimatedCostToClose }
+}
+```
+
+### Gap Importance Classification
+
+Gaps are classified based on market inclusion rate:
+- **Critical** (>=90% inclusion): Almost all policies have this - you need it
+- **Recommended** (70-89% inclusion): Most policies have this - strongly suggested
+- **Optional** (<70% inclusion): Nice to have but not essential
 
 ### Gap Severity Levels
 ```typescript
