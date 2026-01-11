@@ -15,6 +15,9 @@ import {
   fuzzyMatchOCR,
   isPolicyIdentifierMatch,
   getPolicyIdentifierSimilarity,
+  normalizeStringTolerant,
+  arraysEqualTolerant,
+  calculatePolicyDiff,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -543,6 +546,171 @@ describe('policy-utils', () => {
 
       const similarity = getPolicyIdentifierSimilarity(policy1, policy2)
       expect(similarity).toBeLessThan(0.5)
+    })
+  })
+
+  // ========================================================================
+  // TOLERANT STRING NORMALIZATION TESTS
+  // ========================================================================
+
+  describe('normalizeStringTolerant', () => {
+    it('should collapse multiple spaces to single space', () => {
+      expect(normalizeStringTolerant('hello    world')).toBe('hello world')
+      expect(normalizeStringTolerant('a  b  c')).toBe('a b c')
+    })
+
+    it('should normalize colon spacing', () => {
+      expect(normalizeStringTolerant('NO: 25')).toBe('no:25')
+      expect(normalizeStringTolerant('NO : 25')).toBe('no:25')
+      expect(normalizeStringTolerant('NO :25')).toBe('no:25')
+    })
+
+    it('should normalize slash spacing', () => {
+      expect(normalizeStringTolerant('25 /1A')).toBe('25/1a')
+      expect(normalizeStringTolerant('25/ 1A')).toBe('25/1a')
+      expect(normalizeStringTolerant('25 / 1A')).toBe('25/1a')
+    })
+
+    it('should normalize comma spacing', () => {
+      expect(normalizeStringTolerant('Istanbul , Turkey')).toBe('istanbul,turkey')
+      expect(normalizeStringTolerant('Istanbul, Turkey')).toBe('istanbul,turkey')
+    })
+
+    it('should handle address variations that are effectively the same', () => {
+      const addr1 = 'İSTANBUL, ATAŞEHİR, ATAŞEHİR BELEDİYESİ, MUSTAFA KEMAL CAD., NO: 25 /1A'
+      const addr2 = 'İSTANBUL, ATAŞEHİR, ATAŞEHİR BELEDİYESİ, MUSTAFA KEMAL CAD., NO: 25/1A'
+      expect(normalizeStringTolerant(addr1)).toBe(normalizeStringTolerant(addr2))
+    })
+
+    it('should handle empty and null values', () => {
+      expect(normalizeStringTolerant('')).toBe('')
+      expect(normalizeStringTolerant(null)).toBe('')
+      expect(normalizeStringTolerant(undefined)).toBe('')
+    })
+  })
+
+  // ========================================================================
+  // TOLERANT ARRAY COMPARISON TESTS
+  // ========================================================================
+
+  describe('arraysEqualTolerant', () => {
+    it('should return true for identical arrays', () => {
+      expect(arraysEqualTolerant(['a', 'b', 'c'], ['a', 'b', 'c'])).toBe(true)
+    })
+
+    it('should return true for arrays with same items in different order', () => {
+      expect(arraysEqualTolerant(['a', 'b', 'c'], ['c', 'a', 'b'])).toBe(true)
+    })
+
+    it('should return true for arrays with whitespace differences', () => {
+      expect(arraysEqualTolerant(
+        ['hello  world', 'foo   bar'],
+        ['hello world', 'foo bar']
+      )).toBe(true)
+    })
+
+    it('should return false for arrays with different lengths', () => {
+      expect(arraysEqualTolerant(['a', 'b'], ['a', 'b', 'c'])).toBe(false)
+    })
+
+    it('should return false for arrays with different content', () => {
+      expect(arraysEqualTolerant(['a', 'b'], ['x', 'y'])).toBe(false)
+    })
+
+    it('should handle empty arrays', () => {
+      expect(arraysEqualTolerant([], [])).toBe(true)
+      expect(arraysEqualTolerant(null, null)).toBe(true)
+      expect(arraysEqualTolerant(undefined, undefined)).toBe(true)
+    })
+
+    it('should handle object arrays with name/description', () => {
+      const arr1 = [{ name: 'Coverage A', description: 'Full coverage' }]
+      const arr2 = [{ name: 'Coverage A', description: 'Full  coverage' }] // extra space
+      expect(arraysEqualTolerant(arr1, arr2)).toBe(true)
+    })
+
+    it('should handle arrays with OCR-like errors', () => {
+      expect(arraysEqualTolerant(
+        ['POL-001', 'Coverage'],
+        ['POL-OO1', 'Coverage'] // O vs 0
+      )).toBe(true)
+    })
+  })
+
+  // ========================================================================
+  // POLICY DIFF CALCULATION TESTS WITH TOLERANCE
+  // ========================================================================
+
+  describe('calculatePolicyDiff with tolerance', () => {
+    it('should not flag identical policies as different', () => {
+      const policy1 = createMockPolicy()
+      const policy2 = createMockPolicy()
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      expect(diff).toHaveLength(0)
+    })
+
+    it('should not flag address differences that are just whitespace/punctuation', () => {
+      const policy1 = createMockPolicy({
+        location: 'İSTANBUL, ATAŞEHİR, MUSTAFA KEMAL CAD., NO: 25 /1A'
+      })
+      const policy2 = createMockPolicy({
+        location: 'İSTANBUL, ATAŞEHİR, MUSTAFA KEMAL CAD., NO: 25/1A'
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      const locationDiff = diff.find(d => d.field === 'location')
+      expect(locationDiff).toBeUndefined()
+    })
+
+    it('should not flag coverage arrays with only whitespace differences', () => {
+      const policy1 = createMockPolicy({
+        coverages: [
+          { name: 'Collision', limit: 100000, description: 'Full collision  coverage' }
+        ]
+      })
+      const policy2 = createMockPolicy({
+        coverages: [
+          { name: 'Collision', limit: 100000, description: 'Full collision coverage' }
+        ]
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      const coveragesDiff = diff.find(d => d.field === 'coverages')
+      expect(coveragesDiff).toBeUndefined()
+    })
+
+    it('should detect real changes in coverage amount', () => {
+      const policy1 = createMockPolicy({ coverage: 100000 })
+      const policy2 = createMockPolicy({ coverage: 200000 })
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      const coverageDiff = diff.find(d => d.field === 'coverage')
+      expect(coverageDiff).toBeDefined()
+      expect(coverageDiff?.significance).toBe('critical')
+    })
+
+    it('should detect real changes in exclusion count', () => {
+      const policy1 = createMockPolicy({
+        exclusions: ['Flood damage']
+      })
+      const policy2 = createMockPolicy({
+        exclusions: ['Flood damage', 'Earthquake damage']
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      const exclusionsDiff = diff.find(d => d.field === 'exclusions')
+      expect(exclusionsDiff).toBeDefined()
+    })
+
+    it('should handle insured person name with minor OCR variations', () => {
+      const policy1 = createMockPolicy({ insuredPerson: 'AHMET YILMAZ' })
+      const policy2 = createMockPolicy({ insuredPerson: 'AHMET YlLMAZ' }) // l vs I
+
+      const diff = calculatePolicyDiff(policy1, policy2)
+      const insuredDiff = diff.find(d => d.field === 'insuredPerson')
+      // Should not flag this as a difference due to OCR tolerance
+      expect(insuredDiff).toBeUndefined()
     })
   })
 })
