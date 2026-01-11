@@ -926,6 +926,439 @@ type PolicyType = typeof VALID_POLICY_TYPES[number]
 
 ---
 
+## UI Component Library
+
+### Location: `src/components/ui/`
+
+Base components built with Tailwind CSS, following shadcn/ui patterns:
+
+| Component | File | Purpose |
+|-----------|------|---------|
+| `Button` | `button.tsx` | Primary action buttons with variants |
+| `Card` | `card.tsx` | Content containers with header/footer |
+| `Badge` | `badge.tsx` | Status indicators, tags |
+| `Input` | `input.tsx` | Form inputs with validation states |
+| `Progress` | `progress.tsx` | Progress bars for uploads, loading |
+| `Loading` | `loading.tsx` | Spinner and skeleton loaders |
+| `ErrorBoundary` | `error-boundary.tsx` | React error boundary with fallback UI |
+| `ConfirmationDialog` | `confirmation-dialog.tsx` | Modal for destructive actions |
+
+### Button Variants
+```tsx
+<Button variant="default">Primary</Button>
+<Button variant="outline">Secondary</Button>
+<Button variant="ghost">Tertiary</Button>
+<Button variant="destructive">Delete</Button>
+<Button size="sm">Small</Button>
+<Button size="lg">Large</Button>
+<Button disabled>Disabled</Button>
+<Button loading>Loading...</Button>
+```
+
+### Card Usage
+```tsx
+<Card>
+  <CardHeader>
+    <CardTitle>Policy Details</CardTitle>
+    <CardDescription>View your policy information</CardDescription>
+  </CardHeader>
+  <CardContent>
+    {/* Content */}
+  </CardContent>
+  <CardFooter>
+    <Button>Save</Button>
+  </CardFooter>
+</Card>
+```
+
+---
+
+## Custom Hooks
+
+### Location: `src/hooks/`
+
+| Hook | Purpose | Returns |
+|------|---------|---------|
+| `useBackendHealth` | Check backend server availability | `{ isHealthy, isLoading, error, retry }` |
+| `useFileUpload` | Handle PDF upload with progress | `{ upload, progress, isUploading, error }` |
+| `usePolicyEvaluation` | Evaluate policy against benchmarks | `{ evaluation, isLoading }` |
+| `usePolicyComparison` | Compare multiple policies | `{ comparison, compare }` |
+| `useRegionalBenchmark` | Get regional risk data | `{ benchmarks, region }` |
+| `useMarketData` | Fetch market provider data | `{ providers, benchmarks }` |
+| `usePdfExport` | Export policy to PDF | `{ exportPdf, isExporting }` |
+| `useAnalytics` | Track user actions | `{ track, identify }` |
+| `useCostTracking` | Track AI API costs | `{ costs, addCost }` |
+| `usePrivacy` | KVKK/GDPR consent management | `{ hasConsent, requestConsent }` |
+| `useIndustryRisk` | Industry-specific risk factors | `{ riskFactor, industryData }` |
+| `usePolicyTemplates` | Predefined policy templates | `{ templates, applyTemplate }` |
+
+### Hook Pattern
+```tsx
+// Standard hook structure
+export function useBackendHealth() {
+  const [isHealthy, setIsHealthy] = useState<boolean | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  const checkHealth = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      const response = await fetch(`${API_URL}/api/health`)
+      setIsHealthy(response.ok)
+    } catch (err) {
+      setError(err as Error)
+      setIsHealthy(false)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    checkHealth()
+  }, [checkHealth])
+
+  return { isHealthy, isLoading, error, retry: checkHealth }
+}
+```
+
+---
+
+## Utility Functions
+
+### Location: `src/lib/utils.ts`
+
+```typescript
+import { cn, formatCurrency, formatDate, formatNumber } from '@/lib/utils'
+
+// Class name merging (Tailwind + clsx)
+cn("base-class", isActive && "active-class", className)
+// → Merges classes, handles conflicts
+
+// Turkish currency formatting
+formatCurrency(15000)      // "₺15.000"
+formatCurrency(15000.50)   // "₺15.001" (rounded)
+
+// Turkish date formatting
+formatDate('2026-01-15')   // "15.01.2026"
+formatDate(new Date())     // "11.01.2026"
+
+// Turkish number formatting
+formatNumber(1500000)      // "1.500.000"
+```
+
+### Policy Utilities (`src/lib/policy-utils.ts`)
+```typescript
+import {
+  fuzzyMatchOCR,
+  normalizeForOCR,
+  isPolicyIdentifierMatch,
+  calculatePolicyDiff,
+  levenshteinDistance,
+} from '@/lib/policy-utils'
+
+// OCR-tolerant string comparison
+fuzzyMatchOCR('POL-001', 'P0L-OO1', 0.85) // true
+
+// Normalize for comparison
+normalizeForOCR('İstanbul') // 'istanbul'
+
+// Check if policies are duplicates
+isPolicyIdentifierMatch(policyA, policyB, true) // fuzzy mode
+
+// Calculate differences
+const diff = calculatePolicyDiff(oldPolicy, newPolicy)
+// { significantChanges, minorChanges, overallSignificance }
+```
+
+---
+
+## KVKK/GDPR Privacy Compliance
+
+### Location: `src/lib/privacy/`
+
+InsurAI implements Turkish KVKK (Kişisel Verilerin Korunması Kanunu) compliance:
+
+### Consent Management
+```typescript
+import { hasConsent, recordConsent, checkRequiredConsents } from '@/lib/privacy'
+
+// Check if user has given consent
+if (hasConsent(userId, 'analytics')) {
+  trackEvent('page_view')
+}
+
+// Record new consent
+await recordConsent(userId, 'marketing', true)
+
+// Check all required consents before proceeding
+const { allRequired, missing } = checkRequiredConsents(userId)
+if (!allRequired) {
+  showConsentDialog(missing)
+}
+```
+
+### Data Subject Rights
+```typescript
+import {
+  requestDataAccess,
+  requestDataDeletion,
+  exportUserData,
+} from '@/lib/privacy'
+
+// User requests their data (KVKK Article 11)
+const userData = await exportUserData(userId)
+
+// User requests deletion (Right to be forgotten)
+await requestDataDeletion(userId)
+```
+
+### Personal Data Categories
+| Category | Examples | Sensitivity |
+|----------|----------|-------------|
+| `identity` | Name, TC Kimlik No | High |
+| `contact` | Email, phone, address | Medium |
+| `financial` | Premium amounts, coverage | High |
+| `insurance` | Policy details, claims | High |
+| `technical` | IP address, device info | Low |
+
+### KVKK Compliance Checklist
+- ✅ Explicit consent collection before data processing
+- ✅ Data minimization (only collect what's needed)
+- ✅ Purpose limitation (use data only for stated purpose)
+- ✅ Data subject access requests (DSAR)
+- ✅ Right to deletion
+- ✅ Data portability (JSON export)
+- ✅ Breach notification procedures
+- ✅ Retention policies (auto-delete after period)
+
+---
+
+## Error Handling Patterns
+
+### API Error Handling
+```typescript
+// Server-side (server/routes/ai.ts)
+try {
+  const result = await openai.chat.completions.create(...)
+  res.json({ success: true, data: result })
+} catch (error) {
+  if (error instanceof OpenAI.APIError) {
+    if (error.status === 429) {
+      return res.status(429).json({
+        success: false,
+        error: 'Rate limit exceeded',
+        retryAfter: error.headers?.['retry-after']
+      })
+    }
+  }
+  // Log to Sentry
+  captureException(error)
+  res.status(500).json({ success: false, error: 'Internal server error' })
+}
+```
+
+### React Error Boundary
+```tsx
+// Wrap routes with ErrorBoundary
+<ErrorBoundary
+  fallback={<ErrorFallback />}
+  onError={(error, info) => captureException(error, { extra: info })}
+>
+  <Routes>
+    <Route path="/dashboard" element={<Dashboard />} />
+  </Routes>
+</ErrorBoundary>
+```
+
+### Form Validation with Zod
+```typescript
+// Server validation (server/middleware/validation.ts)
+const chatSchema = z.object({
+  message: z.string().min(1).max(4096),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string()
+  })).optional(),
+  policyContext: z.string().max(51200).optional(),
+  provider: z.enum(['openai', 'anthropic']).optional()
+})
+
+// Usage in route
+app.post('/api/ai/chat', validateBody(chatSchema), async (req, res) => {
+  // req.body is typed and validated
+})
+```
+
+---
+
+## Policy Scoring Algorithm
+
+### Evaluation Weights (Default)
+```typescript
+const DEFAULT_WEIGHTS = {
+  premium: 20,      // Cost efficiency
+  coverage: 30,     // Coverage comprehensiveness
+  deductible: 15,   // Out-of-pocket exposure
+  compliance: 20,   // Regulatory compliance
+  value: 15,        // Value for money ratio
+}
+```
+
+### Score Calculation
+```typescript
+// From src/lib/policy-evaluation/evaluator.ts
+function calculateScore(policy: Policy, benchmarks: Benchmarks): number {
+  // 1. Coverage Score (0-100)
+  const coverageScore = calculateCoverageScore(
+    policy.coverages,
+    benchmarks.typicalCoverages
+  )
+
+  // 2. Premium Score (0-100) - lower is better
+  const premiumScore = calculatePremiumScore(
+    policy.premium,
+    benchmarks.typicalPremium,
+    policy.coverage
+  )
+
+  // 3. Deductible Score (0-100) - lower deductible = higher score
+  const deductibleScore = calculateDeductibleScore(
+    policy.deductible,
+    benchmarks.typicalDeductible
+  )
+
+  // 4. Compliance Score (0-100)
+  const complianceScore = checkComplianceScore(policy, regulations)
+
+  // 5. Value Score (coverage per premium unit)
+  const valueScore = (policy.coverage / policy.premium) * normalizationFactor
+
+  // Weighted average
+  return (
+    coverageScore * weights.coverage +
+    premiumScore * weights.premium +
+    deductibleScore * weights.deductible +
+    complianceScore * weights.compliance +
+    valueScore * weights.value
+  ) / 100
+}
+```
+
+### Grade Thresholds
+```typescript
+function getGrade(score: number): Grade {
+  if (score >= 90) return 'A'  // Excellent
+  if (score >= 75) return 'B'  // Good
+  if (score >= 60) return 'C'  // Fair
+  if (score >= 40) return 'D'  // Poor
+  return 'F'                    // Critical
+}
+```
+
+---
+
+## Common Code Patterns
+
+### Async Data Fetching
+```tsx
+// Pattern used throughout the app
+function PolicyList() {
+  const [policies, setPolicies] = useState<Policy[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+
+  useEffect(() => {
+    const fetchPolicies = async () => {
+      try {
+        setIsLoading(true)
+        const data = await getPolicies()
+        setPolicies(data)
+      } catch (err) {
+        setError(err as Error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPolicies()
+  }, [])
+
+  if (isLoading) return <Loading />
+  if (error) return <ErrorMessage error={error} />
+  return <PolicyGrid policies={policies} />
+}
+```
+
+### Optimistic Updates
+```tsx
+// For better UX on mutations
+const handleDelete = async (policyId: string) => {
+  // Optimistic: remove from UI immediately
+  setPolicies(prev => prev.filter(p => p.id !== policyId))
+
+  try {
+    await deletePolicy(policyId)
+    toast.success('Policy deleted')
+  } catch (error) {
+    // Rollback on failure
+    setPolicies(prev => [...prev, policy])
+    toast.error('Failed to delete policy')
+  }
+}
+```
+
+### Context Provider Pattern
+```tsx
+// Used for PolicyContext, AuthContext
+const PolicyContext = createContext<PolicyContextType | null>(null)
+
+export function PolicyProvider({ children }: { children: ReactNode }) {
+  const [policies, setPolicies] = useState<Policy[]>([])
+  const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null)
+
+  const value = useMemo(() => ({
+    policies,
+    selectedPolicy,
+    addPolicy: (policy: Policy) => setPolicies(prev => [...prev, policy]),
+    removePolicy: (id: string) => setPolicies(prev => prev.filter(p => p.id !== id)),
+    selectPolicy: setSelectedPolicy,
+  }), [policies, selectedPolicy])
+
+  return (
+    <PolicyContext.Provider value={value}>
+      {children}
+    </PolicyContext.Provider>
+  )
+}
+
+export function usePolicies() {
+  const context = useContext(PolicyContext)
+  if (!context) throw new Error('usePolicies must be used within PolicyProvider')
+  return context
+}
+```
+
+### Debounced Search
+```tsx
+// For search inputs
+function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
+  const [query, setQuery] = useState('')
+
+  const debouncedSearch = useMemo(
+    () => debounce((q: string) => onSearch(q), 300),
+    [onSearch]
+  )
+
+  useEffect(() => {
+    debouncedSearch(query)
+    return () => debouncedSearch.cancel()
+  }, [query, debouncedSearch])
+
+  return <Input value={query} onChange={e => setQuery(e.target.value)} />
+}
+```
+
+---
+
 ## Known Issues & Solutions
 
 ### 1. Port 3001 Conflicts
@@ -1060,10 +1493,66 @@ cp .env.example .env
 npm run dev:all
 ```
 
-### GitHub Codespaces
-1. Create `.env` file with keys
-2. Run `npm run dev:all`
-3. Open port 5173 in browser
+### GitHub Codespaces (IMPORTANT)
+
+GitHub Codespaces requires special configuration because the browser accesses the app through forwarded URLs (`https://*.app.github.dev`), not `localhost`.
+
+**Step 1: Kill any existing processes on ports**
+```bash
+fuser -k 4001/tcp
+fuser -k 5173/tcp
+```
+
+**Step 2: Create `.env` with Codespaces URLs**
+```bash
+cat > .env << 'EOF'
+# Frontend - use YOUR Codespaces forwarded URLs
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_API_PROXY_URL=https://YOUR-CODESPACE-NAME-4001.app.github.dev
+
+# Backend - CORS must allow Codespaces frontend URL
+API_PORT=4001
+FRONTEND_URL=https://YOUR-CODESPACE-NAME-5173.app.github.dev
+NODE_ENV=development
+
+# AI Keys
+OPENAI_API_KEY=sk-proj-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+GOOGLE_CLOUD_API_KEY=xxx
+EOF
+```
+
+**Step 3: Find your Codespaces URL**
+- Look at the PORTS tab in VS Code
+- Your URL will be like: `literate-invention-x9j77xxg5jrhppvp`
+- Replace `YOUR-CODESPACE-NAME` in .env with this value
+
+**Step 4: Start servers**
+```bash
+npm run dev:all
+```
+
+**Step 5: Open in browser**
+- Use the forwarded URL from PORTS tab for port 5173
+- Example: `https://literate-invention-x9j77xxg5jrhppvp-5173.app.github.dev`
+
+### Common Codespaces Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Backend Server Unavailable" | VITE_API_PROXY_URL uses localhost | Use Codespaces forwarded URL |
+| CSP violations | Mixed content (HTTPS→HTTP) | Use HTTPS Codespaces URLs |
+| CORS errors | FRONTEND_URL mismatch | Set to Codespaces frontend URL |
+| Port already in use | Previous processes still running | Run `fuser -k PORT/tcp` |
+
+### CSP Configuration for Codespaces
+
+The `index.html` includes CSP rules for Codespaces:
+```html
+connect-src 'self' http://localhost:* https://*.app.github.dev wss://*.app.github.dev;
+manifest-src 'self' https://*.app.github.dev;
+```
 
 ### Production
 - **Frontend**: Vercel or Netlify
