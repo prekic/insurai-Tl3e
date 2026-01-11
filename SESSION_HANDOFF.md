@@ -8,7 +8,7 @@
 | **TypeCheck** | ✅ 0 errors |
 | **Lint** | ✅ 0 warnings |
 | **Tests** | ✅ ~4500 passing |
-| **Branch** | `main` (clean) |
+| **Branch** | `claude/review-project-docs-rJvn4` |
 | **Production Readiness** | 9.5/10 |
 
 ---
@@ -16,11 +16,12 @@
 ## Session Summary
 
 This session focused on:
-1. **Comprehensive codebase review** - Identified and fixed critical issues
-2. **Duplicate detection feature** - Added OCR-tolerant fuzzy matching (from previous session)
-3. **Critical bug fixes** - Fixed failing test and schema mismatch
-4. **Branch cleanup** - Deleted all stale Claude branches
-5. **Documentation update** - Comprehensive CLAUDE.md rewrite
+1. **GitHub Codespaces configuration** - Fixed CSP and CORS for Codespaces environment
+2. **Comprehensive codebase review** - Identified and fixed critical issues
+3. **Duplicate detection feature** - Added OCR-tolerant fuzzy matching (from previous session)
+4. **Critical bug fixes** - Fixed failing test and schema mismatch
+5. **Branch cleanup** - Deleted all stale Claude branches
+6. **Documentation update** - Comprehensive CLAUDE.md rewrite with Codespaces guide
 
 ---
 
@@ -73,12 +74,21 @@ This session focused on:
 
 ## Fixes Applied This Session
 
-### 1. Failing Test (PolicyDetailView.test.tsx)
+### 1. GitHub Codespaces CSP Fix (index.html)
+**Problem:** "Backend Server Unavailable" - CSP blocked connections to localhost from Codespaces
+**Root Cause:** Browser accessed app via `https://*.app.github.dev` but tried connecting to `http://localhost:4001`
+**Fix:**
+- Added `manifest-src 'self' https://*.app.github.dev;` to CSP
+- Added `wss://*.app.github.dev` to connect-src
+- Updated `.env` instructions for Codespaces (use forwarded URLs)
+**Commit:** `113b07e`
+
+### 2. Failing Test (PolicyDetailView.test.tsx)
 **Problem:** `getByText('Deductible')` found multiple elements
 **Fix:** Changed to `getAllByText('Deductible').length).toBeGreaterThan(0)`
 **Commit:** `ecc42c5`
 
-### 2. Schema Mismatch (supabase/schema.sql)
+### 3. Schema Mismatch (supabase/schema.sql)
 **Problem:** Used ENUM with wrong values (`auto`, `travel` instead of `kasko`, `dask`)
 **Fix:** Changed to TEXT with CHECK constraints:
 ```sql
@@ -87,7 +97,7 @@ status TEXT DEFAULT 'active' CHECK (status IN ('active', 'expiring', 'expired', 
 ```
 **Commit:** `ecc42c5`
 
-### 3. Branch Cleanup
+### 4. Branch Cleanup
 **Action:** Deleted 11 stale `claude/review-project-docs-*` branches
 **Reason:** All were 17-56 commits behind main with superseded work
 
@@ -137,10 +147,12 @@ All known issues have been resolved:
 
 | File | Change Type | Description |
 |------|-------------|-------------|
+| `index.html` | Modified | CSP rules for GitHub Codespaces |
 | `src/components/PolicyDetailView.test.tsx` | Modified | Fixed multiple elements test |
 | `supabase/schema.sql` | Modified | Changed ENUM to TEXT with CHECK |
-| `CLAUDE.md` | Rewritten | Comprehensive 900+ line documentation |
+| `CLAUDE.md` | Updated | Added comprehensive Codespaces guide |
 | `SESSION_HANDOFF.md` | Updated | This file |
+| `.env` | Modified (local) | Codespaces forwarded URLs (not committed) |
 
 ---
 
@@ -247,11 +259,11 @@ npm run validate
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 1 (`ecc42c5`) |
-| Files changed | 4 |
+| Commits this session | 2 (`ecc42c5`, `113b07e`) |
+| Files changed | 5 |
 | Tests passing | ~4500 |
 | Branches deleted | 11 |
-| Critical bugs fixed | 2 |
+| Critical bugs fixed | 3 (including Codespaces CSP) |
 
 ---
 

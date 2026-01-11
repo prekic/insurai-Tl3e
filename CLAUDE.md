@@ -1060,10 +1060,66 @@ cp .env.example .env
 npm run dev:all
 ```
 
-### GitHub Codespaces
-1. Create `.env` file with keys
-2. Run `npm run dev:all`
-3. Open port 5173 in browser
+### GitHub Codespaces (IMPORTANT)
+
+GitHub Codespaces requires special configuration because the browser accesses the app through forwarded URLs (`https://*.app.github.dev`), not `localhost`.
+
+**Step 1: Kill any existing processes on ports**
+```bash
+fuser -k 4001/tcp
+fuser -k 5173/tcp
+```
+
+**Step 2: Create `.env` with Codespaces URLs**
+```bash
+cat > .env << 'EOF'
+# Frontend - use YOUR Codespaces forwarded URLs
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+VITE_API_PROXY_URL=https://YOUR-CODESPACE-NAME-4001.app.github.dev
+
+# Backend - CORS must allow Codespaces frontend URL
+API_PORT=4001
+FRONTEND_URL=https://YOUR-CODESPACE-NAME-5173.app.github.dev
+NODE_ENV=development
+
+# AI Keys
+OPENAI_API_KEY=sk-proj-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+GOOGLE_CLOUD_API_KEY=xxx
+EOF
+```
+
+**Step 3: Find your Codespaces URL**
+- Look at the PORTS tab in VS Code
+- Your URL will be like: `literate-invention-x9j77xxg5jrhppvp`
+- Replace `YOUR-CODESPACE-NAME` in .env with this value
+
+**Step 4: Start servers**
+```bash
+npm run dev:all
+```
+
+**Step 5: Open in browser**
+- Use the forwarded URL from PORTS tab for port 5173
+- Example: `https://literate-invention-x9j77xxg5jrhppvp-5173.app.github.dev`
+
+### Common Codespaces Issues
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "Backend Server Unavailable" | VITE_API_PROXY_URL uses localhost | Use Codespaces forwarded URL |
+| CSP violations | Mixed content (HTTPS→HTTP) | Use HTTPS Codespaces URLs |
+| CORS errors | FRONTEND_URL mismatch | Set to Codespaces frontend URL |
+| Port already in use | Previous processes still running | Run `fuser -k PORT/tcp` |
+
+### CSP Configuration for Codespaces
+
+The `index.html` includes CSP rules for Codespaces:
+```html
+connect-src 'self' http://localhost:* https://*.app.github.dev wss://*.app.github.dev;
+manifest-src 'self' https://*.app.github.dev;
+```
 
 ### Production
 - **Frontend**: Vercel or Netlify
