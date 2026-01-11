@@ -144,8 +144,19 @@ app.use(
   })
 )
 
+// Serve static files in production (before CORS to avoid blocking)
+if (IS_PRODUCTION) {
+  const distPath = path.join(__dirname, '..', 'dist')
+
+  // Serve static assets
+  app.use(express.static(distPath, {
+    maxAge: '1d',
+    etag: true,
+  }))
+}
+
 // CORS configuration
-// Support multiple origins for local dev and Codespaces
+// Support multiple origins for local dev, Codespaces, and Railway
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'http://localhost:5173',
@@ -161,6 +172,11 @@ const corsOptions: cors.CorsOptions = {
     }
     // Allow Codespaces domains (*.app.github.dev)
     if (origin.endsWith('.app.github.dev')) {
+      callback(null, true)
+      return
+    }
+    // Allow Railway domains (*.up.railway.app)
+    if (origin.endsWith('.up.railway.app')) {
       callback(null, true)
       return
     }
@@ -237,25 +253,18 @@ app.get('/api/health', healthLimiter, (_req, res) => {
 // AI proxy routes (with longer timeout for AI processing)
 app.use('/api/ai', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), aiRoutes)
 
-// Serve static files in production
+// 404 handler for API routes only
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found' })
+})
+
+// Handle client-side routing in production - serve index.html for all other routes
 if (IS_PRODUCTION) {
   const distPath = path.join(__dirname, '..', 'dist')
-  app.use(express.static(distPath))
-
-  // Handle client-side routing - serve index.html for all non-API routes
-  app.get('*', (req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api')) {
-      return next()
-    }
+  app.get('*', (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }
-
-// 404 handler (for API routes)
-app.use((_req, res) => {
-  res.status(404).json({ error: 'Not found' })
-})
 
 // Setup Sentry error handling (must be before other error handlers)
 setupSentryErrorHandler(app)
