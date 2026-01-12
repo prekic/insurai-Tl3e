@@ -331,6 +331,204 @@ export function arraysEqualTolerant(
 }
 
 // ============================================================================
+// DOCUMENT HASH FOR DUPLICATE DETECTION
+// ============================================================================
+
+/**
+ * Generate a simple hash from text content for duplicate detection
+ * This is used to identify re-uploads of the same document
+ */
+export function generateDocumentHash(text: string): string {
+  // Normalize text: remove extra whitespace, lowercase
+  const normalized = text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  // Simple hash using string reduction (not cryptographic, but fast)
+  let hash = 0
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash // Convert to 32-bit integer
+  }
+
+  return Math.abs(hash).toString(16).padStart(8, '0')
+}
+
+/**
+ * Check if two document hashes match (indicating same document)
+ */
+export function documentHashesMatch(hash1?: string, hash2?: string): boolean {
+  if (!hash1 || !hash2) return false
+  return hash1 === hash2
+}
+
+// ============================================================================
+// SMART COVERAGE ARRAY COMPARISON
+// ============================================================================
+
+interface CoverageItem {
+  name?: string
+  nameTr?: string
+  limit?: number
+  deductible?: number
+  description?: string
+  included?: boolean
+}
+
+/**
+ * Extract normalized name from a coverage item for matching
+ */
+function extractCoverageName(item: unknown): string {
+  if (!item) return ''
+  if (typeof item === 'string') return normalizeStringTolerant(item)
+
+  const obj = item as CoverageItem
+  const name = obj.name || obj.nameTr || ''
+  return normalizeStringTolerant(String(name))
+}
+
+/**
+ * Smart coverage comparison that matches items by NAME, ignoring:
+ * - Description differences (AI often paraphrases)
+ * - Property order differences
+ * - Different number of items IF names match
+ *
+ * Returns true if coverages are "effectively the same" (same core coverages)
+ *
+ * IMPORTANT: This is LENIENT to avoid false positives on extraction variance.
+ * Real changes (new coverage added, limit changed significantly) will still be detected.
+ */
+export function coveragesEqualSmart(
+  a: unknown[] | undefined | null,
+  b: unknown[] | undefined | null,
+  options: { tolerantMode?: boolean } = {}
+): boolean {
+  const { tolerantMode = true } = options
+
+  // Both empty = equal
+  if (!a?.length && !b?.length) return true
+  // One empty, one not = different (this is a real change)
+  if (!a?.length || !b?.length) return false
+
+  // Extract names from both arrays
+  const namesA = a.map(extractCoverageName).filter(n => n.length > 0)
+  const namesB = b.map(extractCoverageName).filter(n => n.length > 0)
+
+  // In tolerant mode, we care about:
+  // 1. Whether the same coverage NAMES exist (fuzzy match)
+  // 2. Whether limits/deductibles are significantly different
+  if (tolerantMode) {
+    // Try to match each item in A to an item in B by name
+    const usedB = new Set<number>()
+
+    for (let iA = 0; iA < namesA.length; iA++) {
+      const nameA = namesA[iA]
+      let found = false
+      for (let j = 0; j < namesB.length; j++) {
+        if (usedB.has(j)) continue
+
+        // Fuzzy match on name (0.85 threshold)
+        if (fuzzyMatchOCR(nameA, namesB[j], 0.85)) {
+          found = true
+          usedB.add(j)
+
+          // Check if limits/deductibles differ significantly
+          const itemA = a[iA] as CoverageItem
+          const itemB = b[j] as CoverageItem
+
+          // If limit differs by more than 10%, flag as different
+          if (itemA?.limit !== undefined && itemB?.limit !== undefined) {
+            if (!numbersEqualWithTolerance(itemA.limit, itemB.limit, 0.10)) {
+              return false
+            }
+          }
+
+          // If deductible differs significantly, flag
+          if (itemA?.deductible !== undefined && itemB?.deductible !== undefined) {
+            if (!numbersEqualWithTolerance(itemA.deductible, itemB.deductible, 0.20)) {
+              return false
+            }
+          }
+
+          break
+        }
+      }
+
+      // If we couldn't find a match, check if it's a significant coverage
+      if (!found && nameA.length > 2) {
+        // Very short names (1-2 chars) might be parsing artifacts, ignore them
+        // But missing significant coverages = different
+        return false
+      }
+    }
+
+    // Check if B has coverages not in A (new coverages added)
+    for (let j = 0; j < namesB.length; j++) {
+      if (usedB.has(j)) continue
+      if (namesB[j].length > 2) {
+        // New significant coverage = different
+        return false
+      }
+    }
+
+    return true
+  }
+
+  // Strict mode: use original comparison
+  return arraysEqualTolerant(a, b)
+}
+
+/**
+ * Smart string array comparison (for exclusions, conditions)
+ * More lenient: considers arrays equal if >70% of items match
+ */
+export function stringsArrayEqualSmart(
+  a: string[] | undefined | null,
+  b: string[] | undefined | null,
+  options: { tolerantMode?: boolean } = {}
+): boolean {
+  const { tolerantMode = true } = options
+
+  // Both empty = equal
+  if (!a?.length && !b?.length) return true
+  // One empty, one not = different
+  if (!a?.length || !b?.length) return false
+
+  if (tolerantMode) {
+    // Normalize all strings
+    const normalizedA = a.map(normalizeStringTolerant).filter(s => s.length > 10)
+    const normalizedB = b.map(normalizeStringTolerant).filter(s => s.length > 10)
+
+    if (normalizedA.length === 0 && normalizedB.length === 0) return true
+
+    // Count matches (allowing fuzzy matching)
+    let matchCount = 0
+    const usedB = new Set<number>()
+
+    for (const strA of normalizedA) {
+      for (let j = 0; j < normalizedB.length; j++) {
+        if (usedB.has(j)) continue
+        if (fuzzyMatchOCR(strA, normalizedB[j], 0.85)) {
+          matchCount++
+          usedB.add(j)
+          break
+        }
+      }
+    }
+
+    // Consider equal if >70% of significant items match
+    const totalItems = Math.max(normalizedA.length, normalizedB.length)
+    const matchRatio = matchCount / totalItems
+
+    return matchRatio >= 0.70
+  }
+
+  return arraysEqualTolerant(a, b)
+}
+
+// ============================================================================
 // POLICY IDENTIFIER MATCHING
 // ============================================================================
 
@@ -550,8 +748,12 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check coverages array (with tolerant comparison)
-  if (!arraysEqualTolerant(oldPolicy.coverages, newPolicy.coverages)) {
+  // Check coverages array with smart comparison (matches by name, ignores description differences)
+  const coveragesEqual = tolerantMode
+    ? coveragesEqualSmart(oldPolicy.coverages, newPolicy.coverages, { tolerantMode })
+    : arraysEqualTolerant(oldPolicy.coverages, newPolicy.coverages)
+
+  if (!coveragesEqual) {
     diffs.push({
       field: 'coverages',
       fieldLabel: 'Coverage Details',
@@ -563,8 +765,12 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check exclusions array (with tolerant comparison)
-  if (!arraysEqualTolerant(oldPolicy.exclusions, newPolicy.exclusions)) {
+  // Check exclusions array with smart comparison (70% match threshold)
+  const exclusionsEqual = tolerantMode
+    ? stringsArrayEqualSmart(oldPolicy.exclusions, newPolicy.exclusions, { tolerantMode })
+    : arraysEqualTolerant(oldPolicy.exclusions, newPolicy.exclusions)
+
+  if (!exclusionsEqual) {
     diffs.push({
       field: 'exclusions',
       fieldLabel: 'Exclusions',
@@ -576,8 +782,12 @@ export function calculatePolicyDiff(
     })
   }
 
-  // Check special conditions array (with tolerant comparison)
-  if (!arraysEqualTolerant(oldPolicy.specialConditions, newPolicy.specialConditions)) {
+  // Check special conditions array with smart comparison (70% match threshold)
+  const conditionsEqual = tolerantMode
+    ? stringsArrayEqualSmart(oldPolicy.specialConditions, newPolicy.specialConditions, { tolerantMode })
+    : arraysEqualTolerant(oldPolicy.specialConditions, newPolicy.specialConditions)
+
+  if (!conditionsEqual) {
     diffs.push({
       field: 'specialConditions',
       fieldLabel: 'Special Conditions',
