@@ -21,6 +21,10 @@ import {
   numbersEqualWithTolerance,
   hasAmendmentMarkers,
   comparePoliciesAdvanced,
+  coveragesEqualSmart,
+  stringsArrayEqualSmart,
+  generateDocumentHash,
+  documentHashesMatch,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -902,6 +906,265 @@ describe('policy-utils', () => {
 
       const defaultDiff = calculatePolicyDiff(policy1, policy2)
       expect(defaultDiff.find(d => d.field === 'coverage')).toBeUndefined()
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Smart Coverage Array Comparison
+  // ============================================================================
+  describe('coveragesEqualSmart', () => {
+    it('should return true for identical coverages', () => {
+      const a = [{ name: 'Collision', limit: 100000, description: 'Full coverage' }]
+      const b = [{ name: 'Collision', limit: 100000, description: 'Full coverage' }]
+      expect(coveragesEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should return true when coverages have same names but different descriptions', () => {
+      const a = [{ name: 'Collision', limit: 100000, description: 'Covers collision damage' }]
+      const b = [{ name: 'Collision', limit: 100000, description: 'This coverage protects against collisions' }]
+      expect(coveragesEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should return true when coverages have same names in different order', () => {
+      const a = [
+        { name: 'Collision', limit: 100000 },
+        { name: 'Fire', limit: 50000 },
+      ]
+      const b = [
+        { name: 'Fire', limit: 50000 },
+        { name: 'Collision', limit: 100000 },
+      ]
+      expect(coveragesEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should return true when limits are within 10% tolerance', () => {
+      const a = [{ name: 'Collision', limit: 100000 }]
+      const b = [{ name: 'Collision', limit: 105000 }] // 5% diff
+      expect(coveragesEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should return false when limits differ by more than 10%', () => {
+      const a = [{ name: 'Collision', limit: 100000 }]
+      const b = [{ name: 'Collision', limit: 150000 }] // 50% diff
+      expect(coveragesEqualSmart(a, b)).toBe(false)
+    })
+
+    it('should return false when a significant coverage is missing', () => {
+      const a = [
+        { name: 'Collision Coverage', limit: 100000 },
+        { name: 'Fire Coverage', limit: 50000 },
+      ]
+      const b = [
+        { name: 'Collision Coverage', limit: 100000 },
+      ]
+      expect(coveragesEqualSmart(a, b)).toBe(false)
+    })
+
+    it('should return false when a new significant coverage is added', () => {
+      const a = [{ name: 'Collision Coverage', limit: 100000 }]
+      const b = [
+        { name: 'Collision Coverage', limit: 100000 },
+        { name: 'Theft Coverage', limit: 50000 },
+      ]
+      expect(coveragesEqualSmart(a, b)).toBe(false)
+    })
+
+    it('should ignore very short coverage names (artifacts)', () => {
+      const a = [
+        { name: 'Collision Coverage', limit: 100000 },
+        { name: 'A', limit: 1000 },
+      ]
+      const b = [
+        { name: 'Collision Coverage', limit: 100000 },
+      ]
+      expect(coveragesEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should handle empty arrays', () => {
+      expect(coveragesEqualSmart([], [])).toBe(true)
+      expect(coveragesEqualSmart(null, null)).toBe(true)
+      expect(coveragesEqualSmart(undefined, undefined)).toBe(true)
+    })
+
+    it('should return false when one is empty and other has significant coverage', () => {
+      const a = [{ name: 'Collision Coverage', limit: 100000 }]
+      expect(coveragesEqualSmart(a, [])).toBe(false)
+      expect(coveragesEqualSmart([], a)).toBe(false)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Smart String Array Comparison (Exclusions, Conditions)
+  // ============================================================================
+  describe('stringsArrayEqualSmart', () => {
+    it('should return true for identical arrays', () => {
+      const a = ['Flood damage excluded', 'Earthquake excluded']
+      const b = ['Flood damage excluded', 'Earthquake excluded']
+      expect(stringsArrayEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should return true when 75% of items match', () => {
+      const a = [
+        'Flood damage is excluded from coverage',
+        'Earthquake damage is excluded',
+        'War and terrorism excluded',
+        'Nuclear hazards excluded',
+      ]
+      const b = [
+        'Flood damage is excluded from coverage',
+        'Earthquake damage is excluded',
+        'War and terrorism excluded',
+        'Intentional damage excluded',
+      ]
+      // 3/4 = 75% match >= 70%
+      expect(stringsArrayEqualSmart(a, b)).toBe(true)
+    })
+
+    it('should handle empty arrays', () => {
+      expect(stringsArrayEqualSmart([], [])).toBe(true)
+      expect(stringsArrayEqualSmart(null, null)).toBe(true)
+      expect(stringsArrayEqualSmart(undefined, undefined)).toBe(true)
+    })
+
+    it('should return false when one is empty and other is not', () => {
+      expect(stringsArrayEqualSmart(['Flood damage excluded'], [])).toBe(false)
+      expect(stringsArrayEqualSmart([], ['Flood damage excluded'])).toBe(false)
+    })
+
+    it('should ignore short strings (likely parsing artifacts)', () => {
+      const a = ['Flood damage is excluded from coverage', 'A', 'B']
+      const b = ['Flood damage is excluded from coverage']
+      expect(stringsArrayEqualSmart(a, b)).toBe(true)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Document Hash Functions
+  // ============================================================================
+  describe('generateDocumentHash', () => {
+    it('should generate consistent hash for same text', () => {
+      const hash1 = generateDocumentHash('This is a test document')
+      const hash2 = generateDocumentHash('This is a test document')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should generate different hash for different text', () => {
+      const hash1 = generateDocumentHash('This is a test document')
+      const hash2 = generateDocumentHash('This is another test document')
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('should normalize whitespace before hashing', () => {
+      const hash1 = generateDocumentHash('This is  a   test')
+      const hash2 = generateDocumentHash('This is a test')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should be case-insensitive', () => {
+      const hash1 = generateDocumentHash('THIS IS A TEST')
+      const hash2 = generateDocumentHash('this is a test')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should return a hex string', () => {
+      const hash = generateDocumentHash('test')
+      expect(hash).toMatch(/^[0-9a-f]+$/)
+    })
+  })
+
+  describe('documentHashesMatch', () => {
+    it('should return true for matching hashes', () => {
+      const hash = generateDocumentHash('test')
+      expect(documentHashesMatch(hash, hash)).toBe(true)
+    })
+
+    it('should return false for different hashes', () => {
+      const hash1 = generateDocumentHash('test1')
+      const hash2 = generateDocumentHash('test2')
+      expect(documentHashesMatch(hash1, hash2)).toBe(false)
+    })
+
+    it('should return false when either hash is missing', () => {
+      const hash = generateDocumentHash('test')
+      expect(documentHashesMatch(hash, undefined)).toBe(false)
+      expect(documentHashesMatch(undefined, hash)).toBe(false)
+      expect(documentHashesMatch(undefined, undefined)).toBe(false)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: calculatePolicyDiff with smart array comparison
+  // ============================================================================
+  describe('calculatePolicyDiff with smart array comparison', () => {
+    it('should not flag coverages with same names but different descriptions', () => {
+      const policy1 = createMockPolicy({
+        coverages: [
+          { name: 'Collision', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: true, description: 'Covers collision' },
+        ],
+      })
+      const policy2 = createMockPolicy({
+        coverages: [
+          { name: 'Collision', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: true, description: 'This covers collision damage' },
+        ],
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      expect(diff.find(d => d.field === 'coverages')).toBeUndefined()
+    })
+
+    it('should not flag exclusions when 70%+ match', () => {
+      const policy1 = createMockPolicy({
+        exclusions: [
+          'Flood damage is excluded',
+          'Earthquake damage excluded',
+          'War and terrorism excluded',
+          'Nuclear hazards excluded',
+        ],
+      })
+      const policy2 = createMockPolicy({
+        exclusions: [
+          'Flood damage is excluded',
+          'Earthquake damage excluded',
+          'War and terrorism excluded',
+          'Intentional damage excluded',
+        ],
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      expect(diff.find(d => d.field === 'exclusions')).toBeUndefined()
+    })
+
+    it('should flag coverages when a significant coverage is added/removed', () => {
+      const policy1 = createMockPolicy({
+        coverages: [
+          { name: 'Collision Coverage', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: true },
+        ],
+      })
+      const policy2 = createMockPolicy({
+        coverages: [
+          { name: 'Collision Coverage', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: true },
+          { name: 'Theft Coverage', nameTr: 'Hırsızlık', limit: 50000, deductible: 0, included: true },
+        ],
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      expect(diff.find(d => d.field === 'coverages')).toBeDefined()
+    })
+
+    it('should flag coverages when limit changes significantly (>10%)', () => {
+      const policy1 = createMockPolicy({
+        coverages: [
+          { name: 'Collision Coverage', nameTr: 'Çarpışma', limit: 100000, deductible: 0, included: true },
+        ],
+      })
+      const policy2 = createMockPolicy({
+        coverages: [
+          { name: 'Collision Coverage', nameTr: 'Çarpışma', limit: 150000, deductible: 0, included: true },
+        ],
+      })
+
+      const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      expect(diff.find(d => d.field === 'coverages')).toBeDefined()
     })
   })
 })
