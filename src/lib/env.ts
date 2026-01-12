@@ -32,6 +32,26 @@ interface EnvWarning {
 }
 
 /**
+ * Detect API proxy URL at runtime
+ * In production, if not explicitly set, use the same origin (works when frontend/backend are co-hosted)
+ */
+function detectApiProxyUrl(): string | null {
+  // First check if explicitly set via environment variable
+  const envProxyUrl = import.meta.env.VITE_API_PROXY_URL
+  if (envProxyUrl) {
+    return envProxyUrl
+  }
+
+  // In production, auto-detect from current origin (same server hosts frontend + backend)
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    // Use the current origin - works for Railway, Vercel, etc where both are co-hosted
+    return window.location.origin
+  }
+
+  return null
+}
+
+/**
  * Parse and validate environment variables
  */
 function parseEnv(): EnvConfig {
@@ -44,7 +64,8 @@ function parseEnv(): EnvConfig {
   const isSupabaseConfigured = !!(supabaseUrl && supabaseAnonKey)
 
   // API Proxy (secure server-side AI calls - recommended for production)
-  const apiProxyUrl = import.meta.env.VITE_API_PROXY_URL || null
+  // Auto-detect in production when frontend and backend are co-hosted
+  const apiProxyUrl = detectApiProxyUrl()
   const isProxyConfigured = !!apiProxyUrl
 
   // Direct AI Keys (for local dev without server - not recommended for production)
@@ -135,10 +156,16 @@ function generateWarnings(config: EnvConfig): EnvWarning[] {
 }
 
 /**
- * Log environment status to console (development only)
+ * Log environment status to console
  */
 function logEnvironmentStatus(config: EnvConfig, warnings: EnvWarning[]): void {
-  if (!config.isDevelopment) return
+  // In production, only log errors; in development, log everything
+  const hasErrors = warnings.some((w) => w.level === 'error')
+  if (config.isProduction && !hasErrors) {
+    // Production with no errors - just log a brief status
+    console.log('🔧 InsurAI: AI proxy at', config.apiProxyUrl || 'NOT CONFIGURED')
+    return
+  }
 
   console.group('🔧 InsurAI Environment')
 
