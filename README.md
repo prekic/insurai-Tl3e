@@ -141,3 +141,4 @@ Personal project. See `CLAUDE.md` for development conventions when working with 
 ---
 
 © 2025 Erdem. All rights reserved.
+# Railway deployment trigger - Mon Jan 12 14:29:00 UTC 2026
