@@ -1,13 +1,11 @@
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
+import env from '@/lib/env'
 
 // Environment variables for AI providers
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
 const ANTHROPIC_API_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY
 const GOOGLE_CLOUD_API_KEY = import.meta.env.VITE_GOOGLE_CLOUD_API_KEY
-
-// API proxy configuration (for secure production use)
-const API_PROXY_URL = import.meta.env.VITE_API_PROXY_URL
 
 // API key storage key (for user-configured keys)
 const STORAGE_KEYS = {
@@ -21,14 +19,15 @@ const STORAGE_KEYS = {
  * When enabled, API calls go through the backend server instead of directly from browser
  */
 export function isProxyConfigured(): boolean {
-  return !!API_PROXY_URL
+  return env.hasProxy
 }
 
 /**
  * Get the API proxy URL
+ * In production, auto-detects from window.location.origin if not explicitly set
  */
 export function getProxyUrl(): string | null {
-  return API_PROXY_URL || null
+  return env.proxyUrl
 }
 
 /**
@@ -40,10 +39,11 @@ export async function checkProxyProviders(): Promise<{
   anthropic: boolean
   google: boolean
 } | null> {
-  if (!API_PROXY_URL) return null
+  const proxyUrl = getProxyUrl()
+  if (!proxyUrl) return null
 
   try {
-    const response = await fetch(`${API_PROXY_URL}/api/ai/providers`, {
+    const response = await fetch(`${proxyUrl}/api/ai/providers`, {
       method: 'GET',
       headers: { 'Content-Type': 'application/json' },
     })
