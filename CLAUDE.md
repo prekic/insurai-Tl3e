@@ -1400,6 +1400,31 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Solution**: Fuzzy matching with Levenshtein distance (0.85 threshold)
 - **File**: `src/lib/policy-utils.ts`
 
+### 9. Duplicate Detection False Positives (Fixed Jan 2026)
+- **Problem**: Identical policies flagged as amendments due to minor formatting differences
+- **Example**: "NO: 25 /1A" vs "NO: 25/1A" incorrectly flagged as different
+- **Solution**: Added tolerant string comparison in `src/lib/policy-utils.ts`
+- **Functions**: `normalizeStringTolerant()`, `arraysEqualTolerant()`
+- **Behavior**: Collapses whitespace, normalizes punctuation around `:`, `/`, `,`, `.`
+
+### 10. API Proxy Not Detected in Production (Fixed Jan 2026)
+- **Problem**: "No AI service configured" error on Railway/Vercel deployments
+- **Cause**: `VITE_API_PROXY_URL` baked at build time, not available in production
+- **Solution**: Auto-detect from `window.location.origin` in production
+- **Files**: `src/lib/env.ts`, `src/lib/ai/config.ts`
+
+### 11. PDF.js Worker Blocked by CSP (Fixed Jan 2026)
+- **Problem**: PDF parsing fails with "Setting up fake worker" warning
+- **Cause**: CSP blocking `unpkg.com` where PDF.js worker is hosted
+- **Solution**: Added CDN domains to CSP in `server/index.ts`
+- **Domains**: `unpkg.com`, `cdn.jsdelivr.net`, `cdnjs.cloudflare.com`
+
+### 12. ESM Module Resolution in Production
+- **Problem**: `Cannot find module './routes/ai'` error on Railway
+- **Cause**: Node.js ESM requires `.js` extensions in imports
+- **Solution**: Changed `server/tsconfig.json` to `"module": "NodeNext"` and added `.js` extensions
+- **Files**: `server/tsconfig.json`, `server/index.ts`, `server/routes/*.ts`
+
 ---
 
 ## Turkish Market Considerations
@@ -1554,11 +1579,77 @@ connect-src 'self' http://localhost:* https://*.app.github.dev wss://*.app.githu
 manifest-src 'self' https://*.app.github.dev;
 ```
 
-### Production
-- **Frontend**: Vercel or Netlify
-- **Backend**: Railway, Render, or Fly.io
+### Railway Production Deployment (Current)
+
+**Live URL**: https://insurai-production.up.railway.app
+
+Railway hosts both frontend and backend as a single service. The Express server serves the built React app as static files.
+
+**Configuration Files:**
+- `railway.json` - Build and deploy configuration
+- `server/index.ts` - Serves static files in production
+
+**railway.json:**
+```json
+{
+  "build": {
+    "builder": "NIXPACKS",
+    "buildCommand": "npm run build && npm run build:server"
+  },
+  "deploy": {
+    "startCommand": "NODE_ENV=production node dist-server/index.js"
+  }
+}
+```
+
+**Environment Variables on Railway:**
+```bash
+# Server-side only (never exposed to browser)
+OPENAI_API_KEY=sk-proj-xxx
+ANTHROPIC_API_KEY=sk-ant-xxx
+GOOGLE_CLOUD_API_KEY=xxx
+NODE_ENV=production
+
+# Build-time (embedded in JS bundle)
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+
+# NOT needed - auto-detected from window.location.origin
+# VITE_API_PROXY_URL is automatically set in production
+```
+
+**Key Architecture Points:**
+1. `VITE_*` variables are baked into the JS bundle at **build time**
+2. API proxy URL auto-detects in production via `src/lib/env.ts`
+3. Express serves `/api/*` routes AND static files from same origin
+4. No CORS issues because frontend and backend share the same domain
+
+**Deployment Steps:**
+1. Push to the deployment branch
+2. Railway auto-detects changes and rebuilds
+3. Nixpacks runs `npm run build && npm run build:server`
+4. Server starts with `node dist-server/index.js`
+
+**Supabase Configuration Required:**
+- Go to Supabase Dashboard → Authentication → URL Configuration
+- Add `https://insurai-production.up.railway.app/**` to Redirect URLs
+- This allows OAuth and magic link flows to work
+
+**Common Railway Issues:**
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| "No AI service configured" | VITE_API_PROXY_URL not set at build | Auto-fixed: uses window.location.origin |
+| PDF.js worker blocked | CSP missing CDN domains | Fixed in server/index.ts Helmet config |
+| CORS errors | Railway domain not in allowlist | Fixed: `*.up.railway.app` in CORS config |
+| Env vars with quotes | Railway UI adds quotes | Don't add manual quotes |
+| Build not using env vars | VITE_* need rebuild | Trigger new deploy, not just restart |
+
+### Other Production Options
+- **Frontend only**: Vercel or Netlify (need separate backend)
+- **Backend only**: Render, Fly.io
 - **Database**: Supabase (managed)
-- See `docs/DEPLOYMENT_GUIDE.md` for details
+- See `docs/DEPLOYMENT_GUIDE.md` for alternative setups
 
 ---
 
