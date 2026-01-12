@@ -168,6 +168,94 @@ const OCR_SUBSTITUTIONS: Record<string, string> = {
 }
 
 /**
+ * OCR error patterns specific to Turkish insurance documents
+ * These are common misreadings from scanned Turkish policies
+ */
+const OCR_ERROR_CORRECTIONS: Array<{ pattern: RegExp; replacement: string }> = [
+  // Turkish currency symbol variations
+  { pattern: /TL\s*\./gi, replacement: 'TL' },
+  { pattern: /T\.L\./gi, replacement: 'TL' },
+  { pattern: /\bTI\b/g, replacement: 'TL' }, // OCR misreads TL as TI
+
+  // Common Turkish insurance terms OCR errors
+  { pattern: /POL[İI1l]CE/gi, replacement: 'POLICE' },
+  { pattern: /S[İI1l]GORTA/gi, replacement: 'SIGORTA' },
+  { pattern: /TEM[İI1l]NAT/gi, replacement: 'TEMINAT' },
+  { pattern: /PR[İI1l]M/gi, replacement: 'PRIM' },
+  { pattern: /TAR[İI1l]H/gi, replacement: 'TARIH' },
+  { pattern: /MUAF[İI1l]YET/gi, replacement: 'MUAFIYET' },
+  { pattern: /ZEY[İI1l]LNAME/gi, replacement: 'ZEYILNAME' },
+
+  // Number/letter confusions in policy numbers
+  { pattern: /([A-Z])-?O([0-9])/gi, replacement: '$1-0$2' }, // O after letter is likely 0
+  { pattern: /([0-9])-?O([A-Z])/gi, replacement: '$1-0$2' }, // O before letter is likely 0
+  { pattern: /([0-9])l([0-9])/g, replacement: '$11$2' }, // l between numbers is likely 1
+  { pattern: /([0-9])I([0-9])/g, replacement: '$11$2' }, // I between numbers is likely 1
+
+  // Whitespace normalization
+  { pattern: /\s+/g, replacement: ' ' },
+  { pattern: /\n\s*\n/g, replacement: '\n' },
+]
+
+/**
+ * Normalize OCR text BEFORE sending to AI extraction
+ * This ensures deterministic input for consistent AI output
+ *
+ * Unlike normalizeForOCR (used for comparison), this preserves
+ * the text structure and only fixes clear OCR errors
+ */
+export function normalizeOCRTextForExtraction(text: string): string {
+  if (!text) return ''
+
+  let normalized = text
+
+  // Apply OCR error corrections
+  for (const { pattern, replacement } of OCR_ERROR_CORRECTIONS) {
+    normalized = normalized.replace(pattern, replacement)
+  }
+
+  // Normalize Turkish currency amounts (ensure consistent format)
+  // "1.234.567,89 TL" or "1,234,567.89 TL" -> consistent format
+  normalized = normalized.replace(
+    /(\d{1,3})\.(\d{3})\.(\d{3}),(\d{2})/g,
+    '$1$2$3.$4'
+  )
+
+  // Normalize dates to ISO-like format for consistency
+  // "15.01.2026" -> "15.01.2026" (keep as-is, just ensure consistency)
+  // "15/01/2026" -> "15.01.2026"
+  normalized = normalized.replace(
+    /(\d{2})\/(\d{2})\/(\d{4})/g,
+    '$1.$2.$3'
+  )
+
+  return normalized.trim()
+}
+
+/**
+ * Generate a deterministic hash from OCR text for duplicate detection
+ * This should be called on the raw OCR output BEFORE AI extraction
+ */
+export function generateOCRTextHash(text: string): string {
+  // Normalize aggressively for hash comparison
+  const normalized = text
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[^\w\s]/g, '') // Remove all punctuation
+    .trim()
+
+  // Simple hash (same as generateDocumentHash but more aggressive normalization)
+  let hash = 0
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized.charCodeAt(i)
+    hash = ((hash << 5) - hash) + char
+    hash = hash & hash
+  }
+
+  return Math.abs(hash).toString(16).padStart(8, '0')
+}
+
+/**
  * Normalize string for OCR-tolerant comparison
  * Converts visually similar characters to a canonical form
  */
@@ -850,7 +938,15 @@ export function comparePoliciesAdvanced(
     return { type: 'noConflict' }
   }
 
-  // Check if the NEW document has explicit amendment markers
+  // STEP 1: Check document hash (exact same document re-uploaded)
+  // If hashes match, it's definitely the same document - no need for AI diff
+  if (newPolicy.documentHash && existingPolicy.documentHash) {
+    if (documentHashesMatch(newPolicy.documentHash, existingPolicy.documentHash)) {
+      return { type: 'exactDuplicate', existingPolicy }
+    }
+  }
+
+  // STEP 2: Check if the NEW document has explicit amendment markers
   const isVerifiedAmendment = hasAmendmentMarkers(newPolicy)
 
   if (isVerifiedAmendment) {
@@ -865,42 +961,46 @@ export function comparePoliciesAdvanced(
     }
   }
 
-  // No amendment markers - likely same document uploaded again
-  // First check with tolerant comparison (handles AI extraction variance)
-  const tolerantChanges = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: true })
+  // STEP 3: No hash match, no amendment markers
+  // Compare using STRICT mode (no tolerance that could mask real changes)
+  const changes = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: false })
 
-  if (tolerantChanges.length === 0) {
-    // No differences even with strict comparison, or all within tolerance
+  if (changes.length === 0) {
+    // Identical after strict comparison - exact duplicate
     return { type: 'exactDuplicate', existingPolicy }
   }
 
-  // There are differences but no amendment markers
-  // This could be:
-  // 1. Extraction variance (AI extracted different values from same document)
-  // 2. A real amendment that's missing proper markers
-  // 3. A different version of the policy
+  // STEP 4: There are differences - determine if OCR variance or real change
+  // OCR-sensitive fields: text arrays and addresses often have OCR/formatting variance
+  const ocrSensitiveFields = ['coverages', 'exclusions', 'specialConditions', 'location', 'insuredPerson']
+  const coreFieldChanges = changes.filter(c => !ocrSensitiveFields.includes(c.field))
+  const ocrFieldChanges = changes.filter(c => ocrSensitiveFields.includes(c.field))
 
-  // Check if ALL differences are minor (within tolerance when compared strictly)
-  const strictChanges = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: false })
+  // If there are changes to core fields (coverage amount, premium, dates, etc.)
+  // these are likely REAL changes, not OCR variance
+  if (coreFieldChanges.length > 0) {
+    // Check if changes are significant enough to be a real amendment
+    const hasSignificantChange = coreFieldChanges.some(c =>
+      c.significance === 'critical' || c.significance === 'major'
+    )
 
-  // If strict and tolerant produce same results, differences are beyond tolerance
-  if (strictChanges.length === tolerantChanges.length) {
-    // Differences exceed tolerance - flag as potential amendment
-    // but mark as unverified since no amendment markers found
-    return {
-      type: 'amendment',
-      existingPolicy,
-      changes: strictChanges,
-      isVerifiedAmendment: false,
+    if (hasSignificantChange) {
+      // Real policy change without amendment markers
+      return {
+        type: 'amendment',
+        existingPolicy,
+        changes,
+        isVerifiedAmendment: false,
+      }
     }
   }
 
-  // Some differences were absorbed by tolerance
-  // This is likely extraction variance, not a real amendment
+  // Only OCR-sensitive fields changed, or only minor/moderate changes
+  // This is likely extraction variance from re-scanning or AI variance
   return {
     type: 'extractionVariance',
     existingPolicy,
-    changes: tolerantChanges, // Only show differences that exceeded tolerance
+    changes: ocrFieldChanges.length > 0 ? ocrFieldChanges : changes,
   }
 }
 

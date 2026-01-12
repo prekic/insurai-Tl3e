@@ -25,6 +25,8 @@ import {
   stringsArrayEqualSmart,
   generateDocumentHash,
   documentHashesMatch,
+  normalizeOCRTextForExtraction,
+  generateOCRTextHash,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -831,13 +833,14 @@ describe('policy-utils', () => {
       expect(result.type).toBe('exactDuplicate')
     })
 
-    it('should return extractionVariance for same policy with minor numeric differences', () => {
+    it('should return amendment for same policy with numeric differences (no tolerance masking)', () => {
       const policy1 = createMockPolicy({ coverage: 5153000, premium: 10000 })
-      const policy2 = createMockPolicy({ coverage: 5203000, premium: 10100 }) // ~1% diff
+      const policy2 = createMockPolicy({ coverage: 5203000, premium: 10100 }) // Different values
 
       const result = comparePoliciesAdvanced(policy2, policy1)
-      // Should be exactDuplicate or extractionVariance since diff is within tolerance
-      expect(['exactDuplicate', 'extractionVariance'].includes(result.type)).toBe(true)
+      // With strict comparison (no tolerance), numeric differences are flagged as amendments
+      // This is intentional - we don't want to mask real changes
+      expect(result.type).toBe('amendment')
     })
 
     it('should return verified amendment for policy with amendment markers', () => {
@@ -1165,6 +1168,123 @@ describe('policy-utils', () => {
 
       const diff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
       expect(diff.find(d => d.field === 'coverages')).toBeDefined()
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: OCR Text Normalization
+  // ============================================================================
+  describe('normalizeOCRTextForExtraction', () => {
+    it('should fix common Turkish insurance term OCR errors', () => {
+      expect(normalizeOCRTextForExtraction('POL1CE')).toContain('POLICE')
+      expect(normalizeOCRTextForExtraction('S1GORTA')).toContain('SIGORTA')
+      expect(normalizeOCRTextForExtraction('TEM1NAT')).toContain('TEMINAT')
+      expect(normalizeOCRTextForExtraction('PR1M')).toContain('PRIM')
+    })
+
+    it('should fix Turkish currency symbol OCR errors', () => {
+      expect(normalizeOCRTextForExtraction('T.L.')).toBe('TL')
+      expect(normalizeOCRTextForExtraction('TL.')).toBe('TL')
+    })
+
+    it('should normalize dates from slash to dot format', () => {
+      expect(normalizeOCRTextForExtraction('15/01/2026')).toBe('15.01.2026')
+    })
+
+    it('should normalize whitespace', () => {
+      expect(normalizeOCRTextForExtraction('hello   world')).toBe('hello world')
+      // Multiple newlines collapse to single space (text flows together)
+      expect(normalizeOCRTextForExtraction('hello\n\n\nworld')).toBe('hello world')
+    })
+
+    it('should handle empty input', () => {
+      expect(normalizeOCRTextForExtraction('')).toBe('')
+      expect(normalizeOCRTextForExtraction(null as unknown as string)).toBe('')
+    })
+
+    it('should fix number/letter confusions in policy numbers', () => {
+      // I between numbers should become 1
+      expect(normalizeOCRTextForExtraction('POL-2I34')).toBe('POL-2134')
+      // l between numbers should become 1
+      expect(normalizeOCRTextForExtraction('POL-2l34')).toBe('POL-2134')
+    })
+  })
+
+  describe('generateOCRTextHash', () => {
+    it('should generate consistent hash for same text', () => {
+      const hash1 = generateOCRTextHash('This is a test document')
+      const hash2 = generateOCRTextHash('This is a test document')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should generate same hash for text with different whitespace', () => {
+      const hash1 = generateOCRTextHash('This is  a   test')
+      const hash2 = generateOCRTextHash('This is a test')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should generate same hash for text with different punctuation', () => {
+      const hash1 = generateOCRTextHash('Hello, world!')
+      const hash2 = generateOCRTextHash('Hello world')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should be case insensitive', () => {
+      const hash1 = generateOCRTextHash('HELLO WORLD')
+      const hash2 = generateOCRTextHash('hello world')
+      expect(hash1).toBe(hash2)
+    })
+
+    it('should return hex string', () => {
+      const hash = generateOCRTextHash('test')
+      expect(hash).toMatch(/^[0-9a-f]+$/)
+    })
+  })
+
+  describe('comparePoliciesAdvanced with document hash', () => {
+    it('should return exactDuplicate when document hashes match', () => {
+      const hash = generateOCRTextHash('same document content')
+      const policy1 = createMockPolicy({ documentHash: hash })
+      const policy2 = createMockPolicy({ documentHash: hash })
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('exactDuplicate')
+    })
+
+    it('should check for changes when hashes do not match', () => {
+      const policy1 = createMockPolicy({
+        documentHash: 'hash1',
+        coverage: 100000,
+      })
+      const policy2 = createMockPolicy({
+        documentHash: 'hash2',
+        coverage: 200000, // Significant change
+      })
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('amendment')
+    })
+
+    it('should return extractionVariance when only OCR-sensitive fields differ', () => {
+      // Same policy identifiers, different hashes, only location differs
+      const policy1 = createMockPolicy({
+        policyNumber: 'POL-001',
+        provider: 'Test Provider',
+        insuredPerson: 'John Doe',
+        documentHash: 'hash1',
+        location: '123 Main St',
+      })
+      const policy2 = createMockPolicy({
+        policyNumber: 'POL-001',
+        provider: 'Test Provider',
+        insuredPerson: 'John Doe',
+        documentHash: 'hash2',
+        location: '123 Main Street', // Minor address format difference - OCR-sensitive
+      })
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      // Only location (an OCR-sensitive field) differs, so should be extractionVariance
+      expect(result.type).toBe('extractionVariance')
     })
   })
 })
