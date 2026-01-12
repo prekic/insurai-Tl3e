@@ -18,6 +18,9 @@ import {
   normalizeStringTolerant,
   arraysEqualTolerant,
   calculatePolicyDiff,
+  numbersEqualWithTolerance,
+  hasAmendmentMarkers,
+  comparePoliciesAdvanced,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -711,6 +714,194 @@ describe('policy-utils', () => {
       const insuredDiff = diff.find(d => d.field === 'insuredPerson')
       // Should not flag this as a difference due to OCR tolerance
       expect(insuredDiff).toBeUndefined()
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Numeric Tolerance for AI Extraction Variance
+  // ============================================================================
+  describe('numbersEqualWithTolerance', () => {
+    it('should consider numbers within 2% tolerance as equal', () => {
+      // ₺5,153,000 vs ₺5,203,000 = 0.97% difference < 2%
+      expect(numbersEqualWithTolerance(5153000, 5203000)).toBe(true)
+    })
+
+    it('should consider numbers beyond 2% tolerance as different', () => {
+      // ₺100,000 vs ₺200,000 = 100% difference > 2%
+      expect(numbersEqualWithTolerance(100000, 200000)).toBe(false)
+    })
+
+    it('should handle null values', () => {
+      expect(numbersEqualWithTolerance(null, null)).toBe(true)
+      expect(numbersEqualWithTolerance(null, 100)).toBe(false)
+      expect(numbersEqualWithTolerance(100, null)).toBe(false)
+    })
+
+    it('should handle zero values', () => {
+      expect(numbersEqualWithTolerance(0, 0)).toBe(true)
+      expect(numbersEqualWithTolerance(0, 1)).toBe(false)
+    })
+
+    it('should accept custom tolerance', () => {
+      // 10% difference with 5% tolerance = not equal
+      expect(numbersEqualWithTolerance(100, 110, 0.05)).toBe(false)
+      // 10% difference with 15% tolerance = equal
+      expect(numbersEqualWithTolerance(100, 110, 0.15)).toBe(true)
+    })
+
+    it('should handle the exact case from the user report', () => {
+      // User reported: ₺5.153.000 vs ₺5.203.000
+      expect(numbersEqualWithTolerance(5153000, 5203000)).toBe(true)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Amendment Marker Detection
+  // ============================================================================
+  describe('hasAmendmentMarkers', () => {
+    it('should return false for policy without amendmentInfo', () => {
+      const policy = createMockPolicy()
+      expect(hasAmendmentMarkers(policy)).toBe(false)
+    })
+
+    it('should return true for policy with isAmendment flag', () => {
+      const policy = createMockPolicy({
+        amendmentInfo: {
+          isAmendment: true,
+          amendmentNumber: '1/2024',
+          amendmentDate: '2024-06-01',
+          basePolicyNumber: 'POL-001',
+          amendmentReason: 'Sigortalı Talebi',
+          premiumDifference: 300,
+        },
+      })
+      expect(hasAmendmentMarkers(policy)).toBe(true)
+    })
+
+    it('should return true for policy with amendment number even if isAmendment is false', () => {
+      const policy = createMockPolicy({
+        amendmentInfo: {
+          isAmendment: false,
+          amendmentNumber: '1/2024',
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
+        },
+      })
+      expect(hasAmendmentMarkers(policy)).toBe(true)
+    })
+
+    it('should return false for policy with empty amendmentInfo', () => {
+      const policy = createMockPolicy({
+        amendmentInfo: {
+          isAmendment: false,
+          amendmentNumber: null,
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
+        },
+      })
+      expect(hasAmendmentMarkers(policy)).toBe(false)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: Advanced Policy Comparison (Amendment vs Extraction Variance)
+  // ============================================================================
+  describe('comparePoliciesAdvanced', () => {
+    it('should return noConflict for different policies', () => {
+      const policy1 = createMockPolicy({ policyNumber: 'POL-001', provider: 'Provider A' })
+      const policy2 = createMockPolicy({ policyNumber: 'POL-002', provider: 'Provider B' })
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('noConflict')
+    })
+
+    it('should return exactDuplicate for identical policies', () => {
+      const policy1 = createMockPolicy()
+      const policy2 = createMockPolicy()
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('exactDuplicate')
+    })
+
+    it('should return extractionVariance for same policy with minor numeric differences', () => {
+      const policy1 = createMockPolicy({ coverage: 5153000, premium: 10000 })
+      const policy2 = createMockPolicy({ coverage: 5203000, premium: 10100 }) // ~1% diff
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      // Should be exactDuplicate or extractionVariance since diff is within tolerance
+      expect(['exactDuplicate', 'extractionVariance'].includes(result.type)).toBe(true)
+    })
+
+    it('should return verified amendment for policy with amendment markers', () => {
+      const policy1 = createMockPolicy({ coverage: 500000, premium: 5000 })
+      const policy2 = createMockPolicy({
+        coverage: 600000,
+        premium: 5500,
+        amendmentInfo: {
+          isAmendment: true,
+          amendmentNumber: '1/2024',
+          amendmentDate: '2024-06-01',
+          basePolicyNumber: 'POL-001',
+          amendmentReason: 'Teminat Eklenmesi',
+          premiumDifference: 500,
+        },
+      })
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('amendment')
+      if (result.type === 'amendment') {
+        expect(result.isVerifiedAmendment).toBe(true)
+        expect(result.changes.length).toBeGreaterThan(0)
+      }
+    })
+
+    it('should return unverified amendment for major differences without markers', () => {
+      const policy1 = createMockPolicy({ coverage: 100000, premium: 5000 })
+      const policy2 = createMockPolicy({ coverage: 200000, premium: 10000 }) // 100% diff
+
+      const result = comparePoliciesAdvanced(policy2, policy1)
+      expect(result.type).toBe('amendment')
+      if (result.type === 'amendment') {
+        expect(result.isVerifiedAmendment).toBe(false)
+      }
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: calculatePolicyDiff with tolerantMode option
+  // ============================================================================
+  describe('calculatePolicyDiff with tolerantMode', () => {
+    it('should ignore small numeric differences in tolerant mode', () => {
+      const policy1 = createMockPolicy({ coverage: 5153000 })
+      const policy2 = createMockPolicy({ coverage: 5203000 }) // ~1% diff
+
+      const tolerantDiff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      const strictDiff = calculatePolicyDiff(policy1, policy2, { tolerantMode: false })
+
+      // Tolerant mode should not flag the coverage difference
+      expect(tolerantDiff.find(d => d.field === 'coverage')).toBeUndefined()
+      // Strict mode should flag the coverage difference
+      expect(strictDiff.find(d => d.field === 'coverage')).toBeDefined()
+    })
+
+    it('should flag large numeric differences even in tolerant mode', () => {
+      const policy1 = createMockPolicy({ coverage: 100000 })
+      const policy2 = createMockPolicy({ coverage: 200000 }) // 100% diff
+
+      const tolerantDiff = calculatePolicyDiff(policy1, policy2, { tolerantMode: true })
+      expect(tolerantDiff.find(d => d.field === 'coverage')).toBeDefined()
+    })
+
+    it('should use tolerant mode by default', () => {
+      const policy1 = createMockPolicy({ coverage: 5153000 })
+      const policy2 = createMockPolicy({ coverage: 5203000 })
+
+      const defaultDiff = calculatePolicyDiff(policy1, policy2)
+      expect(defaultDiff.find(d => d.field === 'coverage')).toBeUndefined()
     })
   })
 })

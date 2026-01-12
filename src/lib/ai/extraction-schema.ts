@@ -30,6 +30,17 @@ export interface ExtractedPolicyData {
   specialConditions: string[]
   exclusions: string[]
 
+  // Amendment/Zeyilname detection (NEW)
+  // Turkish insurance amendments have specific markers that distinguish them from original policies
+  amendmentInfo: {
+    isAmendment: boolean // true if document contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", or similar markers
+    amendmentNumber: string | null // e.g., "1/2024", "2/2024" - extracted from "NO: N/YYYY" or "Değişiklik No: N"
+    amendmentDate: string | null // Effective date of amendment (Geçerlilik Tarihi) in YYYY-MM-DD
+    basePolicyNumber: string | null // Original policy number this amends (Ana Poliçe No)
+    amendmentReason: string | null // e.g., "Sigortalı Talebi", "Prim Farkı", "Teminat Eklenmesi"
+    premiumDifference: number | null // Premium change amount (can be negative for refunds)
+  }
+
   // Confidence scores for each field
   confidence: {
     overall: number
@@ -125,6 +136,38 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: { type: 'string' },
         description: 'What is NOT covered',
       },
+      amendmentInfo: {
+        type: 'object',
+        properties: {
+          isAmendment: {
+            type: 'boolean',
+            description: 'true if document is a Zeyilname/Amendment (contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "DEĞİŞİKLİK NO")',
+          },
+          amendmentNumber: {
+            type: ['string', 'null'],
+            description: 'Amendment sequence number (e.g., "1/2024", "2/2024") from "NO: N/YYYY" or "Değişiklik No: N"',
+          },
+          amendmentDate: {
+            type: ['string', 'null'],
+            description: 'Effective date of amendment (Geçerlilik Tarihi) in YYYY-MM-DD format',
+          },
+          basePolicyNumber: {
+            type: ['string', 'null'],
+            description: 'Original policy number this amends (Ana Poliçe No)',
+          },
+          amendmentReason: {
+            type: ['string', 'null'],
+            description: 'Reason for amendment (e.g., "Sigortalı Talebi", "Prim Farkı", "Teminat Eklenmesi")',
+          },
+          premiumDifference: {
+            type: ['number', 'null'],
+            description: 'Premium change amount (Prim Farkı) - positive for increase, negative for refund',
+          },
+        },
+        required: ['isAmendment', 'amendmentNumber', 'amendmentDate', 'basePolicyNumber', 'amendmentReason', 'premiumDifference'],
+        additionalProperties: false,
+        description: 'Amendment/Zeyilname detection - identifies if this is a policy change document',
+      },
       confidence: {
         type: 'object',
         properties: {
@@ -154,6 +197,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'coverages',
       'specialConditions',
       'exclusions',
+      'amendmentInfo',
       'confidence',
     ],
     additionalProperties: false,
@@ -204,5 +248,26 @@ Your task is to extract structured information from insurance policy documents.
    - Main coverage (Ana Teminat)
    - Additional coverages (Ek Teminatlar)
    - Optional protections
+
+8. **CRITICAL - Amendment/Zeyilname Detection**:
+   IMPORTANT: Determine if this document is an ORIGINAL POLICY or an AMENDMENT (Zeyilname).
+
+   An AMENDMENT (Zeyilname) document will have ONE OR MORE of these markers:
+   - Header containing: "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "POLİÇE TADİLATI"
+   - Amendment number: "NO: N/YYYY", "Değişiklik No: N", "Zeyilname No: N"
+   - Reference text: "Ana Poliçe No:", "Esas Poliçe:", "Base Policy:"
+   - Change reason: "Değişiklik Nedeni:", "Reason for Amendment:"
+   - Premium difference: "Prim Farkı:", "Premium Adjustment:"
+
+   For amendmentInfo:
+   - isAmendment: Set to TRUE only if you find explicit amendment markers above
+   - isAmendment: Set to FALSE for original policy documents (most documents)
+   - amendmentNumber: Extract from "NO: 1/2024" or "Değişiklik No: 1" format
+   - amendmentDate: The effective date of the amendment (Geçerlilik Tarihi)
+   - basePolicyNumber: The original policy being amended (may be same as policyNumber)
+   - amendmentReason: e.g., "Sigortalı Talebi", "Teminat Eklenmesi", "Prim Düzeltmesi"
+   - premiumDifference: Amount added/subtracted from premium (can be negative)
+
+   If NO amendment markers are found, set isAmendment to false and all other amendmentInfo fields to null.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

@@ -6,6 +6,12 @@ import type { Policy, DuplicatePolicy } from '@/types/policy'
  */
 const NEW_POLICY_THRESHOLD_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Tolerance threshold for numeric comparisons (handles AI extraction variance)
+ * 2% tolerance - e.g., ₺5,153,000 vs ₺5,203,000 (1% diff) would be considered same
+ */
+const NUMERIC_TOLERANCE_PERCENT = 0.02
+
 // ============================================================================
 // NORMALIZATION FUNCTIONS - Handle variations in extracted data
 // ============================================================================
@@ -18,6 +24,37 @@ export function normalizeNumber(value: number | string | undefined | null): numb
   const num = typeof value === 'string' ? parseFloat(value) : value
   if (isNaN(num)) return null
   return Math.round(num)
+}
+
+/**
+ * Check if two numbers are "equal" within tolerance (for handling AI extraction variance)
+ * Returns true if the difference is within NUMERIC_TOLERANCE_PERCENT (default 2%)
+ * This handles cases where AI extracts slightly different values from same document
+ *
+ * @example
+ * numbersEqualWithTolerance(5153000, 5203000) // true (0.97% diff < 2%)
+ * numbersEqualWithTolerance(100000, 200000)   // false (100% diff > 2%)
+ */
+export function numbersEqualWithTolerance(
+  a: number | null,
+  b: number | null,
+  tolerancePercent: number = NUMERIC_TOLERANCE_PERCENT
+): boolean {
+  // Both null = equal
+  if (a === null && b === null) return true
+  // One null = not equal
+  if (a === null || b === null) return false
+  // Both zero = equal
+  if (a === 0 && b === 0) return true
+
+  // Calculate percentage difference relative to the larger value
+  const maxValue = Math.max(Math.abs(a), Math.abs(b))
+  if (maxValue === 0) return true
+
+  const diff = Math.abs(a - b)
+  const percentDiff = diff / maxValue
+
+  return percentDiff <= tolerancePercent
 }
 
 /**
@@ -428,14 +465,37 @@ const DIFF_FIELD_CONFIG: Array<{
 const FUZZY_MATCH_FIELDS = ['location', 'insuredPerson', 'beneficiary', 'agentName']
 
 /**
+ * Fields that should use numeric tolerance (for AI extraction variance)
+ * These are financial fields where AI might extract slightly different values
+ */
+const NUMERIC_TOLERANCE_FIELDS = ['coverage', 'premium', 'deductible', 'monthlyPremium']
+
+export interface PolicyDiffOptions {
+  /**
+   * When true, uses relaxed comparison that tolerates extraction variance:
+   * - 2% tolerance for numeric fields (coverage, premium)
+   * - Fuzzy matching for text fields
+   * - Ignores array length differences within 20%
+   *
+   * Use tolerant mode when the new document does NOT have amendment markers.
+   * Use strict mode (false) when the document HAS amendment markers.
+   */
+  tolerantMode?: boolean
+}
+
+/**
  * Calculate field differences between two policies
  * Returns all fields that have changed
  * Uses tolerant comparison for strings and fuzzy matching for addresses/names
+ *
+ * @param tolerantMode - When true, applies extra tolerance for AI extraction variance
  */
 export function calculatePolicyDiff(
   oldPolicy: Policy,
-  newPolicy: Policy
+  newPolicy: Policy,
+  options: PolicyDiffOptions = {}
 ): PolicyFieldDiff[] {
+  const { tolerantMode = true } = options
   const diffs: PolicyFieldDiff[] = []
 
   for (const config of DIFF_FIELD_CONFIG) {
@@ -447,7 +507,13 @@ export function calculatePolicyDiff(
     if (config.type === 'number') {
       const oldNorm = normalizeNumber(oldVal as number)
       const newNorm = normalizeNumber(newVal as number)
-      areSame = oldNorm === newNorm || (oldNorm === null && newNorm === null)
+
+      // Use numeric tolerance for financial fields when in tolerant mode
+      if (tolerantMode && NUMERIC_TOLERANCE_FIELDS.includes(config.field)) {
+        areSame = numbersEqualWithTolerance(oldNorm, newNorm)
+      } else {
+        areSame = oldNorm === newNorm || (oldNorm === null && newNorm === null)
+      }
     } else if (config.type === 'date') {
       const oldNorm = normalizeDate(oldVal as string)
       const newNorm = normalizeDate(newVal as string)
@@ -533,10 +599,36 @@ export function calculatePolicyDiff(
 export type PreUploadCheckResult =
   | { type: 'noConflict' }
   | { type: 'exactDuplicate'; existingPolicy: Policy }
-  | { type: 'amendment'; existingPolicy: Policy; changes: PolicyFieldDiff[] }
+  | { type: 'extractionVariance'; existingPolicy: Policy; changes: PolicyFieldDiff[] }
+  | { type: 'amendment'; existingPolicy: Policy; changes: PolicyFieldDiff[]; isVerifiedAmendment: boolean }
+
+/**
+ * Check if a policy has valid amendment markers (Zeyilname indicators)
+ * Turkish insurance amendments always have explicit markers in the document
+ */
+export function hasAmendmentMarkers(policy: Policy): boolean {
+  if (!policy.amendmentInfo) return false
+
+  // Check for explicit amendment flag
+  if (policy.amendmentInfo.isAmendment) return true
+
+  // Additional validation: must have at least an amendment number
+  // to be considered a real amendment
+  if (policy.amendmentInfo.amendmentNumber) return true
+
+  return false
+}
 
 /**
  * Compare policies and determine conflict type
+ *
+ * Logic:
+ * 1. If identifiers don't match → no conflict
+ * 2. If new document has amendment markers (Zeyilname) → real amendment
+ * 3. If no markers, compare with tolerance:
+ *    - No differences → exact duplicate
+ *    - Only minor differences within tolerance → extraction variance
+ *    - Significant differences → suspicious (possible amendment without markers)
  */
 export function comparePoliciesAdvanced(
   newPolicy: Policy,
@@ -548,14 +640,58 @@ export function comparePoliciesAdvanced(
     return { type: 'noConflict' }
   }
 
-  // Same identifier - check for differences
-  const changes = calculatePolicyDiff(existingPolicy, newPolicy)
+  // Check if the NEW document has explicit amendment markers
+  const isVerifiedAmendment = hasAmendmentMarkers(newPolicy)
 
-  if (changes.length === 0) {
+  if (isVerifiedAmendment) {
+    // This is a verified Zeyilname/Amendment document
+    // Use strict comparison to show actual differences
+    const changes = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: false })
+    return {
+      type: 'amendment',
+      existingPolicy,
+      changes,
+      isVerifiedAmendment: true,
+    }
+  }
+
+  // No amendment markers - likely same document uploaded again
+  // First check with tolerant comparison (handles AI extraction variance)
+  const tolerantChanges = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: true })
+
+  if (tolerantChanges.length === 0) {
+    // No differences even with strict comparison, or all within tolerance
     return { type: 'exactDuplicate', existingPolicy }
   }
 
-  return { type: 'amendment', existingPolicy, changes }
+  // There are differences but no amendment markers
+  // This could be:
+  // 1. Extraction variance (AI extracted different values from same document)
+  // 2. A real amendment that's missing proper markers
+  // 3. A different version of the policy
+
+  // Check if ALL differences are minor (within tolerance when compared strictly)
+  const strictChanges = calculatePolicyDiff(existingPolicy, newPolicy, { tolerantMode: false })
+
+  // If strict and tolerant produce same results, differences are beyond tolerance
+  if (strictChanges.length === tolerantChanges.length) {
+    // Differences exceed tolerance - flag as potential amendment
+    // but mark as unverified since no amendment markers found
+    return {
+      type: 'amendment',
+      existingPolicy,
+      changes: strictChanges,
+      isVerifiedAmendment: false,
+    }
+  }
+
+  // Some differences were absorbed by tolerance
+  // This is likely extraction variance, not a real amendment
+  return {
+    type: 'extractionVariance',
+    existingPolicy,
+    changes: tolerantChanges, // Only show differences that exceeded tolerance
+  }
 }
 
 // ============================================================================
