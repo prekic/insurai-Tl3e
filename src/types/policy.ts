@@ -11,6 +11,25 @@ export interface Coverage {
   description?: string
 }
 
+/**
+ * Amendment/Zeyilname information for Turkish insurance policies
+ * Real amendments have explicit markers in the document
+ */
+export interface AmendmentInfo {
+  /** True if document explicitly contains Zeyilname/Amendment markers */
+  isAmendment: boolean
+  /** Amendment sequence number (e.g., "1/2024", "2/2024") */
+  amendmentNumber: string | null
+  /** Effective date of the amendment */
+  amendmentDate: string | null
+  /** Original policy number being amended */
+  basePolicyNumber: string | null
+  /** Reason for amendment (e.g., "Sigortalı Talebi", "Teminat Eklenmesi") */
+  amendmentReason: string | null
+  /** Premium change amount (positive = increase, negative = refund) */
+  premiumDifference: number | null
+}
+
 export interface Policy {
   id: string
   policyNumber: string
@@ -40,6 +59,10 @@ export interface Policy {
   exclusions: string[]
   specialConditions: string[]
   insuranceLine: string
+  /** Amendment information - populated if document has Zeyilname markers */
+  amendmentInfo?: AmendmentInfo
+  /** Hash of extracted text for detecting re-uploads of same document */
+  documentHash?: string
 }
 
 /**

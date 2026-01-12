@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, AlertTriangle, Copy, GitMerge, FileX, Files, Loader2 } from 'lucide-react'
+import { X, AlertTriangle, Copy, GitMerge, FileX, Files, Loader2, RefreshCw, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import type { Policy } from '@/types/policy'
@@ -26,7 +26,7 @@ interface ConflictResolutionDialogProps {
 }
 
 /**
- * Modal dialog for resolving policy conflicts (duplicates and amendments)
+ * Modal dialog for resolving policy conflicts (duplicates, extraction variance, and amendments)
  */
 export function ConflictResolutionDialog({
   conflict,
@@ -48,9 +48,68 @@ export function ConflictResolutionDialog({
   }
 
   const isExactDuplicate = conflict.type === 'exactDuplicate'
+  const isExtractionVariance = conflict.type === 'extractionVariance'
   const isAmendment = conflict.type === 'amendment'
+  const isVerifiedAmendment = isAmendment && conflict.isVerifiedAmendment
   const existingPolicy = conflict.existingPolicy
-  const changes = isAmendment ? conflict.changes : []
+  const changes = (isAmendment || isExtractionVariance) ? conflict.changes : []
+
+  // Determine dialog style based on conflict type
+  const getDialogStyle = () => {
+    if (isExactDuplicate || isExtractionVariance) {
+      return { bgColor: 'bg-amber-50', borderColor: 'border-amber-200', iconBg: 'bg-amber-100' }
+    }
+    if (isVerifiedAmendment) {
+      return { bgColor: 'bg-green-50', borderColor: 'border-green-200', iconBg: 'bg-green-100' }
+    }
+    return { bgColor: 'bg-blue-50', borderColor: 'border-blue-200', iconBg: 'bg-blue-100' }
+  }
+
+  const style = getDialogStyle()
+
+  // Get the appropriate icon
+  const getIcon = () => {
+    if (isExactDuplicate) return <Copy className="w-5 h-5 text-amber-600" />
+    if (isExtractionVariance) return <RefreshCw className="w-5 h-5 text-amber-600" />
+    if (isVerifiedAmendment) return <CheckCircle className="w-5 h-5 text-green-600" />
+    return <GitMerge className="w-5 h-5 text-blue-600" />
+  }
+
+  // Get dialog title
+  const getTitle = () => {
+    if (isExactDuplicate) {
+      return locale === 'tr' ? 'Ayni Police Bulundu' : 'Duplicate Policy Found'
+    }
+    if (isExtractionVariance) {
+      return locale === 'tr' ? 'Ayni Belge - Farkli Okuma' : 'Same Document - Extraction Variance'
+    }
+    if (isVerifiedAmendment) {
+      return locale === 'tr' ? 'Resmi Zeyilname Tespit Edildi' : 'Official Amendment (Zeyilname) Detected'
+    }
+    return locale === 'tr' ? 'Olasi Police Degisikligi' : 'Possible Policy Amendment'
+  }
+
+  // Get dialog description
+  const getDescription = () => {
+    if (isExactDuplicate) {
+      return locale === 'tr'
+        ? 'Bu police veritabaninizda zaten mevcut.'
+        : 'This policy already exists in your database.'
+    }
+    if (isExtractionVariance) {
+      return locale === 'tr'
+        ? 'Ayni belge tekrar yuklendi. AI kucuk farkliliklar tespit etti (OCR/okuma farki).'
+        : 'Same document uploaded again. AI detected minor differences (OCR/extraction variance).'
+    }
+    if (isVerifiedAmendment) {
+      return locale === 'tr'
+        ? 'Bu belge resmi bir zeyilname (police degisikligi). Degisiklik numarasi tespit edildi.'
+        : 'This document is an official amendment (Zeyilname). Amendment number detected.'
+    }
+    return locale === 'tr'
+      ? 'Farkliliklar tespit edildi ancak zeyilname isaretleyicisi bulunamadi. Gercek degisiklik mi kontrol edin.'
+      : 'Differences detected but no amendment markers found. Verify if this is a real change.'
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -66,39 +125,24 @@ export function ConflictResolutionDialog({
         <div
           className={cn(
             'flex items-center gap-3 px-6 py-4 border-b',
-            isExactDuplicate ? 'bg-amber-50 border-amber-200' : 'bg-blue-50 border-blue-200'
+            style.bgColor,
+            style.borderColor
           )}
         >
           <div
             className={cn(
               'w-10 h-10 rounded-full flex items-center justify-center',
-              isExactDuplicate ? 'bg-amber-100' : 'bg-blue-100'
+              style.iconBg
             )}
           >
-            {isExactDuplicate ? (
-              <Copy className="w-5 h-5 text-amber-600" />
-            ) : (
-              <GitMerge className="w-5 h-5 text-blue-600" />
-            )}
+            {getIcon()}
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-semibold text-gray-900">
-              {isExactDuplicate
-                ? locale === 'tr'
-                  ? 'Ayni Police Bulundu'
-                  : 'Duplicate Policy Found'
-                : locale === 'tr'
-                  ? 'Police Degisikligi Algilandi'
-                  : 'Policy Amendment Detected'}
+              {getTitle()}
             </h2>
             <p className="text-sm text-gray-600">
-              {isExactDuplicate
-                ? locale === 'tr'
-                  ? 'Bu police veritabaninizda zaten mevcut.'
-                  : 'This policy already exists in your database.'
-                : locale === 'tr'
-                  ? 'Mevcut policede degisiklikler tespit edildi.'
-                  : 'Changes detected from an existing policy.'}
+              {getDescription()}
             </p>
           </div>
           <button
@@ -132,26 +176,48 @@ export function ConflictResolutionDialog({
             </div>
           </div>
 
-          {/* Amendment diff */}
-          {isAmendment && changes.length > 0 && (
+          {/* Amendment or Extraction Variance diff */}
+          {(isAmendment || isExtractionVariance) && changes.length > 0 && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-gray-500">
                   {locale === 'tr'
-                    ? `${changes.length} Degisiklik Tespit Edildi`
-                    : `${changes.length} Change(s) Detected`}
+                    ? `${changes.length} Fark Tespit Edildi`
+                    : `${changes.length} Difference(s) Detected`}
                 </h3>
                 <PolicyDiffSummary changes={changes} />
               </div>
 
-              {/* Summary warning for critical/major changes */}
-              {changes.some((c) => c.significance === 'critical' || c.significance === 'major') && (
+              {/* Info box based on type */}
+              {isExtractionVariance && (
+                <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+                  <RefreshCw className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-amber-800">
+                    {locale === 'tr'
+                      ? 'Bu farklar muhtemelen AI\'nin ayni belgeyi farkli okumasi kaynakli (OCR varyasyonu). Gercek bir zeyilname degilse "Atla" secenegini kullanin.'
+                      : 'These differences are likely from AI reading the same document differently (OCR variance). If not a real amendment, use "Skip" option.'}
+                  </div>
+                </div>
+              )}
+
+              {isVerifiedAmendment && (
+                <div className="flex items-start gap-3 p-3 mb-4 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-green-800">
+                    {locale === 'tr'
+                      ? 'Bu belgede resmi zeyilname isaretleyicileri bulundu. Degisiklikleri kaydederek surum gecmisini tutabilirsiniz.'
+                      : 'Official amendment markers found in this document. Track changes to maintain version history.'}
+                  </div>
+                </div>
+              )}
+
+              {isAmendment && !isVerifiedAmendment && changes.some((c) => c.significance === 'critical' || c.significance === 'major') && (
                 <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-800">
                     {locale === 'tr'
-                      ? 'Bu degisiklikler onemli police sartlarini etkiliyor. Lutfen dikkatli inceleyin.'
-                      : 'These changes affect important policy terms. Please review carefully.'}
+                      ? 'Onemli farkliliklar tespit edildi ancak zeyilname isaretleyicisi yok. Gercek bir degisiklik mi yoksa ayni belgenin farkli okunmasi mi kontrol edin.'
+                      : 'Significant differences detected but no amendment markers. Verify if this is a real change or just extraction variance.'}
                   </div>
                 </div>
               )}
@@ -166,8 +232,8 @@ export function ConflictResolutionDialog({
                     ? 'Detaylari Gizle'
                     : 'Hide Details'
                   : locale === 'tr'
-                    ? 'Tum Degisiklikleri Goster'
-                    : 'Show All Changes'}
+                    ? 'Tum Farkliliklari Goster'
+                    : 'Show All Differences'}
               </button>
 
               {showDetails && (
@@ -223,8 +289,36 @@ export function ConflictResolutionDialog({
                   variant="secondary"
                 />
               </>
+            ) : isExtractionVariance ? (
+              // Extraction variance options - prioritize Skip
+              <>
+                <ActionButton
+                  icon={FileX}
+                  label={locale === 'tr' ? 'Atla (Onerilen)' : 'Skip (Recommended)'}
+                  description={locale === 'tr' ? 'Ayni belge, kaydetme' : "Same document, don't save"}
+                  onClick={onSkip}
+                  disabled={isLoading}
+                  variant="primary"
+                />
+                <ActionButton
+                  icon={Copy}
+                  label={locale === 'tr' ? 'Yine de Guncelle' : 'Update Anyway'}
+                  description={locale === 'tr' ? 'Yeni okuma ile guncelle' : 'Replace with new extraction'}
+                  onClick={onReplace}
+                  disabled={isLoading}
+                  variant="secondary"
+                />
+                <ActionButton
+                  icon={Files}
+                  label={locale === 'tr' ? 'Ayri Kaydet' : 'Save Separately'}
+                  description={locale === 'tr' ? 'Farkli belge ise' : 'If different document'}
+                  onClick={onKeepBoth}
+                  disabled={isLoading}
+                  variant="secondary"
+                />
+              </>
             ) : (
-              // Amendment options
+              // Amendment options (verified or unverified)
               <>
                 <ActionButton
                   icon={FileX}
@@ -236,7 +330,7 @@ export function ConflictResolutionDialog({
                 />
                 <ActionButton
                   icon={GitMerge}
-                  label={locale === 'tr' ? 'Degisiklik Olarak Kaydet' : 'Track as Amendment'}
+                  label={locale === 'tr' ? 'Zeyilname Olarak Kaydet' : 'Track as Amendment'}
                   description={
                     locale === 'tr'
                       ? 'Guncelle ve gecmisi sakla'
@@ -244,7 +338,7 @@ export function ConflictResolutionDialog({
                   }
                   onClick={onTrackAmendment}
                   disabled={isLoading}
-                  variant="primary"
+                  variant={isVerifiedAmendment ? 'primary' : 'secondary'}
                   loading={isLoading}
                 />
                 <ActionButton
@@ -253,7 +347,7 @@ export function ConflictResolutionDialog({
                   description={locale === 'tr' ? 'Yeni kayit olarak ekle' : 'Add as new record'}
                   onClick={onKeepBoth}
                   disabled={isLoading}
-                  variant="secondary"
+                  variant={isVerifiedAmendment ? 'secondary' : 'primary'}
                 />
               </>
             )}
@@ -334,49 +428,80 @@ export function DuplicateWarningBanner({
   }
 
   const isExactDuplicate = conflict.type === 'exactDuplicate'
+  const isExtractionVariance = conflict.type === 'extractionVariance'
+  const isAmendment = conflict.type === 'amendment'
+  const isVerifiedAmendment = isAmendment && conflict.isVerifiedAmendment
+
+  // Determine styling based on type
+  const getStyle = () => {
+    if (isExactDuplicate || isExtractionVariance) {
+      return { bg: 'bg-amber-50', border: 'border-amber-200', buttonBg: 'bg-amber-100', buttonText: 'text-amber-700', buttonHover: 'hover:bg-amber-200' }
+    }
+    if (isVerifiedAmendment) {
+      return { bg: 'bg-green-50', border: 'border-green-200', buttonBg: 'bg-green-100', buttonText: 'text-green-700', buttonHover: 'hover:bg-green-200' }
+    }
+    return { bg: 'bg-blue-50', border: 'border-blue-200', buttonBg: 'bg-blue-100', buttonText: 'text-blue-700', buttonHover: 'hover:bg-blue-200' }
+  }
+
+  const style = getStyle()
+
+  // Get the appropriate icon
+  const getIcon = () => {
+    if (isExactDuplicate) return <Copy className="w-5 h-5 text-amber-600 flex-shrink-0" />
+    if (isExtractionVariance) return <RefreshCw className="w-5 h-5 text-amber-600 flex-shrink-0" />
+    if (isVerifiedAmendment) return <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+    return <GitMerge className="w-5 h-5 text-blue-600 flex-shrink-0" />
+  }
+
+  // Get message
+  const getMessage = () => {
+    if (isExactDuplicate) {
+      return {
+        title: locale === 'tr' ? 'Kopya police' : 'Duplicate',
+        detail: locale === 'tr' ? '- Zaten mevcut' : '- Already exists',
+      }
+    }
+    if (isExtractionVariance) {
+      return {
+        title: locale === 'tr' ? 'Okuma farki' : 'Extraction variance',
+        detail: locale === 'tr' ? '- Ayni belge, farkli okuma' : '- Same doc, different extraction',
+      }
+    }
+    if (isVerifiedAmendment) {
+      return {
+        title: locale === 'tr' ? 'Resmi zeyilname' : 'Official amendment',
+        detail: locale === 'tr' ? `- ${conflict.changes.length} degisiklik` : `- ${conflict.changes.length} change(s)`,
+      }
+    }
+    return {
+      title: locale === 'tr' ? 'Olasi degisiklik' : 'Possible change',
+      detail: locale === 'tr' ? `- ${conflict.changes.length} fark` : `- ${conflict.changes.length} diff(s)`,
+    }
+  }
+
+  const message = getMessage()
 
   return (
     <div
       className={cn(
         'flex items-center gap-3 p-3 rounded-lg border',
-        isExactDuplicate
-          ? 'bg-amber-50 border-amber-200'
-          : 'bg-blue-50 border-blue-200',
+        style.bg,
+        style.border,
         className
       )}
     >
-      {isExactDuplicate ? (
-        <Copy className="w-5 h-5 text-amber-600 flex-shrink-0" />
-      ) : (
-        <GitMerge className="w-5 h-5 text-blue-600 flex-shrink-0" />
-      )}
+      {getIcon()}
       <div className="flex-1 text-sm">
-        <span className="font-medium text-gray-900">
-          {isExactDuplicate
-            ? locale === 'tr'
-              ? 'Kopya police algilandi'
-              : 'Duplicate detected'
-            : locale === 'tr'
-              ? 'Degisiklik algilandi'
-              : 'Amendment detected'}
-        </span>
-        <span className="text-gray-600 ml-1">
-          {isExactDuplicate
-            ? locale === 'tr'
-              ? '- Bu police zaten mevcut'
-              : '- This policy already exists'
-            : locale === 'tr'
-              ? `- ${conflict.changes.length} degisiklik`
-              : `- ${conflict.changes.length} change(s)`}
-        </span>
+        <span className="font-medium text-gray-900">{message.title}</span>
+        <span className="text-gray-600 ml-1">{message.detail}</span>
       </div>
       <button
         onClick={onShowDialog}
         className={cn(
           'px-3 py-1.5 text-sm font-medium rounded-lg',
-          isExactDuplicate
-            ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-            : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+          style.buttonBg,
+          style.buttonText,
+          style.buttonHover
         )}
       >
         {locale === 'tr' ? 'Coz' : 'Resolve'}

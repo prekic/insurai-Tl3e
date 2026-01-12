@@ -408,6 +408,14 @@ function createEmptyData(): ExtractedPolicyData {
     coverages: [],
     specialConditions: [],
     exclusions: [],
+    amendmentInfo: {
+      isAmendment: false,
+      amendmentNumber: null,
+      amendmentDate: null,
+      basePolicyNumber: null,
+      amendmentReason: null,
+      premiumDifference: null,
+    },
     confidence: {
       overall: 0,
       policyNumber: 0,
