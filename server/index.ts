@@ -92,6 +92,11 @@ app.use(
         defaultSrc: ["'self'"],
         scriptSrc: [
           "'self'",
+          // PDF.js worker from CDN
+          'https://unpkg.com',
+          'https://cdn.jsdelivr.net',
+          'https://cdnjs.cloudflare.com',
+          'blob:', // PDF.js creates blob URLs for workers
           // Sentry for error tracking
           'https://*.sentry.io',
           'https://*.sentry-cdn.com',
@@ -121,6 +126,10 @@ app.use(
           // Sentry
           'https://*.sentry.io',
           'https://*.ingest.sentry.io',
+          // PDF.js worker modules
+          'https://unpkg.com',
+          'https://cdn.jsdelivr.net',
+          'https://cdnjs.cloudflare.com',
           // Development WebSocket (Vite HMR)
           ...(IS_PRODUCTION ? [] : ['ws://localhost:*', 'wss://localhost:*']),
         ],
@@ -129,7 +138,7 @@ app.use(
         baseUri: ["'self'"],
         formAction: ["'self'"],
         frameAncestors: ["'none'"],
-        workerSrc: ["'self'", 'blob:'],
+        workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net'],
         childSrc: ["'self'", 'blob:'],
         mediaSrc: ["'self'"],
         manifestSrc: ["'self'"],
