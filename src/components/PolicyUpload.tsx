@@ -86,7 +86,7 @@ interface ConflictDialogState {
 
 export function PolicyUpload() {
   const navigate = useNavigate()
-  const { addPolicies } = usePolicies()
+  const { addPolicies, refreshPolicies } = usePolicies()
   const { user, isConfigured: authConfigured } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -275,6 +275,9 @@ export function PolicyUpload() {
           const supabasePolicy = convertToSupabasePolicy(policy, user.id)
           await createPolicy(supabasePolicy)
           savedToCloud = true
+
+          // Refresh local context so policy is immediately available
+          await refreshPolicies()
 
           // Also upload the document to storage
           try {
@@ -509,6 +512,9 @@ export function PolicyUpload() {
         throw new Error(result.error)
       }
 
+      // Refresh local context so policy is immediately available
+      await refreshPolicies()
+
       // Update file state
       setFiles((prev) =>
         prev.map((f) =>
@@ -540,6 +546,9 @@ export function PolicyUpload() {
       // Save the new policy as a separate record
       const supabasePolicy = convertToSupabasePolicy(newPolicy, user.id)
       await createPolicy(supabasePolicy)
+
+      // Refresh local context so policy is immediately available
+      await refreshPolicies()
 
       // Also upload the document
       const uploadedFile = files.find((f) => f.id === fileId)
@@ -585,6 +594,9 @@ export function PolicyUpload() {
       if (!result.success) {
         throw new Error(result.error || 'Failed to track amendment')
       }
+
+      // Refresh local context so policy is immediately available
+      await refreshPolicies()
 
       // Update file state
       setFiles((prev) =>
