@@ -93,7 +93,7 @@ export function Hero() {
                 )}
               </Link>
               <Link
-                to="/upload"
+                to="/upload?autoOpen=true"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
               >
                 <span>Compare</span>
@@ -117,7 +117,7 @@ export function Hero() {
                 <Bell size={20} />
               </button>
               <Link
-                to="/upload"
+                to="/upload?autoOpen=true"
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
               >
                 <Upload size={18} />
@@ -199,13 +199,13 @@ export function Hero() {
                 Dashboard
               </button>
               <button
-                onClick={() => handleMenuClick('/upload')}
+                onClick={() => handleMenuClick('/upload?autoOpen=true')}
                 className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
               >
                 Compare
               </button>
               <button
-                onClick={() => handleMenuClick('/upload')}
+                onClick={() => handleMenuClick('/upload?autoOpen=true')}
                 className="block w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-center"
               >
                 Upload Policy
@@ -253,7 +253,7 @@ export function Hero() {
               <div key="ctas" className="flex flex-col sm:flex-row gap-4 pt-4">
                 <UploadWidget compact={true} />
                 <AnimatedButton
-                  onClick={() => navigate('/upload')}
+                  onClick={() => navigate('/upload?autoOpen=true')}
                   className="group inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-medium"
                 >
                   <span>Try with sample policies</span>

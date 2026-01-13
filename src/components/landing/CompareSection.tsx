@@ -12,7 +12,7 @@ export function CompareSection() {
           Upload your first policy and see the power of AI-driven insurance analysis.
         </p>
         <Link
-          to="/upload"
+          to="/upload?autoOpen=true"
           className="inline-flex items-center gap-3 px-8 py-4 bg-white text-blue-600 rounded-xl hover:shadow-lg transition-all font-semibold text-lg group"
         >
           Get Started Free

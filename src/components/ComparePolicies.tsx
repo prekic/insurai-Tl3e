@@ -200,7 +200,7 @@ export function ComparePolicies() {
                     ? 'Karşılaştırmak için önce poliçe yükleyin'
                     : 'Upload policies first to compare them'}
                 </p>
-                <Button onClick={() => navigate('/upload')}>
+                <Button onClick={() => navigate('/upload?autoOpen=true')}>
                   {locale === 'tr' ? 'Poliçe Yükle' : 'Upload Policy'}
                 </Button>
               </div>

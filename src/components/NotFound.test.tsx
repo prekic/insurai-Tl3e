@@ -116,7 +116,7 @@ describe('NotFound', () => {
       renderWithRouter(<NotFound />)
 
       const uploadLink = screen.getByText('Upload').closest('a')
-      expect(uploadLink).toHaveAttribute('href', '/upload')
+      expect(uploadLink).toHaveAttribute('href', '/upload?autoOpen=true')
     })
 
     it('should render Help link', () => {
