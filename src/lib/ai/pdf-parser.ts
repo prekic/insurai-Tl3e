@@ -3,6 +3,8 @@
  *
  * Uses dynamic imports to load pdfjs-dist only when needed,
  * reducing initial bundle size by ~450KB.
+ *
+ * Includes CDN fallback logic for worker loading reliability.
  */
 
 export interface PDFParseResult {
@@ -23,6 +25,55 @@ export interface PDFParseError {
 // Cached pdfjs-dist module
 let pdfjsLib: typeof import('pdfjs-dist') | null = null
 let loadPromise: Promise<typeof import('pdfjs-dist')> | null = null
+let workerLoadAttempted = false
+
+/**
+ * CDN sources for PDF.js worker (in order of preference)
+ * Multiple fallbacks to handle CDN outages
+ */
+const WORKER_CDN_SOURCES = [
+  (version: string) => `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
+  (version: string) => `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
+  (version: string) => `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`,
+]
+
+/**
+ * Test if a worker URL is accessible
+ */
+async function testWorkerUrl(url: string, timeout: number = 5000): Promise<boolean> {
+  try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+    })
+
+    clearTimeout(timeoutId)
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Find a working CDN for the PDF.js worker
+ */
+async function findWorkingWorkerUrl(version: string): Promise<string | null> {
+  for (const cdnFn of WORKER_CDN_SOURCES) {
+    const url = cdnFn(version)
+    console.log(`[PDF.js] Testing worker URL: ${url}`)
+
+    if (await testWorkerUrl(url)) {
+      console.log(`[PDF.js] Found working worker: ${url}`)
+      return url
+    }
+  }
+
+  console.warn('[PDF.js] No CDN worker available, will use fake worker')
+  return null
+}
 
 /**
  * Lazily load pdfjs-dist only when first needed
@@ -42,11 +93,23 @@ async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
   // Start loading
   loadPromise = (async () => {
     const pdfjs = await import('pdfjs-dist')
-
-    // Configure worker using unpkg CDN (most reliable for npm packages)
     const PDFJS_VERSION = pdfjs.version
-    pdfjs.GlobalWorkerOptions.workerSrc =
-      `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}/build/pdf.worker.min.mjs`
+
+    // Only attempt worker setup once
+    if (!workerLoadAttempted) {
+      workerLoadAttempted = true
+
+      // Try to find a working CDN for the worker
+      const workerUrl = await findWorkingWorkerUrl(PDFJS_VERSION)
+
+      if (workerUrl) {
+        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+      } else {
+        // All CDNs failed - pdfjs will use fake worker (main thread)
+        // This is slower but still works
+        console.warn('[PDF.js] Using main thread (fake worker) - parsing may be slower')
+      }
+    }
 
     // Cache the module
     pdfjsLib = pdfjs
