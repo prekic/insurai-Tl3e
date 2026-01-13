@@ -607,6 +607,25 @@ export function PolicyUpload() {
     }
   }
 
+  const handleConflictEdit = () => {
+    const { newPolicy } = conflictDialog
+    if (!newPolicy) return
+
+    // Close the conflict dialog and navigate to policy detail with edit mode
+    // For now, we'll store the policy ID and show a toast
+    // The PolicyDetailView can be enhanced to support editing
+    closeConflictDialog()
+
+    toast.info('Edit Mode', {
+      description: 'Editing the extracted data before saving. Navigate to the policy to make changes.',
+      action: {
+        label: 'View Policy',
+        onClick: () => navigate(`/policy/${newPolicy.id}?edit=true`),
+      },
+      duration: 10000,
+    })
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -1038,6 +1057,7 @@ export function PolicyUpload() {
           onReplace={handleConflictReplace}
           onKeepBoth={handleConflictKeepBoth}
           onTrackAmendment={handleConflictTrackAmendment}
+          onEdit={handleConflictEdit}
           onClose={closeConflictDialog}
           isLoading={conflictDialog.isLoading}
         />

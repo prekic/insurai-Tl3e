@@ -27,6 +27,8 @@ import {
   documentHashesMatch,
   normalizeOCRTextForExtraction,
   generateOCRTextHash,
+  areLimitsSDKEquivalent,
+  areTotalCoveragesSDKEquivalent,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 
@@ -758,6 +760,60 @@ describe('policy-utils', () => {
     it('should handle the exact case from the user report', () => {
       // User reported: ₺5.153.000 vs ₺5.203.000
       expect(numbersEqualWithTolerance(5153000, 5203000)).toBe(true)
+    })
+  })
+
+  // ============================================================================
+  // NEW TESTS: SEDDK Equivalent Limits (Traffic Insurance)
+  // ============================================================================
+  describe('areLimitsSDKEquivalent', () => {
+    it('should recognize SEDDK Maddi Hasar limits as equivalent', () => {
+      // 300,000 TL (per vehicle) ↔ 600,000 TL (per accident)
+      expect(areLimitsSDKEquivalent(300000, 600000)).toBe(true)
+      expect(areLimitsSDKEquivalent(600000, 300000)).toBe(true)
+    })
+
+    it('should recognize SEDDK bodily injury limits as equivalent', () => {
+      // 2,700,000 TL (per person) ↔ 13,500,000 TL (per accident)
+      expect(areLimitsSDKEquivalent(2700000, 13500000)).toBe(true)
+      expect(areLimitsSDKEquivalent(13500000, 2700000)).toBe(true)
+    })
+
+    it('should return true for identical limits', () => {
+      expect(areLimitsSDKEquivalent(300000, 300000)).toBe(true)
+      expect(areLimitsSDKEquivalent(2700000, 2700000)).toBe(true)
+    })
+
+    it('should return false for non-SEDDK limit pairs', () => {
+      expect(areLimitsSDKEquivalent(100000, 500000)).toBe(false)
+      expect(areLimitsSDKEquivalent(1000000, 5000000)).toBe(false)
+    })
+
+    it('should allow 5% tolerance for minor extraction differences', () => {
+      // 300,000 ± 5% = 285,000 - 315,000
+      // 600,000 ± 5% = 570,000 - 630,000
+      expect(areLimitsSDKEquivalent(285000, 630000)).toBe(true)
+      expect(areLimitsSDKEquivalent(315000, 570000)).toBe(true)
+    })
+  })
+
+  describe('areTotalCoveragesSDKEquivalent', () => {
+    it('should recognize SEDDK total coverage calculations as equivalent', () => {
+      // Per-unit sum:    300K + 2.7M + 2.7M = 5.7M
+      // Per-accident sum: 600K + 13.5M + 13.5M = 27.6M
+      expect(areTotalCoveragesSDKEquivalent(5700000, 27600000)).toBe(true)
+      expect(areTotalCoveragesSDKEquivalent(27600000, 5700000)).toBe(true)
+    })
+
+    it('should return true for similar totals within 5% tolerance', () => {
+      expect(areTotalCoveragesSDKEquivalent(5700000, 5800000)).toBe(true)
+      // 5.4M is 5.26% different from 5.7M - just outside 5% tolerance
+      expect(areTotalCoveragesSDKEquivalent(5700000, 5415000)).toBe(true) // 5% exactly
+    })
+
+    it('should return false for non-SEDDK equivalent totals', () => {
+      expect(areTotalCoveragesSDKEquivalent(1000000, 10000000)).toBe(false)
+      expect(areTotalCoveragesSDKEquivalent(500000, 5000000)).toBe(false)
     })
   })
 

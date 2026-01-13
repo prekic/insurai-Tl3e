@@ -13,6 +13,79 @@ const NEW_POLICY_THRESHOLD_MS = 24 * 60 * 60 * 1000
 const NUMERIC_TOLERANCE_PERCENT = 0.02
 
 // ============================================================================
+// SEDDK STANDARD LIMIT PAIRS (Traffic Insurance - ZMSS)
+// AI sometimes extracts per-unit limits, sometimes per-accident limits
+// Both are valid representations of the same coverage
+// ============================================================================
+
+/**
+ * SEDDK 2025 traffic insurance (ZMSS) standard limits
+ * Per-unit (kişi/araç başı) and per-accident (kaza başı) limit pairs
+ * These are official limits set by SEDDK and updated annually
+ */
+const SEDDK_LIMIT_PAIRS: Array<{ perUnit: number; perAccident: number; name: string }> = [
+  // Maddi Hasar (Material Damage) - 2025 limits
+  { perUnit: 300000, perAccident: 600000, name: 'maddi_hasar' },
+  // Ölüm ve Sürekli Sakatlık (Death and Permanent Disability) - 2025 limits
+  { perUnit: 2700000, perAccident: 13500000, name: 'olum_sakatlik' },
+  // Sağlık Giderleri (Medical Expenses) - 2025 limits
+  { perUnit: 2700000, perAccident: 13500000, name: 'saglik_giderleri' },
+]
+
+/**
+ * Total coverage calculation varies based on whether AI uses per-unit or per-accident limits
+ * Per-unit sum:    300K + 2.7M + 2.7M = 5.7M
+ * Per-accident sum: 600K + 13.5M + 13.5M = 27.6M
+ * These represent the SAME policy
+ */
+const SEDDK_TOTAL_COVERAGE_EQUIVALENTS = [
+  { perUnitTotal: 5700000, perAccidentTotal: 27600000 },
+]
+
+/**
+ * Check if two limit values are SEDDK equivalent (per-unit ↔ per-accident)
+ * Returns true if both are valid representations of the same coverage limit
+ */
+export function areLimitsSDKEquivalent(limitA: number, limitB: number): boolean {
+  if (limitA === limitB) return true
+
+  // Sort to always compare smaller vs larger
+  const [smaller, larger] = limitA < limitB ? [limitA, limitB] : [limitB, limitA]
+
+  // Check against SEDDK pairs
+  for (const pair of SEDDK_LIMIT_PAIRS) {
+    // Allow 5% tolerance for minor extraction differences
+    const perUnitMatch = numbersEqualWithTolerance(smaller, pair.perUnit, 0.05)
+    const perAccidentMatch = numbersEqualWithTolerance(larger, pair.perAccident, 0.05)
+    if (perUnitMatch && perAccidentMatch) {
+      return true
+    }
+  }
+
+  return false
+}
+
+/**
+ * Check if two total coverage values are SEDDK equivalent
+ * (one calculated from per-unit limits, other from per-accident limits)
+ */
+export function areTotalCoveragesSDKEquivalent(coverageA: number, coverageB: number): boolean {
+  if (numbersEqualWithTolerance(coverageA, coverageB, 0.05)) return true
+
+  const [smaller, larger] = coverageA < coverageB ? [coverageA, coverageB] : [coverageB, coverageA]
+
+  for (const pair of SEDDK_TOTAL_COVERAGE_EQUIVALENTS) {
+    const perUnitMatch = numbersEqualWithTolerance(smaller, pair.perUnitTotal, 0.10)
+    const perAccidentMatch = numbersEqualWithTolerance(larger, pair.perAccidentTotal, 0.10)
+    if (perUnitMatch && perAccidentMatch) {
+      return true
+    }
+  }
+
+  return false
+}
+
+// ============================================================================
 // NORMALIZATION FUNCTIONS - Handle variations in extracted data
 // ============================================================================
 
@@ -526,9 +599,12 @@ export function coveragesEqualSmart(
           const itemA = a[iA] as CoverageItem
           const itemB = b[j] as CoverageItem
 
-          // If limit differs by more than 10%, flag as different
+          // If limit differs, check if it's a SEDDK per-unit vs per-accident difference
+          // For traffic insurance, 300K vs 600K and 2.7M vs 13.5M are equivalent limits
           if (itemA?.limit !== undefined && itemB?.limit !== undefined) {
-            if (!numbersEqualWithTolerance(itemA.limit, itemB.limit, 0.10)) {
+            const limitsMatch = numbersEqualWithTolerance(itemA.limit, itemB.limit, 0.10) ||
+                                areLimitsSDKEquivalent(itemA.limit, itemB.limit)
+            if (!limitsMatch) {
               return false
             }
           }
@@ -570,7 +646,9 @@ export function coveragesEqualSmart(
 
 /**
  * Smart string array comparison (for exclusions, conditions)
- * More lenient: considers arrays equal if >70% of items match
+ * More lenient: considers arrays equal if:
+ * 1. >70% of items fuzzy match, OR
+ * 2. Combined text is semantically equivalent (split/merged differently)
  */
 export function stringsArrayEqualSmart(
   a: string[] | undefined | null,
@@ -610,7 +688,44 @@ export function stringsArrayEqualSmart(
     const totalItems = Math.max(normalizedA.length, normalizedB.length)
     const matchRatio = matchCount / totalItems
 
-    return matchRatio >= 0.70
+    if (matchRatio >= 0.70) return true
+
+    // FALLBACK: Check if arrays are semantically equivalent (split/merged differently)
+    // Only use this fallback when arrays have significantly different lengths
+    // (suggesting the same content was split differently)
+    const lengthRatio = Math.min(normalizedA.length, normalizedB.length) /
+                        Math.max(normalizedA.length, normalizedB.length)
+
+    // If one array has WAY more items (e.g., 1 vs 3), it might be split/merged content
+    // But if lengths are similar (e.g., 1 vs 2), it's likely a real addition
+    if (lengthRatio > 0.5) {
+      // Lengths are similar - probably not split/merge, likely real change
+      return false
+    }
+
+    // Lengths differ significantly - check if content is semantically equivalent
+    // (one long exclusion split into multiple shorter ones, or vice versa)
+    const combinedA = normalizedA.join(' ')
+    const combinedB = normalizedB.join(' ')
+
+    // Extract key terms (words >4 chars) and compare
+    const keywordsA = new Set(combinedA.split(/\s+/).filter(w => w.length > 4))
+    const keywordsB = new Set(combinedB.split(/\s+/).filter(w => w.length > 4))
+
+    if (keywordsA.size === 0 && keywordsB.size === 0) return true
+
+    // Count shared keywords
+    let sharedKeywords = 0
+    for (const word of keywordsA) {
+      if (keywordsB.has(word)) sharedKeywords++
+    }
+
+    const totalUniqueKeywords = new Set([...keywordsA, ...keywordsB]).size
+    const keywordOverlapRatio = totalUniqueKeywords > 0 ? sharedKeywords / totalUniqueKeywords : 1
+
+    // Need high keyword overlap (80%+) for significantly different array lengths
+    // This catches cases where one long exclusion is split into multiple shorter ones
+    return keywordOverlapRatio >= 0.80
   }
 
   return arraysEqualTolerant(a, b)
@@ -797,6 +912,21 @@ export function calculatePolicyDiff(
       // Use numeric tolerance for financial fields when in tolerant mode
       if (tolerantMode && NUMERIC_TOLERANCE_FIELDS.includes(config.field)) {
         areSame = numbersEqualWithTolerance(oldNorm, newNorm)
+
+        // Special case for 'coverage' field in traffic insurance
+        // AI may calculate total using per-unit OR per-accident limits
+        // Both are valid - check SEDDK equivalents
+        if (!areSame && config.field === 'coverage' && oldNorm !== null && newNorm !== null) {
+          const isTrafficInsurance =
+            newPolicy.type === 'traffic' ||
+            oldPolicy.type === 'traffic' ||
+            newPolicy.typeTr?.toLowerCase().includes('trafik') ||
+            oldPolicy.typeTr?.toLowerCase().includes('trafik')
+
+          if (isTrafficInsurance) {
+            areSame = areTotalCoveragesSDKEquivalent(oldNorm, newNorm)
+          }
+        }
       } else {
         areSame = oldNorm === newNorm || (oldNorm === null && newNorm === null)
       }
