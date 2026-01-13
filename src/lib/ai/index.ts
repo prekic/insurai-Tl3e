@@ -11,8 +11,8 @@ export {
   type AIProvider,
 } from './config'
 
-// PDF parsing (with lazy loading)
-export { extractTextFromPDF, isPDFFile, preloadPdfJs, type PDFParseResult, type PDFParseError } from './pdf-parser'
+// PDF parsing (with lazy loading and retry logic)
+export { extractTextFromPDF, extractTextFromPDFWithRetry, isPDFFile, preloadPdfJs, type PDFParseResult, type PDFParseError } from './pdf-parser'
 
 // Extraction schema
 export {

@@ -249,6 +249,68 @@ export async function extractTextFromPDF(
 }
 
 /**
+ * Reset the worker setup to allow retrying CDN selection
+ * Called when PDF parsing fails with a load error
+ */
+function resetWorkerSetup(): void {
+  workerLoadAttempted = false
+  pdfjsLib = null
+  loadPromise = null
+}
+
+/**
+ * Extract text from PDF with automatic retry for transient errors
+ * Retries up to 3 times with exponential backoff for load/parse errors
+ */
+export async function extractTextFromPDFWithRetry(
+  file: File,
+  maxRetries: number = 3
+): Promise<{ success: true; data: PDFParseResult } | { success: false; error: PDFParseError }> {
+  let lastError: PDFParseError | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const result = await extractTextFromPDF(file)
+
+    if (result.success) {
+      return result
+    }
+
+    lastError = result.error
+
+    // Only retry on transient errors (load errors, parse errors)
+    // Don't retry for invalid PDF, empty PDF, or password protected
+    const isRetryableError = ['LOAD_ERROR', 'PARSE_ERROR'].includes(result.error.code)
+
+    if (!isRetryableError) {
+      return result
+    }
+
+    // If it's a load error, reset the worker setup to try different CDN
+    if (result.error.code === 'LOAD_ERROR') {
+      console.warn(`[PDF.js] Load error on attempt ${attempt}, resetting worker setup`)
+      resetWorkerSetup()
+    }
+
+    // Don't wait after the last attempt
+    if (attempt < maxRetries) {
+      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000) // 1s, 2s, 4s
+      console.log(`[PDF.js] Retry ${attempt}/${maxRetries} failed, waiting ${delayMs}ms before retry`)
+      await new Promise(resolve => setTimeout(resolve, delayMs))
+    }
+  }
+
+  // All retries failed
+  console.error(`[PDF.js] All ${maxRetries} attempts failed`)
+  return {
+    success: false,
+    error: lastError || {
+      code: 'PARSE_ERROR',
+      message: 'Failed to parse PDF after multiple attempts',
+    },
+  }
+}
+
+/**
  * Check if a file is a PDF
  */
 export function isPDFFile(file: File): boolean {
