@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server, Stethoscope, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
@@ -86,6 +86,8 @@ interface ConflictDialogState {
 
 export function PolicyUpload() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { addPolicies, refreshPolicies } = usePolicies()
   const { user, isConfigured: authConfigured } = useAuth()
   const [files, setFiles] = useState<UploadedFile[]>([])
@@ -106,6 +108,18 @@ export function PolicyUpload() {
   const backendReady = health.status === 'healthy'
   // In production (SaaS), hide technical details from end users
   const IS_PRODUCTION = import.meta.env.PROD
+
+  // Auto-open file dialog if autoOpen query param is present
+  useEffect(() => {
+    const autoOpen = searchParams.get('autoOpen')
+    if (autoOpen === 'true' && fileInputRef.current) {
+      // Small delay to ensure the component is fully rendered
+      const timer = setTimeout(() => {
+        fileInputRef.current?.click()
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [searchParams])
 
   const handleRunDiagnostics = async () => {
     setIsRunningDiagnostics(true)
@@ -851,6 +865,7 @@ export function PolicyUpload() {
               <p>Maximum size: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file</p>
             </div>
             <input
+              ref={fileInputRef}
               type="file"
               accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
               multiple

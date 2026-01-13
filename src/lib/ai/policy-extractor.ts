@@ -1,5 +1,5 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
-import { extractTextFromPDF, isPDFFile } from './pdf-parser'
+import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import { isLikelyScannedPDF, performOCR } from './ocr'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
@@ -94,8 +94,8 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // Extract text from PDF
-  const parseResult = await extractTextFromPDF(file)
+  // Extract text from PDF (with automatic retry for transient errors)
+  const parseResult = await extractTextFromPDFWithRetry(file)
   let documentText: string
   let usedOCR = false
 

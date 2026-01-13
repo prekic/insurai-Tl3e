@@ -132,7 +132,7 @@ export function PolicyDashboard() {
   }
 
   const handleUploadPolicy = () => {
-    navigate('/upload')
+    navigate('/upload?autoOpen=true')
   }
 
   // Show loading state while hydrating from localStorage

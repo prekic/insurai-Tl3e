@@ -22,6 +22,12 @@ vi.mock('./pdf-parser', () => ({
       data: { text: 'Sample policy text with coverage details', pageCount: 5, metadata: {} },
     })
   ),
+  extractTextFromPDFWithRetry: vi.fn(() =>
+    Promise.resolve({
+      success: true,
+      data: { text: 'Sample policy text with coverage details', pageCount: 5, metadata: {} },
+    })
+  ),
   isPDFFile: vi.fn((file: File) => file.type === 'application/pdf'),
 }))
 
@@ -543,7 +549,7 @@ describe('PDF Parsing', () => {
 
   it('should handle PDF parse errors with fallback', async () => {
     const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
+    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
       success: false,
       error: { code: 'PARSE_ERROR', message: 'Failed to parse PDF' },
     })
@@ -559,7 +565,7 @@ describe('PDF Parsing', () => {
 
   it('should return error when PDF parsing fails and fallback disabled', async () => {
     const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
+    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
       success: false,
       error: { code: 'PARSE_ERROR', message: 'PDF is encrypted' },
     })
@@ -591,7 +597,7 @@ describe('OCR Processing', () => {
 
   it('should use OCR for scanned PDFs', async () => {
     const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
+    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
       success: true,
       data: { text: '', pageCount: 5, metadata: {} }, // Empty text suggests scanned
     })
@@ -632,7 +638,7 @@ describe('OCR Processing', () => {
 
   it('should use regular text if OCR produces less content', async () => {
     const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDF).mockResolvedValue({
+    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
       success: true,
       data: { text: 'Long text content from PDF parsing with many words', pageCount: 5, metadata: {} },
     })

@@ -169,7 +169,7 @@ export function GlobalNavigation() {
               )}
             </button>
             <Link
-              to="/upload"
+              to="/upload?autoOpen=true"
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2 focus-ring"
             >
               <Upload size={18} aria-hidden="true" />
