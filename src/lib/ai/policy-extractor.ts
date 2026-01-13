@@ -523,7 +523,6 @@ function generateGaps(data: ExtractedPolicyData): string[] {
       // For traffic insurance, don't report per-person variants as missing if per-accident variant exists
       // since policies often only show the per-accident (higher) limit
       if (isTrafficPolicy && criticalNameLower.includes('kişi başı')) {
-        const perAccidentVariant = criticalBaseName + ' (kaza başı)'
         const hasPerAccident = data.coverages.some(c =>
           c.name.toLowerCase().includes(criticalBaseName) &&
           (c.limit ?? 0) >= critical.typicalLimit
