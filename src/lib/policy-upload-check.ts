@@ -229,22 +229,33 @@ export async function handlePolicyAmendment(
       newData[change.field] = change.newValue
     }
 
-    // Create version entry first (to track history)
-    const version = await createPolicyVersion(
-      existingPolicyId,
-      'updated',
-      changeSummary,
-      previousData,
-      { ...updateData, ...newData }
-    )
+    // Try to create version entry (non-blocking)
+    // Version tracking is optional - if table doesn't exist, continue anyway
+    let versionNumber = 0
+    try {
+      const version = await createPolicyVersion(
+        existingPolicyId,
+        'updated',
+        changeSummary,
+        previousData,
+        { ...updateData, ...newData }
+      )
+      versionNumber = version.version_number
+    } catch (versionError) {
+      // Log but don't fail - version tracking is optional
+      console.warn(
+        'Could not create version entry (policy_versions table may not exist):',
+        versionError instanceof Error ? versionError.message : versionError
+      )
+    }
 
-    // Update the policy with new values
+    // Update the policy with new values - this is the core operation
     await updatePolicy(existingPolicyId, updateData)
 
     return {
       success: true,
       policyId: existingPolicyId,
-      versionNumber: version.version_number,
+      versionNumber,
       changes,
     }
   } catch (error) {
@@ -293,11 +304,21 @@ export async function handleDuplicateResolution(
       try {
         const updateData = policyToUpdateData(newPolicyData)
 
-        // Create version entry for the replacement
-        await createPolicyVersion(existingPolicyId, 'updated', 'Replaced with re-uploaded policy', null, {
-          ...updateData,
-        })
+        // Try to create version entry for the replacement (non-blocking)
+        // Version tracking is optional - if table doesn't exist, continue anyway
+        try {
+          await createPolicyVersion(existingPolicyId, 'updated', 'Replaced with re-uploaded policy', null, {
+            ...updateData,
+          })
+        } catch (versionError) {
+          // Log but don't fail - version tracking is optional
+          console.warn(
+            'Could not create version entry (policy_versions table may not exist):',
+            versionError instanceof Error ? versionError.message : versionError
+          )
+        }
 
+        // This is the core operation - update the policy
         await updatePolicy(existingPolicyId, updateData)
 
         return { action: 'replace', existingId: existingPolicyId }
