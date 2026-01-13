@@ -1,6 +1,6 @@
 import { useState, useId, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { FileText, Plus, Eye, Trash2, Search, Calendar, TrendingUp, AlertTriangle, Check, LayoutGrid, List, Scale, X, Copy, Sparkles, Merge } from 'lucide-react'
+import { FileText, Plus, Eye, Trash2, Search, Calendar, AlertTriangle, Check, LayoutGrid, List, Scale, X, Copy, Sparkles, Merge, ArrowUpDown, ArrowUp, ArrowDown, Shield, Banknote } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -9,7 +9,12 @@ import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
 import { PolicyCardGrid } from './PolicyCard'
 import { useCompareSelection } from '@/hooks/usePolicyComparison'
+import { getShortCompanyName, getCoverageType, getMainCoverageValue, getSubjectDisplay } from '@/lib/insurance-display'
 import type { DuplicatePolicy } from '@/types/policy'
+
+// Sorting configuration
+type SortField = 'provider' | 'type' | 'coverage' | 'premium' | 'expiryDate' | 'status'
+type SortDirection = 'asc' | 'desc'
 
 export function PolicyDashboard() {
   const navigate = useNavigate()
@@ -29,6 +34,8 @@ export function PolicyDashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [sortField, setSortField] = useState<SortField>('expiryDate')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const baseId = useId()
 
   // Compare selection state
@@ -76,40 +83,106 @@ export function PolicyDashboard() {
   // Sanitize search query for safe filtering
   const sanitizedQuery = sanitizeSearchQuery(searchQuery).toLowerCase()
 
+  // Sorting function
+  const sortPolicies = <T extends { provider: string; type: string; coverage: number; premium: number; expiryDate: string; status: string }>(policies: T[]): T[] => {
+    return [...policies].sort((a, b) => {
+      let comparison = 0
+      switch (sortField) {
+        case 'provider':
+          comparison = getShortCompanyName(a.provider).localeCompare(getShortCompanyName(b.provider))
+          break
+        case 'type':
+          comparison = a.type.localeCompare(b.type)
+          break
+        case 'coverage':
+          comparison = a.coverage - b.coverage
+          break
+        case 'premium':
+          comparison = a.premium - b.premium
+          break
+        case 'expiryDate':
+          comparison = new Date(a.expiryDate).getTime() - new Date(b.expiryDate).getTime()
+          break
+        case 'status':
+          const statusOrder = { active: 0, expiring: 1, expired: 2, pending: 3 }
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 4) - (statusOrder[b.status as keyof typeof statusOrder] || 4)
+          break
+      }
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
+  }
+
+  // Toggle sort direction or change field
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDirection('asc')
+    }
+  }
+
+  // Get sort icon for column header
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown size={14} className="text-gray-400" />
+    return sortDirection === 'asc'
+      ? <ArrowUp size={14} className="text-blue-600" />
+      : <ArrowDown size={14} className="text-blue-600" />
+  }
+
   // Filter for table view (dashboard format)
-  const filteredPolicies = uploadedPolicies.filter((policy) => {
+  const filteredPolicies = sortPolicies(uploadedPolicies.filter((policy) => {
     const matchesSearch =
       !sanitizedQuery ||
       policy.policyNumber.toLowerCase().includes(sanitizedQuery) ||
       policy.provider.toLowerCase().includes(sanitizedQuery) ||
+      getShortCompanyName(policy.provider).toLowerCase().includes(sanitizedQuery) ||
       policy.type.toLowerCase().includes(sanitizedQuery)
 
     const matchesStatus = statusFilter === 'all' || policy.status === statusFilter
 
     return matchesSearch && matchesStatus
-  })
+  }))
 
   // Filter full policies for card view (includes all data for evaluation)
-  const filteredFullPolicies = fullPolicies.filter((policy) => {
+  const filteredFullPolicies = sortPolicies(fullPolicies.filter((policy) => {
     const matchesSearch =
       !sanitizedQuery ||
       policy.policyNumber.toLowerCase().includes(sanitizedQuery) ||
       policy.provider.toLowerCase().includes(sanitizedQuery) ||
+      getShortCompanyName(policy.provider).toLowerCase().includes(sanitizedQuery) ||
       policy.type.toLowerCase().includes(sanitizedQuery) ||
       policy.typeTr.toLowerCase().includes(sanitizedQuery)
 
     const matchesStatus = statusFilter === 'all' || policy.status === statusFilter
 
     return matchesSearch && matchesStatus
-  })
+  }))
 
-  const stats = {
-    total: uploadedPolicies.length,
-    active: uploadedPolicies.filter((p) => p.status === 'active').length,
-    expiring: uploadedPolicies.filter((p) => p.status === 'expiring').length,
-    totalCoverage: uploadedPolicies.reduce((sum, p) => sum + p.coverage, 0),
-    totalPremium: uploadedPolicies.reduce((sum, p) => sum + p.premium, 0),
-  }
+  // Compute stats with separate sum insured and limit totals
+  const stats = useMemo(() => {
+    let totalSumInsured = 0
+    let totalLimit = 0
+
+    for (const p of fullPolicies) {
+      const coverageType = getCoverageType(p.type)
+      const value = getMainCoverageValue(p)
+      if (coverageType === 'limit') {
+        totalLimit += value
+      } else {
+        totalSumInsured += value
+      }
+    }
+
+    return {
+      total: uploadedPolicies.length,
+      active: uploadedPolicies.filter((p) => p.status === 'active').length,
+      expiring: uploadedPolicies.filter((p) => p.status === 'expiring').length,
+      totalSumInsured,
+      totalLimit,
+      totalPremium: uploadedPolicies.reduce((sum, p) => sum + p.premium, 0),
+    }
+  }, [uploadedPolicies, fullPolicies])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -195,7 +268,7 @@ export function PolicyDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <section aria-label={t.a11y.policyStats} className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <section aria-label={t.a11y.policyStats} className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
@@ -217,11 +290,20 @@ export function PolicyDashboard() {
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                <TrendingUp className="text-purple-600" size={20} aria-hidden="true" />
+                <Shield className="text-purple-600" size={20} aria-hidden="true" />
               </div>
-              <span className="text-sm text-gray-600">{t.dashboard.totalCoverage}</span>
+              <span className="text-sm text-gray-600">{t.policy.totalSumInsured}</span>
             </div>
-            <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.totalCoverage)}</p>
+            <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+                <Banknote className="text-indigo-600" size={20} aria-hidden="true" />
+              </div>
+              <span className="text-sm text-gray-600">{t.policy.totalLimit}</span>
+            </div>
+            <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
           </div>
           <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
@@ -457,12 +539,63 @@ export function PolicyDashboard() {
               <table className="w-full" role="table" aria-label={t.policy.policies}>
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.policy}</th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.type}</th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.coverage}</th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.premium}</th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.expiryDate}</th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">{t.policy.status}</th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('provider')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.policy}
+                        {getSortIcon('provider')}
+                      </button>
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('type')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.type}
+                        {getSortIcon('type')}
+                      </button>
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      {t.policy.insured}
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('coverage')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.sumInsuredLimit}
+                        {getSortIcon('coverage')}
+                      </button>
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('premium')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.premium}
+                        {getSortIcon('premium')}
+                      </button>
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('expiryDate')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.expiryDate}
+                        {getSortIcon('expiryDate')}
+                      </button>
+                    </th>
+                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                      <button
+                        onClick={() => handleSort('status')}
+                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                      >
+                        {t.policy.status}
+                        {getSortIcon('status')}
+                      </button>
+                    </th>
                     <th scope="col" className="text-right px-6 py-4 text-sm font-semibold text-gray-600">
                       <span className="sr-only">{t.common.actions}</span>
                     </th>
@@ -472,6 +605,12 @@ export function PolicyDashboard() {
                   {filteredPolicies.map((policy) => {
                     const isNew = newPolicyIds.has(policy.id)
                     const isDuplicate = duplicateMap.has(policy.id)
+                    const shortName = getShortCompanyName(policy.provider)
+                    // Get full policy data for subject display
+                    const fullPolicy = fullPolicies.find(p => p.id === policy.id)
+                    const subjectInfo = fullPolicy ? getSubjectDisplay(fullPolicy, locale as 'en' | 'tr') : null
+                    const coverageType = fullPolicy ? getCoverageType(fullPolicy.type) : 'sumInsured'
+                    const displayValue = fullPolicy ? getMainCoverageValue(fullPolicy) : policy.coverage
                     return (
                     <tr
                       key={policy.id}
@@ -486,7 +625,7 @@ export function PolicyDashboard() {
                           <span className="text-2xl" aria-hidden="true">{policy.logo}</span>
                           <div>
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-gray-900">{policy.provider}</p>
+                              <p className="font-medium text-gray-900">{shortName}</p>
                               {isNew && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full">
                                   <Sparkles className="w-2.5 h-2.5" />
@@ -508,7 +647,22 @@ export function PolicyDashboard() {
                         <span className="text-gray-900">{policy.type}</span>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-medium text-gray-900">{formatCurrency(policy.coverage)}</span>
+                        {subjectInfo ? (
+                          <div>
+                            <p className="text-xs text-gray-500">{subjectInfo.label}</p>
+                            <p className="text-sm text-gray-900 truncate max-w-[150px]" title={subjectInfo.value}>{subjectInfo.value}</p>
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div>
+                          <p className="font-medium text-gray-900">{formatCurrency(displayValue)}</p>
+                          <p className="text-xs text-gray-500">
+                            {coverageType === 'limit' ? (locale === 'tr' ? 'Limit' : 'Limit') : (locale === 'tr' ? 'Bedel' : 'Sum Insured')}
+                          </p>
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <span className="text-gray-900">{formatCurrency(policy.premium)}/yr</span>
@@ -524,14 +678,14 @@ export function PolicyDashboard() {
                           <button
                             onClick={() => handleViewPolicy(policy.id)}
                             className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
-                            aria-label={`${t.common.view} ${policy.provider} ${policy.type}`}
+                            aria-label={`${t.common.view} ${shortName} ${policy.type}`}
                           >
                             <Eye size={18} aria-hidden="true" />
                           </button>
                           <button
                             onClick={() => deletePolicy(policy.id)}
                             className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring"
-                            aria-label={`${t.common.delete} ${policy.provider} ${policy.type}`}
+                            aria-label={`${t.common.delete} ${shortName} ${policy.type}`}
                           >
                             <Trash2 size={18} aria-hidden="true" />
                           </button>

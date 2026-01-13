@@ -99,6 +99,9 @@ export interface TranslationDictionary {
     provider: string
     type: string
     coverage: string
+    sumInsured: string
+    limit: string
+    sumInsuredLimit: string
     premium: string
     deductible: string
     startDate: string
@@ -111,10 +114,18 @@ export interface TranslationDictionary {
     uploadDate: string
     totalPolicies: string
     totalCoverage: string
+    totalSumInsured: string
+    totalLimit: string
     expiringSoon: string
     noPoliciesFound: string
     uploadFirst: string
     adjustFilters: string
+    insured: string
+    plate: string
+    vehicle: string
+    address: string
+    business: string
+    subject: string
   }
 
   // Upload
@@ -348,6 +359,9 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     provider: 'Provider',
     type: 'Type',
     coverage: 'Coverage',
+    sumInsured: 'Sum Insured',
+    limit: 'Limit',
+    sumInsuredLimit: 'Sum Insured / Limit',
     premium: 'Premium',
     deductible: 'Deductible',
     startDate: 'Start Date',
@@ -360,10 +374,18 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     uploadDate: 'Upload Date',
     totalPolicies: 'Total Policies',
     totalCoverage: 'Total Coverage',
+    totalSumInsured: 'Total Sum Insured',
+    totalLimit: 'Total Limits',
     expiringSoon: 'Expiring Soon',
     noPoliciesFound: 'No policies found',
     uploadFirst: 'Upload your first policy to get started',
     adjustFilters: 'Try adjusting your filters',
+    insured: 'Insured',
+    plate: 'Plate',
+    vehicle: 'Vehicle',
+    address: 'Address',
+    business: 'Business',
+    subject: 'Subject',
   },
 
   upload: {
@@ -587,6 +609,9 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     provider: 'Sigorta Şirketi',
     type: 'Tür',
     coverage: 'Teminat',
+    sumInsured: 'Sigorta Bedeli',
+    limit: 'Limit',
+    sumInsuredLimit: 'Bedel / Limit',
     premium: 'Prim',
     deductible: 'Muafiyet',
     startDate: 'Başlangıç Tarihi',
@@ -599,10 +624,18 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     uploadDate: 'Yükleme Tarihi',
     totalPolicies: 'Toplam Poliçe',
     totalCoverage: 'Toplam Teminat',
+    totalSumInsured: 'Toplam Bedel',
+    totalLimit: 'Toplam Limit',
     expiringSoon: 'Yakında Bitiyor',
     noPoliciesFound: 'Poliçe bulunamadı',
     uploadFirst: 'Başlamak için ilk poliçenizi yükleyin',
     adjustFilters: 'Filtreleri ayarlamayı deneyin',
+    insured: 'Sigortalı',
+    plate: 'Plaka',
+    vehicle: 'Araç',
+    address: 'Adres',
+    business: 'İşyeri',
+    subject: 'Konu',
   },
 
   upload: {
