@@ -68,7 +68,7 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
         description: `${valid.length} policy document(s) are being analyzed.`,
       })
       // Navigate to upload page for full analysis
-      navigate('/upload')
+      navigate('/upload?autoOpen=true')
     } catch (err) {
       setIsUploading(false)
       const message = err instanceof Error ? err.message : 'Upload failed'

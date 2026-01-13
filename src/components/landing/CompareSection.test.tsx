@@ -39,7 +39,7 @@ describe('CompareSection', () => {
       renderWithRouter(<CompareSection />)
 
       const link = screen.getByText('Get Started Free').closest('a')
-      expect(link).toHaveAttribute('href', '/upload')
+      expect(link).toHaveAttribute('href', '/upload?autoOpen=true')
     })
 
     it('should display no credit card message', () => {

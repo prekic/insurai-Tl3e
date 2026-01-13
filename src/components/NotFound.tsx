@@ -60,7 +60,7 @@ export function NotFound() {
               {t.nav.dashboard}
             </Link>
             <Link
-              to="/upload"
+              to="/upload?autoOpen=true"
               className="px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm text-gray-700 hover:border-gray-300 transition-colors"
             >
               {t.upload.title}

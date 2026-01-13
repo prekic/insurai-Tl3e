@@ -444,7 +444,7 @@ export function PolicyUpload() {
 
   const handleAnalyzeAll = () => {
     const analyzedPolicies = files
-      .filter((f): f is UploadedFile & { policy: AnalyzedPolicy } => f.status === 'complete' && f.policy !== undefined)
+      .filter((f): f is UploadedFile & { policy: AnalyzedPolicy } => f.status === 'complete' && f.policy !== undefined && !f.awaitingResolution)
       .map((f) => f.policy)
 
     if (analyzedPolicies.length === 0) {
@@ -454,7 +454,13 @@ export function PolicyUpload() {
       return
     }
 
-    addPolicies(analyzedPolicies)
+    // When using Supabase, policies are already saved in processFileAsync()
+    // and local context is updated via refreshPolicies().
+    // Only call addPolicies() for local-only mode (no Supabase).
+    if (!useSupabase) {
+      addPolicies(analyzedPolicies)
+    }
+
     navigate('/dashboard')
   }
 
