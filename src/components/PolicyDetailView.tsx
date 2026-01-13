@@ -158,7 +158,27 @@ export function PolicyDetailView() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {policy.coverages.map((coverage, i) => (
+                  {policy.coverages
+                    // Filter out zero-limit category entries (like "Zorunlu Mali Sorumluluk" with ₺0)
+                    .filter(coverage => {
+                      // Keep all coverages with actual limits
+                      if (coverage.limit > 0) return true
+                      // Filter out zero-limit entries that look like policy categories
+                      const categoryPatterns = [
+                        'zorunlu mali sorumluluk',
+                        'trafik sigortası',
+                        'kasko sigortası',
+                        'konut sigortası',
+                        'sağlık sigortası',
+                      ]
+                      const nameLower = (coverage.name || '').toLowerCase()
+                      const nameTrLower = (coverage.nameTr || '').toLowerCase()
+                      const isCategory = categoryPatterns.some(
+                        pattern => nameLower.includes(pattern) || nameTrLower.includes(pattern)
+                      )
+                      return !isCategory
+                    })
+                    .map((coverage, i) => (
                     <div
                       key={i}
                       className={`flex items-center justify-between p-4 rounded-xl ${

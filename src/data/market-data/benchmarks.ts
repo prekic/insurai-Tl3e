@@ -137,36 +137,74 @@ const KASKO_EXCLUSIONS = [
 
 /**
  * Traffic (Mandatory Third-Party Liability) Benchmark
+ * Updated with 2025 SEDDK minimum limits
+ *
+ * Note: Traffic insurance has specific structure:
+ * - Material damage (Maddi Hasar) is per-vehicle and per-accident, NOT per-person
+ * - Bodily injury (Ölüm/Sakatlık, Sağlık) is per-person and per-accident
  */
 const TRAFFIC_COVERAGES: CoverageBenchmark[] = [
   {
-    name: 'Bodily Injury (per person)',
-    nameTr: 'Maddi Hasar (kişi başı)',
-    typicalLimit: 1300000, // SEDDK 2024 minimum
-    minLimit: 1300000,
-    maxLimit: 1300000,
+    name: 'Property Damage (per vehicle)',
+    nameTr: 'Maddi Hasar (araç başı)',
+    typicalLimit: 300000, // SEDDK 2025 minimum
+    minLimit: 300000,
+    maxLimit: 300000,
     typicalDeductible: 0,
     minDeductible: 0,
     maxDeductible: 0,
     inclusionRate: 100,
   },
   {
-    name: 'Bodily Injury (per accident)',
+    name: 'Property Damage (per accident)',
     nameTr: 'Maddi Hasar (kaza başı)',
-    typicalLimit: 6500000, // SEDDK 2024 minimum
-    minLimit: 6500000,
-    maxLimit: 6500000,
+    typicalLimit: 600000, // SEDDK 2025 minimum
+    minLimit: 600000,
+    maxLimit: 600000,
     typicalDeductible: 0,
     minDeductible: 0,
     maxDeductible: 0,
     inclusionRate: 100,
   },
   {
-    name: 'Property Damage',
-    nameTr: 'Maddi Hasar',
-    typicalLimit: 130000, // SEDDK 2024 minimum
-    minLimit: 130000,
-    maxLimit: 130000,
+    name: 'Death/Permanent Disability (per person)',
+    nameTr: 'Ölüm ve Sürekli Sakatlık (kişi başı)',
+    typicalLimit: 2700000, // SEDDK 2025 minimum
+    minLimit: 2700000,
+    maxLimit: 2700000,
+    typicalDeductible: 0,
+    minDeductible: 0,
+    maxDeductible: 0,
+    inclusionRate: 100,
+  },
+  {
+    name: 'Death/Permanent Disability (per accident)',
+    nameTr: 'Ölüm ve Sürekli Sakatlık (kaza başı)',
+    typicalLimit: 13500000, // SEDDK 2025 minimum
+    minLimit: 13500000,
+    maxLimit: 13500000,
+    typicalDeductible: 0,
+    minDeductible: 0,
+    maxDeductible: 0,
+    inclusionRate: 100,
+  },
+  {
+    name: 'Medical Expenses (per person)',
+    nameTr: 'Sağlık Giderleri (kişi başı)',
+    typicalLimit: 2700000, // SEDDK 2025 minimum
+    minLimit: 2700000,
+    maxLimit: 2700000,
+    typicalDeductible: 0,
+    minDeductible: 0,
+    maxDeductible: 0,
+    inclusionRate: 100,
+  },
+  {
+    name: 'Medical Expenses (per accident)',
+    nameTr: 'Sağlık Giderleri (kaza başı)',
+    typicalLimit: 13500000, // SEDDK 2025 minimum
+    minLimit: 13500000,
+    maxLimit: 13500000,
     typicalDeductible: 0,
     minDeductible: 0,
     maxDeductible: 0,
