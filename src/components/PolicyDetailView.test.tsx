@@ -52,6 +52,7 @@ const mockPolicy: AnalyzedPolicy = {
 }
 
 const mockGetPolicyById = vi.fn()
+const mockFetchPolicyById = vi.fn()
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -64,6 +65,7 @@ vi.mock('react-router-dom', async () => {
 vi.mock('@/lib/policy-context', () => ({
   usePolicies: () => ({
     getPolicyById: mockGetPolicyById,
+    fetchPolicyById: mockFetchPolicyById,
   }),
 }))
 
@@ -96,30 +98,38 @@ describe('PolicyDetailView', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockGetPolicyById.mockReturnValue(mockPolicy)
+    mockFetchPolicyById.mockResolvedValue(mockPolicy)
   })
 
   describe('Policy Not Found', () => {
-    it('should render not found message when policy does not exist', () => {
+    it('should render not found message when policy does not exist', async () => {
       mockGetPolicyById.mockReturnValue(undefined)
+      mockFetchPolicyById.mockResolvedValue(null)
       renderPolicyDetailView('nonexistent-id')
 
-      expect(screen.getByText('Policy not found')).toBeInTheDocument()
+      // Wait for async fetch to complete
+      expect(await screen.findByText('Policy not found')).toBeInTheDocument()
       expect(screen.getByText("The policy you're looking for doesn't exist.")).toBeInTheDocument()
     })
 
-    it('should show Go to Dashboard button when policy not found', () => {
+    it('should show Go to Dashboard button when policy not found', async () => {
       mockGetPolicyById.mockReturnValue(undefined)
+      mockFetchPolicyById.mockResolvedValue(null)
       renderPolicyDetailView('nonexistent-id')
 
-      expect(screen.getByRole('button', { name: /go to dashboard/i })).toBeInTheDocument()
+      // Wait for async fetch to complete
+      expect(await screen.findByRole('button', { name: /go to dashboard/i })).toBeInTheDocument()
     })
 
     it('should navigate to dashboard when button is clicked', async () => {
       mockGetPolicyById.mockReturnValue(undefined)
+      mockFetchPolicyById.mockResolvedValue(null)
       const user = userEvent.setup()
       renderPolicyDetailView('nonexistent-id')
 
-      await user.click(screen.getByRole('button', { name: /go to dashboard/i }))
+      // Wait for async fetch to complete
+      const button = await screen.findByRole('button', { name: /go to dashboard/i })
+      await user.click(button)
 
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
     })
@@ -412,6 +422,7 @@ describe('PolicyDetailView', () => {
 describe('PolicyDetailView Edge Cases', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFetchPolicyById.mockResolvedValue(mockPolicy)
   })
 
   it('should handle policy with no coverages', () => {

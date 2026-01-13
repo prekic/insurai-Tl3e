@@ -1,5 +1,6 @@
+import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -12,15 +13,54 @@ import { GradeBadge } from './evaluation/GradeBadge'
 import { StatusIndicator } from './evaluation/StatusIndicator'
 import { ScoreBreakdown } from './evaluation/ScoreBreakdown'
 import { RecommendationCard } from './evaluation/RecommendationCard'
+import type { AnalyzedPolicy } from '@/types/policy'
 
 export function PolicyDetailView() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { getPolicyById } = usePolicies()
+  const { getPolicyById, fetchPolicyById } = usePolicies()
   const { locale } = useI18n()
 
-  const policy = id ? getPolicyById(id) : undefined
+  // Try local cache first, then fetch from Supabase if not found
+  const [policy, setPolicy] = useState<AnalyzedPolicy | undefined>(() =>
+    id ? getPolicyById(id) : undefined
+  )
+  const [isLoadingPolicy, setIsLoadingPolicy] = useState(!policy && !!id)
+
+  useEffect(() => {
+    // If policy is already in local cache, no need to fetch
+    if (policy || !id) return
+
+    let cancelled = false
+    setIsLoadingPolicy(true)
+
+    fetchPolicyById(id).then((fetchedPolicy) => {
+      if (cancelled) return
+      setPolicy(fetchedPolicy ?? undefined)
+      setIsLoadingPolicy(false)
+    }).catch(() => {
+      if (cancelled) return
+      setIsLoadingPolicy(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, policy, fetchPolicyById])
+
   const { evaluation, isLoading: isEvaluationLoading } = usePolicyEvaluation(policy)
+
+  // Show loading state while fetching policy
+  if (isLoadingPolicy) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading policy...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!policy) {
     return (
