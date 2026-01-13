@@ -476,17 +476,61 @@ function generateGaps(data: ExtractedPolicyData): string[] {
 
   // Check for limited coverage areas
   const criticalCoverages = benchmark.commonCoverages.filter(c => c.inclusionRate >= 90)
-  if (data.coverages.length < criticalCoverages.length) {
-    gaps.push('Limited coverage areas - consider additional protection')
-  }
 
-  // Check for missing critical coverages
+  // Check for missing critical coverages with smart matching
+  // For traffic insurance, match based on coverage name AND limit to handle per-person/per-accident variants
+  const isTrafficPolicy = policyType === 'traffic'
+
   for (const critical of criticalCoverages) {
-    const hasCoverage = data.coverages.some(c =>
-      c.name.toLowerCase().includes(critical.name.toLowerCase()) ||
-      c.name.toLowerCase().includes(critical.nameTr.toLowerCase())
-    )
+    const criticalNameLower = critical.nameTr.toLowerCase()
+    // Extract base name without qualifier (e.g., "Maddi Hasar" from "Maddi Hasar (kaza başı)")
+    const baseNameMatch = criticalNameLower.match(/^([^(]+)/)
+    const criticalBaseName = baseNameMatch ? baseNameMatch[1].trim() : criticalNameLower
+
+    const hasCoverage = data.coverages.some(c => {
+      const coverageNameLower = c.name.toLowerCase()
+      const coverageLimit = c.limit ?? 0
+
+      // Direct match
+      if (coverageNameLower.includes(critical.name.toLowerCase()) ||
+          coverageNameLower.includes(criticalNameLower)) {
+        return true
+      }
+
+      // For traffic insurance, match base name + limit tolerance
+      if (isTrafficPolicy) {
+        // Check if the coverage matches the base name
+        const matchesBaseName = coverageNameLower.includes(criticalBaseName) ||
+          criticalBaseName.includes(coverageNameLower.replace(/\([^)]*\)/g, '').trim())
+
+        if (matchesBaseName) {
+          // If limits match within 10% tolerance, consider it a match
+          const limitTolerance = critical.typicalLimit * 0.1
+          if (Math.abs(coverageLimit - critical.typicalLimit) <= limitTolerance) {
+            return true
+          }
+          // Per-accident limits are always higher, so also match if coverage >= expected
+          if (criticalNameLower.includes('kaza başı') && coverageLimit >= critical.typicalLimit * 0.9) {
+            return true
+          }
+        }
+      }
+
+      return false
+    })
+
     if (!hasCoverage) {
+      // For traffic insurance, don't report per-person variants as missing if per-accident variant exists
+      // since policies often only show the per-accident (higher) limit
+      if (isTrafficPolicy && criticalNameLower.includes('kişi başı')) {
+        const perAccidentVariant = criticalBaseName + ' (kaza başı)'
+        const hasPerAccident = data.coverages.some(c =>
+          c.name.toLowerCase().includes(criticalBaseName) &&
+          (c.limit ?? 0) >= critical.typicalLimit
+        )
+        if (hasPerAccident) continue // Skip this gap, per-accident coverage exists
+      }
+
       gaps.push(`Missing common coverage: ${critical.nameTr}`)
     }
   }
