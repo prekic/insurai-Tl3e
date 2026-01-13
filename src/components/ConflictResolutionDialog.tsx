@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { X, AlertTriangle, Copy, GitMerge, FileX, Files, Loader2, RefreshCw, CheckCircle } from 'lucide-react'
+import { X, AlertTriangle, Copy, GitMerge, FileX, Files, Loader2, RefreshCw, CheckCircle, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import type { Policy } from '@/types/policy'
@@ -19,6 +19,8 @@ interface ConflictResolutionDialogProps {
   onKeepBoth: () => void
   /** Called when user chooses to track as amendment */
   onTrackAmendment: () => void
+  /** Called when user wants to edit the extracted policy data before saving */
+  onEdit?: () => void
   /** Called to close the dialog */
   onClose: () => void
   /** Whether an action is in progress */
@@ -35,6 +37,7 @@ export function ConflictResolutionDialog({
   onReplace,
   onKeepBoth,
   onTrackAmendment,
+  onEdit,
   onClose,
   isLoading = false,
 }: ConflictResolutionDialogProps) {
@@ -300,6 +303,16 @@ export function ConflictResolutionDialog({
                   disabled={isLoading}
                   variant="primary"
                 />
+                {onEdit && (
+                  <ActionButton
+                    icon={Pencil}
+                    label={locale === 'tr' ? 'Duzenle' : 'Edit'}
+                    description={locale === 'tr' ? 'Verileri manuel duzelt' : 'Manually correct data'}
+                    onClick={onEdit}
+                    disabled={isLoading}
+                    variant="secondary"
+                  />
+                )}
                 <ActionButton
                   icon={Copy}
                   label={locale === 'tr' ? 'Yine de Guncelle' : 'Update Anyway'}
@@ -328,6 +341,16 @@ export function ConflictResolutionDialog({
                   disabled={isLoading}
                   variant="secondary"
                 />
+                {onEdit && (
+                  <ActionButton
+                    icon={Pencil}
+                    label={locale === 'tr' ? 'Duzenle' : 'Edit'}
+                    description={locale === 'tr' ? 'Verileri manuel duzelt' : 'Manually correct data'}
+                    onClick={onEdit}
+                    disabled={isLoading}
+                    variant="secondary"
+                  />
+                )}
                 <ActionButton
                   icon={GitMerge}
                   label={locale === 'tr' ? 'Zeyilname Olarak Kaydet' : 'Track as Amendment'}
