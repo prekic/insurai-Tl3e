@@ -1721,6 +1721,41 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 ---
 
+## Common Gotchas (Quick Reference)
+
+**Environment Variables:**
+- `VITE_*` vars are baked at **build time** - need rebuild, not just restart
+- API keys must NOT have `VITE_` prefix - they stay server-side only
+- Railway env vars shouldn't have manual quotes (Railway adds them automatically)
+
+**API Proxy Auto-Detection (`src/lib/env.ts`):**
+```typescript
+// In production, if VITE_API_PROXY_URL not set, auto-detect:
+if (import.meta.env.PROD && typeof window !== 'undefined') {
+  return window.location.origin  // Same origin when co-hosted
+}
+```
+
+**CSP for PDF.js Worker (`server/index.ts`):**
+```typescript
+// Required in Helmet CSP config:
+scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
+workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
+connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...supabase]
+```
+
+**Supabase Auth Redirect URLs:**
+- Must add production URL to Supabase Dashboard → Authentication → URL Configuration
+- Format: `https://insurai-production.up.railway.app/**`
+- Required for OAuth and magic link flows
+
+**Kasko Implicit Coverages:**
+- Don't flag Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler as missing
+- These are automatically included in base kasko
+- Check `KASKO_IMPLICIT_COVERAGES` in `src/lib/ai/policy-extractor.ts`
+
+---
+
 ## CI/CD
 
 ### GitHub Actions
