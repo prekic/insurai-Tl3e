@@ -12,6 +12,8 @@ import {
   detectCoverageCategory,
   shouldShowUnlimited,
   shouldShowIncluded,
+  groupCoverageSubLimits,
+  type GroupedCoverage,
 } from '@/lib/knowledge/kasko-knowledge'
 
 /**
@@ -186,7 +188,7 @@ function CoveragesByCategory({
     return !categoryPatterns.some(pattern => nameLower.includes(pattern))
   })
 
-  // Group coverages by category
+  // Group coverages by category, then apply sub-limit grouping
   const groupedCoverages = useMemo(() => {
     const groups: Record<string, Coverage[]> = {
       main: [],
@@ -207,7 +209,13 @@ function CoveragesByCategory({
       }
     }
 
-    return groups
+    // Apply sub-limit grouping to each category
+    const groupedWithSubLimits: Record<string, GroupedCoverage[]> = {}
+    for (const [category, coverages] of Object.entries(groups)) {
+      groupedWithSubLimits[category] = groupCoverageSubLimits(coverages)
+    }
+
+    return groupedWithSubLimits
   }, [filteredCoverages])
 
   // Category order for display
@@ -259,7 +267,38 @@ function CoveragesByCategory({
               </Badge>
             </div>
             <div className="space-y-2">
-              {categoryCoverages.map((coverage, i) => {
+              {categoryCoverages.map((groupedCoverage, i) => {
+                // Handle grouped coverages with sub-limits
+                if (groupedCoverage.isGrouped && groupedCoverage.subLimits) {
+                  return (
+                    <div
+                      key={i}
+                      className="p-3 rounded-lg bg-blue-50 border border-blue-100"
+                    >
+                      {/* Parent coverage header */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <Check className="text-blue-600" size={14} />
+                        </div>
+                        <p className="font-medium text-gray-900">{groupedCoverage.name}</p>
+                      </div>
+                      {/* Sub-limits grid */}
+                      <div className="ml-10 grid grid-cols-2 gap-2">
+                        {groupedCoverage.subLimits.map((subLimit, j) => (
+                          <div key={j} className="flex justify-between items-center bg-white/60 px-3 py-2 rounded-md">
+                            <span className="text-sm text-gray-600">{subLimit.label}</span>
+                            <span className={`text-sm font-medium ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
+                              {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                }
+
+                // Regular (non-grouped) coverage
+                const coverage = groupedCoverage as unknown as Coverage
                 const iconStyle = getCoverageIconStyle(coverage)
                 const limitDisplay = formatCoverageLimit(coverage)
                 const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||

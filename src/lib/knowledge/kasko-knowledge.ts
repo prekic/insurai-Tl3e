@@ -893,3 +893,190 @@ export function formatKaskoCoverageLimit(
     maximumFractionDigits: 0,
   }).format(coverage.limit)
 }
+
+// =============================================================================
+// SUB-LIMIT GROUPING
+// =============================================================================
+
+/**
+ * Coverage group prefixes that should be consolidated into a single display item
+ * Each prefix groups multiple sub-limit coverages under one parent
+ */
+export const COVERAGE_GROUP_PREFIXES = [
+  {
+    prefix: 'Hukuksal Koruma',
+    displayName: 'Hukuksal Koruma',
+    displayNameEn: 'Legal Protection',
+    subLimitLabels: {
+      'kefalet': 'Olay Başı Kefalet',
+      'avans': 'Olay Başı Avans',
+      'olay başına azami limit': 'Olay Başı Limit',
+      'sigorta süresi': 'Yıllık Limit',
+    },
+  },
+  {
+    prefix: 'Koltuk Ferdi Kaza',
+    displayName: 'Koltuk Ferdi Kaza',
+    displayNameEn: 'Seat Personal Accident',
+    subLimitLabels: {
+      'ölüm': 'Ölüm',
+      'sürekli sakatlık': 'Sürekli Sakatlık',
+      'tedavi': 'Tedavi Masrafları',
+    },
+  },
+  {
+    prefix: 'Artan Mali Sorumluluk',
+    displayName: 'Artan Mali Sorumluluk',
+    displayNameEn: 'Increased Liability',
+    subLimitLabels: {
+      'maddi': 'Maddi Hasar',
+      'bedeni': 'Bedeni Hasar',
+      'manevi': 'Manevi Tazminat',
+    },
+  },
+  {
+    prefix: 'Ferdi Kaza',
+    displayName: 'Ferdi Kaza',
+    displayNameEn: 'Personal Accident',
+    subLimitLabels: {
+      'ölüm': 'Ölüm',
+      'sakatlık': 'Sürekli Sakatlık',
+      'tedavi': 'Tedavi',
+    },
+  },
+] as const
+
+/**
+ * Represents a coverage with its sub-limits grouped together
+ */
+export interface GroupedCoverage {
+  /** Main coverage name */
+  name: string
+  nameTr: string
+  nameEn: string
+  /** Category for display */
+  category: string
+  /** Whether this is a grouped coverage with sub-limits */
+  isGrouped: boolean
+  /** Sub-limits if grouped */
+  subLimits?: Array<{
+    label: string
+    limit: number
+    isUnlimited?: boolean
+  }>
+  /** Single limit if not grouped */
+  limit?: number
+  deductible?: number
+  isUnlimited?: boolean
+  isMarketValue?: boolean
+  included?: boolean
+  importance?: string
+}
+
+/**
+ * Groups coverages that share a common prefix into consolidated items
+ * e.g., "Hukuksal Koruma - Kefalet", "Hukuksal Koruma - Avans" become one item
+ */
+export function groupCoverageSubLimits<T extends {
+  name: string
+  nameTr?: string
+  limit: number
+  deductible?: number
+  isUnlimited?: boolean
+  isMarketValue?: boolean
+  included?: boolean
+  category?: string
+  importance?: string
+}>(coverages: T[]): GroupedCoverage[] {
+  const result: GroupedCoverage[] = []
+  const processedIndices = new Set<number>()
+
+  // First pass: identify and group coverages with known prefixes
+  for (const groupDef of COVERAGE_GROUP_PREFIXES) {
+    const matchingCoverages: Array<{ coverage: T; index: number; subKey: string }> = []
+
+    coverages.forEach((coverage, index) => {
+      if (processedIndices.has(index)) return
+
+      const nameLower = coverage.name.toLowerCase()
+      const prefixLower = groupDef.prefix.toLowerCase()
+
+      if (nameLower.startsWith(prefixLower) || nameLower.includes(prefixLower + ' -')) {
+        // Find which sub-limit this is
+        let subKey = ''
+        for (const [key] of Object.entries(groupDef.subLimitLabels)) {
+          if (nameLower.includes(key)) {
+            subKey = key
+            break
+          }
+        }
+        matchingCoverages.push({ coverage, index, subKey })
+      }
+    })
+
+    // If we found multiple coverages with this prefix, group them
+    if (matchingCoverages.length > 1) {
+      const firstCoverage = matchingCoverages[0].coverage
+      const category = firstCoverage.category || detectCoverageCategory(firstCoverage.name)
+
+      const grouped: GroupedCoverage = {
+        name: groupDef.displayName,
+        nameTr: groupDef.displayName,
+        nameEn: groupDef.displayNameEn,
+        category,
+        isGrouped: true,
+        subLimits: matchingCoverages.map(({ coverage, subKey }) => ({
+          label: groupDef.subLimitLabels[subKey as keyof typeof groupDef.subLimitLabels] || extractSubLimitLabel(coverage.name, groupDef.prefix),
+          limit: coverage.limit,
+          isUnlimited: coverage.isUnlimited,
+        })),
+        included: true,
+        importance: firstCoverage.importance,
+      }
+
+      result.push(grouped)
+      matchingCoverages.forEach(({ index }) => processedIndices.add(index))
+    }
+  }
+
+  // Second pass: add remaining coverages as-is
+  coverages.forEach((coverage, index) => {
+    if (processedIndices.has(index)) return
+
+    result.push({
+      name: coverage.name,
+      nameTr: coverage.nameTr || coverage.name,
+      nameEn: coverage.name,
+      category: coverage.category || detectCoverageCategory(coverage.name),
+      isGrouped: false,
+      limit: coverage.limit,
+      deductible: coverage.deductible,
+      isUnlimited: coverage.isUnlimited,
+      isMarketValue: coverage.isMarketValue,
+      included: coverage.included,
+      importance: coverage.importance,
+    })
+  })
+
+  return result
+}
+
+/**
+ * Extract a clean sub-limit label from a full coverage name
+ * e.g., "Hukuksal Koruma - Olay Başına Azami Kefalet" -> "Olay Başına Kefalet"
+ */
+function extractSubLimitLabel(fullName: string, prefix: string): string {
+  // Remove the prefix and any separator
+  let label = fullName
+    .replace(new RegExp(prefix, 'i'), '')
+    .replace(/^\s*[-–—:]\s*/, '')
+    .trim()
+
+  // Clean up common verbose parts
+  label = label
+    .replace(/azami\s*/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return label || fullName
+}
