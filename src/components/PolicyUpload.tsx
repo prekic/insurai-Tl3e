@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { Upload, FileText, Check, ArrowLeft, X, Eye, Sparkles, AlertTriangle, RefreshCw, Cloud, Cpu, Zap, ServerCrash, Server, Stethoscope, CheckCircle2, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
@@ -55,6 +55,7 @@ function convertToSupabasePolicy(policy: AnalyzedPolicy, userId: string): Policy
       riskActions: policy.riskActions,
       gapActions: policy.gapActions,
       extractedText: policy.extractedText,
+      processedText: policy.processedText,
     },
   }
 }
@@ -87,6 +88,7 @@ interface ConflictDialogState {
 
 export function PolicyUpload() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { addPolicies, refreshPolicies } = usePolicies()
@@ -95,6 +97,7 @@ export function PolicyUpload() {
   const [isDragging, setIsDragging] = useState(false)
   const { health, checkHealth, runDiagnostics } = useBackendHealth()
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
+  const filesReceivedRef = useRef(false)
 
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
@@ -131,6 +134,34 @@ export function PolicyUpload() {
       return () => clearTimeout(timer)
     }
   }, [isAutoOpen, autoOpenTriggered, searchParams, navigate])
+
+  // Listen for files passed from GlobalNavigation
+  useEffect(() => {
+    // Check if files were passed via navigation state
+    const state = location.state as { filesReady?: boolean } | null
+    if (state?.filesReady && !filesReceivedRef.current) {
+      filesReceivedRef.current = true
+
+      // Listen for the custom event with actual file objects
+      const handleFilesSelected = (e: CustomEvent<File[]>) => {
+        const selectedFiles = e.detail
+        if (selectedFiles && selectedFiles.length > 0) {
+          addFiles(selectedFiles)
+        }
+        // Clean up session storage
+        sessionStorage.removeItem('pendingUploadFiles')
+        // Clear the navigation state
+        navigate(location.pathname, { replace: true, state: null })
+      }
+
+      window.addEventListener('filesSelected', handleFilesSelected as EventListener)
+
+      // Cleanup
+      return () => {
+        window.removeEventListener('filesSelected', handleFilesSelected as EventListener)
+      }
+    }
+  }, [location, navigate])
 
   const handleRunDiagnostics = async () => {
     setIsRunningDiagnostics(true)

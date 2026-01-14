@@ -71,6 +71,8 @@ export interface GapAnalysis {
 export interface RawPolicyData {
   // Extraction metadata
   extractedText?: string
+  /** AI-processed text with OCR corrections and improved readability */
+  processedText?: string
   confidence?: number
   fields?: Record<string, unknown>
 

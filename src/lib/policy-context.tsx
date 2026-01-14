@@ -144,6 +144,8 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     gapActions: rawData.gapActions,
     // Raw extracted text from PDF
     extractedText: rawData.extractedText,
+    // AI-processed text with OCR corrections
+    processedText: rawData.processedText,
   }
 }
 
@@ -179,6 +181,7 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
       gapAnalysis: policy.gapAnalysis,
       gapActions: policy.gapActions,
       extractedText: policy.extractedText,
+      processedText: policy.processedText,
     },
   }
 }
@@ -214,7 +217,9 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
     updates.riskScore !== undefined ||
     updates.riskActions !== undefined ||
     updates.gapAnalysis !== undefined ||
-    updates.gapActions !== undefined
+    updates.gapActions !== undefined ||
+    updates.extractedText !== undefined ||
+    updates.processedText !== undefined
 
   if (hasRawDataUpdates) {
     result.raw_data = {
@@ -229,6 +234,8 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
       riskActions: updates.riskActions,
       gapAnalysis: updates.gapAnalysis,
       gapActions: updates.gapActions,
+      extractedText: updates.extractedText,
+      processedText: updates.processedText,
     }
   }
 

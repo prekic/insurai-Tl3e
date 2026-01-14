@@ -4,6 +4,7 @@ import { isLikelyScannedPDF, performOCR } from './ocr'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
+import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing } from './text-processor'
 import {
   ExtractedPolicyData,
   ExtractedCoverage,
@@ -272,7 +273,34 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // Call AI for extraction
+  // Process text to correct OCR errors and improve readability
+  let processedText = documentText
+
+  // Only process if text appears to need it
+  if (textNeedsProcessing(documentText)) {
+    try {
+      const processingResult = await processTextWithAI(documentText, {
+        provider: primaryProvider || 'openai',
+        preserveStructure: true,
+      })
+
+      if (processingResult.success) {
+        processedText = processingResult.processedText
+        // Debug info - text processing stats
+        if (import.meta.env.DEV) {
+          console.warn(`[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ${Math.round(processingResult.confidence * 100)}% confidence`)
+        }
+      }
+    } catch (error) {
+      // Text processing is optional, continue with raw text
+      console.warn('Text processing failed, using raw text:', error)
+      // At minimum apply basic OCR corrections
+      const basicResult = applyBasicOCRCorrections(documentText)
+      processedText = basicResult.text
+    }
+  }
+
+  // Call AI for extraction (use processed text for better results)
   try {
     const configuredProviders = getConfiguredProviders()
     const useMultiProvider = useConsensus && configuredProviders.length > 1
@@ -281,8 +309,8 @@ export async function extractPolicyFromDocument(
     let consensusInfo: ExtractionResult['consensus'] | undefined
 
     if (useMultiProvider) {
-      // Use multi-model consensus
-      const consensusResult: ConsensusResult = await extractWithConsensus(documentText, {
+      // Use multi-model consensus (use processed text for better extraction)
+      const consensusResult: ConsensusResult = await extractWithConsensus(processedText, {
         providers,
         primaryProvider,
       })
@@ -296,9 +324,9 @@ export async function extractPolicyFromDocument(
         score: consensusResult.consensus.score,
       }
     } else {
-      // Use single provider
+      // Use single provider (use processed text for better extraction)
       const provider = primaryProvider || configuredProviders[0]
-      extractedData = await extractWithProvider(provider, documentText)
+      extractedData = await extractWithProvider(provider, processedText)
     }
 
     // Check confidence threshold
@@ -321,7 +349,8 @@ export async function extractPolicyFromDocument(
     }
 
     // Convert extracted data to AnalyzedPolicy format
-    const policy = convertToAnalyzedPolicy(extractedData, file, documentText)
+    // Store both raw extractedText and processedText for display and analysis
+    const policy = convertToAnalyzedPolicy(extractedData, file, documentText, processedText)
 
     return {
       success: true,
@@ -366,8 +395,12 @@ async function extractWithProvider(provider: AIProvider, documentText: string): 
 
 /**
  * Convert extracted data to AnalyzedPolicy format
+ * @param data - Extracted policy data from AI
+ * @param file - Original PDF file
+ * @param rawText - Raw extracted text from PDF/OCR (for reference)
+ * @param processedText - AI-processed text with OCR corrections (for display and chat)
  */
-function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, documentText?: string): AnalyzedPolicy {
+function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?: string, processedText?: string): AnalyzedPolicy {
   const now = new Date()
 
   // Determine status based on dates
@@ -437,7 +470,8 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, document
     aiConfidence: data.confidence.overall,
     aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
-    extractedText: documentText,
+    extractedText: rawText,
+    processedText: processedText || rawText, // Use processed text if available, otherwise raw
   }
 
   // Calculate ML-based risk score

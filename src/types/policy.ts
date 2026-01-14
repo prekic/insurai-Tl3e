@@ -104,6 +104,8 @@ export interface Policy {
   vehicleInfo?: VehicleInfo
   /** Raw extracted text from the PDF document */
   extractedText?: string
+  /** AI-processed text with OCR corrections and improved readability */
+  processedText?: string
 }
 
 /**
