@@ -6,8 +6,9 @@ import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
 import {
   ExtractedPolicyData,
+  ExtractedCoverage,
 } from './extraction-schema'
-import type { AnalyzedPolicy, PolicyType, Coverage } from '@/types/policy'
+import type { AnalyzedPolicy, PolicyType, Coverage, CoverageImportance } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
 import { generateMarketComparisonData } from '@/lib/market-data/service'
@@ -47,6 +48,109 @@ export interface ExtractionOptions {
   useConsensus?: boolean
   primaryProvider?: AIProvider
   providers?: AIProvider[]
+}
+
+/**
+ * Determine coverage importance based on category and characteristics
+ */
+function determineCoverageImportance(coverage: ExtractedCoverage): CoverageImportance {
+  const nameLower = coverage.name.toLowerCase()
+
+  // Critical coverages - main coverage, high limits, or essential protections
+  if (coverage.category === 'main') return 'critical'
+  if (coverage.isMarketValue) return 'critical'
+  if (coverage.isUnlimited) return 'critical'
+
+  // Standard coverages - liability, legal, most supplementary
+  if (coverage.category === 'liability') return 'standard'
+  if (coverage.category === 'legal') return 'standard'
+  if (coverage.limit && coverage.limit >= 100000) return 'standard'
+
+  // Check for important coverage names
+  if (nameLower.includes('mali sorumluluk')) return 'standard'
+  if (nameLower.includes('hırsızlık')) return 'standard'
+  if (nameLower.includes('deprem')) return 'standard'
+  if (nameLower.includes('yangın')) return 'standard'
+
+  // Minor coverages - assistance, small limits
+  if (coverage.category === 'assistance') return 'minor'
+  if (coverage.limit && coverage.limit < 50000) return 'minor'
+
+  return 'standard'
+}
+
+/**
+ * Calculate the main coverage value based on policy type
+ * For kasko: use vehicle value (Rayiç Değer) or main coverage, NOT sum of all limits
+ * For other types: use sum of main coverages or highest coverage
+ */
+function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): number {
+  // For kasko and nakliyat: find the main/vehicle coverage
+  if (policyType === 'kasko' || policyType === 'nakliyat') {
+    // Look for market value coverage first
+    const marketValueCoverage = coverages.find(c => c.isMarketValue)
+    if (marketValueCoverage) {
+      // Market value - use 0 as placeholder since actual value varies
+      // The display should show "Rayiç Değer" instead of a number
+      return 0
+    }
+
+    // Look for main category coverage
+    const mainCoverage = coverages.find(c => c.category === 'main' && c.limit > 0)
+    if (mainCoverage) {
+      return mainCoverage.limit
+    }
+
+    // Look for coverage that looks like vehicle value
+    const vehicleValue = coverages.find(c => {
+      const nameLower = c.name.toLowerCase()
+      return (
+        nameLower.includes('araç bedeli') ||
+        nameLower.includes('araç değeri') ||
+        nameLower.includes('sigorta bedeli') ||
+        nameLower.includes('kasko') && !nameLower.includes('mali')
+      ) && c.limit > 0
+    })
+    if (vehicleValue) {
+      return vehicleValue.limit
+    }
+
+    // Fallback: find the highest non-liability coverage
+    const nonLiabilityCoverages = coverages.filter(c =>
+      c.category !== 'liability' &&
+      !c.name.toLowerCase().includes('mali sorumluluk') &&
+      !c.name.toLowerCase().includes('hukuki') &&
+      c.limit > 0
+    )
+    if (nonLiabilityCoverages.length > 0) {
+      return Math.max(...nonLiabilityCoverages.map(c => c.limit))
+    }
+  }
+
+  // For traffic insurance: use the highest bodily injury limit
+  if (policyType === 'traffic') {
+    const bodilyInjury = coverages.find(c =>
+      c.name.toLowerCase().includes('bedeni') ||
+      c.name.toLowerCase().includes('ölüm')
+    )
+    if (bodilyInjury && bodilyInjury.limit > 0) {
+      return bodilyInjury.limit
+    }
+  }
+
+  // For other policy types: sum only main category coverages, or use highest
+  const mainCoverages = coverages.filter(c => c.category === 'main' && c.limit > 0)
+  if (mainCoverages.length > 0) {
+    return mainCoverages.reduce((sum, c) => sum + c.limit, 0)
+  }
+
+  // Fallback: use the highest individual coverage limit
+  const validLimits = coverages.filter(c => c.limit > 0).map(c => c.limit)
+  if (validLimits.length > 0) {
+    return Math.max(...validLimits)
+  }
+
+  return 0
 }
 
 /**
@@ -280,7 +384,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     }
   }
 
-  // Convert coverages with Turkish names
+  // Convert coverages with Turkish names and enhanced metadata
   const coverages: Coverage[] = data.coverages.map((c) => ({
     name: c.name,
     nameTr: c.name, // AI extracts in original language
@@ -288,10 +392,16 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     deductible: c.deductible ?? 0,
     included: true,
     description: c.description ?? undefined,
+    isUnlimited: c.isUnlimited ?? false,
+    isMarketValue: c.isMarketValue ?? false,
+    category: c.category ?? 'other',
+    importance: determineCoverageImportance(c),
   }))
 
-  // Calculate total coverage
-  const totalCoverage = coverages.reduce((sum, c) => sum + c.limit, 0)
+  // Calculate total coverage based on policy type
+  // For kasko: use vehicle value (main coverage or market value), NOT sum of all limits
+  // For other types: use the main coverage or sum of main coverages
+  const totalCoverage = calculateMainCoverage(data.policyType ?? 'home', coverages)
 
   // Get policy type info
   const policyType = data.policyType ?? 'home'
@@ -491,6 +601,39 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
 }
 
 /**
+ * Check if policy has kasko base coverage that includes fundamental protections
+ */
+function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
+  return coverages.some(c => {
+    const nameLower = c.name.toLowerCase()
+    return (
+      nameLower === 'kasko' ||
+      nameLower.includes('tam kasko') ||
+      nameLower.includes('full kasko') ||
+      nameLower.includes('mini kasko') ||
+      nameLower.includes('kasko sigortası') ||
+      (nameLower.includes('kasko') && c.category === 'main')
+    )
+  })
+}
+
+/**
+ * Coverages that are inherently included in base kasko coverage
+ * These should NOT be flagged as missing if kasko coverage exists
+ */
+const KASKO_IMPLICIT_COVERAGES = [
+  'çarpma', 'çarpışma', 'collision',
+  'hırsızlık', 'theft',
+  'yangın', 'fire',
+  'doğal afet', 'natural disaster',
+  'sel', 'flood',
+  'deprem', 'earthquake',
+  'ani hareket', 'sudden movement',
+  'fırtına', 'storm',
+  'dolu', 'hail',
+]
+
+/**
  * Generate policy gaps based on extracted data and market benchmarks
  */
 function generateGaps(data: ExtractedPolicyData): string[] {
@@ -516,12 +659,28 @@ function generateGaps(data: ExtractedPolicyData): string[] {
   // Check for limited coverage areas
   const criticalCoverages = benchmark.commonCoverages.filter(c => c.inclusionRate >= 90)
 
+  // For kasko policies, check if base kasko coverage exists
+  // If so, fundamental coverages (collision, theft, fire, etc.) are implicitly included
+  const isKaskoPolicy = policyType === 'kasko'
+  const hasBaseKasko = isKaskoPolicy && hasKaskoBaseCoverage(data.coverages)
+
   // Check for missing critical coverages with smart matching
   // For traffic insurance, match based on coverage name AND limit to handle per-person/per-accident variants
   const isTrafficPolicy = policyType === 'traffic'
 
   for (const critical of criticalCoverages) {
     const criticalNameLower = critical.nameTr.toLowerCase()
+
+    // For kasko: skip implicit coverages if base kasko exists
+    if (hasBaseKasko) {
+      const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(implicit =>
+        criticalNameLower.includes(implicit) || critical.name.toLowerCase().includes(implicit)
+      )
+      if (isImplicitCoverage) {
+        continue // Skip - this is included in base kasko coverage
+      }
+    }
+
     // Extract base name without qualifier (e.g., "Maddi Hasar" from "Maddi Hasar (kaza başı)")
     const baseNameMatch = criticalNameLower.match(/^([^(]+)/)
     const criticalBaseName = baseNameMatch ? baseNameMatch[1].trim() : criticalNameLower

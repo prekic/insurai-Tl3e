@@ -57,6 +57,12 @@ export interface ExtractedCoverage {
   limit: number | null
   deductible: number | null
   description: string | null
+  /** True if coverage shows "Sınırsız" (unlimited) */
+  isUnlimited?: boolean
+  /** True if limit is "Rayiç Değer" (market value) */
+  isMarketValue?: boolean
+  /** Coverage category: main, liability, supplementary, assistance, legal, other */
+  category?: 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
 }
 
 /**
@@ -117,14 +123,21 @@ export const EXTRACTION_JSON_SCHEMA = {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'Coverage name/type' },
-            limit: { type: ['number', 'null'], description: 'Coverage limit amount' },
+            limit: { type: ['number', 'null'], description: 'Coverage limit amount. Use null for Sınırsız or Rayiç Değer.' },
             deductible: { type: ['number', 'null'], description: 'Deductible amount' },
             description: { type: ['string', 'null'], description: 'Brief description' },
+            isUnlimited: { type: 'boolean', description: 'Set to true if coverage shows "Sınırsız" (unlimited)' },
+            isMarketValue: { type: 'boolean', description: 'Set to true if limit shows "Rayiç Değer" (market value)' },
+            category: {
+              type: ['string', 'null'],
+              enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other', null],
+              description: 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
+            },
           },
-          required: ['name'],
+          required: ['name', 'isUnlimited', 'isMarketValue'],
           additionalProperties: false,
         },
-        description: 'List of coverage items',
+        description: 'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
       },
       specialConditions: {
         type: 'array',
@@ -280,6 +293,19 @@ Your task is to extract structured information from insurance policy documents.
    - Main coverage (Ana Teminat)
    - Additional coverages (Ek Teminatlar)
    - Optional protections
+
+   **CRITICAL - Special Coverage Values**:
+   - "Sınırsız" (Unlimited): Set isUnlimited=true and limit=null
+   - "Rayiç Değer" (Market Value): Set isMarketValue=true and limit=null. This is the vehicle's current market value for kasko policies.
+   - For kasko policies: The main coverage is usually "Rayiç Değer" for the vehicle itself
+
+   **Coverage Categories**:
+   - main: Primary coverage (vehicle value, property value, main insured amount)
+   - liability: Mali Sorumluluk, third-party liability coverages
+   - supplementary: Ek Teminatlar, additional protections (Cam, Hırsızlık, etc.)
+   - assistance: Asistans, İkame Araç, roadside assistance
+   - legal: Hukuki Koruma, legal protection
+   - other: Everything else
 
 8. **CRITICAL - Amendment/Zeyilname Detection**:
    IMPORTANT: Determine if this document is an ORIGINAL POLICY or an AMENDMENT (Zeyilname).

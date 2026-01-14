@@ -82,6 +82,14 @@ export const POLICY_TYPE_PROMPTS: Record<PolicyType, string> = {
   kasko: `
 ## KASKO (Comprehensive Auto Insurance) Specific Fields:
 
+**CRITICAL - Coverage Calculation for Kasko**:
+The main coverage for kasko is the VEHICLE VALUE, which is typically shown as:
+- "Rayiç Değer" = Current market value of the vehicle
+- "Araç Bedeli" = Vehicle value (may be a specific TRY amount)
+- "Kasko Kapsamındaki Değerler" section shows the vehicle value
+
+DO NOT sum all the liability limits! The other limits (Mali Sorumluluk, Hukuki Koruma, Ferdi Kaza, etc.) are SEPARATE coverages with their own limits, not added to the main vehicle coverage.
+
 Extract these additional vehicle-specific fields:
 - **Vehicle Information**:
   - vehicleMake (Marka): e.g., Toyota, Ford, Volkswagen
@@ -90,7 +98,7 @@ Extract these additional vehicle-specific fields:
   - plateNumber (Plaka): Turkish format (e.g., 34 ABC 123)
   - chassisNumber (Şasi No): 17-character VIN
   - engineNumber (Motor No): Engine identification
-  - vehicleValue (Araç Değeri): Declared value in TRY
+  - vehicleValue (Araç Değeri): Declared value - this is the MAIN coverage amount
   - usageType (Kullanım Şekli): 'private' (Hususi) or 'commercial' (Ticari)
 
 - **Driver Information**:
@@ -98,16 +106,29 @@ Extract these additional vehicle-specific fields:
   - licenseYear (Ehliyet Yılı): Year license was obtained
   - bonusMalus (Hasarsızlık Kademesi): Discount level 1-7 (7 = max discount)
 
+- **Coverage Categories** (IMPORTANT for categorization):
+  - category: "main" → Vehicle value (Araç Bedeli, Rayiç Değer)
+  - category: "liability" → Artan Mali Sorumluluk, Koltuk Ferdi Kaza
+  - category: "supplementary" → Kişisel Eşya, Hatalı Akaryakıt, Mini Onarım
+  - category: "assistance" → Asistans, İkame Araç, Anadolu Hizmet
+  - category: "legal" → Hukuki Koruma
+
+- **Special Values**:
+  - "Sınırsız" = Unlimited → Set isUnlimited=true, limit=null
+  - "Rayiç Değer" = Market Value → Set isMarketValue=true, limit=null
+
 - **Coverage Types to Look For**:
-  - Tam Kasko = Full comprehensive
+  - Tam Kasko = Full comprehensive (category: main)
   - Mini Kasko = Limited comprehensive
-  - Deprem = Earthquake
-  - Sel/Su Baskını = Flood
-  - Hırsızlık = Theft
-  - Cam Kırılması = Glass breakage
-  - Ferdi Kaza = Personal accident
-  - Asistans = Roadside assistance
-  - İkame Araç = Replacement vehicle
+  - Deprem = Earthquake (category: supplementary)
+  - Sel/Su Baskını = Flood (category: supplementary)
+  - Hırsızlık = Theft (category: supplementary)
+  - Cam Kırılması = Glass breakage (category: supplementary)
+  - Ferdi Kaza = Personal accident (category: liability)
+  - Asistans = Roadside assistance (category: assistance)
+  - İkame Araç = Replacement vehicle (category: assistance)
+  - Artan Mali Sorumluluk = Increased liability (category: liability)
+  - Hukuki Koruma = Legal protection (category: legal)
 
 - **Common Turkish Terms**:
   - Araç Sahibi = Vehicle Owner

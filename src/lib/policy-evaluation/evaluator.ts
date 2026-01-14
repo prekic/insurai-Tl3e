@@ -621,33 +621,57 @@ function generateMarketComparison(
 }
 
 function generateRecommendations(
-  _policy: Policy,
+  policy: Policy,
   scores: Record<string, ScoreBreakdown>,
   complianceIssues: ComplianceIssue[]
 ): Recommendation[] {
   const recommendations: Recommendation[] = []
 
-  // Critical compliance issues first
+  // Critical compliance issues first - with specific details
   for (const issue of complianceIssues.filter(i => i.severity === 'critical')) {
+    let specificTitle = 'Address Compliance Issue'
+    let specificTitleTR = 'Uyumluluk Sorununu Giderin'
+
+    if (issue.type === 'expired') {
+      specificTitle = 'Renew Expired Policy Immediately'
+      specificTitleTR = 'Süresi Dolan Poliçeyi Hemen Yenileyin'
+    } else if (issue.type === 'below_minimum') {
+      specificTitle = 'Increase Coverage to Meet Legal Minimums'
+      specificTitleTR = 'Yasal Asgari Limitleri Karşılamak İçin Teminatı Artırın'
+    }
+
     recommendations.push({
       priority: 'critical',
       type: 'compliance',
-      title: 'Address Compliance Issue',
-      titleTR: 'Uyumluluk Sorununu Giderin',
+      title: specificTitle,
+      titleTR: specificTitleTR,
       description: issue.description,
       descriptionTR: issue.descriptionTR,
     })
   }
 
-  // Coverage improvements
+  // Coverage improvements - with specific missing coverages
   if (scores.coverage.score < 70) {
+    const missingIssues = scores.coverage.issues.filter(i => i.includes('Missing') || i.includes('essential'))
+    const missingCoverages = missingIssues.length > 0
+      ? missingIssues.map(i => i.replace('Missing essential coverage: ', '')).join(', ')
+      : null
+
+    const specificDescription = missingCoverages
+      ? `Add missing coverages: ${missingCoverages}. These are standard in most ${policy.type} policies.`
+      : 'Your policy has fewer coverages than typical market offerings. Request quotes with additional protections.'
+
+    const specificDescriptionTR = missingCoverages
+      ? `Eksik teminatları ekleyin: ${scores.coverage.issuesTR.filter(i => i.includes('Eksik')).map(i => i.replace('Eksik temel teminat: ', '')).join(', ')}. Bunlar çoğu ${policy.typeTr} poliçesinde standart olarak bulunur.`
+      : 'Poliçenizde piyasa ortalamasından daha az teminat var. Ek korumalar içeren teklifler isteyin.'
+
     recommendations.push({
       priority: 'high',
       type: 'add_coverage',
-      title: 'Improve Coverage',
-      titleTR: 'Teminatı İyileştirin',
-      description: 'Consider adding essential coverages that are currently missing',
-      descriptionTR: 'Şu anda eksik olan temel teminatları eklemeyi düşünün',
+      title: missingCoverages ? `Add Missing: ${missingCoverages.substring(0, 30)}${missingCoverages.length > 30 ? '...' : ''}` : 'Expand Coverage Portfolio',
+      titleTR: missingCoverages ? `Eksik Ekleyin: ${scores.coverage.issuesTR.filter(i => i.includes('Eksik')).map(i => i.replace('Eksik temel teminat: ', '')).join(', ').substring(0, 30)}` : 'Teminat Portföyünü Genişletin',
+      description: specificDescription,
+      descriptionTR: specificDescriptionTR,
       estimatedImpact: {
         coverageChange: 20,
         premiumChange: 15,
@@ -655,15 +679,18 @@ function generateRecommendations(
     })
   }
 
-  // Deductible optimization
+  // Deductible optimization - with specific amounts
   if (scores.deductible.score < 60) {
+    const deductibleAmount = policy.deductible.toLocaleString('tr-TR')
+    const deductiblePercent = ((policy.deductible / policy.coverage) * 100).toFixed(1)
+
     recommendations.push({
       priority: 'medium',
       type: 'reduce_deductible',
-      title: 'Reduce Deductible',
-      titleTR: 'Muafiyeti Azaltın',
-      description: 'High deductible may leave you exposed to significant out-of-pocket costs',
-      descriptionTR: 'Yüksek muafiyet önemli cepten harcamalara maruz kalmanıza neden olabilir',
+      title: `Negotiate Lower Deductible (Currently ₺${deductibleAmount})`,
+      titleTR: `Daha Düşük Muafiyet Pazarlığı Yapın (Mevcut: ₺${deductibleAmount})`,
+      description: `Your deductible of ₺${deductibleAmount} (${deductiblePercent}% of coverage) is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it by 50%.`,
+      descriptionTR: `₺${deductibleAmount} muafiyetiniz (teminatın %${deductiblePercent}'i) yüksek. Bir hasarda bu tutarı cebinizden ödemeniz gerekir. Temsilcinizden %50 azaltma konusunda bilgi alın.`,
       estimatedImpact: {
         premiumChange: 10,
         riskReduction: 25,
@@ -671,27 +698,43 @@ function generateRecommendations(
     })
   }
 
-  // Premium optimization
+  // Premium optimization - actionable advice
   if (scores.premium.score < 60) {
+    const premiumAmount = policy.premium.toLocaleString('tr-TR')
+
     recommendations.push({
       priority: 'medium',
       type: 'review_premium',
-      title: 'Review Premium',
-      titleTR: 'Primi Gözden Geçirin',
-      description: 'Premium appears high compared to market. Consider getting competitive quotes.',
-      descriptionTR: 'Prim piyasaya göre yüksek görünüyor. Rekabetçi teklifler almayı düşünün.',
+      title: 'Compare Alternative Quotes',
+      titleTR: 'Alternatif Teklifleri Karşılaştırın',
+      description: `Your premium of ₺${premiumAmount} is above market average. Get 3-5 competitive quotes from different insurers. Use comparison sites like sigorta.com or ask an independent broker.`,
+      descriptionTR: `₺${premiumAmount} priminiz piyasa ortalamasının üzerinde. Farklı sigortacılardan 3-5 rekabetçi teklif alın. sigorta.com gibi karşılaştırma sitelerini kullanın veya bağımsız bir acenta ile görüşün.`,
     })
   }
 
-  // Value optimization
+  // Value optimization - specific suggestions
   if (scores.value.score < 60) {
+    const coverageToPremium = (policy.coverage / policy.premium).toFixed(1)
+
     recommendations.push({
       priority: 'low',
       type: 'optimize',
-      title: 'Optimize Value',
-      titleTR: 'Değeri Optimize Edin',
-      description: 'Consider adjusting coverage mix to improve overall value',
-      descriptionTR: 'Genel değeri artırmak için teminat karışımını ayarlamayı düşünün',
+      title: 'Improve Coverage-to-Premium Ratio',
+      titleTR: 'Teminat/Prim Oranını İyileştirin',
+      description: `Your ratio of ${coverageToPremium}x coverage per TL premium is below optimal. Consider: (1) Bundling policies for discounts, (2) Increasing deductibles slightly to lower premium, (3) Removing rarely-used coverages.`,
+      descriptionTR: `TL prim başına ${coverageToPremium}x teminat oranınız optimal seviyenin altında. Şunları değerlendirin: (1) İndirim için poliçeleri birleştirme, (2) Primi düşürmek için muafiyeti biraz artırma, (3) Nadiren kullanılan teminatları kaldırma.`,
+    })
+  }
+
+  // Add positive recommendation if policy is good
+  if (recommendations.length === 0 && scores.coverage.score >= 70 && scores.premium.score >= 70) {
+    recommendations.push({
+      priority: 'low',
+      type: 'optimize',
+      title: 'Policy Well-Structured',
+      titleTR: 'Poliçe İyi Yapılandırılmış',
+      description: 'Your policy offers good value. Consider reviewing annually before renewal to ensure continued competitiveness.',
+      descriptionTR: 'Poliçeniz iyi değer sunuyor. Rekabetçiliğin devam etmesini sağlamak için yenileme öncesi yıllık incelemeyi düşünün.',
     })
   }
 
