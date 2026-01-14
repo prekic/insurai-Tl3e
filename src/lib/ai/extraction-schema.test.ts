@@ -95,8 +95,8 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     expect(required).toContain('confidence')
   })
 
-  it('should have exactly 14 required fields', () => {
-    expect(required.length).toBe(14)
+  it('should have exactly 15 required fields', () => {
+    expect(required.length).toBe(15)
   })
 })
 
