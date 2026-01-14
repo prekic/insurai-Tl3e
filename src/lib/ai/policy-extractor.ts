@@ -32,7 +32,7 @@ export interface ExtractionResult {
 export interface ExtractionError {
   success: false
   error: {
-    code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE' | 'OCR_ERROR'
+    code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'PDF_TIMEOUT' | 'PDF_WORKER_ERROR' | 'FILE_READ_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE' | 'OCR_ERROR'
     message: string
     details?: string
   }
@@ -101,6 +101,20 @@ export async function extractPolicyFromDocument(
   let usedOCR = false
 
   if (!parseResult.success) {
+    // Map PDF parser error codes to extraction error codes
+    const mapPdfErrorCode = (pdfCode: string): ExtractionError['error']['code'] => {
+      switch (pdfCode) {
+        case 'TIMEOUT_ERROR':
+          return 'PDF_TIMEOUT'
+        case 'WORKER_ERROR':
+          return 'PDF_WORKER_ERROR'
+        case 'FILE_READ_ERROR':
+          return 'FILE_READ_ERROR'
+        default:
+          return 'PDF_PARSE_ERROR'
+      }
+    }
+
     // Check if we should try OCR
     if (useOCR && isOCRConfigured()) {
       const ocrResult = await performOCR(file)
@@ -114,7 +128,7 @@ export async function extractPolicyFromDocument(
         return {
           success: false,
           error: {
-            code: 'PDF_PARSE_ERROR',
+            code: mapPdfErrorCode(parseResult.error.code),
             message: parseResult.error.message,
             details: parseResult.error.code,
           },
@@ -128,7 +142,7 @@ export async function extractPolicyFromDocument(
       return {
         success: false,
         error: {
-          code: 'PDF_PARSE_ERROR',
+          code: mapPdfErrorCode(parseResult.error.code),
           message: parseResult.error.message,
           details: parseResult.error.code,
         },

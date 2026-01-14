@@ -352,6 +352,18 @@ export function PolicyUpload() {
         troubleshootingTip = IS_PRODUCTION
           ? 'Please contact support if this issue persists.'
           : 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env'
+      } else if (errorMessage.includes('PDF_TIMEOUT') || errorMessage.includes('timed out') || errorMessage.includes('took too long')) {
+        userTitle = 'PDF Processing Timeout'
+        userMessage = 'The PDF took too long to process.'
+        troubleshootingTip = 'The file may be too large or complex. Try a smaller file or retry.'
+      } else if (errorMessage.includes('PDF_WORKER_ERROR') || errorMessage.includes('worker failed')) {
+        userTitle = 'PDF Processing Error'
+        userMessage = 'The PDF processor encountered an error.'
+        troubleshootingTip = 'This is usually temporary. Please try again.'
+      } else if (errorMessage.includes('FILE_READ_ERROR') || errorMessage.includes('Could not read')) {
+        userTitle = 'File Read Error'
+        userMessage = 'Could not read the uploaded file.'
+        troubleshootingTip = 'The file may have been moved or is corrupted. Please select the file again.'
       } else if (errorMessage.includes('PDF_PARSE_ERROR') || errorMessage.includes('PDF processing')) {
         userTitle = 'PDF Processing Error'
         userMessage = 'Could not read the PDF file.'
