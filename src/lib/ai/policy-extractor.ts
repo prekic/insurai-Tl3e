@@ -308,6 +308,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     exclusions: data.exclusions,
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
+    currency: data.currency ?? 'TRY',
     aiConfidence: data.confidence.overall,
     aiInsights: [
       ...generateStrengths(data).map(s => `✓ ${s}`),

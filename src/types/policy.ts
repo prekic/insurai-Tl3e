@@ -59,6 +59,8 @@ export interface Policy {
   exclusions: string[]
   specialConditions: string[]
   insuranceLine: string
+  /** Currency code for this policy (TRY, USD, EUR, GBP) - defaults to TRY */
+  currency?: string
   /** Amendment information - populated if document has Zeyilname markers */
   amendmentInfo?: AmendmentInfo
   /** Hash of extracted text for detecting re-uploads of same document */
