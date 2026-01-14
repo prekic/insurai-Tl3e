@@ -619,6 +619,112 @@ const BUSINESS_EXCLUSIONS = [
 ]
 
 /**
+ * Nakliyat (Transportation/Cargo Insurance) Benchmark
+ */
+const NAKLIYAT_COVERAGES: CoverageBenchmark[] = [
+  {
+    name: 'Cargo Damage - All Risks (ICC-A)',
+    nameTr: 'Emtia Hasarı - Tüm Riskler',
+    typicalLimit: 500000,
+    minLimit: 50000,
+    maxLimit: 10000000,
+    typicalDeductible: 2500,
+    minDeductible: 0,
+    maxDeductible: 25000,
+    inclusionRate: 100,
+  },
+  {
+    name: 'Loading/Unloading Damage',
+    nameTr: 'Yükleme/Boşaltma Hasarı',
+    typicalLimit: 500000,
+    minLimit: 50000,
+    maxLimit: 10000000,
+    typicalDeductible: 2500,
+    minDeductible: 0,
+    maxDeductible: 25000,
+    inclusionRate: 95,
+  },
+  {
+    name: 'Theft',
+    nameTr: 'Hırsızlık/Gasp',
+    typicalLimit: 500000,
+    minLimit: 50000,
+    maxLimit: 10000000,
+    typicalDeductible: 5000,
+    minDeductible: 0,
+    maxDeductible: 50000,
+    inclusionRate: 90,
+  },
+  {
+    name: 'Natural Perils',
+    nameTr: 'Doğal Afetler',
+    typicalLimit: 500000,
+    minLimit: 50000,
+    maxLimit: 10000000,
+    typicalDeductible: 5000,
+    minDeductible: 0,
+    maxDeductible: 25000,
+    inclusionRate: 85,
+  },
+  {
+    name: 'Storage Risk',
+    nameTr: 'Depoda Bekleme Riski',
+    typicalLimit: 250000,
+    minLimit: 25000,
+    maxLimit: 5000000,
+    typicalDeductible: 2500,
+    minDeductible: 0,
+    maxDeductible: 10000,
+    inclusionRate: 70,
+  },
+  {
+    name: 'General Average',
+    nameTr: 'Müşterek Avarya',
+    typicalLimit: 100000,
+    minLimit: 10000,
+    maxLimit: 1000000,
+    typicalDeductible: 0,
+    minDeductible: 0,
+    maxDeductible: 5000,
+    inclusionRate: 80,
+  },
+  {
+    name: 'War and Strikes (optional)',
+    nameTr: 'Savaş ve Grev (isteğe bağlı)',
+    typicalLimit: 500000,
+    minLimit: 50000,
+    maxLimit: 10000000,
+    typicalDeductible: 5000,
+    minDeductible: 0,
+    maxDeductible: 25000,
+    inclusionRate: 35,
+  },
+  {
+    name: 'Carrier Liability (CMR)',
+    nameTr: 'Taşıyıcı Sorumluluğu (CMR)',
+    typicalLimit: 200000,
+    minLimit: 25000,
+    maxLimit: 2000000,
+    typicalDeductible: 2500,
+    minDeductible: 0,
+    maxDeductible: 10000,
+    inclusionRate: 60,
+  },
+]
+
+const NAKLIYAT_EXCLUSIONS = [
+  'Yetersiz ambalaj',
+  'Malın doğasından kaynaklanan hasar (bozulma, ağırlık kaybı)',
+  'Gecikme kaynaklı dolaylı zararlar',
+  'Yaptırım uygulanan ülkelere taşıma',
+  'Konteyner iç paketleme kusurları',
+  'Gönderenin kusuru',
+  'Savaş ve grev (ek teminat olmadan)',
+  'Radyoaktif kirlenme',
+  'Kasıtlı hasar',
+]
+
+/**
  * Complete market data for all policy types
  */
 export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
@@ -870,6 +976,42 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       karadeniz: 0.88,
       dogu_anadolu: 0.85,
       guneydogu: 0.90,
+    },
+    dataDate: '2024-12-01',
+    source: 'TSB/SEDDK',
+  },
+  nakliyat: {
+    type: 'nakliyat',
+    typeTr: 'Nakliyat Sigortası',
+    premiumRange: {
+      min: 1500,
+      max: 75000,
+      average: 12000,
+      median: 8000,
+      percentile25: 4000,
+      percentile75: 18000,
+    },
+    coverageRange: {
+      min: 50000,
+      max: 50000000,
+      average: 2500000,
+      median: 1000000,
+    },
+    commonCoverages: NAKLIYAT_COVERAGES,
+    commonExclusions: NAKLIYAT_EXCLUSIONS,
+    trends: {
+      premiumChangeYoY: 32.5,
+      claimsRatio: 48.5,
+      marketGrowth: 28.2,
+    },
+    regionalFactors: {
+      marmara: 1.10, // Major ports and logistics hubs
+      ege: 1.05,
+      akdeniz: 1.08, // Mersin port
+      ic_anadolu: 0.95,
+      karadeniz: 0.92,
+      dogu_anadolu: 0.88,
+      guneydogu: 0.95, // Border trade
     },
     dataDate: '2024-12-01',
     source: 'TSB/SEDDK',

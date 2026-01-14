@@ -1008,6 +1008,7 @@ export const ALL_TEMPLATES: Record<PolicyType, PolicyTemplate[]> = {
   traffic: [], // Add when needed
   life: [], // Add when needed
   dask: [], // Add when needed
+  nakliyat: [], // Add when needed
 }
 
 /**
