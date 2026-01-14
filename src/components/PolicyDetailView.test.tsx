@@ -279,14 +279,18 @@ describe('PolicyDetailView', () => {
       renderPolicyDetailView()
 
       // Standard coverages (default importance) should have blue background
-      const fireSection = screen.getByText('Fire').closest('[class*="rounded-xl"]')
+      // With grouped coverage display, items now use rounded-lg
+      const fireSection = screen.getByText('Fire').closest('[class*="rounded-lg"]')
+      expect(fireSection).toBeTruthy()
       expect(fireSection?.className).toContain('bg-blue-50')
     })
 
     it('should apply gray background for non-included coverages', () => {
       renderPolicyDetailView()
 
-      const floodSection = screen.getByText('Flood').closest('[class*="rounded-xl"]')
+      // With grouped coverage display, items now use rounded-lg
+      const floodSection = screen.getByText('Flood').closest('[class*="rounded-lg"]')
+      expect(floodSection).toBeTruthy()
       expect(floodSection?.className).toContain('bg-gray-50')
     })
   })

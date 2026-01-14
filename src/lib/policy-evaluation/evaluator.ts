@@ -206,58 +206,115 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
   const issuesTR: string[] = []
   let score = 70
 
-  // Check total coverage amount
-  const coveragePerPremium = policy.coverage / policy.premium
-  if (coveragePerPremium > 20) {
-    score += 15
-  } else if (coveragePerPremium < 10) {
-    score -= 10
-    issues.push('Coverage amount is low relative to premium paid')
-    issuesTR.push('Teminat tutarı ödenen prime göre düşük')
+  // Kasko-specific evaluation
+  const isKasko = policy.type === 'kasko'
+  const hasMarketValueCoverage = policy.coverages.some(c => c.isMarketValue)
+  const hasUnlimitedLiability = policy.coverages.some(c =>
+    c.isUnlimited && c.name.toLowerCase().includes('mali sorumluluk')
+  )
+
+  if (isKasko) {
+    // For kasko, base coverages (collision, theft, fire, natural disasters) are IMPLICIT
+    // Start with a higher base score since these are always included
+    score = 75
+
+    // Bonus for market value coverage (Rayiç Değer)
+    if (hasMarketValueCoverage || policy.coverage === 0) {
+      score += 10 // Market value coverage is good
+    }
+
+    // Bonus for unlimited liability
+    if (hasUnlimitedLiability) {
+      score += 10
+    }
+
+    // Check for valuable kasko additions
+    const coverageNames = policy.coverages.map(c => c.name.toLowerCase())
+    if (coverageNames.some(n => n.includes('ferdi kaza') || n.includes('koltuk'))) {
+      score += 5 // Personal accident coverage
+    }
+    if (coverageNames.some(n => n.includes('ikame') || n.includes('replacement'))) {
+      score += 5 // Replacement vehicle
+    }
+    if (coverageNames.some(n => n.includes('hukuki') || n.includes('legal'))) {
+      score += 3 // Legal protection
+    }
+  } else {
+    // Non-kasko: Check total coverage amount
+    const coveragePerPremium = policy.coverage / policy.premium
+    if (coveragePerPremium > 20) {
+      score += 15
+    } else if (coveragePerPremium < 10) {
+      score -= 10
+      issues.push('Coverage amount is low relative to premium paid')
+      issuesTR.push('Teminat tutarı ödenen prime göre düşük')
+    }
   }
 
-  // Check number of coverages
-  const includedCoverages = policy.coverages.filter(c => c.included)
+  // Check number of coverages (applies to all policy types)
+  const includedCoverages = policy.coverages.filter(c => c.included !== false)
   const coverageCount = includedCoverages.length
 
-  if (coverageCount >= 8) {
+  if (coverageCount >= 10) {
     score += 10
-  } else if (coverageCount >= 5) {
+  } else if (coverageCount >= 6) {
     score += 5
-  } else if (coverageCount < 3) {
+  } else if (coverageCount < 3 && !isKasko) {
+    // Don't penalize kasko for low count - base coverages are implicit
     score -= 15
     issues.push('Limited number of coverages included')
     issuesTR.push('Dahil edilen teminat sayısı sınırlı')
   }
 
-  // Check for essential coverages by policy type
+  // Check for essential coverages by policy type (kasko now has different essentials)
   const missingEssential = checkMissingEssentialCoverages(policy)
   if (missingEssential.length > 0) {
-    score -= missingEssential.length * 10
+    // For kasko, missing "essentials" are recommendations, not critical gaps
+    const penalty = isKasko ? 5 : 10
+    score -= missingEssential.length * penalty
     missingEssential.forEach(m => {
-      issues.push(`Missing essential coverage: ${m.en}`)
-      issuesTR.push(`Eksik temel teminat: ${m.tr}`)
+      if (isKasko) {
+        issues.push(`Recommended coverage: ${m.en}`)
+        issuesTR.push(`Önerilen teminat: ${m.tr}`)
+      } else {
+        issues.push(`Missing essential coverage: ${m.en}`)
+        issuesTR.push(`Eksik temel teminat: ${m.tr}`)
+      }
     })
   }
 
-  // Check coverage limits
-  const lowLimitCoverages = includedCoverages.filter(c => c.limit < 50000)
-  if (lowLimitCoverages.length > 2) {
-    score -= 10
-    issues.push('Several coverages have low limits')
-    issuesTR.push('Birçok teminatın limiti düşük')
+  // Check coverage limits (skip for kasko - supplementary coverages like glass, roadside often have low limits)
+  if (!isKasko) {
+    const lowLimitCoverages = includedCoverages.filter(c => c.limit > 0 && c.limit < 50000 && !c.isUnlimited)
+    if (lowLimitCoverages.length > 2) {
+      score -= 10
+      issues.push('Several coverages have low limits')
+      issuesTR.push('Birçok teminatın limiti düşük')
+    }
   }
 
   // Ensure score is in valid range
   score = Math.max(0, Math.min(100, score))
+
+  // Generate appropriate details message
+  let details: string
+  let detailsTR: string
+
+  if (isKasko && (hasMarketValueCoverage || policy.coverage === 0)) {
+    details = `${coverageCount} coverages included, vehicle covered at market value`
+    detailsTR = `${coverageCount} teminat dahil, araç rayiç değer üzerinden teminatlı`
+  } else {
+    details = `${coverageCount} coverages included with total coverage of ${policy.coverage.toLocaleString('tr-TR')} TL`
+    detailsTR = `${coverageCount} teminat dahil, toplam ${policy.coverage.toLocaleString('tr-TR')} TL teminat`
+  }
 
   return {
     category: 'Coverage',
     categoryTR: 'Teminat',
     score,
     weight: config.weights.coverage,
-    details: `${coverageCount} coverages included with total coverage of ${policy.coverage.toLocaleString('tr-TR')} TL`,
-    detailsTR: `${coverageCount} teminat dahil, toplam ${policy.coverage.toLocaleString('tr-TR')} TL teminat`,
+    details,
+    detailsTR,
     issues,
     issuesTR,
   }
@@ -267,11 +324,16 @@ function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: strin
   const missing: { en: string; tr: string }[] = []
   const coverageNames = policy.coverages.filter(c => c.included).map(c => c.name.toLowerCase())
 
-  const essentialByType: Record<PolicyType, { en: string; tr: string }[]> = {
+  // IMPORTANT: For kasko, Collision, Theft, Fire, Natural Disasters are IMPLICIT
+  // They are included in the base kasko premium - don't flag them as missing!
+  // Instead, check for valuable additional coverages that enhance the policy.
+  const essentialByType: Record<PolicyType, { en: string; tr: string; implicit?: boolean }[]> = {
     kasko: [
-      { en: 'Collision', tr: 'Çarpışma' },
-      { en: 'Theft', tr: 'Hırsızlık' },
-      { en: 'Fire', tr: 'Yangın' },
+      // NOTE: Collision, Theft, Fire, Natural Disasters are IMPLICIT in kasko
+      // They should NOT be listed here as they're always included in base coverage
+      // Check for valuable additional coverages instead:
+      { en: 'Increased Liability', tr: 'Artan Mali Sorumluluk', implicit: false },
+      { en: 'Personal Accident', tr: 'Ferdi Kaza', implicit: false },
     ],
     traffic: [
       { en: 'Bodily Injury', tr: 'Bedensel Hasar' },
@@ -312,7 +374,7 @@ function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: strin
       name.includes(essential.tr.toLowerCase())
     )
     if (!found) {
-      missing.push(essential)
+      missing.push({ en: essential.en, tr: essential.tr })
     }
   }
 

@@ -1,25 +1,42 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Minus } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { PolicyDocuments } from './PolicyDocuments'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import type { Coverage } from '@/types/policy'
+import type { Coverage, CoverageCategory } from '@/types/policy'
+import {
+  KASKO_COVERAGE_CATEGORIES,
+  detectCoverageCategory,
+  shouldShowUnlimited,
+  shouldShowIncluded,
+} from '@/lib/knowledge/kasko-knowledge'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
+ * Uses kasko knowledge hub for intelligent detection
  */
 function formatCoverageLimit(coverage: Coverage): string {
+  // Explicit flags take priority
   if (coverage.isUnlimited) {
     return 'Sınırsız'
   }
   if (coverage.isMarketValue) {
     return 'Rayiç Değer'
   }
+
+  // Use kasko knowledge hub for intelligent detection
+  if (shouldShowUnlimited(coverage.name, coverage.limit)) {
+    return 'Sınırsız'
+  }
+  if (shouldShowIncluded(coverage.name, coverage.limit)) {
+    return 'Dahil'
+  }
+
+  // Legacy fallback checks
   if (coverage.limit === 0) {
-    // Check name for clues about unlimited/market value
     const nameLower = coverage.name.toLowerCase()
     if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
       return 'Sınırsız'
@@ -27,14 +44,44 @@ function formatCoverageLimit(coverage: Coverage): string {
     if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
       return 'Rayiç Değer'
     }
-    // Check if this is an included coverage without numeric limit
+    // Services without numeric limits
     if (nameLower.includes('asistans') || nameLower.includes('hizmet') ||
         nameLower.includes('ikame') || nameLower.includes('onarım')) {
       return 'Dahil'
     }
-    return formatCurrency(0)
+    return 'Dahil' // Default to "Dahil" instead of ₺0 for zero-limit coverages
   }
   return formatCurrency(coverage.limit)
+}
+
+/**
+ * Get icon for coverage category
+ */
+function getCategoryIcon(category: CoverageCategory) {
+  switch (category) {
+    case 'main': return Car
+    case 'liability': return Scale
+    case 'personal_accident': return Users
+    case 'supplementary': return Briefcase
+    case 'assistance': return LifeBuoy
+    case 'legal': return Gavel
+    default: return Shield
+  }
+}
+
+/**
+ * Get category display info
+ */
+function getCategoryInfo(category: CoverageCategory) {
+  const info = KASKO_COVERAGE_CATEGORIES[category as keyof typeof KASKO_COVERAGE_CATEGORIES]
+  if (info) {
+    return {
+      labelTr: info.labelTr,
+      labelEn: info.labelEn,
+      color: info.color,
+    }
+  }
+  return { labelTr: 'Diğer', labelEn: 'Other', color: 'gray' }
 }
 
 /**
@@ -102,6 +149,163 @@ function isExclusionCritical(exclusion: string): boolean {
   const lowerExclusion = exclusion.toLowerCase()
   return criticalPatterns.some(pattern => lowerExclusion.includes(pattern))
 }
+
+/**
+ * Coverages grouped by category component
+ * Groups and displays coverages in organized sections
+ */
+function CoveragesByCategory({
+  coverages,
+  policyType,
+  locale,
+}: {
+  coverages: Coverage[]
+  policyType: string
+  locale: string
+}) {
+  // Filter and prepare coverages
+  const filteredCoverages = coverages.filter(coverage => {
+    // Always keep coverages with limits, unlimited flag, or market value flag
+    if (coverage.limit > 0) return true
+    if (coverage.isUnlimited) return true
+    if (coverage.isMarketValue) return true
+
+    // Keep service coverages
+    const nameLower = (coverage.name || '').toLowerCase()
+    if (shouldShowUnlimited(nameLower, 0) || shouldShowIncluded(nameLower, 0)) {
+      return true
+    }
+
+    // Filter out zero-limit entries that look like policy category headers
+    const categoryPatterns = [
+      'zorunlu mali sorumluluk',
+      'trafik sigortası',
+      'kasko sigortası',
+      'konut sigortası',
+    ]
+    return !categoryPatterns.some(pattern => nameLower.includes(pattern))
+  })
+
+  // Group coverages by category
+  const groupedCoverages = useMemo(() => {
+    const groups: Record<string, Coverage[]> = {
+      main: [],
+      liability: [],
+      personal_accident: [],
+      supplementary: [],
+      assistance: [],
+      legal: [],
+      other: [],
+    }
+
+    for (const coverage of filteredCoverages) {
+      const category = coverage.category || detectCoverageCategory(coverage.name)
+      if (groups[category]) {
+        groups[category].push(coverage)
+      } else {
+        groups.other.push(coverage)
+      }
+    }
+
+    return groups
+  }, [filteredCoverages])
+
+  // Category order for display
+  const categoryOrder: CoverageCategory[] = [
+    'main',
+    'liability',
+    'personal_accident',
+    'supplementary',
+    'assistance',
+    'legal',
+    'other',
+  ]
+
+  // For kasko, add implicit coverages note
+  const isKasko = policyType === 'kasko'
+
+  return (
+    <div className="space-y-6">
+      {/* Implicit coverages note for kasko */}
+      {isKasko && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
+          <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+            <Check className="text-green-600" size={18} />
+            {locale === 'tr' ? 'Temel Kasko Teminatları (Dahil)' : 'Base Kasko Coverage (Included)'}
+          </div>
+          <p className="text-sm text-green-700">
+            {locale === 'tr'
+              ? 'Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) tüm kasko poliçelerinde standart olarak dahildir.'
+              : 'Collision, Theft, Fire, Natural Disasters (earthquake, flood, hail, storm) are included as standard in all kasko policies.'}
+          </p>
+        </div>
+      )}
+
+      {/* Grouped coverages */}
+      {categoryOrder.map(categoryKey => {
+        const categoryCoverages = groupedCoverages[categoryKey]
+        if (!categoryCoverages || categoryCoverages.length === 0) return null
+
+        const categoryInfo = getCategoryInfo(categoryKey)
+        const CategoryIcon = getCategoryIcon(categoryKey)
+
+        return (
+          <div key={categoryKey}>
+            <div className="flex items-center gap-2 mb-3">
+              <CategoryIcon className="text-gray-600" size={18} />
+              <h4 className="font-semibold text-gray-900">{categoryInfo.labelTr}</h4>
+              <Badge variant="outline" className="text-xs">
+                {categoryCoverages.length}
+              </Badge>
+            </div>
+            <div className="space-y-2">
+              {categoryCoverages.map((coverage, i) => {
+                const iconStyle = getCoverageIconStyle(coverage)
+                const limitDisplay = formatCoverageLimit(coverage)
+                const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
+                  limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
+
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between p-3 rounded-lg ${getCoverageBackground(coverage)}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {coverage.included !== false ? (
+                        <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
+                          <Check className={iconStyle.icon} size={14} />
+                        </div>
+                      ) : (
+                        <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center">
+                          <X className="text-gray-400" size={14} />
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-medium text-gray-900 text-sm">{coverage.name}</p>
+                        {coverage.nameTr && coverage.nameTr !== coverage.name && (
+                          <p className="text-xs text-gray-500">{coverage.nameTr}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`font-semibold text-sm ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                        {limitDisplay}
+                      </p>
+                      {coverage.deductible > 0 && (
+                        <p className="text-xs text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 import { usePolicies } from '@/lib/policy-context'
 import { useI18n } from '@/lib/i18n'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
@@ -251,97 +455,71 @@ export function PolicyDetailView() {
               </CardContent>
             </Card>
 
-            {/* Coverages */}
+            {/* Vehicle Information (Kasko Only) */}
+            {policy.type === 'kasko' && policy.vehicleInfo && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Car className="text-blue-600" size={20} />
+                    {locale === 'tr' ? 'Araç Bilgileri' : 'Vehicle Information'}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {policy.vehicleInfo.plate && (
+                      <div>
+                        <p className="text-sm text-gray-500">Plaka</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.plate}</p>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.make && (
+                      <div>
+                        <p className="text-sm text-gray-500">Marka</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.make}</p>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.model && (
+                      <div>
+                        <p className="text-sm text-gray-500">Model</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.model}</p>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.year && (
+                      <div>
+                        <p className="text-sm text-gray-500">Model Yılı</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.year}</p>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.usage && (
+                      <div>
+                        <p className="text-sm text-gray-500">Kullanım Şekli</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.usage}</p>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.vehicleClass && (
+                      <div>
+                        <p className="text-sm text-gray-500">Araç Sınıfı</p>
+                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.vehicleClass}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Coverages - Grouped by Category */}
             <Card>
               <CardHeader>
-                <CardTitle>Coverage Details</CardTitle>
+                <CardTitle>
+                  {locale === 'tr' ? 'Teminat Detayları' : 'Coverage Details'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {policy.coverages
-                    // Filter out zero-limit category entries (like "Zorunlu Mali Sorumluluk" with ₺0)
-                    .filter(coverage => {
-                      // Always keep coverages with limits, unlimited flag, or market value flag
-                      if (coverage.limit > 0) return true
-                      if (coverage.isUnlimited) return true
-                      if (coverage.isMarketValue) return true
-
-                      // Keep coverages that are included services without numeric limits
-                      const nameLower = (coverage.name || '').toLowerCase()
-                      if (nameLower.includes('asistans') || nameLower.includes('hizmet') ||
-                          nameLower.includes('ikame') || nameLower.includes('onarım') ||
-                          nameLower.includes('anadolu')) {
-                        return true
-                      }
-
-                      // Filter out zero-limit entries that look like policy categories
-                      const categoryPatterns = [
-                        'zorunlu mali sorumluluk',
-                        'trafik sigortası',
-                        'kasko sigortası',
-                        'konut sigortası',
-                        'sağlık sigortası',
-                      ]
-                      const nameTrLower = (coverage.nameTr || '').toLowerCase()
-                      const isCategory = categoryPatterns.some(
-                        pattern => nameLower.includes(pattern) || nameTrLower.includes(pattern)
-                      )
-                      return !isCategory
-                    })
-                    .map((coverage, i) => {
-                      const iconStyle = getCoverageIconStyle(coverage)
-                      const limitDisplay = formatCoverageLimit(coverage)
-                      const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue || limitDisplay === 'Dahil'
-
-                      return (
-                        <div
-                          key={i}
-                          className={`flex items-center justify-between p-4 rounded-xl ${getCoverageBackground(coverage)}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            {coverage.included ? (
-                              coverage.importance === 'minor' ? (
-                                <div className={`w-8 h-8 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
-                                  <Minus className={iconStyle.icon} size={16} />
-                                </div>
-                              ) : (
-                                <div className={`w-8 h-8 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
-                                  <Check className={iconStyle.icon} size={16} />
-                                </div>
-                              )
-                            ) : (
-                              <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                                <X className="text-gray-400" size={16} />
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-medium text-gray-900">{coverage.name}</p>
-                              {coverage.nameTr && coverage.nameTr !== coverage.name && (
-                                <p className="text-sm text-gray-500">{coverage.nameTr}</p>
-                              )}
-                              {coverage.category && (
-                                <Badge variant="outline" className="text-xs mt-1">
-                                  {coverage.category === 'main' ? 'Ana Teminat' :
-                                   coverage.category === 'liability' ? 'Mali Sorumluluk' :
-                                   coverage.category === 'supplementary' ? 'Ek Teminat' :
-                                   coverage.category === 'assistance' ? 'Asistans' :
-                                   coverage.category === 'legal' ? 'Hukuki Koruma' : ''}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className={`font-semibold ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
-                              {limitDisplay}
-                            </p>
-                            {coverage.deductible > 0 && (
-                              <p className="text-sm text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    })}
-                </div>
+                <CoveragesByCategory
+                  coverages={policy.coverages}
+                  policyType={policy.type}
+                  locale={locale}
+                />
               </CardContent>
             </Card>
 

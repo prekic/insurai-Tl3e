@@ -3,10 +3,24 @@ export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'das
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
 
 /** Coverage category for organization */
-export type CoverageCategory = 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+export type CoverageCategory = 'main' | 'liability' | 'personal_accident' | 'supplementary' | 'assistance' | 'legal' | 'other'
 
 /** Coverage importance for visual display */
 export type CoverageImportance = 'critical' | 'standard' | 'minor'
+
+/** Vehicle information for kasko policies */
+export interface VehicleInfo {
+  plate?: string          // e.g., "34 RZ 9511"
+  make?: string           // e.g., "Ford"
+  model?: string          // e.g., "Transit Custom"
+  year?: number           // e.g., 2023
+  engineNo?: string       // Motor no
+  chassisNo?: string      // Şasi no
+  color?: string          // Renk
+  usage?: string          // Kullanım şekli (Hususi/Ticari)
+  vehicleClass?: string   // Araç sınıfı (Binek/Kamyonet/TIR)
+  fuelType?: string       // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
+}
 
 export interface Coverage {
   name: string
@@ -86,6 +100,8 @@ export interface Policy {
   amendmentInfo?: AmendmentInfo
   /** Hash of extracted text for detecting re-uploads of same document */
   documentHash?: string
+  /** Vehicle information for kasko policies */
+  vehicleInfo?: VehicleInfo
 }
 
 /**
