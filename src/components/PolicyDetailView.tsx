@@ -437,7 +437,7 @@ function ExclusionsSection({
                             </Badge>
                           )}
                           {exclusion.needsClarification && (
-                            <HelpCircle className="text-blue-500" size={14} title="Clarification recommended" />
+                            <HelpCircle className="text-blue-500" size={14} />
                           )}
                         </div>
 
