@@ -54,6 +54,7 @@ function convertToSupabasePolicy(policy: AnalyzedPolicy, userId: string): Policy
       gapAnalysis: policy.gapAnalysis,
       riskActions: policy.riskActions,
       gapActions: policy.gapActions,
+      extractedText: policy.extractedText,
     },
   }
 }
@@ -109,17 +110,27 @@ export function PolicyUpload() {
   // In production (SaaS), hide technical details from end users
   const IS_PRODUCTION = import.meta.env.PROD
 
+  // Track if we're in autoOpen mode (to show minimal UI until dialog opens)
+  const isAutoOpen = searchParams.get('autoOpen') === 'true'
+  const [autoOpenTriggered, setAutoOpenTriggered] = useState(false)
+
   // Auto-open file dialog if autoOpen query param is present
   useEffect(() => {
-    const autoOpen = searchParams.get('autoOpen')
-    if (autoOpen === 'true' && fileInputRef.current) {
+    if (isAutoOpen && fileInputRef.current && !autoOpenTriggered) {
+      // Mark as triggered immediately to prevent re-triggering
+      setAutoOpenTriggered(true)
       // Small delay to ensure the component is fully rendered
       const timer = setTimeout(() => {
         fileInputRef.current?.click()
-      }, 100)
+        // Remove the autoOpen param from URL without adding history entry
+        const newSearchParams = new URLSearchParams(searchParams)
+        newSearchParams.delete('autoOpen')
+        const newUrl = newSearchParams.toString() ? `/upload?${newSearchParams.toString()}` : '/upload'
+        navigate(newUrl, { replace: true })
+      }, 50)
       return () => clearTimeout(timer)
     }
-  }, [searchParams])
+  }, [isAutoOpen, autoOpenTriggered, searchParams, navigate])
 
   const handleRunDiagnostics = async () => {
     setIsRunningDiagnostics(true)
@@ -473,7 +484,8 @@ export function PolicyUpload() {
       addPolicies(analyzedPolicies)
     }
 
-    navigate('/dashboard')
+    // Use replace to avoid back button returning to upload page with completed files
+    navigate('/dashboard', { replace: true })
   }
 
   const useSamplePolicies = () => {
@@ -492,7 +504,8 @@ export function PolicyUpload() {
   const handleViewPolicy = (policyId: string) => {
     const safeId = sanitizeId(policyId)
     if (safeId) {
-      navigate(`/policy/${safeId}`)
+      // Use replace to avoid back button returning to upload page with files
+      navigate(`/policy/${safeId}`, { replace: true })
     }
   }
 
@@ -668,6 +681,29 @@ export function PolicyUpload() {
       },
       duration: 10000,
     })
+  }
+
+  // Show minimal loading screen when autoOpen is active but file dialog hasn't opened yet
+  if (isAutoOpen && !autoOpenTriggered) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Upload className="text-white" size={32} />
+          </div>
+          <p className="text-gray-600">Opening file selector...</p>
+          {/* Hidden file input for autoOpen mode */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+            multiple
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+      </div>
+    )
   }
 
   return (
