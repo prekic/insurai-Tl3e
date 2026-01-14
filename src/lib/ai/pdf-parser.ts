@@ -5,6 +5,7 @@
  * reducing initial bundle size by ~450KB.
  *
  * Includes CDN fallback logic for worker loading reliability.
+ * Enhanced error handling for intermittent failures.
  */
 
 export interface PDFParseResult {
@@ -18,7 +19,7 @@ export interface PDFParseResult {
 }
 
 export interface PDFParseError {
-  code: 'INVALID_PDF' | 'EMPTY_PDF' | 'PARSE_ERROR' | 'PASSWORD_PROTECTED' | 'LOAD_ERROR'
+  code: 'INVALID_PDF' | 'EMPTY_PDF' | 'PARSE_ERROR' | 'PASSWORD_PROTECTED' | 'LOAD_ERROR' | 'FILE_READ_ERROR' | 'TIMEOUT_ERROR' | 'WORKER_ERROR'
   message: string
 }
 
@@ -26,6 +27,11 @@ export interface PDFParseError {
 let pdfjsLib: typeof import('pdfjs-dist') | null = null
 let loadPromise: Promise<typeof import('pdfjs-dist')> | null = null
 let workerLoadAttempted = false
+let workerFailureCount = 0
+
+// Configuration
+const PDF_LOAD_TIMEOUT_MS = 30000 // 30 seconds max for loading a PDF
+const MAX_WORKER_FAILURES = 2 // After 2 worker failures, force fake worker
 
 /**
  * CDN sources for PDF.js worker (in order of preference)
@@ -76,6 +82,17 @@ async function findWorkingWorkerUrl(version: string): Promise<string | null> {
 }
 
 /**
+ * Create a promise that rejects after a timeout
+ */
+function createTimeout<T>(ms: number, operation: string): Promise<T> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject(new Error(`${operation} timed out after ${ms}ms`))
+    }, ms)
+  })
+}
+
+/**
  * Lazily load pdfjs-dist only when first needed
  * This reduces the initial bundle size significantly
  */
@@ -87,36 +104,93 @@ async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
 
   // If currently loading, wait for existing promise
   if (loadPromise) {
-    return loadPromise
+    try {
+      return await loadPromise
+    } catch {
+      // Previous load failed - clear and retry
+      console.warn('[PDF.js] Previous load attempt failed, retrying...')
+      loadPromise = null
+    }
   }
 
   // Start loading
   loadPromise = (async () => {
-    const pdfjs = await import('pdfjs-dist')
-    const PDFJS_VERSION = pdfjs.version
+    try {
+      const pdfjs = await import('pdfjs-dist')
+      const PDFJS_VERSION = pdfjs.version
 
-    // Only attempt worker setup once
-    if (!workerLoadAttempted) {
-      workerLoadAttempted = true
+      // Only attempt worker setup once (unless too many failures)
+      if (!workerLoadAttempted || workerFailureCount >= MAX_WORKER_FAILURES) {
+        workerLoadAttempted = true
 
-      // Try to find a working CDN for the worker
-      const workerUrl = await findWorkingWorkerUrl(PDFJS_VERSION)
+        // If too many worker failures, force fake worker mode
+        if (workerFailureCount >= MAX_WORKER_FAILURES) {
+          console.warn(`[PDF.js] Too many worker failures (${workerFailureCount}), forcing fake worker mode`)
+          // Don't set workerSrc - this forces PDF.js to use main thread
+          pdfjs.GlobalWorkerOptions.workerSrc = ''
+        } else {
+          // Try to find a working CDN for the worker
+          const workerUrl = await findWorkingWorkerUrl(PDFJS_VERSION)
 
-      if (workerUrl) {
-        pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
-      } else {
-        // All CDNs failed - pdfjs will use fake worker (main thread)
-        // This is slower but still works
-        console.warn('[PDF.js] Using main thread (fake worker) - parsing may be slower')
+          if (workerUrl) {
+            pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
+          } else {
+            // All CDNs failed - pdfjs will use fake worker (main thread)
+            // This is slower but still works
+            console.warn('[PDF.js] Using main thread (fake worker) - parsing may be slower')
+          }
+        }
       }
-    }
 
-    // Cache the module
-    pdfjsLib = pdfjs
-    return pdfjs
+      // Cache the module
+      pdfjsLib = pdfjs
+      return pdfjs
+    } catch (error) {
+      // Clear the promise so next call can retry
+      loadPromise = null
+      throw error
+    }
   })()
 
   return loadPromise
+}
+
+/**
+ * Check if error message indicates a worker-related failure
+ */
+function isWorkerError(errorMessage: string): boolean {
+  const workerErrorPatterns = [
+    'worker',
+    'postMessage',
+    'message port',
+    'MessageChannel',
+    'terminated',
+    'communication',
+    'not respond',
+    'script error',
+  ]
+  const lowerMessage = errorMessage.toLowerCase()
+  return workerErrorPatterns.some(pattern => lowerMessage.includes(pattern.toLowerCase()))
+}
+
+/**
+ * Check if error indicates a transient/retryable failure
+ */
+function isTransientError(errorMessage: string): boolean {
+  const transientPatterns = [
+    'network',
+    'timeout',
+    'aborted',
+    'connection',
+    'ECONNRESET',
+    'ETIMEDOUT',
+    'temporarily',
+    'try again',
+    'busy',
+    'overloaded',
+  ]
+  const lowerMessage = errorMessage.toLowerCase()
+  return transientPatterns.some(pattern => lowerMessage.includes(pattern.toLowerCase()))
 }
 
 /**
@@ -126,23 +200,78 @@ async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
 export async function extractTextFromPDF(
   file: File
 ): Promise<{ success: true; data: PDFParseResult } | { success: false; error: PDFParseError }> {
+  let pdfDocument: Awaited<ReturnType<typeof import('pdfjs-dist')['getDocument']>['promise']> | null = null
+
   try {
     // Lazily load pdfjs-dist
     const pdfjs = await getPdfJs()
 
-    // Read file as ArrayBuffer
-    const arrayBuffer = await file.arrayBuffer()
+    // Read file as ArrayBuffer with explicit error handling
+    let arrayBuffer: ArrayBuffer
+    try {
+      arrayBuffer = await file.arrayBuffer()
+    } catch (readError) {
+      const readErrorMsg = readError instanceof Error ? readError.message : 'Unknown error'
+      console.error('[PDF.js] Failed to read file:', readErrorMsg)
+      return {
+        success: false,
+        error: {
+          code: 'FILE_READ_ERROR',
+          message: `Could not read the file: ${readErrorMsg}. The file may have been moved, deleted, or is too large.`,
+        },
+      }
+    }
 
-    // Load PDF document
+    // Validate we got actual data
+    if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+      return {
+        success: false,
+        error: {
+          code: 'FILE_READ_ERROR',
+          message: 'The file appears to be empty or could not be read properly.',
+        },
+      }
+    }
+
+    // Load PDF document with timeout
     const loadingTask = pdfjs.getDocument({
       data: arrayBuffer,
       useSystemFonts: true,
     })
 
-    const pdf = await loadingTask.promise
+    try {
+      // Race between PDF loading and timeout
+      pdfDocument = await Promise.race([
+        loadingTask.promise,
+        createTimeout<never>(PDF_LOAD_TIMEOUT_MS, 'PDF loading'),
+      ])
+    } catch (loadError) {
+      // Cancel the loading task if it's still running
+      try {
+        loadingTask.destroy()
+      } catch {
+        // Ignore destroy errors
+      }
+
+      const loadErrorMsg = loadError instanceof Error ? loadError.message : 'Unknown error'
+
+      // Check if it's a timeout
+      if (loadErrorMsg.includes('timed out')) {
+        return {
+          success: false,
+          error: {
+            code: 'TIMEOUT_ERROR',
+            message: 'PDF loading took too long. The file may be too large or complex.',
+          },
+        }
+      }
+
+      // Re-throw to be handled by outer catch
+      throw loadError
+    }
 
     // Check for empty PDF
-    if (pdf.numPages === 0) {
+    if (pdfDocument.numPages === 0) {
       return {
         success: false,
         error: {
@@ -152,31 +281,42 @@ export async function extractTextFromPDF(
       }
     }
 
-    // Extract text from all pages
+    // Extract text from all pages with per-page timeout protection
     const textContent: string[] = []
 
-    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-      const page = await pdf.getPage(pageNum)
-      const content = await page.getTextContent()
+    for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+      try {
+        const page = await pdfDocument.getPage(pageNum)
+        const content = await page.getTextContent()
 
-      // Join text items with proper spacing
-      const pageText = content.items
-        .map((item) => {
-          if ('str' in item) {
-            return item.str
-          }
-          return ''
-        })
-        .join(' ')
-        .replace(/\s+/g, ' ')
-        .trim()
+        // Join text items with proper spacing
+        const pageText = content.items
+          .map((item) => {
+            if ('str' in item) {
+              return item.str
+            }
+            return ''
+          })
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim()
 
-      textContent.push(pageText)
+        textContent.push(pageText)
+      } catch (pageError) {
+        // Log but continue - partial extraction is better than complete failure
+        console.warn(`[PDF.js] Failed to extract page ${pageNum}:`, pageError)
+        textContent.push('') // Add empty string to maintain page count
+      }
     }
 
-    // Get metadata
-    const metadata = await pdf.getMetadata().catch(() => null)
-    const info = metadata?.info as Record<string, unknown> | undefined
+    // Get metadata (optional, don't fail if this errors)
+    let info: Record<string, unknown> | undefined
+    try {
+      const metadata = await pdfDocument.getMetadata()
+      info = metadata?.info as Record<string, unknown> | undefined
+    } catch {
+      // Metadata extraction is optional
+    }
 
     const fullText = textContent.join('\n\n')
 
@@ -191,11 +331,14 @@ export async function extractTextFromPDF(
       }
     }
 
+    // Success - reset worker failure count since this worked
+    workerFailureCount = Math.max(0, workerFailureCount - 1)
+
     return {
       success: true,
       data: {
         text: fullText,
-        pageCount: pdf.numPages,
+        pageCount: pdfDocument.numPages,
         metadata: {
           title: info?.Title as string | undefined,
           author: info?.Author as string | undefined,
@@ -206,6 +349,19 @@ export async function extractTextFromPDF(
   } catch (error) {
     // Handle specific PDF.js errors
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+    // Check if it's a worker-related error
+    if (isWorkerError(errorMessage)) {
+      workerFailureCount++
+      console.warn(`[PDF.js] Worker error detected (failure count: ${workerFailureCount}):`, errorMessage)
+      return {
+        success: false,
+        error: {
+          code: 'WORKER_ERROR',
+          message: 'PDF processing worker failed. Will retry with fallback method.',
+        },
+      }
+    }
 
     // Check if it's a loading error
     if (errorMessage.includes('Failed to fetch') || errorMessage.includes('dynamic import')) {
@@ -228,12 +384,23 @@ export async function extractTextFromPDF(
       }
     }
 
-    if (errorMessage.includes('Invalid PDF')) {
+    if (errorMessage.includes('Invalid PDF') || errorMessage.includes('not a PDF')) {
       return {
         success: false,
         error: {
           code: 'INVALID_PDF',
           message: 'The file does not appear to be a valid PDF document.',
+        },
+      }
+    }
+
+    // Check for transient errors that should be retried
+    if (isTransientError(errorMessage)) {
+      return {
+        success: false,
+        error: {
+          code: 'PARSE_ERROR',
+          message: `Temporary error while parsing PDF. Please try again.`,
         },
       }
     }
@@ -245,22 +412,49 @@ export async function extractTextFromPDF(
         message: `Failed to parse PDF: ${errorMessage}`,
       },
     }
+  } finally {
+    // Clean up: destroy the PDF document to free memory
+    if (pdfDocument) {
+      try {
+        pdfDocument.destroy()
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
   }
 }
 
 /**
  * Reset the worker setup to allow retrying CDN selection
  * Called when PDF parsing fails with a load error
+ * @param forceResetWorkerCount - If true, also reset the worker failure count
  */
-function resetWorkerSetup(): void {
+function resetWorkerSetup(forceResetWorkerCount: boolean = false): void {
   workerLoadAttempted = false
   pdfjsLib = null
   loadPromise = null
+  if (forceResetWorkerCount) {
+    workerFailureCount = 0
+  }
+}
+
+/**
+ * Determine if an error code should trigger a retry
+ */
+function isRetryableErrorCode(code: PDFParseError['code']): boolean {
+  const retryableCodes: PDFParseError['code'][] = [
+    'LOAD_ERROR',
+    'PARSE_ERROR',
+    'WORKER_ERROR',
+    'TIMEOUT_ERROR',
+    'FILE_READ_ERROR', // Can be transient on mobile/low-memory devices
+  ]
+  return retryableCodes.includes(code)
 }
 
 /**
  * Extract text from PDF with automatic retry for transient errors
- * Retries up to 3 times with exponential backoff for load/parse errors
+ * Retries up to 3 times with exponential backoff for load/parse/worker errors
  */
 export async function extractTextFromPDFWithRetry(
   file: File,
@@ -272,29 +466,48 @@ export async function extractTextFromPDFWithRetry(
     const result = await extractTextFromPDF(file)
 
     if (result.success) {
+      // Log success after retry
+      if (attempt > 1) {
+        console.log(`[PDF.js] Successfully parsed PDF on attempt ${attempt}`)
+      }
       return result
     }
 
     lastError = result.error
 
-    // Only retry on transient errors (load errors, parse errors)
-    // Don't retry for invalid PDF, empty PDF, or password protected
-    const isRetryableError = ['LOAD_ERROR', 'PARSE_ERROR'].includes(result.error.code)
-
-    if (!isRetryableError) {
+    // Check if this error type should be retried
+    if (!isRetryableErrorCode(result.error.code)) {
+      // Non-retryable error (e.g., INVALID_PDF, EMPTY_PDF, PASSWORD_PROTECTED)
+      console.log(`[PDF.js] Non-retryable error: ${result.error.code}`)
       return result
     }
 
-    // If it's a load error, reset the worker setup to try different CDN
+    // Log the retry attempt
+    console.warn(
+      `[PDF.js] Attempt ${attempt}/${maxRetries} failed with ${result.error.code}: ${result.error.message}`
+    )
+
+    // Handle specific error types
     if (result.error.code === 'LOAD_ERROR') {
-      console.warn(`[PDF.js] Load error on attempt ${attempt}, resetting worker setup`)
-      resetWorkerSetup()
+      // Reset worker setup to try different CDN
+      console.warn(`[PDF.js] Load error, resetting worker setup`)
+      resetWorkerSetup(false)
+    } else if (result.error.code === 'WORKER_ERROR') {
+      // Worker error - increment failure count and reset
+      // After enough failures, getPdfJs will switch to fake worker mode
+      console.warn(`[PDF.js] Worker error (count: ${workerFailureCount}), resetting worker setup`)
+      resetWorkerSetup(false)
+    } else if (result.error.code === 'TIMEOUT_ERROR') {
+      // Timeout - try again with a fresh worker
+      console.warn(`[PDF.js] Timeout error, resetting worker setup`)
+      resetWorkerSetup(false)
     }
 
     // Don't wait after the last attempt
     if (attempt < maxRetries) {
-      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000) // 1s, 2s, 4s
-      console.log(`[PDF.js] Retry ${attempt}/${maxRetries} failed, waiting ${delayMs}ms before retry`)
+      // Exponential backoff: 1s, 2s, 4s
+      const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000)
+      console.log(`[PDF.js] Waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`)
       await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }
