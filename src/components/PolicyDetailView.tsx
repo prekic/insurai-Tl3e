@@ -1,11 +1,107 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Minus } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { PolicyDocuments } from './PolicyDocuments'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import type { Coverage } from '@/types/policy'
+
+/**
+ * Format coverage limit with special handling for unlimited and market value
+ */
+function formatCoverageLimit(coverage: Coverage): string {
+  if (coverage.isUnlimited) {
+    return 'Sınırsız'
+  }
+  if (coverage.isMarketValue) {
+    return 'Rayiç Değer'
+  }
+  if (coverage.limit === 0) {
+    // Check name for clues about unlimited/market value
+    const nameLower = coverage.name.toLowerCase()
+    if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
+      return 'Sınırsız'
+    }
+    if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
+      return 'Rayiç Değer'
+    }
+    // Check if this is an included coverage without numeric limit
+    if (nameLower.includes('asistans') || nameLower.includes('hizmet') ||
+        nameLower.includes('ikame') || nameLower.includes('onarım')) {
+      return 'Dahil'
+    }
+    return formatCurrency(0)
+  }
+  return formatCurrency(coverage.limit)
+}
+
+/**
+ * Get background color based on coverage importance
+ */
+function getCoverageBackground(coverage: Coverage): string {
+  const importance = coverage.importance || 'standard'
+
+  if (!coverage.included) {
+    return 'bg-gray-50'
+  }
+
+  switch (importance) {
+    case 'critical':
+      return 'bg-green-50'
+    case 'standard':
+      return 'bg-blue-50'
+    case 'minor':
+      return 'bg-gray-50'
+    default:
+      return 'bg-green-50'
+  }
+}
+
+/**
+ * Get icon color based on coverage importance
+ */
+function getCoverageIconStyle(coverage: Coverage): { bg: string; icon: string } {
+  const importance = coverage.importance || 'standard'
+
+  if (!coverage.included) {
+    return { bg: 'bg-gray-200', icon: 'text-gray-400' }
+  }
+
+  switch (importance) {
+    case 'critical':
+      return { bg: 'bg-green-100', icon: 'text-green-600' }
+    case 'standard':
+      return { bg: 'bg-blue-100', icon: 'text-blue-600' }
+    case 'minor':
+      return { bg: 'bg-gray-100', icon: 'text-gray-500' }
+    default:
+      return { bg: 'bg-green-100', icon: 'text-green-600' }
+  }
+}
+
+/**
+ * Check if an exclusion is critical
+ */
+function isExclusionCritical(exclusion: string): boolean {
+  const criticalPatterns = [
+    'kasıt', 'kasdi', 'intentional',
+    'alkol', 'alcohol',
+    'uyuşturucu', 'drug',
+    'savaş', 'war',
+    'terör', 'terror',
+    'nükleer', 'nuclear',
+    'deprem', 'earthquake',
+    'sel', 'flood',
+    'ehliyet', 'license',
+    'hız', 'speed',
+    'kaçak', 'illegal',
+    'ruhsatsız', 'unlicensed',
+  ]
+  const lowerExclusion = exclusion.toLowerCase()
+  return criticalPatterns.some(pattern => lowerExclusion.includes(pattern))
+}
 import { usePolicies } from '@/lib/policy-context'
 import { useI18n } from '@/lib/i18n'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
@@ -125,7 +221,7 @@ export function PolicyDetailView() {
                       <p className="font-semibold text-gray-900">{policy.typeTr}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Insured Person</p>
+                      <p className="text-sm text-gray-500">Insured</p>
                       <p className="font-semibold text-gray-900">{policy.insuredPerson || 'N/A'}</p>
                     </div>
                     <div>
@@ -136,7 +232,11 @@ export function PolicyDetailView() {
                   <div className="space-y-4">
                     <div>
                       <p className="text-sm text-gray-500">Coverage Limit</p>
-                      <p className="text-2xl font-bold text-gray-900">{formatCurrency(policy.coverage)}</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue)
+                          ? 'Rayiç Değer'
+                          : formatCurrency(policy.coverage)}
+                      </p>
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Annual Premium</p>
@@ -161,8 +261,19 @@ export function PolicyDetailView() {
                   {policy.coverages
                     // Filter out zero-limit category entries (like "Zorunlu Mali Sorumluluk" with ₺0)
                     .filter(coverage => {
-                      // Keep all coverages with actual limits
+                      // Always keep coverages with limits, unlimited flag, or market value flag
                       if (coverage.limit > 0) return true
+                      if (coverage.isUnlimited) return true
+                      if (coverage.isMarketValue) return true
+
+                      // Keep coverages that are included services without numeric limits
+                      const nameLower = (coverage.name || '').toLowerCase()
+                      if (nameLower.includes('asistans') || nameLower.includes('hizmet') ||
+                          nameLower.includes('ikame') || nameLower.includes('onarım') ||
+                          nameLower.includes('anadolu')) {
+                        return true
+                      }
+
                       // Filter out zero-limit entries that look like policy categories
                       const categoryPatterns = [
                         'zorunlu mali sorumluluk',
@@ -171,43 +282,65 @@ export function PolicyDetailView() {
                         'konut sigortası',
                         'sağlık sigortası',
                       ]
-                      const nameLower = (coverage.name || '').toLowerCase()
                       const nameTrLower = (coverage.nameTr || '').toLowerCase()
                       const isCategory = categoryPatterns.some(
                         pattern => nameLower.includes(pattern) || nameTrLower.includes(pattern)
                       )
                       return !isCategory
                     })
-                    .map((coverage, i) => (
-                    <div
-                      key={i}
-                      className={`flex items-center justify-between p-4 rounded-xl ${
-                        coverage.included ? 'bg-green-50' : 'bg-gray-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {coverage.included ? (
-                          <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                            <Check className="text-green-600" size={16} />
+                    .map((coverage, i) => {
+                      const iconStyle = getCoverageIconStyle(coverage)
+                      const limitDisplay = formatCoverageLimit(coverage)
+                      const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue || limitDisplay === 'Dahil'
+
+                      return (
+                        <div
+                          key={i}
+                          className={`flex items-center justify-between p-4 rounded-xl ${getCoverageBackground(coverage)}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            {coverage.included ? (
+                              coverage.importance === 'minor' ? (
+                                <div className={`w-8 h-8 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
+                                  <Minus className={iconStyle.icon} size={16} />
+                                </div>
+                              ) : (
+                                <div className={`w-8 h-8 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
+                                  <Check className={iconStyle.icon} size={16} />
+                                </div>
+                              )
+                            ) : (
+                              <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
+                                <X className="text-gray-400" size={16} />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium text-gray-900">{coverage.name}</p>
+                              {coverage.nameTr && coverage.nameTr !== coverage.name && (
+                                <p className="text-sm text-gray-500">{coverage.nameTr}</p>
+                              )}
+                              {coverage.category && (
+                                <Badge variant="outline" className="text-xs mt-1">
+                                  {coverage.category === 'main' ? 'Ana Teminat' :
+                                   coverage.category === 'liability' ? 'Mali Sorumluluk' :
+                                   coverage.category === 'supplementary' ? 'Ek Teminat' :
+                                   coverage.category === 'assistance' ? 'Asistans' :
+                                   coverage.category === 'legal' ? 'Hukuki Koruma' : ''}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
-                        ) : (
-                          <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                            <X className="text-gray-400" size={16} />
+                          <div className="text-right">
+                            <p className={`font-semibold ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                              {limitDisplay}
+                            </p>
+                            {coverage.deductible > 0 && (
+                              <p className="text-sm text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
+                            )}
                           </div>
-                        )}
-                        <div>
-                          <p className="font-medium text-gray-900">{coverage.name}</p>
-                          <p className="text-sm text-gray-500">{coverage.nameTr}</p>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900">{formatCurrency(coverage.limit)}</p>
-                        {coverage.deductible > 0 && (
-                          <p className="text-sm text-gray-500">Deductible: {formatCurrency(coverage.deductible)}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                      )
+                    })}
                 </div>
               </CardContent>
             </Card>
@@ -222,12 +355,30 @@ export function PolicyDetailView() {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
-                  {policy.exclusions.map((exclusion, i) => (
-                    <li key={i} className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg min-h-[2.5rem]">
-                      <X className="text-amber-600 flex-shrink-0" size={16} />
-                      <span className="text-gray-700 text-sm leading-relaxed">{exclusion}</span>
-                    </li>
-                  ))}
+                  {policy.exclusions.map((exclusion, i) => {
+                    const isCritical = isExclusionCritical(exclusion)
+                    return (
+                      <li
+                        key={i}
+                        className={`flex items-center gap-3 p-3 rounded-lg min-h-[2.5rem] ${
+                          isCritical ? 'bg-red-50' : 'bg-amber-50'
+                        }`}
+                      >
+                        <X
+                          className={`flex-shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}
+                          size={16}
+                        />
+                        <span className={`text-sm leading-relaxed ${isCritical ? 'text-red-800 font-medium' : 'text-gray-700'}`}>
+                          {exclusion}
+                        </span>
+                        {isCritical && (
+                          <Badge variant="destructive" className="text-xs ml-auto">
+                            Kritik
+                          </Badge>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               </CardContent>
             </Card>

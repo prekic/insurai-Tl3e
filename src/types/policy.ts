@@ -2,6 +2,12 @@ export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'das
 
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
 
+/** Coverage category for organization */
+export type CoverageCategory = 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+
+/** Coverage importance for visual display */
+export type CoverageImportance = 'critical' | 'standard' | 'minor'
+
 export interface Coverage {
   name: string
   nameTr: string
@@ -9,6 +15,21 @@ export interface Coverage {
   deductible: number
   included: boolean
   description?: string
+  /** True if coverage is unlimited (Sınırsız) */
+  isUnlimited?: boolean
+  /** True if limit is market value (Rayiç Değer) */
+  isMarketValue?: boolean
+  /** Coverage category for organization */
+  category?: CoverageCategory
+  /** Visual importance level */
+  importance?: CoverageImportance
+}
+
+/** Exclusion with severity information */
+export interface Exclusion {
+  text: string
+  /** Severity level for visual display */
+  severity: 'critical' | 'normal'
 }
 
 /**
