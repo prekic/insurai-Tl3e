@@ -13,7 +13,9 @@ import {
   shouldShowUnlimited,
   shouldShowIncluded,
   groupCoverageSubLimits,
+  sortByImportance,
   analyzeExclusionsComprehensive,
+  getCoverageClarifications,
   type GroupedCoverage,
   type AnalyzedExclusion,
 } from '@/lib/knowledge/kasko-knowledge'
@@ -189,10 +191,11 @@ function CoveragesByCategory({
       }
     }
 
-    // Apply sub-limit grouping to each category
+    // Apply sub-limit grouping to each category, then sort by importance
     const groupedWithSubLimits: Record<string, GroupedCoverage[]> = {}
     for (const [category, coverages] of Object.entries(groups)) {
-      groupedWithSubLimits[category] = groupCoverageSubLimits(coverages)
+      const grouped = groupCoverageSubLimits(coverages)
+      groupedWithSubLimits[category] = sortByImportance(grouped)
     }
 
     return groupedWithSubLimits
@@ -221,11 +224,17 @@ function CoveragesByCategory({
             <Check className="text-green-600" size={18} />
             {locale === 'tr' ? 'Temel Kasko Teminatları (Dahil)' : 'Base Kasko Coverage (Included)'}
           </div>
-          <p className="text-sm text-green-700">
+          <p className="text-sm text-green-700 mb-2">
             {locale === 'tr'
-              ? 'Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) tüm kasko poliçelerinde standart olarak dahildir.'
-              : 'Collision, Theft, Fire, Natural Disasters (earthquake, flood, hail, storm) are included as standard in all kasko policies.'}
+              ? 'Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç rayiç bedeli üzerinden teminat altındadır.'
+              : 'Collision, Theft, Fire, Natural Disasters (earthquake, flood, hail, storm) are covered up to vehicle market value.'}
           </p>
+          <div className="text-xs text-green-600 flex items-center gap-1">
+            <HelpCircle size={12} />
+            {locale === 'tr'
+              ? 'Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.'
+              : 'Check your policy for deductibles, depreciation, and special conditions.'}
+          </div>
         </div>
       )}
 
@@ -284,36 +293,55 @@ function CoveragesByCategory({
                 const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
                   limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
 
+                // Check if this coverage needs clarification
+                const clarification = getCoverageClarifications(coverage.name)
+
                 return (
                   <div
                     key={i}
-                    className={`flex items-center justify-between p-3 rounded-lg ${getCoverageBackground(coverage)}`}
+                    className={`p-3 rounded-lg ${getCoverageBackground(coverage)}`}
                   >
-                    <div className="flex items-center gap-3">
-                      {coverage.included !== false ? (
-                        <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
-                          <Check className={iconStyle.icon} size={14} />
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {coverage.included !== false ? (
+                          <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
+                            <Check className={iconStyle.icon} size={14} />
+                          </div>
+                        ) : (
+                          <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center">
+                            <X className="text-gray-400" size={14} />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-gray-900 text-sm">{coverage.name}</p>
+                          {coverage.nameTr && coverage.nameTr !== coverage.name && (
+                            <p className="text-xs text-gray-500">{coverage.nameTr}</p>
+                          )}
                         </div>
-                      ) : (
-                        <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center">
-                          <X className="text-gray-400" size={14} />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-gray-900 text-sm">{coverage.name}</p>
-                        {coverage.nameTr && coverage.nameTr !== coverage.name && (
-                          <p className="text-xs text-gray-500">{coverage.nameTr}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className={`font-semibold text-sm ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                          {limitDisplay}
+                        </p>
+                        {coverage.deductible > 0 && (
+                          <p className="text-xs text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
                         )}
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className={`font-semibold text-sm ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
-                        {limitDisplay}
-                      </p>
-                      {coverage.deductible > 0 && (
-                        <p className="text-xs text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
-                      )}
-                    </div>
+                    {/* Clarification prompt for service coverages */}
+                    {clarification && isSpecialValue && (
+                      <div className="mt-2 ml-10 p-2 bg-blue-50/50 rounded-md border border-blue-100">
+                        <p className="text-xs text-blue-700 flex items-center gap-1">
+                          <HelpCircle size={11} />
+                          {locale === 'tr' ? clarification.question : clarification.questionEn}
+                        </p>
+                        <div className="text-xs text-blue-600 mt-1">
+                          {clarification.details.map((detail, j) => (
+                            <span key={j} className="inline-block mr-2">• {detail}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -656,12 +684,24 @@ export function PolicyDetailView() {
                   </div>
                   <div className="space-y-4">
                     <div>
-                      <p className="text-sm text-gray-500">Coverage Limit</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue)
-                          ? 'Rayiç Değer'
-                          : formatCurrency(policy.coverage)}
+                      <p className="text-sm text-gray-500">
+                        {locale === 'tr' ? 'Teminat Limiti' : 'Coverage Limit'}
                       </p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        {/* Kasko always uses market value for main coverage */}
+                        {policy.type === 'kasko'
+                          ? 'Araç Rayiç Bedeli'
+                          : (policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue))
+                            ? 'Rayiç Değer'
+                            : formatCurrency(policy.coverage)}
+                      </p>
+                      {policy.type === 'kasko' && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          {locale === 'tr'
+                            ? 'Hasar anındaki piyasa değeri üzerinden'
+                            : 'Based on market value at time of loss'}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <p className="text-sm text-gray-500">Annual Premium</p>

@@ -974,6 +974,73 @@ export interface GroupedCoverage {
 }
 
 /**
+ * Service coverages that need clarification about terms
+ */
+export const SERVICE_COVERAGE_CLARIFICATIONS: Record<string, {
+  question: string
+  questionEn: string
+  details: string[]
+}> = {
+  'ikame araç': {
+    question: 'İkame araç kaç gün ve hangi şartlarda sağlanıyor?',
+    questionEn: 'How many days and under what conditions is replacement vehicle provided?',
+    details: ['Gün limiti (genellikle 15-30 gün)', 'Araç sınıfı', 'Minimum hasar tutarı şartı'],
+  },
+  'çekici': {
+    question: 'Çekici hizmeti limitsiz mi yoksa km sınırı var mı?',
+    questionEn: 'Is towing unlimited or is there a distance limit?',
+    details: ['Mesafe limiti (km)', 'Yıllık kullanım sayısı'],
+  },
+  'asistans': {
+    question: 'Asistans hizmetlerinin kapsamı ve limitleri nedir?',
+    questionEn: 'What is the scope and limits of assistance services?',
+    details: ['7/24 erişim', 'Yol yardımı kapsamı', 'Konaklama desteği'],
+  },
+  'cam': {
+    question: 'Cam hasarında muafiyet var mı?',
+    questionEn: 'Is there a deductible for glass damage?',
+    details: ['Ön cam muafiyeti', 'Yan cam muafiyeti', 'Onarım vs değişim'],
+  },
+}
+
+/**
+ * Get clarification questions for a coverage
+ */
+export function getCoverageClarifications(coverageName: string): {
+  question: string
+  questionEn: string
+  details: string[]
+} | null {
+  const nameLower = coverageName.toLowerCase()
+  for (const [key, value] of Object.entries(SERVICE_COVERAGE_CLARIFICATIONS)) {
+    if (nameLower.includes(key)) {
+      return value
+    }
+  }
+  return null
+}
+
+/**
+ * Importance order for sorting coverages
+ */
+export const IMPORTANCE_ORDER: Record<string, number> = {
+  critical: 1,
+  standard: 2,
+  minor: 3,
+}
+
+/**
+ * Sort grouped coverages by importance within each category
+ */
+export function sortByImportance(coverages: GroupedCoverage[]): GroupedCoverage[] {
+  return [...coverages].sort((a, b) => {
+    const importanceA = IMPORTANCE_ORDER[a.importance || 'standard'] || 2
+    const importanceB = IMPORTANCE_ORDER[b.importance || 'standard'] || 2
+    return importanceA - importanceB
+  })
+}
+
+/**
  * Groups coverages that share a common prefix into consolidated items
  * e.g., "Hukuksal Koruma - Kefalet", "Hukuksal Koruma - Avans" become one item
  */
@@ -1028,7 +1095,8 @@ export function groupCoverageSubLimits<T extends {
         subLimits: matchingCoverages.map(({ coverage, subKey }) => ({
           label: groupDef.subLimitLabels[subKey as keyof typeof groupDef.subLimitLabels] || extractSubLimitLabel(coverage.name, groupDef.prefix),
           limit: coverage.limit,
-          isUnlimited: coverage.isUnlimited,
+          // Check for unlimited status using both explicit flag and name pattern
+          isUnlimited: coverage.isUnlimited || shouldShowUnlimited(coverage.name, coverage.limit),
         })),
         included: true,
         importance: firstCoverage.importance,
