@@ -1,4 +1,4 @@
-# Session Handoff - January 12, 2026
+# Session Handoff - January 14, 2026
 
 ## Current Status
 
@@ -8,7 +8,7 @@
 | **TypeCheck** | ✅ 0 errors |
 | **Lint** | ✅ 0 warnings |
 | **Tests** | ✅ ~4500 passing |
-| **Branch** | `claude/review-project-docs-epg8z` |
+| **Branch** | `claude/review-project-status-7bmFc` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 
@@ -16,11 +16,14 @@
 
 ## Session Summary
 
-This session focused on:
-1. **Railway production deployment** - Full deployment with all fixes
-2. **API proxy auto-detection** - No longer need VITE_API_PROXY_URL in production
-3. **CSP configuration** - Fixed PDF.js worker loading from CDN
-4. **Duplicate detection improvements** - Tolerant string comparison for whitespace/punctuation
+This session focused on **kasko policy display improvements**:
+1. **Coverage limit calculation** - Use "Rayiç Değer" (market value) instead of summing all limits
+2. **Unlimited coverage display** - Show "Sınırsız" instead of ₺0
+3. **Included services display** - Show "Dahil" for services without numeric limits
+4. **Coverage categorization** - Added categories (main, liability, supplementary, etc.)
+5. **Color coding** - Green for good, yellow for moderate, red for critical exclusions
+6. **Actionable recommendations** - Specific amounts and advice instead of generic text
+7. **Fixed false alerts** - Skip implicit kasko coverages from missing coverage detection
 
 ---
 
@@ -37,13 +40,23 @@ This session focused on:
 - [x] Policy evaluation and grading (A-F scale)
 - [x] Market data and provider comparisons
 
+### Kasko Policy Display (NEW THIS SESSION)
+- [x] "Rayiç Değer" display for market value coverage
+- [x] "Sınırsız" display for unlimited coverages
+- [x] "Dahil" display for included services without limits
+- [x] Coverage categories (main, liability, supplementary, assistance, legal)
+- [x] Coverage importance levels (critical, standard, minor)
+- [x] Color-coded coverages (green/yellow based on limits)
+- [x] Red highlighting for critical exclusions
+- [x] Skip false missing coverage alerts for implicit kasko coverages
+
 ### Duplicate Detection
 - [x] Pre-upload conflict detection
 - [x] Fuzzy matching with Levenshtein distance
 - [x] OCR character substitution map (0/O, 1/l/I, Turkish chars)
 - [x] PolicyDiffViewer component for visual diffs
 - [x] ConflictResolutionDialog with 4 resolution options
-- [x] **NEW**: Tolerant string comparison (whitespace, punctuation normalization)
+- [x] Tolerant string comparison (whitespace, punctuation normalization)
 
 ### Authentication & Security
 - [x] Supabase Auth (email, Google, GitHub OAuth)
@@ -53,7 +66,7 @@ This session focused on:
 - [x] Helmet security headers with PDF.js CDN allowlist
 - [x] API keys server-side only
 
-### Deployment (NEW THIS SESSION)
+### Deployment
 - [x] Railway production deployment
 - [x] Auto-detect API proxy URL in production
 - [x] CSP configured for PDF.js worker from CDN
@@ -64,39 +77,73 @@ This session focused on:
 
 ## Fixes Applied This Session
 
-### 1. Duplicate Detection False Positives
-**Problem:** Identical policies flagged as amendments due to minor formatting
-**Example:** "NO: 25 /1A" vs "NO: 25/1A" incorrectly flagged as different
-**Fix:** Added tolerant comparison functions:
-- `normalizeStringTolerant()` - Collapses whitespace, normalizes punctuation
-- `arraysEqualTolerant()` - Fuzzy array comparison
-**File:** `src/lib/policy-utils.ts`
-**Commit:** `e3735b5`
+### 1. Kasko Coverage Display
+**Problem:** Multiple display issues with kasko policies
+- Coverage limit incorrectly summed all limits instead of showing market value
+- "Artan Mali Sorumluluk" showed ₺0 instead of "Sınırsız"
+- "İkame Araç" showed ₺0 instead of "Dahil"
 
-### 2. Railway Deployment Configuration
-**Problem:** App needed production hosting
-**Fix:** Complete Railway deployment setup:
-- Created `railway.json` for Nixpacks builder
-- Moved dotenv to production dependencies
-- Fixed ESM module resolution (NodeNext, .js extensions)
-- Fixed CORS for `*.up.railway.app`
-- Fixed static file serving order
-**Commits:** `6def932`, `7a26f52`, `7a68967`, `0f54d17`, `456ca51`
+**Fix:**
+- Added `isUnlimited`, `isMarketValue` flags to Coverage type
+- Created `formatCoverageLimit()` helper for proper display
+- Added `calculateMainCoverage()` to use Rayiç Değer for kasko
 
-### 3. API Proxy Auto-Detection
-**Problem:** "No AI service configured" error in production
-**Cause:** `VITE_API_PROXY_URL` baked at build time, not available
-**Fix:** Auto-detect from `window.location.origin` in production
-**Files:** `src/lib/env.ts`, `src/lib/ai/config.ts`
-**Commits:** `ff8e6f4`, `13146e3`
+**Files:** `src/types/policy.ts`, `src/components/PolicyDetailView.tsx`, `src/lib/ai/policy-extractor.ts`
+**Commit:** `22817bb`
 
-### 4. CSP for PDF.js Worker
-**Problem:** PDF parsing blocked by Content Security Policy
-**Fix:** Added CDN domains to Helmet CSP config:
-- `unpkg.com`, `cdn.jsdelivr.net`, `cdnjs.cloudflare.com`
-- Added to `scriptSrc`, `workerSrc`, `connectSrc`
-**File:** `server/index.ts`
-**Commit:** `584a580`
+### 2. False Missing Coverage Alerts
+**Problem:** AI flagged Çarpma/Çarpışma, Hırsızlık, Doğal Afetler, Yangın as missing when they're included in base kasko
+
+**Fix:**
+- Created `KASKO_IMPLICIT_COVERAGES` list of coverages included in base kasko
+- Added `hasKaskoBaseCoverage()` detection function
+- Modified `generateGaps()` to skip implicit coverages
+
+**File:** `src/lib/ai/policy-extractor.ts`
+**Commit:** `22817bb`
+
+### 3. Coverage Categorization & Styling
+**Problem:** Coverages lacked visual hierarchy and organization
+
+**Fix:**
+- Added `CoverageCategory` type: main, liability, supplementary, assistance, legal, other
+- Added `CoverageImportance` type: critical, standard, minor
+- Created helper functions for background colors and icon styles
+- Green checkmark for good coverages, yellow for moderate limits
+
+**Files:** `src/types/policy.ts`, `src/components/PolicyDetailView.tsx`
+**Commit:** `22817bb`
+
+### 4. Critical Exclusions Highlighting
+**Problem:** Critical exclusions (terör, savaş, nükleer) not visually distinguished
+
+**Fix:**
+- Added `isExclusionCritical()` function to detect critical exclusions
+- Red background and X icon for critical exclusions
+- Normal styling for standard exclusions
+
+**File:** `src/components/PolicyDetailView.tsx`
+**Commit:** `22817bb`
+
+### 5. Actionable Recommendations
+**Problem:** Generic recommendations like "Improve Coverage" and "Review Premium" not helpful
+
+**Fix:**
+- Recommendations now include specific coverage names
+- Deductible recommendations show actual amounts and percentages
+- Premium recommendations suggest getting 3-5 competitive quotes
+- Value recommendations provide 3 specific strategies
+- Added "Policy Well-Structured" positive feedback
+
+**File:** `src/lib/policy-evaluation/evaluator.ts`
+**Commit:** `22817bb`
+
+### 6. Label Change
+**Problem:** "Insured Person" should be "Insured"
+
+**Fix:** Changed label in PolicyDetailView
+**File:** `src/components/PolicyDetailView.tsx`
+**Commit:** `22817bb`
 
 ---
 
@@ -118,13 +165,14 @@ This session focused on:
 1. **Inline event handlers** - Refactor to React handlers for CSP compliance
 2. **PWA icons** - Verify all icon sizes exist in `/public/icons/`
 3. **Font preload timing** - Adjust or remove preload hints
-4. **dev:sync script** - Update to use main branch
+4. **Coverage category extraction** - Improve AI prompts to extract categories from policy documents
 
 ### Future Improvements
 1. Add Sentry DSN to Railway for error tracking
 2. Consider custom domain instead of `*.up.railway.app`
 3. Set up staging environment separate from production
 4. Self-host PDF.js worker instead of CDN
+5. Add more coverage categories from policy documents
 
 ---
 
@@ -132,14 +180,46 @@ This session focused on:
 
 | File | Change Type | Description |
 |------|-------------|-------------|
-| `src/lib/policy-utils.ts` | Modified | Added tolerant comparison functions |
-| `src/lib/env.ts` | Modified | Auto-detect proxy URL in production |
-| `src/lib/ai/config.ts` | Modified | Use centralized env config |
-| `server/index.ts` | Modified | CSP for PDF.js, CORS for Railway |
-| `server/tsconfig.json` | Modified | Changed to NodeNext module resolution |
-| `railway.json` | New | Railway deployment configuration |
-| `package.json` | Modified | Moved dotenv to deps, added start:prod |
-| `CLAUDE.md` | Updated | Railway deployment docs, new known issues |
+| `src/types/policy.ts` | Modified | Added CoverageCategory, CoverageImportance, isUnlimited, isMarketValue |
+| `src/lib/ai/extraction-schema.ts` | Modified | Updated extraction schema with coverage flags |
+| `src/lib/ai/extraction-prompts.ts` | Modified | Enhanced kasko extraction instructions |
+| `src/lib/ai/policy-extractor.ts` | Modified | Added implicit coverage detection, main coverage calculation |
+| `src/components/PolicyDetailView.tsx` | Modified | Coverage display formatting, color coding, exclusion highlighting |
+| `src/lib/policy-evaluation/evaluator.ts` | Modified | Actionable recommendations with specific amounts |
+| `CLAUDE.md` | Updated | New coverage types documentation, known issues |
+
+---
+
+## New Type Definitions
+
+### Coverage Types (src/types/policy.ts)
+```typescript
+export type CoverageCategory = 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+export type CoverageImportance = 'critical' | 'standard' | 'minor'
+
+export interface Coverage {
+  name: string
+  nameTr: string
+  limit: number
+  deductible: number
+  included: boolean
+  isUnlimited?: boolean    // Display as "Sınırsız"
+  isMarketValue?: boolean  // Display as "Rayiç Değer"
+  category?: CoverageCategory
+  importance?: CoverageImportance
+}
+```
+
+### Kasko Implicit Coverages
+These coverages are automatically included in base kasko and should NOT be flagged as missing:
+- çarpma, çarpışma, collision
+- hırsızlık, theft
+- yangın, fire
+- doğal afet, natural disaster
+- sel, su baskını, flood
+- dolu, hail, hailstorm
+- deprem, earthquake
+- fırtına, storm
 
 ---
 
@@ -176,19 +256,19 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Configure Supabase redirect URLs** - Add Railway URL to allowlist
-2. **Test full user flow** - Upload PDF, extract, save, view in dashboard
-3. **Verify auth works** - Login/signup with Railway URL
+1. **Test kasko policy upload** - Verify new display logic works correctly
+2. **Verify recommendations** - Check specific amounts appear in UI
+3. **Test color coding** - Verify green/yellow/red styling
 
 ### Short Term
-1. **Add Sentry DSN** - Enable error tracking in production
-2. **Monitor Railway logs** - Watch for runtime errors
-3. **Custom domain** - Consider branding over `.up.railway.app`
+1. **Improve AI extraction** - Enhance prompts to extract isUnlimited, isMarketValue from PDFs
+2. **Add more implicit coverages** - Expand list based on policy types
+3. **Category extraction** - Teach AI to categorize coverages from document context
 
 ### Medium Term
-1. **CI/CD** - Auto-deploy on push to main
-2. **Staging environment** - Separate from production
-3. **Performance monitoring** - Track API response times
+1. **Coverage comparison** - Visual comparison of coverage categories between policies
+2. **Recommendation tracking** - Track which recommendations users act on
+3. **A/B testing** - Test different recommendation formats
 
 ---
 
@@ -213,32 +293,24 @@ npm test -- --run src/lib/policy-utils.test.ts
 
 ---
 
-## Architecture Notes
+## Display Logic Reference
 
-### API Proxy Auto-Detection Flow
-```
-Production Build → VITE_API_PROXY_URL not set
-                → detectApiProxyUrl() in env.ts
-                → import.meta.env.PROD && window exists
-                → Returns window.location.origin
-                → All /api/* calls go to same domain
-```
+### formatCoverageLimit() behavior
+| Condition | Display |
+|-----------|---------|
+| `isUnlimited: true` | "Sınırsız" |
+| `isMarketValue: true` | "Rayiç Değer" |
+| `limit === 0 && included` | "Dahil" |
+| `limit > 0` | Formatted currency (₺X.XXX) |
 
-### Railway Deployment Flow
-```
-git push → Railway detects → Nixpacks build
-        → npm run build (Vite frontend)
-        → npm run build:server (TypeScript backend)
-        → node dist-server/index.js
-        → Express serves static + API
-```
-
-### CSP Configuration (server/index.ts)
-```typescript
-scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...]
-workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
-connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...]
-```
+### Color Coding
+| Category | Background | Icon |
+|----------|------------|------|
+| Critical coverage | Light green | Green checkmark |
+| Standard coverage | Light green | Green checkmark |
+| Low limit coverage | Light yellow | Yellow circle |
+| Critical exclusion | Light red | Red X |
+| Normal exclusion | Light gray | Gray text |
 
 ---
 
@@ -246,11 +318,11 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ..
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 10 |
-| Files changed | 8 |
+| Commits this session | 1 |
+| Files changed | 6 |
 | Tests passing | ~4500 |
 | Production URL | https://insurai-production.up.railway.app |
-| Major fixes | 4 (duplicate detection, proxy detection, CSP, Railway deploy) |
+| Major fixes | 6 (coverage display, false alerts, categorization, exclusions, recommendations, label) |
 
 ---
 
@@ -259,14 +331,14 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ..
 - [x] All tests passing
 - [x] No TypeScript errors
 - [x] No lint warnings
-- [x] Production deployed to Railway
+- [x] Changes committed and pushed
 - [x] Documentation updated (CLAUDE.md)
 - [x] Known issues documented
 - [x] Next steps prioritized
-- [x] Environment setup documented
+- [x] Session handoff updated
 
 ---
 
-**Last Updated**: January 12, 2026
-**Session Duration**: ~3 hours
-**Next Session Focus**: Supabase auth configuration, monitoring setup, or new feature work
+**Last Updated**: January 14, 2026
+**Session Duration**: ~1 hour
+**Next Session Focus**: Test new kasko display, improve AI extraction prompts, or new feature work

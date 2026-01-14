@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 11, 2026
+- **Last Updated**: January 14, 2026
 
 ---
 
@@ -792,6 +792,18 @@ const comparison = comparePolicies([policy1, policy2, policy3])
 | 40-59 | D | poor |
 | < 40 | F | critical |
 
+### Actionable Recommendations (Updated Jan 14, 2026)
+
+Recommendations now include specific amounts and actionable advice:
+
+| Type | Before | After |
+|------|--------|-------|
+| Coverage | "Improve Coverage" | "Add Missing: Collision, Theft" with specific coverages |
+| Deductible | "Reduce Deductible" | "Negotiate Lower Deductible (Currently ₺15,000)" with percentage |
+| Premium | "Review Premium" | "Compare Alternative Quotes" with advice to get 3-5 quotes |
+| Value | "Optimize Value" | "Improve Coverage-to-Premium Ratio" with 3 specific strategies |
+| Positive | (none) | "Policy Well-Structured" when no issues found |
+
 ---
 
 ## Regional Benchmarking
@@ -823,6 +835,47 @@ const comparison = comparePolicies([policy1, policy2, policy3])
 | Health | Sağlık | `health` |
 | Life | Hayat | `life` |
 | Business | İşyeri | `business` |
+
+### Coverage Types & Categories (Added Jan 14, 2026)
+
+Coverages now support special value types and categorization:
+
+```typescript
+// Coverage value types
+interface Coverage {
+  name: string
+  nameTr: string
+  limit: number
+  deductible: number
+  included: boolean
+  isUnlimited?: boolean    // "Sınırsız" - display as unlimited
+  isMarketValue?: boolean  // "Rayiç Değer" - market value coverage
+  category?: CoverageCategory
+  importance?: CoverageImportance
+}
+
+// Coverage categories for grouping
+type CoverageCategory = 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
+
+// Importance levels for visual styling
+type CoverageImportance = 'critical' | 'standard' | 'minor'
+```
+
+**Display Logic:**
+| Condition | Display |
+|-----------|---------|
+| `isUnlimited: true` | "Sınırsız" |
+| `isMarketValue: true` | "Rayiç Değer" |
+| `limit === 0 && included` | "Dahil" |
+| `limit > 0` | Formatted currency |
+
+**Kasko Implicit Coverages:**
+These are automatically included in base kasko policies and should NOT be flagged as missing:
+- Çarpma/Çarpışma (Collision)
+- Hırsızlık (Theft)
+- Yangın (Fire)
+- Doğal Afetler (Natural Disasters)
+- Sel/Su Baskını (Flood)
 
 ---
 
@@ -1425,6 +1478,21 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Solution**: Changed `server/tsconfig.json` to `"module": "NodeNext"` and added `.js` extensions
 - **Files**: `server/tsconfig.json`, `server/index.ts`, `server/routes/*.ts`
 
+### 13. Kasko Coverage Display Issues (Fixed Jan 14, 2026)
+- **Problem**: Multiple display issues with kasko policies:
+  - Coverage limit incorrectly summed all limits instead of showing "Rayiç Değer" (market value)
+  - "Artan Mali Sorumluluk" showed ₺0 instead of "Sınırsız" (unlimited)
+  - "İkame Araç" showed ₺0 instead of "Dahil" (included)
+  - False missing coverage alerts for implicit kasko coverages (Çarpma/Çarpışma, Hırsızlık, etc.)
+  - Generic recommendations like "Improve Coverage" not actionable
+- **Solution**:
+  - Added `isUnlimited`, `isMarketValue` flags to Coverage type
+  - Added `CoverageCategory` and `CoverageImportance` types
+  - Created `KASKO_IMPLICIT_COVERAGES` list to skip false alerts
+  - Updated `generateRecommendations()` with specific amounts and actionable advice
+  - Added color coding: green (good), yellow (moderate), red (critical exclusions)
+- **Files**: `src/types/policy.ts`, `src/lib/ai/policy-extractor.ts`, `src/components/PolicyDetailView.tsx`, `src/lib/policy-evaluation/evaluator.ts`
+
 ---
 
 ## Turkish Market Considerations
@@ -1653,6 +1721,41 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 ---
 
+## Common Gotchas (Quick Reference)
+
+**Environment Variables:**
+- `VITE_*` vars are baked at **build time** - need rebuild, not just restart
+- API keys must NOT have `VITE_` prefix - they stay server-side only
+- Railway env vars shouldn't have manual quotes (Railway adds them automatically)
+
+**API Proxy Auto-Detection (`src/lib/env.ts`):**
+```typescript
+// In production, if VITE_API_PROXY_URL not set, auto-detect:
+if (import.meta.env.PROD && typeof window !== 'undefined') {
+  return window.location.origin  // Same origin when co-hosted
+}
+```
+
+**CSP for PDF.js Worker (`server/index.ts`):**
+```typescript
+// Required in Helmet CSP config:
+scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
+workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
+connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...supabase]
+```
+
+**Supabase Auth Redirect URLs:**
+- Must add production URL to Supabase Dashboard → Authentication → URL Configuration
+- Format: `https://insurai-production.up.railway.app/**`
+- Required for OAuth and magic link flows
+
+**Kasko Implicit Coverages:**
+- Don't flag Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler as missing
+- These are automatically included in base kasko
+- Check `KASKO_IMPLICIT_COVERAGES` in `src/lib/ai/policy-extractor.ts`
+
+---
+
 ## CI/CD
 
 ### GitHub Actions
@@ -1699,4 +1802,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 4500+ tests, all passing
-**Last Updated**: January 11, 2026
+**Last Updated**: January 14, 2026
