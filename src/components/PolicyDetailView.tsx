@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -13,7 +13,9 @@ import {
   shouldShowUnlimited,
   shouldShowIncluded,
   groupCoverageSubLimits,
+  analyzeExclusionsComprehensive,
   type GroupedCoverage,
+  type AnalyzedExclusion,
 } from '@/lib/knowledge/kasko-knowledge'
 
 /**
@@ -128,28 +130,6 @@ function getCoverageIconStyle(coverage: Coverage): { bg: string; icon: string } 
     default:
       return { bg: 'bg-green-100', icon: 'text-green-600' }
   }
-}
-
-/**
- * Check if an exclusion is critical
- */
-function isExclusionCritical(exclusion: string): boolean {
-  const criticalPatterns = [
-    'kasıt', 'kasdi', 'intentional',
-    'alkol', 'alcohol',
-    'uyuşturucu', 'drug',
-    'savaş', 'war',
-    'terör', 'terror',
-    'nükleer', 'nuclear',
-    'deprem', 'earthquake',
-    'sel', 'flood',
-    'ehliyet', 'license',
-    'hız', 'speed',
-    'kaçak', 'illegal',
-    'ruhsatsız', 'unlicensed',
-  ]
-  const lowerExclusion = exclusion.toLowerCase()
-  return criticalPatterns.some(pattern => lowerExclusion.includes(pattern))
 }
 
 /**
@@ -341,6 +321,208 @@ function CoveragesByCategory({
           </div>
         )
       })}
+    </div>
+  )
+}
+
+/**
+ * Comprehensive Exclusions Section
+ * Analyzes exclusions, provides explanations, and highlights items needing clarification
+ */
+function ExclusionsSection({
+  exclusions,
+  policyType: _policyType, // Reserved for future policy-type-specific logic
+  isCommercial = false,
+  locale,
+}: {
+  exclusions: string[]
+  policyType: string
+  isCommercial?: boolean
+  locale: string
+}) {
+  const [expandedExclusion, setExpandedExclusion] = useState<number | null>(null)
+
+  // Analyze exclusions comprehensively
+  const analysis = useMemo(
+    () => analyzeExclusionsComprehensive(exclusions, isCommercial),
+    [exclusions, isCommercial]
+  )
+
+  const getSeverityStyles = (severity: AnalyzedExclusion['severity']) => {
+    switch (severity) {
+      case 'critical':
+        return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', icon: 'text-red-600', badge: 'destructive' as const }
+      case 'important':
+        return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: 'text-amber-600', badge: 'warning' as const }
+      case 'standard':
+        return { bg: 'bg-yellow-50', border: 'border-yellow-100', text: 'text-gray-700', icon: 'text-yellow-600', badge: 'outline' as const }
+      default:
+        return { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-600', icon: 'text-gray-400', badge: 'secondary' as const }
+    }
+  }
+
+  const getSeverityLabel = (severity: AnalyzedExclusion['severity']) => {
+    switch (severity) {
+      case 'critical': return locale === 'tr' ? 'Kritik' : 'Critical'
+      case 'important': return locale === 'tr' ? 'Önemli' : 'Important'
+      case 'standard': return locale === 'tr' ? 'Standart' : 'Standard'
+      default: return locale === 'tr' ? 'Bilgi' : 'Info'
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Coverages mistakenly in exclusions (if any) */}
+      {analysis.coveragesInExclusions.length > 0 && (
+        <Card className="border-green-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShieldCheck className="text-green-600" size={18} />
+              {locale === 'tr' ? 'Ek Teminatlar (Limitli)' : 'Additional Coverage (Limited)'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {analysis.coveragesInExclusions.map((item, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Check className="text-green-600" size={16} />
+                    <span className="text-sm text-gray-700">{item.original.replace(/\(.*\)/, '').trim()}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-green-700">
+                    {item.extractedLimit ? formatCurrency(item.extractedLimit) : ''}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Main Exclusions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="text-amber-500" size={20} />
+            {locale === 'tr' ? 'İstisnalar (Kapsam Dışı)' : 'Exclusions'}
+          </CardTitle>
+          <p className="text-sm text-gray-500 mt-1">
+            {locale === 'tr'
+              ? 'Bu durumlar sigorta kapsamı dışındadır. Detaylı açıklama için tıklayın.'
+              : 'These situations are not covered. Click for detailed explanation.'}
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-2">
+            {analysis.exclusions.map((exclusion, i) => {
+              const styles = getSeverityStyles(exclusion.severity)
+              const isExpanded = expandedExclusion === i
+
+              return (
+                <li key={i}>
+                  <button
+                    onClick={() => setExpandedExclusion(isExpanded ? null : i)}
+                    className={`w-full text-left p-3 rounded-lg border ${styles.bg} ${styles.border} transition-all hover:shadow-sm`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <X className={`flex-shrink-0 mt-0.5 ${styles.icon}`} size={16} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-sm leading-relaxed ${styles.text} ${exclusion.severity === 'critical' ? 'font-medium' : ''}`}>
+                            {exclusion.original}
+                          </span>
+                          {exclusion.severity !== 'standard' && exclusion.severity !== 'informational' && (
+                            <Badge variant={styles.badge} className="text-xs">
+                              {getSeverityLabel(exclusion.severity)}
+                            </Badge>
+                          )}
+                          {exclusion.needsClarification && (
+                            <HelpCircle className="text-blue-500" size={14} title="Clarification recommended" />
+                          )}
+                        </div>
+
+                        {/* Expanded explanation */}
+                        {isExpanded && exclusion.explanation && (
+                          <div className="mt-3 p-3 bg-white/70 rounded-md border border-gray-200">
+                            <p className="text-sm text-gray-700 mb-2">
+                              <Info className="inline mr-1 text-blue-500" size={14} />
+                              {locale === 'tr' ? exclusion.explanation : exclusion.explanationEn}
+                            </p>
+                            {exclusion.examples && exclusion.examples.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-xs font-medium text-gray-500 mb-1">
+                                  {locale === 'tr' ? 'Örnekler:' : 'Examples:'}
+                                </p>
+                                <ul className="text-xs text-gray-600 space-y-1">
+                                  {exclusion.examples.map((ex, j) => (
+                                    <li key={j} className="flex items-center gap-1">
+                                      <span className="text-gray-400">•</span> {ex}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <Info className="text-gray-400 flex-shrink-0" size={14} />
+                    </div>
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Clarification Needed */}
+      {(analysis.clarificationNeeded.length > 0 || analysis.missingImportantExclusions.length > 0) && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base text-blue-900">
+              <HelpCircle className="text-blue-600" size={18} />
+              {locale === 'tr' ? 'Sigortanıza Sorun' : 'Ask Your Insurer'}
+            </CardTitle>
+            <p className="text-sm text-blue-700 mt-1">
+              {locale === 'tr'
+                ? 'Bu konuları sigorta şirketinizle netleştirmenizi öneririz.'
+                : 'We recommend clarifying these points with your insurance company.'}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {/* Items from exclusions that need clarification */}
+              {analysis.clarificationNeeded.map((item, i) => (
+                <div key={`clarify-${i}`} className="p-3 bg-white rounded-lg border border-blue-200">
+                  <p className="text-sm font-medium text-gray-800 mb-1">{item.item}</p>
+                  <p className="text-sm text-blue-700 flex items-center gap-1">
+                    <HelpCircle size={12} />
+                    {locale === 'tr' ? item.question : item.questionEn}
+                  </p>
+                </div>
+              ))}
+
+              {/* Important topics not mentioned in exclusions */}
+              {analysis.missingImportantExclusions
+                .filter(item => item.importance === 'high')
+                .map((item, i) => (
+                  <div key={`missing-${i}`} className="p-3 bg-white rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                      <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                        {locale === 'tr' ? 'Poliçede belirtilmemiş' : 'Not specified'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-blue-700 flex items-center gap-1">
+                      <HelpCircle size={12} />
+                      {locale === 'tr' ? item.question : item.question}
+                    </p>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
@@ -562,43 +744,13 @@ export function PolicyDetailView() {
               </CardContent>
             </Card>
 
-            {/* Exclusions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="text-amber-500" size={20} />
-                  Exclusions
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {policy.exclusions.map((exclusion, i) => {
-                    const isCritical = isExclusionCritical(exclusion)
-                    return (
-                      <li
-                        key={i}
-                        className={`flex items-center gap-3 p-3 rounded-lg min-h-[2.5rem] ${
-                          isCritical ? 'bg-red-50' : 'bg-amber-50'
-                        }`}
-                      >
-                        <X
-                          className={`flex-shrink-0 ${isCritical ? 'text-red-600' : 'text-amber-600'}`}
-                          size={16}
-                        />
-                        <span className={`text-sm leading-relaxed ${isCritical ? 'text-red-800 font-medium' : 'text-gray-700'}`}>
-                          {exclusion}
-                        </span>
-                        {isCritical && (
-                          <Badge variant="destructive" className="text-xs ml-auto">
-                            Kritik
-                          </Badge>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              </CardContent>
-            </Card>
+            {/* Exclusions - Comprehensive Analysis */}
+            <ExclusionsSection
+              exclusions={policy.exclusions}
+              policyType={policy.type}
+              isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
+              locale={locale}
+            />
           </div>
 
           {/* Sidebar */}

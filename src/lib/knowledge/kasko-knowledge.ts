@@ -1043,6 +1043,9 @@ export function groupCoverageSubLimits<T extends {
   coverages.forEach((coverage, index) => {
     if (processedIndices.has(index)) return
 
+    // Check if this should be displayed as unlimited (even if not explicitly flagged)
+    const shouldBeUnlimited = coverage.isUnlimited || shouldShowUnlimited(coverage.name, coverage.limit)
+
     result.push({
       name: coverage.name,
       nameTr: coverage.nameTr || coverage.name,
@@ -1051,7 +1054,7 @@ export function groupCoverageSubLimits<T extends {
       isGrouped: false,
       limit: coverage.limit,
       deductible: coverage.deductible,
-      isUnlimited: coverage.isUnlimited,
+      isUnlimited: shouldBeUnlimited,
       isMarketValue: coverage.isMarketValue,
       included: coverage.included,
       importance: coverage.importance,
@@ -1079,4 +1082,362 @@ function extractSubLimitLabel(fullName: string, prefix: string): string {
     .trim()
 
   return label || fullName
+}
+
+// =============================================================================
+// EXCLUSION ANALYSIS & EXPLANATIONS
+// =============================================================================
+
+/**
+ * Comprehensive exclusion explanations for kasko policies
+ * Each exclusion has plain-language explanation and examples
+ */
+export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
+  explanation: string
+  explanationEn: string
+  examples?: string[]
+  severity: 'critical' | 'important' | 'standard' | 'informational'
+  affectsPrivate?: boolean  // Does this affect private/personal vehicles?
+  affectsCommercial?: boolean  // Does this affect commercial vehicles?
+}> = {
+  // Critical exclusions - always important
+  'alkol': {
+    explanation: 'Sürücünün alkollü olması durumunda meydana gelen hasarlar karşılanmaz. Yasal alkol sınırı 0.50 promil\'dir.',
+    explanationEn: 'Damages that occur while the driver is under the influence of alcohol are not covered. Legal limit is 0.50 promil.',
+    examples: ['Alkollü sürüş sonucu kaza', 'İçki içtikten sonra araç kullanımı'],
+    severity: 'critical',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'uyuşturucu': {
+    explanation: 'Uyuşturucu veya uyarıcı madde etkisi altında oluşan hasarlar karşılanmaz.',
+    explanationEn: 'Damages occurring under the influence of drugs or stimulants are not covered.',
+    examples: ['İlaç etkisi altında kaza', 'Uyuşturucu kullanımı sonrası kaza'],
+    severity: 'critical',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'ehliyet': {
+    explanation: 'Geçerli ehliyeti olmayan sürücünün kullanımı sırasında oluşan hasarlar karşılanmaz.',
+    explanationEn: 'Damages that occur while the vehicle is driven by an unlicensed driver are not covered.',
+    examples: ['Ehliyetsiz sürüş', 'Süresi dolmuş ehliyet', 'Uygun sınıf ehliyet olmadan kullanım'],
+    severity: 'critical',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'yetkisiz sürücü': {
+    explanation: 'Poliçede belirtilen sürücü dışında birinin aracı kullanması durumunda hasar karşılanmayabilir. Bazı poliçelerde "belirli sürücü" şartı vardır.',
+    explanationEn: 'Damages may not be covered if someone other than the designated driver operates the vehicle.',
+    examples: ['Arkadaşa araç vermek', 'Aile üyesi dışında kullanım'],
+    severity: 'important',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'vale': {
+    explanation: 'Vale (otopark görevlisi) kullanımı sırasında oluşan hasarlar genellikle kapsam dışıdır. Vale hizmeti aldığınızda dikkatli olun.',
+    explanationEn: 'Damages during valet parking are typically excluded. Be careful when using valet services.',
+    examples: ['Vale park sırasında çizik', 'Otoparkta hasar', 'Vale tarafından kaza'],
+    severity: 'important',
+    affectsPrivate: true,
+    affectsCommercial: false,
+  },
+  'yarış': {
+    explanation: 'Yarış, hız denemesi veya ralli gibi etkinliklerde oluşan hasarlar karşılanmaz.',
+    explanationEn: 'Damages during racing, speed tests, or rally events are not covered.',
+    examples: ['Drag yarışı', 'Pist günü', 'Hız denemesi'],
+    severity: 'critical',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'kasıt': {
+    explanation: 'Bilerek ve isteyerek yapılan hasarlar karşılanmaz.',
+    explanationEn: 'Intentional damages are not covered.',
+    examples: ['Kasıtlı hasar', 'Sigorta dolandırıcılığı'],
+    severity: 'critical',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'siber': {
+    explanation: 'Siber saldırı, bilgisayar virüsü veya yazılım hatası kaynaklı hasarlar karşılanmaz. Modern araçlarda önemli bir risk.',
+    explanationEn: 'Damages from cyber attacks, computer viruses, or software failures are not covered.',
+    examples: ['Araç yazılımının hacklenmesi', 'Uzaktan erişim saldırısı'],
+    severity: 'standard',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'salgın': {
+    explanation: 'Salgın hastalık (pandemi) döneminde karantina veya kısıtlamalar nedeniyle oluşan dolaylı zararlar karşılanmaz.',
+    explanationEn: 'Indirect damages due to pandemic quarantine or restrictions are not covered.',
+    examples: ['COVID-19 döneminde araç kullanılamama'],
+    severity: 'informational',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'nükleer': {
+    explanation: 'Nükleer, biyolojik veya kimyasal riskler çoğu poliçede kapsam dışıdır veya sınırlı teminatlıdır.',
+    explanationEn: 'Nuclear, biological, or chemical risks are excluded or have limited coverage.',
+    examples: ['Radyoaktif kirlilik', 'Kimyasal sızıntı'],
+    severity: 'informational',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'savaş': {
+    explanation: 'Savaş, iç savaş, isyan veya halk hareketleri sırasında oluşan hasarlar karşılanmaz.',
+    explanationEn: 'Damages during war, civil war, riots, or civil unrest are not covered.',
+    examples: ['Savaş hasarı', 'İsyan sırasında zarar'],
+    severity: 'informational',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'terör': {
+    explanation: 'Terör eylemleri sonucu oluşan hasarlar genellikle ayrı değerlendirilir. DASK benzeri özel fonlar devreye girebilir.',
+    explanationEn: 'Damages from terrorist acts may be covered separately through special funds.',
+    examples: ['Bombalı saldırı hasarı', 'Terör olayı sonucu zarar'],
+    severity: 'important',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'yaptırım': {
+    explanation: 'Uluslararası yaptırımlar kapsamındaki kişi veya kuruluşlarla yapılan işlemlerle ilgili talepler karşılanmaz. Sigorta şirketleri yasal olarak bu ödemeleri yapamaz.',
+    explanationEn: 'Claims related to sanctioned persons or entities cannot be paid due to international sanctions compliance.',
+    examples: ['Yaptırım listesindeki şirketle iş yapma', 'Ambargo uygulanan ülkelerle işlem'],
+    severity: 'informational',
+    affectsPrivate: false,
+    affectsCommercial: true,
+  },
+  'lpg': {
+    explanation: 'Ruhsata işlenmemiş veya yetkisiz LPG dönüşümü olan araçlarda yangın hasarları karşılanmayabilir.',
+    explanationEn: 'Fire damages may not be covered for vehicles with unauthorized LPG conversions.',
+    examples: ['Kaçak LPG tüpü', 'Ruhsatsız dönüşüm'],
+    severity: 'important',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'kiralık': {
+    explanation: 'Aracın taksi, dolmuş veya kiralık araç olarak kullanılması durumunda özel şartlar geçerlidir. Hususi kullanım poliçeleri bu durumları kapsamaz.',
+    explanationEn: 'Special conditions apply if vehicle is used as taxi, minibus, or rental car.',
+    examples: ['Uber/Bolt gibi servislerde kullanım', 'Araç kiralama işi'],
+    severity: 'important',
+    affectsPrivate: true,
+    affectsCommercial: false,
+  },
+  'aşınma': {
+    explanation: 'Normal kullanım sonucu oluşan yıpranma, aşınma ve eskime hasarları karşılanmaz.',
+    explanationEn: 'Wear and tear from normal use is not covered.',
+    examples: ['Lastik aşınması', 'Fren balatası eskimesi', 'Motor yıpranması'],
+    severity: 'standard',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+  'bakım': {
+    explanation: 'Yetersiz bakım veya periyodik bakım yapılmaması nedeniyle oluşan hasarlar karşılanmayabilir.',
+    explanationEn: 'Damages due to lack of maintenance may not be covered.',
+    examples: ['Yağ değişimi yapılmadan motor arızası', 'Bakımsızlık nedeniyle hasar'],
+    severity: 'standard',
+    affectsPrivate: true,
+    affectsCommercial: true,
+  },
+}
+
+/**
+ * Common exclusions that users SHOULD know about but may not be in their policy
+ * These are important items to clarify with insurance
+ */
+export const COMMON_EXCLUSIONS_TO_CHECK = [
+  {
+    name: 'Vale Hırsızlığı/Hasarı',
+    nameEn: 'Valet Theft/Damage',
+    question: 'Vale park hizmeti sırasında araç çalınırsa veya hasar görürse karşılanıyor mu?',
+    questionEn: 'Is theft or damage during valet parking covered?',
+    importance: 'high',
+  },
+  {
+    name: 'Alkollü Sürücü Limiti',
+    nameEn: 'Alcohol Limit',
+    question: 'Hangi promil seviyesinden sonra teminat geçersiz oluyor?',
+    questionEn: 'At what blood alcohol level does coverage become invalid?',
+    importance: 'high',
+  },
+  {
+    name: 'Yedek Sürücü',
+    nameEn: 'Additional Drivers',
+    question: 'Poliçede belirtilen sürücü dışında başkası aracı kullanabilir mi?',
+    questionEn: 'Can someone other than the named driver operate the vehicle?',
+    importance: 'high',
+  },
+  {
+    name: 'Yurt Dışı Kullanımı',
+    nameEn: 'International Use',
+    question: 'Araç yurt dışında kullanılırsa teminat geçerli mi?',
+    questionEn: 'Is coverage valid when the vehicle is used abroad?',
+    importance: 'medium',
+  },
+  {
+    name: 'Ticari Kullanım',
+    nameEn: 'Commercial Use',
+    question: 'Aracı ticari amaçla (Uber, teslimat vb.) kullanabilir miyim?',
+    questionEn: 'Can I use the vehicle commercially (Uber, delivery, etc.)?',
+    importance: 'high',
+  },
+  {
+    name: 'Modifikasyon',
+    nameEn: 'Vehicle Modifications',
+    question: 'Araçta modifikasyon yaparsam (jant, cam filmi, ses sistemi) teminat etkilenir mi?',
+    questionEn: 'Does modifying the vehicle affect coverage?',
+    importance: 'medium',
+  },
+]
+
+/**
+ * Analyzed exclusion with explanation and classification
+ */
+export interface AnalyzedExclusion {
+  original: string
+  type: 'exclusion' | 'coverage_with_limit' | 'condition'
+  severity: 'critical' | 'important' | 'standard' | 'informational'
+  explanation?: string
+  explanationEn?: string
+  examples?: string[]
+  extractedLimit?: number  // If it's actually a coverage with limit
+  needsClarification?: boolean
+  clarificationQuestion?: string
+}
+
+/**
+ * Full exclusion analysis result
+ */
+export interface ExclusionAnalysisResult {
+  exclusions: AnalyzedExclusion[]
+  coveragesInExclusions: AnalyzedExclusion[]  // Items that are actually coverages
+  clarificationNeeded: Array<{
+    item: string
+    question: string
+    questionEn: string
+  }>
+  missingImportantExclusions: Array<{
+    name: string
+    nameEn: string
+    question: string
+    importance: string
+  }>
+}
+
+/**
+ * Analyze exclusions comprehensively
+ * - Detect if items are actually coverages (have limits mentioned)
+ * - Add explanations
+ * - Flag items needing clarification
+ */
+export function analyzeExclusionsComprehensive(
+  exclusions: string[],
+  isCommercial: boolean = false
+): ExclusionAnalysisResult {
+  const result: ExclusionAnalysisResult = {
+    exclusions: [],
+    coveragesInExclusions: [],
+    clarificationNeeded: [],
+    missingImportantExclusions: [],
+  }
+
+  // Pattern to detect if an "exclusion" is actually a coverage with limit
+  const limitPattern = /\(?\s*(\d+(?:[.,]\d+)*)\s*(?:TL|₺|lira)?\s*(?:limit|teminat)?\s*\)?/i
+
+  for (const exclusion of exclusions) {
+    const exclusionLower = exclusion.toLowerCase()
+
+    // Check if this is actually a coverage with a limit
+    const limitMatch = exclusion.match(limitPattern)
+    if (limitMatch) {
+      // This is a coverage, not an exclusion
+      const limitStr = limitMatch[1].replace(/[.,]/g, '')
+      const limit = parseInt(limitStr)
+
+      result.coveragesInExclusions.push({
+        original: exclusion,
+        type: 'coverage_with_limit',
+        severity: 'informational',
+        explanation: `Bu bir teminat limiti, istisna değil. ${exclusion.replace(limitMatch[0], '').trim()} için ${formatTurkishCurrency(limit)} limite kadar teminat verilmektedir.`,
+        explanationEn: `This is a coverage limit, not an exclusion. Coverage up to ${formatTurkishCurrency(limit)} for ${exclusion.replace(limitMatch[0], '').trim()}.`,
+        extractedLimit: limit,
+      })
+      continue
+    }
+
+    // Find explanation for this exclusion
+    let analyzed: AnalyzedExclusion = {
+      original: exclusion,
+      type: 'exclusion',
+      severity: 'standard',
+    }
+
+    // Match against known exclusion patterns
+    for (const [key, info] of Object.entries(KASKO_EXCLUSION_EXPLANATIONS)) {
+      if (exclusionLower.includes(key)) {
+        // Check if this exclusion applies to the vehicle type
+        if (isCommercial && info.affectsCommercial === false) continue
+        if (!isCommercial && info.affectsPrivate === false) continue
+
+        analyzed = {
+          ...analyzed,
+          severity: info.severity,
+          explanation: info.explanation,
+          explanationEn: info.explanationEn,
+          examples: info.examples,
+        }
+        break
+      }
+    }
+
+    // Check if this exclusion is unclear and needs clarification
+    const unclearPatterns = [
+      { pattern: 'yetkisiz', question: 'Yetkisiz sürücü tam olarak nasıl tanımlanıyor?' },
+      { pattern: 'belirli sürücü', question: 'Hangi sürücüler bu poliçe kapsamında?' },
+      { pattern: 'ruhsata', question: 'Ruhsat bilgilerinin güncel olduğundan emin misiniz?' },
+    ]
+
+    for (const { pattern, question } of unclearPatterns) {
+      if (exclusionLower.includes(pattern)) {
+        analyzed.needsClarification = true
+        analyzed.clarificationQuestion = question
+        result.clarificationNeeded.push({
+          item: exclusion,
+          question,
+          questionEn: question, // TODO: translate
+        })
+        break
+      }
+    }
+
+    result.exclusions.push(analyzed)
+  }
+
+  // Check for important exclusions that SHOULD be mentioned but aren't
+  const mentionedTopics = exclusions.map(e => e.toLowerCase()).join(' ')
+
+  for (const check of COMMON_EXCLUSIONS_TO_CHECK) {
+    const keywords = check.name.toLowerCase().split(/[\s/]+/)
+    const isMentioned = keywords.some(kw => mentionedTopics.includes(kw))
+
+    if (!isMentioned) {
+      result.missingImportantExclusions.push({
+        name: check.name,
+        nameEn: check.nameEn,
+        question: check.question,
+        importance: check.importance,
+      })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Format number as Turkish currency
+ */
+function formatTurkishCurrency(amount: number): string {
+  return new Intl.NumberFormat('tr-TR', {
+    style: 'currency',
+    currency: 'TRY',
+    maximumFractionDigits: 0,
+  }).format(amount)
 }
