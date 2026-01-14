@@ -142,6 +142,8 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     // Gap analysis
     gapAnalysis: rawData.gapAnalysis,
     gapActions: rawData.gapActions,
+    // Raw extracted text from PDF
+    extractedText: rawData.extractedText,
   }
 }
 
@@ -176,6 +178,7 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
       riskActions: policy.riskActions,
       gapAnalysis: policy.gapAnalysis,
       gapActions: policy.gapActions,
+      extractedText: policy.extractedText,
     },
   }
 }
