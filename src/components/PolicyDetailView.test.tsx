@@ -189,7 +189,7 @@ describe('PolicyDetailView', () => {
     it('should display insured person', () => {
       renderPolicyDetailView()
 
-      expect(screen.getByText('Insured Person')).toBeInTheDocument()
+      expect(screen.getByText('Insured')).toBeInTheDocument()
       expect(screen.getByText('John Doe')).toBeInTheDocument()
     })
 
@@ -271,15 +271,16 @@ describe('PolicyDetailView', () => {
     it('should display coverage deductibles', () => {
       renderPolicyDetailView()
 
-      // Look for deductible text that includes specific amounts
-      expect(screen.getAllByText(/Deductible:/).length).toBeGreaterThan(0)
+      // Look for deductible text - component uses Turkish "Muafiyet:" for coverage deductibles
+      expect(screen.getAllByText(/Muafiyet:/).length).toBeGreaterThan(0)
     })
 
-    it('should apply green background for included coverages', () => {
+    it('should apply blue background for standard included coverages', () => {
       renderPolicyDetailView()
 
+      // Standard coverages (default importance) should have blue background
       const fireSection = screen.getByText('Fire').closest('[class*="rounded-xl"]')
-      expect(fireSection?.className).toContain('bg-green-50')
+      expect(fireSection?.className).toContain('bg-blue-50')
     })
 
     it('should apply gray background for non-included coverages', () => {

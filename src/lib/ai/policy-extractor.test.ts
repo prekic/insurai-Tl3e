@@ -819,9 +819,9 @@ describe('Policy Conversion', () => {
       currency: 'TRY',
       paymentFrequency: null,
       coverages: [
-        { name: 'Fire', limit: 500000, deductible: 1000, description: null },
-        { name: 'Theft', limit: 200000, deductible: 500, description: null },
-        { name: 'Water', limit: 100000, deductible: 500, description: null },
+        { name: 'Fire', limit: 500000, deductible: 1000, description: null, isUnlimited: false, isMarketValue: false, category: 'main' },
+        { name: 'Theft', limit: 200000, deductible: 500, description: null, isUnlimited: false, isMarketValue: false, category: 'main' },
+        { name: 'Water', limit: 100000, deductible: 500, description: null, isUnlimited: false, isMarketValue: false, category: 'main' },
       ],
       specialConditions: [],
       exclusions: [],
@@ -833,6 +833,7 @@ describe('Policy Conversion', () => {
 
     expect(result.success).toBe(true)
     if (result.success) {
+      // For home policies with main category coverages, sum them up
       expect(result.policy.coverage).toBe(800000) // 500k + 200k + 100k
     }
   })
