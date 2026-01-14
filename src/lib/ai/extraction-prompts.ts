@@ -31,20 +31,34 @@ Your task is to extract structured information from insurance policy documents.
    - Turkish documents often use DD.MM.YYYY or DD/MM/YYYY
    - Convert ALL dates to YYYY-MM-DD format in your output
 
-3. **Currency Detection**:
-   - Most Turkish policies use TRY (Turkish Lira), symbol: ₺
-   - Look for: TL, TRY, Türk Lirası, ₺
-   - BUT some policies may use foreign currencies: USD ($), EUR (€), GBP (£)
-   - **IMPORTANT**: Extract the currency code for EACH monetary value
-   - Verify consistency: 99% of policies use ONE currency throughout
-   - If you find mixed currencies (rare), flag each item with its currency
-   - For the main currency field, use the MOST COMMON currency in the document
-   - If premium or coverage is in a different currency than others, note it in special conditions
-   - Common currency indicators:
-     - TL, TRY, Türk Lirası, ₺ → "TRY"
-     - USD, $, Amerikan Doları, ABD Doları → "USD"
-     - EUR, €, Euro, Avro → "EUR"
-     - GBP, £, Sterlin, İngiliz Sterlini → "GBP"
+3. **Currency Detection** (CRITICAL):
+   - Most Turkish policies use TRY (Turkish Lira):
+     - Indicators: ₺, TL, TRY, "Türk Lirası", "-TL", "TL."
+   - Common foreign currencies in Turkish policies:
+     - USD: $, USD, "Amerikan Doları", "ABD Doları", "Dolar"
+     - EUR: €, EUR, "Euro", "Avro"
+     - GBP: £, GBP, "Sterlin", "İngiliz Sterlini"
+   - Other worldwide currencies (use 3-letter ISO code):
+     - JPY/CNY: ¥, Yen, Yuan, Renminbi
+     - CHF: CHF, "İsviçre Frangı", Swiss Franc
+     - AED: د.إ, AED, Dirham
+     - SAR: ﷼, SAR, Riyal
+     - INR: ₹, INR, Rupee
+     - AUD/CAD/NZD: A$, C$, NZ$
+     - SEK/NOK/DKK: kr, Krone/Krona
+     - PLN: zł, Zloty
+     - RUB: ₽, Ruble
+     - KRW: ₩, Won
+     - BRL: R$, Real
+     - MXN: MX$, Peso
+     - ZAR: R, Rand
+     - SGD/HKD: S$, HK$
+   - **IMPORTANT**:
+     - Extract the currency code for EACH monetary value
+     - Verify consistency: 99% of policies use ONE currency throughout
+     - If mixed currencies (rare), use the currency of premium/main coverage
+     - ALWAYS return the 3-letter ISO currency code
+     - Default to "TRY" only if no currency indicator found
 
 4. **Confidence Scores**: Rate your confidence (0-1) based on:
    - Clarity of the source text

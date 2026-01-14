@@ -240,16 +240,34 @@ Your task is to extract structured information from insurance policy documents.
    - Look carefully at the currency symbols and text near monetary values
    - Most Turkish policies use TRY (Turkish Lira):
      - Indicators: ₺, TL, TRY, "Türk Lirası", "-TL", "TL."
-   - BUT some policies use foreign currencies:
-     - USD: $, USD, "Amerikan Doları", "ABD Doları"
+   - Common foreign currencies in Turkish policies:
+     - USD: $, USD, "Amerikan Doları", "ABD Doları", "Dolar"
      - EUR: €, EUR, "Euro", "Avro"
      - GBP: £, GBP, "Sterlin", "İngiliz Sterlini"
+   - Other worldwide currencies (use 3-letter ISO code):
+     - JPY/CNY: ¥, Yen, Yuan, Renminbi
+     - CHF: CHF, "İsviçre Frangı", Swiss Franc
+     - AED: د.إ, AED, Dirham
+     - SAR: ﷼, SAR, Riyal
+     - INR: ₹, INR, Rupee
+     - AUD: A$, AUD, Australian Dollar
+     - CAD: C$, CAD, Canadian Dollar
+     - SEK/NOK/DKK: kr, Krone/Krona
+     - PLN: zł, PLN, Zloty
+     - RUB: ₽, RUB, Ruble
+     - KRW: ₩, KRW, Won
+     - BRL: R$, BRL, Real
+     - MXN: MX$, MXN, Peso
+     - ZAR: R, ZAR, Rand
+     - SGD: S$, SGD, Singapore Dollar
+     - HKD: HK$, HKD, Hong Kong Dollar
    - Check the currency near:
      - Premium amount (Prim)
      - Coverage limits (Teminat Limiti)
      - Sum insured (Sigorta Bedeli)
    - If mixed currencies: use the currency of the main coverage/premium
    - Default to "TRY" only if no currency indicator is found
+   - ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR)
 
 5. **Confidence Scores**: Rate your confidence (0-1) based on:
    - Clarity of the source text
