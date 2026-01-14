@@ -14,6 +14,7 @@ import { generateMarketComparisonData } from '@/lib/market-data/service'
 import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { RiskAssessmentService } from '@/lib/ml'
 import { GapDetectionService } from '@/lib/gap-detection'
+import { validateCurrencyRegion } from '@/lib/utils'
 
 export interface ExtractionResult {
   success: true
@@ -308,12 +309,9 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     exclusions: data.exclusions,
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
+    currency: data.currency ?? 'TRY',
     aiConfidence: data.confidence.overall,
-    aiInsights: [
-      ...generateStrengths(data).map(s => `✓ ${s}`),
-      ...generateGaps(data).map(g => `⚠ ${g}`),
-      ...generateRecommendations(data).map(r => `💡 ${r}`),
-    ],
+    aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
   }
 
@@ -420,6 +418,33 @@ function createEmptyExtractedData(): ExtractedPolicyData {
       coverages: 0,
     },
   }
+}
+
+/**
+ * Generate all AI insights including currency validation warnings
+ */
+function generateAIInsights(data: ExtractedPolicyData): string[] {
+  const insights: string[] = []
+
+  // Add strengths
+  insights.push(...generateStrengths(data).map(s => `✓ ${s}`))
+
+  // Add gaps
+  insights.push(...generateGaps(data).map(g => `⚠ ${g}`))
+
+  // Add recommendations
+  insights.push(...generateRecommendations(data).map(r => `💡 ${r}`))
+
+  // Validate currency against address
+  const currency = data.currency ?? 'TRY'
+  const address = data.insuredAddress
+  const currencyValidation = validateCurrencyRegion(currency, address)
+
+  if (currencyValidation.warning) {
+    insights.push(`🔍 ${currencyValidation.warning}`)
+  }
+
+  return insights
 }
 
 /**

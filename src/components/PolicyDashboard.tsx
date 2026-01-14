@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { FileText, Plus, Eye, Trash2, Search, Calendar, AlertTriangle, Check, LayoutGrid, List, Scale, X, Copy, Sparkles, Merge, ArrowUpDown, ArrowUp, ArrowDown, Shield, Banknote } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
@@ -184,16 +184,32 @@ export function PolicyDashboard() {
     }
   }, [uploadedPolicies, fullPolicies])
 
+  // Status badge - icon only on mobile, full text on desktop
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'active':
-        return <Badge variant="success"><Check size={12} className="mr-1" aria-hidden="true" /> {t.dashboard.active}</Badge>
+        return (
+          <Badge variant="success" className="px-1.5 sm:px-2">
+            <Check size={12} aria-hidden="true" />
+            <span className="hidden sm:inline ml-1">{t.dashboard.active}</span>
+          </Badge>
+        )
       case 'expiring':
-        return <Badge variant="warning"><AlertTriangle size={12} className="mr-1" aria-hidden="true" /> {t.dashboard.expiringSoon}</Badge>
+        return (
+          <Badge variant="warning" className="px-1.5 sm:px-2">
+            <AlertTriangle size={12} aria-hidden="true" />
+            <span className="hidden sm:inline ml-1">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</span>
+          </Badge>
+        )
       case 'expired':
-        return <Badge variant="destructive">{t.dashboard.expired}</Badge>
+        return (
+          <Badge variant="destructive" className="px-1.5 sm:px-2">
+            <X size={12} aria-hidden="true" className="sm:hidden" />
+            <span className="hidden sm:inline">{t.dashboard.expired}</span>
+          </Badge>
+        )
       default:
-        return <Badge>{status}</Badge>
+        return <Badge className="px-1.5 sm:px-2">{status}</Badge>
     }
   }
 
@@ -267,52 +283,65 @@ export function PolicyDashboard() {
           </Button>
         </div>
 
-        {/* Stats Cards */}
-        <section aria-label={t.a11y.policyStats} className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                <FileText className="text-blue-600" size={20} aria-hidden="true" />
+        {/* Stats Cards - Horizontally scrollable on mobile */}
+        <section aria-label={t.a11y.policyStats} className="mb-8 -mx-4 sm:mx-0">
+          <div className="flex sm:grid sm:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 px-4 sm:px-0 snap-x snap-mandatory">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <FileText className="text-blue-600" size={16} aria-hidden="true" />
+                </div>
+                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.totalPolicies}</span>
               </div>
-              <span className="text-sm text-gray-600">{t.dashboard.totalPolicies}</span>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900" aria-label={`${stats.total} ${t.dashboard.totalPolicies.toLowerCase()}`}>{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                <Check className="text-green-600" size={20} aria-hidden="true" />
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Check className="text-green-600" size={16} aria-hidden="true" />
+                </div>
+                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.active}</span>
               </div>
-              <span className="text-sm text-gray-600">{t.dashboard.active}</span>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.active}</p>
+              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900" aria-label={`${stats.active} ${t.dashboard.active.toLowerCase()}`}>{stats.active}</p>
-          </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-                <Shield className="text-purple-600" size={20} aria-hidden="true" />
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Shield className="text-purple-600" size={16} aria-hidden="true" />
+                </div>
+                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.policy.totalSumInsured}</span>
               </div>
-              <span className="text-sm text-gray-600">{t.policy.totalSumInsured}</span>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">
+                <span className="sm:hidden">{formatCurrencyCompact(stats.totalSumInsured)}</span>
+                <span className="hidden sm:inline">{formatCurrency(stats.totalSumInsured)}</span>
+              </p>
+              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Bedel' : 'Sum'}</p>
             </div>
-            <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
-          </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-                <Banknote className="text-indigo-600" size={20} aria-hidden="true" />
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Banknote className="text-indigo-600" size={16} aria-hidden="true" />
+                </div>
+                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.policy.totalLimit}</span>
               </div>
-              <span className="text-sm text-gray-600">{t.policy.totalLimit}</span>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">
+                <span className="sm:hidden">{formatCurrencyCompact(stats.totalLimit)}</span>
+                <span className="hidden sm:inline">{formatCurrency(stats.totalLimit)}</span>
+              </p>
+              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Limit' : 'Limit'}</p>
             </div>
-            <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
-          </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center">
-                <Calendar className="text-amber-600" size={20} aria-hidden="true" />
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-100 rounded-lg sm:rounded-xl flex items-center justify-center">
+                  <Calendar className="text-amber-600" size={16} aria-hidden="true" />
+                </div>
+                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.expiringSoon}</span>
               </div>
-              <span className="text-sm text-gray-600">{t.dashboard.expiringSoon}</span>
+              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.expiring}</p>
+              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900" aria-label={`${stats.expiring} ${t.dashboard.expiringSoon.toLowerCase()}`}>{stats.expiring}</p>
           </div>
         </section>
 
@@ -424,69 +453,72 @@ export function PolicyDashboard() {
         )}
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-4 mb-6" role="search">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-6" role="search">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} aria-hidden="true" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} aria-hidden="true" />
               <label htmlFor={`${baseId}-search`} className="sr-only">{t.dashboard.searchPolicies}</label>
               <input
                 id={`${baseId}-search`}
                 type="text"
-                placeholder={t.dashboard.searchPolicies}
+                placeholder={locale === 'tr' ? 'Ara...' : 'Search...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="flex items-center gap-4">
-              <fieldset className="flex gap-2">
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
+              <fieldset className="flex gap-1 sm:gap-2 overflow-x-auto">
                 <legend className="sr-only">{t.dashboard.filterByStatus}</legend>
                 {[
-                  { key: 'all', label: t.common.all },
-                  { key: 'active', label: t.dashboard.active },
-                  { key: 'expiring', label: t.dashboard.expiringSoon },
-                  { key: 'expired', label: t.dashboard.expired },
-                ].map(({ key, label }) => (
+                  { key: 'all', label: t.common.all, mobileLabel: locale === 'tr' ? 'Tümü' : 'All' },
+                  { key: 'active', label: t.dashboard.active, mobileLabel: locale === 'tr' ? 'Aktif' : 'Active' },
+                  { key: 'expiring', label: t.dashboard.expiringSoon, mobileLabel: locale === 'tr' ? 'Yaklaşan' : 'Expiring' },
+                  { key: 'expired', label: t.dashboard.expired, mobileLabel: locale === 'tr' ? 'Süresi Dolmuş' : 'Expired' },
+                ].map(({ key, label, mobileLabel }) => (
                   <button
                     key={key}
                     onClick={() => setStatusFilter(key)}
                     aria-pressed={statusFilter === key}
-                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all focus-ring ${
+                    className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all focus-ring whitespace-nowrap ${
                       statusFilter === key
                         ? 'bg-slate-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
-                    {label}
+                    <span className="sm:hidden">{mobileLabel}</span>
+                    <span className="hidden sm:inline">{label}</span>
                   </button>
                 ))}
               </fieldset>
 
               {/* View Toggle */}
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden flex-shrink-0">
                 <button
                   onClick={() => setViewMode('table')}
                   aria-pressed={viewMode === 'table'}
                   aria-label="Table view"
-                  className={`p-2 transition-colors ${
+                  className={`p-1.5 sm:p-2 transition-colors ${
                     viewMode === 'table'
                       ? 'bg-slate-900 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <List size={18} />
+                  <List size={16} className="sm:hidden" />
+                  <List size={18} className="hidden sm:block" />
                 </button>
                 <button
                   onClick={() => setViewMode('cards')}
                   aria-pressed={viewMode === 'cards'}
                   aria-label="Card view"
-                  className={`p-2 transition-colors ${
+                  className={`p-1.5 sm:p-2 transition-colors ${
                     viewMode === 'cards'
                       ? 'bg-slate-900 text-white'
                       : 'bg-white text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <LayoutGrid size={18} />
+                  <LayoutGrid size={16} className="sm:hidden" />
+                  <LayoutGrid size={18} className="hidden sm:block" />
                 </button>
               </div>
             </div>
@@ -536,7 +568,7 @@ export function PolicyDashboard() {
           /* Table View - Mobile responsive with hidden columns on small screens */
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[600px] sm:min-w-0" role="table" aria-label={t.policy.policies}>
+              <table className="w-full" role="table" aria-label={t.policy.policies}>
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600">
@@ -662,7 +694,10 @@ export function PolicyDashboard() {
                       </td>
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <div>
-                          <p className="font-medium text-gray-900 text-sm sm:text-base">{formatCurrency(displayValue)}</p>
+                          <p className="font-medium text-gray-900 text-sm sm:text-base">
+                            <span className="sm:hidden">{formatCurrencyCompact(displayValue)}</span>
+                            <span className="hidden sm:inline">{formatCurrency(displayValue)}</span>
+                          </p>
                           <p className="text-[10px] sm:text-xs text-gray-500">
                             {coverageType === 'limit' ? (locale === 'tr' ? 'Limit' : 'Limit') : (locale === 'tr' ? 'Bedel' : 'Sum')}
                           </p>
@@ -677,22 +712,22 @@ export function PolicyDashboard() {
                       <td className="px-3 sm:px-6 py-3 sm:py-4">
                         {getStatusBadge(policy.status)}
                       </td>
-                      <td className="px-3 sm:px-6 py-3 sm:py-4">
-                        <div className="flex items-center justify-end gap-1">
+                      <td className="px-2 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center justify-end gap-0.5 sm:gap-1">
+                          {/* View button hidden on mobile since row is clickable */}
                           <button
                             onClick={(e) => { e.stopPropagation(); handleViewPolicy(policy.id) }}
-                            className="p-1.5 sm:p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
+                            className="hidden sm:block p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.view} ${shortName} ${policy.type}`}
                           >
-                            <Eye size={16} className="sm:hidden" aria-hidden="true" />
-                            <Eye size={18} className="hidden sm:block" aria-hidden="true" />
+                            <Eye size={18} aria-hidden="true" />
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); deletePolicy(policy.id) }}
                             className="p-1.5 sm:p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.delete} ${shortName} ${policy.type}`}
                           >
-                            <Trash2 size={16} className="sm:hidden" aria-hidden="true" />
+                            <Trash2 size={14} className="sm:hidden" aria-hidden="true" />
                             <Trash2 size={18} className="hidden sm:block" aria-hidden="true" />
                           </button>
                         </div>
