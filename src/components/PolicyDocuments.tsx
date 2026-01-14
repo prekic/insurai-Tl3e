@@ -177,16 +177,24 @@ export function PolicyDocuments({
           {documents.map((doc) => (
             <div
               key={doc.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer group"
+              onClick={() => {
+                // Open document in new tab when clicking anywhere on the row
+                if (doc.signedUrl) {
+                  window.open(doc.signedUrl, '_blank', 'noopener,noreferrer')
+                } else {
+                  handleRefreshUrl(doc)
+                }
+              }}
             >
               {/* Icon */}
-              <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center">
+              <div className="flex-shrink-0 w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-blue-50 transition-colors">
                 {getIcon(doc.mimeType)}
               </div>
 
               {/* File Info */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">
+                <p className="text-sm font-medium text-gray-900 truncate group-hover:text-blue-600 transition-colors">
                   {doc.fileName}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -194,8 +202,8 @@ export function PolicyDocuments({
                 </p>
               </div>
 
-              {/* Actions */}
-              <div className="flex items-center gap-1">
+              {/* Actions - stop propagation to prevent row click */}
+              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                 {doc.signedUrl ? (
                   <a
                     href={doc.signedUrl}

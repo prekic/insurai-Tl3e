@@ -31,9 +31,20 @@ Your task is to extract structured information from insurance policy documents.
    - Turkish documents often use DD.MM.YYYY or DD/MM/YYYY
    - Convert ALL dates to YYYY-MM-DD format in your output
 
-3. **Currency**:
-   - Turkish policies use TRY (Turkish Lira), symbol: ₺
-   - Look for: TL, TRY, Türk Lirası
+3. **Currency Detection**:
+   - Most Turkish policies use TRY (Turkish Lira), symbol: ₺
+   - Look for: TL, TRY, Türk Lirası, ₺
+   - BUT some policies may use foreign currencies: USD ($), EUR (€), GBP (£)
+   - **IMPORTANT**: Extract the currency code for EACH monetary value
+   - Verify consistency: 99% of policies use ONE currency throughout
+   - If you find mixed currencies (rare), flag each item with its currency
+   - For the main currency field, use the MOST COMMON currency in the document
+   - If premium or coverage is in a different currency than others, note it in special conditions
+   - Common currency indicators:
+     - TL, TRY, Türk Lirası, ₺ → "TRY"
+     - USD, $, Amerikan Doları, ABD Doları → "USD"
+     - EUR, €, Euro, Avro → "EUR"
+     - GBP, £, Sterlin, İngiliz Sterlini → "GBP"
 
 4. **Confidence Scores**: Rate your confidence (0-1) based on:
    - Clarity of the source text
@@ -355,6 +366,59 @@ Extract these commercial insurance specific fields:
   - Tekne-Makine = Hull and machinery
   - Nakliyat = Transportation/marine
 `,
+
+  nakliyat: `
+## NAKLİYAT SİGORTASI (Transportation/Cargo Insurance) Specific Fields:
+
+Extract these transportation insurance specific fields:
+- **Shipment Information**:
+  - cargoType (Emtia Türü): Type of goods being transported
+  - cargoDescription (Mal Tanımı): Detailed description of cargo
+  - cargoValue (Emtia Değeri): Declared value of cargo
+  - packagingType (Ambalaj Şekli): Packaging method
+  - totalWeight (Toplam Ağırlık): Total weight in kg
+  - numberOfPackages (Koli/Paket Sayısı): Number of packages
+
+- **Transport Details**:
+  - transportMode (Taşıma Şekli): 'karayolu' (road), 'denizyolu' (sea), 'havayolu' (air), 'demiryolu' (rail), 'kombine' (multimodal)
+  - originPoint (Yükleme Yeri): Loading/origin location
+  - destinationPoint (Boşaltma Yeri): Unloading/destination location
+  - transitCountries (Güzergah Ülkeleri): Countries in transit route
+  - voyageNumber (Sefer No): Voyage/trip number
+  - vesselName (Gemi/Araç Adı): Name of vessel/vehicle
+
+- **Insurance Scope**:
+  - coverageType (Teminat Türü): 'dar' (ICC-C), 'geniş' (ICC-A), 'tam' (All Risks)
+  - incoterms (Teslim Şekli): FOB, CIF, CFR, EXW, etc.
+  - policyBasis (Poliçe Esası): 'tek sefer' (single), 'abonman' (open policy), 'flotan' (floating)
+  - warehouseToWarehouse (Depodan Depoya): true/false
+
+- **Coverage Types**:
+  - Emtia Nakliyat = Cargo insurance
+  - Kıymet Nakliyat = Valuable goods transportation
+  - Taşıyıcı Sorumluluk = Carrier liability (CMR)
+  - Navlun = Freight insurance
+  - Müşterek Avarya = General average
+  - Savaş ve Grev = War and strike risks
+  - Depoda Bekleme = Storage risks
+  - Yükleme/Boşaltma = Loading/unloading risks
+  - Gecikmeden Doğan Zarar = Delay damage
+
+- **ICC Clause Types**:
+  - ICC (A) = All Risks (Tüm Riskler)
+  - ICC (B) = Limited Named Perils
+  - ICC (C) = Minimum Coverage (fire, sinking, collision)
+
+- **Common Turkish Terms**:
+  - Nakliyat Sigortası = Transportation/Cargo Insurance
+  - Emtia = Goods/Cargo
+  - Navlun = Freight
+  - Konşimento = Bill of Lading
+  - CMR = Road Transport Convention
+  - Taşıyıcı = Carrier
+  - Gönderen = Shipper/Consignor
+  - Alıcı = Consignee
+`,
 }
 
 /**
@@ -395,5 +459,6 @@ Look for these indicators:
 - LIFE: "Hayat", "Vefat", "Lehdar", beneficiary terms
 - DASK: "DASK", "Deprem", "Zorunlu Deprem Sigortası", earthquake terms
 - BUSINESS: "İşyeri", "Ticari", "İşletme", business/commercial terms
+- NAKLIYAT: "Nakliyat", "Emtia", "Kargo", "Taşımacılık", "CMR", "Konşimento", "Navlun", transportation/cargo terms
 
-Return ONLY the policy type as a single word: kasko, traffic, home, health, life, dask, or business`
+Return ONLY the policy type as a single word: kasko, traffic, home, health, life, dask, business, or nakliyat`

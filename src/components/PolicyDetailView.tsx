@@ -223,9 +223,9 @@ export function PolicyDetailView() {
               <CardContent>
                 <ul className="space-y-2">
                   {policy.exclusions.map((exclusion, i) => (
-                    <li key={i} className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg">
-                      <X className="text-amber-600" size={16} />
-                      <span className="text-gray-700">{exclusion}</span>
+                    <li key={i} className="flex items-center gap-3 p-3 bg-amber-50 rounded-lg min-h-[2.5rem]">
+                      <X className="text-amber-600 flex-shrink-0" size={16} />
+                      <span className="text-gray-700 text-sm leading-relaxed">{exclusion}</span>
                     </li>
                   ))}
                 </ul>

@@ -341,6 +341,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 800000, premiumVolume: 9000000000, avgPremium: 11250, marketShare: 0.064 },
       dask: { count: 2500000, premiumVolume: 2500000000, avgPremium: 1000, marketShare: 0.200 },
       business: { count: 450000, premiumVolume: 29500000000, avgPremium: 65556, marketShare: 0.036 },
+      nakliyat: { count: 380000, premiumVolume: 5700000000, avgPremium: 15000, marketShare: 0.030 },
     },
     claimsData: {
       totalClaims: 2800000,
@@ -371,6 +372,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 280000, premiumVolume: 2800000000, avgPremium: 10000, marketShare: 0.067 },
       dask: { count: 850000, premiumVolume: 750000000, avgPremium: 882, marketShare: 0.202 },
       business: { count: 180000, premiumVolume: 6350000000, avgPremium: 35278, marketShare: 0.043 },
+      nakliyat: { count: 145000, premiumVolume: 1740000000, avgPremium: 12000, marketShare: 0.035 },
     },
     claimsData: {
       totalClaims: 850000,
@@ -401,6 +403,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 240000, premiumVolume: 2300000000, avgPremium: 9583, marketShare: 0.063 },
       dask: { count: 720000, premiumVolume: 580000000, avgPremium: 806, marketShare: 0.189 },
       business: { count: 160000, premiumVolume: 5720000000, avgPremium: 35750, marketShare: 0.042 },
+      nakliyat: { count: 130000, premiumVolume: 1430000000, avgPremium: 11000, marketShare: 0.034 },
     },
     claimsData: {
       totalClaims: 780000,
@@ -431,6 +434,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 320000, premiumVolume: 3000000000, avgPremium: 9375, marketShare: 0.071 },
       dask: { count: 900000, premiumVolume: 650000000, avgPremium: 722, marketShare: 0.200 },
       business: { count: 210000, premiumVolume: 5550000000, avgPremium: 26429, marketShare: 0.047 },
+      nakliyat: { count: 155000, premiumVolume: 1705000000, avgPremium: 11000, marketShare: 0.034 },
     },
     claimsData: {
       totalClaims: 820000,
@@ -461,6 +465,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 140000, premiumVolume: 1100000000, avgPremium: 7857, marketShare: 0.064 },
       dask: { count: 420000, premiumVolume: 280000000, avgPremium: 667, marketShare: 0.191 },
       business: { count: 85000, premiumVolume: 1220000000, avgPremium: 14353, marketShare: 0.039 },
+      nakliyat: { count: 75000, premiumVolume: 750000000, avgPremium: 10000, marketShare: 0.034 },
     },
     claimsData: {
       totalClaims: 380000,
@@ -491,6 +496,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 70000, premiumVolume: 480000000, avgPremium: 6857, marketShare: 0.058 },
       dask: { count: 280000, premiumVolume: 320000000, avgPremium: 1143, marketShare: 0.233 },
       business: { count: 42000, premiumVolume: 650000000, avgPremium: 15476, marketShare: 0.035 },
+      nakliyat: { count: 36000, premiumVolume: 324000000, avgPremium: 9000, marketShare: 0.030 },
     },
     claimsData: {
       totalClaims: 180000,
@@ -521,6 +527,7 @@ export const REGIONAL_INSURANCE_STATS: Record<TurkishRegion, RegionalInsuranceSt
       life: { count: 95000, premiumVolume: 720000000, avgPremium: 7579, marketShare: 0.053 },
       dask: { count: 380000, premiumVolume: 380000000, avgPremium: 1000, marketShare: 0.211 },
       business: { count: 65000, premiumVolume: 1000000000, avgPremium: 15385, marketShare: 0.036 },
+      nakliyat: { count: 58000, premiumVolume: 522000000, avgPremium: 9000, marketShare: 0.032 },
     },
     claimsData: {
       totalClaims: 280000,

@@ -1,4 +1,4 @@
-export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business'
+export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business' | 'nakliyat'
 
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
 
@@ -125,4 +125,5 @@ export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; 
   life: { label: 'Life Insurance', labelTr: 'Hayat Sigortası', icon: '💗' },
   dask: { label: 'Earthquake Insurance', labelTr: 'DASK', icon: '🏗️' },
   business: { label: 'Business Insurance', labelTr: 'İşyeri Sigortası', icon: '🏢' },
+  nakliyat: { label: 'Transportation Insurance', labelTr: 'Nakliyat Sigortası', icon: '🚛' },
 }

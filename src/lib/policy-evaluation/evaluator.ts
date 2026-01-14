@@ -41,6 +41,7 @@ const POLICY_TYPE_TO_BRANCH: Record<PolicyType, string> = {
   life: 'life',
   dask: 'fire', // DASK falls under fire/natural disasters
   business: 'fire',
+  nakliyat: 'nakliyat', // Transportation/Cargo insurance
 }
 
 const POLICY_TYPE_TO_INSURANCE_TYPE: Record<PolicyType, string> = {
@@ -51,6 +52,7 @@ const POLICY_TYPE_TO_INSURANCE_TYPE: Record<PolicyType, string> = {
   life: 'life',
   dask: 'dask',
   business: 'business',
+  nakliyat: 'nakliyat',
 }
 
 // =============================================================================
@@ -294,6 +296,11 @@ function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: strin
       { en: 'Fire', tr: 'Yangın' },
       { en: 'Theft', tr: 'Hırsızlık' },
       { en: 'Business Interruption', tr: 'İş Durması' },
+    ],
+    nakliyat: [
+      { en: 'Cargo Damage', tr: 'Emtia Hasarı' },
+      { en: 'Loading/Unloading', tr: 'Yükleme/Boşaltma' },
+      { en: 'Theft', tr: 'Hırsızlık' },
     ],
   }
 

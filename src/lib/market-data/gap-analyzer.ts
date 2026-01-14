@@ -211,6 +211,13 @@ function analyzeExclusions(
       { pattern: /siber|cyber/i, risk: 'medium', rec: 'Siber güvenlik teminatı değerlendirin' },
       { pattern: /sorumluluk|liability/i, risk: 'high', rec: 'Sorumluluk teminatı eklenmeli' },
     ],
+    nakliyat: [
+      { pattern: /emtia|cargo/i, risk: 'high', rec: 'Emtia hasarı teminatı kritik öneme sahip' },
+      { pattern: /yükleme|boşaltma|loading|unloading/i, risk: 'high', rec: 'Yükleme/boşaltma teminatı eklenmeli' },
+      { pattern: /hırsızlık|theft/i, risk: 'high', rec: 'Hırsızlık teminatı kritik' },
+      { pattern: /doğal afet|natural disaster/i, risk: 'medium', rec: 'Doğal afet teminatı değerlendirin' },
+      { pattern: /depo|warehouse/i, risk: 'medium', rec: 'Depo riski teminatı düşünülebilir' },
+    ],
   }
 
   const typeExclusions = riskExclusions[policyType] || []

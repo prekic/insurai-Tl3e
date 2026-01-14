@@ -20,6 +20,7 @@ const MINIMUM_COVERAGES: Record<PolicyType, string[]> = {
   life: ['vefat', 'maluliyet', 'kritik hastalık'],
   dask: ['deprem'],
   business: ['yangın', 'hırsızlık', 'iş durması', 'sorumluluk'],
+  nakliyat: ['emtia hasarı', 'yükleme/boşaltma', 'hırsızlık', 'doğal afetler', 'depo riski'],
 }
 
 /**

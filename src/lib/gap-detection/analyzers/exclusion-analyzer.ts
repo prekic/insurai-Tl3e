@@ -60,6 +60,15 @@ const EXCLUSION_PATTERNS: Record<PolicyType, ExclusionPattern[]> = {
     { pattern: /grev|strike/i, risk: 'medium', nameTr: 'Grev/Lokavt', nameEn: 'Strike/Lockout' },
     { pattern: /terör|terror/i, risk: 'medium', nameTr: 'Terör', nameEn: 'Terrorism' },
   ],
+  nakliyat: [
+    { pattern: /emtia hasarı|cargo damage/i, risk: 'critical', nameTr: 'Emtia Hasarı', nameEn: 'Cargo Damage' },
+    { pattern: /yükleme|boşaltma|loading|unloading/i, risk: 'high', nameTr: 'Yükleme/Boşaltma Hasarı', nameEn: 'Loading/Unloading Damage' },
+    { pattern: /hırsızlık|theft/i, risk: 'critical', nameTr: 'Hırsızlık', nameEn: 'Theft' },
+    { pattern: /deprem|earthquake|doğal afet|natural disaster/i, risk: 'high', nameTr: 'Doğal Afetler', nameEn: 'Natural Disasters' },
+    { pattern: /depo|warehouse|storage/i, risk: 'medium', nameTr: 'Depo Riski', nameEn: 'Warehouse Risk' },
+    { pattern: /gecikme|delay/i, risk: 'medium', nameTr: 'Gecikme Hasarı', nameEn: 'Delay Damage' },
+    { pattern: /kontaminasyon|contamination/i, risk: 'high', nameTr: 'Kontaminasyon', nameEn: 'Contamination' },
+  ],
 }
 
 interface ExclusionPattern {

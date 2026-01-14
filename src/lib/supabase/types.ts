@@ -15,7 +15,7 @@
 // =============================================================================
 
 /** Policy types supported by the application */
-export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business'
+export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business' | 'nakliyat'
 
 /** Policy status values */
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
@@ -580,7 +580,7 @@ export function isChatMessageRole(value: unknown): value is ChatMessageRole {
 export function isPolicyType(value: unknown): value is PolicyType {
   return (
     typeof value === 'string' &&
-    ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business'].includes(value)
+    ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat'].includes(value)
   )
 }
 

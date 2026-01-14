@@ -57,6 +57,7 @@ const PREMIUM_RANGES: Record<PolicyType, PremiumRange> = {
   life: { min: 3500, max: 35000, typical: 9500 },
   dask: { min: 250, max: 3500, typical: 850 },
   business: { min: 5000, max: 150000, typical: 28000 },
+  nakliyat: { min: 1500, max: 75000, typical: 12000 },
 }
 
 // Minimum liability limits (SEDDK 2024)

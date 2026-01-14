@@ -495,7 +495,7 @@ export function PolicyDashboard() {
 
         {/* Policy List */}
         {filteredPolicies.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center" role="status">
+          <div className="bg-white rounded-2xl border border-gray-100 p-8 sm:p-12 text-center" role="status">
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
               <FileText className="text-gray-400" size={32} aria-hidden="true" />
             </div>
@@ -533,70 +533,71 @@ export function PolicyDashboard() {
             </div>
           </>
         ) : (
-          /* Table View */
+          /* Table View - Mobile responsive with hidden columns on small screens */
           <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full" role="table" aria-label={t.policy.policies}>
+              <table className="w-full min-w-[600px] sm:min-w-0" role="table" aria-label={t.policy.policies}>
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600">
                       <button
                         onClick={() => handleSort('provider')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
                         {t.policy.policy}
                         {getSortIcon('provider')}
                       </button>
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600 hidden md:table-cell">
                       <button
                         onClick={() => handleSort('type')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
                         {t.policy.type}
                         {getSortIcon('type')}
                       </button>
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600 hidden lg:table-cell">
                       {t.policy.insured}
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600">
                       <button
                         onClick={() => handleSort('coverage')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
-                        {t.policy.sumInsuredLimit}
+                        <span className="hidden sm:inline">{t.policy.sumInsuredLimit}</span>
+                        <span className="sm:hidden">{locale === 'tr' ? 'Bedel' : 'Value'}</span>
                         {getSortIcon('coverage')}
                       </button>
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600 hidden sm:table-cell">
                       <button
                         onClick={() => handleSort('premium')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
                         {t.policy.premium}
                         {getSortIcon('premium')}
                       </button>
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600 hidden md:table-cell">
                       <button
                         onClick={() => handleSort('expiryDate')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
                         {t.policy.expiryDate}
                         {getSortIcon('expiryDate')}
                       </button>
                     </th>
-                    <th scope="col" className="text-left px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-left px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600">
                       <button
                         onClick={() => handleSort('status')}
-                        className="flex items-center gap-1.5 hover:text-gray-900 transition-colors"
+                        className="flex items-center gap-1 sm:gap-1.5 hover:text-gray-900 transition-colors"
                       >
                         {t.policy.status}
                         {getSortIcon('status')}
                       </button>
                     </th>
-                    <th scope="col" className="text-right px-6 py-4 text-sm font-semibold text-gray-600">
+                    <th scope="col" className="text-right px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-gray-600">
                       <span className="sr-only">{t.common.actions}</span>
                     </th>
                   </tr>
@@ -614,39 +615,42 @@ export function PolicyDashboard() {
                     return (
                     <tr
                       key={policy.id}
-                      className={`transition-colors ${
+                      onClick={() => handleViewPolicy(policy.id)}
+                      className={`transition-colors cursor-pointer ${
                         isNew ? 'bg-green-50/50 hover:bg-green-50' :
                         isDuplicate ? 'bg-amber-50/50 hover:bg-amber-50' :
                         'hover:bg-gray-50'
                       }`}
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl" aria-hidden="true">{policy.logo}</span>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-gray-900">{shortName}</p>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <span className="text-xl sm:text-2xl" aria-hidden="true">{policy.logo}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                              <p className="font-medium text-gray-900 text-sm sm:text-base truncate">{shortName}</p>
                               {isNew && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full">
-                                  <Sparkles className="w-2.5 h-2.5" />
+                                <span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold bg-green-500 text-white rounded-full whitespace-nowrap">
+                                  <Sparkles className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                                   {locale === 'tr' ? 'Yeni' : 'New'}
                                 </span>
                               )}
                               {isDuplicate && (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded-full">
-                                  <Copy className="w-2.5 h-2.5" />
-                                  {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+                                <span className="inline-flex items-center gap-0.5 px-1 sm:px-1.5 py-0.5 text-[9px] sm:text-[10px] font-semibold bg-amber-500 text-white rounded-full whitespace-nowrap">
+                                  <Copy className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
+                                  {locale === 'tr' ? 'Kopya' : 'Dup'}
                                 </span>
                               )}
                             </div>
-                            <p className="text-sm text-gray-500">{policy.policyNumber}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 truncate">{policy.policyNumber}</p>
+                            {/* Show type on mobile below policy name */}
+                            <p className="text-xs text-gray-400 md:hidden">{policy.type}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-900">{policy.type}</span>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
+                        <span className="text-gray-900 text-sm">{policy.type}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
                         {subjectInfo ? (
                           <div>
                             <p className="text-xs text-gray-500">{subjectInfo.label}</p>
@@ -656,38 +660,40 @@ export function PolicyDashboard() {
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <div>
-                          <p className="font-medium text-gray-900">{formatCurrency(displayValue)}</p>
-                          <p className="text-xs text-gray-500">
-                            {coverageType === 'limit' ? (locale === 'tr' ? 'Limit' : 'Limit') : (locale === 'tr' ? 'Bedel' : 'Sum Insured')}
+                          <p className="font-medium text-gray-900 text-sm sm:text-base">{formatCurrency(displayValue)}</p>
+                          <p className="text-[10px] sm:text-xs text-gray-500">
+                            {coverageType === 'limit' ? (locale === 'tr' ? 'Limit' : 'Limit') : (locale === 'tr' ? 'Bedel' : 'Sum')}
                           </p>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-900">{formatCurrency(policy.premium)}/yr</span>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
+                        <span className="text-gray-900 text-sm">{formatCurrency(policy.premium)}<span className="text-gray-500">/yr</span></span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-gray-900">{formatDate(policy.expiryDate)}</span>
+                      <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
+                        <span className="text-gray-900 text-sm">{formatDate(policy.expiryDate)}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
                         {getStatusBadge(policy.status)}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-3 sm:px-6 py-3 sm:py-4">
                         <div className="flex items-center justify-end gap-1">
                           <button
-                            onClick={() => handleViewPolicy(policy.id)}
-                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
+                            onClick={(e) => { e.stopPropagation(); handleViewPolicy(policy.id) }}
+                            className="p-1.5 sm:p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.view} ${shortName} ${policy.type}`}
                           >
-                            <Eye size={18} aria-hidden="true" />
+                            <Eye size={16} className="sm:hidden" aria-hidden="true" />
+                            <Eye size={18} className="hidden sm:block" aria-hidden="true" />
                           </button>
                           <button
-                            onClick={() => deletePolicy(policy.id)}
-                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring"
+                            onClick={(e) => { e.stopPropagation(); deletePolicy(policy.id) }}
+                            className="p-1.5 sm:p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus-ring"
                             aria-label={`${t.common.delete} ${shortName} ${policy.type}`}
                           >
-                            <Trash2 size={18} aria-hidden="true" />
+                            <Trash2 size={16} className="sm:hidden" aria-hidden="true" />
+                            <Trash2 size={18} className="hidden sm:block" aria-hidden="true" />
                           </button>
                         </div>
                       </td>
