@@ -321,7 +321,7 @@ export async function extractPolicyFromDocument(
     }
 
     // Convert extracted data to AnalyzedPolicy format
-    const policy = convertToAnalyzedPolicy(extractedData, file)
+    const policy = convertToAnalyzedPolicy(extractedData, file, documentText)
 
     return {
       success: true,
@@ -367,7 +367,7 @@ async function extractWithProvider(provider: AIProvider, documentText: string): 
 /**
  * Convert extracted data to AnalyzedPolicy format
  */
-function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): AnalyzedPolicy {
+function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, documentText?: string): AnalyzedPolicy {
   const now = new Date()
 
   // Determine status based on dates
@@ -437,6 +437,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File): Analyze
     aiConfidence: data.confidence.overall,
     aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
+    extractedText: documentText,
   }
 
   // Calculate ML-based risk score

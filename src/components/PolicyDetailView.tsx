@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck, FileText, ChevronDown, ChevronUp, Copy, CheckCircle } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -555,6 +555,126 @@ function ExclusionsSection({
   )
 }
 
+/**
+ * Raw Extracted Text Section
+ * Displays the raw text extracted from the PDF document
+ */
+function RawExtractedTextSection({
+  extractedText,
+  locale,
+}: {
+  extractedText: string
+  locale: string
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(extractedText)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement('textarea')
+      textarea.value = extractedText
+      document.body.appendChild(textarea)
+      textarea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textarea)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  // Calculate text stats
+  const lineCount = extractedText.split('\n').length
+  const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length
+  const charCount = extractedText.length
+
+  // Show preview (first 500 characters)
+  const previewText = extractedText.slice(0, 500)
+  const hasMore = extractedText.length > 500
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="text-gray-600" size={20} />
+            {locale === 'tr' ? 'Poliçe Metni (Ham Veri)' : 'Raw Extracted Text'}
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCopy}
+              className="gap-2"
+            >
+              {copied ? (
+                <>
+                  <CheckCircle className="text-green-600" size={14} />
+                  {locale === 'tr' ? 'Kopyalandı' : 'Copied'}
+                </>
+              ) : (
+                <>
+                  <Copy size={14} />
+                  {locale === 'tr' ? 'Kopyala' : 'Copy'}
+                </>
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="gap-1"
+            >
+              {isExpanded ? (
+                <>
+                  <ChevronUp size={16} />
+                  {locale === 'tr' ? 'Küçült' : 'Collapse'}
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={16} />
+                  {locale === 'tr' ? 'Genişlet' : 'Expand'}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+        <p className="text-sm text-gray-500 mt-1">
+          {locale === 'tr'
+            ? `PDF'den çıkarılan ham metin • ${lineCount} satır • ${wordCount.toLocaleString()} kelime • ${charCount.toLocaleString()} karakter`
+            : `Raw text extracted from PDF • ${lineCount} lines • ${wordCount.toLocaleString()} words • ${charCount.toLocaleString()} chars`}
+        </p>
+      </CardHeader>
+      <CardContent>
+        <div className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}>
+          <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+            {isExpanded ? extractedText : previewText}
+            {!isExpanded && hasMore && '...'}
+          </pre>
+          {!isExpanded && hasMore && (
+            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
+          )}
+        </div>
+        {!isExpanded && hasMore && (
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
+          >
+            <ChevronDown size={14} />
+            {locale === 'tr'
+              ? `Tamamını göster (${(charCount - 500).toLocaleString()} karakter daha)`
+              : `Show full text (${(charCount - 500).toLocaleString()} more chars)`}
+          </button>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 import { usePolicies } from '@/lib/policy-context'
 import { useI18n } from '@/lib/i18n'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
@@ -791,6 +911,14 @@ export function PolicyDetailView() {
               isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
               locale={locale}
             />
+
+            {/* Raw Extracted Text Section */}
+            {policy.extractedText && (
+              <RawExtractedTextSection
+                extractedText={policy.extractedText}
+                locale={locale}
+              />
+            )}
           </div>
 
           {/* Sidebar */}

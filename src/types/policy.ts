@@ -102,6 +102,8 @@ export interface Policy {
   documentHash?: string
   /** Vehicle information for kasko policies */
   vehicleInfo?: VehicleInfo
+  /** Raw extracted text from the PDF document */
+  extractedText?: string
 }
 
 /**
