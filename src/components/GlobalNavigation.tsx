@@ -1,9 +1,10 @@
 import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn, Scale } from 'lucide-react'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
 export function GlobalNavigation() {
   const location = useLocation()
@@ -15,6 +16,50 @@ export function GlobalNavigation() {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle file upload directly from navigation
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFiles = Array.from(e.target.files || [])
+    if (selectedFiles.length === 0) return
+
+    // Validate files
+    const { valid, errors } = validateFiles(selectedFiles)
+
+    // Show error toasts for invalid files
+    errors.forEach((error) => {
+      const errorInfo = getErrorMessage(error.code)
+      toast.error(errorInfo.title, {
+        description: error.details || errorInfo.description,
+        duration: 5000,
+      })
+    })
+
+    if (valid.length > 0) {
+      // Navigate to upload page with the files
+      // Store files in sessionStorage temporarily
+      const fileData = valid.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type,
+      }))
+      sessionStorage.setItem('pendingUploadFiles', JSON.stringify(fileData))
+
+      // Create a global event to pass the actual files
+      const event = new CustomEvent('filesSelected', { detail: valid })
+      window.dispatchEvent(event)
+
+      // Navigate to upload page (it will pick up the files)
+      navigate('/upload', { state: { filesReady: true } })
+    }
+
+    // Reset input
+    e.target.value = ''
+  }, [navigate])
+
+  const triggerFileUpload = useCallback(() => {
+    fileInputRef.current?.click()
+  }, [])
 
   const currentPage = location.pathname
 
@@ -168,13 +213,23 @@ export function GlobalNavigation() {
                 />
               )}
             </button>
-            <Link
-              to="/upload?autoOpen=true"
+            {/* Hidden file input for immediate upload */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+              multiple
+              onChange={handleFileSelect}
+              className="hidden"
+              aria-hidden="true"
+            />
+            <button
+              onClick={triggerFileUpload}
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2 focus-ring"
             >
               <Upload size={18} aria-hidden="true" />
               <span>Upload</span>
-            </Link>
+            </button>
 
             {/* Profile Menu */}
             <div className="relative">

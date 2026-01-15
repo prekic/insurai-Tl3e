@@ -432,6 +432,7 @@ export function PolicyChat() {
   }
 
   // Build policy context from uploaded policies for the AI
+  // Uses processed text (with OCR corrections) when available for better understanding
   const policyContext = useMemo(() => {
     if (policies.length === 0) return undefined
 
@@ -448,9 +449,20 @@ export function PolicyChat() {
         if (p.coverages && p.coverages.length > 0) {
           parts.push(`Coverages: ${p.coverages.map((c) => c.name).join(', ')}`)
         }
+        // Include processed text (or raw if not available) for detailed policy content
+        // This allows the AI to answer specific questions about the policy document
+        const documentText = p.processedText || p.extractedText
+        if (documentText) {
+          // Limit text length to avoid context overflow, keeping the most important parts
+          const maxTextLength = 8000
+          const truncatedText = documentText.length > maxTextLength
+            ? documentText.slice(0, maxTextLength) + '... [truncated]'
+            : documentText
+          parts.push(`\nDocument Content:\n${truncatedText}`)
+        }
         return parts.join('\n')
       })
-      .join('\n\n')
+      .join('\n\n---\n\n')
   }, [policies])
 
   // Get conversation history for API (excluding error messages and the initial greeting)

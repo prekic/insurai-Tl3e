@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck, FileText, ChevronDown, ChevronUp, Copy, CheckCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck, FileText, ChevronDown, ChevronUp, Copy, CheckCircle, Code } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -556,28 +557,36 @@ function ExclusionsSection({
 }
 
 /**
- * Raw Extracted Text Section
- * Displays the raw text extracted from the PDF document
+ * Document Text Section
+ * Displays the AI-processed or raw text extracted from the PDF document
+ * Shows processed text by default (with OCR corrections) if available
  */
 function RawExtractedTextSection({
   extractedText,
+  processedText,
   locale,
 }: {
   extractedText: string
+  processedText?: string
   locale: string
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [showRaw, setShowRaw] = useState(false)
+
+  // Use processed text by default if available, otherwise fall back to raw
+  const hasProcessedText = processedText && processedText !== extractedText
+  const displayText = showRaw || !processedText ? extractedText : processedText
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(extractedText)
+      await navigator.clipboard.writeText(displayText)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     } catch {
       // Fallback for older browsers
       const textarea = document.createElement('textarea')
-      textarea.value = extractedText
+      textarea.value = displayText
       document.body.appendChild(textarea)
       textarea.select()
       document.execCommand('copy')
@@ -587,14 +596,14 @@ function RawExtractedTextSection({
     }
   }
 
-  // Calculate text stats
-  const lineCount = extractedText.split('\n').length
-  const wordCount = extractedText.split(/\s+/).filter(w => w.length > 0).length
-  const charCount = extractedText.length
+  // Calculate text stats for current display text
+  const lineCount = displayText.split('\n').length
+  const wordCount = displayText.split(/\s+/).filter(w => w.length > 0).length
+  const charCount = displayText.length
 
   // Show preview (first 500 characters)
-  const previewText = extractedText.slice(0, 500)
-  const hasMore = extractedText.length > 500
+  const previewText = displayText.slice(0, 500)
+  const hasMore = displayText.length > 500
 
   return (
     <Card>
@@ -602,9 +611,36 @@ function RawExtractedTextSection({
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
             <FileText className="text-gray-600" size={20} />
-            {locale === 'tr' ? 'Poliçe Metni (Ham Veri)' : 'Raw Extracted Text'}
+            {locale === 'tr'
+              ? (showRaw ? 'Ham Poliçe Metni' : 'Poliçe Metni')
+              : (showRaw ? 'Raw Extracted Text' : 'Document Text')}
+            {!showRaw && hasProcessedText && (
+              <Badge variant="success" className="text-xs">
+                {locale === 'tr' ? 'AI İşlenmiş' : 'AI Processed'}
+              </Badge>
+            )}
           </CardTitle>
           <div className="flex items-center gap-2">
+            {hasProcessedText && (
+              <Button
+                variant={showRaw ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setShowRaw(!showRaw)}
+                className="gap-1 text-xs"
+              >
+                {showRaw ? (
+                  <>
+                    <Sparkles size={12} />
+                    {locale === 'tr' ? 'İşlenmiş' : 'Processed'}
+                  </>
+                ) : (
+                  <>
+                    <Code size={12} />
+                    {locale === 'tr' ? 'Ham' : 'Raw'}
+                  </>
+                )}
+              </Button>
+            )}
             <Button
               variant="outline"
               size="sm"
@@ -645,14 +681,14 @@ function RawExtractedTextSection({
         </div>
         <p className="text-sm text-gray-500 mt-1">
           {locale === 'tr'
-            ? `PDF'den çıkarılan ham metin • ${lineCount} satır • ${wordCount.toLocaleString()} kelime • ${charCount.toLocaleString()} karakter`
-            : `Raw text extracted from PDF • ${lineCount} lines • ${wordCount.toLocaleString()} words • ${charCount.toLocaleString()} chars`}
+            ? `${showRaw ? 'Ham metin' : 'AI ile işlenmiş metin'} • ${lineCount} satır • ${wordCount.toLocaleString()} kelime • ${charCount.toLocaleString()} karakter`
+            : `${showRaw ? 'Raw text from PDF' : 'AI-corrected text'} • ${lineCount} lines • ${wordCount.toLocaleString()} words • ${charCount.toLocaleString()} chars`}
         </p>
       </CardHeader>
       <CardContent>
         <div className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}>
           <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
-            {isExpanded ? extractedText : previewText}
+            {isExpanded ? displayText : previewText}
             {!isExpanded && hasMore && '...'}
           </pre>
           {!isExpanded && hasMore && (
@@ -764,13 +800,68 @@ export function PolicyDetailView() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  const shareUrl = `${window.location.origin}/policy/${policy.id}`
+                  if (navigator.share) {
+                    await navigator.share({
+                      title: `${policy.provider} - ${policy.typeTr}`,
+                      text: `Policy ${policy.policyNumber} - ${policy.insuredPerson}`,
+                      url: shareUrl,
+                    })
+                  } else {
+                    await navigator.clipboard.writeText(shareUrl)
+                    toast.success(locale === 'tr' ? 'Bağlantı kopyalandı' : 'Link copied to clipboard')
+                  }
+                } catch (err) {
+                  if ((err as Error).name !== 'AbortError') {
+                    toast.error(locale === 'tr' ? 'Paylaşım başarısız' : 'Share failed')
+                  }
+                }
+              }}
+            >
               <Share2 size={18} />
-              Share
+              {locale === 'tr' ? 'Paylaş' : 'Share'}
             </Button>
-            <Button variant="outline" className="gap-2">
+            <Button
+              variant="outline"
+              className="gap-2"
+              onClick={() => {
+                // Generate policy summary for download
+                const summary = [
+                  `Policy: ${policy.policyNumber}`,
+                  `Provider: ${policy.provider}`,
+                  `Type: ${policy.typeTr}`,
+                  `Insured: ${policy.insuredPerson}`,
+                  `Coverage: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
+                  `Premium: ${formatCurrency(policy.premium)}`,
+                  `Deductible: ${formatCurrency(policy.deductible)}`,
+                  `Period: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
+                  '',
+                  '=== COVERAGES ===',
+                  ...policy.coverages.map(c => `• ${c.nameTr || c.name}: ${c.isUnlimited ? 'Sınırsız' : formatCurrency(c.limit)}`),
+                  '',
+                  '=== EXCLUSIONS ===',
+                  ...policy.exclusions.map(e => `• ${e}`),
+                ].join('\n')
+
+                const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
+                const url = URL.createObjectURL(blob)
+                const link = document.createElement('a')
+                link.href = url
+                link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
+                document.body.appendChild(link)
+                link.click()
+                document.body.removeChild(link)
+                URL.revokeObjectURL(url)
+                toast.success(locale === 'tr' ? 'Özet indirildi' : 'Summary downloaded')
+              }}
+            >
               <Download size={18} />
-              Download
+              {locale === 'tr' ? 'İndir' : 'Download'}
             </Button>
           </div>
         </div>
@@ -797,10 +888,27 @@ export function PolicyDetailView() {
                       <p className="text-sm text-gray-500">Insured</p>
                       <p className="font-semibold text-gray-900">{policy.insuredPerson || 'N/A'}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-gray-500">Location</p>
-                      <p className="font-semibold text-gray-900">{policy.location || 'N/A'}</p>
-                    </div>
+                    {/* Show vehicle info for auto policies, location for others */}
+                    {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo ? (
+                      <div>
+                        <p className="text-sm text-gray-500">{locale === 'tr' ? 'Araç' : 'Vehicle'}</p>
+                        <p className="font-semibold text-gray-900">
+                          {[
+                            policy.vehicleInfo.plate,
+                            policy.vehicleInfo.make,
+                            policy.vehicleInfo.model,
+                            policy.vehicleInfo.year,
+                          ]
+                            .filter(Boolean)
+                            .join(' • ') || 'N/A'}
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <p className="text-sm text-gray-500">Location</p>
+                        <p className="font-semibold text-gray-900">{policy.location || 'N/A'}</p>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-4">
                     <div>
@@ -912,10 +1020,11 @@ export function PolicyDetailView() {
               locale={locale}
             />
 
-            {/* Raw Extracted Text Section */}
-            {policy.extractedText && (
+            {/* Document Text Section */}
+            {(policy.extractedText || policy.processedText) && (
               <RawExtractedTextSection
-                extractedText={policy.extractedText}
+                extractedText={policy.extractedText || ''}
+                processedText={policy.processedText}
                 locale={locale}
               />
             )}
