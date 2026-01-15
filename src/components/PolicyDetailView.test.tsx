@@ -184,8 +184,8 @@ describe('PolicyDetailView', () => {
     it('should display policy type', () => {
       renderPolicyDetailView()
 
-      // Labels are locale-dependent: "Poliçe Türü" (TR) or "Type" (EN)
-      expect(screen.getByText(/^Type$|Poliçe Türü/)).toBeInTheDocument()
+      // Now using hardcoded Turkish labels: "Tür"
+      expect(screen.getByText('Tür')).toBeInTheDocument()
       expect(screen.getByText('Konut Sigortası')).toBeInTheDocument()
     })
 
@@ -341,16 +341,16 @@ describe('PolicyDetailView', () => {
       mockGetPolicyById.mockReturnValue({ ...mockPolicy, status: 'expiring' })
       renderPolicyDetailView()
 
-      // Turkish locale: "Bitiyor" or English "Expiring Soon"
-      expect(screen.getByText(/Expiring Soon|Bitiyor/)).toBeInTheDocument()
+      // Now using hardcoded Turkish: "Bitiyor"
+      expect(screen.getByText('Bitiyor')).toBeInTheDocument()
     })
 
     it('should display start and expiry dates', () => {
       renderPolicyDetailView()
 
-      // Mobile-first uses Turkish labels: "Başlangıç" / "Bitiş" or English
-      expect(screen.getByText(/Start Date|Başlangıç/)).toBeInTheDocument()
-      expect(screen.getByText(/Expiry Date|Bitiş/)).toBeInTheDocument()
+      // Now using hardcoded Turkish: "Başlangıç:" and "Bitiş:"
+      expect(screen.getByText('Başlangıç:')).toBeInTheDocument()
+      expect(screen.getByText('Bitiş:')).toBeInTheDocument()
     })
   })
 

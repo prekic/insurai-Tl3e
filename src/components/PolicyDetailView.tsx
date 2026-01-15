@@ -755,11 +755,11 @@ export function PolicyDetailView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden">
       {/* Mobile-first header - ultra compact */}
-      <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
-        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3">
-          <div className="flex items-center gap-2">
+      <div className="sticky top-0 z-10 bg-white border-b shadow-sm w-full">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 w-full overflow-hidden">
+          <div className="flex items-center gap-2 w-full">
             {/* Back button - minimal padding */}
             <button
               onClick={() => navigate(-1)}
@@ -854,80 +854,70 @@ export function PolicyDetailView() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
-        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-3 sm:py-6 w-full overflow-hidden">
+        <div className="grid lg:grid-cols-3 gap-3 sm:gap-6 w-full">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Policy Overview - Ultra compact mobile-first */}
-            <Card className="overflow-hidden">
+            {/* Policy Overview - Ultra compact mobile-first - ALWAYS Turkish */}
+            <Card className="overflow-hidden w-full">
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6 bg-gradient-to-r from-blue-50 to-blue-100/50">
-                <CardTitle className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-sm sm:text-base font-semibold text-gray-800">
-                    <Shield className="text-blue-600" size={16} />
-                    {locale === 'tr' ? 'Poliçe Özeti' : 'Policy Overview'}
+                <CardTitle className="flex items-center justify-between gap-2 overflow-hidden">
+                  <span className="flex items-center gap-2 text-sm sm:text-base font-semibold text-gray-800 truncate">
+                    <Shield className="text-blue-600 flex-shrink-0" size={16} />
+                    <span className="truncate">Poliçe Özeti</span>
                   </span>
-                  <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="text-xs">
-                    {policy.status === 'active'
-                      ? (locale === 'tr' ? 'Aktif' : 'Active')
-                      : (locale === 'tr' ? 'Bitiyor' : 'Expiring')}
+                  <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="text-xs flex-shrink-0">
+                    {policy.status === 'active' ? 'Aktif' : 'Bitiyor'}
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-6">
-                {/* Key info in compact 2-column grid */}
-                <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm">
-                  {/* Coverage - highlighted */}
-                  <div className="col-span-2 p-2.5 sm:p-3 bg-blue-50 rounded-lg border border-blue-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-blue-600 font-medium">
-                        {locale === 'tr' ? 'Teminat' : 'Coverage'}
-                      </span>
-                      <span className="text-base sm:text-lg font-bold text-blue-700">
-                        {policy.type === 'kasko'
-                          ? (locale === 'tr' ? 'Rayiç Bedel' : 'Market Value')
-                          : formatCurrency(policy.coverage)}
-                      </span>
-                    </div>
+                {/* Key info in compact 2-column grid - FORCE Turkish labels for Turkish insurance app */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm w-full overflow-hidden">
+                  {/* Coverage - stacked vertically to prevent overflow */}
+                  <div className="col-span-2 p-2.5 sm:p-3 bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
+                    <p className="text-xs text-blue-600 font-medium mb-1">Teminat</p>
+                    <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
+                      {policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}
+                    </p>
                     {policy.type === 'kasko' && (
-                      <p className="text-[10px] text-blue-500 mt-0.5 text-right">
-                        {locale === 'tr' ? 'Hasar anındaki değer' : 'At time of loss'}
-                      </p>
+                      <p className="text-[10px] text-blue-500 mt-0.5">Hasar anındaki piyasa değeri</p>
                     )}
                   </div>
 
                   {/* Premium & Deductible row */}
-                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Prim' : 'Premium'}</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {policy.premium > 0 ? formatCurrency(policy.premium) : (locale === 'tr' ? 'Belirtilmemiş' : 'N/A')}
+                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Prim</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {policy.premium > 0 ? formatCurrency(policy.premium) : 'Belirtilmemiş'}
                     </p>
                   </div>
-                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Muafiyet' : 'Deductible'}</p>
-                    <p className="text-sm font-semibold text-gray-900">
-                      {policy.deductible > 0 ? formatCurrency(policy.deductible) : (locale === 'tr' ? 'Yok' : 'None')}
+                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Muafiyet</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {policy.deductible > 0 ? formatCurrency(policy.deductible) : 'Yok'}
                     </p>
                   </div>
 
                   {/* Insured - full width for long names */}
-                  <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Sigortalı' : 'Insured'}</p>
+                  <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Sigortalı</p>
                     <p className="text-sm font-semibold text-gray-900 truncate" title={policy.insuredPerson}>
                       {policy.insuredPerson || '-'}
                     </p>
                   </div>
 
                   {/* Type & Vehicle/Location row - only show relevant info */}
-                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Tür' : 'Type'}</p>
-                    <p className="text-sm font-semibold text-gray-900">{policy.typeTr}</p>
+                  <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Tür</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{policy.typeTr}</p>
                   </div>
 
                   {/* Vehicle for Kasko/Traffic, Location for others - only if available */}
                   {(policy.type === 'kasko' || policy.type === 'traffic') ? (
                     policy.vehicleInfo && (
-                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Araç' : 'Vehicle'}</p>
+                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Araç</p>
                         <p className="text-sm font-semibold text-gray-900 truncate">
                           {policy.vehicleInfo.plate || `${policy.vehicleInfo.make || ''} ${policy.vehicleInfo.model || ''}`.trim() || '-'}
                         </p>
@@ -935,8 +925,8 @@ export function PolicyDetailView() {
                     )
                   ) : (
                     policy.location && (
-                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg">
-                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">{locale === 'tr' ? 'Konum' : 'Location'}</p>
+                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Konum</p>
                         <p className="text-sm font-semibold text-gray-900 truncate">{policy.location}</p>
                       </div>
                     )
@@ -944,13 +934,13 @@ export function PolicyDetailView() {
                 </div>
 
                 {/* Dates row - compact */}
-                <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t text-xs text-gray-500">
-                  <span>
-                    <span className="text-gray-400">{locale === 'tr' ? 'Başlangıç' : 'Start'}:</span>{' '}
+                <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t text-xs text-gray-500 overflow-hidden">
+                  <span className="truncate">
+                    <span className="text-gray-400">Başlangıç:</span>{' '}
                     <span className="font-medium text-gray-700">{formatDate(policy.startDate)}</span>
                   </span>
-                  <span>
-                    <span className="text-gray-400">{locale === 'tr' ? 'Bitiş' : 'End'}:</span>{' '}
+                  <span className="truncate text-right">
+                    <span className="text-gray-400">Bitiş:</span>{' '}
                     <span className="font-medium text-gray-700">{formatDate(policy.expiryDate)}</span>
                   </span>
                 </div>
