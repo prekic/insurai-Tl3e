@@ -257,7 +257,8 @@ describe('PolicyDetailView', () => {
     it('should render Coverage Details section', () => {
       renderPolicyDetailView()
 
-      expect(screen.getByText('Coverage Details')).toBeInTheDocument()
+      // Now using hardcoded Turkish: "Teminat Detayları"
+      expect(screen.getByText('Teminat Detayları')).toBeInTheDocument()
     })
 
     it('should display included coverages', () => {
@@ -455,7 +456,8 @@ describe('PolicyDetailView Edge Cases', () => {
     mockGetPolicyById.mockReturnValue({ ...mockPolicy, coverages: [] })
     renderPolicyDetailView()
 
-    expect(screen.getByText('Coverage Details')).toBeInTheDocument()
+    // Now using hardcoded Turkish: "Teminat Detayları"
+    expect(screen.getByText('Teminat Detayları')).toBeInTheDocument()
   })
 
   it('should handle policy with no exclusions', () => {
