@@ -81,7 +81,7 @@ function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: num
     return match
   })
 
-  // Pattern 3: Known Turkish words that often appear spaced
+  // Pattern 3: Known Turkish words that often appear spaced (UPPERCASE)
   const knownSpacedWords: Array<[RegExp, string]> = [
     [/B\s*İ\s*R\s*L\s*E\s*Ş\s*İ\s*K/gi, 'BİRLEŞİK'],
     [/S\s*İ\s*G\s*O\s*R\s*T\s*A/gi, 'SİGORTA'],
@@ -102,6 +102,78 @@ function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: num
     if (pattern.test(result)) {
       fixCount++
       result = result.replace(pattern, replacement)
+    }
+  }
+
+  // Pattern 4: Common Turkish words with lowercase spacing (from OCR)
+  // These handle cases like "poli ç e", "de ğ erlendirmesi", "sigorta l ı"
+  const lowercaseSpacedWords: Array<[RegExp, string]> = [
+    // Insurance terms (lowercase variations)
+    [/poli\s*ç\s*e/gi, 'poliçe'],
+    [/de\s*ğ\s*erlendirme/gi, 'değerlendirme'],
+    [/de\s*ğ\s*er/gi, 'değer'],
+    [/sigorta\s*l\s*ı/gi, 'sigortalı'],
+    [/sigorta\s*c\s*ı/gi, 'sigortacı'],
+    [/teminat\s*l\s*ar/gi, 'teminatlar'],
+    [/muafiyet\s*i/gi, 'muafiyeti'],
+    [/öde\s*me/gi, 'ödeme'],
+    [/ücret\s*i/gi, 'ücreti'],
+    [/güvence\s*si/gi, 'güvencesi'],
+    [/konut\s*u/gi, 'konutu'],
+    [/araç\s*ı/gi, 'aracı'],
+    [/hasar\s*ı/gi, 'hasarı'],
+    [/prim\s*i/gi, 'primi'],
+    [/tarih\s*i/gi, 'tarihi'],
+    [/bedel\s*i/gi, 'bedeli'],
+    [/limit\s*i/gi, 'limiti'],
+    [/kaza\s*s\s*ı/gi, 'kazası'],
+    [/olay\s+ba\s*ş/gi, 'olay başı'],
+    [/olay\s+ba\s*ş\s*ı/gi, 'olay başı'],
+    // Common words with Turkish special chars
+    [/şirket\s*i/gi, 'şirketi'],
+    [/ş\s*irket/gi, 'şirket'],
+    [/ö\s*deme/gi, 'ödeme'],
+    [/ü\s*cret/gi, 'ücret'],
+    [/ç\s*arpma/gi, 'çarpma'],
+    [/ç\s*alınma/gi, 'çalınma'],
+    [/h\s*ırsız/gi, 'hırsız'],
+    [/y\s*angın/gi, 'yangın'],
+    [/d\s*eprem/gi, 'deprem'],
+    [/s\s*el\b/gi, 'sel'],
+    [/d\s*olu/gi, 'dolu'],
+    [/f\s*ırtına/gi, 'fırtına'],
+  ]
+
+  for (const [pattern, replacement] of lowercaseSpacedWords) {
+    const beforeLength = result.length
+    result = result.replace(pattern, replacement)
+    if (result.length !== beforeLength) {
+      fixCount++
+    }
+  }
+
+  // Pattern 5: Fix single-character spacing in common suffixes
+  // Handles: "sigorta l ı" -> "sigortalı", "değer l endirme" -> "değerlendirme"
+  const suffixPatterns: Array<[RegExp, string]> = [
+    [/(\w{3,})\s+l\s*ı\b/gi, '$1lı'],
+    [/(\w{3,})\s+l\s*i\b/gi, '$1li'],
+    [/(\w{3,})\s+l\s*u\b/gi, '$1lu'],
+    [/(\w{3,})\s+l\s*ü\b/gi, '$1lü'],
+    [/(\w{3,})\s+s\s*ı\b/gi, '$1sı'],
+    [/(\w{3,})\s+s\s*i\b/gi, '$1si'],
+    [/(\w{3,})\s+s\s*u\b/gi, '$1su'],
+    [/(\w{3,})\s+s\s*ü\b/gi, '$1sü'],
+    [/(\w{3,})\s+n\s*ı\b/gi, '$1nı'],
+    [/(\w{3,})\s+n\s*i\b/gi, '$1ni'],
+    [/(\w{3,})\s+l\s*ar\b/gi, '$1lar'],
+    [/(\w{3,})\s+l\s*er\b/gi, '$1ler'],
+  ]
+
+  for (const [pattern, replacement] of suffixPatterns) {
+    const beforeLength = result.length
+    result = result.replace(pattern, replacement)
+    if (result.length !== beforeLength) {
+      fixCount++
     }
   }
 
@@ -309,6 +381,19 @@ const TURKISH_OCR_CORRECTIONS: Array<[RegExp, string]> = [
   [/\bODEME\b/g, 'ÖDEME'],
   [/\bUCRET\b/g, 'ÜCRET'],
   [/\bGUVENCE\b/g, 'GÜVENCE'],
+
+  // Common insurance term OCR errors
+  [/\bOlay\s*Baş(?!\s*ı)\b/gi, 'Olay Başı'],  // Olay Baş → Olay Başı (per incident)
+  [/\bOlay\s*Bay\b/gi, 'Olay Başı'],           // Olay Bay → Olay Başı (common OCR error)
+  [/\bHırsız\s*Eşya\b/gi, 'Hırsız Eşyası'],   // Hırsız Eşya → Hırsız Eşyası
+  [/\bKoltuk\s*Ferdi\b/gi, 'Koltuk Ferdi'],   // Keep as is but normalize spacing
+  [/\bArtan\s*Mali\b/gi, 'Artan Mali'],       // Keep as is but normalize spacing
+  [/\bİkame\s*Araç\b/gi, 'İkame Araç'],       // Keep as is but normalize spacing
+  [/\bHukuksal\s*Koruma\b/gi, 'Hukuksal Koruma'], // Normalize spacing
+  [/\bRayiç\s*Değer\b/gi, 'Rayiç Değer'],     // Normalize spacing
+  [/\bSakatlık\s*Sakatlık\b/gi, 'Sürekli Sakatlık'], // OCR duplicate error
+  [/\bSakatılık\b/gi, 'Sakatlık'],             // Common OCR error
+  [/\bŞinssi\b/gi, 'Şahıs'],                   // OCR error: Şinssi → Şahıs
 
   // Common OCR number/letter confusion
   [/l(?=\d{3,})/gi, '1'],           // l1234 → 11234 (in numbers)
