@@ -288,7 +288,13 @@ export async function extractPolicyFromDocument(
         processedText = processingResult.processedText
         // Debug info - text processing stats
         if (import.meta.env.DEV) {
-          console.warn(`[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ${Math.round(processingResult.confidence * 100)}% confidence`)
+          const stats = processingResult.cleanupStats
+          console.warn(`[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ` +
+            `${stats.garbageBlocksRemoved} garbage blocks removed, ` +
+            `${stats.spacedCharsFixed} spaced chars fixed, ` +
+            `${stats.urlsCleaned} URLs cleaned, ` +
+            `${stats.totalCharactersRemoved} chars removed, ` +
+            `${Math.round(processingResult.confidence * 100)}% confidence`)
         }
       }
     } catch (error) {
