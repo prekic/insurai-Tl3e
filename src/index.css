@@ -143,6 +143,20 @@
     max-width: 100vw;
     overflow-x: hidden;
   }
+
+  /* CSS Containment for strict layout boundaries */
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    contain: inline-size;
+  }
+
+  /* Prevent framer-motion transforms from causing overflow */
+  #root > * {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
 }
 
 html {
