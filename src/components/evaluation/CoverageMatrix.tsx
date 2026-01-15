@@ -27,34 +27,133 @@ export function CoverageMatrix({ comparison, className }: CoverageMatrixProps) {
   }
 
   return (
-    <div className={cn('overflow-x-auto', className)}>
-      <table className="w-full min-w-[600px] border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b border-gray-200">
-            <th className="sticky left-0 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-600 min-w-[160px] z-10">
-              {locale === 'tr' ? 'Teminat' : 'Coverage'}
-            </th>
-            {policies.map((p) => (
-              <th key={p.policy.id} className="px-4 py-3 text-center min-w-[140px]">
-                <div className="flex flex-col items-center gap-1">
-                  <span className="text-lg" aria-hidden="true">{p.policy.logo}</span>
-                  <span className="font-semibold text-gray-900 text-sm">{p.label || p.policy.provider}</span>
-                </div>
+    <div className={cn(className)}>
+      {/* Mobile: Card-based layout */}
+      <div className="md:hidden space-y-4">
+        {coverageMatrix.map((coverage) => (
+          <MobileCoverageCard
+            key={coverage.coverageName}
+            coverage={coverage}
+            policies={policies}
+            locale={locale}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: Table layout */}
+      <div className="hidden md:block overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-50 border-b border-gray-200">
+              <th className="sticky left-0 bg-gray-50 px-4 py-3 text-left text-sm font-semibold text-gray-600 min-w-[160px] z-10">
+                {locale === 'tr' ? 'Teminat' : 'Coverage'}
               </th>
+              {policies.map((p) => (
+                <th key={p.policy.id} className="px-4 py-3 text-center min-w-[140px]">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-lg" aria-hidden="true">{p.policy.logo}</span>
+                    <span className="font-semibold text-gray-900 text-sm">{p.label || p.policy.provider}</span>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {coverageMatrix.map((coverage) => (
+              <CoverageRow
+                key={coverage.coverageName}
+                coverage={coverage}
+                policies={policies}
+                locale={locale}
+              />
             ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {coverageMatrix.map((coverage) => (
-            <CoverageRow
-              key={coverage.coverageName}
-              coverage={coverage}
-              policies={policies}
-              locale={locale}
-            />
-          ))}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Mobile-friendly card layout for coverage comparison
+ */
+interface MobileCoverageCardProps {
+  coverage: CoverageComparison
+  policies: ComparisonPolicy[]
+  locale: string
+}
+
+function MobileCoverageCard({ coverage, policies, locale }: MobileCoverageCardProps) {
+  const name = locale === 'tr' ? coverage.coverageNameTR : coverage.coverageName
+
+  return (
+    <div className="bg-white rounded-lg border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="font-medium text-gray-900 text-sm">{name}</h4>
+        {coverage.marketBenchmark !== undefined && (
+          <span className="text-xs text-gray-400">
+            {locale === 'tr' ? 'Piyasa:' : 'Market:'} {formatCurrency(coverage.marketBenchmark)}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        {policies.map((p) => {
+          const policyCoverage = coverage.policies.find(pc => pc.policyId === p.policy.id)
+          const isBest = coverage.bestPolicyId === p.policy.id
+          const isWorst = coverage.worstPolicyId === p.policy.id
+
+          return (
+            <div
+              key={p.policy.id}
+              className={cn(
+                'p-3 rounded-lg text-center',
+                isBest && 'bg-emerald-50 border border-emerald-200',
+                isWorst && 'bg-orange-50 border border-orange-200',
+                !isBest && !isWorst && 'bg-gray-50'
+              )}
+            >
+              <div className="flex items-center justify-center gap-1 mb-1">
+                <span className="text-sm" aria-hidden="true">{p.policy.logo}</span>
+                <span className="text-xs font-medium text-gray-700 truncate max-w-[80px]">
+                  {p.label || p.policy.provider}
+                </span>
+              </div>
+              {!policyCoverage ? (
+                <div className="flex items-center justify-center gap-1">
+                  <Minus className="w-3 h-3 text-gray-300" />
+                  <span className="text-xs text-gray-400">-</span>
+                </div>
+              ) : !policyCoverage.included ? (
+                <div className="flex items-center justify-center gap-1">
+                  <X className="w-3 h-3 text-red-500" />
+                  <span className="text-xs text-red-500">
+                    {locale === 'tr' ? 'Yok' : 'No'}
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-0.5">
+                  <div className="flex items-center justify-center gap-1">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className={cn(
+                      'text-xs font-medium',
+                      isBest && 'text-emerald-700',
+                      isWorst && 'text-orange-600'
+                    )}>
+                      {formatCurrency(policyCoverage.limit)}
+                    </span>
+                    {isBest && <TrophyIndicator isWinner isBest />}
+                  </div>
+                  {policyCoverage.deductible > 0 && (
+                    <p className="text-[10px] text-gray-400">
+                      {locale === 'tr' ? 'M:' : 'D:'} {formatCurrency(policyCoverage.deductible)}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
