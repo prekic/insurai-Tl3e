@@ -68,7 +68,7 @@ const ROUTES = {
 export default function App() {
   return (
     <BrowserRouter>
-      <I18nProvider>
+      <I18nProvider defaultLocale="tr">
         <AuthProvider>
           <PolicyProvider>
             <AppContent />
