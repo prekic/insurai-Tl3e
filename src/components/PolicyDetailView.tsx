@@ -259,14 +259,14 @@ function CoveragesByCategory({
                   return (
                     <div
                       key={i}
-                      className="p-3 rounded-lg bg-blue-50 border border-blue-100"
+                      className="p-3 rounded-lg bg-blue-50 border border-blue-100 overflow-hidden"
                     >
                       {/* Parent coverage header */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <div className="flex items-center gap-3 mb-3 min-w-0">
+                        <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
                           <Check className="text-blue-600" size={14} />
                         </div>
-                        <p className="font-medium text-gray-900">{groupedCoverage.name}</p>
+                        <p className="font-medium text-gray-900 min-w-0 truncate">{groupedCoverage.name}</p>
                       </div>
                       {/* Sub-limits grid - single column on mobile, 2 cols on tablet+ */}
                       <div className="ml-0 md:ml-10 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -296,27 +296,27 @@ function CoveragesByCategory({
                 return (
                   <div
                     key={i}
-                    className={`p-3 rounded-lg ${getCoverageBackground(coverage)}`}
+                    className={`p-3 rounded-lg ${getCoverageBackground(coverage)} overflow-hidden`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
                         {coverage.included !== false ? (
-                          <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center`}>
+                          <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
                             <Check className={iconStyle.icon} size={14} />
                           </div>
                         ) : (
-                          <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center">
+                          <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
                             <X className="text-gray-400" size={14} />
                           </div>
                         )}
-                        <div>
-                          <p className="font-medium text-gray-900 text-sm">{coverage.name}</p>
+                        <div className="min-w-0 overflow-hidden">
+                          <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
                           {coverage.nameTr && coverage.nameTr !== coverage.name && (
-                            <p className="text-xs text-gray-500">{coverage.nameTr}</p>
+                            <p className="text-xs text-gray-500 truncate">{coverage.nameTr}</p>
                           )}
                         </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex-shrink-0">
                         <p className={`font-semibold text-sm ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
                           {limitDisplay}
                         </p>
@@ -327,14 +327,14 @@ function CoveragesByCategory({
                     </div>
                     {/* Clarification prompt for service coverages */}
                     {clarification && isSpecialValue && (
-                      <div className="mt-2 ml-10 p-2 bg-blue-50/50 rounded-md border border-blue-100">
+                      <div className="mt-2 ml-10 p-2 bg-blue-50/50 rounded-md border border-blue-100 overflow-hidden">
                         <p className="text-xs text-blue-700 flex items-center gap-1">
-                          <HelpCircle size={11} />
-                          {locale === 'tr' ? clarification.question : clarification.questionEn}
+                          <HelpCircle size={11} className="flex-shrink-0" />
+                          <span className="truncate">{locale === 'tr' ? clarification.question : clarification.questionEn}</span>
                         </p>
-                        <div className="text-xs text-blue-600 mt-1">
+                        <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
                           {clarification.details.map((detail, j) => (
-                            <span key={j} className="inline-block mr-2">• {detail}</span>
+                            <span key={j}>• {detail}</span>
                           ))}
                         </div>
                       </div>
