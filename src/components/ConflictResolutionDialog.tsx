@@ -122,8 +122,8 @@ export function ConflictResolutionDialog({
         onClick={!isLoading ? onClose : undefined}
       />
 
-      {/* Dialog */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col mx-4">
+      {/* Dialog - use dvh for mobile Safari compatibility */}
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col mx-4">
         {/* Header */}
         <div
           className={cn(
@@ -158,22 +158,22 @@ export function ConflictResolutionDialog({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6">
           {/* Existing policy info */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">
               {locale === 'tr' ? 'Mevcut Police' : 'Existing Policy'}
             </h3>
-            <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-4">
-              <span className="text-3xl">{existingPolicy.logo || '📄'}</span>
-              <div className="flex-1 min-w-0">
+            <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 sm:gap-4 overflow-hidden">
+              <span className="text-2xl sm:text-3xl flex-shrink-0">{existingPolicy.logo || '📄'}</span>
+              <div className="flex-1 min-w-0 overflow-hidden">
                 <p className="font-medium text-gray-900 truncate">{existingPolicy.provider}</p>
-                <p className="text-sm text-gray-500">{existingPolicy.policyNumber}</p>
+                <p className="text-sm text-gray-500 break-all">{existingPolicy.policyNumber}</p>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-gray-500">{existingPolicy.typeTr || existingPolicy.type}</p>
+              <div className="text-right flex-shrink-0 max-w-[100px] sm:max-w-[140px]">
+                <p className="text-sm text-gray-500 truncate">{existingPolicy.typeTr || existingPolicy.type}</p>
                 {existingPolicy.insuredPerson && (
-                  <p className="text-xs text-gray-400">{existingPolicy.insuredPerson}</p>
+                  <p className="text-xs text-gray-400 truncate">{existingPolicy.insuredPerson}</p>
                 )}
               </div>
             </div>
@@ -240,11 +240,15 @@ export function ConflictResolutionDialog({
               </button>
 
               {showDetails && (
-                <PolicyDiffViewer changes={changes} className="mb-4" />
+                <div className="max-w-full overflow-x-auto">
+                  <PolicyDiffViewer changes={changes} className="mb-4" />
+                </div>
               )}
 
               {!showDetails && (
-                <PolicyDiffViewer changes={changes.slice(0, 3)} compact className="mb-4" />
+                <div className="max-w-full overflow-x-auto">
+                  <PolicyDiffViewer changes={changes.slice(0, 3)} compact className="mb-4" />
+                </div>
               )}
             </div>
           )}

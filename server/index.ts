@@ -130,6 +130,9 @@ app.use(
           'https://unpkg.com',
           'https://cdn.jsdelivr.net',
           'https://cdnjs.cloudflare.com',
+          // Google Fonts (for service worker fetch)
+          'https://fonts.googleapis.com',
+          'https://fonts.gstatic.com',
           // Development WebSocket (Vite HMR)
           ...(IS_PRODUCTION ? [] : ['ws://localhost:*', 'wss://localhost:*']),
         ],

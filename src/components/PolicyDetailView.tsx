@@ -271,9 +271,9 @@ function CoveragesByCategory({
                       {/* Sub-limits grid - single column on mobile, 2 cols on tablet+ */}
                       <div className="ml-0 md:ml-10 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {groupedCoverage.subLimits.map((subLimit, j) => (
-                          <div key={j} className="flex justify-between items-center bg-white/60 px-3 py-2 rounded-md">
-                            <span className="text-xs sm:text-sm text-gray-600 truncate mr-2">{subLimit.label}</span>
-                            <span className={`text-xs sm:text-sm font-medium whitespace-nowrap ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
+                          <div key={j} className="flex justify-between items-center bg-white/60 px-3 py-2 rounded-md min-w-0 overflow-hidden">
+                            <span className="text-xs sm:text-sm text-gray-600 truncate mr-2 min-w-0">{subLimit.label}</span>
+                            <span className={`text-xs sm:text-sm font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
                               {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
                             </span>
                           </div>
@@ -850,10 +850,10 @@ export function PolicyDetailView() {
       </div>
 
       {/* Main content */}
-      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-3 sm:py-6 w-full overflow-hidden">
-        <div className="grid lg:grid-cols-3 gap-3 sm:gap-6 w-full">
+      <div className="max-w-6xl mx-auto px-2 sm:px-4 py-3 sm:py-6 w-full overflow-hidden overflow-x-hidden">
+        <div className="grid lg:grid-cols-3 gap-3 sm:gap-6 w-full min-w-0">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6 min-w-0 overflow-hidden">
             {/* Policy Overview - Ultra compact mobile-first - ALWAYS Turkish */}
             <Card className="overflow-hidden w-full">
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6 bg-gradient-to-r from-blue-50 to-blue-100/50">
