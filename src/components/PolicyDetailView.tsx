@@ -272,12 +272,12 @@ function CoveragesByCategory({
                         </div>
                         <p className="font-medium text-gray-900">{groupedCoverage.name}</p>
                       </div>
-                      {/* Sub-limits grid */}
-                      <div className="ml-10 grid grid-cols-2 gap-2">
+                      {/* Sub-limits grid - single column on mobile, 2 cols on tablet+ */}
+                      <div className="ml-0 md:ml-10 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
                         {groupedCoverage.subLimits.map((subLimit, j) => (
                           <div key={j} className="flex justify-between items-center bg-white/60 px-3 py-2 rounded-md">
-                            <span className="text-sm text-gray-600">{subLimit.label}</span>
-                            <span className={`text-sm font-medium ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
+                            <span className="text-xs sm:text-sm text-gray-600 truncate mr-2">{subLimit.label}</span>
+                            <span className={`text-xs sm:text-sm font-medium whitespace-nowrap ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
                               {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
                             </span>
                           </div>
@@ -607,82 +607,57 @@ function RawExtractedTextSection({
 
   return (
     <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="text-gray-600" size={20} />
-            {locale === 'tr'
-              ? (showRaw ? 'Ham Poliçe Metni' : 'Poliçe Metni')
-              : (showRaw ? 'Raw Extracted Text' : 'Document Text')}
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <FileText className="text-gray-600 flex-shrink-0" size={18} />
+            <span className="truncate">
+              {locale === 'tr'
+                ? (showRaw ? 'Ham Metin' : 'Poliçe Metni')
+                : (showRaw ? 'Raw Text' : 'Document')}
+            </span>
             {!showRaw && hasProcessedText && (
-              <Badge variant="success" className="text-xs">
-                {locale === 'tr' ? 'AI İşlenmiş' : 'AI Processed'}
+              <Badge variant="success" className="text-xs flex-shrink-0">
+                AI
               </Badge>
             )}
           </CardTitle>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             {hasProcessedText && (
               <Button
                 variant={showRaw ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setShowRaw(!showRaw)}
-                className="gap-1 text-xs"
+                className="gap-1 text-xs h-8 px-2 sm:px-3"
               >
-                {showRaw ? (
-                  <>
-                    <Sparkles size={12} />
-                    {locale === 'tr' ? 'İşlenmiş' : 'Processed'}
-                  </>
-                ) : (
-                  <>
-                    <Code size={12} />
-                    {locale === 'tr' ? 'Ham' : 'Raw'}
-                  </>
-                )}
+                {showRaw ? <Sparkles size={12} /> : <Code size={12} />}
+                <span className="hidden sm:inline">{showRaw ? (locale === 'tr' ? 'İşlenmiş' : 'Processed') : (locale === 'tr' ? 'Ham' : 'Raw')}</span>
               </Button>
             )}
             <Button
               variant="outline"
               size="sm"
               onClick={handleCopy}
-              className="gap-2"
+              className="gap-1 h-8 px-2 sm:px-3"
             >
-              {copied ? (
-                <>
-                  <CheckCircle className="text-green-600" size={14} />
-                  {locale === 'tr' ? 'Kopyalandı' : 'Copied'}
-                </>
-              ) : (
-                <>
-                  <Copy size={14} />
-                  {locale === 'tr' ? 'Kopyala' : 'Copy'}
-                </>
-              )}
+              {copied ? <CheckCircle className="text-green-600" size={14} /> : <Copy size={14} />}
+              <span className="hidden sm:inline">{copied ? (locale === 'tr' ? 'Kopyalandı' : 'Copied') : (locale === 'tr' ? 'Kopyala' : 'Copy')}</span>
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="gap-1"
+              className="gap-1 h-8 px-2"
             >
-              {isExpanded ? (
-                <>
-                  <ChevronUp size={16} />
-                  {locale === 'tr' ? 'Küçült' : 'Collapse'}
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={16} />
-                  {locale === 'tr' ? 'Genişlet' : 'Expand'}
-                </>
-              )}
+              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              <span className="hidden sm:inline">{isExpanded ? (locale === 'tr' ? 'Küçült' : 'Less') : (locale === 'tr' ? 'Genişlet' : 'More')}</span>
             </Button>
           </div>
         </div>
-        <p className="text-sm text-gray-500 mt-1">
+        <p className="text-xs sm:text-sm text-gray-500 mt-2">
           {locale === 'tr'
-            ? `${showRaw ? 'Ham metin' : 'AI ile işlenmiş metin'} • ${lineCount} satır • ${wordCount.toLocaleString()} kelime • ${charCount.toLocaleString()} karakter`
-            : `${showRaw ? 'Raw text from PDF' : 'AI-corrected text'} • ${lineCount} lines • ${wordCount.toLocaleString()} words • ${charCount.toLocaleString()} chars`}
+            ? `${lineCount} satır • ${wordCount.toLocaleString()} kelime`
+            : `${lineCount} lines • ${wordCount.toLocaleString()} words`}
         </p>
       </CardHeader>
       <CardContent>
@@ -783,26 +758,28 @@ export function PolicyDetailView() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
+        <div className="flex items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
           <button
             onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white rounded-lg transition-colors"
+            className="p-2 hover:bg-white rounded-lg transition-colors flex-shrink-0"
+            aria-label="Go back"
           >
-            <ArrowLeft size={24} />
+            <ArrowLeft size={20} className="sm:w-6 sm:h-6" />
           </button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{policy.logo}</span>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{policy.provider}</h1>
-                <p className="text-gray-600">{policy.policyNumber}</p>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-2xl sm:text-3xl flex-shrink-0">{policy.logo}</span>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{policy.provider}</h1>
+                <p className="text-sm sm:text-base text-gray-600 truncate">{policy.policyNumber}</p>
               </div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
             <Button
               variant="outline"
-              className="gap-2"
+              size="sm"
+              className="gap-1 sm:gap-2 h-9 px-2 sm:px-3"
               onClick={async () => {
                 try {
                   const shareUrl = `${window.location.origin}/policy/${policy.id}`
@@ -823,12 +800,13 @@ export function PolicyDetailView() {
                 }
               }}
             >
-              <Share2 size={18} />
-              {locale === 'tr' ? 'Paylaş' : 'Share'}
+              <Share2 size={16} />
+              <span className="hidden sm:inline">{locale === 'tr' ? 'Paylaş' : 'Share'}</span>
             </Button>
             <Button
               variant="outline"
-              className="gap-2"
+              size="sm"
+              className="gap-1 sm:gap-2 h-9 px-2 sm:px-3"
               onClick={() => {
                 // Generate policy summary for download
                 const summary = [
@@ -860,8 +838,8 @@ export function PolicyDetailView() {
                 toast.success(locale === 'tr' ? 'Özet indirildi' : 'Summary downloaded')
               }}
             >
-              <Download size={18} />
-              {locale === 'tr' ? 'İndir' : 'Download'}
+              <Download size={16} />
+              <span className="hidden sm:inline">{locale === 'tr' ? 'İndir' : 'Download'}</span>
             </Button>
           </div>
         </div>
@@ -915,12 +893,12 @@ export function PolicyDetailView() {
                       <p className="text-sm text-gray-500">
                         {locale === 'tr' ? 'Teminat Limiti' : 'Coverage Limit'}
                       </p>
-                      <p className="text-2xl font-bold text-gray-900">
+                      <p className="text-xl md:text-2xl font-bold text-gray-900">
                         {/* Kasko always uses market value for main coverage */}
                         {policy.type === 'kasko'
-                          ? 'Araç Rayiç Bedeli'
+                          ? (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Vehicle Market Value')
                           : (policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue))
-                            ? 'Rayiç Değer'
+                            ? (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
                             : formatCurrency(policy.coverage)}
                       </p>
                       {policy.type === 'kasko' && (
@@ -932,12 +910,16 @@ export function PolicyDetailView() {
                       )}
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Annual Premium</p>
-                      <p className="text-xl font-semibold text-gray-900">{formatCurrency(policy.premium)}</p>
+                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Yıllık Prim' : 'Annual Premium'}</p>
+                      <p className="text-lg md:text-xl font-semibold text-gray-900">
+                        {policy.premium > 0 ? formatCurrency(policy.premium) : (locale === 'tr' ? 'Belirtilmemiş' : 'Not specified')}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Deductible</p>
-                      <p className="font-semibold text-gray-900">{formatCurrency(policy.deductible)}</p>
+                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Muafiyet' : 'Deductible'}</p>
+                      <p className="font-semibold text-gray-900">
+                        {policy.deductible > 0 ? formatCurrency(policy.deductible) : (locale === 'tr' ? 'Yok' : 'None')}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1134,35 +1116,45 @@ export function PolicyDetailView() {
               </CardContent>
             </Card>
 
-            {/* Market Comparison */}
-            {policy.marketComparison && (
+            {/* Market Comparison - Only show when we have valid premium data */}
+            {policy.marketComparison && policy.premium > 0 && (
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="text-blue-600" size={20} />
-                    Market Comparison
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <TrendingUp className="text-blue-600" size={18} />
+                    {locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-sm text-gray-500">Your Premium</span>
-                        <span className="text-sm text-gray-500">Market Avg</span>
+                        <span className="text-xs sm:text-sm text-gray-500">{locale === 'tr' ? 'Priminiz' : 'Your Premium'}</span>
+                        <span className="text-xs sm:text-sm text-gray-500">{locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-gray-900">{formatCurrency(policy.premium)}</span>
                         <span className="font-semibold text-gray-600">{formatCurrency(policy.marketComparison.averagePremium)}</span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (
-                        <div className="flex items-center gap-1 mt-1 text-green-600 text-sm">
+                        <div className="flex items-center gap-1 mt-1 text-green-600 text-xs sm:text-sm">
                           <TrendingDown size={14} />
-                          <span>{Math.round((1 - policy.premium / policy.marketComparison.averagePremium) * 100)}% below average</span>
+                          <span>
+                            {Math.round((1 - policy.premium / policy.marketComparison.averagePremium) * 100)}% {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                          </span>
+                        </div>
+                      )}
+                      {policy.premium > policy.marketComparison.averagePremium && (
+                        <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs sm:text-sm">
+                          <TrendingUp size={14} />
+                          <span>
+                            {Math.round((policy.premium / policy.marketComparison.averagePremium - 1) * 100)}% {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                          </span>
                         </div>
                       )}
                     </div>
                     <div className="pt-2 border-t">
-                      <p className="text-sm text-gray-500 mb-1">Market Percentile</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-1">{locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}</p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -1170,7 +1162,7 @@ export function PolicyDetailView() {
                             style={{ width: `${policy.marketComparison.percentile}%` }}
                           />
                         </div>
-                        <span className="font-semibold text-gray-900">{policy.marketComparison.percentile}%</span>
+                        <span className="font-semibold text-gray-900 text-sm">{policy.marketComparison.percentile}%</span>
                       </div>
                     </div>
                   </div>
