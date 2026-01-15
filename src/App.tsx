@@ -125,7 +125,7 @@ function AppContent() {
       {/* Global Navigation - Show on all pages except landing and auth */}
       {!hideNavigation && <GlobalNavigation />}
 
-      <main id="main-content" tabIndex={-1}>
+      <main id="main-content" tabIndex={-1} className="w-full max-w-[100vw] overflow-x-hidden">
         <Suspense fallback={<PageLoader />}>
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>

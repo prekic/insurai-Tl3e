@@ -284,8 +284,8 @@ export function PolicyDashboard() {
         </div>
 
         {/* Stats Cards - Horizontally scrollable on mobile */}
-        <section aria-label={t.a11y.policyStats} className="mb-8 -mx-4 sm:mx-0">
-          <div className="flex sm:grid sm:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 px-4 sm:px-0 snap-x snap-mandatory">
+        <section aria-label={t.a11y.policyStats} className="mb-8 w-full overflow-hidden">
+          <div className="flex sm:grid sm:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 snap-x snap-mandatory -mx-3 px-3 sm:mx-0 sm:px-0">
             <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 w-[140px] sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
