@@ -756,172 +756,214 @@ export function PolicyDetailView() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-2 sm:gap-4 mb-6 sm:mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white rounded-lg transition-colors flex-shrink-0"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={20} className="sm:w-6 sm:h-6" />
-          </button>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <span className="text-2xl sm:text-3xl flex-shrink-0">{policy.logo}</span>
+      {/* Mobile-first header - compact and functional */}
+      <div className="sticky top-0 z-10 bg-white border-b shadow-sm">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 py-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Back button */}
+            <button
+              onClick={() => navigate(-1)}
+              className="p-2 -ml-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+              aria-label={locale === 'tr' ? 'Geri' : 'Go back'}
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            {/* Provider info - compact on mobile */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xl sm:text-2xl flex-shrink-0">{policy.logo}</span>
               <div className="min-w-0">
-                <h1 className="text-lg sm:text-2xl font-bold text-gray-900 truncate">{policy.provider}</h1>
-                <p className="text-sm sm:text-base text-gray-600 truncate">{policy.policyNumber}</p>
+                <h1 className="text-sm sm:text-lg font-bold text-gray-900 truncate leading-tight">
+                  {policy.provider}
+                </h1>
+                <p className="text-xs sm:text-sm text-gray-500 truncate">{policy.policyNumber}</p>
               </div>
             </div>
-          </div>
-          <div className="flex gap-1 sm:gap-2 flex-shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1 sm:gap-2 h-9 px-2 sm:px-3"
-              onClick={async () => {
-                try {
-                  const shareUrl = `${window.location.origin}/policy/${policy.id}`
-                  if (navigator.share) {
-                    await navigator.share({
-                      title: `${policy.provider} - ${policy.typeTr}`,
-                      text: `Policy ${policy.policyNumber} - ${policy.insuredPerson}`,
-                      url: shareUrl,
-                    })
-                  } else {
-                    await navigator.clipboard.writeText(shareUrl)
-                    toast.success(locale === 'tr' ? 'Bağlantı kopyalandı' : 'Link copied to clipboard')
-                  }
-                } catch (err) {
-                  if ((err as Error).name !== 'AbortError') {
-                    toast.error(locale === 'tr' ? 'Paylaşım başarısız' : 'Share failed')
-                  }
-                }
-              }}
-            >
-              <Share2 size={16} />
-              <span className="hidden sm:inline">{locale === 'tr' ? 'Paylaş' : 'Share'}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-1 sm:gap-2 h-9 px-2 sm:px-3"
-              onClick={() => {
-                // Generate policy summary for download
-                const summary = [
-                  `Policy: ${policy.policyNumber}`,
-                  `Provider: ${policy.provider}`,
-                  `Type: ${policy.typeTr}`,
-                  `Insured: ${policy.insuredPerson}`,
-                  `Coverage: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
-                  `Premium: ${formatCurrency(policy.premium)}`,
-                  `Deductible: ${formatCurrency(policy.deductible)}`,
-                  `Period: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
-                  '',
-                  '=== COVERAGES ===',
-                  ...policy.coverages.map(c => `• ${c.nameTr || c.name}: ${c.isUnlimited ? 'Sınırsız' : formatCurrency(c.limit)}`),
-                  '',
-                  '=== EXCLUSIONS ===',
-                  ...policy.exclusions.map(e => `• ${e}`),
-                ].join('\n')
 
-                const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
-                const url = URL.createObjectURL(blob)
-                const link = document.createElement('a')
-                link.href = url
-                link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
-                document.body.appendChild(link)
-                link.click()
-                document.body.removeChild(link)
-                URL.revokeObjectURL(url)
-                toast.success(locale === 'tr' ? 'Özet indirildi' : 'Summary downloaded')
-              }}
-            >
-              <Download size={16} />
-              <span className="hidden sm:inline">{locale === 'tr' ? 'İndir' : 'Download'}</span>
-            </Button>
+            {/* Action buttons - icon only on mobile */}
+            <div className="flex gap-1 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 sm:w-auto sm:px-3"
+                onClick={async () => {
+                  try {
+                    const shareUrl = `${window.location.origin}/policy/${policy.id}`
+                    if (navigator.share) {
+                      await navigator.share({
+                        title: `${policy.provider} - ${policy.typeTr}`,
+                        text: `${locale === 'tr' ? 'Poliçe' : 'Policy'} ${policy.policyNumber}`,
+                        url: shareUrl,
+                      })
+                    } else {
+                      await navigator.clipboard.writeText(shareUrl)
+                      toast.success(locale === 'tr' ? 'Bağlantı kopyalandı' : 'Link copied')
+                    }
+                  } catch (err) {
+                    if ((err as Error).name !== 'AbortError') {
+                      toast.error(locale === 'tr' ? 'Paylaşım başarısız' : 'Share failed')
+                    }
+                  }
+                }}
+              >
+                <Share2 size={18} />
+                <span className="hidden sm:inline ml-1">{locale === 'tr' ? 'Paylaş' : 'Share'}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 w-9 p-0 sm:w-auto sm:px-3"
+                onClick={() => {
+                  const summary = [
+                    `${locale === 'tr' ? 'Poliçe' : 'Policy'}: ${policy.policyNumber}`,
+                    `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${policy.provider}`,
+                    `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
+                    `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
+                    `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
+                    `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium)}`,
+                    `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible)}`,
+                    `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
+                    '',
+                    `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
+                    ...policy.coverages.map(c => `• ${c.nameTr || c.name}: ${c.isUnlimited ? 'Sınırsız' : formatCurrency(c.limit)}`),
+                    '',
+                    `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
+                    ...policy.exclusions.map(e => `• ${e}`),
+                  ].join('\n')
+
+                  const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                  URL.revokeObjectURL(url)
+                  toast.success(locale === 'tr' ? 'Özet indirildi' : 'Summary downloaded')
+                }}
+              >
+                <Download size={18} />
+                <span className="hidden sm:inline ml-1">{locale === 'tr' ? 'İndir' : 'Download'}</span>
+              </Button>
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
+      {/* Main content */}
+      <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        <div className="grid lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Policy Overview */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Policy Overview - Mobile optimized */}
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="text-blue-600" size={20} />
-                  Policy Overview
+              <CardHeader className="pb-2 sm:pb-4">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Shield className="text-blue-600" size={18} />
+                  {locale === 'tr' ? 'Poliçe Özeti' : 'Policy Overview'}
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Poliçe Türü' : 'Policy Type'}</p>
-                      <p className="font-semibold text-gray-900">{policy.typeTr}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Sigortalı' : 'Insured'}</p>
-                      <p className="font-semibold text-gray-900">{policy.insuredPerson || (locale === 'tr' ? 'Belirtilmemiş' : 'N/A')}</p>
-                    </div>
-                    {/* Show vehicle info for auto policies, location for others */}
-                    {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo ? (
-                      <div>
-                        <p className="text-sm text-gray-500">{locale === 'tr' ? 'Araç' : 'Vehicle'}</p>
-                        <p className="font-semibold text-gray-900">
-                          {[
-                            policy.vehicleInfo.plate,
-                            policy.vehicleInfo.make,
-                            policy.vehicleInfo.model,
-                            policy.vehicleInfo.year,
-                          ]
-                            .filter(Boolean)
-                            .join(' • ') || 'N/A'}
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm text-gray-500">{locale === 'tr' ? 'Konum' : 'Location'}</p>
-                        <p className="font-semibold text-gray-900">{policy.location || (locale === 'tr' ? 'Belirtilmemiş' : 'N/A')}</p>
-                      </div>
+              <CardContent className="pt-0">
+                {/* Mobile: stacked, Desktop: 2 columns */}
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Coverage - Most important, full width on mobile */}
+                  <div className="col-span-2 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-600 font-medium mb-1">
+                      {locale === 'tr' ? 'Teminat Limiti' : 'Coverage'}
+                    </p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-900">
+                      {policy.type === 'kasko'
+                        ? (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Market Value')
+                        : (policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue))
+                          ? (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
+                          : formatCurrency(policy.coverage)}
+                    </p>
+                    {policy.type === 'kasko' && (
+                      <p className="text-xs text-blue-600 mt-0.5">
+                        {locale === 'tr' ? 'Hasar anındaki değer' : 'At time of loss'}
+                      </p>
                     )}
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-gray-500">
-                        {locale === 'tr' ? 'Teminat Limiti' : 'Coverage Limit'}
-                      </p>
-                      <p className="text-xl md:text-2xl font-bold text-gray-900">
-                        {/* Kasko always uses market value for main coverage */}
-                        {policy.type === 'kasko'
-                          ? (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Vehicle Market Value')
-                          : (policy.coverage === 0 && policy.coverages.some(c => c.isMarketValue))
-                            ? (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
-                            : formatCurrency(policy.coverage)}
-                      </p>
-                      {policy.type === 'kasko' && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {locale === 'tr'
-                            ? 'Hasar anındaki piyasa değeri üzerinden'
-                            : 'Based on market value at time of loss'}
-                        </p>
-                      )}
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Yıllık Prim' : 'Annual Premium'}</p>
-                      <p className="text-lg md:text-xl font-semibold text-gray-900">
-                        {policy.premium > 0 ? formatCurrency(policy.premium) : (locale === 'tr' ? 'Belirtilmemiş' : 'Not specified')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Muafiyet' : 'Deductible'}</p>
-                      <p className="font-semibold text-gray-900">
-                        {policy.deductible > 0 ? formatCurrency(policy.deductible) : (locale === 'tr' ? 'Yok' : 'None')}
-                      </p>
-                    </div>
+
+                  {/* Premium */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {locale === 'tr' ? 'Yıllık Prim' : 'Premium'}
+                    </p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">
+                      {policy.premium > 0 ? formatCurrency(policy.premium) : '-'}
+                    </p>
                   </div>
+
+                  {/* Deductible */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {locale === 'tr' ? 'Muafiyet' : 'Deductible'}
+                    </p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">
+                      {policy.deductible > 0 ? formatCurrency(policy.deductible) : (locale === 'tr' ? 'Yok' : 'None')}
+                    </p>
+                  </div>
+
+                  {/* Policy Type */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {locale === 'tr' ? 'Poliçe Türü' : 'Type'}
+                    </p>
+                    <p className="text-sm sm:text-base font-semibold text-gray-900">{policy.typeTr}</p>
+                  </div>
+
+                  {/* Insured - can be long, give it more space */}
+                  <div className="col-span-2 sm:col-span-1 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {locale === 'tr' ? 'Sigortalı' : 'Insured'}
+                    </p>
+                    <p className="text-sm font-semibold text-gray-900 truncate" title={policy.insuredPerson}>
+                      {policy.insuredPerson || '-'}
+                    </p>
+                  </div>
+
+                  {/* Vehicle or Location */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo ? (
+                      <>
+                        <p className="text-xs text-gray-500 mb-1">
+                          {locale === 'tr' ? 'Araç' : 'Vehicle'}
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {policy.vehicleInfo.plate || policy.vehicleInfo.make || '-'}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500 mb-1">
+                          {locale === 'tr' ? 'Konum' : 'Location'}
+                        </p>
+                        <p className="text-sm font-semibold text-gray-900 truncate">
+                          {policy.location || '-'}
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Status Badge */}
+                  <div className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">
+                      {locale === 'tr' ? 'Durum' : 'Status'}
+                    </p>
+                    <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="text-xs">
+                      {policy.status === 'active'
+                        ? (locale === 'tr' ? 'Aktif' : 'Active')
+                        : (locale === 'tr' ? 'Süresi Doluyor' : 'Expiring')}
+                    </Badge>
+                  </div>
+                </div>
+
+                {/* Dates row */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t text-xs sm:text-sm text-gray-500">
+                  <span>{locale === 'tr' ? 'Başlangıç' : 'Start'}: <span className="font-medium text-gray-700">{formatDate(policy.startDate)}</span></span>
+                  <span>{locale === 'tr' ? 'Bitiş' : 'End'}: <span className="font-medium text-gray-700">{formatDate(policy.expiryDate)}</span></span>
                 </div>
               </CardContent>
             </Card>
