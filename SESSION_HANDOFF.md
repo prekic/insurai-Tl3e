@@ -161,6 +161,19 @@ The following CDN domains must be allowed in CSP (`server/index.ts`):
 - `cdn.jsdelivr.net` (fallback)
 - `cdnjs.cloudflare.com` (fallback)
 
+### API Proxy Auto-Detection (`src/lib/env.ts`)
+In production, if `VITE_API_PROXY_URL` is not set at build time, the app auto-detects the API URL:
+```typescript
+export function getApiProxyUrl(): string {
+  // In production, if not set, use same origin (co-hosted frontend/backend)
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    return window.location.origin
+  }
+  return import.meta.env.VITE_API_PROXY_URL || 'http://localhost:4001'
+}
+```
+This allows Railway deployment without setting `VITE_API_PROXY_URL` since frontend and backend share the same origin.
+
 ---
 
 ## Gotchas Discovered
