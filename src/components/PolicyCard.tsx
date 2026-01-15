@@ -199,11 +199,11 @@ export function PolicyCard({
 
           {/* Logo and basic info */}
           <span className="text-3xl flex-shrink-0" aria-hidden="true">{policy.logo}</span>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <h3 className="font-semibold text-gray-900">{policy.provider}</h3>
-                <p className="text-sm text-gray-500">{policy.policyNumber}</p>
+              <div className="min-w-0 overflow-hidden">
+                <h3 className="font-semibold text-gray-900 truncate">{policy.provider}</h3>
+                <p className="text-sm text-gray-500 truncate">{policy.policyNumber}</p>
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
                 {evaluation && (
