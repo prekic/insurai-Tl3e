@@ -658,7 +658,7 @@ function RawExtractedTextSection({
       </CardHeader>
       <CardContent>
         <div className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}>
-          <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap font-mono leading-relaxed overflow-x-auto">
+          <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap break-words font-mono leading-relaxed max-w-full">
             {isExpanded ? displayText : previewText}
             {!isExpanded && hasMore && '...'}
           </pre>
@@ -1028,7 +1028,7 @@ export function PolicyDetailView() {
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 min-w-0 overflow-hidden">
             {/* Status Card */}
             <Card>
               <CardContent className="pt-6">
