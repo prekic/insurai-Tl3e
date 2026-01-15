@@ -217,24 +217,20 @@ function CoveragesByCategory({
   const isKasko = policyType === 'kasko'
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full overflow-hidden">
       {/* Implicit coverages note for kasko */}
       {isKasko && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-xl">
-          <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
-            <Check className="text-green-600" size={18} />
-            {locale === 'tr' ? 'Temel Kasko Teminatları (Dahil)' : 'Base Kasko Coverage (Included)'}
+        <div className="p-3 sm:p-4 bg-green-50 border border-green-200 rounded-xl overflow-hidden">
+          <div className="flex items-start gap-2 text-green-800 font-medium mb-2">
+            <Check className="text-green-600 flex-shrink-0 mt-0.5" size={16} />
+            <span className="text-sm">Temel Kasko Teminatları (Dahil)</span>
           </div>
-          <p className="text-sm text-green-700 mb-2">
-            {locale === 'tr'
-              ? 'Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç rayiç bedeli üzerinden teminat altındadır.'
-              : 'Collision, Theft, Fire, Natural Disasters (earthquake, flood, hail, storm) are covered up to vehicle market value.'}
+          <p className="text-xs sm:text-sm text-green-700 mb-2 leading-relaxed">
+            Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç rayiç bedeli üzerinden teminat altındadır.
           </p>
-          <div className="text-xs text-green-600 flex items-center gap-1">
-            <HelpCircle size={12} />
-            {locale === 'tr'
-              ? 'Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.'
-              : 'Check your policy for deductibles, depreciation, and special conditions.'}
+          <div className="text-xs text-green-600 flex items-start gap-1">
+            <HelpCircle size={12} className="flex-shrink-0 mt-0.5" />
+            <span>Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.</span>
           </div>
         </div>
       )}
@@ -933,16 +929,16 @@ export function PolicyDetailView() {
                   )}
                 </div>
 
-                {/* Dates row - compact */}
-                <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t text-xs text-gray-500 overflow-hidden">
-                  <span className="truncate">
+                {/* Dates row - grid layout to prevent overflow */}
+                <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2.5 border-t text-xs text-gray-500">
+                  <div className="truncate">
                     <span className="text-gray-400">Başlangıç:</span>{' '}
                     <span className="font-medium text-gray-700">{formatDate(policy.startDate)}</span>
-                  </span>
-                  <span className="truncate text-right">
+                  </div>
+                  <div className="truncate text-right">
                     <span className="text-gray-400">Bitiş:</span>{' '}
                     <span className="font-medium text-gray-700">{formatDate(policy.expiryDate)}</span>
-                  </span>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -1000,11 +996,9 @@ export function PolicyDetailView() {
             )}
 
             {/* Coverages - Grouped by Category */}
-            <Card>
+            <Card className="overflow-hidden">
               <CardHeader>
-                <CardTitle>
-                  {locale === 'tr' ? 'Teminat Detayları' : 'Coverage Details'}
-                </CardTitle>
+                <CardTitle>Teminat Detayları</CardTitle>
               </CardHeader>
               <CardContent>
                 <CoveragesByCategory

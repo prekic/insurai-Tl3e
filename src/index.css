@@ -120,10 +120,28 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  /* CRITICAL: Global viewport lock to prevent horizontal scroll on mobile */
+  html {
+    overflow-x: hidden;
+    max-width: 100vw;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    overflow-x: hidden;
+    max-width: 100vw;
+    width: 100%;
+    position: relative;
+  }
+
+  /* Force all direct children of body to respect viewport */
+  body > * {
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 }
 
