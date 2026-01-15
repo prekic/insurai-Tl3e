@@ -3,6 +3,33 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
 
+// Prevent horizontal scroll on mobile - safety net
+// This runs before React renders to ensure no horizontal scroll
+if (typeof window !== 'undefined') {
+  // Prevent horizontal scroll by resetting scrollLeft
+  const preventHorizontalScroll = () => {
+    if (window.scrollX > 0) {
+      window.scrollTo(0, window.scrollY)
+    }
+  }
+
+  // Run on scroll to prevent horizontal scrolling
+  window.addEventListener('scroll', preventHorizontalScroll, { passive: true })
+
+  // Also run after DOM mutations (in case content changes cause overflow)
+  if (typeof MutationObserver !== 'undefined') {
+    const observer = new MutationObserver(() => {
+      requestAnimationFrame(preventHorizontalScroll)
+    })
+    observer.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'class']
+    })
+  }
+}
+
 // Initialize error tracking first (before anything else can error)
 import { initSentry } from './lib/sentry'
 initSentry()
