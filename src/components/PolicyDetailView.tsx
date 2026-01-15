@@ -859,12 +859,12 @@ export function PolicyDetailView() {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div>
-                      <p className="text-sm text-gray-500">Policy Type</p>
+                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Poliçe Türü' : 'Policy Type'}</p>
                       <p className="font-semibold text-gray-900">{policy.typeTr}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Insured</p>
-                      <p className="font-semibold text-gray-900">{policy.insuredPerson || 'N/A'}</p>
+                      <p className="text-sm text-gray-500">{locale === 'tr' ? 'Sigortalı' : 'Insured'}</p>
+                      <p className="font-semibold text-gray-900">{policy.insuredPerson || (locale === 'tr' ? 'Belirtilmemiş' : 'N/A')}</p>
                     </div>
                     {/* Show vehicle info for auto policies, location for others */}
                     {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo ? (
@@ -883,8 +883,8 @@ export function PolicyDetailView() {
                       </div>
                     ) : (
                       <div>
-                        <p className="text-sm text-gray-500">Location</p>
-                        <p className="font-semibold text-gray-900">{policy.location || 'N/A'}</p>
+                        <p className="text-sm text-gray-500">{locale === 'tr' ? 'Konum' : 'Location'}</p>
+                        <p className="font-semibold text-gray-900">{policy.location || (locale === 'tr' ? 'Belirtilmemiş' : 'N/A')}</p>
                       </div>
                     )}
                   </div>
