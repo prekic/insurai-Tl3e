@@ -123,7 +123,7 @@ export function ConflictResolutionDialog({
       />
 
       {/* Dialog */}
-      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col mx-4">
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col mx-4">
         {/* Header */}
         <div
           className={cn(
@@ -262,8 +262,8 @@ export function ConflictResolutionDialog({
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-          <div className="flex flex-wrap gap-3 justify-end">
+        <div className="px-4 sm:px-6 py-4 bg-gray-50 border-t border-gray-200">
+          <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-3 sm:justify-end">
             {isExactDuplicate ? (
               // Exact duplicate options
               <>
@@ -405,7 +405,8 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled}
       className={cn(
-        'flex flex-col items-center gap-1 px-4 py-3 rounded-lg border transition-colors min-w-[140px]',
+        'flex flex-col items-center gap-1 px-4 py-3 rounded-lg border transition-colors',
+        'w-full sm:w-auto sm:min-w-[140px]',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variant === 'primary'
           ? 'bg-blue-600 border-blue-600 text-white hover:bg-blue-700'

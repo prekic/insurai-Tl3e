@@ -833,7 +833,7 @@ export function PolicyChat() {
                   </div>
                 )}
                 <div
-                  className={`max-w-[80%] p-4 rounded-2xl ${
+                  className={`max-w-[calc(100%-3rem)] sm:max-w-[80%] min-w-0 p-3 sm:p-4 rounded-2xl ${
                     message.role === 'user'
                       ? 'bg-blue-600 text-white'
                       : message.role === 'error'
