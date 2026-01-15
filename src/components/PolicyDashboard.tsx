@@ -347,17 +347,17 @@ export function PolicyDashboard() {
 
         {/* Compare Selection Bar */}
         {selectionCount > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Scale className="w-5 h-5 text-blue-600" />
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap min-w-0">
+              <Scale className="w-5 h-5 text-blue-600 flex-shrink-0" />
               <span className="font-medium text-blue-900">
                 {selectionCount} {selectionCount === 1 ? 'policy' : 'policies'} selected
               </span>
               {selectionCount < 2 && (
-                <span className="text-sm text-blue-700">(select at least 2 to compare)</span>
+                <span className="text-xs sm:text-sm text-blue-700">(select at least 2 to compare)</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
@@ -398,12 +398,12 @@ export function PolicyDashboard() {
                 </p>
                 <div className="space-y-2">
                   {duplicates.slice(0, 3).map((dup) => (
-                    <div key={dup.policy.id} className="flex items-center justify-between bg-white/60 rounded-lg p-2">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{dup.policy.logo}</span>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{dup.policy.provider}</p>
-                          <p className="text-xs text-gray-500">
+                    <div key={dup.policy.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white/60 rounded-lg p-2">
+                      <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+                        <span className="text-lg flex-shrink-0">{dup.policy.logo}</span>
+                        <div className="min-w-0 overflow-hidden">
+                          <p className="text-sm font-medium text-gray-900 truncate">{dup.policy.provider}</p>
+                          <p className="text-xs text-gray-500 truncate">
                             {dup.similarity === 'exact'
                               ? (locale === 'tr' ? 'Birebir kopya' : 'Exact duplicate')
                               : dup.similarity === 'high'
@@ -416,7 +416,7 @@ export function PolicyDashboard() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 flex-shrink-0 self-end sm:self-auto">
                         <Button
                           variant="ghost"
                           size="sm"
