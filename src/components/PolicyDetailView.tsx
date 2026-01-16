@@ -16,7 +16,6 @@ import {
   groupCoverageSubLimits,
   sortByImportance,
   analyzeExclusionsComprehensive,
-  getCoverageClarifications,
   type GroupedCoverage,
   type AnalyzedExclusion,
 } from '@/lib/knowledge/kasko-knowledge'
@@ -92,47 +91,125 @@ function getCategoryInfo(category: CoverageCategory) {
 }
 
 /**
- * Get background color based on coverage importance
+ * Collapsible coverage category for mobile-friendly display
  */
-function getCoverageBackground(coverage: Coverage): string {
-  const importance = coverage.importance || 'standard'
+function CollapsibleCoverageCategory({
+  categoryKey: _categoryKey,
+  categoryLabel,
+  CategoryIcon,
+  coverages,
+  locale,
+  defaultExpanded = false,
+}: {
+  categoryKey: string // Used for React key prop
+  categoryLabel: string
+  CategoryIcon: React.ElementType
+  coverages: GroupedCoverage[]
+  locale: string
+  defaultExpanded?: boolean
+}) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const PREVIEW_COUNT = 2
 
-  if (!coverage.included) {
-    return 'bg-gray-50'
-  }
+  const hasMore = coverages.length > PREVIEW_COUNT
+  const displayedCoverages = isExpanded ? coverages : coverages.slice(0, PREVIEW_COUNT)
 
-  switch (importance) {
-    case 'critical':
-      return 'bg-green-50'
-    case 'standard':
-      return 'bg-blue-50'
-    case 'minor':
-      return 'bg-gray-50'
-    default:
-      return 'bg-green-50'
-  }
-}
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      {/* Category header - clickable */}
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="flex items-center justify-between w-full px-3 py-2.5 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <CategoryIcon className="text-gray-600" size={18} />
+          <h4 className="font-semibold text-gray-900 text-sm">{categoryLabel}</h4>
+          <Badge variant="outline" className="text-xs">
+            {coverages.length}
+          </Badge>
+        </div>
+        <ChevronDown
+          size={18}
+          className={`text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+        />
+      </button>
 
-/**
- * Get icon color based on coverage importance
- */
-function getCoverageIconStyle(coverage: Coverage): { bg: string; icon: string } {
-  const importance = coverage.importance || 'standard'
+      {/* Coverage items */}
+      <div className="p-2 space-y-1.5">
+        {displayedCoverages.map((groupedCoverage, i) => {
+          // Handle grouped coverages with sub-limits
+          if (groupedCoverage.isGrouped && groupedCoverage.subLimits) {
+            return (
+              <div key={i} className="p-2.5 rounded-lg bg-blue-50 border border-blue-100">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
+                    <Check className="text-blue-600" size={12} />
+                  </div>
+                  <p className="font-medium text-gray-900 text-sm truncate">{groupedCoverage.name}</p>
+                </div>
+                <div className="grid grid-cols-1 gap-1 ml-8">
+                  {groupedCoverage.subLimits.map((subLimit, j) => (
+                    <div key={j} className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600 truncate mr-2">{subLimit.label}</span>
+                      <span className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
+                        {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          }
 
-  if (!coverage.included) {
-    return { bg: 'bg-gray-200', icon: 'text-gray-400' }
-  }
+          // Regular coverage
+          const coverage = groupedCoverage as unknown as Coverage
+          const limitDisplay = formatCoverageLimit(coverage)
+          const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
+            limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
 
-  switch (importance) {
-    case 'critical':
-      return { bg: 'bg-green-100', icon: 'text-green-600' }
-    case 'standard':
-      return { bg: 'bg-blue-100', icon: 'text-blue-600' }
-    case 'minor':
-      return { bg: 'bg-gray-100', icon: 'text-gray-500' }
-    default:
-      return { bg: 'bg-green-100', icon: 'text-green-600' }
-  }
+          return (
+            <div key={i} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {coverage.included !== false ? (
+                  <div className="w-6 h-6 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
+                    <Check className="text-green-600" size={12} />
+                  </div>
+                ) : (
+                  <div className="w-6 h-6 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
+                    <X className="text-gray-400" size={12} />
+                  </div>
+                )}
+                <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
+              </div>
+              <p className={`font-semibold text-sm flex-shrink-0 ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                {limitDisplay}
+              </p>
+            </div>
+          )
+        })}
+
+        {/* Show more/less button */}
+        {hasMore && (
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="flex items-center justify-center gap-1 w-full py-2 text-xs text-blue-600 hover:text-blue-700 font-medium"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp size={14} />
+                {locale === 'tr' ? 'Daha az göster' : 'Show less'}
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} />
+                +{coverages.length - PREVIEW_COUNT} {locale === 'tr' ? 'daha fazla' : 'more'}
+              </>
+            )}
+          </button>
+        )}
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -235,8 +312,8 @@ function CoveragesByCategory({
         </div>
       )}
 
-      {/* Grouped coverages */}
-      {categoryOrder.map(categoryKey => {
+      {/* Grouped coverages - Collapsible categories for mobile */}
+      {categoryOrder.map((categoryKey, index) => {
         const categoryCoverages = groupedCoverages[categoryKey]
         if (!categoryCoverages || categoryCoverages.length === 0) return null
 
@@ -244,106 +321,15 @@ function CoveragesByCategory({
         const CategoryIcon = getCategoryIcon(categoryKey)
 
         return (
-          <div key={categoryKey}>
-            <div className="flex items-center gap-2 mb-3">
-              <CategoryIcon className="text-gray-600" size={18} />
-              <h4 className="font-semibold text-gray-900">{categoryInfo.labelTr}</h4>
-              <Badge variant="outline" className="text-xs">
-                {categoryCoverages.length}
-              </Badge>
-            </div>
-            <div className="space-y-2">
-              {categoryCoverages.map((groupedCoverage, i) => {
-                // Handle grouped coverages with sub-limits
-                if (groupedCoverage.isGrouped && groupedCoverage.subLimits) {
-                  return (
-                    <div
-                      key={i}
-                      className="p-3 rounded-lg bg-blue-50 border border-blue-100 overflow-hidden"
-                    >
-                      {/* Parent coverage header */}
-                      <div className="flex items-center gap-3 mb-3 min-w-0">
-                        <div className="w-7 h-7 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <Check className="text-blue-600" size={14} />
-                        </div>
-                        <p className="font-medium text-gray-900 min-w-0 truncate">{groupedCoverage.name}</p>
-                      </div>
-                      {/* Sub-limits grid - single column on mobile, 2 cols on tablet+ */}
-                      <div className="ml-0 md:ml-10 mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {groupedCoverage.subLimits.map((subLimit, j) => (
-                          <div key={j} className="flex justify-between items-center bg-white/60 px-3 py-2 rounded-md min-w-0 overflow-hidden">
-                            <span className="text-xs sm:text-sm text-gray-600 truncate mr-2 min-w-0">{subLimit.label}</span>
-                            <span className={`text-xs sm:text-sm font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
-                              {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                }
-
-                // Regular (non-grouped) coverage
-                const coverage = groupedCoverage as unknown as Coverage
-                const iconStyle = getCoverageIconStyle(coverage)
-                const limitDisplay = formatCoverageLimit(coverage)
-                const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
-                  limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
-
-                // Check if this coverage needs clarification
-                const clarification = getCoverageClarifications(coverage.name)
-
-                return (
-                  <div
-                    key={i}
-                    className={`p-3 rounded-lg ${getCoverageBackground(coverage)} overflow-hidden`}
-                  >
-                    <div className="flex items-center justify-between gap-2 min-w-0">
-                      <div className="flex items-center gap-3 min-w-0 flex-1 overflow-hidden">
-                        {coverage.included !== false ? (
-                          <div className={`w-7 h-7 ${iconStyle.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                            <Check className={iconStyle.icon} size={14} />
-                          </div>
-                        ) : (
-                          <div className="w-7 h-7 bg-gray-200 rounded-lg flex items-center justify-center flex-shrink-0">
-                            <X className="text-gray-400" size={14} />
-                          </div>
-                        )}
-                        <div className="min-w-0 overflow-hidden">
-                          <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
-                          {coverage.nameTr && coverage.nameTr !== coverage.name && (
-                            <p className="text-xs text-gray-500 truncate">{coverage.nameTr}</p>
-                          )}
-                        </div>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className={`font-semibold text-sm ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
-                          {limitDisplay}
-                        </p>
-                        {coverage.deductible > 0 && (
-                          <p className="text-xs text-gray-500">Muafiyet: {formatCurrency(coverage.deductible)}</p>
-                        )}
-                      </div>
-                    </div>
-                    {/* Clarification prompt for service coverages */}
-                    {clarification && isSpecialValue && (
-                      <div className="mt-2 ml-10 p-2 bg-blue-50/50 rounded-md border border-blue-100 overflow-hidden">
-                        <p className="text-xs text-blue-700 flex items-center gap-1">
-                          <HelpCircle size={11} className="flex-shrink-0" />
-                          <span className="truncate">{locale === 'tr' ? clarification.question : clarification.questionEn}</span>
-                        </p>
-                        <div className="text-xs text-blue-600 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
-                          {clarification.details.map((detail, j) => (
-                            <span key={j}>• {detail}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          </div>
+          <CollapsibleCoverageCategory
+            key={categoryKey}
+            categoryKey={categoryKey}
+            categoryLabel={categoryInfo.labelTr}
+            CategoryIcon={CategoryIcon}
+            coverages={categoryCoverages}
+            locale={locale}
+            defaultExpanded={index === 0} // First category expanded by default
+          />
         )
       })}
     </div>
@@ -772,7 +758,7 @@ export function PolicyDetailView() {
               <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
             </button>
 
-            {/* Policy type as title, provider as subtitle - more relevant for users */}
+            {/* Policy type as title, provider and plate as subtitles */}
             <div className="flex items-center gap-2 flex-1 overflow-hidden" style={{ minWidth: 0 }}>
               <span className="text-lg sm:text-2xl flex-shrink-0">{policy.logo}</span>
               <div className="overflow-hidden" style={{ minWidth: 0 }}>
@@ -786,6 +772,12 @@ export function PolicyDetailView() {
                 <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis" title={policy.provider}>
                   {policy.provider}
                 </p>
+                {/* Show plate for vehicle policies */}
+                {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo?.plate && (
+                  <p className="text-xs text-blue-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                    🚗 {policy.vehicleInfo.plate}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -910,29 +902,18 @@ export function PolicyDetailView() {
                     </p>
                   </div>
 
-                  {/* Type & Vehicle/Location row - only show relevant info */}
+                  {/* Policy number - now that type is in header */}
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
-                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Tür</p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{policy.typeTr}</p>
+                    <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Poliçe No</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">{policy.policyNumber}</p>
                   </div>
 
-                  {/* Vehicle for Kasko/Traffic, Location for others - only if available */}
-                  {(policy.type === 'kasko' || policy.type === 'traffic') ? (
-                    policy.vehicleInfo && (
-                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
-                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Araç</p>
-                        <p className="text-sm font-semibold text-gray-900 truncate">
-                          {policy.vehicleInfo.plate || `${policy.vehicleInfo.make || ''} ${policy.vehicleInfo.model || ''}`.trim() || '-'}
-                        </p>
-                      </div>
-                    )
-                  ) : (
-                    policy.location && (
-                      <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
-                        <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Konum</p>
-                        <p className="text-sm font-semibold text-gray-900 truncate">{policy.location}</p>
-                      </div>
-                    )
+                  {/* Location for non-vehicle policies */}
+                  {policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location && (
+                    <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
+                      <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Konum</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">{policy.location}</p>
+                    </div>
                   )}
                 </div>
 
@@ -1053,12 +1034,16 @@ export function PolicyDetailView() {
                   {(insightsExpanded
                     ? policy.aiInsights
                     : policy.aiInsights.slice(0, 3)
-                  ).map((insight, i) => (
-                    <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
-                      <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
-                      <span>{insight}</span>
-                    </div>
-                  ))}
+                  ).map((insight, i) => {
+                    // Strip any existing checkmark characters from the text
+                    const cleanInsight = insight.replace(/^[✓✔☑]\s*/g, '').trim()
+                    return (
+                      <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
+                        <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
+                        <span>{cleanInsight}</span>
+                      </div>
+                    )
+                  })}
                   {policy.aiInsights.length > 3 && (
                     <button
                       onClick={() => setInsightsExpanded(!insightsExpanded)}
