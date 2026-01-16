@@ -943,6 +943,143 @@ export function PolicyDetailView() {
               </CardContent>
             </Card>
 
+            {/* Policy Evaluation - Mobile only (high priority) */}
+            {evaluation && !isEvaluationLoading && (
+              <Card className="lg:hidden">
+                <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                    <BarChart3 className="text-blue-600 flex-shrink-0" size={18} />
+                    <span className="truncate">{locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-4">
+                  {/* Overall Score with Grade - Compact */}
+                  <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900">{evaluation.overallScore}</div>
+                      <div className="text-xs sm:text-sm text-gray-500">/100</div>
+                    </div>
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <GradeBadge grade={evaluation.grade} size="md" />
+                      <StatusIndicator status={evaluation.status} showLabel size="sm" />
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown - Mini for mobile */}
+                  <div className="pt-2 border-t">
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                      {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
+                    </p>
+                    <ScoreBreakdown
+                      breakdown={evaluation.scoreBreakdown}
+                      variant="mini"
+                    />
+                  </div>
+
+                  {/* Top Recommendations - Show first 2 */}
+                  {evaluation.recommendations.length > 0 && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
+                        {locale === 'tr' ? 'Öneriler' : 'Recommendations'}
+                      </p>
+                      <div className="space-y-2">
+                        {evaluation.recommendations.slice(0, 2).map((rec, i) => (
+                          <RecommendationCard key={i} recommendation={rec} compact />
+                        ))}
+                      </div>
+                      {evaluation.recommendations.length > 2 && (
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                          +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* AI Insights - Mobile only (high priority) */}
+            <Card className="lg:hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
+                  <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
+                  <span className="truncate">AI Insights</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-6">
+                <div className="space-y-2 sm:space-y-3">
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <span className="text-purple-600">{locale === 'tr' ? 'Güven:' : 'Confidence:'}</span>
+                    <span className="font-semibold text-purple-900">{Math.round(policy.aiConfidence * 100)}%</span>
+                  </div>
+                  {policy.aiInsights.slice(0, 3).map((insight, i) => (
+                    <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700">
+                      {insight}
+                    </div>
+                  ))}
+                  {policy.aiInsights.length > 3 && (
+                    <p className="text-xs text-purple-600 text-center">
+                      +{policy.aiInsights.length - 3} {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
+                    </p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Market Comparison - Mobile only */}
+            {policy.marketComparison && policy.premium > 0 && (
+              <Card className="lg:hidden">
+                <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                    <TrendingUp className="text-blue-600 flex-shrink-0" size={18} />
+                    <span className="truncate">{locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-6">
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-gray-500">{locale === 'tr' ? 'Priminiz' : 'Your Premium'}</span>
+                        <span className="text-xs text-gray-500">{locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-gray-900">{formatCurrency(policy.premium)}</span>
+                        <span className="font-semibold text-sm text-gray-600">{formatCurrency(policy.marketComparison.averagePremium)}</span>
+                      </div>
+                      {policy.premium < policy.marketComparison.averagePremium && (
+                        <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
+                          <TrendingDown size={12} />
+                          <span>
+                            {Math.round((1 - policy.premium / policy.marketComparison.averagePremium) * 100)}% {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                          </span>
+                        </div>
+                      )}
+                      {policy.premium > policy.marketComparison.averagePremium && (
+                        <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs">
+                          <TrendingUp size={12} />
+                          <span>
+                            {Math.round((policy.premium / policy.marketComparison.averagePremium - 1) * 100)}% {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-gray-500 mb-1">{locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-blue-600"
+                            style={{ width: `${policy.marketComparison.percentile}%` }}
+                          />
+                        </div>
+                        <span className="font-semibold text-gray-900 text-xs">{policy.marketComparison.percentile}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Vehicle Information (Kasko Only) */}
             {policy.type === 'kasko' && policy.vehicleInfo && (
               <Card>
@@ -1017,7 +1154,12 @@ export function PolicyDetailView() {
               locale={locale}
             />
 
-            {/* Document Text Section */}
+            {/* Policy Documents - Mobile only (shown in sidebar on desktop) */}
+            <div className="lg:hidden">
+              <PolicyDocuments policyId={policy.id} />
+            </div>
+
+            {/* Document Text Section - Low priority, at bottom */}
             {(policy.extractedText || policy.processedText) && (
               <RawExtractedTextSection
                 extractedText={policy.extractedText || ''}
@@ -1027,8 +1169,8 @@ export function PolicyDetailView() {
             )}
           </div>
 
-          {/* Sidebar */}
-          <div className="space-y-6 min-w-0 overflow-hidden">
+          {/* Sidebar - Desktop only */}
+          <div className="hidden lg:block space-y-6 min-w-0 overflow-hidden">
             {/* Status Card */}
             <Card>
               <CardContent className="pt-6">
