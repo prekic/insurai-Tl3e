@@ -283,64 +283,61 @@ export function PolicyDashboard() {
           </Button>
         </div>
 
-        {/* Stats Cards - Horizontally scrollable on mobile */}
-        <section aria-label={t.a11y.policyStats} className="mb-8 w-full">
-          <div className="flex sm:grid sm:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 snap-x snap-mandatory scrollbar-hide">
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <FileText className="text-blue-600" size={16} aria-hidden="true" />
+        {/* Stats Cards - Mobile-first grid layout */}
+        <section aria-label={t.a11y.policyStats} className="mb-6 sm:mb-8 w-full">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
+            {/* Total */}
+            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="text-blue-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
-                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.totalPolicies}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.totalPolicies}</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Check className="text-green-600" size={16} aria-hidden="true" />
+            {/* Active */}
+            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Check className="text-green-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
-                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.active}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.active}</span>
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.active}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.active}</p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Shield className="text-purple-600" size={16} aria-hidden="true" />
+            {/* Expiring - shown 3rd on mobile for importance */}
+            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-5">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Calendar className="text-amber-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
-                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.policy.totalSumInsured}</span>
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.expiringSoon}</span>
               </div>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">
-                <span className="sm:hidden">{formatCurrencyCompact(stats.totalSumInsured)}</span>
-                <span className="hidden sm:inline">{formatCurrency(stats.totalSumInsured)}</span>
-              </p>
-              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Bedel' : 'Sum'}</p>
-            </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Banknote className="text-indigo-600" size={16} aria-hidden="true" />
-                </div>
-                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.policy.totalLimit}</span>
-              </div>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">
-                <span className="sm:hidden">{formatCurrencyCompact(stats.totalLimit)}</span>
-                <span className="hidden sm:inline">{formatCurrency(stats.totalLimit)}</span>
-              </p>
-              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Limit' : 'Limit'}</p>
-            </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
-              <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-100 rounded-lg sm:rounded-xl flex items-center justify-center">
-                  <Calendar className="text-amber-600" size={16} aria-hidden="true" />
-                </div>
-                <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">{t.dashboard.expiringSoon}</span>
-              </div>
-              <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.expiring}</p>
+              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.expiring}</p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</p>
+            </div>
+            {/* Sum Insured - hidden on mobile, shown on sm+ */}
+            <div className="hidden sm:block bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-3">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Shield className="text-purple-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                </div>
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.policy.totalSumInsured}</span>
+              </div>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
+            </div>
+            {/* Limit - hidden on mobile, shown on sm+ */}
+            <div className="hidden sm:block bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-4">
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
+                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Banknote className="text-indigo-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+                </div>
+                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.policy.totalLimit}</span>
+              </div>
+              <p className="text-lg sm:text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
             </div>
           </div>
         </section>
