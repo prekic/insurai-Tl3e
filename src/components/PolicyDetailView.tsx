@@ -726,6 +726,11 @@ export function PolicyDetailView() {
 
   const { evaluation, isLoading: isEvaluationLoading } = usePolicyEvaluation(policy)
 
+  // Mobile expandable section states
+  const [insightsExpanded, setInsightsExpanded] = useState(false)
+  const [recommendationsExpanded, setRecommendationsExpanded] = useState(false)
+  const [scoreBreakdownExpanded, setScoreBreakdownExpanded] = useState(false)
+
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
     return (
@@ -965,32 +970,64 @@ export function PolicyDetailView() {
                     </div>
                   </div>
 
-                  {/* Score Breakdown - Mini for mobile */}
+                  {/* Score Breakdown - Expandable */}
                   <div className="pt-2 border-t">
-                    <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                      {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
-                    </p>
-                    <ScoreBreakdown
-                      breakdown={evaluation.scoreBreakdown}
-                      variant="mini"
-                    />
+                    <button
+                      onClick={() => setScoreBreakdownExpanded(!scoreBreakdownExpanded)}
+                      className="flex items-center justify-between w-full text-left mb-2"
+                    >
+                      <p className="text-xs sm:text-sm font-medium text-gray-700">
+                        {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
+                      </p>
+                      <ChevronDown
+                        size={16}
+                        className={`text-gray-400 transition-transform ${scoreBreakdownExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+                    {scoreBreakdownExpanded ? (
+                      <ScoreBreakdown
+                        breakdown={evaluation.scoreBreakdown}
+                        variant="full"
+                      />
+                    ) : (
+                      <ScoreBreakdown
+                        breakdown={evaluation.scoreBreakdown}
+                        variant="mini"
+                      />
+                    )}
                   </div>
 
-                  {/* Top Recommendations - Show first 2 */}
+                  {/* Recommendations - Expandable */}
                   {evaluation.recommendations.length > 0 && (
                     <div className="pt-2 border-t">
                       <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
                         {locale === 'tr' ? 'Öneriler' : 'Recommendations'}
                       </p>
                       <div className="space-y-2">
-                        {evaluation.recommendations.slice(0, 2).map((rec, i) => (
+                        {(recommendationsExpanded
+                          ? evaluation.recommendations
+                          : evaluation.recommendations.slice(0, 2)
+                        ).map((rec, i) => (
                           <RecommendationCard key={i} recommendation={rec} compact />
                         ))}
                       </div>
                       {evaluation.recommendations.length > 2 && (
-                        <p className="text-xs text-gray-500 mt-2 text-center">
-                          +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more'}
-                        </p>
+                        <button
+                          onClick={() => setRecommendationsExpanded(!recommendationsExpanded)}
+                          className="flex items-center justify-center gap-1 w-full mt-2 py-1.5 text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          {recommendationsExpanded ? (
+                            <>
+                              <ChevronUp size={14} />
+                              {locale === 'tr' ? 'Daha az göster' : 'Show less'}
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown size={14} />
+                              +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                            </>
+                          )}
+                        </button>
                       )}
                     </div>
                   )}
@@ -1004,23 +1041,39 @@ export function PolicyDetailView() {
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
                   <span className="truncate">AI Insights</span>
+                  <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 ml-auto">
+                    {Math.round(policy.aiConfidence * 100)}%
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 sm:space-y-3">
-                  <div className="flex items-center gap-2 text-xs sm:text-sm">
-                    <span className="text-purple-600">{locale === 'tr' ? 'Güven:' : 'Confidence:'}</span>
-                    <span className="font-semibold text-purple-900">{Math.round(policy.aiConfidence * 100)}%</span>
-                  </div>
-                  {policy.aiInsights.slice(0, 3).map((insight, i) => (
-                    <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700">
-                      {insight}
+                  {(insightsExpanded
+                    ? policy.aiInsights
+                    : policy.aiInsights.slice(0, 3)
+                  ).map((insight, i) => (
+                    <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
+                      <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
+                      <span>{insight}</span>
                     </div>
                   ))}
                   {policy.aiInsights.length > 3 && (
-                    <p className="text-xs text-purple-600 text-center">
-                      +{policy.aiInsights.length - 3} {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
-                    </p>
+                    <button
+                      onClick={() => setInsightsExpanded(!insightsExpanded)}
+                      className="flex items-center justify-center gap-1 w-full mt-1 py-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium"
+                    >
+                      {insightsExpanded ? (
+                        <>
+                          <ChevronUp size={14} />
+                          {locale === 'tr' ? 'Daha az göster' : 'Show less'}
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={14} />
+                          +{policy.aiInsights.length - 3} {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
+                        </>
+                      )}
+                    </button>
                   )}
                 </div>
               </CardContent>

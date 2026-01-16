@@ -45,13 +45,13 @@ function SingleScore({ score, label, weight, details, variant }: SingleScoreProp
     return (
       <span
         className={cn(
-          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium',
+          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap',
           getScoreBgColor(score),
           getScoreTextColor(score)
         )}
         title={details}
       >
-        <span className="truncate max-w-[60px]">{label}</span>
+        <span>{label}</span>
         <span className="font-bold">{Math.round(score)}</span>
       </span>
     )
