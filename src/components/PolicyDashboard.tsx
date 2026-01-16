@@ -283,61 +283,87 @@ export function PolicyDashboard() {
           </Button>
         </div>
 
-        {/* Stats Cards - Compact mobile-first grid */}
-        <section aria-label={t.a11y.policyStats} className="mb-4 sm:mb-8 w-full">
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
-            {/* Total */}
-            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
-                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-blue-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileText className="text-blue-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
-                </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.totalPolicies}</span>
+        {/* Stats - Compact inline bar on mobile, cards on desktop */}
+        <section aria-label={t.a11y.policyStats} className="mb-3 sm:mb-8 w-full">
+          {/* Mobile: Single compact row */}
+          <div className="flex sm:hidden items-center gap-2 py-2 px-1 overflow-x-auto scrollbar-hide">
+            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
+              <FileText className="text-blue-600 w-3.5 h-3.5" aria-hidden="true" />
+              <span className="text-sm font-semibold text-gray-900">{stats.total}</span>
+              <span className="text-[10px] text-gray-500">{locale === 'tr' ? 'Toplam' : 'Total'}</span>
+            </div>
+            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-full px-3 py-1.5 shadow-sm">
+              <Check className="text-green-600 w-3.5 h-3.5" aria-hidden="true" />
+              <span className="text-sm font-semibold text-gray-900">{stats.active}</span>
+              <span className="text-[10px] text-gray-500">{locale === 'tr' ? 'Aktif' : 'Active'}</span>
+            </div>
+            {stats.expiring > 0 && (
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 rounded-full px-3 py-1.5 shadow-sm">
+                <Calendar className="text-amber-600 w-3.5 h-3.5" aria-hidden="true" />
+                <span className="text-sm font-semibold text-amber-700">{stats.expiring}</span>
+                <span className="text-[10px] text-amber-600">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</span>
               </div>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
+            )}
+            {stats.expiring === 0 && (
+              <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+                <Calendar className="text-gray-400 w-3.5 h-3.5" aria-hidden="true" />
+                <span className="text-sm font-semibold text-gray-400">0</span>
+                <span className="text-[10px] text-gray-400">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Full cards grid */}
+          <div className="hidden sm:grid sm:grid-cols-5 gap-4">
+            {/* Total */}
+            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <FileText className="text-blue-600 w-4 h-4" aria-hidden="true" />
+                </div>
+                <span className="text-xs text-gray-500">{t.dashboard.totalPolicies}</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
             </div>
             {/* Active */}
-            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
-                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-green-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Check className="text-green-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
-                </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.active}</span>
-              </div>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.active}</p>
-              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
-            </div>
-            {/* Expiring - shown 3rd on mobile for importance */}
-            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm sm:order-5">
-              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
-                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-amber-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Calendar className="text-amber-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
-                </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.expiringSoon}</span>
-              </div>
-              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.expiring}</p>
-              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</p>
-            </div>
-            {/* Sum Insured - hidden on mobile, shown on sm+ */}
-            <div className="hidden sm:block bg-white rounded-xl p-5 border border-gray-100 shadow-sm sm:order-3">
+            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+                  <Check className="text-green-600 w-4 h-4" aria-hidden="true" />
+                </div>
+                <span className="text-xs text-gray-500">{t.dashboard.active}</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{stats.active}</p>
+            </div>
+            {/* Sum Insured */}
+            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Shield className="text-purple-600 w-4 h-4" aria-hidden="true" />
                 </div>
                 <span className="text-xs text-gray-500">{t.policy.totalSumInsured}</span>
               </div>
               <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
             </div>
-            {/* Limit - hidden on mobile, shown on sm+ */}
-            <div className="hidden sm:block bg-white rounded-xl p-5 border border-gray-100 shadow-sm sm:order-4">
+            {/* Limit */}
+            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
               <div className="flex items-center gap-2 mb-1">
-                <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
                   <Banknote className="text-indigo-600 w-4 h-4" aria-hidden="true" />
                 </div>
                 <span className="text-xs text-gray-500">{t.policy.totalLimit}</span>
               </div>
               <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
+            </div>
+            {/* Expiring */}
+            <div className="bg-white rounded-xl p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-9 h-9 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <Calendar className="text-amber-600 w-4 h-4" aria-hidden="true" />
+                </div>
+                <span className="text-xs text-gray-500">{t.dashboard.expiringSoon}</span>
+              </div>
+              <p className="text-2xl font-bold text-gray-900">{stats.expiring}</p>
             </div>
           </div>
         </section>
