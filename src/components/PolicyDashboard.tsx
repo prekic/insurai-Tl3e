@@ -453,9 +453,9 @@ export function PolicyDashboard() {
         )}
 
         {/* Filters */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-6" role="search">
+        <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-6 overflow-hidden" role="search">
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} aria-hidden="true" />
               <label htmlFor={`${baseId}-search`} className="sr-only">{t.dashboard.searchPolicies}</label>
               <input
@@ -467,8 +467,8 @@ export function PolicyDashboard() {
                 className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4">
-              <fieldset className="flex gap-1 sm:gap-2 overflow-x-auto">
+            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 min-w-0">
+              <fieldset className="flex gap-1 sm:gap-2 overflow-x-auto min-w-0 scrollbar-hide">
                 <legend className="sr-only">{t.dashboard.filterByStatus}</legend>
                 {[
                   { key: 'all', label: t.common.all, mobileLabel: locale === 'tr' ? 'Tümü' : 'All' },
