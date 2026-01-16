@@ -730,6 +730,8 @@ export function PolicyDetailView() {
   const [insightsExpanded, setInsightsExpanded] = useState(false)
   const [recommendationsExpanded, setRecommendationsExpanded] = useState(false)
   const [scoreBreakdownExpanded, setScoreBreakdownExpanded] = useState(false)
+  const [coveragesExpanded, setCoveragesExpanded] = useState(true) // Default expanded - important content
+  const [exclusionsExpanded, setExclusionsExpanded] = useState(false) // Default collapsed
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -770,19 +772,19 @@ export function PolicyDetailView() {
               <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
             </button>
 
-            {/* Provider info - MUST truncate on mobile */}
+            {/* Policy type as title, provider as subtitle - more relevant for users */}
             <div className="flex items-center gap-2 flex-1 overflow-hidden" style={{ minWidth: 0 }}>
               <span className="text-lg sm:text-2xl flex-shrink-0">{policy.logo}</span>
               <div className="overflow-hidden" style={{ minWidth: 0 }}>
                 <h1
                   className="text-sm sm:text-base font-bold text-gray-900 whitespace-nowrap overflow-hidden text-ellipsis"
                   style={{ maxWidth: '100%' }}
-                  title={policy.provider}
+                  title={policy.typeTr}
                 >
-                  {policy.provider}
+                  {policy.typeTr}
                 </h1>
-                <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis">
-                  {policy.policyNumber}
+                <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis" title={policy.provider}>
+                  {policy.provider}
                 </p>
               </div>
             </div>
@@ -1185,27 +1187,81 @@ export function PolicyDetailView() {
               </Card>
             )}
 
-            {/* Coverages - Grouped by Category */}
+            {/* Coverages - Grouped by Category - Expandable */}
             <Card className="overflow-hidden">
-              <CardHeader>
-                <CardTitle>Teminat Detayları</CardTitle>
+              <CardHeader className="py-3 px-4 sm:py-4 sm:px-6">
+                <button
+                  onClick={() => setCoveragesExpanded(!coveragesExpanded)}
+                  className="flex items-center justify-between w-full"
+                >
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <Shield className="text-blue-600" size={20} />
+                    Teminat Detayları
+                    <Badge variant="outline" className="text-xs ml-1">
+                      {policy.coverages.length}
+                    </Badge>
+                  </CardTitle>
+                  <ChevronDown
+                    size={20}
+                    className={`text-gray-400 transition-transform ${coveragesExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
               </CardHeader>
-              <CardContent>
-                <CoveragesByCategory
-                  coverages={policy.coverages}
-                  policyType={policy.type}
-                  locale={locale}
-                />
-              </CardContent>
+              {coveragesExpanded && (
+                <CardContent>
+                  <CoveragesByCategory
+                    coverages={policy.coverages}
+                    policyType={policy.type}
+                    locale={locale}
+                  />
+                </CardContent>
+              )}
+              {!coveragesExpanded && (
+                <CardContent className="pt-0 pb-3">
+                  <p className="text-sm text-gray-500">
+                    {locale === 'tr' ? 'Detayları görmek için tıklayın' : 'Click to view details'}
+                  </p>
+                </CardContent>
+              )}
             </Card>
 
-            {/* Exclusions - Comprehensive Analysis */}
-            <ExclusionsSection
-              exclusions={policy.exclusions}
-              policyType={policy.type}
-              isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
-              locale={locale}
-            />
+            {/* Exclusions - Comprehensive Analysis - Expandable */}
+            <Card className="overflow-hidden">
+              <CardHeader className="py-3 px-4 sm:py-4 sm:px-6">
+                <button
+                  onClick={() => setExclusionsExpanded(!exclusionsExpanded)}
+                  className="flex items-center justify-between w-full"
+                >
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                    <AlertTriangle className="text-amber-500" size={20} />
+                    {locale === 'tr' ? 'İstisnalar & Sorular' : 'Exclusions & Questions'}
+                    <Badge variant="outline" className="text-xs ml-1">
+                      {policy.exclusions.length}
+                    </Badge>
+                  </CardTitle>
+                  <ChevronDown
+                    size={20}
+                    className={`text-gray-400 transition-transform ${exclusionsExpanded ? 'rotate-180' : ''}`}
+                  />
+                </button>
+              </CardHeader>
+              {exclusionsExpanded ? (
+                <CardContent className="pt-0">
+                  <ExclusionsSection
+                    exclusions={policy.exclusions}
+                    policyType={policy.type}
+                    isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
+                    locale={locale}
+                  />
+                </CardContent>
+              ) : (
+                <CardContent className="pt-0 pb-3">
+                  <p className="text-sm text-gray-500">
+                    {locale === 'tr' ? 'Kapsam dışı durumlar ve sigortacıya sorulacak konular' : 'Uncovered situations and questions for your insurer'}
+                  </p>
+                </CardContent>
+              )}
+            </Card>
 
             {/* Policy Documents - Mobile only (shown in sidebar on desktop) */}
             <div className="lg:hidden">
