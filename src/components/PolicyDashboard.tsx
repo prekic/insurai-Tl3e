@@ -286,7 +286,7 @@ export function PolicyDashboard() {
         {/* Stats Cards - Horizontally scrollable on mobile */}
         <section aria-label={t.a11y.policyStats} className="mb-8 w-full">
           <div className="flex sm:grid sm:grid-cols-5 gap-3 sm:gap-4 overflow-x-auto pb-2 sm:pb-0 snap-x snap-mandatory scrollbar-hide">
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto snap-start">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-100 rounded-lg sm:rounded-xl flex items-center justify-center">
                   <FileText className="text-blue-600" size={16} aria-hidden="true" />
@@ -296,7 +296,7 @@ export function PolicyDashboard() {
               <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.total}</p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto snap-start">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 rounded-lg sm:rounded-xl flex items-center justify-center">
                   <Check className="text-green-600" size={16} aria-hidden="true" />
@@ -306,7 +306,7 @@ export function PolicyDashboard() {
               <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stats.active}</p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto snap-start">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 rounded-lg sm:rounded-xl flex items-center justify-center">
                   <Shield className="text-purple-600" size={16} aria-hidden="true" />
@@ -319,7 +319,7 @@ export function PolicyDashboard() {
               </p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Bedel' : 'Sum'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto snap-start">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-100 rounded-lg sm:rounded-xl flex items-center justify-center">
                   <Banknote className="text-indigo-600" size={16} aria-hidden="true" />
@@ -332,7 +332,7 @@ export function PolicyDashboard() {
               </p>
               <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Limit' : 'Limit'}</p>
             </div>
-            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto snap-start">
+            <div className="bg-white rounded-xl sm:rounded-2xl p-4 sm:p-6 border border-gray-100 shadow-sm flex-shrink-0 min-w-[120px] w-32 sm:w-auto snap-start">
               <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 bg-amber-100 rounded-lg sm:rounded-xl flex items-center justify-center">
                   <Calendar className="text-amber-600" size={16} aria-hidden="true" />
