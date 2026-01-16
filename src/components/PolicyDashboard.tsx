@@ -270,74 +270,74 @@ export function PolicyDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden" dir={isRTL ? 'rtl' : 'ltr'}>
-      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 w-full overflow-hidden">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
+      <div className="max-w-[1600px] mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-8 w-full overflow-hidden">
+        {/* Header - Compact on mobile */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">{t.dashboard.title}</h1>
-            <p className="text-gray-600">{t.dashboard.subtitle}</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t.dashboard.title}</h1>
+            <p className="text-sm sm:text-base text-gray-600">{t.dashboard.subtitle}</p>
           </div>
-          <Button onClick={handleUploadPolicy} className="gap-2">
+          <Button onClick={handleUploadPolicy} className="gap-2 w-full sm:w-auto">
             <Plus size={18} aria-hidden="true" />
             {t.upload.uploadPolicy}
           </Button>
         </div>
 
-        {/* Stats Cards - Mobile-first grid layout */}
-        <section aria-label={t.a11y.policyStats} className="mb-6 sm:mb-8 w-full">
+        {/* Stats Cards - Compact mobile-first grid */}
+        <section aria-label={t.a11y.policyStats} className="mb-4 sm:mb-8 w-full">
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-4">
             {/* Total */}
-            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <FileText className="text-blue-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
+                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-blue-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
+                  <FileText className="text-blue-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.totalPolicies}</span>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.total}</p>
-              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.total}</p>
+              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Toplam' : 'Total'}</p>
             </div>
             {/* Active */}
-            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Check className="text-green-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
+                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-green-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Check className="text-green-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.active}</span>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.active}</p>
-              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.active}</p>
+              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Aktif' : 'Active'}</p>
             </div>
             {/* Expiring - shown 3rd on mobile for importance */}
-            <div className="bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-5">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-amber-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Calendar className="text-amber-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+            <div className="bg-white rounded-lg sm:rounded-xl p-2.5 sm:p-5 border border-gray-100 shadow-sm sm:order-5">
+              <div className="flex items-center gap-1.5 mb-0.5 sm:mb-1">
+                <div className="w-5 h-5 sm:w-9 sm:h-9 bg-amber-100 rounded-md sm:rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Calendar className="text-amber-600 w-2.5 h-2.5 sm:w-4 sm:h-4" aria-hidden="true" />
                 </div>
                 <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.dashboard.expiringSoon}</span>
               </div>
-              <p className="text-xl sm:text-2xl font-bold text-gray-900">{stats.expiring}</p>
-              <p className="text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</p>
+              <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.expiring}</p>
+              <p className="text-[9px] sm:text-[10px] text-gray-500 sm:hidden">{locale === 'tr' ? 'Yaklaşan' : 'Expiring'}</p>
             </div>
             {/* Sum Insured - hidden on mobile, shown on sm+ */}
-            <div className="hidden sm:block bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-3">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Shield className="text-purple-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+            <div className="hidden sm:block bg-white rounded-xl p-5 border border-gray-100 shadow-sm sm:order-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Shield className="text-purple-600 w-4 h-4" aria-hidden="true" />
                 </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.policy.totalSumInsured}</span>
+                <span className="text-xs text-gray-500">{t.policy.totalSumInsured}</span>
               </div>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
+              <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalSumInsured)}</p>
             </div>
             {/* Limit - hidden on mobile, shown on sm+ */}
-            <div className="hidden sm:block bg-white rounded-xl p-3 sm:p-5 border border-gray-100 shadow-sm sm:order-4">
-              <div className="flex items-center gap-1.5 sm:gap-2 mb-1">
-                <div className="w-6 h-6 sm:w-9 sm:h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <Banknote className="text-indigo-600 w-3 h-3 sm:w-4 sm:h-4" aria-hidden="true" />
+            <div className="hidden sm:block bg-white rounded-xl p-5 border border-gray-100 shadow-sm sm:order-4">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <Banknote className="text-indigo-600 w-4 h-4" aria-hidden="true" />
                 </div>
-                <span className="text-[10px] sm:text-xs text-gray-500 hidden sm:block">{t.policy.totalLimit}</span>
+                <span className="text-xs text-gray-500">{t.policy.totalLimit}</span>
               </div>
-              <p className="text-lg sm:text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
+              <p className="text-xl font-bold text-gray-900">{formatCurrency(stats.totalLimit)}</p>
             </div>
           </div>
         </section>
@@ -449,11 +449,11 @@ export function PolicyDashboard() {
           </div>
         )}
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl border border-gray-100 p-3 sm:p-4 mb-6 overflow-hidden" role="search">
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+        {/* Filters - Compact on mobile */}
+        <div className="bg-white rounded-xl sm:rounded-2xl border border-gray-100 p-2.5 sm:p-4 mb-4 sm:mb-6 overflow-hidden" role="search">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
             <div className="relative flex-1 min-w-0">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} aria-hidden="true" />
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
               <label htmlFor={`${baseId}-search`} className="sr-only">{t.dashboard.searchPolicies}</label>
               <input
                 id={`${baseId}-search`}
@@ -461,10 +461,10 @@ export function PolicyDashboard() {
                 placeholder={locale === 'tr' ? 'Ara...' : 'Search...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2.5 text-sm border border-gray-200 rounded-lg sm:rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-            <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 min-w-0">
+            <div className="flex items-center justify-between sm:justify-start gap-1.5 sm:gap-4 min-w-0">
               <fieldset className="flex gap-1 sm:gap-2 overflow-x-auto min-w-0 scrollbar-hide">
                 <legend className="sr-only">{t.dashboard.filterByStatus}</legend>
                 {[
@@ -477,7 +477,7 @@ export function PolicyDashboard() {
                     key={key}
                     onClick={() => setStatusFilter(key)}
                     aria-pressed={statusFilter === key}
-                    className={`px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium transition-all focus-ring whitespace-nowrap ${
+                    className={`px-2 sm:px-4 py-1 sm:py-2 rounded-md sm:rounded-xl text-[11px] sm:text-sm font-medium transition-all focus-ring whitespace-nowrap ${
                       statusFilter === key
                         ? 'bg-slate-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
