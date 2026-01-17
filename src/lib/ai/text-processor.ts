@@ -1061,10 +1061,12 @@ export async function processTextEnhanced(
 
     const stats: CleanupStats = {
       garbageBlocksRemoved: 0, // Clean-room doesn't track this granularly
+      qrBlocksRemoved: 0,
       spacedCharsFixed: 0,
       urlsCleaned: 0,
       linesRemoved: 0,
       totalCharactersRemoved: rawText.length - cleanRoomResult.cleanCopy.length,
+      sectionsIdentified: [],
     }
 
     return {
