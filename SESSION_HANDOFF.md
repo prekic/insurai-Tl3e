@@ -124,7 +124,7 @@ const [expanded, setExpanded] = useState(false)
 
 ---
 
-## Known Issues (Non-blocking)
+## New Files Created
 
 | Issue | Severity | Notes |
 |-------|----------|-------|
@@ -194,6 +194,9 @@ npm run dev:all
 # Validate before commit
 npm run validate
 
+# Run mobile viewport tests
+npx playwright test e2e/mobile-viewport.spec.ts --project=chromium
+
 # Build production
 npm run build && npm run build:server
 
@@ -236,6 +239,7 @@ To force cache refresh for users:
 ## Handoff Checklist
 
 - [x] All tests passing
+- [x] E2E mobile viewport tests passing
 - [x] No TypeScript errors
 - [x] No lint warnings
 - [x] Changes committed
