@@ -7,9 +7,12 @@
  * - Cleans up URLs and emails (www. site. com → www.site.com)
  * - Corrects OCR errors and formatting
  * - Makes text human and AI readable
+ *
+ * NEW: Clean-room document normalization mode for legally auditable processing
  */
 
 import { env } from '@/lib/env'
+import { DocumentNormalizer, type DocumentNormalizerOutput } from './document-normalizer'
 
 export interface ProcessedTextResult {
   success: boolean
@@ -802,4 +805,131 @@ export function estimateTextQuality(text: string): number {
   score -= excessiveSpaces * 2
 
   return Math.max(0, Math.min(100, score))
+}
+
+// =============================================================================
+// CLEAN-ROOM DOCUMENT NORMALIZATION
+// =============================================================================
+
+export interface CleanRoomResult {
+  cleanCopy: string
+  redactedCopy: string
+  piiVault: DocumentNormalizerOutput['piiVault']
+  validationReport: DocumentNormalizerOutput['validationReport']
+  metadata: DocumentNormalizerOutput['metadata']
+}
+
+/**
+ * Process document using clean-room normalization
+ *
+ * This is the preferred method for legally auditable document processing.
+ * It follows strict rules:
+ * - Deterministic: Same input => same output
+ * - No stylistic edits, grammar polishing, or rewording
+ * - Preserves contractual meaning and identifiers exactly
+ * - Changes are purely mechanical and audit-friendly
+ *
+ * @param rawText - Raw OCR/extracted text
+ * @param options - Processing options
+ * @returns CleanRoomResult with clean, redacted, and PII vault
+ */
+export function processDocumentCleanRoom(
+  rawText: string,
+  options: { source?: string; title?: string } = {}
+): CleanRoomResult {
+  const normalizer = new DocumentNormalizer()
+  const result = normalizer.process(rawText, options)
+
+  return {
+    cleanCopy: result.cleanCopy,
+    redactedCopy: result.redactedCopy,
+    piiVault: result.piiVault,
+    validationReport: result.validationReport,
+    metadata: result.metadata,
+  }
+}
+
+/**
+ * Get only the clean copy using clean-room processing
+ * Use this for AI extraction where you need normalized but unaltered text
+ */
+export function getCleanCopyForExtraction(rawText: string): string {
+  const normalizer = new DocumentNormalizer()
+  return normalizer.process(rawText).cleanCopy
+}
+
+/**
+ * Get a redacted copy suitable for sharing
+ * All PII is replaced with standardized tokens
+ */
+export function getRedactedCopyForSharing(rawText: string): string {
+  const normalizer = new DocumentNormalizer()
+  return normalizer.process(rawText).redactedCopy
+}
+
+/**
+ * Enhanced text processing with clean-room option
+ *
+ * When useCleanRoom is true, uses the deterministic clean-room processor.
+ * When false, uses the legacy AI-assisted processing.
+ */
+export async function processTextEnhanced(
+  rawText: string,
+  options: {
+    useCleanRoom?: boolean
+    provider?: 'openai' | 'anthropic'
+    preserveStructure?: boolean
+    detectLanguage?: boolean
+    source?: string
+    title?: string
+  } = {}
+): Promise<ProcessedTextResult & { cleanRoomOutput?: CleanRoomResult }> {
+  const {
+    useCleanRoom = true,
+    provider = 'openai',
+    preserveStructure = true,
+    source,
+    title,
+  } = options
+
+  const startTime = Date.now()
+
+  if (useCleanRoom) {
+    // Use deterministic clean-room processing
+    const cleanRoomResult = processDocumentCleanRoom(rawText, { source, title })
+
+    // Map clean-room stats to ProcessedTextResult format
+    const corrections: TextCorrection[] = []
+    if (cleanRoomResult.validationReport.issues.length > 0) {
+      for (const issue of cleanRoomResult.validationReport.issues) {
+        corrections.push({
+          original: '',
+          corrected: issue,
+          type: 'structure',
+        })
+      }
+    }
+
+    const stats: CleanupStats = {
+      garbageBlocksRemoved: 0, // Clean-room doesn't track this granularly
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      linesRemoved: 0,
+      totalCharactersRemoved: rawText.length - cleanRoomResult.cleanCopy.length,
+    }
+
+    return {
+      success: true,
+      processedText: cleanRoomResult.cleanCopy,
+      corrections,
+      detectedLanguage: cleanRoomResult.metadata.language === 'Mixed (mainly Turkish)' ? 'tr' : 'en',
+      confidence: cleanRoomResult.validationReport.issues.length === 0 ? 0.98 : 0.90,
+      processingTimeMs: Date.now() - startTime,
+      cleanupStats: stats,
+      cleanRoomOutput: cleanRoomResult,
+    }
+  }
+
+  // Fall back to legacy AI-assisted processing
+  return processTextWithAI(rawText, { provider, preserveStructure })
 }
