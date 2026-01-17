@@ -4,7 +4,7 @@ import { isLikelyScannedPDF, performOCR } from './ocr'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
-import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing } from './text-processor'
+import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing, processTextEnhanced, type CleanRoomResult } from './text-processor'
 import {
   ExtractedPolicyData,
   ExtractedCoverage,
@@ -29,6 +29,8 @@ export interface ExtractionResult {
     agreement: number
     score: number
   }
+  // Clean-room processing output (when enabled)
+  cleanRoomOutput?: CleanRoomResult
 }
 
 export interface ExtractionError {
@@ -47,6 +49,7 @@ export interface ExtractionOptions {
   useFallback?: boolean
   useOCR?: boolean
   useConsensus?: boolean
+  useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
 }
@@ -167,6 +170,7 @@ export async function extractPolicyFromDocument(
     useFallback = true,
     useOCR = true,
     useConsensus = true,
+    useCleanRoom = true,  // Default to clean-room processing
     primaryProvider,
     providers,
   } = options
@@ -275,9 +279,42 @@ export async function extractPolicyFromDocument(
 
   // Process text to correct OCR errors and improve readability
   let processedText = documentText
+  let cleanRoomResult: CleanRoomResult | undefined
 
-  // Only process if text appears to need it
-  if (textNeedsProcessing(documentText)) {
+  // Use clean-room processing for deterministic, auditable results
+  if (useCleanRoom) {
+    try {
+      const processingResult = await processTextEnhanced(documentText, {
+        useCleanRoom: true,
+        provider: primaryProvider || 'openai',
+        preserveStructure: true,
+        source: file.name,
+      })
+
+      if (processingResult.success) {
+        processedText = processingResult.processedText
+        cleanRoomResult = processingResult.cleanRoomOutput
+
+        // Debug info - text processing stats
+        if (import.meta.env.DEV) {
+          const validation = cleanRoomResult?.validationReport
+          console.warn(`[DEBUG] Clean-room processing: ` +
+            `${processingResult.cleanupStats.totalCharactersRemoved} chars normalized, ` +
+            `${cleanRoomResult?.piiVault?.length || 0} PII items detected, ` +
+            `${validation?.issues?.length || 0} validation issues, ` +
+            `${Math.round(processingResult.confidence * 100)}% confidence`)
+        }
+      }
+    } catch (error) {
+      // Clean-room processing failed, fall back to legacy
+      console.warn('Clean-room processing failed, using legacy:', error)
+      if (textNeedsProcessing(documentText)) {
+        const basicResult = applyBasicOCRCorrections(documentText)
+        processedText = basicResult.text
+      }
+    }
+  } else if (textNeedsProcessing(documentText)) {
+    // Legacy AI-assisted processing
     try {
       const processingResult = await processTextWithAI(documentText, {
         provider: primaryProvider || 'openai',
@@ -364,6 +401,7 @@ export async function extractPolicyFromDocument(
       extractedData,
       source: usedOCR ? 'ocr' : 'ai',
       consensus: consensusInfo,
+      cleanRoomOutput: cleanRoomResult,
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
