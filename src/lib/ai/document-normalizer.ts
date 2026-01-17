@@ -177,39 +177,58 @@ const PII_PATTERNS: Record<PIICategory, RegExp> = {
  * Maps commonly confused characters to their normalized form
  */
 const TURKISH_OCR_CONFUSIONS: Array<[RegExp, string]> = [
-  // Spaced Turkish characters (only when unambiguous word context)
-  [/(?<=\s|^)B\s+İ\s+R\s+L\s+E\s+Ş\s+İ\s+K(?=\s|$)/gi, 'BİRLEŞİK'],
-  [/(?<=\s|^)S\s+İ\s+G\s+O\s+R\s+T\s+A(?=\s|$)/gi, 'SİGORTA'],
-  [/(?<=\s|^)P\s+O\s+L\s+İ\s+Ç\s+E(?=\s|$)/gi, 'POLİÇE'],
-  [/(?<=\s|^)T\s+E\s+M\s+İ\s+N\s+A\s+T(?=\s|$)/gi, 'TEMİNAT'],
-  [/(?<=\s|^)M\s+U\s+A\s+F\s+İ\s+Y\s+E\s+T(?=\s|$)/gi, 'MUAFİYET'],
-  [/(?<=\s|^)A\s+N\s+A\s+D\s+O\s+L\s+U(?=\s|$)/gi, 'ANADOLU'],
-  [/(?<=\s|^)T\s+Ü\s+R\s+K\s+İ\s+Y\s+E(?=\s|$)/gi, 'TÜRKİYE'],
-  [/(?<=\s|^)İ\s+S\s+T\s+A\s+N\s+B\s+U\s+L(?=\s|$)/gi, 'İSTANBUL'],
-  [/(?<=\s|^)K\s+A\s+S\s+K\s+O(?=\s|$)/gi, 'KASKO'],
-  [/(?<=\s|^)T\s+R\s+A\s+F\s+İ\s+K(?=\s|$)/gi, 'TRAFİK'],
+  // =========================================================================
+  // Spaced Turkish words - use \s* (zero or more) to handle partially grouped letters
+  // e.g., "B İ RLE Şİ K" where some letters are grouped (RLE, Şİ)
+  // =========================================================================
+  [/(?<=\s|^)B\s*İ\s*R\s*L\s*E\s*Ş\s*İ\s*K(?=\s|$)/gi, 'BİRLEŞİK'],
+  [/(?<=\s|^)S\s*İ\s*G\s*O\s*R\s*T\s*A(?=\s|$)/gi, 'SİGORTA'],
+  [/(?<=\s|^)P\s*O\s*L\s*İ\s*Ç\s*E\s*S?\s*İ?(?=\s|$)/gi, 'POLİÇESİ'],  // Handles POLİÇE and POLİÇESİ
+  [/(?<=\s|^)T\s*E\s*M\s*İ\s*N\s*A\s*T(?=\s|$)/gi, 'TEMİNAT'],
+  [/(?<=\s|^)M\s*U\s*A\s*F\s*İ\s*Y\s*E\s*T(?=\s|$)/gi, 'MUAFİYET'],
+  [/(?<=\s|^)A\s*N\s*A\s*D\s*O\s*L\s*U(?=\s|$)/gi, 'ANADOLU'],
+  [/(?<=\s|^)T\s*Ü\s*R\s*K\s*İ\s*Y\s*E(?=\s|$)/gi, 'TÜRKİYE'],
+  [/(?<=\s|^)İ\s*S\s*T\s*A\s*N\s*B\s*U\s*L(?=\s|$)/gi, 'İSTANBUL'],
+  [/(?<=\s|^)K\s*A\s*S\s*K\s*O(?=\s|$)/gi, 'KASKO'],
+  [/(?<=\s|^)T\s*R\s*A\s*F\s*İ\s*K(?=\s|$)/gi, 'TRAFİK'],
+  [/(?<=\s|^)G\s*E\s*N\s*İ\s*Ş\s*L\s*E\s*T\s*İ\s*L\s*M\s*İ\s*Ş(?=\s|$)/gi, 'GENİŞLETİLMİŞ'],
+  [/(?<=\s|^)D\s*Ü\s*Z\s*E\s*N\s*L\s*E\s*M\s*E(?=\s|$)/gi, 'DÜZENLEME'],
+  [/(?<=\s|^)Ş\s*İ\s*R\s*K\s*E\s*T\s*İ?(?=\s|$)/gi, 'ŞİRKET'],
+  [/(?<=\s|^)M\s*Ü\s*Ş\s*T\s*E\s*R\s*İ(?=\s|$)/gi, 'MÜŞTERİ'],
+  [/(?<=\s|^)A\s*N\s*O\s*N\s*İ\s*M(?=\s|$)/gi, 'ANONİM'],
+  [/(?<=\s|^)A\s*D\s*R\s*E\s*S\s*İ?(?=\s|$)/gi, 'ADRES'],
 
-  // Common Turkish word spacing fixes (lowercase)
-  [/poli\s+ç\s*e/gi, 'poliçe'],
-  [/sigorta\s+l\s*ı/gi, 'sigortalı'],
-  [/teminat\s+l\s*ar/gi, 'teminatlar'],
-  [/muafiyet\s+i/gi, 'muafiyeti'],
-  [/de\s+ğ\s*er/gi, 'değer'],
+  // =========================================================================
+  // Common Turkish word spacing fixes (lowercase and mixed case)
+  // =========================================================================
+  [/poli\s*ç\s*e\s*s?\s*i?/gi, 'poliçe'],
+  [/sigorta\s*l\s*ı/gi, 'sigortalı'],
+  [/teminat\s*l\s*ar/gi, 'teminatlar'],
+  [/muafiyet\s*i/gi, 'muafiyeti'],
+  [/de\s*ğ\s*er/gi, 'değer'],
+  [/d\s*ü\s*zenleme/gi, 'düzenleme'],
+  [/s\s*ü\s*re\s*s?\s*i?/gi, 'süre'],
+  [/g\s*ü\s*n(?=\s|$)/gi, 'gün'],
+  [/ş\s*irket\s*i?/gi, 'şirket'],
 
-  // Turkish special character spacing within words (only single space)
-  // Be careful not to remove intentional spaces like in "Şişli / İstanbul"
-  [/(\w)ş\s(\w)/g, '$1ş$2'],  // Note: single space only, case sensitive
-  [/(\w)\sş(\w)/g, '$1ş$2'],
-  [/(\w)ğ\s(\w)/g, '$1ğ$2'],
-  [/(\w)\sğ(\w)/g, '$1ğ$2'],
-  [/(\w)ü\s(\w)/g, '$1ü$2'],
-  [/(\w)\sü(\w)/g, '$1ü$2'],
-  [/(\w)ö\s(\w)/g, '$1ö$2'],
-  [/(\w)\sö(\w)/g, '$1ö$2'],
-  [/(\w)ç\s(\w)/g, '$1ç$2'],
-  [/(\w)\sç(\w)/g, '$1ç$2'],
-  [/(\w)ı\s(\w)/g, '$1ı$2'],
-  [/(\w)\sı(\w)/g, '$1ı$2'],
+  // =========================================================================
+  // Turkish special character spacing within words
+  // Handle both space before and after special chars
+  // =========================================================================
+  [/(\w)\s+ş\s*(\w)/g, '$1ş$2'],
+  [/(\w)\s*ş\s+(\w)/g, '$1ş$2'],
+  [/(\w)\s+ğ\s*(\w)/g, '$1ğ$2'],
+  [/(\w)\s*ğ\s+(\w)/g, '$1ğ$2'],
+  [/(\w)\s+ü\s*(\w)/g, '$1ü$2'],
+  [/(\w)\s*ü\s+(\w)/g, '$1ü$2'],
+  [/(\w)\s+ö\s*(\w)/g, '$1ö$2'],
+  [/(\w)\s*ö\s+(\w)/g, '$1ö$2'],
+  [/(\w)\s+ç\s*(\w)/g, '$1ç$2'],
+  [/(\w)\s*ç\s+(\w)/g, '$1ç$2'],
+  [/(\w)\s+ı\s*(\w)/g, '$1ı$2'],
+  [/(\w)\s*ı\s+(\w)/g, '$1ı$2'],
+  [/(\w)\s+İ\s*(\w)/g, '$1İ$2'],
+  [/(\w)\s*İ\s+(\w)/g, '$1İ$2'],
 ]
 
 /**
