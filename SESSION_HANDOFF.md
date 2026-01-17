@@ -1,14 +1,14 @@
-# Session Handoff - January 14, 2026
+# Session Handoff - January 17, 2026
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | ✅ Passing |
-| **TypeCheck** | ✅ 0 errors |
-| **Lint** | ✅ 0 warnings |
-| **Tests** | ✅ ~4500 passing |
-| **Branch** | `claude/review-project-status-7bmFc` |
+| **Build** | Passing |
+| **TypeCheck** | 0 errors |
+| **Lint** | 0 warnings |
+| **Tests** | ~4500 passing |
+| **Branch** | `claude/review-project-status-CdRZi` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 
@@ -16,210 +16,121 @@
 
 ## Session Summary
 
-This session focused on **kasko policy display improvements**:
-1. **Coverage limit calculation** - Use "Rayiç Değer" (market value) instead of summing all limits
-2. **Unlimited coverage display** - Show "Sınırsız" instead of ₺0
-3. **Included services display** - Show "Dahil" for services without numeric limits
-4. **Coverage categorization** - Added categories (main, liability, supplementary, etc.)
-5. **Color coding** - Green for good, yellow for moderate, red for critical exclusions
-6. **Actionable recommendations** - Specific amounts and advice instead of generic text
-7. **Fixed false alerts** - Skip implicit kasko coverages from missing coverage detection
+This session focused on **mobile UX improvements** for PolicyDetailView and PolicyDashboard:
+
+1. **Header Reorganization** - Insurance type as title, provider as subtitle, plate number as third line
+2. **Expandable/Collapsible Sections** - Score Breakdown, AI Insights, Recommendations, Coverages, Exclusions
+3. **Coverage Details Redesign** - Collapsible categories with preview mode (first 2 items + "+X more")
+4. **Dashboard Mobile Fixes** - Grid overflow, filter row overflow, compact stats badges
+5. **Double Checkmarks Fix** - Strip existing checkmarks from AI insight text
+6. **ScoreBreakdown Fix** - Remove truncation on mini variant labels
 
 ---
 
-## Completed Features
+## Features Completed This Session
 
-### Core Functionality
-- [x] PDF upload and AI extraction (OpenAI, Anthropic, Google Vision OCR)
-- [x] Multi-turn PolicyChat with conversation history
-- [x] Policy dashboard with cards and filtering
-- [x] Policy detail view with share/download buttons
-- [x] Policy comparison (side-by-side)
-- [x] Gap detection and analysis
-- [x] Regional benchmarking (7 Turkish regions)
-- [x] Policy evaluation and grading (A-F scale)
-- [x] Market data and provider comparisons
+### PolicyDetailView Mobile Improvements (4 commits)
+- [x] Header shows: Insurance type (Kasko) > Provider > Plate number (3 lines)
+- [x] Removed redundant "Tür: Kasko" from Policy Overview
+- [x] Score Breakdown: click to toggle mini/full view
+- [x] AI Insights: show first 3, "+X more insights" expandable
+- [x] Recommendations: show first 2, expand for all
+- [x] Coverage Details: collapsible categories with preview mode
+- [x] Exclusions: collapsed by default with count badge
+- [x] Fixed double checkmarks in AI Insights
+- [x] Fixed ScoreBreakdown "Complia..." truncation
+- [x] Created CollapsibleCoverageCategory component
 
-### Kasko Policy Display (NEW THIS SESSION)
-- [x] "Rayiç Değer" display for market value coverage
-- [x] "Sınırsız" display for unlimited coverages
-- [x] "Dahil" display for included services without limits
-- [x] Coverage categories (main, liability, supplementary, assistance, legal)
-- [x] Coverage importance levels (critical, standard, minor)
-- [x] Color-coded coverages (green/yellow based on limits)
-- [x] Red highlighting for critical exclusions
-- [x] Skip false missing coverage alerts for implicit kasko coverages
+### Dashboard Mobile Improvements (6 commits)
+- [x] Fixed grid column overflow on mobile
+- [x] Fixed filter row mobile overflow
+- [x] Redesigned stats cards for mobile
+- [x] Replaced stats cards with compact pill badges on small screens
+- [x] Fixed 100vw overflow issues
 
-### Duplicate Detection
-- [x] Pre-upload conflict detection
-- [x] Fuzzy matching with Levenshtein distance
-- [x] OCR character substitution map (0/O, 1/l/I, Turkish chars)
-- [x] PolicyDiffViewer component for visual diffs
-- [x] ConflictResolutionDialog with 4 resolution options
-- [x] Tolerant string comparison (whitespace, punctuation normalization)
-
-### Authentication & Security
-- [x] Supabase Auth (email, Google, GitHub OAuth)
-- [x] Protected routes
-- [x] Row Level Security (RLS)
-- [x] Rate limiting (per IP, per endpoint)
-- [x] Helmet security headers with PDF.js CDN allowlist
-- [x] API keys server-side only
-
-### Deployment
-- [x] Railway production deployment
-- [x] Auto-detect API proxy URL in production
-- [x] CSP configured for PDF.js worker from CDN
-- [x] CORS configured for Railway domains
-- [x] Express serves static files + API on same origin
+### Other Fixes (2 commits)
+- [x] Fixed inline event handler CSP violations
+- [x] Bumped service worker cache v3 → v6
 
 ---
 
-## Fixes Applied This Session
+## Commits This Session
 
-### 1. Kasko Coverage Display
-**Problem:** Multiple display issues with kasko policies
-- Coverage limit incorrectly summed all limits instead of showing market value
-- "Artan Mali Sorumluluk" showed ₺0 instead of "Sınırsız"
-- "İkame Araç" showed ₺0 instead of "Dahil"
+```
+22e9697 Major mobile UX improvements for PolicyDetailView
+d010c24 Improve PolicyDetailView header and add expandable sections
+a25d568 Add expandable sections for mobile PolicyDetailView
+69240b3 Reorder PolicyDetailView sections for mobile-first UX
+3351cd5 Bump service worker cache version to v2 to force refresh
+7741fc5 Replace stats cards with compact pill badges on mobile
+7bc4ff5 Refine dashboard mobile-first design
+01ce81b Redesign stats cards with mobile-first approach
+b30f346 Fix stats cards 100vw overflow on mobile
+f95ab8f Fix dashboard filter row mobile overflow
+dd56b58 Fix dashboard mobile overflow issues
+70939d3 Fix grid column overflow on mobile
+af3f337 Fix inline event handler CSP violations
+eb7502b Fix coverage items causing mobile overflow
+f91ffdb Fix CSP and mobile overflow issues
+```
 
-**Fix:**
-- Added `isUnlimited`, `isMarketValue` flags to Coverage type
-- Created `formatCoverageLimit()` helper for proper display
-- Added `calculateMainCoverage()` to use Rayiç Değer for kasko
+---
 
-**Files:** `src/types/policy.ts`, `src/components/PolicyDetailView.tsx`, `src/lib/ai/policy-extractor.ts`
-**Commit:** `22817bb`
+## Key Files Changed
 
-### 2. False Missing Coverage Alerts
-**Problem:** AI flagged Çarpma/Çarpışma, Hırsızlık, Doğal Afetler, Yangın as missing when they're included in base kasko
+| File | Changes |
+|------|---------|
+| `src/components/PolicyDetailView.tsx` | Major restructure - header, expandable sections, CollapsibleCoverageCategory |
+| `src/components/PolicyDashboard.tsx` | Mobile overflow fixes, compact stats badges |
+| `src/components/evaluation/ScoreBreakdown.tsx` | Mini variant fix - removed truncation |
+| `public/sw.js` | Cache version v3 → v6 |
 
-**Fix:**
-- Created `KASKO_IMPLICIT_COVERAGES` list of coverages included in base kasko
-- Added `hasKaskoBaseCoverage()` detection function
-- Modified `generateGaps()` to skip implicit coverages
+---
 
-**File:** `src/lib/ai/policy-extractor.ts`
-**Commit:** `22817bb`
+## New UI Patterns
 
-### 3. Coverage Categorization & Styling
-**Problem:** Coverages lacked visual hierarchy and organization
+### CollapsibleCoverageCategory Component
+```tsx
+// Collapsible coverage category with preview mode
+// Shows first 2 items, "+X more" button to expand
+<CollapsibleCoverageCategory
+  title="Ana Teminatlar"
+  icon={<Shield />}
+  items={coverages}
+  defaultExpanded={true}
+/>
+```
 
-**Fix:**
-- Added `CoverageCategory` type: main, liability, supplementary, assistance, legal, other
-- Added `CoverageImportance` type: critical, standard, minor
-- Created helper functions for background colors and icon styles
-- Green checkmark for good coverages, yellow for moderate limits
+### Expandable Section Pattern
+```tsx
+const [expanded, setExpanded] = useState(false)
 
-**Files:** `src/types/policy.ts`, `src/components/PolicyDetailView.tsx`
-**Commit:** `22817bb`
+<button onClick={() => setExpanded(!expanded)}>
+  {expanded ? 'Show Less' : `+${items.length - 3} more insights`}
+</button>
 
-### 4. Critical Exclusions Highlighting
-**Problem:** Critical exclusions (terör, savaş, nükleer) not visually distinguished
+{(expanded ? items : items.slice(0, 3)).map(item => ...)}
+```
 
-**Fix:**
-- Added `isExclusionCritical()` function to detect critical exclusions
-- Red background and X icon for critical exclusions
-- Normal styling for standard exclusions
-
-**File:** `src/components/PolicyDetailView.tsx`
-**Commit:** `22817bb`
-
-### 5. Actionable Recommendations
-**Problem:** Generic recommendations like "Improve Coverage" and "Review Premium" not helpful
-
-**Fix:**
-- Recommendations now include specific coverage names
-- Deductible recommendations show actual amounts and percentages
-- Premium recommendations suggest getting 3-5 competitive quotes
-- Value recommendations provide 3 specific strategies
-- Added "Policy Well-Structured" positive feedback
-
-**File:** `src/lib/policy-evaluation/evaluator.ts`
-**Commit:** `22817bb`
-
-### 6. Label Change
-**Problem:** "Insured Person" should be "Insured"
-
-**Fix:** Changed label in PolicyDetailView
-**File:** `src/components/PolicyDetailView.tsx`
-**Commit:** `22817bb`
+### Header 3-Line Pattern (Vehicle Policies)
+```tsx
+<h1 className="text-sm font-bold">{policy.typeTr}</h1>
+<p className="text-xs text-gray-500">{policy.provider}</p>
+{policy.vehicleInfo?.plate && (
+  <p className="text-xs text-blue-600">🚗 {policy.vehicleInfo.plate}</p>
+)}
+```
 
 ---
 
 ## Known Issues (Non-blocking)
 
-### Minor / Low Priority
 | Issue | Severity | Notes |
 |-------|----------|-------|
-| CSP inline event handler warnings | Low | Cosmetic, refactor to React handlers |
 | PWA icon 144x144 missing | Low | Create icon file |
 | Font preload warnings | Low | Timing optimization |
-| Supabase auth redirect | Config | Need to add Railway URL to Supabase |
-
----
-
-## Technical Debt
-
-### Low Priority
-1. **Inline event handlers** - Refactor to React handlers for CSP compliance
-2. **PWA icons** - Verify all icon sizes exist in `/public/icons/`
-3. **Font preload timing** - Adjust or remove preload hints
-4. **Coverage category extraction** - Improve AI prompts to extract categories from policy documents
-
-### Future Improvements
-1. Add Sentry DSN to Railway for error tracking
-2. Consider custom domain instead of `*.up.railway.app`
-3. Set up staging environment separate from production
-4. Self-host PDF.js worker instead of CDN
-5. Add more coverage categories from policy documents
-
----
-
-## Files Changed This Session
-
-| File | Change Type | Description |
-|------|-------------|-------------|
-| `src/types/policy.ts` | Modified | Added CoverageCategory, CoverageImportance, isUnlimited, isMarketValue |
-| `src/lib/ai/extraction-schema.ts` | Modified | Updated extraction schema with coverage flags |
-| `src/lib/ai/extraction-prompts.ts` | Modified | Enhanced kasko extraction instructions |
-| `src/lib/ai/policy-extractor.ts` | Modified | Added implicit coverage detection, main coverage calculation |
-| `src/components/PolicyDetailView.tsx` | Modified | Coverage display formatting, color coding, exclusion highlighting |
-| `src/lib/policy-evaluation/evaluator.ts` | Modified | Actionable recommendations with specific amounts |
-| `CLAUDE.md` | Updated | New coverage types documentation, known issues |
-
----
-
-## New Type Definitions
-
-### Coverage Types (src/types/policy.ts)
-```typescript
-export type CoverageCategory = 'main' | 'liability' | 'supplementary' | 'assistance' | 'legal' | 'other'
-export type CoverageImportance = 'critical' | 'standard' | 'minor'
-
-export interface Coverage {
-  name: string
-  nameTr: string
-  limit: number
-  deductible: number
-  included: boolean
-  isUnlimited?: boolean    // Display as "Sınırsız"
-  isMarketValue?: boolean  // Display as "Rayiç Değer"
-  category?: CoverageCategory
-  importance?: CoverageImportance
-}
-```
-
-### Kasko Implicit Coverages
-These coverages are automatically included in base kasko and should NOT be flagged as missing:
-- çarpma, çarpışma, collision
-- hırsızlık, theft
-- yangın, fire
-- doğal afet, natural disaster
-- sel, su baskını, flood
-- dolu, hail, hailstorm
-- deprem, earthquake
-- fırtına, storm
+| Supabase auth redirect | Config | Need Railway URL in Supabase redirect allowlist |
+| OCR text correction quality | Medium | User reported AI corrections not optimal - needs investigation |
 
 ---
 
@@ -246,29 +157,30 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 # VITE_API_PROXY_URL
 ```
 
-**Important Notes:**
-- Don't add manual quotes to Railway env vars (Railway adds them automatically)
-- VITE_* vars need rebuild, not just restart
-- API keys must NOT have VITE_ prefix
+### Important Gotchas
+- `VITE_*` vars are baked at **build time** - need rebuild, not just restart
+- API keys must NOT have `VITE_` prefix
+- Railway env vars shouldn't have manual quotes
+- CSP must allow `unpkg.com`, `cdn.jsdelivr.net` for PDF.js worker
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Test kasko policy upload** - Verify new display logic works correctly
-2. **Verify recommendations** - Check specific amounts appear in UI
-3. **Test color coding** - Verify green/yellow/red styling
+1. **Test mobile UX** - Verify expandable sections work correctly on various devices
+2. **Investigate OCR correction** - User reported AI corrections are "not good at all"
+3. **Clear service worker cache** - Users may need to refresh to get v6 cache
 
 ### Short Term
-1. **Improve AI extraction** - Enhance prompts to extract isUnlimited, isMarketValue from PDFs
-2. **Add more implicit coverages** - Expand list based on policy types
-3. **Category extraction** - Teach AI to categorize coverages from document context
+1. **Improve OCR post-processing** - Better text normalization for Turkish documents
+2. **Add keyboard navigation** - Arrow keys for expandable sections
+3. **Test accessibility** - ARIA labels for expandable sections
 
 ### Medium Term
 1. **Coverage comparison** - Visual comparison of coverage categories between policies
 2. **Recommendation tracking** - Track which recommendations users act on
-3. **A/B testing** - Test different recommendation formats
+3. **Performance profiling** - Ensure expandable sections don't cause re-renders
 
 ---
 
@@ -288,29 +200,23 @@ npm run build && npm run build:server
 NODE_ENV=production node dist-server/index.js
 
 # Test specific file
-npm test -- --run src/lib/policy-utils.test.ts
+npm test -- --run src/components/PolicyDetailView.test.tsx
+
+# Force service worker update
+# Users: Clear browser cache or hard refresh (Ctrl+Shift+R)
 ```
 
 ---
 
-## Display Logic Reference
+## Service Worker Cache
 
-### formatCoverageLimit() behavior
-| Condition | Display |
-|-----------|---------|
-| `isUnlimited: true` | "Sınırsız" |
-| `isMarketValue: true` | "Rayiç Değer" |
-| `limit === 0 && included` | "Dahil" |
-| `limit > 0` | Formatted currency (₺X.XXX) |
+Current version: **v6**
 
-### Color Coding
-| Category | Background | Icon |
-|----------|------------|------|
-| Critical coverage | Light green | Green checkmark |
-| Standard coverage | Light green | Green checkmark |
-| Low limit coverage | Light yellow | Yellow circle |
-| Critical exclusion | Light red | Red X |
-| Normal exclusion | Light gray | Gray text |
+To force cache refresh for users:
+1. Cache version is in `public/sw.js`
+2. Increment `CACHE_NAME` value
+3. Users will get new cache on next visit
+4. Old caches are automatically cleaned up
 
 ---
 
@@ -318,11 +224,11 @@ npm test -- --run src/lib/policy-utils.test.ts
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 1 |
-| Files changed | 6 |
+| Commits this session | 15 |
+| Files changed | 4 major, several minor |
 | Tests passing | ~4500 |
 | Production URL | https://insurai-production.up.railway.app |
-| Major fixes | 6 (coverage display, false alerts, categorization, exclusions, recommendations, label) |
+| Major focus | Mobile UX improvements |
 
 ---
 
@@ -331,14 +237,33 @@ npm test -- --run src/lib/policy-utils.test.ts
 - [x] All tests passing
 - [x] No TypeScript errors
 - [x] No lint warnings
-- [x] Changes committed and pushed
+- [x] Changes committed
 - [x] Documentation updated (CLAUDE.md)
 - [x] Known issues documented
 - [x] Next steps prioritized
 - [x] Session handoff updated
+- [ ] Push to remote (pending)
 
 ---
 
-**Last Updated**: January 14, 2026
-**Session Duration**: ~1 hour
-**Next Session Focus**: Test new kasko display, improve AI extraction prompts, or new feature work
+## Pending User Question
+
+User asked about OCR text correction quality:
+> "This is ok. Now check the below oct and corrected fields; the edited is not good at all; what is the best way to handle these issues?"
+
+The user shared raw OCR text vs AI-corrected text and expressed dissatisfaction with the correction quality. This needs investigation:
+- OCR produces fragmented Turkish characters ("İ" split, "ş" as separate chars)
+- Words broken with spaces ("poliçe" as "P o l i ç e")
+- AI correction may need better prompts or post-processing logic
+
+**Recommended investigation areas:**
+1. Review `src/lib/ai/prompts.ts` for OCR correction prompts
+2. Consider pre-processing OCR text before AI correction
+3. Improve character normalization in `src/lib/policy-utils.ts`
+4. Test with different AI models (Claude vs GPT-4o)
+
+---
+
+**Last Updated**: January 17, 2026
+**Session Duration**: ~3 hours (continued from previous session)
+**Next Session Focus**: OCR correction improvements or new feature work
