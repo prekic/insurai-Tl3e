@@ -887,3 +887,286 @@ function generateMarketComparison(data: ExtractedPolicyData): AnalyzedPolicy['ma
   // Use the new market data service for accurate benchmarking
   return generateMarketComparisonData(premium, totalCoverage, policyType, location)
 }
+
+// ============================================================================
+// TWO-PASS COMPREHENSIVE EXTRACTION
+// Implements the enhanced extraction with structured output
+// ============================================================================
+
+import {
+  EXTRACTION_SYSTEM_PROMPT,
+  EXTRACTION_USER_PROMPT_TEMPLATE,
+  parseStructuredOutput,
+  extractQualityScore,
+  extractWatchOuts,
+  type StructuredPolicyData,
+} from './kasko-parser-prompts'
+import { applyComprehensivePreprocessing, addSectionMarkers } from './text-processor'
+import { env } from '@/lib/env'
+
+/**
+ * Result from comprehensive two-pass extraction
+ */
+export interface ComprehensiveExtractionResult {
+  success: boolean
+  policyBrief: string | null           // Markdown formatted Policy Brief
+  structuredData: StructuredPolicyData | null  // Machine-readable JSON
+  watchOuts: string[]                   // Top 15 watch-outs
+  qualityScore: number                  // 0-100 quality score
+  sectionsFound: string[]               // Document sections identified
+  preprocessingStats: {
+    garbageBlocksRemoved: number
+    qrBlocksRemoved: number
+    spacedCharsFixed: number
+    totalCharactersRemoved: number
+  }
+  error?: string
+}
+
+/**
+ * Comprehensive two-pass policy extraction
+ *
+ * Pass 1: Preprocess text (remove garbage, fix OCR, segment sections)
+ * Pass 2: Extract structured data with quality scoring
+ *
+ * Returns both human-readable Policy Brief and machine-readable JSON.
+ */
+export async function extractPolicyComprehensive(
+  rawText: string,
+  options: {
+    provider?: 'openai' | 'anthropic'
+    requireQualityScore?: number  // Minimum quality score (default: 90)
+    maxRetries?: number           // Max retries for quality improvement
+  } = {}
+): Promise<ComprehensiveExtractionResult> {
+  const {
+    provider = 'openai',
+    requireQualityScore = 90,
+    maxRetries = 2,
+  } = options
+
+  // Pass 1: Comprehensive preprocessing
+  const { text: preprocessed, stats } = applyComprehensivePreprocessing(rawText, {
+    addSectionMarkers: true,
+  })
+
+  // Get sections found
+  const { sectionsFound } = addSectionMarkers(rawText)
+
+  const API_URL = env.proxyUrl
+  if (!API_URL) {
+    return {
+      success: false,
+      policyBrief: null,
+      structuredData: null,
+      watchOuts: [],
+      qualityScore: 0,
+      sectionsFound,
+      preprocessingStats: {
+        garbageBlocksRemoved: stats.garbageBlocksRemoved,
+        qrBlocksRemoved: stats.qrBlocksRemoved,
+        spacedCharsFixed: stats.spacedCharsFixed,
+        totalCharactersRemoved: stats.totalCharactersRemoved,
+      },
+      error: 'AI service not configured',
+    }
+  }
+
+  // Pass 2: AI extraction with structured output
+  let attempts = 0
+  let bestResult: { response: string; qualityScore: number } | null = null
+
+  while (attempts < maxRetries + 1) {
+    attempts++
+
+    try {
+      const userPrompt = EXTRACTION_USER_PROMPT_TEMPLATE.replace('{PROCESSED_TEXT}', preprocessed.slice(0, 25000))
+
+      const response = await fetch(`${API_URL}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userPrompt,
+          policyContext: EXTRACTION_SYSTEM_PROMPT,
+          provider,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`API error: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (!data.success || !data.response) {
+        throw new Error(data.error || 'Empty response from AI')
+      }
+
+      const aiResponse = data.response
+      const qualityScore = extractQualityScore(aiResponse)
+
+      // Keep best result
+      if (!bestResult || qualityScore > bestResult.qualityScore) {
+        bestResult = { response: aiResponse, qualityScore }
+      }
+
+      // If quality score meets requirement, we're done
+      if (qualityScore >= requireQualityScore) {
+        break
+      }
+
+      // Log quality issue in development
+      if (import.meta.env.DEV) {
+        console.warn(`[Extraction] Quality score ${qualityScore} < ${requireQualityScore}, retry ${attempts}/${maxRetries + 1}`)
+      }
+
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.error(`[Extraction] Attempt ${attempts} failed:`, error)
+      }
+      // Continue to next attempt
+    }
+  }
+
+  if (!bestResult) {
+    return {
+      success: false,
+      policyBrief: null,
+      structuredData: null,
+      watchOuts: [],
+      qualityScore: 0,
+      sectionsFound,
+      preprocessingStats: {
+        garbageBlocksRemoved: stats.garbageBlocksRemoved,
+        qrBlocksRemoved: stats.qrBlocksRemoved,
+        spacedCharsFixed: stats.spacedCharsFixed,
+        totalCharactersRemoved: stats.totalCharactersRemoved,
+      },
+      error: 'All extraction attempts failed',
+    }
+  }
+
+  // Parse the best result
+  const structuredData = parseStructuredOutput(bestResult.response)
+  const watchOuts = extractWatchOuts(bestResult.response)
+
+  // Extract policy brief (everything before the JSON block)
+  let policyBrief = bestResult.response
+  const jsonStart = bestResult.response.indexOf('```json')
+  if (jsonStart > 0) {
+    policyBrief = bestResult.response.substring(0, jsonStart).trim()
+  }
+
+  return {
+    success: true,
+    policyBrief,
+    structuredData,
+    watchOuts,
+    qualityScore: bestResult.qualityScore,
+    sectionsFound,
+    preprocessingStats: {
+      garbageBlocksRemoved: stats.garbageBlocksRemoved,
+      qrBlocksRemoved: stats.qrBlocksRemoved,
+      spacedCharsFixed: stats.spacedCharsFixed,
+      totalCharactersRemoved: stats.totalCharactersRemoved,
+    },
+  }
+}
+
+/**
+ * Convert comprehensive extraction result to AnalyzedPolicy
+ * Bridges the new extraction format with existing policy type
+ */
+export function comprehensiveToAnalyzedPolicy(
+  result: ComprehensiveExtractionResult,
+  file: File,
+  rawText: string,
+  processedText: string
+): AnalyzedPolicy | null {
+  if (!result.success || !result.structuredData) {
+    return null
+  }
+
+  const data = result.structuredData
+  const now = new Date()
+
+  // Determine status based on dates
+  let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
+  if (data.policy.endDate) {
+    const endDate = new Date(data.policy.endDate)
+    const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    if (daysUntilExpiry < 0) {
+      status = 'expired'
+    } else if (daysUntilExpiry <= 30) {
+      status = 'expiring'
+    }
+  }
+
+  // Convert coverages
+  const coverages: Coverage[] = data.coverages.map(c => ({
+    name: c.name,
+    nameTr: c.nameTr,
+    limit: c.limit ?? 0,
+    deductible: c.deductible ?? 0,
+    included: true,
+    isUnlimited: c.isUnlimited,
+    isMarketValue: c.isMarketValue,
+    category: c.category,
+    importance: c.category === 'main' ? 'critical' : c.category === 'liability' ? 'standard' : 'minor',
+  }))
+
+  // Calculate main coverage
+  const totalCoverage = calculateMainCoverage('kasko', coverages)
+
+  const policy: AnalyzedPolicy = {
+    id: crypto.randomUUID(),
+    policyNumber: data.policy.policyNumber ?? `POL-${Date.now()}`,
+    type: 'kasko',
+    typeTr: 'Kasko',
+    provider: data.policy.provider,
+    logo: '',
+    coverage: totalCoverage,
+    premium: data.premium.totalPremium,
+    monthlyPremium: data.premium.totalPremium / 12,
+    deductible: coverages[0]?.deductible ?? 0,
+    startDate: data.policy.startDate,
+    expiryDate: data.policy.endDate,
+    status,
+    uploadDate: now.toISOString().split('T')[0],
+    fileName: file.name,
+    documentType: 'PDF',
+    documentUrl: URL.createObjectURL(file),
+    insuredPerson: data.insured.name,
+    location: data.insured.address ?? undefined,
+    insuredAddress: data.insured.address ?? undefined,
+    coverages,
+    exclusions: data.exclusions.map(e => e.trigger),
+    specialConditions: [],
+    insuranceLine: 'Kasko',
+    currency: data.premium.currency,
+    aiConfidence: result.qualityScore / 100,
+    aiInsights: [
+      ...result.watchOuts.slice(0, 5).map(w => `⚠ ${w}`),
+      `🔍 Kalite skoru: ${result.qualityScore}/100`,
+    ],
+    marketComparison: generateMarketComparisonData(
+      data.premium.totalPremium,
+      totalCoverage,
+      'kasko',
+      data.insured.address ?? undefined
+    ),
+    extractedText: rawText,
+    processedText,
+    vehicleInfo: data.vehicle ? {
+      make: data.vehicle.make,
+      model: data.vehicle.model,
+      year: data.vehicle.year,
+      plate: data.vehicle.plate,
+      chassisNo: data.vehicle.chassisNumber ?? undefined,
+      engineNo: data.vehicle.engineNumber ?? undefined,
+      usage: data.vehicle.usageType,
+    } : undefined,
+  }
+
+  return policy
+}

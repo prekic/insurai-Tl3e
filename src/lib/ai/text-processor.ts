@@ -33,10 +33,12 @@ export interface TextCorrection {
 
 export interface CleanupStats {
   garbageBlocksRemoved: number
+  qrBlocksRemoved: number
   spacedCharsFixed: number
   urlsCleaned: number
   linesRemoved: number
   totalCharactersRemoved: number
+  sectionsIdentified: string[]
 }
 
 // ============================================================================
@@ -248,7 +250,7 @@ function cleanupURLsAndEmails(text: string): { text: string; cleanupCount: numbe
 
 // ============================================================================
 // GARBAGE DATA REMOVAL
-// Removes binary/encrypted data blocks that appear in PDFs
+// Removes binary/encrypted data blocks, QR codes, and barcodes that appear in PDFs
 // ============================================================================
 
 /**
@@ -262,6 +264,30 @@ const GARBAGE_PATTERNS = [
   /(?:[A-Za-z0-9+/]{4}){10,}={0,2}/g,  // Base64-like long sequences
   /(?:\d[A-Za-z]){10,}/g,  // Alternating digit-letter patterns (binary artifacts)
   /[^\x20-\x7E\xA0-\xFF\u0100-\u017F]+/g,  // Non-printable except common Unicode
+]
+
+/**
+ * QR Code and Barcode patterns - these are common in Turkish insurance PDFs
+ */
+const QR_BARCODE_PATTERNS = [
+  // QR code binary data (often appears as repeated special char blocks)
+  /(?:B\s*\^+\s*B[A-Za-z0-9]+)+/g,  // B^^^Bj54... pattern
+  /(?:[A-Z]\s*[\^<>]+\s*[A-Z][A-Za-z0-9]*\s*)+/g,  // Variations with spaces
+
+  // Barcode patterns (long sequences of similar characters)
+  /[|l1I]{20,}/g,  // Vertical bar patterns
+  /[=_\-]{20,}/g,  // Horizontal patterns
+
+  // Encoded/encrypted blocks (common in PDF QR overlays)
+  /[A-Za-z0-9]{40,}(?![a-z]{3})/g,  // Very long alphanumeric without words
+  /(?:[0-9A-F]{2}\s*){20,}/gi,  // Hex-like sequences
+
+  // DataMatrix/QR encoded text
+  /\[QR\][\s\S]*?\[\/QR\]/gi,
+  /\[BARCODE\][\s\S]*?\[\/BARCODE\]/gi,
+
+  // Lines that are entirely special characters
+  /^[\s\W]+$/gm,
 ]
 
 /**
@@ -295,13 +321,24 @@ function isGarbageLine(line: string): boolean {
 /**
  * Remove garbage data blocks from text
  */
-function removeGarbageData(text: string): { text: string; stats: { blocksRemoved: number; linesRemoved: number; charsRemoved: number } } {
+function removeGarbageData(text: string): { text: string; stats: { blocksRemoved: number; linesRemoved: number; charsRemoved: number; qrBlocksRemoved: number } } {
   const originalLength = text.length
   let blocksRemoved = 0
   let linesRemoved = 0
+  let qrBlocksRemoved = 0
 
-  // First, clean each line
-  const lines = text.split('\n')
+  // First pass: Remove QR/barcode patterns from the entire text
+  let result = text
+  for (const pattern of QR_BARCODE_PATTERNS) {
+    const matches = result.match(pattern)
+    if (matches) {
+      qrBlocksRemoved += matches.length
+      result = result.replace(pattern, ' ')
+    }
+  }
+
+  // Second pass: Clean each line
+  const lines = result.split('\n')
   const cleanedLines: string[] = []
 
   for (const line of lines) {
@@ -323,13 +360,114 @@ function removeGarbageData(text: string): { text: string; stats: { blocksRemoved
     }
   }
 
-  const result = cleanedLines.join('\n')
+  result = cleanedLines.join('\n')
   const charsRemoved = originalLength - result.length
 
   return {
     text: result,
-    stats: { blocksRemoved, linesRemoved, charsRemoved },
+    stats: { blocksRemoved, linesRemoved, charsRemoved, qrBlocksRemoved },
   }
+}
+
+// ============================================================================
+// SECTION SEGMENTATION
+// Identifies and marks document sections using Turkish insurance anchors
+// ============================================================================
+
+/**
+ * Turkish insurance document section anchors
+ */
+const SECTION_ANCHORS: Record<string, string[]> = {
+  '[TARAFLAR]': [
+    'SÖZLEŞME TARAFLARI',
+    'SİGORTA ETTİREN',
+    'SİGORTALI BİLGİLERİ',
+  ],
+  '[KONU]': [
+    'SİGORTA KONUSU',
+    'ARAÇ BİLGİLERİ',
+    'SİGORTALANAN ARAÇ',
+  ],
+  '[PRIM]': [
+    'PRİM BİLGİLERİ',
+    'PRİM TUTARI',
+    'ÖDEME PLANI',
+    'ÖDENECEK TUTAR',
+  ],
+  '[TEMINAT]': [
+    'TEMİNAT',
+    'SİGORTA KAPSAMI',
+    'TEMİNAT TABLOSU',
+    'KASKO TEMİNATLARI',
+  ],
+  '[KLOZLAR]': [
+    'KLOZLAR',
+    'ÖZEL ŞARTLAR',
+    'EK KLOZLAR',
+  ],
+  '[MUAFIYET]': [
+    'MUAFİYET',
+    'TENZİLİ MUAFİYET',
+    'SİGORTALI PAYI',
+  ],
+  '[HASARSIZLIK]': [
+    'HASARSIZLIK',
+    'HASARSIZLIK İNDİRİMİ',
+    'NO-CLAIMS',
+  ],
+  '[IKAME]': [
+    'İKAME ARAÇ',
+    'YEDEK ARAÇ',
+    'KİRALIK ARAÇ',
+  ],
+  '[ASISTANS]': [
+    'ASİSTANS',
+    'YOL YARDIM',
+    'ÇEKME KURTARMA',
+  ],
+  '[ISTISNALAR]': [
+    'İSTİSNALAR',
+    'KAPSAM DIŞI',
+    'TEMİNAT DIŞI',
+  ],
+  '[HASAR]': [
+    'HASAR BİLDİRİMİ',
+    'HASAR ANINDA',
+    'HASAR PROSEDÜRÜ',
+  ],
+}
+
+/**
+ * Add section markers to text based on Turkish anchor phrases
+ */
+export function addSectionMarkers(text: string): { text: string; sectionsFound: string[] } {
+  let result = text
+  const sectionsFound: string[] = []
+
+  for (const [marker, anchors] of Object.entries(SECTION_ANCHORS)) {
+    for (const anchor of anchors) {
+      // Create case-insensitive pattern that matches the anchor at start of line or after whitespace
+      const pattern = new RegExp(`(^|\\n)(\\s*)(${escapeRegExp(anchor)})`, 'gi')
+      const hasMatch = pattern.test(result)
+
+      if (hasMatch) {
+        // Add marker before the anchor
+        result = result.replace(pattern, `$1$2${marker}\n$2$3`)
+        if (!sectionsFound.includes(marker)) {
+          sectionsFound.push(marker)
+        }
+      }
+    }
+  }
+
+  return { text: result, sectionsFound }
+}
+
+/**
+ * Escape special regex characters
+ */
+function escapeRegExp(string: string): string {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 // ============================================================================
@@ -452,15 +590,16 @@ function applyOCRCorrections(text: string): { text: string; corrections: TextCor
  * Apply all local preprocessing before AI
  * This handles the bulk of the cleanup without needing AI
  */
-export function applyComprehensivePreprocessing(text: string): {
+export function applyComprehensivePreprocessing(text: string, options: { addSectionMarkers?: boolean } = {}): {
   text: string
   corrections: TextCorrection[]
   stats: CleanupStats
 } {
   const corrections: TextCorrection[] = []
   let result = text
+  let sectionsIdentified: string[] = []
 
-  // 1. Remove garbage data first
+  // 1. Remove garbage data first (including QR/barcode)
   const garbageResult = removeGarbageData(result)
   result = garbageResult.text
 
@@ -480,16 +619,25 @@ export function applyComprehensivePreprocessing(text: string): {
   result = ocrResult.text
   corrections.push(...ocrResult.corrections)
 
-  // 6. Final cleanup - normalize whitespace
+  // 6. Add section markers if requested (for two-pass extraction)
+  if (options.addSectionMarkers) {
+    const sectionResult = addSectionMarkers(result)
+    result = sectionResult.text
+    sectionsIdentified = sectionResult.sectionsFound
+  }
+
+  // 7. Final cleanup - normalize whitespace
   result = result.trim()
   result = result.replace(/[ \t]+$/gm, '') // Remove trailing spaces per line
 
   const stats: CleanupStats = {
     garbageBlocksRemoved: garbageResult.stats.blocksRemoved,
+    qrBlocksRemoved: garbageResult.stats.qrBlocksRemoved,
     spacedCharsFixed: turkishResult.fixCount,
     urlsCleaned: urlResult.cleanupCount,
     linesRemoved: garbageResult.stats.linesRemoved,
     totalCharactersRemoved: garbageResult.stats.charsRemoved,
+    sectionsIdentified,
   }
 
   return { text: result, corrections, stats }
@@ -526,6 +674,7 @@ export async function processTextWithAI(
 
   // If preprocessing made significant changes, we might not need AI
   const significantChanges = stats.garbageBlocksRemoved > 0 ||
+    stats.qrBlocksRemoved > 0 ||
     stats.spacedCharsFixed > 5 ||
     stats.urlsCleaned > 0 ||
     stats.totalCharactersRemoved > 100
