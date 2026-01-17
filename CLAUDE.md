@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 15, 2026
+- **Last Updated**: January 17, 2026
 
 ---
 
@@ -1493,26 +1493,38 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - Added color coding: green (good), yellow (moderate), red (critical exclusions)
 - **Files**: `src/types/policy.ts`, `src/lib/ai/policy-extractor.ts`, `src/components/PolicyDetailView.tsx`, `src/lib/policy-evaluation/evaluator.ts`
 
-### 14. Mobile Viewport Horizontal Overflow (Fixed Jan 15, 2026)
-- **Problem**: Dashboard and other pages had horizontal scroll on mobile devices
-- **Root Cause**: Stats cards had `w-[140px] flex-shrink-0` creating 748px minimum width (5 cards × 140px + gaps), exceeding mobile viewport (375-390px)
-- **Why Previous Fixes Failed**: Adding `overflow: hidden` at multiple levels didn't work because the content was fundamentally too wide
-- **Solution**: Changed from fixed width to responsive viewport-based width:
-  ```css
-  /* Before - fixed width */
-  w-[140px] flex-shrink-0
+### 14. Mobile UX Improvements (Jan 16-17, 2026)
+- **Problem**: PolicyDetailView and PolicyDashboard not optimized for mobile
+  - Information hierarchy unclear on small screens
+  - Coverages section too verbose
+  - Score breakdown labels truncated ("Complia...")
+  - Double checkmarks appearing in AI Insights
+  - Grid/filter overflow on mobile
 
-  /* After - responsive width */
-  min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto
-  ```
-- **Additional Changes**:
-  - Added `overflow: clip` (stricter than `overflow-x: hidden` on iOS Safari)
-  - Added `100dvw` for iOS dynamic viewport width
-  - Added JavaScript scroll prevention in `main.tsx` as safety net
-  - Added `viewport-fit=cover` to viewport meta tag
-  - Created E2E tests for mobile viewport overflow detection
-- **Files**: `src/components/PolicyDashboard.tsx`, `src/index.css`, `src/main.tsx`, `index.html`, `e2e/mobile-viewport.spec.ts`
-- **Key Lesson**: Don't fight overflow with containment - make content fit the viewport
+- **Solution (PolicyDetailView)**:
+  - Reorganized header: Insurance type (Kasko) as title, provider as subtitle, plate number as third line
+  - Removed redundant "Tür: Kasko" from Policy Overview
+  - Made sections collapsible/expandable:
+    - Score Breakdown: click to toggle mini/full view
+    - AI Insights: show first 3, "+X more insights" button
+    - Recommendations: show first 2, expand for all
+    - Coverage Details: collapsible categories with preview (first 2 items + "+X more")
+    - Exclusions: collapsed by default
+  - Fixed double checkmarks by stripping existing "✓" from AI insight text
+  - Created `CollapsibleCoverageCategory` component for mobile-friendly coverage display
+  - Fixed ScoreBreakdown mini variant truncation
+
+- **Solution (PolicyDashboard)**:
+  - Fixed grid column overflow on mobile
+  - Fixed filter row overflow
+  - Redesigned stats cards with compact pill badges for mobile
+  - Replaced full stats cards with horizontal scrollable badges on small screens
+
+- **Files**:
+  - `src/components/PolicyDetailView.tsx` - Major restructure
+  - `src/components/evaluation/ScoreBreakdown.tsx` - Mini variant fix
+  - `src/components/PolicyDashboard.tsx` - Mobile overflow fixes
+  - `public/sw.js` - Cache version bumped to v6
 
 ---
 
@@ -1823,4 +1835,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 4500+ tests, all passing
-**Last Updated**: January 15, 2026
+**Last Updated**: January 17, 2026

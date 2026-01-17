@@ -1,15 +1,14 @@
-# Session Handoff - January 15, 2026
+# Session Handoff - January 17, 2026
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | ✅ Passing |
-| **TypeCheck** | ✅ 0 errors |
-| **Lint** | ✅ 0 warnings |
-| **Tests** | ✅ ~4500 passing |
-| **E2E Tests** | ✅ Mobile viewport tests passing |
-| **Branch** | `claude/review-project-status-EJgLa` |
+| **Build** | Passing |
+| **TypeCheck** | 0 errors |
+| **Lint** | 0 warnings |
+| **Tests** | ~4500 passing |
+| **Branch** | `claude/review-project-status-CdRZi` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 
@@ -17,118 +16,122 @@
 
 ## Session Summary
 
-This session focused on **fixing mobile viewport horizontal overflow** that persisted despite multiple CSS-based attempts. The root cause was identified and properly fixed.
+This session focused on **mobile UX improvements** for PolicyDetailView and PolicyDashboard:
 
-### The Problem
-Dashboard and other pages had horizontal scroll on mobile devices. Multiple attempts to fix with `overflow: hidden`, `overflow: clip`, CSS containment, and JavaScript scroll prevention did not resolve the issue.
-
-### Root Cause
-Stats cards in Dashboard had fixed widths that exceeded mobile viewport:
-- `w-[140px] flex-shrink-0` on 5 cards
-- **5 × 140px + 4 gaps × 12px = 748px minimum width**
-- Mobile viewport is only 375-390px
-
-### The Fix
-Changed from fixed width to responsive viewport-based width:
-```css
-/* Before - fixed width */
-w-[140px] flex-shrink-0
-
-/* After - responsive width */
-min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto
-```
-
-### Key Lesson Learned
-**Don't fight overflow with containment - make content fit the viewport.**
+1. **Header Reorganization** - Insurance type as title, provider as subtitle, plate number as third line
+2. **Expandable/Collapsible Sections** - Score Breakdown, AI Insights, Recommendations, Coverages, Exclusions
+3. **Coverage Details Redesign** - Collapsible categories with preview mode (first 2 items + "+X more")
+4. **Dashboard Mobile Fixes** - Grid overflow, filter row overflow, compact stats badges
+5. **Double Checkmarks Fix** - Strip existing checkmarks from AI insight text
+6. **ScoreBreakdown Fix** - Remove truncation on mini variant labels
 
 ---
 
-## Commits This Session (10 total)
+## Features Completed This Session
 
-| Commit | Description |
-|--------|-------------|
-| `1aaac15` | **ROOT CAUSE FIX**: Dashboard stats cards responsive width |
-| `577e8c7` | Add E2E mobile viewport tests, overflow: clip, JS safety net |
-| `a951efd` | Multi-layer containment strategy (PageTransition, App, GlobalNav) |
-| `209bb3a` | Global CSS viewport lock, dates grid layout |
-| `50d6190` | Hardcoded Turkish labels for mobile |
-| `e1a6f33` | Mobile-first design improvements, default locale to TR |
-| `cec4325` | PolicyDetailView mobile redesign |
-| `3a3dc4c` | Text processor improvements, mobile translations |
-| `75e6954` | PolicyDetailView mobile layout UX |
-| `cfb2ec9` | AI text processor OCR correction improvements |
+### PolicyDetailView Mobile Improvements (4 commits)
+- [x] Header shows: Insurance type (Kasko) > Provider > Plate number (3 lines)
+- [x] Removed redundant "Tür: Kasko" from Policy Overview
+- [x] Score Breakdown: click to toggle mini/full view
+- [x] AI Insights: show first 3, "+X more insights" expandable
+- [x] Recommendations: show first 2, expand for all
+- [x] Coverage Details: collapsible categories with preview mode
+- [x] Exclusions: collapsed by default with count badge
+- [x] Fixed double checkmarks in AI Insights
+- [x] Fixed ScoreBreakdown "Complia..." truncation
+- [x] Created CollapsibleCoverageCategory component
+
+### Dashboard Mobile Improvements (6 commits)
+- [x] Fixed grid column overflow on mobile
+- [x] Fixed filter row mobile overflow
+- [x] Redesigned stats cards for mobile
+- [x] Replaced stats cards with compact pill badges on small screens
+- [x] Fixed 100vw overflow issues
+
+### Other Fixes (2 commits)
+- [x] Fixed inline event handler CSP violations
+- [x] Bumped service worker cache v3 → v6
+
+---
+
+## Commits This Session
+
+```
+f373930 Update documentation for mobile UX session
+22e9697 Major mobile UX improvements for PolicyDetailView
+d010c24 Improve PolicyDetailView header and add expandable sections
+a25d568 Add expandable sections for mobile PolicyDetailView
+69240b3 Reorder PolicyDetailView sections for mobile-first UX
+3351cd5 Bump service worker cache version to v2 to force refresh
+7741fc5 Replace stats cards with compact pill badges on mobile
+7bc4ff5 Refine dashboard mobile-first design
+01ce81b Redesign stats cards with mobile-first approach
+b30f346 Fix stats cards 100vw overflow on mobile
+f95ab8f Fix dashboard filter row mobile overflow
+dd56b58 Fix dashboard mobile overflow issues
+70939d3 Fix grid column overflow on mobile
+af3f337 Fix inline event handler CSP violations
+eb7502b Fix coverage items causing mobile overflow
+f91ffdb Fix CSP and mobile overflow issues
+```
+
+---
+
+## Key Files Changed
+
+| File | Changes |
+|------|---------|
+| `src/components/PolicyDetailView.tsx` | Major restructure - header, expandable sections, CollapsibleCoverageCategory |
+| `src/components/PolicyDashboard.tsx` | Mobile overflow fixes, compact stats badges |
+| `src/components/evaluation/ScoreBreakdown.tsx` | Mini variant fix - removed truncation |
+| `public/sw.js` | Cache version v3 → v6 |
+
+---
+
+## New UI Patterns
+
+### CollapsibleCoverageCategory Component
+```tsx
+// Collapsible coverage category with preview mode
+// Shows first 2 items, "+X more" button to expand
+<CollapsibleCoverageCategory
+  title="Ana Teminatlar"
+  icon={<Shield />}
+  items={coverages}
+  defaultExpanded={true}
+/>
+```
+
+### Expandable Section Pattern
+```tsx
+const [expanded, setExpanded] = useState(false)
+
+<button onClick={() => setExpanded(!expanded)}>
+  {expanded ? 'Show Less' : `+${items.length - 3} more insights`}
+</button>
+
+{(expanded ? items : items.slice(0, 3)).map(item => ...)}
+```
+
+### Header 3-Line Pattern (Vehicle Policies)
+```tsx
+<h1 className="text-sm font-bold">{policy.typeTr}</h1>
+<p className="text-xs text-gray-500">{policy.provider}</p>
+{policy.vehicleInfo?.plate && (
+  <p className="text-xs text-blue-600">🚗 {policy.vehicleInfo.plate}</p>
+)}
+```
 
 ---
 
 ## New Files Created
 
-### E2E Test: `e2e/mobile-viewport.spec.ts`
-Mobile viewport overflow detection test:
-- Tests Dashboard, Landing, Settings, Samples pages
-- Uses iPhone 13 (390px) and iPhone SE (375px) viewports
-- Detects which specific elements cause overflow
-- Takes screenshots on failure for debugging
-
----
-
-## Files Modified This Session
-
-| File | Change |
-|------|--------|
-| `src/components/PolicyDashboard.tsx` | Stats cards responsive width |
-| `src/components/PolicyDetailView.tsx` | Mobile-first layout, Turkish labels |
-| `src/components/GlobalNavigation.tsx` | Viewport constraints |
-| `src/components/animations/AnimatedComponents.tsx` | PageTransition width constraints |
-| `src/App.tsx` | Main element viewport constraints |
-| `src/index.css` | `overflow: clip`, `100dvw`, CSS containment |
-| `src/main.tsx` | JavaScript scroll prevention safety net |
-| `index.html` | `viewport-fit=cover` meta tag |
-
----
-
-## Mobile Viewport Fixes Applied
-
-### 1. Root Cause Fix (Dashboard Stats)
-```tsx
-// Before
-w-[140px] flex-shrink-0
-
-// After
-min-w-[120px] w-[calc((100vw-48px)/2.5)] sm:w-auto
-```
-
-### 2. CSS Containment (`src/index.css`)
-```css
-html, body, #root {
-  overflow-x: clip;  /* Stricter than hidden on iOS Safari */
-  max-width: 100vw;
-  max-width: 100dvw; /* Dynamic viewport for iOS */
-  overscroll-behavior-x: none;
-}
-#root {
-  contain: inline-size; /* CSS containment */
-}
-```
-
-### 3. Component Constraints
-- `PageTransition`: `w-full max-w-[100vw] overflow-x-hidden`
-- `GlobalNavigation`: `w-full max-w-[100vw] overflow-x-hidden`
-- `App main`: `w-full max-w-[100vw] overflow-x-hidden`
-
-### 4. JavaScript Safety Net (`src/main.tsx`)
-```typescript
-// Resets horizontal scroll if it somehow occurs
-window.addEventListener('scroll', () => {
-  if (window.scrollX > 0) window.scrollTo(0, window.scrollY)
-}, { passive: true })
-
-// MutationObserver catches DOM changes causing overflow
-```
-
-### 5. Viewport Meta (`index.html`)
-```html
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-```
+| Issue | Severity | Notes |
+|-------|----------|-------|
+| PWA icon 144x144 missing | Low | Create icon file |
+| Font preload warnings | Low | Timing optimization |
+| Supabase auth redirect | Config | Need Railway URL in Supabase redirect allowlist |
+| OCR text correction quality | Medium | User reported AI corrections not optimal - needs investigation |
 
 ---
 
@@ -155,65 +158,30 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 # VITE_API_PROXY_URL
 ```
 
-### CSP Configuration for PDF.js Worker
-The following CDN domains must be allowed in CSP (`server/index.ts`):
-- `unpkg.com` (primary PDF.js worker source)
-- `cdn.jsdelivr.net` (fallback)
-- `cdnjs.cloudflare.com` (fallback)
-
-### API Proxy Auto-Detection (`src/lib/env.ts`)
-In production, if `VITE_API_PROXY_URL` is not set at build time, the app auto-detects the API URL:
-```typescript
-export function getApiProxyUrl(): string {
-  // In production, if not set, use same origin (co-hosted frontend/backend)
-  if (import.meta.env.PROD && typeof window !== 'undefined') {
-    return window.location.origin
-  }
-  return import.meta.env.VITE_API_PROXY_URL || 'http://localhost:4001'
-}
-```
-This allows Railway deployment without setting `VITE_API_PROXY_URL` since frontend and backend share the same origin.
-
----
-
-## Gotchas Discovered
-
-| Issue | Solution |
-|-------|----------|
-| VITE_* vars not updating | Need rebuild, not just restart |
-| Railway env vars with quotes | Don't add manual quotes (Railway adds them) |
-| PDF.js worker blocked | Add CDN domains to CSP |
-| Supabase auth fails | Add Railway URL to redirect allowlist |
-| iOS Safari overflow | Use `overflow: clip` instead of `hidden` |
-| iOS viewport changes | Use `100dvw` instead of `100vw` |
-| Fixed widths cause overflow | Use responsive `calc()` based widths |
+### Important Gotchas
+- `VITE_*` vars are baked at **build time** - need rebuild, not just restart
+- API keys must NOT have `VITE_` prefix
+- Railway env vars shouldn't have manual quotes
+- CSP must allow `unpkg.com`, `cdn.jsdelivr.net` for PDF.js worker
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Deploy and test on real mobile device** - Verify overflow fix works on actual iOS/Android
-2. **Check production Railway logs** - Confirm no runtime errors
+1. **Test mobile UX** - Verify expandable sections work correctly on various devices
+2. **Investigate OCR correction** - User reported AI corrections are "not good at all"
+3. **Clear service worker cache** - Users may need to refresh to get v6 cache
 
 ### Short Term
-1. **Test other pages on mobile** - Compare, Settings, Chat pages
-2. **Review other fixed-width elements** - Search for `w-[` patterns that might cause issues
-3. **Add more E2E viewport tests** - Cover more user flows
+1. **Improve OCR post-processing** - Better text normalization for Turkish documents
+2. **Add keyboard navigation** - Arrow keys for expandable sections
+3. **Test accessibility** - ARIA labels for expandable sections
 
 ### Medium Term
-1. **Remove JavaScript scroll prevention** - If CSS fix is confirmed working, remove the safety net
-2. **Simplify CSS containment** - Clean up redundant overflow rules
-3. **Audit Tailwind classes** - Document mobile-safe width patterns
-
----
-
-## Technical Debt (Low Priority)
-
-1. **Redundant overflow rules** - Multiple layers of overflow containment could be simplified
-2. **JavaScript safety net** - Should be removed once CSS fix is confirmed
-3. **CSS containment** - `contain: inline-size` may not be needed with proper widths
-4. **E2E test coverage** - Could add more pages and interactions
+1. **Coverage comparison** - Visual comparison of coverage categories between policies
+2. **Recommendation tracking** - Track which recommendations users act on
+3. **Performance profiling** - Ensure expandable sections don't cause re-renders
 
 ---
 
@@ -234,7 +202,25 @@ npm run build && npm run build:server
 
 # Run production locally
 NODE_ENV=production node dist-server/index.js
+
+# Test specific file
+npm test -- --run src/components/PolicyDetailView.test.tsx
+
+# Force service worker update
+# Users: Clear browser cache or hard refresh (Ctrl+Shift+R)
 ```
+
+---
+
+## Service Worker Cache
+
+Current version: **v6**
+
+To force cache refresh for users:
+1. Cache version is in `public/sw.js`
+2. Increment `CACHE_NAME` value
+3. Users will get new cache on next visit
+4. Old caches are automatically cleaned up
 
 ---
 
@@ -242,12 +228,11 @@ NODE_ENV=production node dist-server/index.js
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 10 |
-| Files changed | 8+ |
-| New E2E tests | 5 |
+| Commits this session | 16 |
+| Files changed | 4 major, several minor |
 | Tests passing | ~4500 |
 | Production URL | https://insurai-production.up.railway.app |
-| Root cause identified | Stats cards fixed width exceeding viewport |
+| Major focus | Mobile UX improvements |
 
 ---
 
@@ -257,15 +242,33 @@ NODE_ENV=production node dist-server/index.js
 - [x] E2E mobile viewport tests passing
 - [x] No TypeScript errors
 - [x] No lint warnings
-- [x] Changes committed and pushed
-- [x] CLAUDE.md updated with Known Issue #14
-- [x] SESSION_HANDOFF.md updated
-- [x] Root cause documented
+- [x] Changes committed
+- [x] Documentation updated (CLAUDE.md)
+- [x] Known issues documented
 - [x] Next steps prioritized
+- [x] Session handoff updated
+- [x] Push to remote (completed)
 
 ---
 
-**Last Updated**: January 15, 2026
-**Session Duration**: Extended debugging session
-**Key Achievement**: Identified root cause of mobile viewport overflow (fixed widths exceeding viewport) after multiple CSS-only attempts failed
-**Next Session Focus**: Verify fix on real mobile device, clean up redundant overflow rules
+## Pending User Question
+
+User asked about OCR text correction quality:
+> "This is ok. Now check the below oct and corrected fields; the edited is not good at all; what is the best way to handle these issues?"
+
+The user shared raw OCR text vs AI-corrected text and expressed dissatisfaction with the correction quality. This needs investigation:
+- OCR produces fragmented Turkish characters ("İ" split, "ş" as separate chars)
+- Words broken with spaces ("poliçe" as "P o l i ç e")
+- AI correction may need better prompts or post-processing logic
+
+**Recommended investigation areas:**
+1. Review `src/lib/ai/prompts.ts` for OCR correction prompts
+2. Consider pre-processing OCR text before AI correction
+3. Improve character normalization in `src/lib/policy-utils.ts`
+4. Test with different AI models (Claude vs GPT-4o)
+
+---
+
+**Last Updated**: January 17, 2026
+**Session Duration**: ~3 hours (continued from previous session)
+**Next Session Focus**: OCR correction improvements or new feature work
