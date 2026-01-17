@@ -34,11 +34,13 @@ export interface TextCorrection {
 export interface CleanupStats {
   garbageBlocksRemoved: number
   qrBlocksRemoved: number
+  eSigortaArtifactsRemoved: number
   spacedCharsFixed: number
   urlsCleaned: number
   linesRemoved: number
   totalCharactersRemoved: number
   sectionsIdentified: string[]
+  numbersNormalized: number
 }
 
 // ============================================================================
@@ -46,16 +48,91 @@ export interface CleanupStats {
 // Detects spaced Turkish characters like "B İ RLE Şİ K" and merges them
 // ============================================================================
 
-// Turkish character sets (used in regex patterns defined below)
+// Turkish character sets reference (hardcoded in regex patterns for performance)
 // Upper: A-ZÇĞİÖŞÜ  Lower: a-zçğıöşü
+// Special chars: ÇçĞğİıÖöŞşÜü
+
+// Note: These constants are documented for reference but regex patterns
+// use literal strings for better performance and compatibility
+const _TURKISH_SPECIAL_CHARS = 'ÇçĞğİıÖöŞşÜü'
+const _ALL_TURKISH_UPPER = 'A-ZÇĞİÖŞÜ'
+const _ALL_TURKISH_LOWER = 'a-zçğıöşü'
+void _TURKISH_SPECIAL_CHARS, _ALL_TURKISH_UPPER, _ALL_TURKISH_LOWER // Suppress unused warnings
 
 /**
  * Fix spaced Turkish characters (B İ RLE Şİ K → BİRLEŞİK)
  * Detects sequences of single letters with spaces and merges them
+ *
+ * ENHANCED: Now handles:
+ * - Single special char spacing: "Poli ç e" → "Poliçe", "Ara ç" → "Araç"
+ * - Diacritic spacing: "D ü zenleme" → "Düzenleme", "De ğ er" → "Değer"
+ * - All-caps spacing: "POL İÇ ES İ" → "POLİÇESİ"
+ * - Mixed case: "GEN İŞ LET İ LM İŞ" → "GENİŞLETİLMİŞ"
  */
 function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: number } {
   let fixCount = 0
   let result = text
+
+  // =========================================================================
+  // PRIORITY 1: Fix single Turkish special character spacing
+  // These are the most common OCR errors: "Poli ç e", "Ara ç", "De ğ er"
+  // =========================================================================
+
+  // Pattern: word + space + single Turkish char + space/end
+  // "Poli ç e" → "Poliçe", "ara ç" → "araç"
+  const singleSpecialCharPatterns: Array<[RegExp, string]> = [
+    // ç spacing
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ç\s+([a-zçğıöşü]*)/gi, '$1ç$2'],
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+Ç\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1Ç$2'],
+
+    // ğ spacing
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ğ\s+([a-zçğıöşü]*)/gi, '$1ğ$2'],
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+Ğ\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1Ğ$2'],
+
+    // ş spacing
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ş\s+([a-zçğıöşü]*)/gi, '$1ş$2'],
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+Ş\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1Ş$2'],
+
+    // ü spacing
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ü\s+([a-zçğıöşü]*)/gi, '$1ü$2'],
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+Ü\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1Ü$2'],
+
+    // ö spacing
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ö\s+([a-zçğıöşü]*)/gi, '$1ö$2'],
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+Ö\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1Ö$2'],
+
+    // ı spacing (dotless i)
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+ı\s+([a-zçğıöşü]*)/gi, '$1ı$2'],
+
+    // İ spacing (dotted I)
+    [/([A-Za-zÇĞİÖŞÜçğıöşü]+)\s+İ\s+([A-Za-zÇĞİÖŞÜçğıöşü]*)/gi, '$1İ$2'],
+  ]
+
+  for (const [pattern, replacement] of singleSpecialCharPatterns) {
+    const beforeLength = result.length
+    result = result.replace(pattern, replacement)
+    if (result.length !== beforeLength) {
+      fixCount++
+    }
+  }
+
+  // =========================================================================
+  // PRIORITY 2: Fix word-internal single char spacing
+  // Pattern: "D ü zenleme" → "Düzenleme", "M üş teri" → "Müşteri"
+  // =========================================================================
+
+  // Fix single letter spacing within words (letter + space + letter pattern)
+  // This catches: "D ü zenleme", "S ü re", "M üş teri", "Ş irketi"
+  const intraWordSpacingPattern = /([A-ZÇĞİÖŞÜa-zçğıöşü])\s([ÇçĞğİıÖöŞşÜü])\s?([a-zçğıöşü]*)/g
+  result = result.replace(intraWordSpacingPattern, (_match, before, special, after) => {
+    fixCount++
+    return before + special + (after || '')
+  })
+
+  // =========================================================================
+  // PRIORITY 3: All-uppercase spaced sequences
+  // "B İ RLE Şİ K" → "BİRLEŞİK", "POL İÇ ES İ" → "POLİÇESİ"
+  // =========================================================================
 
   // Pattern 1: Single uppercase letters with spaces between them
   // Matches: "B İ RLE Şİ K", "A N A D O L U"
@@ -86,8 +163,13 @@ function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: num
     return match
   })
 
+  // =========================================================================
+  // PRIORITY 4: Known Turkish insurance words (comprehensive list)
+  // =========================================================================
+
   // Pattern 3: Known Turkish words that often appear spaced (UPPERCASE)
   const knownSpacedWords: Array<[RegExp, string]> = [
+    // Insurance company/document terms
     [/B\s*İ\s*R\s*L\s*E\s*Ş\s*İ\s*K/gi, 'BİRLEŞİK'],
     [/S\s*İ\s*G\s*O\s*R\s*T\s*A/gi, 'SİGORTA'],
     [/A\s*N\s*A\s*D\s*O\s*L\s*U/gi, 'ANADOLU'],
@@ -101,6 +183,21 @@ function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: num
     [/S\s*İ\s*G\s*O\s*R\s*T\s*A\s*L\s*I/gi, 'SİGORTALI'],
     [/P\s*R\s*İ\s*M/gi, 'PRİM'],
     [/M\s*U\s*A\s*F\s*İ\s*Y\s*E\s*T/gi, 'MUAFİYET'],
+
+    // Additional insurance terms
+    [/G\s*E\s*N\s*İ\s*Ş\s*L\s*E\s*T\s*İ\s*L\s*M\s*İ\s*Ş/gi, 'GENİŞLETİLMİŞ'],
+    [/D\s*Ü\s*Z\s*E\s*N\s*L\s*E\s*M\s*E/gi, 'DÜZENLEME'],
+    [/Ş\s*İ\s*R\s*K\s*E\s*T/gi, 'ŞİRKET'],
+    [/M\s*Ü\s*Ş\s*T\s*E\s*R\s*İ/gi, 'MÜŞTERİ'],
+    [/İ\s*R\s*T\s*İ\s*B\s*A\s*T/gi, 'İRTİBAT'],
+    [/Ş\s*İ\s*K\s*A\s*Y\s*E\s*T/gi, 'ŞİKAYET'],
+    [/D\s*E\s*Ğ\s*E\s*R/gi, 'DEĞER'],
+    [/S\s*Ü\s*R\s*E/gi, 'SÜRE'],
+    [/Ö\s*D\s*E\s*M\s*E/gi, 'ÖDEME'],
+    [/Ü\s*C\s*R\s*E\s*T/gi, 'ÜCRET'],
+    [/H\s*A\s*S\s*A\s*R/gi, 'HASAR'],
+    [/T\s*A\s*R\s*İ\s*H/gi, 'TARİH'],
+    [/P\s*L\s*A\s*K\s*A/gi, 'PLAKA'],
   ]
 
   for (const [pattern, replacement] of knownSpacedWords) {
@@ -267,27 +364,111 @@ const GARBAGE_PATTERNS = [
 ]
 
 /**
- * QR Code and Barcode patterns - these are common in Turkish insurance PDFs
+ * QR Code and Barcode patterns - comprehensive detection for Turkish insurance PDFs
+ *
+ * Turkish insurance policies commonly embed:
+ * - QR codes for digital verification (e-sigorta)
+ * - Barcodes for policy tracking
+ * - DataMatrix codes for regulatory compliance
+ * - Encoded digital signatures
  */
 const QR_BARCODE_PATTERNS = [
-  // QR code binary data (often appears as repeated special char blocks)
-  /(?:B\s*\^+\s*B[A-Za-z0-9]+)+/g,  // B^^^Bj54... pattern
-  /(?:[A-Z]\s*[\^<>]+\s*[A-Z][A-Za-z0-9]*\s*)+/g,  // Variations with spaces
+  // =========================================================================
+  // QR CODE PATTERNS (Binary data that appears when QR is OCR'd)
+  // =========================================================================
 
-  // Barcode patterns (long sequences of similar characters)
-  /[|l1I]{20,}/g,  // Vertical bar patterns
-  /[=_\-]{20,}/g,  // Horizontal patterns
+  // Pattern 1: B^^^B style (most common in Turkish insurance PDFs)
+  // Matches: B^^^Bj54<O[dR^B, B^B^B, B^^^Bk7j etc.
+  /(?:B\s*\^+\s*B[A-Za-z0-9<>\[\]]*\s*)+/g,
+  /(?:B\s*[\^<>]+\s*B\s*)+/gi,
 
-  // Encoded/encrypted blocks (common in PDF QR overlays)
-  /[A-Za-z0-9]{40,}(?![a-z]{3})/g,  // Very long alphanumeric without words
-  /(?:[0-9A-F]{2}\s*){20,}/gi,  // Hex-like sequences
+  // Pattern 2: Generic caret sequences with letters
+  /(?:[A-Z]\s*[\^<>]+\s*[A-Z][A-Za-z0-9]*\s*)+/g,
+  /(?:[A-Z][\^]+[A-Z])+[A-Za-z0-9<>\[\]]+/g,
 
-  // DataMatrix/QR encoded text
+  // Pattern 3: Encoded blocks with special char clusters
+  /[A-Za-z0-9]*[\^<>\[\]{}|\\]{3,}[A-Za-z0-9]+/g,
+
+  // =========================================================================
+  // BARCODE PATTERNS (Linear barcodes)
+  // =========================================================================
+
+  // Vertical bar patterns (Code 128, Code 39, etc.)
+  /[|l1I]{15,}/g,
+
+  // Horizontal line patterns
+  /[=_\-]{15,}/g,
+
+  // Mixed bar patterns
+  /(?:[|lI1]+[.\s]*){10,}/g,
+
+  // =========================================================================
+  // DATAMATRIX / PDF417 / AZTEC PATTERNS
+  // =========================================================================
+
+  // Very long alphanumeric strings (encoded data, no natural words)
+  /\b[A-Za-z0-9+/]{50,}(?:={0,2})?\b/g,
+
+  // Hex-like sequences (digital signatures, checksums)
+  /(?:[0-9A-Fa-f]{2}\s*){15,}/g,
+
+  // Alternating pattern blocks (common in 2D barcodes)
+  /(?:[01]{8}\s*){5,}/g,
+
+  // =========================================================================
+  // TURKISH DIGITAL SIGNATURE PATTERNS (E-İMZA)
+  // =========================================================================
+
+  // Base64-encoded signature blocks
+  /(?:[A-Za-z0-9+/]{4}){15,}={0,2}/g,
+
+  // SHA/hash values
+  /\b[A-Fa-f0-9]{32,128}\b/g,
+
+  // PEM-style blocks (BEGIN/END markers)
+  /-----BEGIN\s+[\w\s]+-----[\s\S]*?-----END\s+[\w\s]+-----/gi,
+
+  // =========================================================================
+  // NOISE AND ENCODING ARTIFACTS
+  // =========================================================================
+
+  // Unicode replacement characters and boxes
+  /[\uFFFD\u2588\u2591-\u2593]+/g,
+
+  // Repeated non-word characters
+  /([^\w\s\u00C0-\u017F])\1{5,}/g,
+
+  // OCR confusion sequences (looks like barcode residue)
+  /(?:[0O]+[1Il]+){5,}/g,
+
+  // =========================================================================
+  // EXPLICIT MARKERS (if document contains them)
+  // =========================================================================
+
   /\[QR\][\s\S]*?\[\/QR\]/gi,
   /\[BARCODE\][\s\S]*?\[\/BARCODE\]/gi,
+  /\[DATAMATRIX\][\s\S]*?\[\/DATAMATRIX\]/gi,
 
-  // Lines that are entirely special characters
+  // Lines that are entirely non-word characters
   /^[\s\W]+$/gm,
+]
+
+/**
+ * Additional patterns specific to Turkish e-Sigorta documents
+ */
+const ESIGORTA_ARTIFACT_PATTERNS = [
+  // E-signature verification codes
+  /E-İMZA\s*:\s*[A-Za-z0-9+/=]+/gi,
+  /DOĞRULAMA\s*KODU\s*:\s*[A-Za-z0-9]+/gi,
+
+  // QR verification URLs that got corrupted
+  /https?:\/\/[^\s]*[\^<>\[\]{}|\\]+[^\s]*/gi,
+
+  // Digital certificate fragments
+  /CN=[^\n,]+,\s*OU=[^\n,]+/gi,
+
+  // Timestamp tokens
+  /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{4}[A-Za-z0-9+/=]+/g,
 ]
 
 /**
@@ -321,14 +502,24 @@ function isGarbageLine(line: string): boolean {
 /**
  * Remove garbage data blocks from text
  */
-function removeGarbageData(text: string): { text: string; stats: { blocksRemoved: number; linesRemoved: number; charsRemoved: number; qrBlocksRemoved: number } } {
+function removeGarbageData(text: string): { text: string; stats: { blocksRemoved: number; linesRemoved: number; charsRemoved: number; qrBlocksRemoved: number; eSigortaArtifacts: number } } {
   const originalLength = text.length
   let blocksRemoved = 0
   let linesRemoved = 0
   let qrBlocksRemoved = 0
+  let eSigortaArtifacts = 0
 
-  // First pass: Remove QR/barcode patterns from the entire text
+  // First pass: Remove e-Sigorta specific artifacts
   let result = text
+  for (const pattern of ESIGORTA_ARTIFACT_PATTERNS) {
+    const matches = result.match(pattern)
+    if (matches) {
+      eSigortaArtifacts += matches.length
+      result = result.replace(pattern, ' ')
+    }
+  }
+
+  // Second pass: Remove QR/barcode patterns from the entire text
   for (const pattern of QR_BARCODE_PATTERNS) {
     const matches = result.match(pattern)
     if (matches) {
@@ -337,7 +528,7 @@ function removeGarbageData(text: string): { text: string; stats: { blocksRemoved
     }
   }
 
-  // Second pass: Clean each line
+  // Third pass: Clean each line
   const lines = result.split('\n')
   const cleanedLines: string[] = []
 
@@ -365,8 +556,211 @@ function removeGarbageData(text: string): { text: string; stats: { blocksRemoved
 
   return {
     text: result,
-    stats: { blocksRemoved, linesRemoved, charsRemoved, qrBlocksRemoved },
+    stats: { blocksRemoved, linesRemoved, charsRemoved, qrBlocksRemoved, eSigortaArtifacts },
   }
+}
+
+// ============================================================================
+// QUALITY METRICS AND CER CALCULATION
+// ============================================================================
+
+/**
+ * Quality metrics for OCR text processing
+ */
+export interface TextQualityMetrics {
+  /** Character Error Rate (0-1, lower is better) */
+  estimatedCER: number
+  /** Word Error Rate (0-1, lower is better) */
+  estimatedWER: number
+  /** Overall quality score (0-100, higher is better) */
+  qualityScore: number
+  /** Confidence level in the metrics */
+  confidence: 'high' | 'medium' | 'low'
+  /** Specific quality indicators */
+  indicators: {
+    garbageRatio: number
+    turkishCharCorrectness: number
+    spacingQuality: number
+    numberFormatConsistency: number
+    structureIntegrity: number
+  }
+  /** Suggested actions based on quality */
+  suggestions: string[]
+}
+
+/**
+ * Calculate quality metrics for processed text
+ *
+ * This estimates CER/WER without a reference document by analyzing:
+ * - Presence of garbage/binary artifacts
+ * - Turkish character usage patterns
+ * - Spacing consistency
+ * - Number format consistency
+ * - Document structure integrity
+ *
+ * @param originalText - Raw OCR text
+ * @param processedText - Text after processing
+ * @param stats - Cleanup statistics
+ * @returns Quality metrics
+ */
+export function calculateQualityMetrics(
+  originalText: string,
+  processedText: string,
+  stats: CleanupStats
+): TextQualityMetrics {
+  const suggestions: string[] = []
+
+  // 1. Garbage ratio (what percentage was garbage)
+  const garbageRatio = stats.totalCharactersRemoved / Math.max(originalText.length, 1)
+
+  // 2. Turkish character correctness
+  // Check for common OCR errors in Turkish chars
+  const turkishErrors = countTurkishCharErrors(processedText)
+  const expectedTurkishChars = (processedText.match(/[a-zA-Z]/g) || []).length * 0.15 // ~15% Turkish chars expected
+  const turkishCharCorrectness = 1 - (turkishErrors / Math.max(expectedTurkishChars, 1))
+
+  // 3. Spacing quality
+  // Check for abnormal spacing patterns
+  const spacingIssues = (processedText.match(/\s{3,}|\w\s\w\s\w/g) || []).length
+  const totalSpaces = (processedText.match(/\s/g) || []).length
+  const spacingQuality = 1 - (spacingIssues / Math.max(totalSpaces, 1))
+
+  // 4. Number format consistency
+  const numberFormatConsistency = checkNumberFormatConsistency(processedText)
+
+  // 5. Structure integrity
+  // Check if document has expected sections
+  const structureScore = calculateStructureIntegrity(processedText)
+
+  // Calculate estimated CER
+  // CER = (substitutions + insertions + deletions) / reference length
+  // We estimate based on detected issues
+  const estimatedCER = Math.min(1, (
+    garbageRatio * 0.3 +
+    (1 - turkishCharCorrectness) * 0.25 +
+    (1 - spacingQuality) * 0.2 +
+    (1 - numberFormatConsistency) * 0.15 +
+    (1 - structureScore) * 0.1
+  ))
+
+  // Estimate WER (typically higher than CER)
+  const estimatedWER = Math.min(1, estimatedCER * 1.5)
+
+  // Overall quality score (0-100)
+  const qualityScore = Math.round((1 - estimatedCER) * 100)
+
+  // Determine confidence
+  let confidence: 'high' | 'medium' | 'low' = 'medium'
+  if (originalText.length > 2000 && stats.sectionsIdentified.length > 3) {
+    confidence = 'high'
+  } else if (originalText.length < 500) {
+    confidence = 'low'
+  }
+
+  // Generate suggestions
+  if (garbageRatio > 0.1) {
+    suggestions.push('Document contains significant binary/QR data artifacts')
+  }
+  if (turkishCharCorrectness < 0.9) {
+    suggestions.push('Turkish character OCR errors detected (İ/I, Ş/S confusion)')
+  }
+  if (spacingQuality < 0.9) {
+    suggestions.push('Spacing issues detected - words may be split or merged incorrectly')
+  }
+  if (numberFormatConsistency < 0.8) {
+    suggestions.push('Inconsistent number formats detected - verify amounts')
+  }
+  if (structureScore < 0.7) {
+    suggestions.push('Document structure unclear - key sections may be missing')
+  }
+  if (suggestions.length === 0) {
+    suggestions.push('Document quality is good')
+  }
+
+  return {
+    estimatedCER,
+    estimatedWER,
+    qualityScore,
+    confidence,
+    indicators: {
+      garbageRatio,
+      turkishCharCorrectness: Math.max(0, Math.min(1, turkishCharCorrectness)),
+      spacingQuality: Math.max(0, Math.min(1, spacingQuality)),
+      numberFormatConsistency,
+      structureIntegrity: structureScore,
+    },
+    suggestions,
+  }
+}
+
+/**
+ * Count potential Turkish character OCR errors
+ */
+function countTurkishCharErrors(text: string): number {
+  let errors = 0
+
+  // Check for common ASCII substitutions that should be Turkish
+  // ISTANBUL should be İSTANBUL
+  if (/\bISTANBUL\b/.test(text)) errors += 2
+  if (/\bTURKIYE\b/.test(text)) errors += 2
+  if (/\bSIGORTA\b/.test(text)) errors += 1
+  if (/\bPOLICE\b/.test(text) && /sigorta|kasko|trafik/i.test(text)) errors += 1
+
+  // Check for isolated ASCII where Turkish expected
+  // Words ending in 'LI' or 'SI' that should have Turkish chars
+  const suspiciousEndings = (text.match(/\b\w+(?:LI|SI|NI|RI)\b/g) || []).length
+  errors += suspiciousEndings * 0.3
+
+  return errors
+}
+
+/**
+ * Check number format consistency
+ */
+function checkNumberFormatConsistency(text: string): number {
+  // Count Turkish format numbers (N.NNN,NN)
+  const turkishFormat = (text.match(/\d{1,3}(?:\.\d{3})+(?:,\d{2})?/g) || []).length
+
+  // Count English format numbers (N,NNN.NN)
+  const englishFormat = (text.match(/\d{1,3}(?:,\d{3})+(?:\.\d{2})?/g) || []).length
+
+  // Count ambiguous (could be either)
+  const ambiguous = (text.match(/\d+\.\d{2}\b/g) || []).length
+
+  const total = turkishFormat + englishFormat + ambiguous
+  if (total === 0) return 1 // No numbers to check
+
+  // Penalize mixed formats
+  if (turkishFormat > 0 && englishFormat > 0) {
+    return 0.5 // Mixed formats
+  }
+
+  return 1 // Consistent
+}
+
+/**
+ * Calculate document structure integrity
+ */
+function calculateStructureIntegrity(text: string): number {
+  let score = 0
+  const checks = [
+    // Has policy number pattern
+    /(?:POLİÇE|POLICE|NO)\s*[:.]?\s*\d/i,
+    // Has date pattern
+    /\d{2}[./-]\d{2}[./-]\d{4}/,
+    // Has currency amount
+    /(?:₺|TL)\s*\d|^\d[\d.,]*\s*(?:TL|₺)/m,
+    // Has section headers
+    /(?:TEMİNAT|COVERAGE|PRİM|PREMIUM|SİGORTALI|INSURED)/i,
+    // Has structured labels
+    /(?:ADI?|SOYADI?|ADRES|TC|VKN)\s*:/i,
+  ]
+
+  for (const pattern of checks) {
+    if (pattern.test(text)) score += 0.2
+  }
+
+  return Math.min(1, score)
 }
 
 // ============================================================================
@@ -507,6 +901,186 @@ function fixNumberAndPunctuationSpacing(text: string): string {
 }
 
 // ============================================================================
+// TURKISH NUMERIC LOCALE NORMALIZATION
+// Handles TR format (29.657,14) → internal decimal format (29657.14)
+// ============================================================================
+
+/**
+ * Parse a Turkish-format number string to a numeric value
+ * Turkish format uses . for thousands and , for decimal
+ * Examples:
+ *   "29.657,14" → 29657.14
+ *   "1.500.000" → 1500000
+ *   "100,50" → 100.50
+ *   "1.234" → 1234 (if no comma, treat . as thousands)
+ *
+ * @param numStr - The number string in Turkish format
+ * @returns Parsed number or NaN if invalid
+ */
+export function parseTurkishNumber(numStr: string): number {
+  if (!numStr || typeof numStr !== 'string') return NaN
+
+  // Clean the string: remove spaces and currency symbols
+  let cleaned = numStr.trim()
+    .replace(/\s+/g, '')
+    .replace(/₺|TL|TRY/gi, '')
+    .trim()
+
+  // Handle empty after cleaning
+  if (!cleaned) return NaN
+
+  // Check for Turkish format indicators
+  const hasTurkishDecimal = cleaned.includes(',')
+  const hasPeriods = cleaned.includes('.')
+
+  // Case 1: Has comma (definite Turkish decimal separator)
+  if (hasTurkishDecimal) {
+    // Remove thousand separators (periods) and convert decimal comma to period
+    cleaned = cleaned.replace(/\./g, '').replace(',', '.')
+    return parseFloat(cleaned)
+  }
+
+  // Case 2: Has periods but no comma - could be Turkish thousands OR decimal
+  if (hasPeriods) {
+    // Heuristic: If the pattern matches N.NNN or N.NNN.NNN, treat as thousands
+    const turkishThousandsPattern = /^\d{1,3}(\.\d{3})+$/
+    if (turkishThousandsPattern.test(cleaned)) {
+      // It's Turkish thousands format (1.234, 1.234.567)
+      cleaned = cleaned.replace(/\./g, '')
+      return parseFloat(cleaned)
+    }
+
+    // Otherwise, treat period as decimal (international format)
+    return parseFloat(cleaned)
+  }
+
+  // Case 3: No separators - just parse as number
+  return parseFloat(cleaned)
+}
+
+/**
+ * Format a number to Turkish locale string
+ * @param value - Numeric value
+ * @param decimals - Number of decimal places (default 2)
+ * @returns Turkish formatted string (e.g., "29.657,14")
+ */
+export function formatTurkishNumber(value: number, decimals = 2): string {
+  if (isNaN(value)) return ''
+
+  return value.toLocaleString('tr-TR', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  })
+}
+
+/**
+ * Normalize numbers in text to consistent internal format
+ * Converts Turkish numbers to standard decimal format for storage
+ *
+ * @param text - Text containing numbers
+ * @param options - Normalization options
+ * @returns Text with normalized numbers and count of changes
+ */
+export function normalizeNumbersInText(
+  text: string,
+  options: {
+    preserveDisplay?: boolean  // If true, keep Turkish display format
+    normalizeCurrency?: boolean  // If true, standardize currency amounts
+  } = {}
+): { text: string; changesCount: number } {
+  const { preserveDisplay = false, normalizeCurrency = true } = options
+  let result = text
+  let changesCount = 0
+
+  // Pattern 1: Turkish currency amounts (₺ 29.657,14 or 29.657,14 TL)
+  if (normalizeCurrency) {
+    // Match currency with Turkish format
+    const currencyPattern = /(?:₺\s*)?(\d{1,3}(?:\.\d{3})*(?:,\d{2})?)\s*(?:TL|₺)?/g
+
+    result = result.replace(currencyPattern, (match, numPart) => {
+      // Only process if it looks like Turkish format (has comma or multiple periods)
+      if (numPart.includes(',') || (numPart.match(/\./g) || []).length > 1 || /^\d{1,3}\.\d{3}$/.test(numPart)) {
+        const parsed = parseTurkishNumber(numPart)
+        if (!isNaN(parsed)) {
+          changesCount++
+          if (preserveDisplay) {
+            // Keep as Turkish format but normalized (₺29.657,14)
+            return `₺${formatTurkishNumber(parsed, numPart.includes(',') ? 2 : 0)}`
+          }
+          // Convert to internal format (₺29657.14)
+          return `₺${parsed.toFixed(numPart.includes(',') ? 2 : 0)}`
+        }
+      }
+      return match
+    })
+  }
+
+  // Pattern 2: Standalone Turkish numbers (not currency)
+  // Match patterns like "1.234.567" or "1.234,56"
+  const turkishNumberPattern = /\b(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?)\b/g
+
+  result = result.replace(turkishNumberPattern, (match) => {
+    // Skip if it looks like a date (DD.MM.YYYY)
+    if (/^\d{2}\.\d{2}\.\d{4}$/.test(match)) {
+      return match
+    }
+    // Skip if it looks like a version number (1.2.3)
+    if (/^\d+\.\d+\.\d+$/.test(match) && !/^\d{1,3}\.\d{3}\.\d{3}$/.test(match)) {
+      return match
+    }
+
+    const parsed = parseTurkishNumber(match)
+    if (!isNaN(parsed)) {
+      changesCount++
+      if (preserveDisplay) {
+        return formatTurkishNumber(parsed, match.includes(',') ? 2 : 0)
+      }
+      // Internal format
+      return parsed.toFixed(match.includes(',') ? 2 : 0)
+    }
+    return match
+  })
+
+  // Pattern 3: Fix inconsistent decimal separators
+  // Handle cases like "1482.86" mixed with "29.657,14"
+  // If we detect majority Turkish format, normalize everything
+
+  return { text: result, changesCount }
+}
+
+/**
+ * Detect the primary number format used in text
+ * @returns 'tr' for Turkish, 'en' for English/International, 'mixed' if both
+ */
+export function detectNumberFormat(text: string): 'tr' | 'en' | 'mixed' {
+  // Count Turkish format indicators (comma as decimal)
+  const turkishDecimalCount = (text.match(/\d+,\d{2}\b/g) || []).length
+
+  // Count English format indicators (period as decimal with 2 digits)
+  const englishDecimalCount = (text.match(/\d+\.\d{2}\b/g) || []).length
+
+  // Count Turkish thousands (N.NNN pattern)
+  const turkishThousandsCount = (text.match(/\d{1,3}\.\d{3}(?!\d)/g) || []).length
+
+  // Heuristic decision
+  const turkishScore = turkishDecimalCount * 2 + turkishThousandsCount
+  const englishScore = englishDecimalCount * 2
+
+  if (turkishScore > 0 && englishScore > 0) {
+    // Both formats detected
+    if (turkishScore > englishScore * 2) return 'tr'
+    if (englishScore > turkishScore * 2) return 'en'
+    return 'mixed'
+  }
+
+  if (turkishScore > 0) return 'tr'
+  if (englishScore > 0) return 'en'
+
+  // Default to Turkish for Turkish documents
+  return 'tr'
+}
+
+// ============================================================================
 // COMMON OCR CORRECTIONS
 // Character substitutions and common OCR errors
 // ============================================================================
@@ -589,17 +1163,42 @@ function applyOCRCorrections(text: string): { text: string; corrections: TextCor
 /**
  * Apply all local preprocessing before AI
  * This handles the bulk of the cleanup without needing AI
+ *
+ * Processing order:
+ * 1. Remove garbage/QR/barcode data
+ * 2. Fix spaced Turkish characters
+ * 3. Clean URLs/emails
+ * 4. Fix number/punctuation spacing
+ * 5. Normalize numeric locale (TR format)
+ * 6. Apply OCR corrections
+ * 7. Add section markers (optional)
+ * 8. Final whitespace cleanup
  */
-export function applyComprehensivePreprocessing(text: string, options: { addSectionMarkers?: boolean } = {}): {
+export function applyComprehensivePreprocessing(
+  text: string,
+  options: {
+    addSectionMarkers?: boolean
+    normalizeNumbers?: boolean
+    preserveDisplayFormat?: boolean
+  } = {}
+): {
   text: string
   corrections: TextCorrection[]
   stats: CleanupStats
+  qualityMetrics?: TextQualityMetrics
 } {
+  const {
+    addSectionMarkers: shouldAddMarkers = false,
+    normalizeNumbers = true,
+    preserveDisplayFormat = true,
+  } = options
+
   const corrections: TextCorrection[] = []
   let result = text
   let sectionsIdentified: string[] = []
+  let numbersNormalized = 0
 
-  // 1. Remove garbage data first (including QR/barcode)
+  // 1. Remove garbage data first (including QR/barcode and e-Sigorta artifacts)
   const garbageResult = removeGarbageData(result)
   result = garbageResult.text
 
@@ -614,33 +1213,48 @@ export function applyComprehensivePreprocessing(text: string, options: { addSect
   // 4. Fix number and punctuation spacing
   result = fixNumberAndPunctuationSpacing(result)
 
-  // 5. Apply OCR corrections
+  // 5. Normalize numeric locale (TR format handling)
+  if (normalizeNumbers) {
+    const numberResult = normalizeNumbersInText(result, {
+      preserveDisplay: preserveDisplayFormat,
+      normalizeCurrency: true,
+    })
+    result = numberResult.text
+    numbersNormalized = numberResult.changesCount
+  }
+
+  // 6. Apply OCR corrections
   const ocrResult = applyOCRCorrections(result)
   result = ocrResult.text
   corrections.push(...ocrResult.corrections)
 
-  // 6. Add section markers if requested (for two-pass extraction)
-  if (options.addSectionMarkers) {
+  // 7. Add section markers if requested (for two-pass extraction)
+  if (shouldAddMarkers) {
     const sectionResult = addSectionMarkers(result)
     result = sectionResult.text
     sectionsIdentified = sectionResult.sectionsFound
   }
 
-  // 7. Final cleanup - normalize whitespace
+  // 8. Final cleanup - normalize whitespace
   result = result.trim()
   result = result.replace(/[ \t]+$/gm, '') // Remove trailing spaces per line
 
   const stats: CleanupStats = {
     garbageBlocksRemoved: garbageResult.stats.blocksRemoved,
     qrBlocksRemoved: garbageResult.stats.qrBlocksRemoved,
+    eSigortaArtifactsRemoved: garbageResult.stats.eSigortaArtifacts,
     spacedCharsFixed: turkishResult.fixCount,
     urlsCleaned: urlResult.cleanupCount,
     linesRemoved: garbageResult.stats.linesRemoved,
     totalCharactersRemoved: garbageResult.stats.charsRemoved,
     sectionsIdentified,
+    numbersNormalized,
   }
 
-  return { text: result, corrections, stats }
+  // Calculate quality metrics
+  const qualityMetrics = calculateQualityMetrics(text, result, stats)
+
+  return { text: result, corrections, stats, qualityMetrics }
 }
 
 /**
@@ -1062,11 +1676,13 @@ export async function processTextEnhanced(
     const stats: CleanupStats = {
       garbageBlocksRemoved: 0, // Clean-room doesn't track this granularly
       qrBlocksRemoved: 0,
+      eSigortaArtifactsRemoved: 0,
       spacedCharsFixed: 0,
       urlsCleaned: 0,
       linesRemoved: 0,
       totalCharactersRemoved: rawText.length - cleanRoomResult.cleanCopy.length,
       sectionsIdentified: [],
+      numbersNormalized: 0,
     }
 
     return {
