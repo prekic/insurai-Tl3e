@@ -1330,7 +1330,7 @@ export async function processDocumentQuick(
     cleanText: cleanRoomResult.cleanCopy,
     redactedText: cleanRoomResult.redactedCopy,
     piiVault: cleanRoomResult.piiVault,
-    confidence: cleanRoomResult.validationReport.isValid ? 0.90 : 0.80,
+    confidence: cleanRoomResult.validationReport.issues.length === 0 ? 0.90 : 0.80,
     processingTimeMs: Date.now() - startTime,
   }
 }
