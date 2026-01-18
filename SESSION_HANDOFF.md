@@ -44,6 +44,7 @@ This addresses the user's feedback from the previous session about poor OCR corr
 ## Commits This Session
 
 ```
+3f251af Update documentation for combined document processing pipeline session
 9c73fb3 Fix ValidationReport.isValid type error - use issues.length check
 a869dea Add combined document processing pipeline
 9b88157 Add comprehensive AI prompts for OCR correction and structured extraction
@@ -217,8 +218,8 @@ NODE_ENV=production node dist-server/index.js
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 4 |
-| Files changed/created | 6 major files |
+| Commits this session | 5 |
+| Files changed/created | 8 files (6 code + 2 docs) |
 | New tests added | 127 |
 | Total tests passing | ~4600+ |
 | Production URL | https://insurai-production.up.railway.app |
