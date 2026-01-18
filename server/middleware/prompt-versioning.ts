@@ -1177,8 +1177,8 @@ async function updateVersionMetrics(
  */
 export async function getTemplateStats(
   templateId: string,
-  startDate?: string,
-  endDate?: string
+  _startDate?: string,
+  _endDate?: string
 ): Promise<{
   totalUsage: number
   successRate: number

@@ -9,7 +9,27 @@
  * - Analytics and trends
  */
 
-import { supabase } from '../lib/supabase.js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+// ============================================================================
+// Database Client
+// ============================================================================
+
+let supabase: SupabaseClient | null = null
+
+function getSupabase(): SupabaseClient | null {
+  if (supabase) return supabase
+
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url || !serviceKey) {
+    return null
+  }
+
+  supabase = createClient(url, serviceKey)
+  return supabase
+}
 
 // ============================================================================
 // Types & Interfaces
@@ -220,9 +240,10 @@ export function recordRequest(metric: RequestMetric): void {
  * Persist metric to database
  */
 async function persistMetric(metric: RequestMetric): Promise<void> {
-  if (!supabase) return
+  const db = getSupabase()
+  if (!db) return
 
-  await supabase.from('request_metrics').insert({
+  await db.from('request_metrics').insert({
     endpoint: metric.endpoint,
     method: metric.method,
     status_code: metric.statusCode,
@@ -316,7 +337,8 @@ export function getSystemMetrics(): SystemMetrics {
 async function checkDatabaseHealth(): Promise<ComponentHealth> {
   const start = Date.now()
   try {
-    if (!supabase) {
+    const db = getSupabase()
+    if (!db) {
       return {
         name: 'database',
         status: 'unknown',
@@ -325,7 +347,7 @@ async function checkDatabaseHealth(): Promise<ComponentHealth> {
       }
     }
 
-    const { error } = await supabase.from('admin_users').select('count').limit(1)
+    const { error } = await db.from('admin_users').select('count').limit(1)
     const responseTime = Date.now() - start
 
     if (error) {
@@ -642,9 +664,10 @@ function triggerAlert(rule: AlertRule, value: number): void {
  * Persist alert to database
  */
 async function persistAlert(alert: Alert): Promise<void> {
-  if (!supabase) return
+  const db = getSupabase()
+  if (!db) return
 
-  await supabase.from('monitoring_alerts').insert({
+  await db.from('monitoring_alerts').insert({
     id: alert.id,
     rule_id: alert.ruleId,
     rule_name: alert.ruleName,

@@ -6,7 +6,10 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyDatabase = any
 
 // ============================================================================
 // TYPES
@@ -53,11 +56,11 @@ const BCRYPT_ROUNDS = 12
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
-let supabase: ReturnType<typeof createClient> | null = null
+let supabase: SupabaseClient<AnyDatabase> | null = null
 
-function getSupabase() {
+function getSupabase(): SupabaseClient<AnyDatabase> | null {
   if (!supabase && supabaseUrl && supabaseServiceKey) {
-    supabase = createClient(supabaseUrl, supabaseServiceKey)
+    supabase = createClient<AnyDatabase>(supabaseUrl, supabaseServiceKey)
   }
   return supabase
 }
@@ -78,10 +81,10 @@ export function generateAdminToken(user: AdminUser, sessionId: string): string {
   }
 
   return jwt.sign(payload, JWT_SECRET, {
-    expiresIn: JWT_EXPIRES_IN,
+    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     issuer: 'insurai-admin',
     audience: 'insurai-admin-api',
-  })
+  } as jwt.SignOptions)
 }
 
 /**
@@ -91,7 +94,7 @@ export function generateRefreshToken(user: AdminUser, sessionId: string): string
   return jwt.sign(
     { sub: user.id, sessionId, type: 'refresh' },
     JWT_SECRET,
-    { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] } as jwt.SignOptions
   )
 }
 
@@ -137,6 +140,22 @@ export function hashToken(token: string): string {
 // ============================================================================
 
 /**
+ * Database row type for admin users
+ */
+interface AdminUserRow {
+  id: string
+  email: string
+  role: AdminRole
+  status: 'active' | 'inactive' | 'suspended'
+  display_name?: string
+  permissions?: string[]
+  password_hash?: string
+  last_login_at?: string
+  last_login_ip?: string
+  login_count?: number
+}
+
+/**
  * Get admin user by ID from database
  */
 export async function getAdminUserById(id: string): Promise<AdminUser | null> {
@@ -155,13 +174,14 @@ export async function getAdminUserById(id: string): Promise<AdminUser | null> {
 
   if (error || !data) return null
 
+  const row = data as AdminUserRow
   return {
-    id: data.id,
-    email: data.email,
-    role: data.role,
-    status: data.status,
-    displayName: data.display_name,
-    permissions: data.permissions || [],
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    displayName: row.display_name,
+    permissions: row.permissions || [],
   }
 }
 
@@ -183,14 +203,15 @@ export async function getAdminUserByEmail(email: string): Promise<(AdminUser & {
 
   if (error || !data) return null
 
+  const row = data as AdminUserRow
   return {
-    id: data.id,
-    email: data.email,
-    role: data.role,
-    status: data.status,
-    displayName: data.display_name,
-    permissions: data.permissions || [],
-    passwordHash: data.password_hash,
+    id: row.id,
+    email: row.email,
+    role: row.role,
+    status: row.status,
+    displayName: row.display_name,
+    permissions: row.permissions || [],
+    passwordHash: row.password_hash,
   }
 }
 
@@ -227,7 +248,8 @@ export async function createAdminSession(
     return null
   }
 
-  return data.id
+  const row = data as { id: string }
+  return row.id
 }
 
 /**
@@ -280,14 +302,22 @@ export async function updateAdminLogin(adminId: string, ipAddress: string): Prom
   const db = getSupabase()
   if (!db) return
 
+  // First update login timestamp and IP
   await db
     .from('admin_users')
     .update({
       last_login_at: new Date().toISOString(),
       last_login_ip: ipAddress,
-      login_count: db.rpc('increment_login_count', { row_id: adminId }),
     })
     .eq('id', adminId)
+
+  // Then increment login count using RPC if available
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (db as any).rpc('increment_login_count', { row_id: adminId })
+  } catch {
+    // RPC might not exist, that's okay
+  }
 }
 
 // ============================================================================
