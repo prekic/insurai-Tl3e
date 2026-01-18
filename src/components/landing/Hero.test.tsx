@@ -16,6 +16,23 @@ vi.mock('@/lib/policy-context', () => ({
   }),
 }))
 
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({
+    user: {
+      email: 'john@example.com',
+      user_metadata: { full_name: 'John Doe' },
+    },
+    signOut: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+vi.mock('sonner', () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
+
 vi.mock('./UploadWidget', () => ({
   UploadWidget: ({ compact }: { compact?: boolean }) => (
     <div data-testid="upload-widget" data-compact={compact}>

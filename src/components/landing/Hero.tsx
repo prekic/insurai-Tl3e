@@ -1,15 +1,18 @@
-import { Shield, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, HelpCircle } from 'lucide-react'
+import { Shield, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { UploadWidget } from './UploadWidget'
 import { StaggeredList, AnimatedButton, NumberCounter, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
 import { LanguageToggle } from './LanguageToggle'
 import { usePolicies } from '@/lib/policy-context'
+import { useAuth } from '@/lib/supabase/auth-context'
 
 export function Hero() {
   const navigate = useNavigate()
   const { policies } = usePolicies()
+  const { user, signOut } = useAuth()
   const policyCount = policies.length
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -19,6 +22,24 @@ export function Hero() {
     setShowProfileMenu(false)
     setMobileMenuOpen(false)
     navigate(path)
+  }
+
+  const handleSignOut = async () => {
+    setShowProfileMenu(false)
+    setMobileMenuOpen(false)
+
+    if (!user) {
+      navigate('/auth')
+      return
+    }
+
+    try {
+      await signOut()
+      toast.success('Signed out successfully')
+    } catch (error) {
+      console.error('Sign out error:', error)
+      toast.error('Failed to sign out')
+    }
   }
 
   return (
@@ -141,16 +162,20 @@ export function Hero() {
                     <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
                     <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
                       <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900">John Doe</p>
-                        <p className="text-xs text-gray-500">john@example.com</p>
+                        <p className="font-semibold text-gray-900">
+                          {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
                       </div>
-                      <button
-                        onClick={() => handleMenuClick('/account')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <User size={16} />
-                        <span>My Account</span>
-                      </button>
+                      {user && (
+                        <button
+                          onClick={() => handleMenuClick('/account')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <User size={16} />
+                          <span>My Account</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => handleMenuClick('/settings')}
                         className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
@@ -166,13 +191,23 @@ export function Hero() {
                         <span>Help Center</span>
                       </button>
                       <div className="border-t border-gray-100 mt-2 pt-2">
-                        <button
-                          onClick={() => handleMenuClick('/')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
-                        >
-                          <LogOut size={16} />
-                          <span>Sign Out</span>
-                        </button>
+                        {user ? (
+                          <button
+                            onClick={handleSignOut}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
+                          >
+                            <LogOut size={16} />
+                            <span>Sign Out</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleMenuClick('/auth')}
+                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors text-left"
+                          >
+                            <LogIn size={16} />
+                            <span>Sign In</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </>
