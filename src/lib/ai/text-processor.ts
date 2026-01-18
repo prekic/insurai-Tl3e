@@ -13,6 +13,12 @@
 
 import { env } from '@/lib/env'
 import { DocumentNormalizer, type DocumentNormalizerOutput } from './document-normalizer'
+import {
+  OCR_CORRECTION_PROMPT,
+  buildDocumentProcessingPrompt,
+  parseDocumentProcessingResponse,
+  validateOCRCorrection,
+} from './prompts'
 
 export interface ProcessedTextResult {
   success: boolean
@@ -1320,46 +1326,8 @@ export async function processTextWithAI(
     }
   }
 
-  // Enhanced AI prompt with specific examples
-  const systemPrompt = `You are a Turkish insurance document text processor. The text has already been preprocessed to remove garbage data and fix obvious OCR errors. Your task is to:
-
-1. Fix any remaining OCR errors, especially Turkish character issues:
-   - I/İ confusion (Istanbul → İstanbul)
-   - S/Ş confusion (Sigorta → Sigorta, but check context)
-   - U/Ü, O/Ö, C/Ç, G/Ğ confusion
-
-2. Fix any remaining spacing issues:
-   - Words that are still incorrectly spaced
-   - Missing spaces between sentences
-   - Extra spaces within words
-
-3. Ensure proper formatting:
-   - Turkish number format: 1.000.000 (not 1,000,000)
-   - Currency: 15.000 TL (space before TL)
-   - Dates: 15.01.2026 (periods as separators)
-   - Phone: 0212 555 66 77
-
-4. Preserve exactly:
-   - Policy numbers
-   - All monetary amounts
-   - All dates
-   - Names and addresses
-   - Vehicle plate numbers
-
-CRITICAL RULES:
-- Do NOT translate anything
-- Do NOT add any information
-- Do NOT remove any information
-- Do NOT change the document structure
-- Output ONLY the cleaned text, no explanations
-- If the text is already clean, return it unchanged
-
-Example corrections:
-- "ISTANBUL" → "İSTANBUL"
-- "SIGORTA" → "SİGORTA"
-- "Türk iye" → "Türkiye"
-- "1 000 000" → "1.000.000"
-- "poliçenumara sı" → "poliçe numarası"`
+  // Use enhanced OCR correction prompt from prompts.ts
+  const systemPrompt = OCR_CORRECTION_PROMPT
 
   const userPrompt = `Clean and correct this Turkish insurance document text:\n\n${preProcessed.slice(0, 8000)}` // Limit to 8000 chars for efficiency
 
@@ -1699,4 +1667,150 @@ export async function processTextEnhanced(
 
   // Fall back to legacy AI-assisted processing
   return processTextWithAI(rawText, { provider, preserveStructure })
+}
+
+// =============================================================================
+// COMPREHENSIVE AI DOCUMENT PROCESSING (Output A + Output B)
+// =============================================================================
+
+export interface ComprehensiveProcessingResult {
+  success: boolean
+  cleanedText: string
+  structuredExtraction: string | null
+  normalizationLog: string | null
+  rawAIResponse: string
+  processingTimeMs: number
+  confidence: number
+  validationIssues: string[]
+}
+
+/**
+ * Process a document with comprehensive AI normalization and structured extraction.
+ *
+ * This function uses the full DOCUMENT_NORMALIZATION_PROMPT which produces:
+ * - Output A: Cleaned text with OCR corrections and normalization log
+ * - Output B: Structured extraction in universal insurance schema
+ *
+ * Use this for full document analysis. For quick OCR correction only,
+ * use processTextWithAI() or processTextEnhanced() instead.
+ *
+ * @param rawText - Raw OCR/extracted text from PDF
+ * @param options - Processing options
+ */
+export async function processDocumentComprehensive(
+  rawText: string,
+  options: {
+    provider?: 'openai' | 'anthropic'
+    includeStructuredExtraction?: boolean
+  } = {}
+): Promise<ComprehensiveProcessingResult> {
+  const startTime = Date.now()
+  const { provider = 'openai', includeStructuredExtraction = true } = options
+
+  const API_URL = env.proxyUrl
+  if (!API_URL) {
+    // No API available, fall back to local processing
+    const localResult = applyComprehensivePreprocessing(rawText)
+    return {
+      success: true,
+      cleanedText: localResult.text,
+      structuredExtraction: null,
+      normalizationLog: `Local preprocessing applied: ${localResult.stats.spacedCharsFixed} spacing fixes, ${localResult.stats.garbageBlocksRemoved} garbage blocks removed`,
+      rawAIResponse: '',
+      processingTimeMs: Date.now() - startTime,
+      confidence: 0.75,
+      validationIssues: ['AI processing unavailable, used local preprocessing only'],
+    }
+  }
+
+  // Build the comprehensive prompt
+  const fullPrompt = buildDocumentProcessingPrompt(rawText, {
+    includeStructuredExtraction,
+    language: detectLanguage(rawText) as 'tr' | 'en' | 'mixed',
+  })
+
+  try {
+    const response = await fetch(`${API_URL}/api/ai/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        message: fullPrompt,
+        policyContext: '', // The prompt contains all context
+        provider,
+      }),
+    })
+
+    if (!response.ok) {
+      // Fall back to local processing
+      const localResult = applyComprehensivePreprocessing(rawText)
+      return {
+        success: true,
+        cleanedText: localResult.text,
+        structuredExtraction: null,
+        normalizationLog: 'AI unavailable, used local preprocessing',
+        rawAIResponse: '',
+        processingTimeMs: Date.now() - startTime,
+        confidence: 0.75,
+        validationIssues: [`AI request failed with status ${response.status}`],
+      }
+    }
+
+    const data = await response.json()
+
+    if (!data.success || !data.response) {
+      const localResult = applyComprehensivePreprocessing(rawText)
+      return {
+        success: true,
+        cleanedText: localResult.text,
+        structuredExtraction: null,
+        normalizationLog: 'AI returned empty response, used local preprocessing',
+        rawAIResponse: data.response || '',
+        processingTimeMs: Date.now() - startTime,
+        confidence: 0.70,
+        validationIssues: ['Empty AI response'],
+      }
+    }
+
+    // Parse the AI response to extract Output A and Output B
+    const parsed = parseDocumentProcessingResponse(data.response)
+
+    // Validate the OCR corrections
+    const validationIssues: string[] = []
+    if (parsed.cleanedText) {
+      const validation = validateOCRCorrection(rawText, parsed.cleanedText)
+      if (!validation.isValid) {
+        validationIssues.push(...validation.issues)
+      }
+    }
+
+    // Calculate confidence based on parsing success and validation
+    let confidence = 0.95
+    if (!parsed.cleanedText) confidence -= 0.2
+    if (!parsed.structuredExtraction && includeStructuredExtraction) confidence -= 0.1
+    if (validationIssues.length > 0) confidence -= 0.05 * validationIssues.length
+
+    return {
+      success: true,
+      cleanedText: parsed.cleanedText || rawText,
+      structuredExtraction: parsed.structuredExtraction,
+      normalizationLog: parsed.normalizationLog,
+      rawAIResponse: data.response,
+      processingTimeMs: Date.now() - startTime,
+      confidence: Math.max(0.5, confidence),
+      validationIssues,
+    }
+  } catch (error) {
+    // Fall back to local processing on error
+    const localResult = applyComprehensivePreprocessing(rawText)
+    return {
+      success: true,
+      cleanedText: localResult.text,
+      structuredExtraction: null,
+      normalizationLog: 'AI error, used local preprocessing',
+      rawAIResponse: '',
+      processingTimeMs: Date.now() - startTime,
+      confidence: 0.70,
+      validationIssues: [error instanceof Error ? error.message : 'Unknown error'],
+    }
+  }
 }
