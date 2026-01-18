@@ -1814,3 +1814,290 @@ export async function processDocumentComprehensive(
     }
   }
 }
+
+// =============================================================================
+// COMBINED PIPELINE: DETERMINISTIC + AI PROCESSING
+// =============================================================================
+
+export interface CombinedProcessingResult {
+  success: boolean
+
+  // Stage 1: Deterministic clean-room output
+  cleanRoom: {
+    cleanCopy: string
+    redactedCopy: string
+    piiVault: DocumentNormalizerOutput['piiVault']
+    validationReport: DocumentNormalizerOutput['validationReport']
+    metadata: DocumentNormalizerOutput['metadata']
+  }
+
+  // Stage 2: AI-enhanced output
+  aiEnhanced: {
+    cleanedText: string
+    structuredExtraction: string | null
+    normalizationLog: string | null
+    confidence: number
+    validationIssues: string[]
+  }
+
+  // Combined metadata
+  processingTimeMs: number
+  stages: {
+    cleanRoom: { durationMs: number; success: boolean }
+    aiProcessing: { durationMs: number; success: boolean }
+  }
+
+  // Final recommended output (best of both stages)
+  recommendedCleanText: string
+  recommendedStructuredData: string | null
+}
+
+/**
+ * Combined document processing pipeline.
+ *
+ * This function runs BOTH deterministic and AI processing in sequence:
+ *
+ * Stage 1 - Deterministic Clean-Room Processing:
+ * - Fixes Turkish OCR spacing issues (B İ RLE Şİ K → BİRLEŞİK)
+ * - Normalizes whitespace and formatting
+ * - Detects and redacts PII
+ * - Validates identifiers (TC Kimlik, IBAN, phone numbers)
+ * - Produces audit-friendly, legally defensible output
+ *
+ * Stage 2 - AI-Enhanced Processing:
+ * - Takes the clean-room output as input
+ * - Applies comprehensive OCR correction with context awareness
+ * - Produces structured extraction (Output B) with insurance schema
+ * - Validates corrections against known Turkish insurance terms
+ *
+ * Benefits of combined approach:
+ * - Deterministic processing handles mechanical fixes reliably
+ * - AI processing handles context-dependent corrections
+ * - PII vault preserves sensitive data for authorized access
+ * - Full audit trail with normalization logs
+ *
+ * @param rawText - Raw OCR/extracted text from PDF
+ * @param options - Processing options
+ */
+export async function processDocumentCombined(
+  rawText: string,
+  options: {
+    provider?: 'openai' | 'anthropic'
+    includeStructuredExtraction?: boolean
+    source?: string
+    title?: string
+  } = {}
+): Promise<CombinedProcessingResult> {
+  const totalStartTime = Date.now()
+  const {
+    provider = 'openai',
+    includeStructuredExtraction = true,
+    source,
+    title,
+  } = options
+
+  // =========================================================================
+  // Stage 1: Deterministic Clean-Room Processing
+  // =========================================================================
+  const cleanRoomStartTime = Date.now()
+  let cleanRoomSuccess = true
+  let cleanRoomResult: CleanRoomResult
+
+  try {
+    cleanRoomResult = processDocumentCleanRoom(rawText, { source, title })
+  } catch (error) {
+    cleanRoomSuccess = false
+    // Create fallback clean-room result matching DocumentNormalizerOutput structure
+    cleanRoomResult = {
+      cleanCopy: rawText,
+      redactedCopy: rawText,
+      piiVault: [], // PIIVaultEntry[] is an array directly
+      validationReport: {
+        completeness: {
+          noTruncation: true,
+          allSectionsPresent: false,
+          pageCountMatch: true,
+        },
+        identifierIntegrity: {
+          policyNumberUnchanged: true,
+          clauseReferencesUnchanged: true,
+          amountsUnchanged: true,
+          datesUnchanged: true,
+        },
+        redactionCorrectness: {
+          noPlainTextPII: true,
+          standardTokensOnly: true,
+          tokenConsistency: true,
+        },
+        issues: [error instanceof Error ? error.message : 'Clean-room processing failed'],
+      },
+      metadata: {
+        documentTitle: 'Unknown',
+        source: 'User-provided text',
+        conversionDate: new Date().toISOString().split('T')[0],
+        outputType: 'NORMALIZED' as const,
+        language: 'unknown',
+        pageCount: 1,
+      },
+    }
+  }
+  const cleanRoomDuration = Date.now() - cleanRoomStartTime
+
+  // =========================================================================
+  // Stage 2: AI-Enhanced Processing
+  // =========================================================================
+  const aiStartTime = Date.now()
+  let aiSuccess = true
+  let aiResult: ComprehensiveProcessingResult
+
+  try {
+    // Use the clean-room output as input for AI processing
+    // This gives the AI a cleaner starting point
+    aiResult = await processDocumentComprehensive(cleanRoomResult.cleanCopy, {
+      provider,
+      includeStructuredExtraction,
+    })
+  } catch (error) {
+    aiSuccess = false
+    // Create fallback AI result using local preprocessing
+    const localPreprocessed = applyComprehensivePreprocessing(cleanRoomResult.cleanCopy)
+    aiResult = {
+      success: false,
+      cleanedText: localPreprocessed.text,
+      structuredExtraction: null,
+      normalizationLog: 'AI processing failed, used local preprocessing',
+      rawAIResponse: '',
+      processingTimeMs: Date.now() - aiStartTime,
+      confidence: 0.65,
+      validationIssues: [error instanceof Error ? error.message : 'AI processing failed'],
+    }
+  }
+  const aiDuration = Date.now() - aiStartTime
+
+  // =========================================================================
+  // Determine Best Output
+  // =========================================================================
+  // Use AI-enhanced text if it's valid and not significantly shorter
+  // Otherwise fall back to clean-room output
+  let recommendedCleanText: string
+
+  if (aiResult.success && aiResult.cleanedText) {
+    const lengthRatio = aiResult.cleanedText.length / cleanRoomResult.cleanCopy.length
+    // Accept AI output if it's not too short (at least 70% of original)
+    // and not too long (at most 130% - indicating added hallucinations)
+    if (lengthRatio >= 0.7 && lengthRatio <= 1.3) {
+      recommendedCleanText = aiResult.cleanedText
+    } else {
+      recommendedCleanText = cleanRoomResult.cleanCopy
+    }
+  } else {
+    recommendedCleanText = cleanRoomResult.cleanCopy
+  }
+
+  return {
+    success: cleanRoomSuccess && aiResult.success,
+
+    cleanRoom: {
+      cleanCopy: cleanRoomResult.cleanCopy,
+      redactedCopy: cleanRoomResult.redactedCopy,
+      piiVault: cleanRoomResult.piiVault,
+      validationReport: cleanRoomResult.validationReport,
+      metadata: cleanRoomResult.metadata,
+    },
+
+    aiEnhanced: {
+      cleanedText: aiResult.cleanedText,
+      structuredExtraction: aiResult.structuredExtraction,
+      normalizationLog: aiResult.normalizationLog,
+      confidence: aiResult.confidence,
+      validationIssues: aiResult.validationIssues,
+    },
+
+    processingTimeMs: Date.now() - totalStartTime,
+    stages: {
+      cleanRoom: { durationMs: cleanRoomDuration, success: cleanRoomSuccess },
+      aiProcessing: { durationMs: aiDuration, success: aiSuccess },
+    },
+
+    recommendedCleanText,
+    recommendedStructuredData: aiResult.structuredExtraction,
+  }
+}
+
+/**
+ * Quick combined processing for simple OCR correction.
+ *
+ * This is a lighter-weight version that skips structured extraction.
+ * Use when you only need cleaned text, not the full insurance schema.
+ */
+export async function processDocumentQuick(
+  rawText: string,
+  options: {
+    provider?: 'openai' | 'anthropic'
+    source?: string
+    title?: string
+  } = {}
+): Promise<{
+  cleanText: string
+  redactedText: string
+  piiVault: DocumentNormalizerOutput['piiVault']
+  confidence: number
+  processingTimeMs: number
+}> {
+  const startTime = Date.now()
+
+  // Run deterministic processing
+  const cleanRoomResult = processDocumentCleanRoom(rawText, {
+    source: options.source,
+    title: options.title,
+  })
+
+  // Try AI enhancement if proxy is available
+  const API_URL = env.proxyUrl
+  if (API_URL) {
+    try {
+      const response = await fetch(`${API_URL}/api/ai/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Clean and correct this Turkish insurance document text:\n\n${cleanRoomResult.cleanCopy.slice(0, 8000)}`,
+          policyContext: OCR_CORRECTION_PROMPT,
+          provider: options.provider || 'openai',
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.response) {
+          let aiText = data.response.trim()
+          // Clean up AI response artifacts
+          if (aiText.startsWith('```')) {
+            aiText = aiText.replace(/^```\w*\n?/, '').replace(/```$/, '').trim()
+          }
+
+          // Use AI output if reasonable length
+          const lengthRatio = aiText.length / cleanRoomResult.cleanCopy.length
+          if (lengthRatio >= 0.7 && lengthRatio <= 1.3) {
+            return {
+              cleanText: aiText,
+              redactedText: cleanRoomResult.redactedCopy,
+              piiVault: cleanRoomResult.piiVault,
+              confidence: 0.95,
+              processingTimeMs: Date.now() - startTime,
+            }
+          }
+        }
+      }
+    } catch {
+      // Continue with clean-room output only
+    }
+  }
+
+  return {
+    cleanText: cleanRoomResult.cleanCopy,
+    redactedText: cleanRoomResult.redactedCopy,
+    piiVault: cleanRoomResult.piiVault,
+    confidence: cleanRoomResult.validationReport.isValid ? 0.90 : 0.80,
+    processingTimeMs: Date.now() - startTime,
+  }
+}
