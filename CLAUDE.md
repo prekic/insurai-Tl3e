@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 17, 2026
+- **Last Updated**: January 18, 2026
 
 ---
 
@@ -95,7 +95,9 @@ insurai/
 | `src/lib/ai/policy-extractor.ts` | Main AI extraction orchestrator |
 | `src/lib/ai/config.ts` | AI provider configuration & proxy settings |
 | `src/lib/ai/pdf-parser.ts` | PDF text extraction with pdf.js |
-| `src/lib/ai/prompts.ts` | AI prompts for extraction |
+| `src/lib/ai/prompts.ts` | AI prompts for extraction and OCR correction |
+| `src/lib/ai/text-processor.ts` | **NEW** Combined document processing pipeline |
+| `src/lib/ai/document-normalizer.ts` | **NEW** Clean-room deterministic document normalizer |
 | `server/routes/ai.ts` | AI proxy routes (extraction, chat, OCR) |
 
 ### Components
@@ -1525,6 +1527,33 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/components/evaluation/ScoreBreakdown.tsx` - Mini variant fix
   - `src/components/PolicyDashboard.tsx` - Mobile overflow fixes
   - `public/sw.js` - Cache version bumped to v6
+
+### 15. Combined Document Processing Pipeline (Jan 18, 2026)
+- **Feature**: Two-stage document processing combining deterministic and AI processing
+- **Stage 1 - Clean-Room Processing** (`document-normalizer.ts`):
+  - Deterministic Turkish OCR spacing fixes (B İ RLE Şİ K → BİRLEŞİK)
+  - PII detection and redaction with standardized tokens
+  - TC Kimlik, IBAN, phone, email, plate number validation
+  - Produces audit-friendly, legally defensible output
+  - Three outputs: CLEAN_COPY, REDACTED_COPY, PII_VAULT
+- **Stage 2 - AI-Enhanced Processing** (`prompts.ts`):
+  - Context-aware OCR correction using AI
+  - Structured extraction with universal insurance schema
+  - Validation against known Turkish insurance terms
+- **New Functions** (`text-processor.ts`):
+  - `processDocumentCombined()` - Full two-stage pipeline
+  - `processDocumentQuick()` - Lightweight version for simple OCR
+  - `processDocumentCleanRoom()` - Deterministic-only processing
+- **Benefits**:
+  - Deterministic processing handles mechanical fixes reliably
+  - AI processing handles context-dependent corrections
+  - PII vault preserves sensitive data for authorized access
+  - Full audit trail with normalization logs
+- **Files**:
+  - `src/lib/ai/text-processor.ts` - Combined pipeline functions
+  - `src/lib/ai/document-normalizer.ts` - Clean-room normalizer (870+ lines)
+  - `src/lib/ai/prompts.ts` - AI prompts for OCR and extraction
+  - Tests: 55 text-processor + 49 document-normalizer + 23 prompts = 127 new tests
 
 ---
 
