@@ -1,15 +1,40 @@
 /**
  * Admin API Routes
  * Server-side endpoints for admin dashboard
+ *
+ * Features:
+ * - JWT-based authentication with session management
+ * - Role-based access control (admin, super_admin)
+ * - Database persistence with fallback to in-memory storage
+ * - Comprehensive audit logging
  */
 
-import { Router, Request, Response, NextFunction } from 'express'
+import { Router, Request, Response } from 'express'
 import os from 'os'
+import {
+  authenticateAdmin,
+  requireRole,
+  requireSuperAdmin,
+  generateAdminToken,
+  generateRefreshToken,
+  verifyAdminToken,
+  hashPassword,
+  verifyPassword,
+  hashToken,
+  getAdminUserByEmail,
+  createAdminSession,
+  revokeAdminSession,
+  updateAdminLogin,
+  logAdminAction,
+  AuthenticatedRequest,
+  AdminUser,
+} from '../middleware/admin-auth.js'
+import * as adminDb from '../services/admin-db.js'
 
 const router = Router()
 
 // ============================================================================
-// IN-MEMORY STORAGE (Matches frontend admin module)
+// IN-MEMORY FALLBACK STORAGE (Used when database is unavailable)
 // ============================================================================
 
 interface AIRequest {
@@ -76,7 +101,7 @@ interface AuditLog {
   ipAddress: string
 }
 
-// Storage
+// Fallback storage when database is unavailable
 const aiRequests: AIRequest[] = []
 const policyOperations: PolicyOperation[] = []
 const securityLogs: SecurityLog[] = []
@@ -93,23 +118,399 @@ let requestCounters = {
 const MAX_ENTRIES = 10000
 const serverStartTime = Date.now()
 
-// ============================================================================
-// MIDDLEWARE
-// ============================================================================
-
-// Admin authentication middleware (simplified - use proper auth in production)
-function requireAdmin(req: Request, res: Response, next: NextFunction): void {
-  // In production, verify JWT and check admin role
-  const adminToken = req.headers['x-admin-token']
-  const isDevMode = process.env.NODE_ENV !== 'production'
-
-  // Allow in dev mode or with valid admin token
-  if (isDevMode || adminToken === process.env.ADMIN_SECRET) {
-    next()
-  } else {
-    res.status(403).json({ success: false, error: 'Admin access required' })
-  }
+// Helper to get client IP
+function getClientIp(req: Request): string {
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0] || req.ip || req.socket.remoteAddress || 'unknown'
 }
+
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * Admin login endpoint
+ * POST /api/admin/auth/login
+ */
+router.post('/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body
+
+    if (!email || !password) {
+      res.status(400).json({
+        success: false,
+        error: 'Email and password are required',
+        code: 'MISSING_CREDENTIALS',
+      })
+      return
+    }
+
+    // Get admin user from database
+    const adminUser = await getAdminUserByEmail(email)
+
+    if (!adminUser || !adminUser.passwordHash) {
+      // Log failed attempt
+      await adminDb.logSecurityEvent({
+        eventType: 'login_failed',
+        severity: 'warning',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'] || 'unknown',
+        details: { email, reason: 'user_not_found' },
+      })
+
+      res.status(401).json({
+        success: false,
+        error: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+      })
+      return
+    }
+
+    // Check if user is active
+    if (adminUser.status !== 'active') {
+      await adminDb.logSecurityEvent({
+        eventType: 'login_failed',
+        severity: 'warning',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'] || 'unknown',
+        details: { email, reason: 'account_inactive', status: adminUser.status },
+      })
+
+      res.status(401).json({
+        success: false,
+        error: 'Account is not active',
+        code: 'ACCOUNT_INACTIVE',
+      })
+      return
+    }
+
+    // Verify password
+    const passwordValid = await verifyPassword(password, adminUser.passwordHash)
+
+    if (!passwordValid) {
+      await adminDb.logSecurityEvent({
+        eventType: 'login_failed',
+        severity: 'warning',
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'] || 'unknown',
+        details: { email, reason: 'invalid_password' },
+      })
+
+      res.status(401).json({
+        success: false,
+        error: 'Invalid email or password',
+        code: 'INVALID_CREDENTIALS',
+      })
+      return
+    }
+
+    // Generate tokens
+    const sessionId = crypto.randomUUID()
+    const token = generateAdminToken(adminUser, sessionId)
+    const refreshToken = generateRefreshToken(adminUser, sessionId)
+
+    // Create session in database
+    await createAdminSession(
+      adminUser.id,
+      hashToken(token),
+      hashToken(refreshToken),
+      getClientIp(req),
+      req.headers['user-agent'] || 'unknown'
+    )
+
+    // Update login stats
+    await updateAdminLogin(adminUser.id, getClientIp(req))
+
+    // Log successful login
+    await adminDb.logSecurityEvent({
+      eventType: 'login_success',
+      severity: 'info',
+      userId: adminUser.id,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'] || 'unknown',
+      details: { email, role: adminUser.role },
+    })
+
+    res.json({
+      success: true,
+      data: {
+        token,
+        refreshToken,
+        expiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '30m',
+        user: {
+          id: adminUser.id,
+          email: adminUser.email,
+          role: adminUser.role,
+          displayName: adminUser.displayName,
+        },
+      },
+    })
+  } catch (error) {
+    console.error('Login error:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Login failed',
+      code: 'LOGIN_ERROR',
+    })
+  }
+})
+
+/**
+ * Admin logout endpoint
+ * POST /api/admin/auth/logout
+ */
+router.post('/auth/logout', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    if (req.adminSession?.id) {
+      await revokeAdminSession(req.adminSession.id, req.adminUser?.id)
+    }
+
+    await adminDb.logSecurityEvent({
+      eventType: 'logout',
+      severity: 'info',
+      userId: req.adminUser?.id,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'] || 'unknown',
+      details: { email: req.adminUser?.email },
+    })
+
+    res.json({ success: true, message: 'Logged out successfully' })
+  } catch (error) {
+    console.error('Logout error:', error)
+    res.status(500).json({ success: false, error: 'Logout failed' })
+  }
+})
+
+/**
+ * Refresh token endpoint
+ * POST /api/admin/auth/refresh
+ */
+router.post('/auth/refresh', async (req: Request, res: Response) => {
+  try {
+    const { refreshToken } = req.body
+
+    if (!refreshToken) {
+      res.status(400).json({
+        success: false,
+        error: 'Refresh token is required',
+        code: 'MISSING_TOKEN',
+      })
+      return
+    }
+
+    // Verify refresh token
+    const payload = verifyAdminToken(refreshToken)
+    if (!payload || (payload as any).type !== 'refresh') {
+      res.status(401).json({
+        success: false,
+        error: 'Invalid refresh token',
+        code: 'INVALID_REFRESH_TOKEN',
+      })
+      return
+    }
+
+    // Get admin user
+    const adminUser = await getAdminUserByEmail(payload.email)
+    if (!adminUser || adminUser.status !== 'active') {
+      res.status(401).json({
+        success: false,
+        error: 'User not found or inactive',
+        code: 'USER_INACTIVE',
+      })
+      return
+    }
+
+    // Generate new tokens
+    const sessionId = crypto.randomUUID()
+    const newToken = generateAdminToken(adminUser, sessionId)
+    const newRefreshToken = generateRefreshToken(adminUser, sessionId)
+
+    // Create new session
+    await createAdminSession(
+      adminUser.id,
+      hashToken(newToken),
+      hashToken(newRefreshToken),
+      getClientIp(req),
+      req.headers['user-agent'] || 'unknown'
+    )
+
+    // Revoke old session
+    await revokeAdminSession(payload.sessionId)
+
+    res.json({
+      success: true,
+      data: {
+        token: newToken,
+        refreshToken: newRefreshToken,
+        expiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '30m',
+      },
+    })
+  } catch (error) {
+    console.error('Token refresh error:', error)
+    res.status(500).json({ success: false, error: 'Token refresh failed' })
+  }
+})
+
+/**
+ * Get current admin user
+ * GET /api/admin/auth/me
+ */
+router.get('/auth/me', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
+  res.json({
+    success: true,
+    data: {
+      id: req.adminUser?.id,
+      email: req.adminUser?.email,
+      role: req.adminUser?.role,
+      displayName: req.adminUser?.displayName,
+      permissions: req.adminUser?.permissions,
+    },
+  })
+})
+
+// ============================================================================
+// ADMIN USER MANAGEMENT (Super Admin Only)
+// ============================================================================
+
+/**
+ * List all admin users
+ * GET /api/admin/users
+ */
+router.get('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const users = await adminDb.getAdminUsers()
+
+    // Log access
+    await logAdminAction(req, 'view', 'admin_users')
+
+    res.json({ success: true, data: users })
+  } catch (error) {
+    console.error('Failed to list admin users:', error)
+    res.status(500).json({ success: false, error: 'Failed to list admin users' })
+  }
+})
+
+/**
+ * Create new admin user
+ * POST /api/admin/users
+ */
+router.post('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { email, password, role, displayName, permissions } = req.body
+
+    if (!email || !password) {
+      res.status(400).json({
+        success: false,
+        error: 'Email and password are required',
+      })
+      return
+    }
+
+    // Check if user already exists
+    const existing = await getAdminUserByEmail(email)
+    if (existing) {
+      res.status(409).json({
+        success: false,
+        error: 'User with this email already exists',
+        code: 'USER_EXISTS',
+      })
+      return
+    }
+
+    // Hash password
+    const passwordHash = await hashPassword(password)
+
+    // Create user
+    const newUser = await adminDb.createAdminUser({
+      email: email.toLowerCase(),
+      passwordHash,
+      role: role || 'admin',
+      displayName,
+      permissions: permissions || [],
+    })
+
+    // Log action
+    await logAdminAction(req, 'create', 'admin_user', newUser?.id, undefined, {
+      email,
+      role: role || 'admin',
+    })
+
+    res.json({
+      success: true,
+      data: newUser,
+    })
+  } catch (error) {
+    console.error('Failed to create admin user:', error)
+    res.status(500).json({ success: false, error: 'Failed to create admin user' })
+  }
+})
+
+/**
+ * Update admin user
+ * PUT /api/admin/users/:id
+ */
+router.put('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const { role, status, displayName, permissions, password } = req.body
+
+    const updates: Record<string, any> = {}
+    if (role) updates.role = role
+    if (status) updates.status = status
+    if (displayName !== undefined) updates.display_name = displayName
+    if (permissions) updates.permissions = permissions
+    if (password) updates.password_hash = await hashPassword(password)
+
+    const updated = await adminDb.updateAdminUser(id, updates)
+
+    if (!updated) {
+      res.status(404).json({ success: false, error: 'User not found' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'update', 'admin_user', id, undefined, updates)
+
+    res.json({ success: true, data: updated })
+  } catch (error) {
+    console.error('Failed to update admin user:', error)
+    res.status(500).json({ success: false, error: 'Failed to update admin user' })
+  }
+})
+
+/**
+ * Delete admin user
+ * DELETE /api/admin/users/:id
+ */
+router.delete('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+
+    // Prevent self-deletion
+    if (id === req.adminUser?.id) {
+      res.status(400).json({
+        success: false,
+        error: 'Cannot delete your own account',
+        code: 'SELF_DELETE_FORBIDDEN',
+      })
+      return
+    }
+
+    const deleted = await adminDb.deleteAdminUser(id)
+
+    if (!deleted) {
+      res.status(404).json({ success: false, error: 'User not found' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'delete', 'admin_user', id)
+
+    res.json({ success: true, message: 'User deleted' })
+  } catch (error) {
+    console.error('Failed to delete admin user:', error)
+    res.status(500).json({ success: false, error: 'Failed to delete admin user' })
+  }
+})
 
 // ============================================================================
 // SYSTEM HEALTH & METRICS
@@ -157,7 +558,7 @@ router.get('/health', async (req: Request, res: Response) => {
   }
 })
 
-router.get('/metrics', requireAdmin, async (req: Request, res: Response) => {
+router.get('/metrics', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const cpus = os.cpus()
     const totalMemory = os.totalmem()
@@ -213,7 +614,7 @@ router.get('/metrics', requireAdmin, async (req: Request, res: Response) => {
 // AI OPERATIONS
 // ============================================================================
 
-router.get('/ai/requests', requireAdmin, (req: Request, res: Response) => {
+router.get('/ai/requests', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { provider, operation, status, userId, startDate, endDate, limit = 100 } = req.query
 
@@ -247,7 +648,7 @@ router.get('/ai/requests', requireAdmin, (req: Request, res: Response) => {
   }
 })
 
-router.get('/ai/requests/:id', requireAdmin, (req: Request, res: Response) => {
+router.get('/ai/requests/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const request = aiRequests.find((r) => r.id === req.params.id)
 
   if (!request) {
@@ -258,7 +659,7 @@ router.get('/ai/requests/:id', requireAdmin, (req: Request, res: Response) => {
   res.json({ success: true, data: request })
 })
 
-router.get('/ai/stats', requireAdmin, (req: Request, res: Response) => {
+router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { startDate, endDate } = req.query
 
@@ -384,7 +785,7 @@ router.get('/ai/stats', requireAdmin, (req: Request, res: Response) => {
 // POLICY OPERATIONS
 // ============================================================================
 
-router.get('/policies/operations', requireAdmin, (req: Request, res: Response) => {
+router.get('/policies/operations', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { type, userId, status, startDate, endDate, limit = 100 } = req.query
 
@@ -415,7 +816,7 @@ router.get('/policies/operations', requireAdmin, (req: Request, res: Response) =
   }
 })
 
-router.get('/policies/stats', requireAdmin, (req: Request, res: Response) => {
+router.get('/policies/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { startDate, endDate } = req.query
 
@@ -469,7 +870,7 @@ router.get('/policies/stats', requireAdmin, (req: Request, res: Response) => {
 // SECURITY LOGS
 // ============================================================================
 
-router.get('/security/logs', requireAdmin, (req: Request, res: Response) => {
+router.get('/security/logs', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { eventType, severity, resolved, startDate, endDate, limit = 100 } = req.query
 
@@ -500,7 +901,7 @@ router.get('/security/logs', requireAdmin, (req: Request, res: Response) => {
   }
 })
 
-router.post('/security/logs/:id/resolve', requireAdmin, (req: Request, res: Response) => {
+router.post('/security/logs/:id/resolve', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const log = securityLogs.find((l) => l.id === req.params.id)
 
   if (!log) {
@@ -517,7 +918,7 @@ router.post('/security/logs/:id/resolve', requireAdmin, (req: Request, res: Resp
 // RATE LIMITING
 // ============================================================================
 
-router.get('/security/rate-limits', requireAdmin, (req: Request, res: Response) => {
+router.get('/security/rate-limits', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const rateLimits = {
     endpoints: [
       { endpoint: '/api/ai/chat', windowMs: 3600000, maxRequests: 60, currentUsage: 0, blockedRequests: 0 },
@@ -537,7 +938,7 @@ router.get('/security/rate-limits', requireAdmin, (req: Request, res: Response) 
   res.json({ success: true, data: rateLimits })
 })
 
-router.post('/security/block-ip', requireAdmin, (req: Request, res: Response) => {
+router.post('/security/block-ip', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { ip, reason, expiresIn } = req.body
 
   if (!ip || !reason) {
@@ -554,7 +955,7 @@ router.post('/security/block-ip', requireAdmin, (req: Request, res: Response) =>
   res.json({ success: true, message: `IP ${ip} blocked` })
 })
 
-router.delete('/security/block-ip/:ip', requireAdmin, (req: Request, res: Response) => {
+router.delete('/security/block-ip/:ip', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const ip = req.params.ip
 
   if (blockedIPs.has(ip)) {
@@ -569,7 +970,7 @@ router.delete('/security/block-ip/:ip', requireAdmin, (req: Request, res: Respon
 // AUDIT LOGS
 // ============================================================================
 
-router.get('/audit/logs', requireAdmin, (req: Request, res: Response) => {
+router.get('/audit/logs', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { actorId, action, resourceType, resourceId, startDate, endDate, limit = 100 } = req.query
 
@@ -619,7 +1020,7 @@ appConfigs.set('features.enable_ocr', { value: true, type: 'boolean', descriptio
 appConfigs.set('features.enable_gap_analysis', { value: true, type: 'boolean', description: 'Enable gap analysis' })
 appConfigs.set('system.maintenance_mode', { value: false, type: 'boolean', description: 'Maintenance mode' })
 
-router.get('/config', requireAdmin, (req: Request, res: Response) => {
+router.get('/config', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { category } = req.query
 
   const configs: Array<{
@@ -648,7 +1049,7 @@ router.get('/config', requireAdmin, (req: Request, res: Response) => {
   res.json({ success: true, data: configs })
 })
 
-router.put('/config/:id', requireAdmin, (req: Request, res: Response) => {
+router.put('/config/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params
   const { value } = req.body
 
@@ -658,21 +1059,25 @@ router.put('/config/:id', requireAdmin, (req: Request, res: Response) => {
     return
   }
 
+  const oldValue = config.value
   config.value = value
   appConfigs.set(id, config)
 
-  // Log audit
+  // Log audit with proper admin info
   auditLogs.push({
     id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
     timestamp: new Date().toISOString(),
-    actorId: 'admin',
-    actorEmail: 'admin@system',
+    actorId: req.adminUser?.id || 'unknown',
+    actorEmail: req.adminUser?.email || 'unknown',
     action: 'update',
     resourceType: 'config',
     resourceId: id,
-    changes: [{ field: 'value', oldValue: null, newValue: value }],
-    ipAddress: req.ip || 'unknown',
+    changes: [{ field: 'value', oldValue, newValue: value }],
+    ipAddress: getClientIp(req),
   })
+
+  // Also log to database
+  logAdminAction(req, 'update', 'config', id, { value: oldValue }, { value })
 
   res.json({ success: true, data: { id, ...config } })
 })
@@ -707,7 +1112,7 @@ featureFlags.set('dark_mode', {
   enabledPercentage: 10,
 })
 
-router.get('/feature-flags', requireAdmin, (req: Request, res: Response) => {
+router.get('/feature-flags', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const flags = Array.from(featureFlags.entries()).map(([id, flag]) => ({
     id,
     ...flag,
@@ -718,7 +1123,7 @@ router.get('/feature-flags', requireAdmin, (req: Request, res: Response) => {
   res.json({ success: true, data: flags })
 })
 
-router.put('/feature-flags/:id', requireAdmin, (req: Request, res: Response) => {
+router.put('/feature-flags/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params
   const updates = req.body
 
@@ -728,19 +1133,25 @@ router.put('/feature-flags/:id', requireAdmin, (req: Request, res: Response) => 
     return
   }
 
+  const previousState = { ...flag }
   Object.assign(flag, updates)
   featureFlags.set(id, flag)
+
+  const action = updates.enabled !== undefined ? (updates.enabled ? 'enable' : 'disable') : 'update'
 
   auditLogs.push({
     id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
     timestamp: new Date().toISOString(),
-    actorId: 'admin',
-    actorEmail: 'admin@system',
-    action: updates.enabled !== undefined ? (updates.enabled ? 'enable' : 'disable') : 'update',
+    actorId: req.adminUser?.id || 'unknown',
+    actorEmail: req.adminUser?.email || 'unknown',
+    action,
     resourceType: 'feature_flag',
     resourceId: id,
-    ipAddress: req.ip || 'unknown',
+    ipAddress: getClientIp(req),
   })
+
+  // Log to database
+  logAdminAction(req, action, 'feature_flag', id, previousState, flag)
 
   res.json({ success: true, data: { id, ...flag } })
 })
@@ -779,7 +1190,7 @@ promptTemplates.set('chat-default', {
   usageCount: 0,
 })
 
-router.get('/prompts', requireAdmin, (req: Request, res: Response) => {
+router.get('/prompts', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { category } = req.query
 
   const templates = Array.from(promptTemplates.entries())
@@ -795,7 +1206,7 @@ router.get('/prompts', requireAdmin, (req: Request, res: Response) => {
   res.json({ success: true, data: templates })
 })
 
-router.get('/prompts/:id', requireAdmin, (req: Request, res: Response) => {
+router.get('/prompts/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const template = promptTemplates.get(req.params.id)
 
   if (!template) {
@@ -815,7 +1226,7 @@ router.get('/prompts/:id', requireAdmin, (req: Request, res: Response) => {
   })
 })
 
-router.put('/prompts/:id', requireAdmin, (req: Request, res: Response) => {
+router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
   const { id } = req.params
   const updates = req.body
 
@@ -825,24 +1236,28 @@ router.put('/prompts/:id', requireAdmin, (req: Request, res: Response) => {
     return
   }
 
+  const previousState = { ...template }
   Object.assign(template, updates)
   promptTemplates.set(id, template)
 
   auditLogs.push({
     id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
     timestamp: new Date().toISOString(),
-    actorId: 'admin',
-    actorEmail: 'admin@system',
+    actorId: req.adminUser?.id || 'unknown',
+    actorEmail: req.adminUser?.email || 'unknown',
     action: 'update',
     resourceType: 'prompt_template',
     resourceId: id,
-    ipAddress: req.ip || 'unknown',
+    ipAddress: getClientIp(req),
   })
+
+  // Log to database
+  logAdminAction(req, 'update', 'prompt_template', id, previousState, template)
 
   res.json({ success: true, data: { id, ...template } })
 })
 
-router.post('/prompts', requireAdmin, (req: Request, res: Response) => {
+router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
   const { name, description, category, systemPrompt, userPromptTemplate } = req.body
 
   if (!name || !category || !systemPrompt || !userPromptTemplate) {
@@ -866,13 +1281,16 @@ router.post('/prompts', requireAdmin, (req: Request, res: Response) => {
   auditLogs.push({
     id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
     timestamp: new Date().toISOString(),
-    actorId: 'admin',
-    actorEmail: 'admin@system',
+    actorId: req.adminUser?.id || 'unknown',
+    actorEmail: req.adminUser?.email || 'unknown',
     action: 'create',
     resourceType: 'prompt_template',
     resourceId: id,
-    ipAddress: req.ip || 'unknown',
+    ipAddress: getClientIp(req),
   })
+
+  // Log to database
+  logAdminAction(req, 'create', 'prompt_template', id, undefined, template)
 
   res.json({ success: true, data: { id, ...template } })
 })
@@ -881,14 +1299,25 @@ router.post('/prompts', requireAdmin, (req: Request, res: Response) => {
 // DATA EXPORT
 // ============================================================================
 
-router.get('/export', requireAdmin, (req: Request, res: Response) => {
+router.get('/export', authenticateAdmin, requireRole('admin', 'super_admin'), async (req: AuthenticatedRequest, res: Response) => {
   const exportData = {
     aiRequests: aiRequests.slice(-1000),
     policyOperations: policyOperations.slice(-1000),
     securityLogs: securityLogs.slice(-1000),
     auditLogs: auditLogs.slice(-1000),
     exportedAt: new Date().toISOString(),
+    exportedBy: req.adminUser?.email,
   }
+
+  // Log export action
+  await logAdminAction(req, 'export', 'admin_data', undefined, undefined, {
+    recordCounts: {
+      aiRequests: exportData.aiRequests.length,
+      policyOperations: exportData.policyOperations.length,
+      securityLogs: exportData.securityLogs.length,
+      auditLogs: exportData.auditLogs.length,
+    },
+  })
 
   res.json({ success: true, data: exportData })
 })
