@@ -48,6 +48,9 @@ const NotFound = lazy(() =>
 const AuthPage = lazy(() =>
   import('./components/AuthPage').then((m) => ({ default: m.AuthPage }))
 )
+const AdminDashboard = lazy(() =>
+  import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+)
 
 // Route configuration
 const ROUTES = {
@@ -62,6 +65,7 @@ const ROUTES = {
   settings: '/settings',
   help: '/help',
   samples: '/samples',
+  admin: '/admin',
 } as const
 
 // Main App component wrapped with providers
@@ -85,7 +89,8 @@ function AppContent() {
   const { t } = useI18n()
   const isLandingPage = location.pathname === '/'
   const isAuthPage = location.pathname === '/auth'
-  const hideNavigation = isLandingPage || isAuthPage
+  const isAdminPage = location.pathname === '/admin'
+  const hideNavigation = isLandingPage || isAuthPage || isAdminPage
 
   // Get page title for screen readers
   const getPageTitle = (): string => {
@@ -229,6 +234,15 @@ function AppContent() {
                   <PageTransition>
                     <AllSamplesDemo />
                   </PageTransition>
+                }
+              />
+              {/* Admin Dashboard - protected, no standard navigation */}
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute>
+                    <AdminDashboard />
+                  </ProtectedRoute>
                 }
               />
               {/* 404 catch-all route - must be last */}
