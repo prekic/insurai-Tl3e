@@ -3,6 +3,7 @@
  *
  * Secure server-side proxy for AI provider APIs.
  * Keeps API keys secure on the server, never exposed to the browser.
+ * Includes cost tracking and budget enforcement.
  */
 
 import { Router, Request, Response } from 'express'
@@ -21,6 +22,7 @@ import {
   type ChatInput,
   type ChatMessage,
 } from '../middleware/validation.js'
+import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 
 const router = Router()
 
@@ -87,11 +89,36 @@ router.post(
         })
       }
 
+      // Track cost usage
+      const usedModel = response.model || model || 'gpt-4o'
+      const inputTokens = response.usage?.prompt_tokens || 0
+      const outputTokens = response.usage?.completion_tokens || 0
+      const cost = calculateCost(usedModel, inputTokens, outputTokens)
+
+      // Record usage asynchronously (don't block response)
+      recordUsage({
+        provider: 'openai',
+        model: usedModel,
+        operation: 'extraction',
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        inputCost: cost.inputCost,
+        outputCost: cost.outputCost,
+        totalCost: cost.totalCost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[Cost Tracking Error]', err)
+        }
+      })
+
       res.json({
         success: true,
         data: JSON.parse(content),
         usage: response.usage,
         model: response.model,
+        cost: cost.totalCost,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -187,6 +214,30 @@ router.post(
         jsonContent = jsonMatch[1].trim()
       }
 
+      // Track cost usage
+      const usedModel = response.model || model || 'claude-sonnet-4-20250514'
+      const inputTokens = response.usage.input_tokens
+      const outputTokens = response.usage.output_tokens
+      const cost = calculateCost(usedModel, inputTokens, outputTokens)
+
+      // Record usage asynchronously (don't block response)
+      recordUsage({
+        provider: 'anthropic',
+        model: usedModel,
+        operation: 'extraction',
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        inputCost: cost.inputCost,
+        outputCost: cost.outputCost,
+        totalCost: cost.totalCost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[Cost Tracking Error]', err)
+        }
+      })
+
       res.json({
         success: true,
         data: JSON.parse(jsonContent),
@@ -195,6 +246,7 @@ router.post(
           output_tokens: response.usage.output_tokens,
         },
         model: response.model,
+        cost: cost.totalCost,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -298,14 +350,38 @@ router.post(
         }>
       }
       const annotation = result.responses?.[0]?.fullTextAnnotation
+      const pageCount = annotation?.pages?.length || 1
+
+      // Track cost usage for OCR (Google Vision charges per image/page)
+      // Estimate: $1.50 per 1000 pages for document text detection
+      const ocrCost = pageCount * 0.0015
+
+      // Record usage asynchronously (don't block response)
+      recordUsage({
+        provider: 'google',
+        model: 'cloud-vision-v1',
+        operation: 'ocr',
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: ocrCost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) => {
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('[Cost Tracking Error]', err)
+        }
+      })
 
       res.json({
         success: true,
         data: {
           text: annotation?.text || '',
           confidence: annotation?.pages?.[0]?.blocks?.[0]?.confidence || 0,
-          pageCount: annotation?.pages?.length || 1,
+          pageCount,
         },
+        cost: ocrCost,
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -432,11 +508,34 @@ router.post(
           })
         }
 
+        // Track cost usage for chat
+        const chatModel = response.model || 'gpt-4o-mini'
+        const inputTokens = response.usage?.prompt_tokens || 0
+        const outputTokens = response.usage?.completion_tokens || 0
+        const cost = calculateCost(chatModel, inputTokens, outputTokens)
+
+        // Record usage asynchronously
+        recordUsage({
+          provider: 'openai',
+          model: chatModel,
+          operation: 'chat',
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch((err) => {
+          if (!IS_PRODUCTION) console.error('[Cost Tracking Error]', err)
+        })
+
         return res.json({
           success: true,
           response: content,
           provider: 'openai',
           usage: response.usage,
+          cost: cost.totalCost,
         })
       } else {
         // Anthropic
@@ -472,6 +571,28 @@ router.post(
           })
         }
 
+        // Track cost usage for chat
+        const chatModel = response.model || 'claude-3-5-haiku-20241022'
+        const inputTokens = response.usage.input_tokens
+        const outputTokens = response.usage.output_tokens
+        const cost = calculateCost(chatModel, inputTokens, outputTokens)
+
+        // Record usage asynchronously
+        recordUsage({
+          provider: 'anthropic',
+          model: chatModel,
+          operation: 'chat',
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch((err) => {
+          if (!IS_PRODUCTION) console.error('[Cost Tracking Error]', err)
+        })
+
         return res.json({
           success: true,
           response: textBlock.text,
@@ -480,6 +601,7 @@ router.post(
             input_tokens: response.usage.input_tokens,
             output_tokens: response.usage.output_tokens,
           },
+          cost: cost.totalCost,
         })
       }
     } catch (error) {

@@ -21,6 +21,7 @@ const __dirname = path.dirname(__filename)
 dotenv.config()
 
 import aiRoutes from './routes/ai.js'
+import adminRoutes from './routes/admin.js'
 import {
   generalLimiter,
   healthLimiter,
@@ -204,8 +205,8 @@ const corsOptions: cors.CorsOptions = {
     }
     callback(new Error('Not allowed by CORS'))
   },
-  methods: ['GET', 'POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Admin-Token'],
   credentials: true,
 }
 app.use(cors(corsOptions))
@@ -264,6 +265,9 @@ app.get('/api/health', healthLimiter, (_req, res) => {
 
 // AI proxy routes (with longer timeout for AI processing)
 app.use('/api/ai', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), aiRoutes)
+
+// Admin dashboard API routes
+app.use('/api/admin', adminRoutes)
 
 // 404 handler for API routes only
 app.use('/api', (_req, res) => {
