@@ -1,9 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   applyComprehensivePreprocessing,
   applyBasicOCRCorrections,
   textNeedsProcessing,
   estimateTextQuality,
+  processDocumentCleanRoom,
+  processDocumentCombined,
+  processDocumentQuick,
+  type CombinedProcessingResult,
 } from './text-processor'
 
 describe('Text Processor', () => {
@@ -259,6 +263,218 @@ Normal text continues`
       const score = estimateTextQuality('Any text here')
       expect(score).toBeGreaterThanOrEqual(0)
       expect(score).toBeLessThanOrEqual(100)
+    })
+  })
+
+  describe('processDocumentCleanRoom', () => {
+    it('should process document and return clean copy', () => {
+      // Use well-formed spaced text that matches the OCR patterns
+      const input = 'B İ R L E Ş İ K SİGORTA\nPoliçe No: 12345'
+      const result = processDocumentCleanRoom(input)
+
+      // Clean room preserves text - it may or may not fix spacing depending on pattern match
+      expect(result.cleanCopy).toBeDefined()
+      expect(result.cleanCopy).toContain('12345')
+    })
+
+    it('should return redacted copy with PII tokens', () => {
+      const input = 'Email: test@example.com\nTel: 0532 123 45 67'
+      const result = processDocumentCleanRoom(input)
+
+      // Clean-room uses [REDACTED:TYPE_N] format
+      expect(result.redactedCopy).toContain('[REDACTED:')
+    })
+
+    it('should populate PII vault with redacted values', () => {
+      const input = 'Email: test@example.com'
+      const result = processDocumentCleanRoom(input)
+
+      // piiVault is PIIVaultEntry[] (array directly)
+      expect(Array.isArray(result.piiVault)).toBe(true)
+      expect(result.piiVault.length).toBeGreaterThan(0)
+    })
+
+    it('should include validation report', () => {
+      const input = 'Normal insurance document text'
+      const result = processDocumentCleanRoom(input)
+
+      expect(result.validationReport).toBeDefined()
+      // ValidationReport has completeness, identifierIntegrity, redactionCorrectness, issues
+      expect(result.validationReport.completeness).toBeDefined()
+      expect(Array.isArray(result.validationReport.issues)).toBe(true)
+    })
+
+    it('should include metadata with document info', () => {
+      const input = 'Test document text'
+      const result = processDocumentCleanRoom(input)
+
+      // DocumentMetadata has: documentTitle, source, conversionDate, outputType, language, pageCount
+      expect(result.metadata.conversionDate).toBeDefined()
+      expect(result.metadata.language).toBeDefined()
+      expect(typeof result.metadata.pageCount).toBe('number')
+    })
+
+    it('should accept source and title options', () => {
+      const input = 'Kasko Policy Document'
+      const result = processDocumentCleanRoom(input, {
+        source: 'PDF Upload',
+        title: 'Test Kasko Policy',
+      })
+
+      expect(result.cleanCopy).toBeDefined()
+      expect(result.metadata.source).toBe('PDF Upload')
+      expect(result.metadata.documentTitle).toBe('Test Kasko Policy')
+    })
+  })
+
+  describe('processDocumentCombined', () => {
+    it('should run both clean-room and AI stages', async () => {
+      // Mock fetch to simulate no API available
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B İ RLE Şİ K SİGORTA POLİÇESİ'
+      const result = await processDocumentCombined(input)
+
+      expect(result.success).toBeDefined()
+      expect(result.cleanRoom).toBeDefined()
+      expect(result.aiEnhanced).toBeDefined()
+      expect(result.stages.cleanRoom.success).toBe(true)
+
+      global.fetch = originalFetch
+    })
+
+    it('should include clean-room output with all components', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'Email: test@example.com\nPoliçe: 12345'
+      const result = await processDocumentCombined(input)
+
+      expect(result.cleanRoom.cleanCopy).toBeDefined()
+      expect(result.cleanRoom.redactedCopy).toBeDefined()
+      expect(Array.isArray(result.cleanRoom.piiVault)).toBe(true)
+      expect(result.cleanRoom.validationReport).toBeDefined()
+      expect(result.cleanRoom.metadata).toBeDefined()
+
+      global.fetch = originalFetch
+    })
+
+    it('should include AI-enhanced output', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'Test insurance document'
+      const result = await processDocumentCombined(input)
+
+      expect(result.aiEnhanced.cleanedText).toBeDefined()
+      expect(typeof result.aiEnhanced.confidence).toBe('number')
+      expect(Array.isArray(result.aiEnhanced.validationIssues)).toBe(true)
+
+      global.fetch = originalFetch
+    })
+
+    it('should track processing times for each stage', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'Test document'
+      const result = await processDocumentCombined(input)
+
+      expect(result.processingTimeMs).toBeGreaterThanOrEqual(0)
+      expect(result.stages.cleanRoom.durationMs).toBeGreaterThanOrEqual(0)
+      expect(result.stages.aiProcessing.durationMs).toBeGreaterThanOrEqual(0)
+
+      global.fetch = originalFetch
+    })
+
+    it('should provide recommended clean text', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B İ RLE Şİ K SİGORTA'
+      const result = await processDocumentCombined(input)
+
+      expect(result.recommendedCleanText).toBeDefined()
+      expect(result.recommendedCleanText.length).toBeGreaterThan(0)
+
+      global.fetch = originalFetch
+    })
+
+    it('should accept processing options', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const result = await processDocumentCombined('Test', {
+        provider: 'anthropic',
+        includeStructuredExtraction: false,
+        source: 'Test Source',
+        title: 'Test Title',
+      })
+
+      expect(result).toBeDefined()
+
+      global.fetch = originalFetch
+    })
+  })
+
+  describe('processDocumentQuick', () => {
+    it('should return quick processing results', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B İ R L E Ş İ K SİGORTA'
+      const result = await processDocumentQuick(input)
+
+      expect(result.cleanText).toBeDefined()
+      expect(result.redactedText).toBeDefined()
+      expect(Array.isArray(result.piiVault)).toBe(true)
+      expect(typeof result.confidence).toBe('number')
+      expect(typeof result.processingTimeMs).toBe('number')
+
+      global.fetch = originalFetch
+    })
+
+    it('should preserve Turkish text', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      // Quick processing uses clean-room which has stricter pattern matching
+      const input = 'SİGORTA POLİÇESİ'
+      const result = await processDocumentQuick(input)
+
+      expect(result.cleanText).toContain('SİGORTA')
+
+      global.fetch = originalFetch
+    })
+
+    it('should redact PII in quick mode', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'Contact: test@example.com'
+      const result = await processDocumentQuick(input)
+
+      // Clean-room uses [REDACTED:TYPE_N] format
+      expect(result.redactedText).toContain('[REDACTED:')
+      expect(result.piiVault.length).toBeGreaterThan(0)
+
+      global.fetch = originalFetch
+    })
+
+    it('should accept options for provider and metadata', async () => {
+      const originalFetch = global.fetch
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const result = await processDocumentQuick('Test', {
+        provider: 'anthropic',
+        source: 'Quick Test',
+        title: 'Test Doc',
+      })
+
+      expect(result.cleanText).toBeDefined()
+
+      global.fetch = originalFetch
     })
   })
 })
