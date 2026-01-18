@@ -51,6 +51,9 @@ const AuthPage = lazy(() =>
 const AdminDashboard = lazy(() =>
   import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 )
+const AdminLogin = lazy(() =>
+  import('./components/admin/AdminLogin').then((m) => ({ default: m.AdminLogin }))
+)
 
 // Route configuration
 const ROUTES = {
@@ -66,6 +69,7 @@ const ROUTES = {
   help: '/help',
   samples: '/samples',
   admin: '/admin',
+  adminLogin: '/admin/login',
 } as const
 
 // Main App component wrapped with providers
@@ -89,7 +93,7 @@ function AppContent() {
   const { t } = useI18n()
   const isLandingPage = location.pathname === '/'
   const isAuthPage = location.pathname === '/auth'
-  const isAdminPage = location.pathname === '/admin'
+  const isAdminPage = location.pathname.startsWith('/admin')
   const hideNavigation = isLandingPage || isAuthPage || isAdminPage
 
   // Get page title for screen readers
@@ -236,14 +240,14 @@ function AppContent() {
                   </PageTransition>
                 }
               />
-              {/* Admin Dashboard - protected, no standard navigation */}
+              {/* Admin Routes - separate auth, no standard navigation */}
               <Route
-                path="/admin"
-                element={
-                  <ProtectedRoute>
-                    <AdminDashboard />
-                  </ProtectedRoute>
-                }
+                path="/admin/login"
+                element={<AdminLogin />}
+              />
+              <Route
+                path="/admin/*"
+                element={<AdminDashboard />}
               />
               {/* 404 catch-all route - must be last */}
               <Route
