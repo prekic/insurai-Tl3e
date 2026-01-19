@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 import { I18nProvider, useI18n } from './lib/i18n'
 import { PolicyProvider } from './lib/policy-context'
 import { AuthProvider } from './lib/supabase/auth-context'
+import { AdminAuthProvider } from './lib/admin/context'
 import { GlobalNavigation } from './components/GlobalNavigation'
 import { PageTransition } from './components/animations/AnimatedComponents'
 import { PageLoader } from './components/PageLoader'
@@ -243,11 +244,19 @@ function AppContent() {
               {/* Admin Routes - separate auth, no standard navigation */}
               <Route
                 path="/admin/login"
-                element={<AdminLogin />}
+                element={
+                  <AdminAuthProvider>
+                    <AdminLogin />
+                  </AdminAuthProvider>
+                }
               />
               <Route
                 path="/admin/*"
-                element={<AdminDashboard />}
+                element={
+                  <AdminAuthProvider>
+                    <AdminDashboard />
+                  </AdminAuthProvider>
+                }
               />
               {/* 404 catch-all route - must be last */}
               <Route
