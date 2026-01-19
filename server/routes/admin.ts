@@ -11,6 +11,7 @@
 
 import { Router, Request, Response } from 'express'
 import os from 'os'
+import crypto from 'crypto'
 import {
   authenticateAdmin,
   requireRole,
