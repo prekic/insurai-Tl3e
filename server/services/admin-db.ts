@@ -150,20 +150,49 @@ export interface CostBudget {
 // ============================================================================
 
 let supabase: SupabaseClient | null = null
+let initError: string | null = null
 
-function getClient(): SupabaseClient | null {
-  if (supabase) return supabase
-
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
-  if (!url || !serviceKey) {
-    console.warn('Supabase credentials not configured for admin database')
-    return null
+/**
+ * Get Supabase client with explicit error handling
+ */
+export function getClientWithError(): { client: SupabaseClient | null; error: string | null } {
+  if (initError) {
+    return { client: null, error: initError }
   }
 
-  supabase = createClient(url, serviceKey)
-  return supabase
+  if (supabase) {
+    return { client: supabase, error: null }
+  }
+
+  // IMPORTANT: Use SUPABASE_URL first (server-side), VITE_SUPABASE_URL as fallback (dev only)
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!url) {
+    initError = 'SUPABASE_URL is not configured'
+    console.error('[Admin DB]', initError)
+    return { client: null, error: initError }
+  }
+
+  if (!serviceKey) {
+    initError = 'SUPABASE_SERVICE_ROLE_KEY is not configured'
+    console.error('[Admin DB]', initError)
+    return { client: null, error: initError }
+  }
+
+  try {
+    supabase = createClient(url, serviceKey)
+    return { client: supabase, error: null }
+  } catch (err) {
+    initError = `Failed to create Supabase client: ${err instanceof Error ? err.message : String(err)}`
+    console.error('[Admin DB]', initError)
+    return { client: null, error: initError }
+  }
+}
+
+function getClient(): SupabaseClient | null {
+  const { client } = getClientWithError()
+  return client
 }
 
 // ============================================================================

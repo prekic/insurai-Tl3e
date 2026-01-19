@@ -53,21 +53,54 @@ const REFRESH_TOKEN_EXPIRES_IN = process.env.ADMIN_REFRESH_EXPIRES_IN || '7d'
 const BCRYPT_ROUNDS = 12
 
 // Supabase client for database access
-const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+// IMPORTANT: Use SUPABASE_URL first (server-side), VITE_SUPABASE_URL as fallback (dev only)
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 let supabase: SupabaseClient<AnyDatabase> | null = null
+let supabaseInitError: string | null = null
 
-function getSupabase(): SupabaseClient<AnyDatabase> | null {
-  if (!supabase && supabaseUrl && supabaseServiceKey) {
+/**
+ * Get Supabase client for admin database operations
+ * Returns { client, error } to allow proper error handling
+ */
+export function getSupabaseWithError(): { client: SupabaseClient<AnyDatabase> | null; error: string | null } {
+  if (supabaseInitError) {
+    return { client: null, error: supabaseInitError }
+  }
+
+  if (supabase) {
+    return { client: supabase, error: null }
+  }
+
+  // Validate required env vars
+  if (!supabaseUrl) {
+    supabaseInitError = 'SUPABASE_URL is not configured. Set SUPABASE_URL environment variable.'
+    console.error('[Admin Auth]', supabaseInitError)
+    return { client: null, error: supabaseInitError }
+  }
+
+  if (!supabaseServiceKey) {
+    supabaseInitError = 'SUPABASE_SERVICE_ROLE_KEY is not configured. Set SUPABASE_SERVICE_ROLE_KEY environment variable.'
+    console.error('[Admin Auth]', supabaseInitError)
+    return { client: null, error: supabaseInitError }
+  }
+
+  try {
     console.log('[Admin Auth] Initializing Supabase client...')
     supabase = createClient<AnyDatabase>(supabaseUrl, supabaseServiceKey)
     console.log('[Admin Auth] Supabase client initialized successfully')
+    return { client: supabase, error: null }
+  } catch (err) {
+    supabaseInitError = `Failed to initialize Supabase client: ${err instanceof Error ? err.message : String(err)}`
+    console.error('[Admin Auth]', supabaseInitError)
+    return { client: null, error: supabaseInitError }
   }
-  if (!supabase) {
-    console.warn('[Admin Auth] Supabase not available - URL exists:', !!supabaseUrl, 'ServiceKey exists:', !!supabaseServiceKey)
-  }
-  return supabase
+}
+
+function getSupabase(): SupabaseClient<AnyDatabase> | null {
+  const { client } = getSupabaseWithError()
+  return client
 }
 
 // ============================================================================
