@@ -134,10 +134,13 @@ function getClientIp(req: Request): string {
  * POST /api/admin/auth/login
  */
 router.post('/auth/login', async (req: Request, res: Response) => {
+  console.log('[Admin Login] Request received')
   try {
     const { email, password } = req.body
+    console.log('[Admin Login] Attempting login for:', email)
 
     if (!email || !password) {
+      console.log('[Admin Login] Missing credentials')
       res.status(400).json({
         success: false,
         error: 'Email and password are required',
@@ -147,9 +150,24 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     }
 
     // Get admin user from database
-    const adminUser = await getAdminUserByEmail(email)
+    console.log('[Admin Login] Fetching user from database...')
+    let adminUser
+    try {
+      adminUser = await getAdminUserByEmail(email)
+      console.log('[Admin Login] User fetch result:', adminUser ? 'found' : 'not found', adminUser?.status)
+    } catch (dbError) {
+      console.error('[Admin Login] Database error fetching user:', dbError)
+      res.status(500).json({
+        success: false,
+        error: 'Database error',
+        code: 'DB_ERROR',
+        debug: String(dbError),
+      })
+      return
+    }
 
     if (!adminUser || !adminUser.passwordHash) {
+      console.log('[Admin Login] No user or no password hash - adminUser:', !!adminUser, 'hasHash:', !!adminUser?.passwordHash)
       // Log failed attempt (non-blocking)
       adminDb.logSecurityEvent({
         eventType: 'login_failed',
@@ -186,7 +204,21 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     }
 
     // Verify password
-    const passwordValid = await verifyPassword(password, adminUser.passwordHash)
+    console.log('[Admin Login] Verifying password...')
+    let passwordValid: boolean
+    try {
+      passwordValid = await verifyPassword(password, adminUser.passwordHash)
+      console.log('[Admin Login] Password valid:', passwordValid)
+    } catch (pwError) {
+      console.error('[Admin Login] Password verification error:', pwError)
+      res.status(500).json({
+        success: false,
+        error: 'Password verification failed',
+        code: 'PASSWORD_ERROR',
+        debug: String(pwError),
+      })
+      return
+    }
 
     if (!passwordValid) {
       adminDb.logSecurityEvent({
@@ -206,9 +238,11 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     }
 
     // Generate tokens
+    console.log('[Admin Login] Generating tokens...')
     const sessionId = crypto.randomUUID()
     const token = generateAdminToken(adminUser, sessionId)
     const refreshToken = generateRefreshToken(adminUser, sessionId)
+    console.log('[Admin Login] Tokens generated successfully')
 
     // Create session in database (non-blocking - don't fail login if this fails)
     try {
@@ -255,11 +289,17 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('[Admin Login] Unexpected error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
     res.status(500).json({
       success: false,
       error: 'Login failed',
       code: 'LOGIN_ERROR',
+      debug: {
+        message: errorMessage,
+        stack: errorStack,
+      },
     })
   }
 })
