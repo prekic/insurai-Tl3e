@@ -150,14 +150,14 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     const adminUser = await getAdminUserByEmail(email)
 
     if (!adminUser || !adminUser.passwordHash) {
-      // Log failed attempt
-      await adminDb.logSecurityEvent({
+      // Log failed attempt (non-blocking)
+      adminDb.logSecurityEvent({
         eventType: 'login_failed',
         severity: 'warning',
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'user_not_found' },
-      })
+      }).catch(() => {})
 
       res.status(401).json({
         success: false,
@@ -169,13 +169,13 @@ router.post('/auth/login', async (req: Request, res: Response) => {
 
     // Check if user is active
     if (adminUser.status !== 'active') {
-      await adminDb.logSecurityEvent({
+      adminDb.logSecurityEvent({
         eventType: 'login_failed',
         severity: 'warning',
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'account_inactive', status: adminUser.status },
-      })
+      }).catch(() => {})
 
       res.status(401).json({
         success: false,
@@ -189,13 +189,13 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     const passwordValid = await verifyPassword(password, adminUser.passwordHash)
 
     if (!passwordValid) {
-      await adminDb.logSecurityEvent({
+      adminDb.logSecurityEvent({
         eventType: 'login_failed',
         severity: 'warning',
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'invalid_password' },
-      })
+      }).catch(() => {})
 
       res.status(401).json({
         success: false,
