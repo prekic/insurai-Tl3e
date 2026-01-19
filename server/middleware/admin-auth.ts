@@ -60,7 +60,12 @@ let supabase: SupabaseClient<AnyDatabase> | null = null
 
 function getSupabase(): SupabaseClient<AnyDatabase> | null {
   if (!supabase && supabaseUrl && supabaseServiceKey) {
+    console.log('[Admin Auth] Initializing Supabase client...')
     supabase = createClient<AnyDatabase>(supabaseUrl, supabaseServiceKey)
+    console.log('[Admin Auth] Supabase client initialized successfully')
+  }
+  if (!supabase) {
+    console.warn('[Admin Auth] Supabase not available - URL exists:', !!supabaseUrl, 'ServiceKey exists:', !!supabaseServiceKey)
   }
   return supabase
 }
@@ -189,20 +194,32 @@ export async function getAdminUserById(id: string): Promise<AdminUser | null> {
  * Get admin user by email from database
  */
 export async function getAdminUserByEmail(email: string): Promise<(AdminUser & { passwordHash?: string }) | null> {
+  console.log('[Admin Auth] getAdminUserByEmail called for:', email)
+
   const db = getSupabase()
   if (!db) {
-    console.warn('Supabase not configured')
+    console.warn('[Admin Auth] getAdminUserByEmail: Supabase not configured, returning null')
     return null
   }
 
+  console.log('[Admin Auth] Querying admin_users table...')
   const { data, error } = await db
     .from('admin_users')
     .select('*')
     .eq('email', email.toLowerCase())
     .single()
 
-  if (error || !data) return null
+  if (error) {
+    console.error('[Admin Auth] Database query error:', error.code, error.message, error.details)
+    return null
+  }
 
+  if (!data) {
+    console.log('[Admin Auth] No user found for email:', email)
+    return null
+  }
+
+  console.log('[Admin Auth] User found, id:', data.id, 'role:', data.role, 'status:', data.status)
   const row = data as AdminUserRow
   return {
     id: row.id,
