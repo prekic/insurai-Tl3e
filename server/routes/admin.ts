@@ -210,26 +210,34 @@ router.post('/auth/login', async (req: Request, res: Response) => {
     const token = generateAdminToken(adminUser, sessionId)
     const refreshToken = generateRefreshToken(adminUser, sessionId)
 
-    // Create session in database
-    await createAdminSession(
-      adminUser.id,
-      hashToken(token),
-      hashToken(refreshToken),
-      getClientIp(req),
-      req.headers['user-agent'] || 'unknown'
-    )
+    // Create session in database (non-blocking - don't fail login if this fails)
+    try {
+      await createAdminSession(
+        adminUser.id,
+        hashToken(token),
+        hashToken(refreshToken),
+        getClientIp(req),
+        req.headers['user-agent'] || 'unknown'
+      )
+    } catch (sessionError) {
+      console.error('Failed to create session (non-critical):', sessionError)
+    }
 
-    // Update login stats
-    await updateAdminLogin(adminUser.id, getClientIp(req))
+    // Update login stats (non-blocking)
+    updateAdminLogin(adminUser.id, getClientIp(req)).catch((err) => {
+      console.error('Failed to update login stats (non-critical):', err)
+    })
 
-    // Log successful login
-    await adminDb.logSecurityEvent({
+    // Log successful login (non-blocking)
+    adminDb.logSecurityEvent({
       eventType: 'login_success',
       severity: 'info',
       userId: adminUser.id,
       ipAddress: getClientIp(req),
       userAgent: req.headers['user-agent'] || 'unknown',
       details: { email, role: adminUser.role },
+    }).catch((err) => {
+      console.error('Failed to log security event (non-critical):', err)
     })
 
     res.json({
