@@ -236,17 +236,31 @@ export function GlobalNavigation() {
               <button
                 ref={profileButtonRef}
                 onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
+                  showProfileMenu
+                    ? 'bg-blue-50 ring-2 ring-blue-500'
+                    : 'hover:bg-gray-100'
+                }`}
                 aria-expanded={showProfileMenu}
                 aria-haspopup="menu"
                 aria-label="User menu"
               >
-                <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-                  <User size={16} className="text-white" aria-hidden="true" />
+                <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
+                  {user?.user_metadata?.full_name ? (
+                    <span className="text-white font-semibold text-sm">
+                      {user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                    </span>
+                  ) : user?.email ? (
+                    <span className="text-white font-semibold text-sm">
+                      {user.email.slice(0, 2).toUpperCase()}
+                    </span>
+                  ) : (
+                    <User size={18} className="text-white" aria-hidden="true" />
+                  )}
                 </div>
                 <ChevronDown
                   size={16}
-                  className={`text-gray-600 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`}
+                  className={`text-gray-500 transition-transform duration-200 ${showProfileMenu ? 'rotate-180' : ''}`}
                   aria-hidden="true"
                 />
               </button>
@@ -260,60 +274,99 @@ export function GlobalNavigation() {
                   />
                   <div
                     ref={profileMenuRef}
-                    className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50"
+                    className="absolute right-0 mt-3 w-72 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
                     role="menu"
                     aria-orientation="vertical"
                     aria-label="User menu"
                   >
-                    <div className="px-4 py-3 border-b border-gray-100">
-                      <p className="font-semibold text-gray-900">
-                        {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
+                    {/* User Info Header */}
+                    <div className="px-4 py-4 bg-gradient-to-br from-slate-50 to-gray-50 border-b border-gray-100">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
+                          {user?.user_metadata?.full_name ? (
+                            <span className="text-white font-bold text-base">
+                              {user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </span>
+                          ) : user?.email ? (
+                            <span className="text-white font-bold text-base">
+                              {user.email.slice(0, 2).toUpperCase()}
+                            </span>
+                          ) : (
+                            <User size={22} className="text-white" aria-hidden="true" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">
+                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
+                        </div>
+                      </div>
                     </div>
-                    {user && (
+
+                    {/* Menu Items */}
+                    <div className="py-2">
+                      {user && (
+                        <button
+                          onClick={() => handleMenuItemClick('/account')}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left focus-ring group"
+                          role="menuitem"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                            <User size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                          </div>
+                          <div>
+                            <span className="font-medium">My Account</span>
+                            <p className="text-xs text-gray-400 group-hover:text-blue-500">Profile & preferences</p>
+                          </div>
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleMenuItemClick('/account')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
+                        onClick={() => handleMenuItemClick('/settings')}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left focus-ring group"
                         role="menuitem"
                       >
-                        <User size={16} aria-hidden="true" />
-                        <span>My Account</span>
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                          <Settings size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <span className="font-medium">Settings</span>
+                          <p className="text-xs text-gray-400 group-hover:text-blue-500">App configuration</p>
+                        </div>
                       </button>
-                    )}
-                    <button
-                      onClick={() => handleMenuItemClick('/settings')}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
-                      role="menuitem"
-                    >
-                      <Settings size={16} aria-hidden="true" />
-                      <span>Settings</span>
-                    </button>
-                    <button
-                      onClick={() => handleMenuItemClick('/help')}
-                      className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left focus-ring"
-                      role="menuitem"
-                    >
-                      <HelpCircle size={16} aria-hidden="true" />
-                      <span>Help Center</span>
-                    </button>
-                    <div className="border-t border-gray-100 mt-2 pt-2">
+                      <button
+                        onClick={() => handleMenuItemClick('/help')}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left focus-ring group"
+                        role="menuitem"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
+                          <HelpCircle size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                        </div>
+                        <div>
+                          <span className="font-medium">Help Center</span>
+                          <p className="text-xs text-gray-400 group-hover:text-blue-500">Support & documentation</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Sign Out / Sign In */}
+                    <div className="border-t border-gray-100 p-2">
                       {user ? (
                         <button
                           onClick={handleSignOut}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left focus-ring"
+                          className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl transition-colors text-left focus-ring"
                           role="menuitem"
                         >
-                          <LogOut size={16} aria-hidden="true" />
+                          <LogOut size={18} aria-hidden="true" />
                           <span>Sign Out</span>
                         </button>
                       ) : (
                         <button
                           onClick={() => handleMenuItemClick('/auth')}
-                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors text-left focus-ring"
+                          className="w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl transition-all shadow-sm hover:shadow-md focus-ring"
                           role="menuitem"
                         >
-                          <LogIn size={16} aria-hidden="true" />
+                          <LogIn size={18} aria-hidden="true" />
                           <span>Sign In</span>
                         </button>
                       )}
