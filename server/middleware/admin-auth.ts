@@ -6,6 +6,7 @@
 import { Request, Response, NextFunction } from 'express'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,7 +171,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  */
 export function hashToken(token: string): string {
   // Use a simple hash for token comparison (not for passwords)
-  return require('crypto').createHash('sha256').update(token).digest('hex')
+  return crypto.createHash('sha256').update(token).digest('hex')
 }
 
 // ============================================================================
