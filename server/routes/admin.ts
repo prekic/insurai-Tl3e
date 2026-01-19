@@ -11,6 +11,7 @@
 
 import { Router, Request, Response } from 'express'
 import os from 'os'
+import crypto from 'crypto'
 import {
   authenticateAdmin,
   requireRole,
@@ -26,6 +27,7 @@ import {
   revokeAdminSession,
   updateAdminLogin,
   logAdminAction,
+  getSupabaseWithError,
   AuthenticatedRequest,
 } from '../middleware/admin-auth.js'
 import * as adminDb from '../services/admin-db.js'
@@ -149,6 +151,23 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       return
     }
 
+    // Check Supabase configuration FIRST - fail fast with clear error
+    const { client: supabaseClient, error: supabaseError } = getSupabaseWithError()
+    if (!supabaseClient) {
+      console.error('[Admin Login] Supabase not configured:', supabaseError)
+      res.status(503).json({
+        success: false,
+        error: 'Database service unavailable',
+        code: 'DB_NOT_CONFIGURED',
+        message: supabaseError || 'Supabase is not properly configured',
+        details: {
+          hasSupabaseUrl: !!process.env.SUPABASE_URL,
+          hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        },
+      })
+      return
+    }
+
     // Get admin user from database
     console.log('[Admin Login] Fetching user from database...')
     let adminUser
@@ -157,11 +176,12 @@ router.post('/auth/login', async (req: Request, res: Response) => {
       console.log('[Admin Login] User fetch result:', adminUser ? 'found' : 'not found', adminUser?.status)
     } catch (dbError) {
       console.error('[Admin Login] Database error fetching user:', dbError)
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError)
       res.status(500).json({
         success: false,
-        error: 'Database error',
-        code: 'DB_ERROR',
-        debug: String(dbError),
+        error: 'Database query failed',
+        code: 'DB_QUERY_ERROR',
+        message: errorMessage,
       })
       return
     }
