@@ -4,9 +4,11 @@
  */
 
 import { useState, useEffect, useCallback } from 'react'
+import { Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/loading'
+import { useAdminAuth } from '@/lib/admin/context'
 import type { AdminSection, SystemHealth, AdminAlert } from '@/types/admin'
 
 // Tab components
@@ -56,11 +58,28 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
 ]
 
 export function AdminDashboard() {
+  const { isAuthenticated, isLoading: authLoading } = useAdminAuth()
   const [activeTab, setActiveTab] = useState<AdminSection>('overview')
   const [isLoading, setIsLoading] = useState(true)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [alerts, setAlerts] = useState<AdminAlert[]>([])
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
+
+  // Security: Redirect to login if not authenticated
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <Spinner className="h-8 w-8 mx-auto mb-4" />
+          <p className="text-gray-600">Verifying authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />
+  }
 
   const fetchSystemHealth = useCallback(async () => {
     try {
