@@ -18,18 +18,12 @@ import {
   Eye,
   Sparkles,
 } from 'lucide-react'
-
-interface PromptTemplate {
-  id: string
-  name: string
-  description: string
-  category: string
-  systemPrompt: string
-  userPromptTemplate: string
-  isActive: boolean
-  usageCount: number
-  version: number
-}
+import {
+  getPromptTemplates,
+  createPromptTemplate,
+  updatePromptTemplate,
+} from '@/lib/admin/api'
+import type { PromptTemplate } from '@/lib/admin/types'
 
 export function PromptsTab() {
   const [templates, setTemplates] = useState<PromptTemplate[]>([])
@@ -44,10 +38,9 @@ export function PromptsTab() {
 
   const fetchTemplates = async () => {
     try {
-      const response = await fetch('/api/admin/prompts')
-      const data = await response.json()
-      if (data.success) {
-        setTemplates(data.data)
+      const response = await getPromptTemplates()
+      if (response.success && response.data) {
+        setTemplates(response.data as PromptTemplate[])
       }
     } catch (error) {
       console.error('Failed to fetch templates:', error)
@@ -58,13 +51,8 @@ export function PromptsTab() {
 
   const handleSave = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/prompts/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      })
-      const data = await response.json()
-      if (data.success) {
+      const response = await updatePromptTemplate(id, editForm)
+      if (response.success) {
         setTemplates(templates.map((t) => (t.id === id ? { ...t, ...editForm } : t)))
         setEditingId(null)
         setEditForm({})
@@ -76,14 +64,16 @@ export function PromptsTab() {
 
   const handleCreate = async () => {
     try {
-      const response = await fetch('/api/admin/prompts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
+      const response = await createPromptTemplate({
+        name: editForm.name || '',
+        description: editForm.description || '',
+        category: editForm.category || 'other',
+        systemPrompt: editForm.systemPrompt || '',
+        userPromptTemplate: editForm.userPromptTemplate || '',
+        isDefault: false,
       })
-      const data = await response.json()
-      if (data.success) {
-        setTemplates([...templates, data.data])
+      if (response.success && response.data) {
+        setTemplates([...templates, response.data as PromptTemplate])
         setShowCreateForm(false)
         setEditForm({})
       }
@@ -94,13 +84,8 @@ export function PromptsTab() {
 
   const toggleActive = async (id: string, isActive: boolean) => {
     try {
-      const response = await fetch(`/api/admin/prompts/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !isActive }),
-      })
-      const data = await response.json()
-      if (data.success) {
+      const response = await updatePromptTemplate(id, { isActive: !isActive })
+      if (response.success) {
         setTemplates(templates.map((t) => (t.id === id ? { ...t, isActive: !isActive } : t)))
       }
     } catch (error) {
@@ -169,7 +154,7 @@ export function PromptsTab() {
                 <select
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg"
                   value={editForm.category || ''}
-                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
+                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value as PromptTemplate['category'] })}
                 >
                   <option value="">Select category</option>
                   <option value="extraction">Extraction</option>
