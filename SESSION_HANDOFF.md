@@ -64,6 +64,7 @@ All admin tab components updated to use `adminFetch()` instead of raw `fetch()`:
 ## Commits This Session
 
 ```
+983f722 Update documentation for admin-managed prompts session
 8b943e9 Fix all admin components to use adminFetch with auth headers
 29a09ba Fix admin API endpoints to use /prompts instead of /prompts/templates
 b9216e2 Fix PromptsTab to use admin API client with auth headers
@@ -221,8 +222,8 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 4 |
-| Files changed | 11 |
+| Commits this session | 5 |
+| Files changed | 13 |
 | New files created | 2 |
 | Bugs fixed | 3 |
 | Major focus | Admin-Managed AI Prompts |

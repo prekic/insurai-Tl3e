@@ -590,7 +590,8 @@ Located in `supabase/migrations/`:
 - `002_storage_policies.sql` - Storage bucket RLS
 - `003_security_fixes.sql` - Security hardening, handle_new_user trigger
 - `004_chat_conversations.sql` - Chat history storage
-- `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs)
+- `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs, prompt_templates, prompt_versions)
+- `006_seed_prompts.sql` - Seeds 16 AI prompts (extraction, chat, OCR, analysis)
 
 ### Row Level Security (RLS)
 ```sql
@@ -1894,10 +1895,19 @@ if (import.meta.env.PROD && typeof window !== 'undefined') {
 
 **CSP for PDF.js Worker (`server/index.ts`):**
 ```typescript
-// Required in Helmet CSP config:
-scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
-workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
-connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...supabase]
+// Required in Helmet CSP config (exact domains):
+scriptSrc: [
+  "'self'", 'blob:',
+  'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+  'https://*.sentry.io', 'https://*.sentry-cdn.com'  // Error tracking
+]
+workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+connectSrc: [
+  "'self'",
+  'https://*.supabase.co', 'wss://*.supabase.co',  // Supabase
+  'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',  // PDF.js
+  'https://*.sentry.io', 'https://*.ingest.sentry.io'  // Sentry
+]
 ```
 
 **Supabase Auth Redirect URLs:**
