@@ -1,4 +1,4 @@
-# Session Handoff - January 18, 2026
+# Session Handoff - January 20, 2026
 
 ## Current Status
 
@@ -7,8 +7,8 @@
 | **Build** | Passing |
 | **TypeCheck** | 0 errors |
 | **Lint** | 0 warnings |
-| **Tests** | ~4600+ passing (127 new tests this session) |
-| **Branch** | `claude/review-project-status-UaZEy` |
+| **Tests** | ~4600+ passing |
+| **Branch** | `claude/review-project-status-iqc0k` (needs merge) |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 
@@ -16,200 +16,198 @@
 
 ## Session Summary
 
-This session focused on **Combined Document Processing Pipeline** - a two-stage approach for OCR correction:
+This session focused on **Admin Panel Authentication Fixes** - debugging and fixing 500 errors on the admin login endpoint for Railway deployment.
 
-1. **Stage 1: Clean-Room Processing** - Deterministic, audit-friendly document normalization
-2. **Stage 2: AI-Enhanced Processing** - Context-aware OCR correction with structured extraction
-3. **PII Detection & Redaction** - Automatic detection of sensitive data with standardized tokens
-4. **Comprehensive Prompts** - New AI prompts for OCR correction and insurance schema extraction
-
-This addresses the user's feedback from the previous session about poor OCR correction quality.
+Four critical bugs were identified and fixed:
+1. Environment variable priority (VITE_* vs runtime vars)
+2. Missing crypto import in admin routes
+3. require() used in ESM module
+4. React hooks called after conditional returns
 
 ---
 
 ## Features Completed This Session
 
-### Combined Document Processing Pipeline (4 commits)
-- [x] `processDocumentCombined()` - Full two-stage pipeline with deterministic + AI processing
-- [x] `processDocumentQuick()` - Lightweight version for simple OCR correction
-- [x] `processDocumentCleanRoom()` - Deterministic-only processing for audit compliance
-- [x] Clean-room normalizer with Turkish OCR spacing fixes (B İ RLE Şİ K → BİRLEŞİK)
-- [x] PII detection for TC Kimlik, IBAN, phone, email, plates, VIN
-- [x] Three outputs: CLEAN_COPY, REDACTED_COPY, PII_VAULT
-- [x] Comprehensive AI prompts for OCR correction and structured extraction
-- [x] 127 new tests (55 text-processor + 49 document-normalizer + 23 prompts)
+### Admin Authentication Fixes (5 commits)
+
+| Fix | Issue | Solution |
+|-----|-------|----------|
+| Env var priority | Server read `VITE_SUPABASE_URL` first (build-time only) | Changed to `SUPABASE_URL` first |
+| crypto undefined | `crypto.randomUUID()` without import | Added `import crypto from 'crypto'` |
+| require in ESM | `require('crypto')` fails in ESM | Changed to ES import |
+| React hooks #310 | Hooks after conditional returns | Moved hooks before returns |
+
+### New Files Created
+
+- `supabase/migrations/005_admin_tables.sql` - Complete admin schema (admin_users, admin_sessions, security_events, audit_logs)
 
 ---
 
 ## Commits This Session
 
 ```
-3f251af Update documentation for combined document processing pipeline session
-9c73fb3 Fix ValidationReport.isValid type error - use issues.length check
-a869dea Add combined document processing pipeline
-9b88157 Add comprehensive AI prompts for OCR correction and structured extraction
-a7e375a Add clean-room document normalizer for OCR correction
+442d8d3 Fix React hooks error #310 in AdminDashboard
+1dbc976 Fix require('crypto') in ESM - use proper import
+0f03a90 Fix crypto is not defined error in production
+7033003 Fix admin auth 500 error with fail-fast env validation
+60e3bbb Add comprehensive debug logging to admin login flow
+```
+
+Earlier commits from this feature branch:
+```
+f6fce1c Make all admin login security logging non-blocking
+dde0b07 Make admin login non-blocking for session/logging operations
+2d61be9 SECURITY: Add authentication check to AdminDashboard
+2eb722b Fix admin routes missing AdminAuthProvider wrapper
 ```
 
 ---
 
-## Key Files Changed/Created
+## Key Files Changed
 
 | File | Changes |
 |------|---------|
-| `src/lib/ai/text-processor.ts` | +290 lines: Combined pipeline functions |
-| `src/lib/ai/text-processor.test.ts` | +220 lines: Tests for combined pipeline |
-| `src/lib/ai/document-normalizer.ts` | **NEW** 870+ lines: Clean-room normalizer |
-| `src/lib/ai/document-normalizer.test.ts` | **NEW** 49 tests |
-| `src/lib/ai/prompts.ts` | **NEW** 300+ lines: AI prompts for OCR |
-| `src/lib/ai/prompts.test.ts` | **NEW** 23 tests |
-| `CLAUDE.md` | Updated with new features and files |
+| `server/middleware/admin-auth.ts` | Fixed env var priority, added crypto import, getSupabaseWithError() |
+| `server/services/admin-db.ts` | Fixed env var priority, getClientWithError() |
+| `server/routes/admin.ts` | Added crypto import, improved error responses with codes |
+| `src/components/admin/AdminDashboard.tsx` | Fixed React hooks order (before conditional returns) |
+| `supabase/migrations/005_admin_tables.sql` | **NEW** Complete admin schema |
+| `.env.example` | Added SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_JWT_SECRET |
+| `CLAUDE.md` | Added issues #16-19, Admin Panel section |
 
 ---
 
-## New Architecture: Combined Document Processing
+## Admin Login Configuration
 
-### Processing Flow
-```
-Raw OCR Text
-     ↓
-┌────────────────────────────────────────┐
-│ Stage 1: Clean-Room (Deterministic)    │
-│ - Fix Turkish OCR spacing              │
-│ - Normalize whitespace                 │
-│ - Detect & redact PII                  │
-│ - Validate identifiers                 │
-│ → Output: CLEAN_COPY, REDACTED_COPY    │
-│ → Output: PII_VAULT                    │
-└───────────────┬────────────────────────┘
-                ↓
-┌────────────────────────────────────────┐
-│ Stage 2: AI-Enhanced                   │
-│ - Context-aware OCR correction         │
-│ - Structured extraction                │
-│ - Insurance schema output              │
-│ → Output: Cleaned Text                 │
-│ → Output: Structured JSON              │
-└───────────────┬────────────────────────┘
-                ↓
-         Final Output
-```
+### Credentials
+- **URL**: https://insurai-production.up.railway.app/admin/login
+- **Email**: admin@insurai.com
+- **Password**: secure-password
+- **Role**: super_admin
 
-### Key Functions
+### Two Auth Systems
 
-```typescript
-// Full pipeline (both stages)
-const result = await processDocumentCombined(rawText, {
-  provider: 'openai',
-  includeStructuredExtraction: true,
-})
-// result.cleanRoom.cleanCopy - deterministic output
-// result.cleanRoom.redactedCopy - PII redacted
-// result.cleanRoom.piiVault - sensitive data mapping
-// result.aiEnhanced.cleanedText - AI-corrected text
-// result.aiEnhanced.structuredExtraction - insurance schema
-// result.recommendedCleanText - best output
-
-// Quick mode (simple OCR fix)
-const quick = await processDocumentQuick(rawText)
-// quick.cleanText, quick.redactedText, quick.piiVault
-
-// Deterministic only
-const cleanRoom = processDocumentCleanRoom(rawText)
-// cleanRoom.cleanCopy, cleanRoom.redactedCopy, cleanRoom.piiVault
-```
-
-### PII Categories Detected
-- `TAX_ID` - TC Kimlik (11 digits, validated)
-- `PHONE` - Turkish phone numbers
-- `EMAIL` - Email addresses
-- `IBAN` - Turkish IBAN format
-- `PLATE` - Vehicle plates
-- `VIN` - Vehicle identification numbers
-- `ENGINE_NO` - Engine numbers
+| System | URL | Database | Use Case |
+|--------|-----|----------|----------|
+| Supabase Auth | `/auth` | `auth.users` (managed) | Regular users |
+| Custom JWT | `/admin/login` | `admin_users` (custom) | Admin panel |
 
 ---
 
-## Configuration Requirements
+## Railway Environment Variables
 
-### Supabase Auth (IMPORTANT)
-For login/signup to work on Railway:
-1. Go to Supabase Dashboard → Authentication → URL Configuration
-2. Add: `https://insurai-production.up.railway.app/**` to Redirect URLs
+### Required Variables
 
-### Railway Environment Variables
-```bash
-# Server-side only (never exposed to browser)
-OPENAI_API_KEY=sk-proj-xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
-GOOGLE_CLOUD_API_KEY=xxx
-NODE_ENV=production
-
-# Build-time (embedded in JS bundle)
-VITE_SUPABASE_URL=https://xxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
-
-# NOT needed - auto-detected from window.location.origin
-# VITE_API_PROXY_URL
-```
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `SUPABASE_URL` | `https://exykhfulkbwzatpesruv.supabase.co` | **NEW** - Runtime for server |
+| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` | From Supabase Dashboard > Settings > API |
+| `ADMIN_JWT_SECRET` | (random string) | Generate with: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
+| `OPENAI_API_KEY` | `sk-proj-...` | For AI extraction |
+| `ANTHROPIC_API_KEY` | `sk-ant-...` | Optional |
+| `GOOGLE_CLOUD_API_KEY` | `AIza...` | For OCR |
+| `VITE_SUPABASE_URL` | (same as SUPABASE_URL) | Build-time for frontend |
+| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Public anon key |
 
 ### Important Gotchas
-- `VITE_*` vars are baked at **build time** - need rebuild, not just restart
-- API keys must NOT have `VITE_` prefix
-- Railway env vars shouldn't have manual quotes
-- CSP must allow `unpkg.com`, `cdn.jsdelivr.net` for PDF.js worker
+
+| Gotcha | Explanation |
+|--------|-------------|
+| `VITE_*` needs rebuild | Build-time vars are baked into JS bundle |
+| No quotes in Railway | Railway adds quotes automatically |
+| `SUPABASE_URL` vs `VITE_SUPABASE_URL` | Server needs runtime var, frontend needs build-time |
+
+---
+
+## Supabase Configuration
+
+### Required Tables (Migration 005)
+
+```sql
+-- Run in Supabase SQL Editor
+-- See: supabase/migrations/005_admin_tables.sql
+
+admin_users       -- Admin accounts with bcrypt password hashes
+admin_sessions    -- JWT session tracking
+security_events   -- Security logging
+audit_logs        -- Admin action audit trail
+app_configs       -- Application configuration
+feature_flags     -- Feature flag management
+blocked_ips       -- IP blocking for security
+```
+
+### Auth Redirect URLs
+
+Add to Supabase Dashboard > Authentication > URL Configuration:
+```
+https://insurai-production.up.railway.app/**
+```
+
+---
+
+## CSP Configuration
+
+PDF.js worker requires these domains (configured in `server/index.ts`):
+
+```javascript
+scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
+workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
+connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', '*.supabase.co']
+```
 
 ---
 
 ## Known Issues
 
-| Issue | Severity | Notes |
-|-------|----------|-------|
-| PWA icon 144x144 missing | Low | Create icon file |
-| Font preload warnings | Low | Timing optimization |
-| Supabase auth redirect | Config | Need Railway URL in Supabase redirect allowlist |
+| Issue | Severity | Status | Notes |
+|-------|----------|--------|-------|
+| Branch not merged | High | Open | Fixes committed but need merge to deploy |
+| PWA icon 144x144 missing | Low | Open | Create icon file |
+| Font preload warnings | Low | Open | Timing optimization |
 
 ---
 
 ## Next Steps (Priority Order)
 
-### Immediate
-1. **Test combined pipeline** - Verify OCR correction quality on real Turkish documents
-2. **Integrate with PolicyUpload** - Use `processDocumentCombined` in upload flow
-3. **Test PII redaction** - Ensure sensitive data is properly masked
+### Immediate (Before Next Session)
+1. **Merge PR to main** - Branch `claude/review-project-status-iqc0k`
+2. **Wait for Railway rebuild** - Auto-deploys on merge
+3. **Test admin login** - Verify end-to-end login works
 
-### Short Term
-1. **Add clean-room to extraction flow** - Update `policy-extractor.ts` to use new pipeline
-2. **UI for PII vault** - Show users what was redacted
-3. **Export redacted documents** - Allow sharing without PII
+### Post-Deploy
+1. **Change admin password** - Current password is documented
+2. **Set ADMIN_JWT_SECRET** - Generate strong random secret
+3. **Enable Sentry** - Set `VITE_SENTRY_DSN` for error tracking
+4. **Run SQL migration 005** - If not already run
 
-### Medium Term
-1. **Improve TC Kimlik detection** - Add more context-aware detection
-2. **Multi-document processing** - Batch processing support
-3. **Confidence scoring** - Better accuracy metrics for OCR corrections
+### Feature Work
+1. **Test all admin tabs** - Overview, AI Operations, Users, etc.
+2. **Integrate combined pipeline** - Use in extraction flow
+3. **Review admin permissions** - Test role-based access
 
 ---
 
-## Quick Reference Commands
+## Verification Commands
 
 ```bash
-# Local development
-npm run dev:all
+# Test admin login (should return token)
+curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@insurai.com","password":"secure-password"}' | jq .
 
-# Validate before commit
-npm run validate
+# Test authenticated endpoint
+TOKEN="<token from login>"
+curl -s "https://insurai-production.up.railway.app/api/admin/auth/me" \
+  -H "Authorization: Bearer $TOKEN" | jq .
 
-# Run combined pipeline tests
-npm test -- --run src/lib/ai/text-processor.test.ts
+# Health check
+curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
-# Run all new tests
-npm test -- --run src/lib/ai/text-processor.test.ts src/lib/ai/document-normalizer.test.ts src/lib/ai/prompts.test.ts
-
-# Build production
-npm run build && npm run build:server
-
-# Run production locally
-NODE_ENV=production node dist-server/index.js
+# Check if env vars are configured (should return 503 if missing)
+curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@test.com","password":"test"}' | jq .code
+# Should return "INVALID_CREDENTIALS" not "DB_NOT_CONFIGURED"
 ```
 
 ---
@@ -218,12 +216,11 @@ NODE_ENV=production node dist-server/index.js
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 |
-| Files changed/created | 8 files (6 code + 2 docs) |
-| New tests added | 127 |
-| Total tests passing | ~4600+ |
-| Production URL | https://insurai-production.up.railway.app |
-| Major focus | Combined Document Processing Pipeline |
+| Commits this session | 5 (9 total on branch) |
+| Files changed | 7 code + 2 docs |
+| New migration | 005_admin_tables.sql |
+| Bugs fixed | 4 critical |
+| Major focus | Admin Auth 500 Error Fixes |
 
 ---
 
@@ -237,25 +234,22 @@ NODE_ENV=production node dist-server/index.js
 - [x] Known issues documented
 - [x] Next steps prioritized
 - [x] Session handoff updated
+- [ ] **PENDING**: Branch merged to main
+- [ ] **PENDING**: Production deployed with fixes
 
 ---
 
 ## Previous Session Context
 
-The previous session (Jan 17) focused on mobile UX improvements. The user also reported that OCR correction quality was "not good at all" - this session addressed that feedback by implementing the combined document processing pipeline.
+The previous session (Jan 18) focused on Combined Document Processing Pipeline for OCR correction. This session was started to debug admin login 500 errors reported by the user.
 
-Key OCR issues reported:
-- Turkish characters split with spaces ("İ" split, "ş" as separate chars)
-- Words broken with spaces ("poliçe" as "P o l i ç e")
-- AI correction not handling Turkish-specific patterns
-
-The new pipeline addresses these with:
-- Deterministic Turkish OCR spacing patterns
-- Known Turkish word patterns (BİRLEŞİK, SİGORTA, POLİÇE, etc.)
-- Context-aware AI correction as second pass
+Key issues this session solved:
+- Server couldn't connect to Supabase (env var priority bug)
+- crypto module not available in production
+- React hooks violation in AdminDashboard
+- Security improvements (auth check, non-blocking logging)
 
 ---
 
-**Last Updated**: January 18, 2026
-**Session Duration**: ~1 hour
-**Next Session Focus**: Integration of combined pipeline into extraction flow, or new feature work
+**Last Updated**: January 20, 2026
+**Next Session Focus**: Verify deployment works, test admin panel features
