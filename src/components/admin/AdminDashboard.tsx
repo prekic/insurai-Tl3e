@@ -65,22 +65,7 @@ export function AdminDashboard() {
   const [alerts, setAlerts] = useState<AdminAlert[]>([])
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  // Security: Redirect to login if not authenticated
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="text-center">
-          <Spinner className="h-8 w-8 mx-auto mb-4" />
-          <p className="text-gray-600">Verifying authentication...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/admin/login" replace />
-  }
-
+  // All hooks must be called unconditionally (React Rules of Hooks)
   const fetchSystemHealth = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/health')
@@ -123,11 +108,31 @@ export function AdminDashboard() {
   }, [fetchSystemHealth, fetchAlerts])
 
   useEffect(() => {
-    refresh()
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(refresh, 30000)
-    return () => clearInterval(interval)
-  }, [refresh])
+    // Only refresh if authenticated
+    if (!authLoading && isAuthenticated) {
+      refresh()
+      // Auto-refresh every 30 seconds
+      const interval = setInterval(refresh, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [refresh, authLoading, isAuthenticated])
+
+  // Security: Redirect to login if not authenticated
+  // These conditional returns come AFTER all hooks
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <Spinner className="h-8 w-8 mx-auto mb-4" />
+          <p className="text-gray-600">Verifying authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/admin/login" replace />
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status) {
