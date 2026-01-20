@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { adminFetch } from '@/lib/admin/api'
 import type { SystemHealth, ServerMetrics } from '@/types/admin'
 import {
   Activity,
@@ -45,7 +46,7 @@ export function OverviewTab({ systemHealth }: OverviewTabProps) {
 
   useEffect(() => {
     // Fetch server metrics
-    fetch('/api/admin/metrics')
+    adminFetch('/api/admin/metrics')
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setMetrics(data.data)
@@ -55,7 +56,7 @@ export function OverviewTab({ systemHealth }: OverviewTabProps) {
     // Fetch AI stats
     const today = new Date()
     const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString()
-    fetch(`/api/admin/ai/stats?startDate=${startOfDay}`)
+    adminFetch(`/api/admin/ai/stats?startDate=${startOfDay}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -72,7 +73,7 @@ export function OverviewTab({ systemHealth }: OverviewTabProps) {
       .catch(console.error)
 
     // Fetch policy stats
-    fetch(`/api/admin/policies/stats?startDate=${startOfDay}`)
+    adminFetch(`/api/admin/policies/stats?startDate=${startOfDay}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) setPolicyStats(data.data)

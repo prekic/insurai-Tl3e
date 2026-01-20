@@ -3,6 +3,7 @@
  * Audit trail and activity logging
  */
 
+import { adminFetch } from '@/lib/admin/api'
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -54,7 +55,7 @@ export function AuditTab() {
       if (resourceFilter) params.append('resourceType', resourceFilter)
       params.append('limit', '100')
 
-      const response = await fetch(`/api/admin/audit/logs?${params}`)
+      const response = await adminFetch(`/api/admin/audit/logs?${params}`)
       const data = await response.json()
 
       if (data.success) {
@@ -69,7 +70,7 @@ export function AuditTab() {
 
   const exportLogs = async () => {
     try {
-      const response = await fetch('/api/admin/export')
+      const response = await adminFetch('/api/admin/export')
       const data = await response.json()
 
       const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' })

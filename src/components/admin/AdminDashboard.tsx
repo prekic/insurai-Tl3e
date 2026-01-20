@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/loading'
 import { useAdminAuth } from '@/lib/admin/context'
+import { adminFetch } from '@/lib/admin/api'
 import type { AdminSection, SystemHealth, AdminAlert } from '@/types/admin'
 
 // Tab components
@@ -68,7 +69,7 @@ export function AdminDashboard() {
   // All hooks must be called unconditionally (React Rules of Hooks)
   const fetchSystemHealth = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/health')
+      const response = await adminFetch('/api/admin/health')
       const data = await response.json()
       if (data.success) {
         setSystemHealth(data.data)
@@ -80,7 +81,7 @@ export function AdminDashboard() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const response = await fetch('/api/admin/security/logs?severity=critical&resolved=false&limit=10')
+      const response = await adminFetch('/api/admin/security/logs?severity=critical&resolved=false&limit=10')
       const data = await response.json()
       if (data.success) {
         // Convert security logs to alerts format

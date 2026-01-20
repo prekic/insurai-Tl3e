@@ -66,6 +66,32 @@ export function clearTokens(): void {
 }
 
 // ============================================================================
+// Simple Fetch Wrapper with Auth
+// ============================================================================
+
+/**
+ * Simple fetch wrapper that adds auth headers
+ * Use this for components that need direct fetch calls
+ */
+export async function adminFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const token = getAccessToken()
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...((options.headers as Record<string, string>) || {}),
+  }
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
+  return fetch(url, {
+    ...options,
+    headers,
+  })
+}
+
+// ============================================================================
 // Base Request Helper
 // ============================================================================
 
