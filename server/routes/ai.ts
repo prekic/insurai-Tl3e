@@ -23,6 +23,7 @@ import {
   type ChatMessage,
 } from '../middleware/validation.js'
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
+import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 
 const router = Router()
 
@@ -51,6 +52,7 @@ function getAnthropicClient(): Anthropic | null {
  * Proxy for OpenAI policy extraction
  * Rate limited: 20 requests per hour
  * Validated: documentText required, max 500KB
+ * Uses admin-managed prompts from database with fallback
  */
 router.post(
   '/extract/openai',
@@ -68,13 +70,35 @@ router.post(
       }
 
       // Body is validated and sanitized by middleware
-      const { documentText, systemPrompt, model } = req.body as OpenAIExtractionInput
+      const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as OpenAIExtractionInput & { policyType?: string }
+
+      // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
+      let finalSystemPrompt: string
+      let finalUserPrompt = documentText
+      let promptTemplateUsed: string | undefined
+
+      if (clientPrompt) {
+        // Use client-provided prompt (backward compatibility)
+        finalSystemPrompt = clientPrompt
+      } else {
+        // Use admin-managed prompt
+        const renderedPrompt = await getExtractionPrompt(documentText, policyType)
+        if (renderedPrompt) {
+          finalSystemPrompt = renderedPrompt.systemPrompt
+          finalUserPrompt = renderedPrompt.userPrompt
+          promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
+          console.log(`[Extraction/OpenAI] Using prompt template: ${promptTemplateUsed}`)
+        } else {
+          finalSystemPrompt = 'Extract policy information as JSON.'
+          console.log('[Extraction/OpenAI] Using fallback prompt (admin prompt unavailable)')
+        }
+      }
 
       const response = await client.chat.completions.create({
         model: model || 'gpt-4o',
         messages: [
-          { role: 'system', content: systemPrompt || 'Extract policy information as JSON.' },
-          { role: 'user', content: documentText },
+          { role: 'system', content: finalSystemPrompt },
+          { role: 'user', content: finalUserPrompt },
         ],
         response_format: { type: 'json_object' },
         max_tokens: 4096,
@@ -173,6 +197,7 @@ router.post(
  * Proxy for Anthropic/Claude policy extraction
  * Rate limited: 20 requests per hour
  * Validated: documentText required, max 500KB
+ * Uses admin-managed prompts from database with fallback
  */
 router.post(
   '/extract/anthropic',
@@ -190,13 +215,35 @@ router.post(
       }
 
       // Body is validated and sanitized by middleware
-      const { documentText, systemPrompt, model } = req.body as AnthropicExtractionInput
+      const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string }
+
+      // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
+      let finalSystemPrompt: string
+      let finalUserPrompt = documentText
+      let promptTemplateUsed: string | undefined
+
+      if (clientPrompt) {
+        // Use client-provided prompt (backward compatibility)
+        finalSystemPrompt = clientPrompt
+      } else {
+        // Use admin-managed prompt
+        const renderedPrompt = await getExtractionPrompt(documentText, policyType)
+        if (renderedPrompt) {
+          finalSystemPrompt = renderedPrompt.systemPrompt
+          finalUserPrompt = renderedPrompt.userPrompt
+          promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
+          console.log(`[Extraction/Anthropic] Using prompt template: ${promptTemplateUsed}`)
+        } else {
+          finalSystemPrompt = 'Extract policy information as JSON.'
+          console.log('[Extraction/Anthropic] Using fallback prompt (admin prompt unavailable)')
+        }
+      }
 
       const response = await client.messages.create({
         model: model || 'claude-sonnet-4-20250514',
         max_tokens: 4096,
-        system: systemPrompt || 'Extract policy information as JSON.',
-        messages: [{ role: 'user', content: documentText }],
+        system: finalSystemPrompt,
+        messages: [{ role: 'user', content: finalUserPrompt }],
       })
 
       const textBlock = response.content.find((block) => block.type === 'text')
@@ -428,9 +475,9 @@ router.post(
 )
 
 /**
- * System prompt for policy chat assistant
+ * Fallback system prompt for policy chat assistant (used when admin prompt unavailable)
  */
-const CHAT_SYSTEM_PROMPT = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
+const CHAT_SYSTEM_PROMPT_FALLBACK = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
 
 Key guidelines:
 - Be helpful, professional, and concise
@@ -448,6 +495,7 @@ If the user provides policy context, use that information to answer questions ac
  * Multi-turn chat endpoint for policy assistant
  * Rate limited: 60 requests per hour
  * Supports conversation history for context
+ * Uses admin-managed prompt from database with fallback
  */
 router.post(
   '/chat',
@@ -468,10 +516,19 @@ router.post(
         useProvider = process.env.OPENAI_API_KEY ? 'openai' : 'anthropic'
       }
 
-      // Build the system prompt with policy context if provided
-      let systemPrompt = CHAT_SYSTEM_PROMPT
-      if (policyContext) {
-        systemPrompt += `\n\nPolicy Information:\n${policyContext}`
+      // Get system prompt from admin (with fallback)
+      let systemPrompt: string
+      const renderedPrompt = await getChatPrompt(message, policyContext)
+      if (renderedPrompt) {
+        systemPrompt = renderedPrompt.systemPrompt
+        console.log(`[Chat] Using prompt template: ${renderedPrompt.templateName} v${renderedPrompt.version}`)
+      } else {
+        // Fallback to hardcoded prompt
+        systemPrompt = CHAT_SYSTEM_PROMPT_FALLBACK
+        if (policyContext) {
+          systemPrompt += `\n\nPolicy Information:\n${policyContext}`
+        }
+        console.log('[Chat] Using fallback prompt (admin prompt unavailable)')
       }
 
       if (useProvider === 'openai') {

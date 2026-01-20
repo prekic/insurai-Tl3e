@@ -34,6 +34,7 @@ import * as adminDb from '../services/admin-db.js'
 import * as costControl from '../middleware/cost-control.js'
 import * as promptVersioning from '../middleware/prompt-versioning.js'
 import * as monitoring from '../middleware/monitoring.js'
+import * as promptService from '../services/prompt-service.js'
 
 const router = Router()
 
@@ -1227,142 +1228,140 @@ router.put('/feature-flags/:id', authenticateAdmin, requireRole('admin', 'super_
 })
 
 // ============================================================================
-// PROMPT TEMPLATES
+// PROMPT TEMPLATES (Database-backed via prompt-service)
 // ============================================================================
 
-const promptTemplates = new Map<string, {
-  name: string
-  description: string
-  category: string
-  systemPrompt: string
-  userPromptTemplate: string
-  isActive: boolean
-  usageCount: number
-}>()
+router.get('/prompts', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { category } = req.query
 
-// Initialize defaults
-promptTemplates.set('extraction-default', {
-  name: 'Policy Extraction (Default)',
-  description: 'Standard prompt for extracting policy data',
-  category: 'extraction',
-  systemPrompt: 'You are an expert Turkish insurance document analyzer...',
-  userPromptTemplate: 'Extract all relevant information from this document:\n\n{{document_text}}',
-  isActive: true,
-  usageCount: 0,
-})
-promptTemplates.set('chat-default', {
-  name: 'Policy Chat (Default)',
-  description: 'Standard prompt for policy questions',
-  category: 'chat',
-  systemPrompt: 'You are an expert Turkish insurance advisor...',
-  userPromptTemplate: 'Policy: {{policy_context}}\n\nQuestion: {{user_message}}',
-  isActive: true,
-  usageCount: 0,
-})
+    let templates
+    if (category && typeof category === 'string') {
+      templates = await promptService.getPromptsByCategory(
+        category as promptService.PromptCategory
+      )
+    } else {
+      templates = await promptService.getAllPrompts()
+    }
 
-router.get('/prompts', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const { category } = req.query
-
-  const templates = Array.from(promptTemplates.entries())
-    .filter(([, template]) => !category || template.category === category)
-    .map(([id, template]) => ({
-      id,
-      ...template,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }))
-
-  res.json({ success: true, data: templates })
-})
-
-router.get('/prompts/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const template = promptTemplates.get(req.params.id)
-
-  if (!template) {
-    res.status(404).json({ success: false, error: 'Template not found' })
-    return
+    res.json({ success: true, data: templates })
+  } catch (error) {
+    console.error('[Admin] Error fetching prompts:', error)
+    res.status(500).json({ success: false, error: 'Failed to fetch prompts' })
   }
-
-  res.json({
-    success: true,
-    data: {
-      id: req.params.id,
-      ...template,
-      version: 1,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  })
 })
 
-router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params
-  const updates = req.body
+router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const template = await promptService.getPromptById(req.params.id)
 
-  const template = promptTemplates.get(id)
-  if (!template) {
-    res.status(404).json({ success: false, error: 'Template not found' })
-    return
+    if (!template) {
+      res.status(404).json({ success: false, error: 'Template not found' })
+      return
+    }
+
+    res.json({ success: true, data: template })
+  } catch (error) {
+    console.error('[Admin] Error fetching prompt:', error)
+    res.status(500).json({ success: false, error: 'Failed to fetch prompt' })
   }
-
-  const previousState = { ...template }
-  Object.assign(template, updates)
-  promptTemplates.set(id, template)
-
-  auditLogs.push({
-    id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
-    timestamp: new Date().toISOString(),
-    actorId: req.adminUser?.id || 'unknown',
-    actorEmail: req.adminUser?.email || 'unknown',
-    action: 'update',
-    resourceType: 'prompt_template',
-    resourceId: id,
-    ipAddress: getClientIp(req),
-  })
-
-  // Log to database
-  logAdminAction(req, 'update', 'prompt_template', id, previousState, template)
-
-  res.json({ success: true, data: { id, ...template } })
 })
 
-router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const { name, description, category, systemPrompt, userPromptTemplate } = req.body
+router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
 
-  if (!name || !category || !systemPrompt || !userPromptTemplate) {
-    res.status(400).json({ success: false, error: 'Missing required fields' })
-    return
+    // Get current template for audit log
+    const previousTemplate = await promptService.getPromptById(id)
+    if (!previousTemplate) {
+      res.status(404).json({ success: false, error: 'Template not found' })
+      return
+    }
+
+    const updatedTemplate = await promptService.updatePrompt(id, {
+      name: updates.name,
+      description: updates.description,
+      systemPrompt: updates.systemPrompt,
+      userPromptTemplate: updates.userPromptTemplate,
+      isActive: updates.isActive,
+      parameters: updates.parameters,
+    })
+
+    if (!updatedTemplate) {
+      res.status(500).json({ success: false, error: 'Failed to update template' })
+      return
+    }
+
+    // Audit log
+    auditLogs.push({
+      id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
+      timestamp: new Date().toISOString(),
+      actorId: req.adminUser?.id || 'unknown',
+      actorEmail: req.adminUser?.email || 'unknown',
+      action: 'update',
+      resourceType: 'prompt_template',
+      resourceId: id,
+      ipAddress: getClientIp(req),
+    })
+
+    // Log to database
+    logAdminAction(req, 'update', 'prompt_template', id, previousTemplate, updatedTemplate)
+
+    res.json({ success: true, data: updatedTemplate })
+  } catch (error) {
+    console.error('[Admin] Error updating prompt:', error)
+    res.status(500).json({ success: false, error: 'Failed to update prompt' })
   }
+})
 
-  const id = `prompt-${Date.now()}`
-  const template = {
-    name,
-    description: description || '',
-    category,
-    systemPrompt,
-    userPromptTemplate,
-    isActive: false,
-    usageCount: 0,
+router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { name, description, category, systemPrompt, userPromptTemplate, variables, defaultProvider, defaultModel, parameters } = req.body
+
+    if (!name || !category || !systemPrompt || !userPromptTemplate) {
+      res.status(400).json({ success: false, error: 'Missing required fields' })
+      return
+    }
+
+    const template = await promptService.createPrompt({
+      name,
+      description: description || '',
+      category,
+      systemPrompt,
+      userPromptTemplate,
+      variables: variables || [],
+      isActive: true,
+      defaultProvider,
+      defaultModel,
+      parameters,
+    })
+
+    if (!template) {
+      res.status(500).json({ success: false, error: 'Failed to create template' })
+      return
+    }
+
+    // Audit log
+    auditLogs.push({
+      id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
+      timestamp: new Date().toISOString(),
+      actorId: req.adminUser?.id || 'unknown',
+      actorEmail: req.adminUser?.email || 'unknown',
+      action: 'create',
+      resourceType: 'prompt_template',
+      resourceId: template.id,
+      ipAddress: getClientIp(req),
+    })
+
+    // Log to database
+    logAdminAction(req, 'create', 'prompt_template', template.id, undefined, template)
+
+    res.json({ success: true, data: template })
+  } catch (error) {
+    console.error('[Admin] Error creating prompt:', error)
+    res.status(500).json({ success: false, error: 'Failed to create prompt' })
   }
-
-  promptTemplates.set(id, template)
-
-  auditLogs.push({
-    id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
-    timestamp: new Date().toISOString(),
-    actorId: req.adminUser?.id || 'unknown',
-    actorEmail: req.adminUser?.email || 'unknown',
-    action: 'create',
-    resourceType: 'prompt_template',
-    resourceId: id,
-    ipAddress: getClientIp(req),
-  })
-
-  // Log to database
-  logAdminAction(req, 'create', 'prompt_template', id, undefined, template)
-
-  res.json({ success: true, data: { id, ...template } })
 })
 
 // ============================================================================
