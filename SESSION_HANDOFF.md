@@ -1,64 +1,74 @@
-# Session Handoff - January 20, 2026
+# Session Handoff - January 20, 2026 (Afternoon)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | Passing |
-| **TypeCheck** | 0 errors |
-| **Lint** | 0 warnings |
+| **Build** | ✅ Passing |
+| **TypeCheck** | ✅ 0 errors |
+| **Lint** | ✅ 0 warnings |
 | **Tests** | ~4600+ passing |
-| **Branch** | `claude/review-project-status-iqc0k` (needs merge) |
+| **Branch** | `claude/review-project-status-0IbJI` (merged to main) |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
+| **Admin Prompts** | ✅ 16 prompts seeded and working |
 
 ---
 
 ## Session Summary
 
-This session focused on **Admin Panel Authentication Fixes** - debugging and fixing 500 errors on the admin login endpoint for Railway deployment.
+This session focused on **Admin-Managed AI Prompts** - migrating all AI prompts to be database-backed and manageable through the Admin Dashboard → Prompts tab.
 
-Four critical bugs were identified and fixed:
-1. Environment variable priority (VITE_* vs runtime vars)
-2. Missing crypto import in admin routes
-3. require() used in ESM module
-4. React hooks called after conditional returns
+Key accomplishments:
+1. Created prompt-service.ts for centralized prompt management
+2. Seeded 16 AI prompts to database via migration 006
+3. Fixed 401 authentication errors in admin dashboard tabs
+4. Fixed API endpoint routing issues for prompts
 
 ---
 
 ## Features Completed This Session
 
-### Admin Authentication Fixes (5 commits)
+### Admin-Managed Prompts System
 
-| Fix | Issue | Solution |
-|-----|-------|----------|
-| Env var priority | Server read `VITE_SUPABASE_URL` first (build-time only) | Changed to `SUPABASE_URL` first |
-| crypto undefined | `crypto.randomUUID()` without import | Added `import crypto from 'crypto'` |
-| require in ESM | `require('crypto')` fails in ESM | Changed to ES import |
-| React hooks #310 | Hooks after conditional returns | Moved hooks before returns |
+| Component | Description |
+|-----------|-------------|
+| `server/services/prompt-service.ts` | **NEW** Centralized service for fetching prompts from DB with 5-min cache |
+| `supabase/migrations/006_seed_prompts.sql` | **NEW** Seeds 16 AI prompts to database |
+| `src/lib/admin/api.ts` | Added `adminFetch()` wrapper, fixed endpoint paths |
+| `src/components/admin/tabs/PromptsTab.tsx` | Updated to use admin API client |
 
-### New Files Created
+### Prompts Seeded (16 Total)
 
-- `supabase/migrations/005_admin_tables.sql` - Complete admin schema (admin_users, admin_sessions, security_events, audit_logs)
+| Category | Prompts |
+|----------|---------|
+| **extraction** (10) | Master, Type Detection, Kasko, Traffic, Home, Health, Life, DASK, Business, Nakliyat |
+| **chat** (1) | Policy Chat Assistant |
+| **ocr** (3) | OCR Correction, Document Preprocessing, Document Normalization Full |
+| **analysis** (2) | Coverage Gap Analysis, Extraction Quality Scoring |
+
+### Admin Authentication Fixes
+
+All admin tab components updated to use `adminFetch()` instead of raw `fetch()`:
+- AdminDashboard.tsx
+- OverviewTab.tsx
+- SecurityTab.tsx
+- PoliciesTab.tsx
+- ConfigTab.tsx
+- AuditTab.tsx
+- AIOperationsTab.tsx
+- PromptsTab.tsx
 
 ---
 
 ## Commits This Session
 
 ```
-442d8d3 Fix React hooks error #310 in AdminDashboard
-1dbc976 Fix require('crypto') in ESM - use proper import
-0f03a90 Fix crypto is not defined error in production
-7033003 Fix admin auth 500 error with fail-fast env validation
-60e3bbb Add comprehensive debug logging to admin login flow
-```
-
-Earlier commits from this feature branch:
-```
-f6fce1c Make all admin login security logging non-blocking
-dde0b07 Make admin login non-blocking for session/logging operations
-2d61be9 SECURITY: Add authentication check to AdminDashboard
-2eb722b Fix admin routes missing AdminAuthProvider wrapper
+983f722 Update documentation for admin-managed prompts session
+8b943e9 Fix all admin components to use adminFetch with auth headers
+29a09ba Fix admin API endpoints to use /prompts instead of /prompts/templates
+b9216e2 Fix PromptsTab to use admin API client with auth headers
+4cd601c Integrate admin-managed prompts for AI operations
 ```
 
 ---
@@ -67,93 +77,48 @@ dde0b07 Make admin login non-blocking for session/logging operations
 
 | File | Changes |
 |------|---------|
-| `server/middleware/admin-auth.ts` | Fixed env var priority, added crypto import, getSupabaseWithError() |
-| `server/services/admin-db.ts` | Fixed env var priority, getClientWithError() |
-| `server/routes/admin.ts` | Added crypto import, improved error responses with codes |
-| `src/components/admin/AdminDashboard.tsx` | Fixed React hooks order (before conditional returns) |
-| `supabase/migrations/005_admin_tables.sql` | **NEW** Complete admin schema |
-| `.env.example` | Added SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ADMIN_JWT_SECRET |
-| `CLAUDE.md` | Added issues #16-19, Admin Panel section |
+| `server/services/prompt-service.ts` | **NEW** - Centralized prompt management with DB + cache |
+| `supabase/migrations/006_seed_prompts.sql` | **NEW** - Seeds 16 prompts |
+| `server/routes/ai.ts` | Uses prompt-service for extraction/chat with fallback |
+| `server/routes/admin.ts` | Database-backed CRUD for prompts |
+| `src/lib/admin/api.ts` | Added `adminFetch()`, fixed `/prompts` endpoints |
+| `src/components/admin/tabs/*.tsx` | All tabs use adminFetch |
 
 ---
 
-## Admin Login Configuration
+## Database Migrations Required
 
-### Credentials
-- **URL**: https://insurai-production.up.railway.app/admin/login
-- **Email**: admin@insurai.com
-- **Password**: secure-password
-- **Role**: super_admin
+### Migration 005 (Admin Schema) - Already Run
+Creates admin tables including `prompt_templates` and `prompt_versions`
 
-### Two Auth Systems
-
-| System | URL | Database | Use Case |
-|--------|-----|----------|----------|
-| Supabase Auth | `/auth` | `auth.users` (managed) | Regular users |
-| Custom JWT | `/admin/login` | `admin_users` (custom) | Admin panel |
+### Migration 006 (Seed Prompts) - Already Run
+Seeds 16 AI prompts. Run in Supabase SQL Editor:
+```sql
+-- Located at: supabase/migrations/006_seed_prompts.sql
+-- Contains INSERT statements for all 16 prompts
+```
 
 ---
 
 ## Railway Environment Variables
 
-### Required Variables
+### Required Variables (All Set)
 
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `SUPABASE_URL` | `https://exykhfulkbwzatpesruv.supabase.co` | **NEW** - Runtime for server |
-| `SUPABASE_SERVICE_ROLE_KEY` | `eyJhbG...` | From Supabase Dashboard > Settings > API |
-| `ADMIN_JWT_SECRET` | (random string) | Generate with: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `OPENAI_API_KEY` | `sk-proj-...` | For AI extraction |
-| `ANTHROPIC_API_KEY` | `sk-ant-...` | Optional |
-| `GOOGLE_CLOUD_API_KEY` | `AIza...` | For OCR |
-| `VITE_SUPABASE_URL` | (same as SUPABASE_URL) | Build-time for frontend |
-| `VITE_SUPABASE_ANON_KEY` | `eyJ...` | Public anon key |
+| Variable | Purpose |
+|----------|---------|
+| `SUPABASE_URL` | Runtime DB access for server |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role for admin operations |
+| `ADMIN_JWT_SECRET` | JWT signing for admin auth |
+| `OPENAI_API_KEY` | AI extraction |
+| `ANTHROPIC_API_KEY` | AI fallback |
+| `GOOGLE_CLOUD_API_KEY` | OCR |
+| `VITE_SUPABASE_URL` | Build-time for frontend |
+| `VITE_SUPABASE_ANON_KEY` | Build-time for frontend |
 
-### Important Gotchas
-
-| Gotcha | Explanation |
-|--------|-------------|
-| `VITE_*` needs rebuild | Build-time vars are baked into JS bundle |
-| No quotes in Railway | Railway adds quotes automatically |
-| `SUPABASE_URL` vs `VITE_SUPABASE_URL` | Server needs runtime var, frontend needs build-time |
-
----
-
-## Supabase Configuration
-
-### Required Tables (Migration 005)
-
-```sql
--- Run in Supabase SQL Editor
--- See: supabase/migrations/005_admin_tables.sql
-
-admin_users       -- Admin accounts with bcrypt password hashes
-admin_sessions    -- JWT session tracking
-security_events   -- Security logging
-audit_logs        -- Admin action audit trail
-app_configs       -- Application configuration
-feature_flags     -- Feature flag management
-blocked_ips       -- IP blocking for security
-```
-
-### Auth Redirect URLs
-
-Add to Supabase Dashboard > Authentication > URL Configuration:
-```
-https://insurai-production.up.railway.app/**
-```
-
----
-
-## CSP Configuration
-
-PDF.js worker requires these domains (configured in `server/index.ts`):
-
-```javascript
-scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
-workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
-connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', '*.supabase.co']
-```
+### Important Notes
+- `VITE_API_PROXY_URL` auto-detected via `window.location.origin` in production
+- `VITE_*` vars baked at build time - need redeploy not just restart
+- Don't add quotes in Railway UI - they're added automatically
 
 ---
 
@@ -161,53 +126,94 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', '*.supabase.co']
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Branch not merged | High | Open | Fixes committed but need merge to deploy |
+| Font preload warnings | Low | Open | Console timing warning |
 | PWA icon 144x144 missing | Low | Open | Create icon file |
-| Font preload warnings | Low | Open | Timing optimization |
+
+---
+
+## Bugs Fixed This Session
+
+| Bug | Root Cause | Fix |
+|-----|------------|-----|
+| 401 on all admin API calls | Components used `fetch()` without auth | Added `adminFetch()` wrapper |
+| 404 on `/prompts/templates` | Express route `/prompts/:id` caught it | Changed to `/prompts` endpoints |
+| Empty Prompts tab | Combination of above two issues | Both fixes applied |
+
+---
+
+## Architecture Notes
+
+### Prompt Service Flow
+```
+Admin Dashboard → adminFetch('/api/admin/prompts')
+    → server/routes/admin.ts (with JWT auth)
+    → server/services/prompt-service.ts
+    → Supabase DB (prompt_templates table)
+    → 5-minute in-memory cache
+```
+
+### AI Operations Flow
+```
+PolicyUpload → server/routes/ai.ts
+    → promptService.getExtractionPrompt('kasko')
+    → DB lookup with cache, fallback to hardcoded
+    → OpenAI/Anthropic API
+```
+
+### adminFetch Pattern
+```typescript
+// src/lib/admin/api.ts
+export async function adminFetch(url: string, options?: RequestInit): Promise<Response> {
+  const token = getAccessToken()
+  return fetch(url, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+      ...options?.headers,
+    },
+  })
+}
+```
 
 ---
 
 ## Next Steps (Priority Order)
 
-### Immediate (Before Next Session)
-1. **Merge PR to main** - Branch `claude/review-project-status-iqc0k`
-2. **Wait for Railway rebuild** - Auto-deploys on merge
-3. **Test admin login** - Verify end-to-end login works
+### Immediate
+1. ✅ **Prompts working** - All 16 prompts visible in admin
+2. **Test prompt editing** - Edit a prompt and verify it takes effect
+3. **Test AI extraction** - Upload a policy, verify it uses DB prompt
 
-### Post-Deploy
-1. **Change admin password** - Current password is documented
-2. **Set ADMIN_JWT_SECRET** - Generate strong random secret
-3. **Enable Sentry** - Set `VITE_SENTRY_DSN` for error tracking
-4. **Run SQL migration 005** - If not already run
+### Short Term
+1. **Prompt versioning** - Test version history tracking
+2. **A/B testing** - Test prompt comparison feature
+3. **Usage analytics** - Verify prompt usage counts increment
 
 ### Feature Work
-1. **Test all admin tabs** - Overview, AI Operations, Users, etc.
-2. **Integrate combined pipeline** - Use in extraction flow
-3. **Review admin permissions** - Test role-based access
+1. **Add more prompt types** - As needed for new features
+2. **Prompt import/export** - Backup/restore functionality
+3. **Prompt preview** - Test prompts before activating
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Test admin login (should return token)
-curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@insurai.com","password":"secure-password"}' | jq .
+# Check prompts in database
+# Run in Supabase SQL Editor:
+SELECT name, category, is_active FROM prompt_templates ORDER BY category;
 
-# Test authenticated endpoint
-TOKEN="<token from login>"
-curl -s "https://insurai-production.up.railway.app/api/admin/auth/me" \
-  -H "Authorization: Bearer $TOKEN" | jq .
+# Should return 16 rows with all is_active = true
+
+# Test admin prompts API
+TOKEN="<your-admin-token>"
+curl -s "https://insurai-production.up.railway.app/api/admin/prompts" \
+  -H "Authorization: Bearer $TOKEN" | jq '.data | length'
+# Should return: 16
 
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
-
-# Check if env vars are configured (should return 503 if missing)
-curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@test.com","password":"test"}' | jq .code
-# Should return "INVALID_CREDENTIALS" not "DB_NOT_CONFIGURED"
 ```
 
 ---
@@ -216,11 +222,11 @@ curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login"
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 (9 total on branch) |
-| Files changed | 7 code + 2 docs |
-| New migration | 005_admin_tables.sql |
-| Bugs fixed | 4 critical |
-| Major focus | Admin Auth 500 Error Fixes |
+| Commits this session | 5 |
+| Files changed | 13 |
+| New files created | 2 |
+| Bugs fixed | 3 |
+| Major focus | Admin-Managed AI Prompts |
 
 ---
 
@@ -230,26 +236,26 @@ curl -s -X POST "https://insurai-production.up.railway.app/api/admin/auth/login"
 - [x] No TypeScript errors
 - [x] No lint warnings
 - [x] Changes committed and pushed
+- [x] Branch merged to main
+- [x] Production deployed
+- [x] Migration 006 run in Supabase
+- [x] 16 prompts visible in Admin Dashboard
 - [x] Documentation updated (CLAUDE.md)
-- [x] Known issues documented
-- [x] Next steps prioritized
 - [x] Session handoff updated
-- [ ] **PENDING**: Branch merged to main
-- [ ] **PENDING**: Production deployed with fixes
 
 ---
 
 ## Previous Session Context
 
-The previous session (Jan 18) focused on Combined Document Processing Pipeline for OCR correction. This session was started to debug admin login 500 errors reported by the user.
+Previous session (morning Jan 20) focused on fixing Admin Auth 500 errors:
+- Environment variable priority fixes
+- crypto module imports
+- React hooks ordering
+- Security improvements
 
-Key issues this session solved:
-- Server couldn't connect to Supabase (env var priority bug)
-- crypto module not available in production
-- React hooks violation in AdminDashboard
-- Security improvements (auth check, non-blocking logging)
+This session continued with making the Admin Prompts tab functional.
 
 ---
 
 **Last Updated**: January 20, 2026
-**Next Session Focus**: Verify deployment works, test admin panel features
+**Next Session Focus**: Test prompt editing, verify AI operations use admin prompts

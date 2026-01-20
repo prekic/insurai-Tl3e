@@ -9,7 +9,7 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
 - **Last Updated**: January 20, 2026
 
@@ -133,11 +133,13 @@ insurai/
 |------|---------|
 | `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
 | `src/components/admin/AdminLogin.tsx` | Admin login page |
+| `src/components/admin/tabs/PromptsTab.tsx` | Manage AI prompt templates |
 | `src/lib/admin/context.tsx` | Admin auth context provider (AdminAuthProvider) |
-| `src/lib/admin/api.ts` | Admin API client functions |
-| `server/routes/admin.ts` | Admin API routes (login, users, config) |
+| `src/lib/admin/api.ts` | Admin API client functions (includes `adminFetch` wrapper) |
+| `server/routes/admin.ts` | Admin API routes (login, users, config, prompts) |
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
 | `server/services/admin-db.ts` | Admin database operations |
+| `server/services/prompt-service.ts` | **NEW** Centralized prompt management service |
 
 ### Configuration
 | File | Purpose |
@@ -588,7 +590,8 @@ Located in `supabase/migrations/`:
 - `002_storage_policies.sql` - Storage bucket RLS
 - `003_security_fixes.sql` - Security hardening, handle_new_user trigger
 - `004_chat_conversations.sql` - Chat history storage
-- `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs)
+- `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs, prompt_templates, prompt_versions)
+- `006_seed_prompts.sql` - Seeds 16 AI prompts (extraction, chat, OCR, analysis)
 
 ### Row Level Security (RLS)
 ```sql
@@ -1605,6 +1608,37 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **File**: `src/components/admin/AdminDashboard.tsx`
 
+### 20. Admin Prompts Tab Empty / 401 Errors (Fixed Jan 20, 2026)
+- **Problem**: Admin Dashboard Prompts tab showed "No prompt templates found" even though prompts were in database
+- **Root Causes**:
+  1. Admin components used direct `fetch()` without Authorization headers
+  2. API endpoint mismatch: client called `/prompts/templates` but server had routes at `/prompts`
+  3. Express route ordering: `/prompts/:id` caught `/prompts/templates` before specific route
+- **Solution**:
+  1. Added `adminFetch()` wrapper function in `src/lib/admin/api.ts` that auto-includes auth token
+  2. Changed API client to use `/prompts` endpoints instead of `/prompts/templates`
+  3. Updated all admin tab components to use `adminFetch` instead of raw `fetch`
+- **Files Changed**:
+  - `src/lib/admin/api.ts` - Added `adminFetch()`, fixed endpoint paths
+  - `src/components/admin/AdminDashboard.tsx` - Use adminFetch
+  - `src/components/admin/tabs/*.tsx` - All tabs updated to use adminFetch
+- **New Files**:
+  - `server/services/prompt-service.ts` - Centralized prompt management
+  - `supabase/migrations/006_seed_prompts.sql` - Seeds 16 AI prompts
+
+### 21. Admin-Managed AI Prompts System (Added Jan 20, 2026)
+- **Feature**: All AI prompts now managed through Admin Dashboard → Prompts tab
+- **Database Tables**: `prompt_templates`, `prompt_versions` (created in migration 005)
+- **Seeded Prompts** (16 total):
+  - Extraction: Master, Type Detection, Kasko, Traffic, Home, Health, Life, DASK, Business, Nakliyat
+  - Chat: Policy Chat Assistant
+  - OCR: Lightweight Correction, Document Preprocessing, Document Normalization Full
+  - Analysis: Coverage Gap Analysis, Extraction Quality Scoring
+- **Architecture**:
+  - `server/services/prompt-service.ts` - Fetches prompts from DB with in-memory cache (5-min TTL)
+  - `server/routes/ai.ts` - Uses prompt-service for extraction/chat prompts with hardcoded fallback
+  - Template variables: `{{var}}` and `{{#if var}}...{{/if}}` syntax
+
 ---
 
 ## Turkish Market Considerations
@@ -1861,10 +1895,19 @@ if (import.meta.env.PROD && typeof window !== 'undefined') {
 
 **CSP for PDF.js Worker (`server/index.ts`):**
 ```typescript
-// Required in Helmet CSP config:
-scriptSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com']
-workerSrc: ['self', 'blob:', 'unpkg.com', 'cdn.jsdelivr.net']
-connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ...supabase]
+// Required in Helmet CSP config (exact domains):
+scriptSrc: [
+  "'self'", 'blob:',
+  'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+  'https://*.sentry.io', 'https://*.sentry-cdn.com'  // Error tracking
+]
+workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+connectSrc: [
+  "'self'",
+  'https://*.supabase.co', 'wss://*.supabase.co',  // Supabase
+  'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',  // PDF.js
+  'https://*.sentry.io', 'https://*.ingest.sentry.io'  // Sentry
+]
 ```
 
 **Supabase Auth Redirect URLs:**
@@ -1882,6 +1925,12 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ..
 - Place ALL `useState`, `useCallback`, `useEffect` BEFORE any conditional returns
 - Wrong: `if (loading) return <Spinner />` then `const x = useCallback(...)`
 - Right: `const x = useCallback(...)` then `if (loading) return <Spinner />`
+
+**Admin API Authentication:**
+- All admin tab components MUST use `adminFetch()` from `@/lib/admin/api`, not raw `fetch()`
+- `adminFetch()` automatically adds `Authorization: Bearer <token>` header
+- Prompt endpoints are at `/api/admin/prompts` (not `/api/admin/prompts/templates`)
+- Express route ordering matters: specific routes like `/prompts/templates` must come before `/prompts/:id`
 
 ---
 
@@ -1931,4 +1980,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 4500+ tests, all passing
-**Last Updated**: January 17, 2026
+**Last Updated**: January 20, 2026
