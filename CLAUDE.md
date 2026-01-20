@@ -1790,6 +1790,13 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=xxx
 NODE_ENV=production
 
+# Server-side Supabase (REQUIRED for admin auth)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
+
+# Admin JWT (generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+ADMIN_JWT_SECRET=your-random-secret
+
 # Build-time (embedded in JS bundle)
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
@@ -1824,6 +1831,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 | CORS errors | Railway domain not in allowlist | Fixed: `*.up.railway.app` in CORS config |
 | Env vars with quotes | Railway UI adds quotes | Don't add manual quotes |
 | Build not using env vars | VITE_* need rebuild | Trigger new deploy, not just restart |
+| Admin login 500 error | SUPABASE_URL not set | Add SUPABASE_URL (not VITE_SUPABASE_URL) |
+| crypto not defined | Missing import in ESM | Fixed in server/routes/admin.ts |
 
 ### Other Production Options
 - **Frontend only**: Vercel or Netlify (need separate backend)
@@ -1839,6 +1848,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 - `VITE_*` vars are baked at **build time** - need rebuild, not just restart
 - API keys must NOT have `VITE_` prefix - they stay server-side only
 - Railway env vars shouldn't have manual quotes (Railway adds them automatically)
+- **Server needs `SUPABASE_URL`** (not `VITE_SUPABASE_URL`) for runtime database access
+- Always import `crypto` explicitly in server code (don't rely on global or `require()`)
 
 **API Proxy Auto-Detection (`src/lib/env.ts`):**
 ```typescript
@@ -1865,6 +1876,12 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ..
 - Don't flag Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler as missing
 - These are automatically included in base kasko
 - Check `KASKO_IMPLICIT_COVERAGES` in `src/lib/ai/policy-extractor.ts`
+
+**React Hooks (Rules of Hooks):**
+- All hooks must be called unconditionally, in the same order every render
+- Place ALL `useState`, `useCallback`, `useEffect` BEFORE any conditional returns
+- Wrong: `if (loading) return <Spinner />` then `const x = useCallback(...)`
+- Right: `const x = useCallback(...)` then `if (loading) return <Spinner />`
 
 ---
 
