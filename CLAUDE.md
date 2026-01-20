@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 18, 2026
+- **Last Updated**: January 20, 2026
 
 ---
 
@@ -127,6 +127,17 @@ insurai/
 | `server/middleware/validation.ts` | Zod schemas for request validation |
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `server/lib/sentry.ts` | Sentry error tracking setup |
+
+### Admin Panel (Added Jan 2026)
+| File | Purpose |
+|------|---------|
+| `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
+| `src/components/admin/AdminLogin.tsx` | Admin login page |
+| `src/lib/admin/context.tsx` | Admin auth context provider (AdminAuthProvider) |
+| `src/lib/admin/api.ts` | Admin API client functions |
+| `server/routes/admin.ts` | Admin API routes (login, users, config) |
+| `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
+| `server/services/admin-db.ts` | Admin database operations |
 
 ### Configuration
 | File | Purpose |
@@ -577,6 +588,7 @@ Located in `supabase/migrations/`:
 - `002_storage_policies.sql` - Storage bucket RLS
 - `003_security_fixes.sql` - Security hardening, handle_new_user trigger
 - `004_chat_conversations.sql` - Chat history storage
+- `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs)
 
 ### Row Level Security (RLS)
 ```sql
@@ -1555,6 +1567,44 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/ai/prompts.ts` - AI prompts for OCR and extraction
   - Tests: 55 text-processor + 49 document-normalizer + 23 prompts = 127 new tests
 
+### 16. Admin Auth 500 Error - Environment Variable Priority (Fixed Jan 20, 2026)
+- **Problem**: Admin login returned 500 Internal Server Error on Railway
+- **Root Cause**: Server code read `VITE_SUPABASE_URL` first (line 56 in `admin-auth.ts`), but `VITE_*` vars are only available at build time, not runtime on Railway
+- **Solution**: Changed env var priority to `SUPABASE_URL` first, `VITE_SUPABASE_URL` as fallback
+- **Additional Fix**: Added `getSupabaseWithError()` function for explicit error handling with fail-fast behavior
+- **Files**:
+  - `server/middleware/admin-auth.ts` - Fixed env var priority, added error-aware functions
+  - `server/services/admin-db.ts` - Same fix applied
+  - `server/routes/admin.ts` - Returns 503 `DB_NOT_CONFIGURED` when Supabase unavailable
+
+### 17. crypto.randomUUID() Not Available in Production (Fixed Jan 20, 2026)
+- **Problem**: `ReferenceError: crypto is not defined` on Railway
+- **Root Cause**: `crypto.randomUUID()` was used without importing `crypto` module
+- **Solution**: Added `import crypto from 'crypto'` to `server/routes/admin.ts`
+- **Note**: While Node.js 19+ has global `crypto`, Railway environments may not expose it
+
+### 18. require('crypto') in ESM Module (Fixed Jan 20, 2026)
+- **Problem**: `hashToken()` function used `require('crypto')` which fails in ESM
+- **Root Cause**: Server uses `"module": "NodeNext"` (ESM), but `require()` is CommonJS-only
+- **Solution**: Changed to proper ES import: `import crypto from 'crypto'`
+- **File**: `server/middleware/admin-auth.ts`
+
+### 19. React Hooks Error #310 in AdminDashboard (Fixed Jan 20, 2026)
+- **Problem**: `Minified React error #310` when loading admin dashboard
+- **Root Cause**: `useCallback` and `useEffect` hooks were placed AFTER conditional returns (`if (authLoading)` and `if (!isAuthenticated)`), violating React Rules of Hooks
+- **Solution**: Moved all hooks to top of component, before any conditional returns
+- **Pattern**:
+  ```tsx
+  // WRONG: hooks after early return
+  if (loading) return <Spinner />
+  const data = useCallback(() => {...}, [])  // ERROR!
+
+  // CORRECT: all hooks first, then conditional returns
+  const data = useCallback(() => {...}, [])
+  if (loading) return <Spinner />
+  ```
+- **File**: `src/components/admin/AdminDashboard.tsx`
+
 ---
 
 ## Turkish Market Considerations
@@ -1740,6 +1790,13 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=xxx
 NODE_ENV=production
 
+# Server-side Supabase (REQUIRED for admin auth)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
+
+# Admin JWT (generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+ADMIN_JWT_SECRET=your-random-secret
+
 # Build-time (embedded in JS bundle)
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
@@ -1774,6 +1831,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 | CORS errors | Railway domain not in allowlist | Fixed: `*.up.railway.app` in CORS config |
 | Env vars with quotes | Railway UI adds quotes | Don't add manual quotes |
 | Build not using env vars | VITE_* need rebuild | Trigger new deploy, not just restart |
+| Admin login 500 error | SUPABASE_URL not set | Add SUPABASE_URL (not VITE_SUPABASE_URL) |
+| crypto not defined | Missing import in ESM | Fixed in server/routes/admin.ts |
 
 ### Other Production Options
 - **Frontend only**: Vercel or Netlify (need separate backend)
@@ -1789,6 +1848,8 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 - `VITE_*` vars are baked at **build time** - need rebuild, not just restart
 - API keys must NOT have `VITE_` prefix - they stay server-side only
 - Railway env vars shouldn't have manual quotes (Railway adds them automatically)
+- **Server needs `SUPABASE_URL`** (not `VITE_SUPABASE_URL`) for runtime database access
+- Always import `crypto` explicitly in server code (don't rely on global or `require()`)
 
 **API Proxy Auto-Detection (`src/lib/env.ts`):**
 ```typescript
@@ -1815,6 +1876,12 @@ connectSrc: ['self', 'unpkg.com', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com', ..
 - Don't flag Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler as missing
 - These are automatically included in base kasko
 - Check `KASKO_IMPLICIT_COVERAGES` in `src/lib/ai/policy-extractor.ts`
+
+**React Hooks (Rules of Hooks):**
+- All hooks must be called unconditionally, in the same order every render
+- Place ALL `useState`, `useCallback`, `useEffect` BEFORE any conditional returns
+- Wrong: `if (loading) return <Spinner />` then `const x = useCallback(...)`
+- Right: `const x = useCallback(...)` then `if (loading) return <Spinner />`
 
 ---
 
