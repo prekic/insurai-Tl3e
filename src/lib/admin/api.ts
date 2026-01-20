@@ -318,11 +318,11 @@ export async function getUsageStats(params?: {
 
 export async function getPromptTemplates(category?: string): Promise<ApiResponse<PromptTemplate[]>> {
   const query = category ? `?category=${category}` : ''
-  return request<PromptTemplate[]>(`/prompts/templates${query}`)
+  return request<PromptTemplate[]>(`/prompts${query}`)
 }
 
 export async function getPromptTemplate(id: string): Promise<ApiResponse<PromptTemplate & { versions: PromptVersion[] }>> {
-  return request<PromptTemplate & { versions: PromptVersion[] }>(`/prompts/templates/${id}`)
+  return request<PromptTemplate & { versions: PromptVersion[] }>(`/prompts/${id}`)
 }
 
 export async function createPromptTemplate(template: {
@@ -333,7 +333,7 @@ export async function createPromptTemplate(template: {
   userPromptTemplate: string
   isDefault?: boolean
 }): Promise<ApiResponse<PromptTemplate>> {
-  return request<PromptTemplate>('/prompts/templates', {
+  return request<PromptTemplate>('/prompts', {
     method: 'POST',
     body: JSON.stringify(template),
   })
@@ -343,14 +343,14 @@ export async function updatePromptTemplate(
   id: string,
   updates: Partial<PromptTemplate> & { changeDescription?: string }
 ): Promise<ApiResponse<PromptTemplate>> {
-  return request<PromptTemplate>(`/prompts/templates/${id}`, {
+  return request<PromptTemplate>(`/prompts/${id}`, {
     method: 'PUT',
     body: JSON.stringify(updates),
   })
 }
 
 export async function deletePromptTemplate(id: string): Promise<ApiResponse<void>> {
-  return request<void>(`/prompts/templates/${id}`, { method: 'DELETE' })
+  return request<void>(`/prompts/${id}`, { method: 'DELETE' })
 }
 
 export async function getPromptVersions(templateId: string): Promise<ApiResponse<PromptVersion[]>> {
