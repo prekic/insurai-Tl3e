@@ -3,6 +3,7 @@
  * Application configuration and feature flags management
  */
 
+import { adminFetch } from '@/lib/admin/api'
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -51,8 +52,8 @@ export function ConfigTab() {
     setIsLoading(true)
     try {
       const [configsRes, flagsRes] = await Promise.all([
-        fetch('/api/admin/config'),
-        fetch('/api/admin/feature-flags'),
+        adminFetch('/api/admin/config'),
+        adminFetch('/api/admin/feature-flags'),
       ])
 
       const configsData = await configsRes.json()
@@ -69,7 +70,7 @@ export function ConfigTab() {
 
   const saveConfig = async (id: string, value: unknown) => {
     try {
-      const response = await fetch(`/api/admin/config/${id}`, {
+      const response = await adminFetch(`/api/admin/config/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
@@ -94,7 +95,7 @@ export function ConfigTab() {
 
   const toggleFeatureFlag = async (id: string, enabled: boolean) => {
     try {
-      const response = await fetch(`/api/admin/feature-flags/${id}`, {
+      const response = await adminFetch(`/api/admin/feature-flags/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !enabled }),

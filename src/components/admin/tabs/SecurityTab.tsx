@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
+import { adminFetch } from '@/lib/admin/api'
 import {
   Shield,
   AlertTriangle,
@@ -64,8 +65,8 @@ export function SecurityTab() {
     setIsLoading(true)
     try {
       const [rateLimitRes, logsRes] = await Promise.all([
-        fetch('/api/admin/security/rate-limits'),
-        fetch('/api/admin/security/logs?limit=20'),
+        adminFetch('/api/admin/security/rate-limits'),
+        adminFetch('/api/admin/security/logs?limit=20'),
       ])
 
       const rateLimitData = await rateLimitRes.json()
@@ -89,9 +90,8 @@ export function SecurityTab() {
     if (!newBlockIP || !newBlockReason) return
 
     try {
-      const response = await fetch('/api/admin/security/block-ip', {
+      const response = await adminFetch('/api/admin/security/block-ip', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip: newBlockIP, reason: newBlockReason }),
       })
 
@@ -116,7 +116,7 @@ export function SecurityTab() {
 
   const unblockIP = async (ip: string) => {
     try {
-      const response = await fetch(`/api/admin/security/block-ip/${ip}`, {
+      const response = await adminFetch(`/api/admin/security/block-ip/${ip}`, {
         method: 'DELETE',
       })
 
@@ -130,7 +130,7 @@ export function SecurityTab() {
 
   const resolveLog = async (id: string) => {
     try {
-      const response = await fetch(`/api/admin/security/logs/${id}/resolve`, {
+      const response = await adminFetch(`/api/admin/security/logs/${id}/resolve`, {
         method: 'POST',
       })
 

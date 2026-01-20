@@ -3,6 +3,7 @@
  * Monitor policy operations and processing
  */
 
+import { adminFetch } from '@/lib/admin/api'
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -62,8 +63,8 @@ export function PoliciesTab() {
     setIsLoading(true)
     try {
       const [opsResponse, statsResponse] = await Promise.all([
-        fetch('/api/admin/policies/operations?limit=50'),
-        fetch('/api/admin/policies/stats'),
+        adminFetch('/api/admin/policies/operations?limit=50'),
+        adminFetch('/api/admin/policies/stats'),
       ])
 
       const opsData = await opsResponse.json()

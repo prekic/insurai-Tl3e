@@ -3,6 +3,7 @@
  * Monitor all AI requests, prompts, responses, and costs
  */
 
+import { adminFetch } from '@/lib/admin/api'
 import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -45,7 +46,7 @@ export function AIOperationsTab() {
       if (statusFilter) params.append('status', statusFilter)
       params.append('limit', '100')
 
-      const response = await fetch(`/api/admin/ai/requests?${params}`)
+      const response = await adminFetch(`/api/admin/ai/requests?${params}`)
       const data = await response.json()
 
       if (data.success) {
