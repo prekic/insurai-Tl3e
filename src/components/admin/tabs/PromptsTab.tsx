@@ -260,7 +260,7 @@ export function PromptsTab() {
                       <textarea
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
                         rows={4}
-                        value={editForm.systemPrompt || template.systemPrompt}
+                        value={editForm.systemPrompt ?? template.systemPrompt}
                         onChange={(e) => setEditForm({ ...editForm, systemPrompt: e.target.value })}
                       />
                     </div>
@@ -271,7 +271,7 @@ export function PromptsTab() {
                       <textarea
                         className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
                         rows={4}
-                        value={editForm.userPromptTemplate || template.userPromptTemplate}
+                        value={editForm.userPromptTemplate ?? template.userPromptTemplate}
                         onChange={(e) => setEditForm({ ...editForm, userPromptTemplate: e.target.value })}
                       />
                     </div>
