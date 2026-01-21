@@ -22,6 +22,42 @@ export { normalizeDocument, extractSection, getTextWithLineNumbers, findLineNumb
 export { detectContradictions, quickScan } from './contradiction-detector'
 export { calculateQAScore, meetsMinimumQuality, getQualitySummary } from './qa-scoring'
 export { generateDataRequests, formatDataRequestsChecklist, isDataMissing } from './data-requests'
+export { normalizeTurkishOcr, normalizeTurkishOcrWithStats, needsNormalization } from './turkish-ocr-normalizer'
+
+// Re-export logging utilities
+export {
+  createLogCollector,
+  log,
+  logStageStart,
+  logStageComplete,
+  logStageError,
+  logWarning,
+  logDebug,
+  logNormalization,
+  logExtraction,
+  logQAScoring,
+  logDataRequests,
+  logAnalysis,
+  getLogSummary,
+  formatLogsAsJSON,
+  formatLogsAsText,
+  type PipelineLogCollector,
+  type LogEntry,
+  type PipelineStage,
+  type LogLevel,
+  type StageMetrics,
+} from './pipeline-logger'
+
+// Re-export version constants
+export {
+  PIPELINE_VERSION,
+  OCR_NORMALIZER_VERSION,
+  SECTION_NORMALIZER_VERSION,
+  EXTRACTION_SCHEMA_VERSION,
+  QA_SCORING_VERSION,
+  getPipelineVersionKey,
+  VERSION_HISTORY,
+} from './version'
 
 // Import for orchestrator
 import type {
@@ -163,6 +199,14 @@ CRITICAL REQUIREMENTS:
 3. For "Rayiç Değer" (market value), set isMarketValue=true and amount=null
 4. Include exact quotes from the document as evidence
 5. Note any ambiguities or uncertainties in the errors array
+6. ARRAYS MUST BE EMPTY [] when no items found - NEVER use null for arrays
+
+ARRAY HANDLING (IMPORTANT):
+- vehicles: [] when no vehicles found (but usually there is at least one)
+- coverages: [] when no coverages found
+- exclusions: [] when no exclusions listed
+- specialConditions: [] when no special conditions
+- clauses: [] when no clause references
 
 OUTPUT FORMAT:
 Return a JSON object with these top-level keys:
@@ -172,11 +216,28 @@ Return a JSON object with these top-level keys:
 - warnings: Array of extraction warnings
 
 EVIDENCE MAP FORMAT:
+Field paths use dot notation for nested objects and bracket notation for arrays:
+- "policyNumber" -> top-level field
+- "insured.name" -> nested object field
+- "vehicles[0].plate" -> first item in array
+- "coverages[2].limit" -> third coverage's limit
+
+Example evidence_map:
 {
-  "fieldPath": {
-    "quote": "exact text from document",
-    "location": "Section: X, Line: Y",
-    "confidence": 0.0-1.0
+  "policyNumber": {
+    "quote": "Poliçe No: 1234567890",
+    "location": "Section: POLICY_SUMMARY, Line: 5",
+    "confidence": 0.95
+  },
+  "vehicles[0].plate": {
+    "quote": "Plaka: 34 ABC 123",
+    "location": "Section: VEHICLE_INFO, Line: 12",
+    "confidence": 0.98
+  },
+  "vehicles[0].vehicleValue.isMarketValue": {
+    "quote": "Araç Değeri: Rayiç Değer",
+    "location": "Section: COVERAGES, Line: 28",
+    "confidence": 0.90
   }
 }
 
