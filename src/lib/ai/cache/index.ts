@@ -87,18 +87,37 @@ class AICacheManager {
 
   /**
    * Get cached extraction result
+   *
+   * @param documentText - The document text being extracted
+   * @param provider - The AI provider (openai, anthropic)
+   * @param options - Additional options for cache key generation
+   * @param options.promptVersion - Version of the prompt template (e.g., 'kasko-extract-v3.0')
+   * @param options.pipelineVersion - Version of the processing pipeline (e.g., '1.0.0')
    */
   async getExtraction(
     documentText: string,
-    provider: string
+    provider: string,
+    options?: {
+      promptVersion?: string
+      pipelineVersion?: string
+    }
   ): Promise<ExtractedPolicyData | null> {
     if (!this.isEnabled() || !this.extractionCache) return null
 
     try {
-      const key = await generateCacheKey('extraction', provider, documentText)
+      // Include versions in cache key for proper invalidation
+      const versionSuffix = [
+        options?.promptVersion || 'v1',
+        options?.pipelineVersion || 'p1',
+      ].join('_')
+
+      const key = await generateCacheKey('extraction', provider, versionSuffix, documentText)
       const entry = await this.extractionCache.get(key)
 
       if (entry) {
+        if (this.debug) {
+          console.log(`[AICache] Hit for extraction (${provider}, ${versionSuffix})`)
+        }
         return entry.data
       }
 
@@ -111,21 +130,44 @@ class AICacheManager {
 
   /**
    * Cache an extraction result
+   *
+   * @param documentText - The document text being extracted
+   * @param provider - The AI provider (openai, anthropic)
+   * @param data - The extracted policy data
+   * @param options - Additional options for cache key generation
+   * @param options.promptVersion - Version of the prompt template
+   * @param options.pipelineVersion - Version of the processing pipeline
    */
   async setExtraction(
     documentText: string,
     provider: string,
-    data: ExtractedPolicyData
+    data: ExtractedPolicyData,
+    options?: {
+      promptVersion?: string
+      pipelineVersion?: string
+    }
   ): Promise<void> {
     if (!this.isEnabled() || !this.extractionCache) return
 
     try {
-      const key = await generateCacheKey('extraction', provider, documentText)
+      // Include versions in cache key for proper invalidation
+      const versionSuffix = [
+        options?.promptVersion || 'v1',
+        options?.pipelineVersion || 'p1',
+      ].join('_')
+
+      const key = await generateCacheKey('extraction', provider, versionSuffix, documentText)
       await this.extractionCache.set(key, data, {
         provider,
+        promptVersion: options?.promptVersion,
+        pipelineVersion: options?.pipelineVersion,
         documentLength: documentText.length,
         confidence: data.confidence.overall,
       })
+
+      if (this.debug) {
+        console.log(`[AICache] Stored extraction (${provider}, ${versionSuffix})`)
+      }
     } catch {
       // Cache write failures are non-critical
     }
@@ -174,19 +216,35 @@ class AICacheManager {
 
   /**
    * Get cached consensus result
+   *
+   * @param documentText - The document text being extracted
+   * @param providers - The AI providers used for consensus
+   * @param options - Additional options for cache key generation
    */
   async getConsensus(
     documentText: string,
-    providers: string[]
+    providers: string[],
+    options?: {
+      promptVersion?: string
+      pipelineVersion?: string
+    }
   ): Promise<ExtractedPolicyData | null> {
     if (!this.isEnabled() || !this.consensusCache) return null
 
     try {
       const providerKey = providers.sort().join(',')
-      const key = await generateCacheKey('consensus', providerKey, documentText)
+      const versionSuffix = [
+        options?.promptVersion || 'v1',
+        options?.pipelineVersion || 'p1',
+      ].join('_')
+
+      const key = await generateCacheKey('consensus', providerKey, versionSuffix, documentText)
       const entry = await this.consensusCache.get(key)
 
       if (entry) {
+        if (this.debug) {
+          console.log(`[AICache] Hit for consensus (${providerKey}, ${versionSuffix})`)
+        }
         return entry.data
       }
 
@@ -199,21 +257,41 @@ class AICacheManager {
 
   /**
    * Cache a consensus result
+   *
+   * @param documentText - The document text being extracted
+   * @param providers - The AI providers used for consensus
+   * @param data - The extracted policy data
+   * @param options - Additional options for cache key generation
    */
   async setConsensus(
     documentText: string,
     providers: string[],
-    data: ExtractedPolicyData
+    data: ExtractedPolicyData,
+    options?: {
+      promptVersion?: string
+      pipelineVersion?: string
+    }
   ): Promise<void> {
     if (!this.isEnabled() || !this.consensusCache) return
 
     try {
       const providerKey = providers.sort().join(',')
-      const key = await generateCacheKey('consensus', providerKey, documentText)
+      const versionSuffix = [
+        options?.promptVersion || 'v1',
+        options?.pipelineVersion || 'p1',
+      ].join('_')
+
+      const key = await generateCacheKey('consensus', providerKey, versionSuffix, documentText)
       await this.consensusCache.set(key, data, {
         providers,
+        promptVersion: options?.promptVersion,
+        pipelineVersion: options?.pipelineVersion,
         confidence: data.confidence.overall,
       })
+
+      if (this.debug) {
+        console.log(`[AICache] Stored consensus (${providerKey}, ${versionSuffix})`)
+      }
     } catch {
       // Cache write failures are non-critical
     }
