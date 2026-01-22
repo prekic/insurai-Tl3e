@@ -182,7 +182,10 @@ describe('OCR Cleanup Pipeline', () => {
         const input = 'S İ G O R T A\nB^^^B\na!!!!a\nNormal text'
         const result = await runOCRCleanupPipeline(input)
 
-        expect(result.stats.sanitizerStats.spacedFragmentsMerged).toBeGreaterThan(0)
+        // Pre-clean step handles Turkish word de-spacing now
+        expect(result.stats.preCleanStats?.turkishWordsDespaced).toBeGreaterThan(0)
+        // Barcode lines are removed by pre-clean
+        expect(result.stats.preCleanStats?.noiseLinesRemoved).toBeGreaterThan(0)
       })
 
       it('should track processing time', async () => {

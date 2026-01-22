@@ -47,6 +47,13 @@ import {
 
 import { createLogger, type LogCollector, type PipelineLog } from './pipeline-logger'
 
+import {
+  preCleanOcrText,
+  checkPreCleanQuality,
+  type PreCleanResult,
+  type PreCleanStats,
+} from './deterministic-preclean'
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -60,6 +67,7 @@ export interface PipelineOptions {
 
   // Processing options
   documentId?: string
+  skipPreClean?: boolean // Skip deterministic pre-clean (not recommended)
   skipChunking?: boolean // Process as single chunk
   skipQA?: boolean // Skip QA gates (not recommended)
   skipLLMRetry?: boolean // Skip LLM-based retries
@@ -76,6 +84,10 @@ export interface PipelineResult {
   // Output
   text: string // Final cleaned text
   success: boolean // Overall success
+
+  // Pre-clean info
+  preCleanResult: PreCleanResult | null
+  preCleanQuality: { passed: boolean; issues: string[]; warnings: string[] } | null
 
   // Chunking info
   chunking: ChunkingResult | null
@@ -107,6 +119,7 @@ export interface PipelineStats {
   chunksRetried: number
   chunksFailed: number
   totalProcessingTimeMs: number
+  preCleanStats: PreCleanStats | null
   sanitizerStats: SanitizerStats
 }
 
@@ -118,6 +131,7 @@ const DEFAULT_OPTIONS: Required<Omit<PipelineOptions, 'llmCleanup' | 'logger'>> 
   chunking: {},
   qa: { maxRetries: 2 },
   documentId: 'doc',
+  skipPreClean: false,
   skipChunking: false,
   skipQA: false,
   skipLLMRetry: false,
@@ -147,6 +161,8 @@ export async function runOCRCleanupPipeline(
   const result: PipelineResult = {
     text: '',
     success: false,
+    preCleanResult: null,
+    preCleanQuality: null,
     chunking: null,
     chunks: [],
     qaReport: null,
@@ -164,6 +180,7 @@ export async function runOCRCleanupPipeline(
       chunksRetried: 0,
       chunksFailed: 0,
       totalProcessingTimeMs: 0,
+      preCleanStats: null,
       sanitizerStats: {
         linesRemoved: 0,
         garbageLinesRemoved: 0,
@@ -191,6 +208,51 @@ export async function runOCRCleanupPipeline(
 
   try {
     // =========================================================================
+    // STEP 0: DETERMINISTIC PRE-CLEAN (NEW)
+    // =========================================================================
+    let processedText = text
+
+    if (!opts.skipPreClean) {
+      logger.logStageStart('preclean', { textLength: text.length })
+      const preCleanStartTime = Date.now()
+
+      // Run deterministic pre-clean
+      const preCleanResult = preCleanOcrText(text, { debug: opts.debug })
+      result.preCleanResult = preCleanResult
+      result.stats.preCleanStats = preCleanResult.stats
+
+      // Check quality of pre-cleaned text
+      const qualityCheck = checkPreCleanQuality(preCleanResult.text)
+      result.preCleanQuality = qualityCheck
+
+      // Use pre-cleaned text for rest of pipeline
+      processedText = preCleanResult.text
+
+      // Log warnings
+      for (const issue of qualityCheck.issues) {
+        logger.logWarning('preclean', `Quality issue: ${issue}`)
+      }
+      for (const warning of qualityCheck.warnings) {
+        logger.logWarning('preclean', warning)
+      }
+
+      logger.logStageComplete('preclean', Date.now() - preCleanStartTime, {
+        originalLength: preCleanResult.stats.originalLength,
+        finalLength: preCleanResult.stats.finalLength,
+        noiseLinesRemoved: preCleanResult.stats.noiseLinesRemoved,
+        turkishWordsDespaced: preCleanResult.stats.turkishWordsDespaced,
+        barcodeArtifactsRemoved: preCleanResult.stats.barcodeArtifactsRemoved,
+        qualityPassed: qualityCheck.passed,
+      })
+
+      if (opts.debug && preCleanResult.stats.turkishWordsDespaced > 0) {
+        console.log(`[PreClean] Fixed ${preCleanResult.stats.turkishWordsDespaced} Turkish word spacing issues`)
+      }
+    } else {
+      logger.logStageComplete('preclean', 0, { skipped: true })
+    }
+
+    // =========================================================================
     // STEP 1: CHUNKING
     // =========================================================================
     logger.logStageStart('chunking', { skipChunking: opts.skipChunking })
@@ -198,16 +260,16 @@ export async function runOCRCleanupPipeline(
     let chunks: DocumentChunk[]
     let chunkingResult: ChunkingResult | null = null
 
-    if (opts.skipChunking || text.length <= 12000) {
+    if (opts.skipChunking || processedText.length <= 12000) {
       // Single chunk mode
       chunks = [
         {
           id: `${opts.documentId}_chunk_000`,
           index: 0,
-          text: text,
+          text: processedText,
           pageNumbers: [],
           startOffset: 0,
-          endOffset: text.length,
+          endOffset: processedText.length,
           hasOverlap: false,
           overlapChars: 0,
         },
@@ -218,12 +280,12 @@ export async function runOCRCleanupPipeline(
       })
     } else {
       // Multi-chunk mode
-      chunkingResult = chunkDocument(text, opts.documentId, opts.chunking)
+      chunkingResult = chunkDocument(processedText, opts.documentId, opts.chunking)
       chunks = chunkingResult.chunks
       result.chunking = chunkingResult
 
       // Validate chunk coverage
-      const coverage = validateChunkCoverage(text, chunks)
+      const coverage = validateChunkCoverage(processedText, chunks)
       if (!coverage.valid) {
         logger.logWarning('chunking', `Coverage issues: ${coverage.issues.join('; ')}`)
       }
@@ -434,6 +496,12 @@ export async function fullCleanup(
 
 // Re-export types and functions from sub-modules for convenience
 export {
+  // From deterministic-preclean
+  preCleanOcrText,
+  checkPreCleanQuality,
+  type PreCleanResult,
+  type PreCleanStats,
+
   // From ocr-sanitizer
   sanitizeOCRText,
   sanitizeOCRTextFull,
