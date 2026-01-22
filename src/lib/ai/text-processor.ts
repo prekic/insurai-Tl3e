@@ -21,6 +21,13 @@ import {
   validateOCRCorrection,
 } from './prompts'
 import { preCleanOcrText, type PreCleanStats } from '@/lib/pipeline/deterministic-preclean'
+import {
+  cleanTurkishOCRWithAI,
+  cleanTurkishOCROffline,
+  type AICleanupResult,
+  type AIProviderConfig,
+  type AICleanerOptions,
+} from '@/lib/pipeline/ai-ocr-cleaner'
 
 export interface ProcessedTextResult {
   success: boolean
@@ -2144,3 +2151,192 @@ export async function processDocumentQuick(
     processingTimeMs: Date.now() - startTime,
   }
 }
+
+// =============================================================================
+// AI-POWERED TURKISH OCR CLEANUP
+// =============================================================================
+
+export interface AITurkishCleanupOptions {
+  /** AI provider to use for Turkish text correction */
+  provider?: 'openai' | 'anthropic' | 'gemini'
+  /** API proxy URL (e.g., http://localhost:4001/api/ai) */
+  proxyUrl?: string
+  /** API key for direct provider calls (server-side only) */
+  apiKey?: string
+  /** Fallback to offline mode if AI unavailable */
+  useOfflineFallback?: boolean
+  /** Timeout in milliseconds */
+  timeout?: number
+  /** Skip deterministic pre-clean (garbage removal) */
+  skipPreClean?: boolean
+}
+
+export interface AITurkishCleanupResult {
+  /** Cleaned text with Turkish spacing fixed */
+  text: string
+  /** Original text before processing */
+  originalText: string
+  /** Pre-clean stats (garbage removal) */
+  preCleanStats?: PreCleanStats
+  /** AI cleanup stats */
+  aiCleanupStats: {
+    provider: string
+    processingTimeMs: number
+    fallbackUsed: boolean
+    validationPassed: boolean
+  }
+  /** Overall processing time */
+  totalProcessingTimeMs: number
+  /** Combined cleanup corrections */
+  corrections: TextCorrection[]
+}
+
+/**
+ * Clean Turkish OCR text using AI-powered correction.
+ *
+ * This is the recommended function for fixing Turkish OCR spacing issues.
+ * It combines:
+ * 1. Deterministic pre-clean (removes B^^^B, a!!!!, control chars)
+ * 2. AI-powered Turkish text correction (fixes S İ G O R T A → SİGORTA)
+ *
+ * Why AI over hardcoded word lists:
+ * - No maintenance needed for new words
+ * - Understands context (SİGORTA ŞİRKETİ vs SİGORTAŞİRKETİ)
+ * - Handles names, places, new terms automatically
+ * - Cost: ~$0.001 per document with GPT-4o-mini/Claude Haiku
+ *
+ * @param text - Raw OCR text with Turkish spacing issues
+ * @param options - Configuration options
+ * @returns Cleaned text with AI-corrected Turkish spacing
+ *
+ * @example
+ * ```typescript
+ * // Via proxy (browser use)
+ * const result = await cleanTurkishTextWithAI(rawText, {
+ *   provider: 'openai',
+ *   proxyUrl: 'http://localhost:4001/api/ai',
+ * })
+ *
+ * // Direct API (server use)
+ * const result = await cleanTurkishTextWithAI(rawText, {
+ *   provider: 'openai',
+ *   apiKey: process.env.OPENAI_API_KEY,
+ * })
+ * ```
+ */
+export async function cleanTurkishTextWithAI(
+  text: string,
+  options: AITurkishCleanupOptions = {}
+): Promise<AITurkishCleanupResult> {
+  const startTime = Date.now()
+  const {
+    provider = 'openai',
+    proxyUrl = env.proxyUrl ? `${env.proxyUrl}/api/ai` : undefined,
+    apiKey,
+    useOfflineFallback = true,
+    timeout = 30000,
+    skipPreClean = false,
+  } = options
+
+  const corrections: TextCorrection[] = []
+  let processedText = text
+  let preCleanStats: PreCleanStats | undefined
+
+  // Step 1: Deterministic pre-clean (garbage removal)
+  if (!skipPreClean) {
+    const preCleanResult = preCleanOcrText(processedText)
+    processedText = preCleanResult.text
+    preCleanStats = preCleanResult.stats
+
+    // Track pre-clean corrections
+    if (preCleanResult.stats.noiseLinesRemoved > 0) {
+      corrections.push({
+        original: `${preCleanResult.stats.noiseLinesRemoved} noise lines`,
+        corrected: 'removed',
+        type: 'garbage_removal',
+      })
+    }
+    if (preCleanResult.stats.barcodeArtifactsRemoved > 0) {
+      corrections.push({
+        original: `${preCleanResult.stats.barcodeArtifactsRemoved} barcode artifacts`,
+        corrected: 'removed',
+        type: 'garbage_removal',
+      })
+    }
+  }
+
+  // Step 2: AI-powered Turkish text correction
+  const aiOptions: AICleanerOptions = {
+    useOfflineFallback,
+    timeout,
+    proxyUrl,
+  }
+
+  // Configure primary provider
+  if (apiKey) {
+    aiOptions.primaryProvider = {
+      name: provider as 'openai' | 'anthropic' | 'gemini',
+      apiKey,
+    }
+  } else if (proxyUrl) {
+    // Use proxy without direct API key
+    aiOptions.primaryProvider = {
+      name: provider as 'openai' | 'anthropic' | 'gemini',
+      apiKey: '', // Proxy handles auth
+    }
+  }
+
+  let aiResult: AICleanupResult
+
+  try {
+    aiResult = await cleanTurkishOCRWithAI(processedText, aiOptions)
+    processedText = aiResult.text
+
+    // Track AI corrections
+    if (aiResult.aiProvider !== 'offline') {
+      corrections.push({
+        original: 'Turkish spacing issues',
+        corrected: `fixed by ${aiResult.aiProvider} AI`,
+        type: 'formatting',
+      })
+    }
+  } catch (error) {
+    // Fallback to offline mode
+    if (useOfflineFallback) {
+      processedText = cleanTurkishOCROffline(processedText)
+      aiResult = {
+        text: processedText,
+        originalLength: text.length,
+        cleanedLength: processedText.length,
+        aiProvider: 'offline',
+        processingTimeMs: Date.now() - startTime,
+        validation: { valid: true, missing: [], preserved: [] },
+        fallbackUsed: true,
+      }
+      corrections.push({
+        original: 'Turkish spacing issues',
+        corrected: 'fixed by offline fallback',
+        type: 'formatting',
+      })
+    } else {
+      throw error
+    }
+  }
+
+  return {
+    text: processedText,
+    originalText: text,
+    preCleanStats,
+    aiCleanupStats: {
+      provider: aiResult.aiProvider,
+      processingTimeMs: aiResult.processingTimeMs,
+      fallbackUsed: aiResult.fallbackUsed,
+      validationPassed: aiResult.validation.valid,
+    },
+    totalProcessingTimeMs: Date.now() - startTime,
+    corrections,
+  }
+}
+
+// Re-export AI cleaner types for convenience
+export type { AICleanupResult, AIProviderConfig, AICleanerOptions }
