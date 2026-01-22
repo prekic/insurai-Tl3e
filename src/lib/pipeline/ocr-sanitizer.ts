@@ -43,11 +43,12 @@ const TURKISH_UPPER = 'A-ZÇĞİÖŞÜÂÎÛ'
 // Characters that should NOT be merged across (preserve structure)
 const MERGE_BLOCKERS = /[\d\/:.\-@#$%&*()=+\[\]{}|\\<>]/
 
-// Barcode/QR patterns - exact match
+// Barcode/QR patterns - exact match (for inline removal)
 const BARCODE_EXACT_PATTERNS = [
   /B\^+B/gi,                    // B^^^B, B^^B, etc.
   /B\s*\^+\s*B/gi,              // B ^ ^ ^ B with spaces
   /a!{3,}a/gi,                  // a!!!a, a!!!!a, etc.
+  /a!{3,}a[!aA]*/gi,            // a!!!a followed by more !aA (like a!!!!!a!AAA)
   /\[QR\]/gi,                   // [QR] markers
   /\[BARCODE\]/gi,              // [BARCODE] markers
 ]
@@ -56,10 +57,13 @@ const BARCODE_EXACT_PATTERNS = [
 const BARCODE_LINE_PATTERNS = [
   /B\s*[\^<>]+\s*B/i,           // B^^^B variations
   /a\s*!{3,}\s*a/i,             // a!!!a variations
+  /a!{3,}a.*?(?:!|a|A)+/i,      // a!!!a followed by more noise
   /[<>\[\]{}|\\^]{5,}/,         // 5+ consecutive special chars
   // Base64-like: must have mix of upper+lower+digits, not just one char class
   /(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?:[A-Za-z0-9+/]{4}){10,}/,
   /(?:\d[A-Za-z]){10,}/,        // Alternating digit-letter (binary)
+  // High-ASCII control characters (extended range)
+  /[\x80-\xff]{5,}/,            // 5+ high-ASCII chars in sequence
 ]
 
 // ============================================================================
@@ -91,6 +95,8 @@ function isGarbageLine(line: string): { isGarbage: boolean; reason?: string } {
 
   // Check exact barcode patterns
   for (const pattern of BARCODE_EXACT_PATTERNS) {
+    // Reset lastIndex for global patterns
+    pattern.lastIndex = 0
     if (pattern.test(trimmed)) {
       return { isGarbage: true, reason: 'barcode_pattern' }
     }
@@ -98,9 +104,17 @@ function isGarbageLine(line: string): { isGarbage: boolean; reason?: string } {
 
   // Check line-level barcode patterns
   for (const pattern of BARCODE_LINE_PATTERNS) {
+    // Reset lastIndex for global patterns
+    if (pattern.global) pattern.lastIndex = 0
     if (pattern.test(trimmed)) {
       return { isGarbage: true, reason: 'barcode_line_pattern' }
     }
+  }
+
+  // Check for high-ASCII/control character remnants
+  const highAsciiCount = (trimmed.match(/[\x80-\xff]/g) || []).length
+  if (highAsciiCount > 10 || (trimmed.length > 0 && highAsciiCount / trimmed.length > 0.3)) {
+    return { isGarbage: true, reason: 'high_ascii_content' }
   }
 
   // Check letter ratio for long lines (potential QR payload)
@@ -170,6 +184,10 @@ function mergeSpacedTurkishFragments(text: string): { text: string; mergeCount: 
 
 /**
  * Merge Turkish fragments within a single line
+ *
+ * Handles both:
+ * - Classic: single chars like "S Ö Z L E Ş M E"
+ * - Mixed: variable length like "GEN İŞ LETİLM İŞ" (at least 2 short tokens)
  */
 function mergeFragmentsInLine(line: string): { text: string; mergeCount: number } {
   // Tokenize by spaces, preserving space positions
@@ -198,8 +216,8 @@ function mergeFragmentsInLine(line: string): { text: string; mergeCount: number 
         continue
       }
 
-      // Check if this token is a Turkish upper fragment
-      if (isTurkishUpperFragment(token) && !shouldBlockMerge(token)) {
+      // Check if this token is a Turkish upper fragment (allow up to 10 chars for mixed patterns)
+      if (isTurkishUpperFragment(token, 10) && !shouldBlockMerge(token)) {
         sequence.push({ index: j, token })
         j++
       } else {
@@ -207,15 +225,17 @@ function mergeFragmentsInLine(line: string): { text: string; mergeCount: number 
       }
     }
 
-    // Need at least 3 fragments to merge
-    if (sequence.length >= 3) {
+    // Need at least 2 fragments to merge (reduced from 3 for mixed patterns)
+    if (sequence.length >= 2) {
       // Check if this is a valid merge sequence:
-      // - Classic: all tokens are 1-3 chars
-      // - Mixed: at least 2 tokens are <=3 chars
+      // - Classic: all tokens are 1-3 chars (need 3+ tokens)
+      // - Mixed: at least 2 tokens are <=3 chars AND all tokens are Turkish upper
       const shortTokenCount = sequence.filter(s => s.token.length <= 3).length
+      const turkishUpperPattern = new RegExp(`^[${TURKISH_UPPER}]+$`)
+      const allTurkishUpper = sequence.every(s => turkishUpperPattern.test(s.token))
 
-      const isClassicPattern = sequence.every(s => s.token.length <= 3)
-      const isMixedPattern = shortTokenCount >= 2
+      const isClassicPattern = sequence.length >= 3 && sequence.every(s => s.token.length <= 3)
+      const isMixedPattern = shortTokenCount >= 2 && allTurkishUpper
 
       if (isClassicPattern || isMixedPattern) {
         // Merge the sequence
@@ -300,10 +320,29 @@ export function sanitizeOCRText(text: string): SanitizerResult {
   stats.controlCharsRemoved = beforeControl - result.length
 
   // =========================================================================
-  // Step 4: Force barcode tokens onto their own lines
-  // This helps the line-based removal work even with long lines
+  // Step 4: Remove embedded barcode patterns (mid-line cleanup)
+  // This handles cases where garbage is embedded with valid text
   // =========================================================================
+
+  // First, remove inline barcode patterns completely
+  const inlineBarcodePatterns = [
+    /B\^{2,}B/gi,                     // B^^^B exact
+    /a!{3,}a(?:[!aA]+)?/gi,           // a!!!a and variants like a!!!!!a!AAA
+    /[\x80-\xff]{5,}/g,               // High-ASCII sequences
+  ]
+
+  for (const pattern of inlineBarcodePatterns) {
+    pattern.lastIndex = 0
+    const matches = result.match(pattern)
+    if (matches) {
+      stats.barcodeTokensIsolated += matches.length
+      result = result.replace(pattern, ' ')
+    }
+  }
+
+  // Then, force remaining barcode tokens onto their own lines for line-based removal
   for (const pattern of BARCODE_EXACT_PATTERNS) {
+    pattern.lastIndex = 0
     const matches = result.match(pattern)
     if (matches) {
       stats.barcodeTokensIsolated += matches.length
@@ -387,17 +426,42 @@ export function hasRemainingArtifacts(text: string): {
     artifacts.push('a!!!a barcode pattern')
   }
 
+  // Extended pattern for a!!!a variants (a!!!!!a!AAA etc.)
+  if (/a!{3,}a[!aA]+/i.test(text)) {
+    artifacts.push('a!!!a extended barcode pattern')
+  }
+
   if (/[<>\[\]{}|\\^]{5,}/.test(text)) {
     artifacts.push('Special character cluster')
   }
 
-  // Check for spaced Turkish uppercase patterns
-  // Pattern: 3+ Turkish uppercase tokens (1-3 chars each) separated by spaces
-  const spacedPattern = new RegExp(
+  // Check for high-ASCII/control character remnants
+  if (/[\x80-\xff]{5,}/.test(text)) {
+    artifacts.push('High-ASCII character sequence')
+  }
+
+  // Check for spaced Turkish uppercase patterns (classic: 1-3 char tokens)
+  const spacedPatternClassic = new RegExp(
     `\\b(?:[${TURKISH_UPPER}]{1,3}\\s+){2,}[${TURKISH_UPPER}]{1,3}\\b`
   )
-  if (spacedPattern.test(text)) {
-    artifacts.push('Spaced Turkish uppercase pattern')
+  if (spacedPatternClassic.test(text)) {
+    artifacts.push('Spaced Turkish uppercase pattern (classic)')
+  }
+
+  // Check for mixed-length spaced patterns (1-10 char tokens with at least 2 short)
+  // Pattern like "GEN İŞ LETİLM İŞ"
+  const spacedPatternMixed = new RegExp(
+    `\\b(?:[${TURKISH_UPPER}]{1,10}\\s+){2,}[${TURKISH_UPPER}]{1,10}\\b`
+  )
+  const mixedMatches = text.match(spacedPatternMixed) || []
+  for (const match of mixedMatches) {
+    const tokens = match.split(/\s+/).filter(Boolean)
+    const shortCount = tokens.filter(t => t.length <= 3).length
+    const allTurkishUpper = tokens.every(t => new RegExp(`^[${TURKISH_UPPER}]+$`).test(t))
+    if (shortCount >= 2 && allTurkishUpper) {
+      artifacts.push(`Spaced Turkish uppercase pattern (mixed): "${match}"`)
+      break // Only report once
+    }
   }
 
   return {
