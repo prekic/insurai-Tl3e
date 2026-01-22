@@ -1,4 +1,4 @@
-# Session Handoff - January 20, 2026 (Afternoon)
+# Session Handoff - January 22, 2026
 
 ## Current Status
 
@@ -6,69 +6,80 @@
 |--------|--------|
 | **Build** | ✅ Passing |
 | **TypeCheck** | ✅ 0 errors |
-| **Lint** | ✅ 0 warnings |
-| **Tests** | ~4600+ passing |
-| **Branch** | `claude/review-project-status-0IbJI` (merged to main) |
+| **Lint** | ⚠️ 1 warning (non-null assertion, intentional) |
+| **Tests** | ✅ 4600+ passing (251 pipeline tests) |
+| **Branch** | `claude/review-project-status-y39np` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Admin Prompts** | ✅ 16 prompts seeded and working |
+| **OCR Pipeline** | ✅ Unicode-safe Turkish matching implemented |
 
 ---
 
 ## Session Summary
 
-This session focused on **Admin-Managed AI Prompts** - migrating all AI prompts to be database-backed and manageable through the Admin Dashboard → Prompts tab.
+This session focused on **OCR Cleanup Pipeline Unicode Improvements** - fixing Turkish character matching and improving garbage detection in the OCR sanitization pipeline.
 
 Key accomplishments:
-1. Created prompt-service.ts for centralized prompt management
-2. Seeded 16 AI prompts to database via migration 006
-3. Fixed 401 authentication errors in admin dashboard tabs
-4. Fixed API endpoint routing issues for prompts
+1. Added Unicode-safe Turkish uppercase character detection using codepoints + `\p{Lu}`
+2. Implemented control character stripping (C0/C1 controls)
+3. Added new QA gate `no_control_chars` for remnant detection
+4. Enhanced LLM cleanup prompt to v5 with detailed instructions
+5. Fixed admin save button functionality with proper error handling
 
 ---
 
 ## Features Completed This Session
 
-### Admin-Managed Prompts System
+### OCR Pipeline Unicode Improvements
 
 | Component | Description |
 |-----------|-------------|
-| `server/services/prompt-service.ts` | **NEW** Centralized service for fetching prompts from DB with 5-min cache |
-| `supabase/migrations/006_seed_prompts.sql` | **NEW** Seeds 16 AI prompts to database |
-| `src/lib/admin/api.ts` | Added `adminFetch()` wrapper, fixed endpoint paths |
-| `src/components/admin/tabs/PromptsTab.tsx` | Updated to use admin API client |
+| `src/lib/pipeline/ocr-sanitizer.ts` | Added Unicode-safe `isTurkishUpperChar()`, `isAllTurkishUpper()`, `stripControlChars()` |
+| `src/lib/pipeline/qa-gates.ts` | New `no_control_chars` gate, v5 LLM cleanup prompt |
 
-### Prompts Seeded (16 Total)
+### Key Functions Added
 
-| Category | Prompts |
-|----------|---------|
-| **extraction** (10) | Master, Type Detection, Kasko, Traffic, Home, Health, Life, DASK, Business, Nakliyat |
-| **chat** (1) | Policy Chat Assistant |
-| **ocr** (3) | OCR Correction, Document Preprocessing, Document Normalization Full |
-| **analysis** (2) | Coverage Gap Analysis, Extraction Quality Scoring |
+```typescript
+// Unicode-safe Turkish uppercase detection
+function isTurkishUpperChar(char: string): boolean {
+  const codepoint = char.codePointAt(0)
+  if (TURKISH_UPPER_CODEPOINTS.has(codepoint)) return true
+  return /^\p{Lu}$/u.test(char) // Fallback to Unicode property
+}
 
-### Admin Authentication Fixes
+// NFC normalization before matching
+function isAllTurkishUpper(str: string): boolean {
+  const normalized = str.normalize('NFC')
+  for (const char of normalized) {
+    if (!isTurkishUpperChar(char)) return false
+  }
+  return true
+}
 
-All admin tab components updated to use `adminFetch()` instead of raw `fetch()`:
-- AdminDashboard.tsx
-- OverviewTab.tsx
-- SecurityTab.tsx
-- PoliciesTab.tsx
-- ConfigTab.tsx
-- AuditTab.tsx
-- AIOperationsTab.tsx
-- PromptsTab.tsx
+// Control character stripping
+const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]/g
+function stripControlChars(text: string): string {
+  return text.replace(CONTROL_CHAR_PATTERN, '')
+}
+```
+
+### Admin Save Button Fix
+
+| Component | Description |
+|-----------|-------------|
+| `src/components/admin/tabs/PromptsTab.tsx` | Added error states, loading states, success messages |
+| `src/components/admin/tabs/ConfigTab.tsx` | Same error handling pattern |
 
 ---
 
 ## Commits This Session
 
 ```
-983f722 Update documentation for admin-managed prompts session
-8b943e9 Fix all admin components to use adminFetch with auth headers
-29a09ba Fix admin API endpoints to use /prompts instead of /prompts/templates
-b9216e2 Fix PromptsTab to use admin API client with auth headers
-4cd601c Integrate admin-managed prompts for AI operations
+be67c57 Add Unicode-safe Turkish matching and improved garbage detection in OCR pipeline
+0d6eeff Enhance OCR cleanup pipeline for better garbage removal and fragment merging
+02e7e14 Fix unused variable TypeScript errors in pipeline files
+9cd4b80 Fix admin save button functionality with error handling and user feedback
+292a45e Add robust OCR cleanup pipeline with deterministic sanitization
 ```
 
 ---
@@ -77,26 +88,24 @@ b9216e2 Fix PromptsTab to use admin API client with auth headers
 
 | File | Changes |
 |------|---------|
-| `server/services/prompt-service.ts` | **NEW** - Centralized prompt management with DB + cache |
-| `supabase/migrations/006_seed_prompts.sql` | **NEW** - Seeds 16 prompts |
-| `server/routes/ai.ts` | Uses prompt-service for extraction/chat with fallback |
-| `server/routes/admin.ts` | Database-backed CRUD for prompts |
-| `src/lib/admin/api.ts` | Added `adminFetch()`, fixed `/prompts` endpoints |
-| `src/components/admin/tabs/*.tsx` | All tabs use adminFetch |
+| `src/lib/pipeline/ocr-sanitizer.ts` | Unicode-safe char detection, control char stripping, NFC normalization |
+| `src/lib/pipeline/qa-gates.ts` | New `no_control_chars` gate, v5 LLM prompt, improved detection |
+| `src/components/admin/tabs/PromptsTab.tsx` | Error/success feedback for save buttons |
+| `src/components/admin/tabs/ConfigTab.tsx` | Error/success feedback for save buttons |
 
 ---
 
-## Database Migrations Required
+## QA Gates Available
 
-### Migration 005 (Admin Schema) - Already Run
-Creates admin tables including `prompt_templates` and `prompt_versions`
-
-### Migration 006 (Seed Prompts) - Already Run
-Seeds 16 AI prompts. Run in Supabase SQL Editor:
-```sql
--- Located at: supabase/migrations/006_seed_prompts.sql
--- Contains INSERT statements for all 16 prompts
-```
+| Gate ID | Severity | Description |
+|---------|----------|-------------|
+| `no_artifacts` | high | Check for remaining OCR artifacts |
+| `data_preserved` | critical | Verify policy numbers, dates, amounts preserved |
+| `no_barcode_patterns` | high | Detect B^^^B, a!!!a, high-ASCII sequences |
+| `no_control_chars` | high | **NEW** Detect C0/C1 control characters |
+| `no_spaced_fragments` | high | Detect unmerged Turkish uppercase fragments |
+| `min_content_ratio` | medium | Ensure sanitization didn't remove too much |
+| `reasonable_length` | high | Ensure output isn't suspiciously short |
 
 ---
 
@@ -122,12 +131,37 @@ Seeds 16 AI prompts. Run in Supabase SQL Editor:
 
 ---
 
+## CSP Configuration Notes
+
+PDF.js worker requires CDN access. In `server/index.ts` Helmet config:
+
+```typescript
+scriptSrc: [
+  "'self'", 'blob:',
+  'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+  'https://*.sentry.io', 'https://*.sentry-cdn.com'
+]
+workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+```
+
+---
+
+## Supabase Configuration Requirements
+
+### Auth Redirect URLs
+Add to Supabase Dashboard → Authentication → URL Configuration:
+- `https://insurai-production.up.railway.app/**`
+- Required for OAuth and magic link flows
+
+---
+
 ## Known Issues
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
 | Font preload warnings | Low | Open | Console timing warning |
 | PWA icon 144x144 missing | Low | Open | Create icon file |
+| Non-null assertion warning | Low | Intentional | In `isTurkishUpperChar()` codepoint lookup |
 
 ---
 
@@ -135,45 +169,57 @@ Seeds 16 AI prompts. Run in Supabase SQL Editor:
 
 | Bug | Root Cause | Fix |
 |-----|------------|-----|
-| 401 on all admin API calls | Components used `fetch()` without auth | Added `adminFetch()` wrapper |
-| 404 on `/prompts/templates` | Express route `/prompts/:id` caught it | Changed to `/prompts` endpoints |
-| Empty Prompts tab | Combination of above two issues | Both fixes applied |
+| Turkish chars not matching in regex | Encoding issues with `İ`, `Ş` in char classes | Unicode-safe codepoint checking + `\p{Lu}` |
+| Garbage patterns persisting | Control chars embedded in noise | Added `stripControlChars()` function |
+| QA gates missing remnants | No control char detection | Added `no_control_chars` gate |
+| Admin save buttons no feedback | No error/success states | Added proper UI feedback |
 
 ---
 
 ## Architecture Notes
 
-### Prompt Service Flow
+### OCR Cleanup Pipeline Flow
 ```
-Admin Dashboard → adminFetch('/api/admin/prompts')
-    → server/routes/admin.ts (with JWT auth)
-    → server/services/prompt-service.ts
-    → Supabase DB (prompt_templates table)
-    → 5-minute in-memory cache
+runOCRCleanupPipeline(document)
+├── 1. chunkDocument() - Split by page markers or size
+├── 2. sanitizeChunk() for each chunk
+│   ├── normalizeWhitespace()
+│   ├── stripControlChars() - NEW
+│   ├── removeInlineBarcodes() - B^^^B, a!!!a
+│   ├── removeGarbageLines()
+│   ├── mergeSpacedTurkishFragments() - Unicode-safe
+│   └── validatePreservation()
+├── 3. runQAGates() for each chunk
+│   ├── no_artifacts
+│   ├── data_preserved
+│   ├── no_barcode_patterns
+│   ├── no_control_chars - NEW
+│   ├── no_spaced_fragments
+│   ├── min_content_ratio
+│   └── reasonable_length
+├── 4. processChunkWithRetry() if gates fail
+│   └── generateLLMCleanupPrompt(failedGates) - v5
+└── 5. mergeChunks() and validate
 ```
 
-### AI Operations Flow
-```
-PolicyUpload → server/routes/ai.ts
-    → promptService.getExtractionPrompt('kasko')
-    → DB lookup with cache, fallback to hardcoded
-    → OpenAI/Anthropic API
-```
-
-### adminFetch Pattern
+### Unicode-Safe Turkish Matching
 ```typescript
-// src/lib/admin/api.ts
-export async function adminFetch(url: string, options?: RequestInit): Promise<Response> {
-  const token = getAccessToken()
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options?.headers,
-    },
-  })
-}
+// Explicit codepoint set for fast lookup
+const TURKISH_UPPER_CODEPOINTS = new Set([
+  65-90,    // A-Z
+  199,      // Ç
+  286,      // Ğ
+  304,      // İ
+  214,      // Ö
+  350,      // Ş
+  220,      // Ü
+  194,      // Â
+  206,      // Î
+  219,      // Û
+])
+
+// NFC normalization ensures İ (U+0130) matches correctly
+const normalizedText = text.normalize('NFC')
 ```
 
 ---
@@ -181,36 +227,33 @@ export async function adminFetch(url: string, options?: RequestInit): Promise<Re
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. ✅ **Prompts working** - All 16 prompts visible in admin
-2. **Test prompt editing** - Edit a prompt and verify it takes effect
-3. **Test AI extraction** - Upload a policy, verify it uses DB prompt
+1. **Test OCR pipeline** - Upload scanned PDF with Turkish text
+2. **Verify fragment merging** - "S İ G O R T A" → "SİGORTA"
+3. **Verify garbage removal** - B^^^B, a!!!a patterns removed
 
 ### Short Term
-1. **Prompt versioning** - Test version history tracking
-2. **A/B testing** - Test prompt comparison feature
-3. **Usage analytics** - Verify prompt usage counts increment
+1. **Add more Turkish OCR patterns** - Common misrecognitions
+2. **Improve LLM retry** - Better context in cleanup prompts
+3. **Performance optimization** - Chunk processing parallelization
 
 ### Feature Work
-1. **Add more prompt types** - As needed for new features
-2. **Prompt import/export** - Backup/restore functionality
-3. **Prompt preview** - Test prompts before activating
+1. **OCR confidence scoring** - Track cleanup quality over time
+2. **Pattern learning** - Learn common garbage patterns per source
+3. **Admin OCR dashboard** - View cleanup statistics
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Check prompts in database
-# Run in Supabase SQL Editor:
-SELECT name, category, is_active FROM prompt_templates ORDER BY category;
+# Run pipeline tests
+npm test -- --run src/lib/pipeline/
 
-# Should return 16 rows with all is_active = true
+# Check TypeScript
+npm run typecheck
 
-# Test admin prompts API
-TOKEN="<your-admin-token>"
-curl -s "https://insurai-production.up.railway.app/api/admin/prompts" \
-  -H "Authorization: Bearer $TOKEN" | jq '.data | length'
-# Should return: 16
+# Check lint (expect 1 warning - intentional)
+npx eslint src/lib/pipeline/ocr-sanitizer.ts src/lib/pipeline/qa-gates.ts
 
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
@@ -223,23 +266,21 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 | Metric | Value |
 |--------|-------|
 | Commits this session | 5 |
-| Files changed | 13 |
-| New files created | 2 |
-| Bugs fixed | 3 |
-| Major focus | Admin-Managed AI Prompts |
+| Files changed | 4 |
+| New functions | 5 (isTurkishUpperChar, isAllTurkishUpper, stripControlChars, normalizeUnicode, no_control_chars gate) |
+| Bugs fixed | 4 |
+| Tests passing | 251 pipeline tests |
+| Major focus | OCR Pipeline Unicode Improvements |
 
 ---
 
 ## Handoff Checklist
 
-- [x] All tests passing
-- [x] No TypeScript errors
-- [x] No lint warnings
+- [x] All tests passing (251 pipeline tests)
+- [x] TypeScript no errors
+- [x] Lint passing (1 intentional warning)
 - [x] Changes committed and pushed
-- [x] Branch merged to main
-- [x] Production deployed
-- [x] Migration 006 run in Supabase
-- [x] 16 prompts visible in Admin Dashboard
+- [x] Production deployed via branch
 - [x] Documentation updated (CLAUDE.md)
 - [x] Session handoff updated
 
@@ -247,15 +288,15 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 ## Previous Session Context
 
-Previous session (morning Jan 20) focused on fixing Admin Auth 500 errors:
-- Environment variable priority fixes
-- crypto module imports
-- React hooks ordering
-- Security improvements
+Previous session (Jan 20) focused on Admin-Managed AI Prompts:
+- Created prompt-service.ts
+- Seeded 16 AI prompts
+- Fixed 401 auth errors
+- Fixed API endpoint routing
 
-This session continued with making the Admin Prompts tab functional.
+This session continued with OCR pipeline improvements for better Turkish text handling.
 
 ---
 
-**Last Updated**: January 20, 2026
-**Next Session Focus**: Test prompt editing, verify AI operations use admin prompts
+**Last Updated**: January 22, 2026
+**Next Session Focus**: Test OCR pipeline with real scanned Turkish documents

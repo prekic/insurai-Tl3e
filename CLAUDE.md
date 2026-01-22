@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 20, 2026
+- **Last Updated**: January 22, 2026
 
 ---
 
@@ -99,6 +99,16 @@ insurai/
 | `src/lib/ai/text-processor.ts` | **NEW** Combined document processing pipeline |
 | `src/lib/ai/document-normalizer.ts` | **NEW** Clean-room deterministic document normalizer |
 | `server/routes/ai.ts` | AI proxy routes (extraction, chat, OCR) |
+
+### OCR Cleanup Pipeline (Added Jan 2026)
+| File | Purpose |
+|------|---------|
+| `src/lib/pipeline/ocr-cleanup-pipeline.ts` | Main OCR cleanup orchestrator with chunking, sanitization, QA |
+| `src/lib/pipeline/ocr-sanitizer.ts` | Deterministic OCR text sanitization with Unicode-safe Turkish matching |
+| `src/lib/pipeline/qa-gates.ts` | Quality validation gates with retry logic for failed chunks |
+| `src/lib/pipeline/document-chunker.ts` | Document chunking by page markers or size |
+| `src/lib/pipeline/turkish-ocr-normalizer.ts` | Turkish-specific OCR normalization rules |
+| `src/lib/pipeline/pipeline-logger.ts` | Structured logging for pipeline stages |
 
 ### Components
 | File | Purpose |
@@ -1638,6 +1648,36 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `server/services/prompt-service.ts` - Fetches prompts from DB with in-memory cache (5-min TTL)
   - `server/routes/ai.ts` - Uses prompt-service for extraction/chat prompts with hardcoded fallback
   - Template variables: `{{var}}` and `{{#if var}}...{{/if}}` syntax
+
+### 22. OCR Cleanup Pipeline Unicode Improvements (Fixed Jan 22, 2026)
+- **Problem**: OCR pipeline had issues with:
+  - Turkish uppercase chars like `İ` (U+0130) and `Ş` (U+015E) not matching in regex character classes
+  - Garbage patterns like `a!!!!!a` with embedded control characters persisting
+  - QA gates missing remnant detection for control characters
+  - Spaced Turkish fragment merging incomplete for mixed-length patterns
+- **Root Cause**: Regex character classes `[A-ZÇĞİÖŞÜ]` have encoding issues with Turkish Unicode chars
+- **Solution**:
+  - Added Unicode-safe `isTurkishUpperChar()` using explicit codepoint checking + `\p{Lu}` fallback
+  - Added `isAllTurkishUpper()` function with NFC normalization
+  - Added `stripControlChars()` for C0/C1 control character removal
+  - New QA gate `no_control_chars` for remnant detection
+  - Enhanced LLM cleanup prompt (v5) with detailed issue-specific instructions
+  - Lowered high-ASCII detection threshold from 5+ to 3+ characters
+- **Files Changed**:
+  - `src/lib/pipeline/ocr-sanitizer.ts` - Unicode-safe matching, control char stripping
+  - `src/lib/pipeline/qa-gates.ts` - New gate, improved detection, v5 LLM prompt
+- **Key Functions**:
+  ```typescript
+  // Unicode-safe Turkish uppercase check
+  function isTurkishUpperChar(char: string): boolean {
+    const codepoint = char.codePointAt(0)
+    if (TURKISH_UPPER_CODEPOINTS.has(codepoint)) return true
+    return /^\p{Lu}$/u.test(char) // Fallback to Unicode property
+  }
+
+  // NFC normalization before matching
+  const normalizedText = text.normalize('NFC')
+  ```
 
 ---
 
