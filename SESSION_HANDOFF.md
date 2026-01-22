@@ -75,12 +75,15 @@ function stripControlChars(text: string): string {
 ## Commits This Session
 
 ```
+e78553d Update documentation for OCR pipeline Unicode improvements session
 be67c57 Add Unicode-safe Turkish matching and improved garbage detection in OCR pipeline
 0d6eeff Enhance OCR cleanup pipeline for better garbage removal and fragment merging
 02e7e14 Fix unused variable TypeScript errors in pipeline files
 9cd4b80 Fix admin save button functionality with error handling and user feedback
 292a45e Add robust OCR cleanup pipeline with deterministic sanitization
 ```
+
+Note: Earlier commits (5322547, e718151, 9e2ba5d) from same day are pipeline foundation work.
 
 ---
 
@@ -128,6 +131,22 @@ be67c57 Add Unicode-safe Turkish matching and improved garbage detection in OCR 
 - `VITE_API_PROXY_URL` auto-detected via `window.location.origin` in production
 - `VITE_*` vars baked at build time - need redeploy not just restart
 - Don't add quotes in Railway UI - they're added automatically
+- Server needs `SUPABASE_URL` (not `VITE_SUPABASE_URL`) for runtime DB access
+- Always import `crypto` explicitly in server code (don't rely on global)
+
+### API Proxy Auto-Detection (`src/lib/env.ts`)
+```typescript
+// In production, if VITE_API_PROXY_URL not set, auto-detect:
+export function getApiProxyUrl(): string {
+  if (import.meta.env.VITE_API_PROXY_URL) {
+    return import.meta.env.VITE_API_PROXY_URL
+  }
+  if (import.meta.env.PROD && typeof window !== 'undefined') {
+    return window.location.origin  // Same origin when co-hosted
+  }
+  return 'http://localhost:4001'
+}
+```
 
 ---
 
@@ -152,6 +171,20 @@ workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
 Add to Supabase Dashboard → Authentication → URL Configuration:
 - `https://insurai-production.up.railway.app/**`
 - Required for OAuth and magic link flows
+
+---
+
+## Common Gotchas (Quick Reference)
+
+| Gotcha | Solution |
+|--------|----------|
+| `VITE_*` vars not updating | Need rebuild (redeploy), not just restart |
+| Railway env vars with quotes | Don't add quotes manually - Railway adds them |
+| PDF.js worker blocked | CSP must allow unpkg.com, cdn.jsdelivr.net |
+| Supabase auth failing | Add Railway URL to Supabase redirect allowlist |
+| Server can't access DB | Use `SUPABASE_URL` not `VITE_SUPABASE_URL` |
+| `crypto` not defined | Import explicitly: `import crypto from 'crypto'` |
+| Turkish chars not matching | Use NFC normalization + `\p{Lu}` with `/u` flag |
 
 ---
 
@@ -265,11 +298,11 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 |
-| Files changed | 4 |
+| Commits this session | 6 (+ documentation) |
+| Files changed | 6 |
 | New functions | 5 (isTurkishUpperChar, isAllTurkishUpper, stripControlChars, normalizeUnicode, no_control_chars gate) |
 | Bugs fixed | 4 |
-| Tests passing | 251 pipeline tests |
+| Tests passing | 251 pipeline tests, 4600+ total |
 | Major focus | OCR Pipeline Unicode Improvements |
 
 ---
