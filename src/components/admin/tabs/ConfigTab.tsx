@@ -17,6 +17,7 @@ import {
   ToggleRight,
   Sliders,
   Check,
+  X,
 } from 'lucide-react'
 
 interface AppConfig {
@@ -43,6 +44,8 @@ export function ConfigTab() {
   const [editingConfig, setEditingConfig] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -50,6 +53,7 @@ export function ConfigTab() {
 
   const fetchData = async () => {
     setIsLoading(true)
+    setError(null)
     try {
       const [configsRes, flagsRes] = await Promise.all([
         adminFetch('/api/admin/config'),
@@ -59,10 +63,19 @@ export function ConfigTab() {
       const configsData = await configsRes.json()
       const flagsData = await flagsRes.json()
 
-      if (configsData.success) setConfigs(configsData.data)
-      if (flagsData.success) setFeatureFlags(flagsData.data)
+      if (configsData.success) {
+        setConfigs(configsData.data)
+      } else {
+        setError(configsData.error || 'Failed to fetch configuration')
+      }
+      if (flagsData.success) {
+        setFeatureFlags(flagsData.data)
+      } else if (!error) {
+        setError(flagsData.error || 'Failed to fetch feature flags')
+      }
     } catch (error) {
       console.error('Failed to fetch config:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch configuration')
     } finally {
       setIsLoading(false)
     }
@@ -70,13 +83,16 @@ export function ConfigTab() {
 
   const saveConfig = async (id: string, value: unknown) => {
     try {
+      setIsSaving(true)
+      setError(null)
       const response = await adminFetch(`/api/admin/config/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value }),
       })
 
-      if (response.ok) {
+      const data = await response.json()
+      if (response.ok && data.success) {
         setConfigs(configs.map((c) => (c.id === id ? { ...c, value } : c)))
         setEditingConfig(null)
         setSavedIds((prev) => new Set([...prev, id]))
@@ -87,25 +103,35 @@ export function ConfigTab() {
             return next
           })
         }, 2000)
+      } else {
+        setError(data.error || 'Failed to save configuration')
       }
     } catch (error) {
       console.error('Failed to save config:', error)
+      setError(error instanceof Error ? error.message : 'Failed to save configuration')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const toggleFeatureFlag = async (id: string, enabled: boolean) => {
     try {
+      setError(null)
       const response = await adminFetch(`/api/admin/feature-flags/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !enabled }),
       })
 
-      if (response.ok) {
+      const data = await response.json()
+      if (response.ok && data.success) {
         setFeatureFlags(featureFlags.map((f) => (f.id === id ? { ...f, enabled: !enabled } : f)))
+      } else {
+        setError(data.error || 'Failed to toggle feature flag')
       }
     } catch (error) {
       console.error('Failed to toggle feature flag:', error)
+      setError(error instanceof Error ? error.message : 'Failed to toggle feature flag')
     }
   }
 
@@ -142,6 +168,7 @@ export function ConfigTab() {
           />
           <Button
             size="sm"
+            disabled={isSaving}
             onClick={() => {
               let value: unknown = editValue
               if (config.type === 'number') value = Number(editValue)
@@ -152,7 +179,7 @@ export function ConfigTab() {
           >
             <Save className="h-4 w-4" />
           </Button>
-          <Button size="sm" variant="outline" onClick={() => setEditingConfig(null)}>
+          <Button size="sm" variant="outline" onClick={() => setEditingConfig(null)} disabled={isSaving}>
             Cancel
           </Button>
         </div>
@@ -211,11 +238,21 @@ export function ConfigTab() {
           <h1 className="text-2xl font-bold text-gray-900">Configuration</h1>
           <p className="text-gray-500">Manage application settings and feature flags</p>
         </div>
-        <Button onClick={fetchData} disabled={isLoading}>
+        <Button onClick={fetchData} disabled={isLoading || isSaving}>
           <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
           Refresh
         </Button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Feature Flags */}
       <Card>
