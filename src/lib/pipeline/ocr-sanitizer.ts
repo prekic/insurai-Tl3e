@@ -36,12 +36,30 @@ export interface SanitizerResult {
 // CONSTANTS
 // ============================================================================
 
-// Turkish uppercase letters (including special chars)
-const TURKISH_UPPER = 'A-ZÇĞİÖŞÜÂÎÛ'
-// Note: Full character list available if needed: ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZÂÎÛ
+// Turkish uppercase letters (explicit list for Unicode safety)
+// Using explicit character list instead of ranges to avoid encoding issues
+const TURKISH_UPPER_CHARS = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZÂÎÛ'
+
+// Create a Set of codepoints for fast lookup (Unicode-safe)
+const TURKISH_UPPER_CODEPOINTS = new Set(
+  [...TURKISH_UPPER_CHARS].map(c => c.codePointAt(0)!)
+)
+
+// Also include basic A-Z codepoints (65-90)
+for (let i = 65; i <= 90; i++) {
+  TURKISH_UPPER_CODEPOINTS.add(i)
+}
+
+// For regex patterns (kept as reference): 'A-ZÇĞİÖŞÜÂÎÛ'
+// Now using Unicode-safe isAllTurkishUpper() function instead
 
 // Characters that should NOT be merged across (preserve structure)
-const MERGE_BLOCKERS = /[\d\/:.\-@#$%&*()=+\[\]{}|\\<>]/
+const MERGE_BLOCKERS = /[\d/:.\-@#$%&*()=+[\]{}|\\<>]/
+
+// Control characters to strip (beyond what normalize handles)
+// Includes C0/C1 controls except tab/newline
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]/g
 
 // Barcode/QR patterns - exact match (for inline removal)
 const BARCODE_EXACT_PATTERNS = [
@@ -58,13 +76,71 @@ const BARCODE_LINE_PATTERNS = [
   /B\s*[\^<>]+\s*B/i,           // B^^^B variations
   /a\s*!{3,}\s*a/i,             // a!!!a variations
   /a!{3,}a.*?(?:!|a|A)+/i,      // a!!!a followed by more noise
-  /[<>\[\]{}|\\^]{5,}/,         // 5+ consecutive special chars
+  /[<>[\]{}|\\^]{5,}/,         // 5+ consecutive special chars
   // Base64-like: must have mix of upper+lower+digits, not just one char class
   /(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9])(?:[A-Za-z0-9+/]{4}){10,}/,
   /(?:\d[A-Za-z]){10,}/,        // Alternating digit-letter (binary)
   // High-ASCII control characters (extended range)
   /[\x80-\xff]{5,}/,            // 5+ high-ASCII chars in sequence
 ]
+
+// ============================================================================
+// UNICODE-SAFE HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Normalize text to NFC form for consistent Unicode handling
+ * This ensures İ (U+0130) and Ş (U+015E) match correctly regardless of input encoding
+ */
+function normalizeUnicode(text: string): string {
+  return text.normalize('NFC')
+}
+
+/**
+ * Check if a character is a Turkish uppercase letter (Unicode-safe)
+ * Uses codepoint checking to handle encoding variations
+ */
+function isTurkishUpperChar(char: string): boolean {
+  if (char.length === 0) return false
+  const codepoint = char.codePointAt(0)
+  if (!codepoint) return false
+
+  // Check if it's in our explicit Turkish uppercase set
+  if (TURKISH_UPPER_CODEPOINTS.has(codepoint)) return true
+
+  // Fallback: Check using Unicode general category for any uppercase letter
+  // Then verify it's not in ranges we want to exclude
+  // Using Unicode property escape with /u flag
+  try {
+    if (/^\p{Lu}$/u.test(char)) {
+      return true // Accept any uppercase letter
+    }
+  } catch {
+    // Fallback for environments without Unicode property support
+    return /^[A-ZÇĞİÖŞÜÂÎÛ]$/.test(char)
+  }
+
+  return false
+}
+
+/**
+ * Check if an entire string consists only of Turkish uppercase letters (Unicode-safe)
+ */
+function isAllTurkishUpper(str: string): boolean {
+  if (str.length === 0) return false
+  const normalized = normalizeUnicode(str)
+  for (const char of normalized) {
+    if (!isTurkishUpperChar(char)) return false
+  }
+  return true
+}
+
+/**
+ * Strip control characters and replacement characters from text
+ */
+function stripControlChars(text: string): string {
+  return text.replace(CONTROL_CHAR_PATTERN, '')
+}
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -117,6 +193,13 @@ function isGarbageLine(line: string): { isGarbage: boolean; reason?: string } {
     return { isGarbage: true, reason: 'high_ascii_content' }
   }
 
+  // Check for control characters or replacement chars
+  // eslint-disable-next-line no-control-regex
+  const controlCount = (trimmed.match(/[\x00-\x1F\x7F-\x9F\uFFFD]/g) || []).length
+  if (controlCount > 5 || (trimmed.length > 0 && controlCount / trimmed.length > 0.2)) {
+    return { isGarbage: true, reason: 'control_char_content' }
+  }
+
   // Check letter ratio for long lines (potential QR payload)
   const nonSpaceLength = trimmed.replace(/\s/g, '').length
   if (nonSpaceLength > 40) {
@@ -138,12 +221,12 @@ function shouldBlockMerge(token: string): boolean {
 
 /**
  * Check if a token is a Turkish uppercase fragment (1-10 chars, all Turkish upper)
+ * Uses Unicode-safe character checking
  */
 function isTurkishUpperFragment(token: string, maxLen: number = 10): boolean {
   if (token.length === 0 || token.length > maxLen) return false
-  // Must be all Turkish uppercase letters
-  const pattern = new RegExp(`^[${TURKISH_UPPER}]+$`)
-  return pattern.test(token)
+  // Use Unicode-safe check
+  return isAllTurkishUpper(token)
 }
 
 /**
@@ -155,10 +238,9 @@ function isTurkishUpperFragment(token: string, maxLen: number = 10): boolean {
  */
 function mergeSpacedTurkishFragments(text: string): { text: string; mergeCount: number } {
   let mergeCount = 0
-  let result = text
 
   // Split into lines to preserve structure
-  const lines = result.split('\n')
+  const lines = text.split('\n')
   const processedLines: string[] = []
 
   for (const line of lines) {
@@ -231,8 +313,8 @@ function mergeFragmentsInLine(line: string): { text: string; mergeCount: number 
       // - Classic: all tokens are 1-3 chars (need 3+ tokens)
       // - Mixed: at least 2 tokens are <=3 chars AND all tokens are Turkish upper
       const shortTokenCount = sequence.filter(s => s.token.length <= 3).length
-      const turkishUpperPattern = new RegExp(`^[${TURKISH_UPPER}]+$`)
-      const allTurkishUpper = sequence.every(s => turkishUpperPattern.test(s.token))
+      // Use Unicode-safe check for Turkish uppercase
+      const allTurkishUpper = sequence.every(s => isAllTurkishUpper(s.token))
 
       const isClassicPattern = sequence.length >= 3 && sequence.every(s => s.token.length <= 3)
       const isMixedPattern = shortTokenCount >= 2 && allTurkishUpper
@@ -316,19 +398,31 @@ export function sanitizeOCRText(text: string): SanitizerResult {
   // Step 3: Remove control characters except \n and \t
   // =========================================================================
   const beforeControl = result.length
+  // eslint-disable-next-line no-control-regex
   result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
   stats.controlCharsRemoved = beforeControl - result.length
 
   // =========================================================================
-  // Step 4: Remove embedded barcode patterns (mid-line cleanup)
+  // Step 4: Strip control characters (C0/C1 controls, replacement chars)
+  // This handles embedded control chars that may be mixed with garbage
+  // =========================================================================
+  const beforeControlStrip = result.length
+  result = stripControlChars(result)
+  stats.controlCharsRemoved += beforeControlStrip - result.length
+
+  // =========================================================================
+  // Step 4a: Remove embedded barcode patterns (mid-line cleanup)
   // This handles cases where garbage is embedded with valid text
   // =========================================================================
 
   // First, remove inline barcode patterns completely
   const inlineBarcodePatterns = [
     /B\^{2,}B/gi,                     // B^^^B exact
-    /a!{3,}a(?:[!aA]+)?/gi,           // a!!!a and variants like a!!!!!a!AAA
-    /[\x80-\xff]{5,}/g,               // High-ASCII sequences
+    /B\s*\^{2,}\s*B/gi,               // B ^ ^ ^ B with spaces
+    /a!{3,}a(?:[!aA]*)?/gi,           // a!!!a and variants like a!!!!!a!AAA
+    /a\s*!{3,}\s*a(?:[!aA\s]*)?/gi,   // a ! ! ! a with spaces
+    /[\x80-\xff]{3,}/g,               // High-ASCII sequences (lowered to 3+)
+    /[\uFFFD]{2,}/g,                  // Multiple replacement characters
   ]
 
   for (const pattern of inlineBarcodePatterns) {
@@ -410,57 +504,73 @@ export function sanitizeOCRText(text: string): SanitizerResult {
 
 /**
  * Check if text still contains artifacts that need cleanup
+ * Uses Unicode-safe checking for Turkish patterns
  */
 export function hasRemainingArtifacts(text: string): {
   hasArtifacts: boolean
   artifacts: string[]
 } {
   const artifacts: string[] = []
+  const normalizedText = normalizeUnicode(text)
 
   // Check for barcode patterns
-  if (/B\s*[\^]+\s*B/i.test(text)) {
+  if (/B\s*[\^]+\s*B/i.test(normalizedText)) {
     artifacts.push('B^^^B barcode pattern')
   }
 
-  if (/a\s*!{3,}\s*a/i.test(text)) {
+  if (/a\s*!{3,}\s*a/i.test(normalizedText)) {
     artifacts.push('a!!!a barcode pattern')
   }
 
   // Extended pattern for a!!!a variants (a!!!!!a!AAA etc.)
-  if (/a!{3,}a[!aA]+/i.test(text)) {
+  if (/a!{3,}a[!aA]+/i.test(normalizedText)) {
     artifacts.push('a!!!a extended barcode pattern')
   }
 
-  if (/[<>\[\]{}|\\^]{5,}/.test(text)) {
+  if (/[<>[\]{}|\\^]{5,}/.test(normalizedText)) {
     artifacts.push('Special character cluster')
   }
 
   // Check for high-ASCII/control character remnants
-  if (/[\x80-\xff]{5,}/.test(text)) {
+  if (/[\x80-\xff]{3,}/.test(normalizedText)) {
     artifacts.push('High-ASCII character sequence')
   }
 
-  // Check for spaced Turkish uppercase patterns (classic: 1-3 char tokens)
-  const spacedPatternClassic = new RegExp(
-    `\\b(?:[${TURKISH_UPPER}]{1,3}\\s+){2,}[${TURKISH_UPPER}]{1,3}\\b`
-  )
-  if (spacedPatternClassic.test(text)) {
-    artifacts.push('Spaced Turkish uppercase pattern (classic)')
+  // Check for control characters and replacement chars
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1F\x7F-\x9F\uFFFD]{2,}/.test(normalizedText)) {
+    artifacts.push('Control character sequence')
   }
 
-  // Check for mixed-length spaced patterns (1-10 char tokens with at least 2 short)
-  // Pattern like "GEN İŞ LETİLM İŞ"
-  const spacedPatternMixed = new RegExp(
-    `\\b(?:[${TURKISH_UPPER}]{1,10}\\s+){2,}[${TURKISH_UPPER}]{1,10}\\b`
-  )
-  const mixedMatches = text.match(spacedPatternMixed) || []
-  for (const match of mixedMatches) {
-    const tokens = match.split(/\s+/).filter(Boolean)
-    const shortCount = tokens.filter(t => t.length <= 3).length
-    const allTurkishUpper = tokens.every(t => new RegExp(`^[${TURKISH_UPPER}]+$`).test(t))
-    if (shortCount >= 2 && allTurkishUpper) {
-      artifacts.push(`Spaced Turkish uppercase pattern (mixed): "${match}"`)
-      break // Only report once
+  // Check for spaced Turkish uppercase patterns using Unicode-safe detection
+  // Instead of regex character classes, we'll scan for space-separated uppercase sequences
+  const words = normalizedText.split(/\s+/)
+  let consecutiveUpperFragments: string[] = []
+
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]
+    if (word.length > 0 && word.length <= 3 && isAllTurkishUpper(word)) {
+      consecutiveUpperFragments.push(word)
+    } else if (word.length > 0 && word.length <= 10 && isAllTurkishUpper(word)) {
+      // Mixed-length: keep tracking
+      consecutiveUpperFragments.push(word)
+    } else {
+      // Check if we had a valid spaced fragment sequence
+      if (consecutiveUpperFragments.length >= 3) {
+        const shortCount = consecutiveUpperFragments.filter(w => w.length <= 3).length
+        if (shortCount >= 2) {
+          artifacts.push(`Spaced Turkish uppercase pattern: "${consecutiveUpperFragments.join(' ')}"`)
+        }
+      }
+      consecutiveUpperFragments = []
+    }
+  }
+
+  // Check final sequence
+  if (consecutiveUpperFragments.length >= 3) {
+    const shortCount = consecutiveUpperFragments.filter(w => w.length <= 3).length
+    if (shortCount >= 2) {
+      artifacts.push(`Spaced Turkish uppercase pattern: "${consecutiveUpperFragments.join(' ')}"`)
     }
   }
 
@@ -480,7 +590,7 @@ export function validatePreservation(
   const issues: string[] = []
 
   // Extract and compare policy numbers (format: digits with optional slashes, letters)
-  const policyPattern = /(?:Poli[çc]e\s*(?:No|Numaras[ıi])?\s*[:\.]?\s*)(\d+[\d\/A-Za-z]*)/gi
+  const policyPattern = /(?:Poli[çc]e\s*(?:No|Numaras[ıi])?\s*[:.]\s*)(\d+[\d/A-Za-z]*)/gi
   const originalPolicies = [...original.matchAll(policyPattern)].map(m => m[1])
   const sanitizedPolicies = [...sanitized.matchAll(policyPattern)].map(m => m[1])
 
@@ -494,7 +604,7 @@ export function validatePreservation(
   }
 
   // Extract and compare dates (DD.MM.YYYY or DD/MM/YYYY)
-  const datePattern = /\b(\d{2}[.\/]\d{2}[.\/]\d{4})\b/g
+  const datePattern = /\b(\d{2}[./]\d{2}[./]\d{4})\b/g
   const originalDates = [...original.matchAll(datePattern)].map(m => m[1])
   const sanitizedDates = [...sanitized.matchAll(datePattern)].map(m => m[1])
 
