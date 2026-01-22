@@ -13,8 +13,9 @@
 
 // Turkish uppercase characters including special chars
 const TURKISH_UPPER = 'A-ZÇĞİÖŞÜÂÎÛ'
-const TURKISH_UPPER_REGEX = new RegExp(`[${TURKISH_UPPER}]`)
-const TURKISH_ALPHA_REGEX = new RegExp(`[${TURKISH_UPPER}a-zçğıöşüâîû]`, 'i')
+// Regex patterns available for future use:
+// const TURKISH_UPPER_REGEX = new RegExp(`[${TURKISH_UPPER}]`)
+// const TURKISH_ALPHA_REGEX = new RegExp(`[${TURKISH_UPPER}a-zçğıöşüâîû]`, 'i')
 
 // Patterns to preserve exactly (don't merge across these)
 const PRESERVE_PATTERNS = {
@@ -90,7 +91,7 @@ function extractPreservedTokens(text: string): { text: string; tokens: Preserved
   let placeholderIndex = 0
 
   // Extract all patterns that should be preserved
-  for (const [name, pattern] of Object.entries(PRESERVE_PATTERNS)) {
+  for (const [_name, pattern] of Object.entries(PRESERVE_PATTERNS)) {
     // Reset lastIndex for global patterns
     pattern.lastIndex = 0
 
@@ -330,7 +331,7 @@ export function normalizeTurkishOcrWithStats(text: string): {
   stats: NormalizationStats
 } {
   const originalLength = text.length
-  const originalLines = text.split('\n').length
+  // Note: line count available via text.split('\n').length if needed for debugging
 
   // Count garbage lines
   const lines = text.split('\n')

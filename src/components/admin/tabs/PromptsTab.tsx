@@ -31,6 +31,9 @@ export function PromptsTab() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState<Partial<PromptTemplate>>({})
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   useEffect(() => {
     fetchTemplates()
@@ -38,12 +41,16 @@ export function PromptsTab() {
 
   const fetchTemplates = async () => {
     try {
+      setError(null)
       const response = await getPromptTemplates()
       if (response.success && response.data) {
         setTemplates(response.data as PromptTemplate[])
+      } else {
+        setError(response.error || 'Failed to fetch templates')
       }
     } catch (error) {
       console.error('Failed to fetch templates:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch templates')
     } finally {
       setIsLoading(false)
     }
@@ -51,19 +58,30 @@ export function PromptsTab() {
 
   const handleSave = async (id: string) => {
     try {
+      setIsSaving(true)
+      setError(null)
       const response = await updatePromptTemplate(id, editForm)
       if (response.success) {
         setTemplates(templates.map((t) => (t.id === id ? { ...t, ...editForm } : t)))
         setEditingId(null)
         setEditForm({})
+        setSaveSuccess('Template saved successfully')
+        setTimeout(() => setSaveSuccess(null), 3000)
+      } else {
+        setError(response.error || 'Failed to save template')
       }
     } catch (error) {
       console.error('Failed to save template:', error)
+      setError(error instanceof Error ? error.message : 'Failed to save template')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const handleCreate = async () => {
     try {
+      setIsSaving(true)
+      setError(null)
       const response = await createPromptTemplate({
         name: editForm.name || '',
         description: editForm.description || '',
@@ -76,20 +94,33 @@ export function PromptsTab() {
         setTemplates([...templates, response.data as PromptTemplate])
         setShowCreateForm(false)
         setEditForm({})
+        setSaveSuccess('Template created successfully')
+        setTimeout(() => setSaveSuccess(null), 3000)
+      } else {
+        setError(response.error || 'Failed to create template')
       }
     } catch (error) {
       console.error('Failed to create template:', error)
+      setError(error instanceof Error ? error.message : 'Failed to create template')
+    } finally {
+      setIsSaving(false)
     }
   }
 
   const toggleActive = async (id: string, isActive: boolean) => {
     try {
+      setError(null)
       const response = await updatePromptTemplate(id, { isActive: !isActive })
       if (response.success) {
         setTemplates(templates.map((t) => (t.id === id ? { ...t, isActive: !isActive } : t)))
+        setSaveSuccess(`Template ${!isActive ? 'activated' : 'deactivated'} successfully`)
+        setTimeout(() => setSaveSuccess(null), 3000)
+      } else {
+        setError(response.error || 'Failed to toggle template status')
       }
     } catch (error) {
       console.error('Failed to toggle template:', error)
+      setError(error instanceof Error ? error.message : 'Failed to toggle template status')
     }
   }
 
@@ -127,11 +158,28 @@ export function PromptsTab() {
           <h1 className="text-2xl font-bold text-gray-900">Prompt Templates</h1>
           <p className="text-gray-500">Manage AI prompts for extraction, chat, and OCR</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)}>
+        <Button onClick={() => setShowCreateForm(true)} disabled={isSaving}>
           <Plus className="h-4 w-4 mr-2" />
           New Template
         </Button>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="text-red-500 hover:text-red-700">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {saveSuccess && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
+          {saveSuccess}
+        </div>
+      )}
 
       {/* Create Form */}
       {showCreateForm && (
@@ -201,12 +249,12 @@ export function PromptsTab() {
               <Button variant="outline" onClick={() => {
                 setShowCreateForm(false)
                 setEditForm({})
-              }}>
+              }} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button onClick={handleCreate}>
+              <Button onClick={handleCreate} disabled={isSaving}>
                 <Save className="h-4 w-4 mr-2" />
-                Create Template
+                {isSaving ? 'Creating...' : 'Create Template'}
               </Button>
             </div>
           </CardContent>
@@ -279,13 +327,13 @@ export function PromptsTab() {
                       <Button variant="outline" onClick={() => {
                         setEditingId(null)
                         setEditForm({})
-                      }}>
+                      }} disabled={isSaving}>
                         <X className="h-4 w-4 mr-2" />
                         Cancel
                       </Button>
-                      <Button onClick={() => handleSave(template.id)}>
+                      <Button onClick={() => handleSave(template.id)} disabled={isSaving}>
                         <Save className="h-4 w-4 mr-2" />
-                        Save Changes
+                        {isSaving ? 'Saving...' : 'Save Changes'}
                       </Button>
                     </div>
                   </div>

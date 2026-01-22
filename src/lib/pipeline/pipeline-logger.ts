@@ -432,3 +432,97 @@ export function formatLogsAsText(collector: PipelineLogCollector): string {
 
   return lines.join('\n')
 }
+
+// ============================================================================
+// CONVENIENCE LOGGER CLASS
+// ============================================================================
+
+/**
+ * Extended stage type for OCR pipeline stages
+ */
+export type ExtendedPipelineStage = PipelineStage | 'pipeline' | 'chunking' | 'sanitization' | 'merge' | 'validation'
+
+/**
+ * Pipeline log entry (alias for LogEntry)
+ */
+export type PipelineLog = LogEntry
+
+/**
+ * Logger interface with bound methods
+ */
+export interface LogCollector {
+  logStageStart(stage: ExtendedPipelineStage, context?: Record<string, unknown>): number
+  logStageComplete(stage: ExtendedPipelineStage, startTimeOrDuration: number, metrics?: Record<string, unknown>): void
+  logWarning(stage: ExtendedPipelineStage, message: string): void
+  logError(stage: ExtendedPipelineStage, message: string): void
+  getLogs(): PipelineLog[]
+}
+
+/**
+ * Create a logger with bound methods for easier usage
+ */
+export function createLogger(runId: string, documentId?: string): LogCollector {
+  const collector = createLogCollector(runId, documentId)
+  const stageStartTimes = new Map<string, number>()
+
+  return {
+    logStageStart(stage: ExtendedPipelineStage, context?: Record<string, unknown>): number {
+      const startTime = Date.now()
+      stageStartTimes.set(stage, startTime)
+
+      // Map extended stages to base stages for logging
+      const baseStage = mapToBaseStage(stage)
+      log(collector, baseStage, 'info', `Stage started: ${stage}`, { context })
+      return startTime
+    },
+
+    logStageComplete(stage: ExtendedPipelineStage, startTimeOrDuration: number, metrics?: Record<string, unknown>): void {
+      // If startTimeOrDuration is a small number (< 10000), treat it as duration
+      // Otherwise treat it as start time
+      let duration: number
+      if (startTimeOrDuration < 10000 && !stageStartTimes.has(stage)) {
+        duration = startTimeOrDuration
+      } else {
+        const startTime = stageStartTimes.get(stage) || startTimeOrDuration
+        duration = Date.now() - startTime
+      }
+
+      const baseStage = mapToBaseStage(stage)
+      log(collector, baseStage, 'info', `Stage completed: ${stage}`, {
+        metrics: { ...metrics, duration },
+      })
+    },
+
+    logWarning(stage: ExtendedPipelineStage, message: string): void {
+      const baseStage = mapToBaseStage(stage)
+      log(collector, baseStage, 'warn', message)
+    },
+
+    logError(stage: ExtendedPipelineStage, message: string): void {
+      const baseStage = mapToBaseStage(stage)
+      log(collector, baseStage, 'error', message)
+    },
+
+    getLogs(): PipelineLog[] {
+      return collector.entries
+    },
+  }
+}
+
+/**
+ * Map extended stages to base stages for logging
+ */
+function mapToBaseStage(stage: ExtendedPipelineStage): PipelineStage {
+  switch (stage) {
+    case 'pipeline':
+    case 'chunking':
+    case 'merge':
+      return 'normalize'
+    case 'sanitization':
+      return 'normalize'
+    case 'validation':
+      return 'qa'
+    default:
+      return stage as PipelineStage
+  }
+}
