@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import {
   applyComprehensivePreprocessing,
   applyBasicOCRCorrections,
@@ -7,6 +7,7 @@ import {
   processDocumentCleanRoom,
   processDocumentCombined,
   processDocumentQuick,
+  cleanTurkishTextWithAI,
   type CombinedProcessingResult,
 } from './text-processor'
 
@@ -586,6 +587,130 @@ HUSUSİOTOMOBİL KASKO`
         expect(result.preCleanStats).toBeDefined()
         expect(result.preCleanStats!.noiseLinesRemoved).toBeGreaterThan(0)
       })
+    })
+  })
+
+  describe('cleanTurkishTextWithAI', () => {
+    let originalFetch: typeof global.fetch
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+      vi.restoreAllMocks()
+    })
+
+    it('should run deterministic pre-clean before AI correction', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B^^^B garbage\nS İ G O R T A test'
+      const result = await cleanTurkishTextWithAI(input, {
+        useOfflineFallback: true,
+      })
+
+      // Pre-clean should remove B^^^B
+      expect(result.text).not.toContain('B^^^B')
+      expect(result.preCleanStats).toBeDefined()
+    })
+
+    it('should return AI cleanup stats', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const result = await cleanTurkishTextWithAI('test input', {
+        useOfflineFallback: true,
+      })
+
+      expect(result.aiCleanupStats).toBeDefined()
+      expect(result.aiCleanupStats.provider).toBe('offline')
+      // When no providers configured, offline is default (not a fallback)
+      expect(typeof result.aiCleanupStats.fallbackUsed).toBe('boolean')
+    })
+
+    it('should track corrections from both pre-clean and AI', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B^^^B artifact\nTest text'
+      const result = await cleanTurkishTextWithAI(input, {
+        useOfflineFallback: true,
+      })
+
+      expect(result.corrections.length).toBeGreaterThan(0)
+      // Should have garbage removal correction
+      const hasGarbageCorrection = result.corrections.some(
+        c => c.type === 'garbage_removal'
+      )
+      expect(hasGarbageCorrection).toBe(true)
+    })
+
+    it('should preserve original text in result', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'Original text with B^^^B garbage'
+      const result = await cleanTurkishTextWithAI(input, {
+        useOfflineFallback: true,
+      })
+
+      expect(result.originalText).toBe(input)
+    })
+
+    it('should allow skipping pre-clean', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const input = 'B^^^B test'
+      const result = await cleanTurkishTextWithAI(input, {
+        useOfflineFallback: true,
+        skipPreClean: true,
+      })
+
+      // Without pre-clean, B^^^B may still be present (depends on offline fallback)
+      expect(result.preCleanStats).toBeUndefined()
+    })
+
+    it('should use AI when available', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ response: 'AI cleaned text' }),
+      })
+
+      const result = await cleanTurkishTextWithAI('test', {
+        proxyUrl: 'http://localhost:4001/api/ai',
+        provider: 'openai',
+      })
+
+      expect(result.aiCleanupStats.provider).toBe('openai')
+      expect(result.text).toBe('AI cleaned text')
+    })
+
+    it('should calculate total processing time', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const result = await cleanTurkishTextWithAI('test', {
+        useOfflineFallback: true,
+      })
+
+      expect(result.totalProcessingTimeMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('should work with user-reported problematic text', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('No API'))
+
+      const problematicText = `B^^^Bj54<O[ garbage
+a!!!!!a!AAAaA!AA!!!aaAA!
+S Ö ZLE Ş ME TARAFLARI
+POLİÇE NO: 1680600025`
+
+      const result = await cleanTurkishTextWithAI(problematicText, {
+        useOfflineFallback: true,
+      })
+
+      // Should remove garbage
+      expect(result.text).not.toContain('B^^^B')
+      expect(result.text).not.toMatch(/!{3,}/)
+
+      // Should preserve critical data
+      expect(result.text).toContain('1680600025')
     })
   })
 })
