@@ -480,4 +480,112 @@ Normal text continues`
       global.fetch = originalFetch
     })
   })
+
+  describe('Pre-clean integration - User-reported OCR issues', () => {
+    describe('Barcode artifact removal', () => {
+      it('should remove B^^^B barcode patterns', () => {
+        const input = 'B^^^Bj54<O[ MtWfE<q&vB^^^B\nSİGORTA POLİÇESİ'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).not.toContain('B^^^B')
+        expect(result.text).toContain('SİGORTA')
+      })
+
+      it('should remove complex barcode-like garbage', () => {
+        const input = 'j54<O[ MtWfE<q&v\nPOLİÇE NO: 12345'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).not.toMatch(/[<>\[\]{}]+/)
+        expect(result.text).toContain('POLİÇE NO')
+      })
+    })
+
+    describe('Repetitive character garbage removal', () => {
+      it('should remove a!!!a type garbage patterns', () => {
+        const input = 'a!!!!!a!AAAaA!AA!!!aaAA!aAaAA!!\nSİGORTA'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).not.toMatch(/!{3,}/)
+        expect(result.text).not.toMatch(/a!+a/i)
+        expect(result.text).toContain('SİGORTA')
+      })
+
+      it('should remove lines with excessive repetitive characters', () => {
+        const input = 'aAaAaAaAaAaA!!!!!!!\nPOLİÇE DETAYLARI'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).not.toMatch(/aAaA/i)
+        expect(result.text).toContain('POLİÇE DETAYLARI')
+      })
+    })
+
+    describe('Turkish word spacing fixes', () => {
+      it('should fix "S Ö ZLE Ş ME TARAFLARI" to "SÖZLEŞME TARAFLARI"', () => {
+        const input = 'S Ö ZLE Ş ME TARAFLARI'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).toContain('SÖZLEŞME')
+        expect(result.text).toContain('TARAFLARI')
+      })
+
+      it('should fix "T Ü RK" to "TÜRK"', () => {
+        const input = 'T Ü RK SİGORTA'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).toContain('TÜRK')
+      })
+
+      it('should fix "B İ RLE Şİ K" to "BİRLEŞİK"', () => {
+        const input = 'B İ RLE Şİ K SİGORTA A.Ş.'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).toContain('BİRLEŞİK')
+      })
+    })
+
+    describe('Glued word splitting', () => {
+      it('should split "HUSUSİOTOMOBİL" to "HUSUSİ OTOMOBİL"', () => {
+        const input = 'HUSUSİOTOMOBİL KASKO POLİÇESİ'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).toMatch(/HUSUSİ\s+OTOMOBİL/i)
+      })
+
+      it('should split "SANAYİVE" to "SANAYİ VE"', () => {
+        const input = 'SANAYİVE TİCARET ODASI'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.text).toMatch(/SANAYİ\s+VE/i)
+      })
+    })
+
+    describe('Combined user-reported text cleanup', () => {
+      it('should clean the exact problematic text from user report', () => {
+        const problematicText = `B^^^Bj54<O[ MtWfE<q&vB^^^B
+a!!!!!a!AAAaA!AA!!!aaAA!aAaAA!!
+S Ö ZLE Ş ME TARAFLARI
+T Ü RK SİGORTA
+HUSUSİOTOMOBİL KASKO`
+
+        const result = applyComprehensivePreprocessing(problematicText)
+
+        // Should remove barcode artifacts
+        expect(result.text).not.toContain('B^^^B')
+        expect(result.text).not.toContain('j54<O[')
+
+        // Should remove repetitive garbage
+        expect(result.text).not.toMatch(/!{3,}/)
+        expect(result.text).not.toMatch(/aAaA/i)
+
+        // Should fix Turkish spacing
+        expect(result.text).toContain('SÖZLEŞME')
+        expect(result.text).toContain('TÜRK')
+
+        // Should split glued words
+        expect(result.text).toMatch(/HUSUSİ\s+OTOMOBİL/i)
+
+        // Should preserve important content
+        expect(result.text).toContain('TARAFLARI')
+        expect(result.text).toContain('KASKO')
+      })
+
+      it('should return pre-clean stats for tracking', () => {
+        const input = 'B^^^B\na!!!!!a\nS Ö ZLE Ş ME'
+        const result = applyComprehensivePreprocessing(input)
+        expect(result.preCleanStats).toBeDefined()
+        expect(result.preCleanStats!.noiseLinesRemoved).toBeGreaterThan(0)
+      })
+    })
+  })
 })

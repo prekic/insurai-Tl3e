@@ -9,6 +9,7 @@
  * - Makes text human and AI readable
  *
  * NEW: Clean-room document normalization mode for legally auditable processing
+ * NEW: Integrated deterministic pre-clean module for comprehensive Turkish OCR cleanup
  */
 
 import { env } from '@/lib/env'
@@ -19,6 +20,7 @@ import {
   parseDocumentProcessingResponse,
   validateOCRCorrection,
 } from './prompts'
+import { preCleanOcrText, type PreCleanStats } from '@/lib/pipeline/deterministic-preclean'
 
 export interface ProcessedTextResult {
   success: boolean
@@ -1186,29 +1188,65 @@ export function applyComprehensivePreprocessing(
     addSectionMarkers?: boolean
     normalizeNumbers?: boolean
     preserveDisplayFormat?: boolean
+    skipDeterministicPreClean?: boolean
   } = {}
 ): {
   text: string
   corrections: TextCorrection[]
   stats: CleanupStats
   qualityMetrics?: TextQualityMetrics
+  preCleanStats?: PreCleanStats
 } {
   const {
     addSectionMarkers: shouldAddMarkers = false,
     normalizeNumbers = true,
     preserveDisplayFormat = true,
+    skipDeterministicPreClean = false,
   } = options
 
   const corrections: TextCorrection[] = []
   let result = text
   let sectionsIdentified: string[] = []
   let numbersNormalized = 0
+  let preCleanStats: PreCleanStats | undefined
 
-  // 1. Remove garbage data first (including QR/barcode and e-Sigorta artifacts)
+  // 0. NEW: Apply deterministic pre-clean FIRST (battle-tested Turkish OCR cleanup)
+  // This handles B^^^B, a!!!a barcode artifacts and Turkish word de-spacing
+  if (!skipDeterministicPreClean) {
+    const preCleanResult = preCleanOcrText(result)
+    result = preCleanResult.text
+    preCleanStats = preCleanResult.stats
+
+    // Log pre-clean corrections
+    if (preCleanResult.stats.noiseLinesRemoved > 0) {
+      corrections.push({
+        original: `${preCleanResult.stats.noiseLinesRemoved} noise lines`,
+        corrected: 'removed',
+        type: 'garbage_removal',
+      })
+    }
+    if (preCleanResult.stats.turkishWordsDespaced > 0) {
+      corrections.push({
+        original: `${preCleanResult.stats.turkishWordsDespaced} spaced Turkish words`,
+        corrected: 'merged',
+        type: 'formatting',
+      })
+    }
+    if (preCleanResult.stats.barcodeArtifactsRemoved > 0) {
+      corrections.push({
+        original: `${preCleanResult.stats.barcodeArtifactsRemoved} barcode artifacts`,
+        corrected: 'removed',
+        type: 'garbage_removal',
+      })
+    }
+  }
+
+  // 1. Remove garbage data (including QR/barcode and e-Sigorta artifacts)
+  // Note: Much of this is now handled by pre-clean, but keep for any remaining artifacts
   const garbageResult = removeGarbageData(result)
   result = garbageResult.text
 
-  // 2. Fix spaced Turkish characters
+  // 2. Fix any remaining spaced Turkish characters (most handled by pre-clean now)
   const turkishResult = fixSpacedTurkishCharacters(result)
   result = turkishResult.text
 
@@ -1245,14 +1283,19 @@ export function applyComprehensivePreprocessing(
   result = result.trim()
   result = result.replace(/[ \t]+$/gm, '') // Remove trailing spaces per line
 
+  // Calculate combined stats (pre-clean + legacy cleanup)
+  const preCleanCharsRemoved = preCleanStats
+    ? preCleanStats.originalLength - preCleanStats.finalLength
+    : 0
+
   const stats: CleanupStats = {
-    garbageBlocksRemoved: garbageResult.stats.blocksRemoved,
-    qrBlocksRemoved: garbageResult.stats.qrBlocksRemoved,
+    garbageBlocksRemoved: garbageResult.stats.blocksRemoved + (preCleanStats?.noiseLinesRemoved || 0),
+    qrBlocksRemoved: garbageResult.stats.qrBlocksRemoved + (preCleanStats?.barcodeArtifactsRemoved || 0),
     eSigortaArtifactsRemoved: garbageResult.stats.eSigortaArtifacts,
-    spacedCharsFixed: turkishResult.fixCount,
+    spacedCharsFixed: turkishResult.fixCount + (preCleanStats?.turkishWordsDespaced || 0),
     urlsCleaned: urlResult.cleanupCount,
-    linesRemoved: garbageResult.stats.linesRemoved,
-    totalCharactersRemoved: garbageResult.stats.charsRemoved,
+    linesRemoved: garbageResult.stats.linesRemoved + (preCleanStats?.noiseLinesRemoved || 0),
+    totalCharactersRemoved: garbageResult.stats.charsRemoved + preCleanCharsRemoved,
     sectionsIdentified,
     numbersNormalized,
   }
@@ -1260,7 +1303,7 @@ export function applyComprehensivePreprocessing(
   // Calculate quality metrics
   const qualityMetrics = calculateQualityMetrics(text, result, stats)
 
-  return { text: result, corrections, stats, qualityMetrics }
+  return { text: result, corrections, stats, qualityMetrics, preCleanStats }
 }
 
 /**
