@@ -193,7 +193,13 @@ function isNoiseLine(line: string): { isNoise: boolean; reason: string } {
   }
 
   // B4: Check for repetitive patterns
-  if (/(.)\1{6,}/.test(trimmed)) {
+  // EXCEPTION: Preserve markdown table separators like |-------|-------|
+  const isMarkdownTableSeparator = /^\|[-:]+(\|[-:]+)+\|?$/.test(trimmed) ||
+                                   /^[-:]+(\|[-:]+)+\|?$/.test(trimmed)
+  // EXCEPTION: Preserve lines with TC Kimlik, IBAN, policy numbers (may have repeated digits)
+  const hasIdentifierPattern = /\b(?:TC|T\.?C\.?|Kimlik|IBAN|TR\d{2}|No|Numara|Poliçe|poli[çc]e|VKN|TCKN)\b/i.test(trimmed) ||
+                               /\b\d{10,26}\b/.test(trimmed)  // 10+ digit numbers
+  if (!isMarkdownTableSeparator && !hasIdentifierPattern && /(.)\1{6,}/.test(trimmed)) {
     return { isNoise: true, reason: 'repetitive_chars' }
   }
 
@@ -347,15 +353,19 @@ function despacePartialSequences(text: string): { text: string; count: number } 
 }
 
 /**
- * C2: Join "broken word" pattern: single letter + lowercase continuation
+ * C2: Join "broken word" pattern: single UPPERCASE letter + lowercase continuation
  * Fixes: M üş teri → Müşteri, Ş asi → Şasi, D ü zenleme → Düzenleme
+ *
+ * IMPORTANT: Only matches UPPERCASE letters to avoid matching the last letter
+ * of a spaced word like "poli ç e sigorta" where "e sigorta" would incorrectly
+ * become "esigorta".
  */
 function despaceLeadingSplits(text: string): { text: string; count: number } {
   let count = 0
 
-  // Pattern: single Turkish letter + space (not newline) + 2+ lowercase letters
+  // Pattern: single UPPERCASE Turkish letter + space (not newline) + 2+ lowercase letters
   const pattern = new RegExp(
-    `\\b([${TR_ALL}])${HWS_PATTERN}+([${TR_LOWER}]{2,})\\b`,
+    `\\b([${TR_UPPER}])${HWS_PATTERN}+([${TR_LOWER}]{2,})\\b`,
     'gu'
   )
 
