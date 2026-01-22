@@ -20,6 +20,7 @@ export type QAGateId =
   | 'data_preserved'
   | 'no_barcode_patterns'
   | 'no_spaced_fragments'
+  | 'no_control_chars'
   | 'min_content_ratio'
   | 'reasonable_length'
 
@@ -141,19 +142,22 @@ const QA_GATES: QAGateDefinition[] = [
     description: 'Ensure no barcode/QR code patterns or high-ASCII remnants remain',
     severity: 'high',
     check: (chunk: SanitizedChunk): QAGateCheckResult => {
+      // Normalize text for consistent matching
+      const text = chunk.sanitizedText.normalize('NFC')
       const patterns = [
         { regex: /B\s*[\^]+\s*B/gi, name: 'B^^^B' },
         { regex: /a\s*!{3,}\s*a/gi, name: 'a!!!a' },
-        { regex: /a!{3,}a[!aA]+/gi, name: 'a!!!a extended' },
-        { regex: /[<>\[\]{}|\\^]{5,}/g, name: 'special char cluster' },
-        { regex: /[\x80-\xff]{5,}/g, name: 'high-ASCII sequence' },
+        { regex: /a!{3,}a[!aA]*/gi, name: 'a!!!a extended' },
+        { regex: /[<>[\]{}|\\^]{5,}/g, name: 'special char cluster' },
+        { regex: /[\x80-\xff]{3,}/g, name: 'high-ASCII sequence' },
+        { regex: /[\uFFFD]{2,}/g, name: 'replacement chars' },
       ]
 
       const found: string[] = []
       for (const { regex, name } of patterns) {
         // Reset lastIndex for global patterns
         regex.lastIndex = 0
-        if (regex.test(chunk.sanitizedText)) {
+        if (regex.test(text)) {
           found.push(name)
         }
       }
@@ -169,42 +173,80 @@ const QA_GATES: QAGateDefinition[] = [
     },
   },
   {
+    id: 'no_control_chars',
+    name: 'No Control Characters',
+    description: 'Ensure no control characters (C0/C1) or replacement characters remain',
+    severity: 'high',
+    check: (chunk: SanitizedChunk): QAGateCheckResult => {
+      // Check for C0 controls (except tab/newline), C1 controls, and replacement chars
+      // eslint-disable-next-line no-control-regex
+      const controlPattern = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]/g
+      const matches = chunk.sanitizedText.match(controlPattern) || []
+      const count = matches.length
+
+      // Allow up to 2 stray control chars (might be false positives)
+      const threshold = 2
+
+      return {
+        passed: count <= threshold,
+        gateId: 'no_control_chars',
+        message: count <= threshold
+          ? `Control chars: ${count} (acceptable)`
+          : `Found ${count} control/replacement characters`,
+        details: { count, threshold },
+      }
+    },
+  },
+  {
     id: 'no_spaced_fragments',
     name: 'No Spaced Turkish Fragments',
     description: 'Check that spaced Turkish uppercase fragments (classic and mixed-length) have been merged',
     severity: 'high', // Elevated from medium - these cause extraction issues
     check: (chunk: SanitizedChunk): QAGateCheckResult => {
-      const TURKISH_UPPER = 'A-ZÇĞİÖŞÜÂÎÛ'
       const foundPatterns: string[] = []
+      // Normalize text for consistent Unicode handling
+      const text = chunk.sanitizedText.normalize('NFC')
 
-      // Classic pattern: 3+ Turkish uppercase tokens (1-3 chars each) separated by spaces
-      const classicPattern = new RegExp(
-        `\\b(?:[${TURKISH_UPPER}]{1,3}\\s){2,}[${TURKISH_UPPER}]{1,3}\\b`,
-        'g'
-      )
-      const classicMatches = chunk.sanitizedText.match(classicPattern) || []
-      if (classicMatches.length > 0) {
-        foundPatterns.push(...classicMatches.slice(0, 2).map(m => `classic: "${m}"`))
+      // Unicode-safe check for Turkish uppercase using \p{Lu} with /u flag
+      // Check if a string is all uppercase letters
+      const isAllUpper = (s: string): boolean => {
+        if (s.length === 0) return false
+        try {
+          return /^\p{Lu}+$/u.test(s)
+        } catch {
+          // Fallback for environments without Unicode property support
+          return /^[A-ZÇĞİÖŞÜÂÎÛ]+$/.test(s)
+        }
       }
 
-      // Mixed-length pattern: 2+ Turkish uppercase tokens (1-10 chars) with at least 2 short (<=3)
-      const mixedPattern = new RegExp(
-        `\\b(?:[${TURKISH_UPPER}]{1,10}\\s+){1,}[${TURKISH_UPPER}]{1,10}\\b`,
-        'g'
-      )
-      const mixedMatches = chunk.sanitizedText.match(mixedPattern) || []
-      for (const match of mixedMatches) {
-        const tokens = match.split(/\s+/).filter(Boolean)
-        if (tokens.length < 2) continue
+      // Scan for space-separated uppercase sequences
+      const words = text.split(/\s+/)
+      let consecutiveUpperFragments: string[] = []
 
-        const shortCount = tokens.filter(t => t.length <= 3).length
-        const turkishUpperPattern = new RegExp(`^[${TURKISH_UPPER}]+$`)
-        const allTurkishUpper = tokens.every(t => turkishUpperPattern.test(t))
+      for (const word of words) {
+        if (word.length > 0 && word.length <= 10 && isAllUpper(word)) {
+          consecutiveUpperFragments.push(word)
+        } else {
+          // Check if we had a valid spaced fragment sequence
+          if (consecutiveUpperFragments.length >= 3) {
+            const shortCount = consecutiveUpperFragments.filter(w => w.length <= 3).length
+            if (shortCount >= 2) {
+              const match = consecutiveUpperFragments.join(' ')
+              const type = consecutiveUpperFragments.every(w => w.length <= 3) ? 'classic' : 'mixed'
+              foundPatterns.push(`${type}: "${match}"`)
+            }
+          }
+          consecutiveUpperFragments = []
+        }
+      }
 
-        // Mixed pattern: at least 2 short tokens and all Turkish upper
-        if (shortCount >= 2 && allTurkishUpper) {
-          foundPatterns.push(`mixed: "${match}"`)
-          if (foundPatterns.length >= 3) break
+      // Check final sequence
+      if (consecutiveUpperFragments.length >= 3) {
+        const shortCount = consecutiveUpperFragments.filter(w => w.length <= 3).length
+        if (shortCount >= 2) {
+          const match = consecutiveUpperFragments.join(' ')
+          const type = consecutiveUpperFragments.every(w => w.length <= 3) ? 'classic' : 'mixed'
+          foundPatterns.push(`${type}: "${match}"`)
         }
       }
 
@@ -213,8 +255,8 @@ const QA_GATES: QAGateDefinition[] = [
         gateId: 'no_spaced_fragments',
         message: foundPatterns.length === 0
           ? 'No spaced fragments found'
-          : `Found ${foundPatterns.length} spaced fragment pattern(s): ${foundPatterns.join(', ')}`,
-        details: { examples: foundPatterns },
+          : `Found ${foundPatterns.length} spaced fragment pattern(s): ${foundPatterns.slice(0, 3).join(', ')}`,
+        details: { examples: foundPatterns.slice(0, 5) },
       }
     },
   },
@@ -489,32 +531,61 @@ export function determineRetryAction(
 }
 
 /**
- * Generate LLM cleanup prompt based on failed gates
+ * Generate LLM cleanup prompt based on failed gates (v5 - more robust)
  */
 export function generateLLMCleanupPrompt(failedGates: QAGateId[]): string {
   const issues: string[] = []
 
   if (failedGates.includes('no_barcode_patterns')) {
-    issues.push('- Remove any barcode/QR patterns like "B^^^B", "a!!!a", "a!!!!!a!AAA"')
-    issues.push('- Remove sequences of high-ASCII characters (garbled text)')
+    issues.push('BARCODE REMOVAL:')
+    issues.push('  - Remove "B^^^B" and "B ^ ^ ^ B" patterns completely')
+    issues.push('  - Remove "a!!!a", "a!!!!!a", "a!!!a!AAA" patterns completely')
+    issues.push('  - Remove sequences of 3+ high-ASCII/garbled characters (�, □, ▪, etc.)')
+    issues.push('  - These are scanner artifacts, not real content')
   }
 
   if (failedGates.includes('no_spaced_fragments')) {
-    issues.push('- Merge spaced Turkish uppercase letters: "S İ G O R T A" → "SİGORTA"')
-    issues.push('- Merge mixed-length patterns: "GEN İŞ LETİLM İŞ" → "GENİŞLETİLMİŞ"')
+    issues.push('TURKISH FRAGMENT MERGING:')
+    issues.push('  - Join spaced uppercase letters: "S İ G O R T A" → "SİGORTA"')
+    issues.push('  - Join mixed patterns: "GEN İŞ LETİLM İŞ" → "GENİŞLETİLMİŞ"')
+    issues.push('  - Join patterns like "B İ R L E Ş İ K" → "BİRLEŞİK"')
+    issues.push('  - Turkish uppercase includes: Ç, Ğ, İ, Ö, Ş, Ü')
+  }
+
+  if (failedGates.includes('no_control_chars')) {
+    issues.push('CONTROL CHARACTER REMOVAL:')
+    issues.push('  - Remove invisible control characters (C0/C1 controls)')
+    issues.push('  - Remove replacement characters (�)')
+    issues.push('  - These appear as blank or garbled squares')
   }
 
   if (failedGates.includes('no_artifacts')) {
-    issues.push('- Remove any remaining OCR artifacts and garbage characters')
+    issues.push('GENERAL ARTIFACT CLEANUP:')
+    issues.push('  - Remove any remaining OCR garbage or scanner noise')
+    issues.push('  - Clean up stray punctuation clusters')
   }
 
-  return `Clean this Turkish insurance document text. Fix these specific issues:
-${issues.join('\n')}
+  const issueText = issues.length > 0 ? issues.join('\n') : '- General OCR cleanup needed'
 
-CRITICAL RULES:
-1. PRESERVE ALL: policy numbers, dates (DD.MM.YYYY), amounts (1.234,56 TL), plate numbers (34 ABC 123), VINs exactly
-2. Only remove garbage/artifacts, do not change valid Turkish text
-3. Return only the cleaned text, no explanations`
+  return `# Turkish Insurance Document Cleanup Task
+
+You are cleaning OCR-scanned Turkish insurance document text.
+
+## ISSUES TO FIX:
+${issueText}
+
+## CRITICAL PRESERVATION RULES (NON-NEGOTIABLE):
+1. Policy numbers: Keep EXACT (e.g., "9024025101000253/2", "POL-2024-12345")
+2. Dates: Keep EXACT format (e.g., "15.01.2026", "01/12/2025")
+3. Amounts: Keep EXACT Turkish format (e.g., "1.234,56 TL", "₺50.000,00")
+4. Plate numbers: Keep EXACT (e.g., "34 ABC 123", "06 A 1234")
+5. VIN/Chassis: Keep EXACT 17-char codes (e.g., "WVWZZZ3CZWE123456")
+6. TC Kimlik: Keep EXACT 11-digit numbers
+7. IBAN: Keep EXACT format (e.g., "TR12 0001 2345 6789 0123 4567 89")
+
+## OUTPUT:
+Return ONLY the cleaned text. No explanations, headers, or markdown.
+Preserve all paragraph structure and line breaks from the original.`
 }
 
 /**
@@ -584,7 +655,7 @@ export async function processChunkWithRetry(
           chunkIndex: currentChunk.index,
           failedGates: currentQAResult.failedGates,
         })
-      } catch (error) {
+      } catch (_error) {
         // LLM cleanup failed, mark for manual review
         const attempt = createRetryAttempt(
           chunk.id,
