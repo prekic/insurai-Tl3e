@@ -38,7 +38,7 @@ export interface SanitizerResult {
 
 // Turkish uppercase letters (including special chars)
 const TURKISH_UPPER = 'A-ZÇĞİÖŞÜÂÎÛ'
-const TURKISH_UPPER_CHARS = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZÂÎÛ'
+// Note: Full character list available if needed: ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZÂÎÛ
 
 // Characters that should NOT be merged across (preserve structure)
 const MERGE_BLOCKERS = /[\d\/:.\-@#$%&*()=+\[\]{}|\\<>]/

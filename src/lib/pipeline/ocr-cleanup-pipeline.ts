@@ -15,7 +15,6 @@
 import {
   chunkDocument,
   sanitizeChunk,
-  sanitizeAllChunks,
   mergeChunks,
   validateChunkCoverage,
   type DocumentChunk,
@@ -28,7 +27,6 @@ import {
   runQAGates,
   processChunkWithRetry,
   processAllChunksWithQA,
-  createDocumentQAReport,
   getQASummary,
   hasQAFailures,
   getFailedChunks,
