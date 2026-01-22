@@ -200,35 +200,33 @@ const TURKISH_OCR_CONFUSIONS: Array<[RegExp, string]> = [
 
   // =========================================================================
   // Common Turkish word spacing fixes (lowercase and mixed case)
+  // IMPORTANT: Use \s+ (one or more) to require actual whitespace
+  // NOTE: Turkish chars (ı,ş,ğ,ü,ö,ç) are NOT word chars in JS regex,
+  //       so use (?=\s|$) instead of \b at end of patterns
   // =========================================================================
-  [/poli\s*ç\s*e\s*s?\s*i?/gi, 'poliçe'],
-  [/sigorta\s*l\s*ı/gi, 'sigortalı'],
-  [/teminat\s*l\s*ar/gi, 'teminatlar'],
-  [/muafiyet\s*i/gi, 'muafiyeti'],
-  [/de\s*ğ\s*er/gi, 'değer'],
-  [/d\s*ü\s*zenleme/gi, 'düzenleme'],
-  [/s\s*ü\s*re\s*s?\s*i?/gi, 'süre'],
-  [/g\s*ü\s*n(?=\s|$)/gi, 'gün'],
-  [/ş\s*irket\s*i?/gi, 'şirket'],
+  [/\bpoli\s+ç\s*e(?=\s|$)/gi, 'poliçe'],              // "poli ç e"
+  [/\bpoli\s*ç\s+e(?=\s|$)/gi, 'poliçe'],              // "poliç e"
+  [/\bsigorta\s+l\s*ı(?=\s|$)/gi, 'sigortalı'],        // "sigorta l ı"
+  [/\bsigorta\s*l\s+ı(?=\s|$)/gi, 'sigortalı'],        // "sigortal ı"
+  [/\bteminat\s+l\s*ar(?=\s|$)/gi, 'teminatlar'],      // "teminat l ar"
+  [/\bteminat\s*l\s+ar(?=\s|$)/gi, 'teminatlar'],      // "teminatl ar"
+  [/\bmuafiyet\s+i(?=\s|$)/gi, 'muafiyeti'],           // "muafiyet i"
+  [/\bde\s+ğ\s*er(?=\s|$)/gi, 'değer'],                // "de ğ er"
+  [/\bde\s*ğ\s+er(?=\s|$)/gi, 'değer'],                // "değ er"
+  [/\bd\s+ü\s*zenleme(?=\s|$)/gi, 'düzenleme'],        // "d ü zenleme"
+  [/\bd\s*ü\s+zenleme(?=\s|$)/gi, 'düzenleme'],        // "dü zenleme"
+  [/\bs\s+ü\s*re(?=\s|$)/gi, 'süre'],                  // "s ü re"
+  [/\bs\s*ü\s+re(?=\s|$)/gi, 'süre'],                  // "sü re"
+  [/\bg\s+ü\s*n(?=\s|$)/gi, 'gün'],                    // "g ü n"
+  [/\bg\s*ü\s+n(?=\s|$)/gi, 'gün'],                    // "gü n"
+  [/(?:^|\s)ş\s+irket(?=\s|$)/gi, 'şirket'],           // "ş irket" - no \b at start either
 
   // =========================================================================
   // Turkish special character spacing within words
-  // Handle both space before and after special chars
+  // REMOVED: General patterns like (\w)\s+ş\s*(\w) were too aggressive
+  // and crossed word boundaries (e.g., "l ı t" → "lıt" merging words)
+  // Word-specific patterns above handle the important cases
   // =========================================================================
-  [/(\w)\s+ş\s*(\w)/g, '$1ş$2'],
-  [/(\w)\s*ş\s+(\w)/g, '$1ş$2'],
-  [/(\w)\s+ğ\s*(\w)/g, '$1ğ$2'],
-  [/(\w)\s*ğ\s+(\w)/g, '$1ğ$2'],
-  [/(\w)\s+ü\s*(\w)/g, '$1ü$2'],
-  [/(\w)\s*ü\s+(\w)/g, '$1ü$2'],
-  [/(\w)\s+ö\s*(\w)/g, '$1ö$2'],
-  [/(\w)\s*ö\s+(\w)/g, '$1ö$2'],
-  [/(\w)\s+ç\s*(\w)/g, '$1ç$2'],
-  [/(\w)\s*ç\s+(\w)/g, '$1ç$2'],
-  [/(\w)\s+ı\s*(\w)/g, '$1ı$2'],
-  [/(\w)\s*ı\s+(\w)/g, '$1ı$2'],
-  [/(\w)\s+İ\s*(\w)/g, '$1İ$2'],
-  [/(\w)\s*İ\s+(\w)/g, '$1İ$2'],
 ]
 
 /**
@@ -423,11 +421,18 @@ export class DocumentNormalizer {
     let result = text
 
     for (const [pattern, replacement] of TURKISH_OCR_CONFUSIONS) {
-      const matches = result.match(pattern)
-      if (matches) {
-        this.stats.ocrSpacingFixed += matches.length
-        result = result.replace(pattern, replacement)
-      }
+      // IMPORTANT: Only replace when the match actually contains whitespace!
+      // This prevents changing properly written words like "Anadolu" to "ANADOLU"
+      // Patterns use \s* which can match zero spaces
+      result = result.replace(pattern, (match) => {
+        // Only replace if the match contains at least one whitespace character
+        if (/\s/.test(match)) {
+          this.stats.ocrSpacingFixed++
+          return replacement
+        }
+        // No whitespace in match - return original (preserve case and content)
+        return match
+      })
     }
 
     return result
