@@ -1,4 +1,4 @@
-# Session Handoff - January 22, 2026
+# Session Handoff - January 22, 2026 (Afternoon)
 
 ## Current Status
 
@@ -7,83 +7,80 @@
 | **Build** | ✅ Passing |
 | **TypeCheck** | ✅ 0 errors |
 | **Lint** | ⚠️ 1 warning (non-null assertion, intentional) |
-| **Tests** | ✅ 4600+ passing (251 pipeline tests) |
-| **Branch** | `claude/review-project-status-y39np` |
+| **Tests** | ✅ 5250+ passing (131 OCR-related tests) |
+| **Branch** | `claude/review-project-status-lr99V` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **OCR Pipeline** | ✅ Unicode-safe Turkish matching implemented |
+| **OCR Pipeline** | ✅ Turkish word boundary handling fixed |
 
 ---
 
 ## Session Summary
 
-This session focused on **OCR Cleanup Pipeline Unicode Improvements** - fixing Turkish character matching and improving garbage detection in the OCR sanitization pipeline.
+This session focused on **Turkish Word Boundary Handling** - fixing regex patterns that failed with Turkish characters and improving identifier preservation in the OCR cleanup pipeline.
 
 Key accomplishments:
-1. Added Unicode-safe Turkish uppercase character detection using codepoints + `\p{Lu}`
-2. Implemented control character stripping (C0/C1 controls)
-3. Added new QA gate `no_control_chars` for remnant detection
-4. Enhanced LLM cleanup prompt to v5 with detailed instructions
-5. Fixed admin save button functionality with proper error handling
+1. Fixed TC Kimlik/IBAN numbers being incorrectly removed as noise
+2. Fixed `\b` (word boundary) issues with Turkish characters using `(?=\s|$)`
+3. Changed `despaceLeadingSplits` to only match uppercase letters
+4. Added whitespace check in `fixOCRSpacing` to prevent unwanted case changes
+5. Removed overly aggressive general Turkish char patterns
 
 ---
 
 ## Features Completed This Session
 
-### OCR Pipeline Unicode Improvements
+### Turkish Word Boundary Fixes
 
 | Component | Description |
 |-----------|-------------|
-| `src/lib/pipeline/ocr-sanitizer.ts` | Added Unicode-safe `isTurkishUpperChar()`, `isAllTurkishUpper()`, `stripControlChars()` |
-| `src/lib/pipeline/qa-gates.ts` | New `no_control_chars` gate, v5 LLM cleanup prompt |
+| `src/lib/pipeline/deterministic-preclean.ts` | TC Kimlik exception, uppercase-only matching in despaceLeadingSplits |
+| `src/lib/ai/document-normalizer.ts` | Word boundary fixes with `(?=\s|$)`, whitespace check in fixOCRSpacing |
 
-### Key Functions Added
+### Key Issues Fixed
+
+| Issue | Root Cause | Fix |
+|-------|------------|-----|
+| TC Kimlik `10000000146` removed | 7+ repeated chars flagged as noise | Added identifier pattern exception |
+| `sigortalı` pattern not matching | `\b` fails after Turkish `ı` | Use `(?=\s|$)` instead of `\b` |
+| "e sigorta" → "esigorta" | despaceLeadingSplits matched lowercase | Only match `[TR_UPPER]` letters |
+| "Anadolu" → "ANADOLU" | fixOCRSpacing replaced without whitespace | Added `/\s/.test(match)` check |
+
+### Code Changes
 
 ```typescript
-// Unicode-safe Turkish uppercase detection
-function isTurkishUpperChar(char: string): boolean {
-  const codepoint = char.codePointAt(0)
-  if (TURKISH_UPPER_CODEPOINTS.has(codepoint)) return true
-  return /^\p{Lu}$/u.test(char) // Fallback to Unicode property
-}
+// Turkish chars are NOT word chars in JS regex!
+// \w only matches [A-Za-z0-9_], NOT ı,ş,ğ,ü,ö,ç
 
-// NFC normalization before matching
-function isAllTurkishUpper(str: string): boolean {
-  const normalized = str.normalize('NFC')
-  for (const char of normalized) {
-    if (!isTurkishUpperChar(char)) return false
-  }
-  return true
-}
+// BROKEN: \b after ı fails because ı is not a word char
+[/\bsigorta\s+l\s*ı\b/gi, 'sigortalı']
 
-// Control character stripping
-const CONTROL_CHAR_PATTERN = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\uFFFD]/g
-function stripControlChars(text: string): string {
-  return text.replace(CONTROL_CHAR_PATTERN, '')
+// FIXED: Use lookahead for whitespace or end-of-string
+[/\bsigorta\s+l\s*ı(?=\s|$)/gi, 'sigortalı']
+
+// TC Kimlik preservation - don't remove identifiers with repeated digits
+const hasIdentifierPattern = /\b(?:TC|Kimlik|IBAN|No|Poliçe)\b/i.test(line) ||
+                             /\b\d{10,26}\b/.test(line)
+if (!hasIdentifierPattern && /(.)\1{6,}/.test(line)) {
+  return { isNoise: true }
 }
 ```
-
-### Admin Save Button Fix
-
-| Component | Description |
-|-----------|-------------|
-| `src/components/admin/tabs/PromptsTab.tsx` | Added error states, loading states, success messages |
-| `src/components/admin/tabs/ConfigTab.tsx` | Same error handling pattern |
 
 ---
 
 ## Commits This Session
 
 ```
-e78553d Update documentation for OCR pipeline Unicode improvements session
-be67c57 Add Unicode-safe Turkish matching and improved garbage detection in OCR pipeline
-0d6eeff Enhance OCR cleanup pipeline for better garbage removal and fragment merging
-02e7e14 Fix unused variable TypeScript errors in pipeline files
-9cd4b80 Fix admin save button functionality with error handling and user feedback
-292a45e Add robust OCR cleanup pipeline with deterministic sanitization
+56f0c27 Fix OCR cleanup patterns for Turkish word boundary handling
 ```
 
-Note: Earlier commits (5322547, e718151, 9e2ba5d) from same day are pipeline foundation work.
+Previous session commits (same day, earlier):
+```
+ac69555 Add AI-powered Turkish OCR cleaner for spacing correction
+4bd7ba4 Add integration tests for user-reported OCR cleanup issues
+268ea9f Integrate deterministic pre-clean into text-processor
+f535649 Add deterministic pre-clean module for Turkish OCR cleanup
+```
 
 ---
 
@@ -91,24 +88,8 @@ Note: Earlier commits (5322547, e718151, 9e2ba5d) from same day are pipeline fou
 
 | File | Changes |
 |------|---------|
-| `src/lib/pipeline/ocr-sanitizer.ts` | Unicode-safe char detection, control char stripping, NFC normalization |
-| `src/lib/pipeline/qa-gates.ts` | New `no_control_chars` gate, v5 LLM prompt, improved detection |
-| `src/components/admin/tabs/PromptsTab.tsx` | Error/success feedback for save buttons |
-| `src/components/admin/tabs/ConfigTab.tsx` | Error/success feedback for save buttons |
-
----
-
-## QA Gates Available
-
-| Gate ID | Severity | Description |
-|---------|----------|-------------|
-| `no_artifacts` | high | Check for remaining OCR artifacts |
-| `data_preserved` | critical | Verify policy numbers, dates, amounts preserved |
-| `no_barcode_patterns` | high | Detect B^^^B, a!!!a, high-ASCII sequences |
-| `no_control_chars` | high | **NEW** Detect C0/C1 control characters |
-| `no_spaced_fragments` | high | Detect unmerged Turkish uppercase fragments |
-| `min_content_ratio` | medium | Ensure sanitization didn't remove too much |
-| `reasonable_length` | high | Ensure output isn't suspiciously short |
+| `src/lib/pipeline/deterministic-preclean.ts` | TC Kimlik exception, markdown table exception, uppercase-only despaceLeadingSplits |
+| `src/lib/ai/document-normalizer.ts` | Word boundary fixes `(?=\s|$)`, whitespace check in fixOCRSpacing, removed aggressive patterns |
 
 ---
 
@@ -133,20 +114,6 @@ Note: Earlier commits (5322547, e718151, 9e2ba5d) from same day are pipeline fou
 - Don't add quotes in Railway UI - they're added automatically
 - Server needs `SUPABASE_URL` (not `VITE_SUPABASE_URL`) for runtime DB access
 - Always import `crypto` explicitly in server code (don't rely on global)
-
-### API Proxy Auto-Detection (`src/lib/env.ts`)
-```typescript
-// In production, if VITE_API_PROXY_URL not set, auto-detect:
-export function getApiProxyUrl(): string {
-  if (import.meta.env.VITE_API_PROXY_URL) {
-    return import.meta.env.VITE_API_PROXY_URL
-  }
-  if (import.meta.env.PROD && typeof window !== 'undefined') {
-    return window.location.origin  // Same origin when co-hosted
-  }
-  return 'http://localhost:4001'
-}
-```
 
 ---
 
@@ -184,7 +151,9 @@ Add to Supabase Dashboard → Authentication → URL Configuration:
 | Supabase auth failing | Add Railway URL to Supabase redirect allowlist |
 | Server can't access DB | Use `SUPABASE_URL` not `VITE_SUPABASE_URL` |
 | `crypto` not defined | Import explicitly: `import crypto from 'crypto'` |
-| Turkish chars not matching | Use NFC normalization + `\p{Lu}` with `/u` flag |
+| Turkish chars not matching | Use `(?=\s\|$)` not `\b` at pattern end |
+| TC Kimlik numbers removed | Add identifier pattern exception |
+| Word merging across spaces | Use uppercase-only matching in despaceLeadingSplits |
 
 ---
 
@@ -198,75 +167,16 @@ Add to Supabase Dashboard → Authentication → URL Configuration:
 
 ---
 
-## Bugs Fixed This Session
-
-| Bug | Root Cause | Fix |
-|-----|------------|-----|
-| Turkish chars not matching in regex | Encoding issues with `İ`, `Ş` in char classes | Unicode-safe codepoint checking + `\p{Lu}` |
-| Garbage patterns persisting | Control chars embedded in noise | Added `stripControlChars()` function |
-| QA gates missing remnants | No control char detection | Added `no_control_chars` gate |
-| Admin save buttons no feedback | No error/success states | Added proper UI feedback |
-
----
-
-## Architecture Notes
-
-### OCR Cleanup Pipeline Flow
-```
-runOCRCleanupPipeline(document)
-├── 1. chunkDocument() - Split by page markers or size
-├── 2. sanitizeChunk() for each chunk
-│   ├── normalizeWhitespace()
-│   ├── stripControlChars() - NEW
-│   ├── removeInlineBarcodes() - B^^^B, a!!!a
-│   ├── removeGarbageLines()
-│   ├── mergeSpacedTurkishFragments() - Unicode-safe
-│   └── validatePreservation()
-├── 3. runQAGates() for each chunk
-│   ├── no_artifacts
-│   ├── data_preserved
-│   ├── no_barcode_patterns
-│   ├── no_control_chars - NEW
-│   ├── no_spaced_fragments
-│   ├── min_content_ratio
-│   └── reasonable_length
-├── 4. processChunkWithRetry() if gates fail
-│   └── generateLLMCleanupPrompt(failedGates) - v5
-└── 5. mergeChunks() and validate
-```
-
-### Unicode-Safe Turkish Matching
-```typescript
-// Explicit codepoint set for fast lookup
-const TURKISH_UPPER_CODEPOINTS = new Set([
-  65-90,    // A-Z
-  199,      // Ç
-  286,      // Ğ
-  304,      // İ
-  214,      // Ö
-  350,      // Ş
-  220,      // Ü
-  194,      // Â
-  206,      // Î
-  219,      // Û
-])
-
-// NFC normalization ensures İ (U+0130) matches correctly
-const normalizedText = text.normalize('NFC')
-```
-
----
-
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Test OCR pipeline** - Upload scanned PDF with Turkish text
-2. **Verify fragment merging** - "S İ G O R T A" → "SİGORTA"
-3. **Verify garbage removal** - B^^^B, a!!!a patterns removed
+1. **Test OCR pipeline** - Upload scanned PDF with Turkish text containing TC Kimlik numbers
+2. **Verify word boundaries** - "sigorta l ı" → "sigortalı" works correctly
+3. **Verify identifier preservation** - TC Kimlik, IBAN numbers not removed
 
 ### Short Term
-1. **Add more Turkish OCR patterns** - Common misrecognitions
-2. **Improve LLM retry** - Better context in cleanup prompts
+1. **Add more Turkish word patterns** - Common OCR spacing issues
+2. **Improve AI OCR cleaner integration** - Use for complex context-dependent fixes
 3. **Performance optimization** - Chunk processing parallelization
 
 ### Feature Work
@@ -280,13 +190,16 @@ const normalizedText = text.normalize('NFC')
 
 ```bash
 # Run pipeline tests
-npm test -- --run src/lib/pipeline/
+npm test -- --run src/lib/pipeline/deterministic-preclean.test.ts
+
+# Run document normalizer tests
+npm test -- --run src/lib/ai/document-normalizer.test.ts
+
+# Run all OCR-related tests
+npm test -- --run src/lib/pipeline/ src/lib/ai/document-normalizer.test.ts
 
 # Check TypeScript
 npm run typecheck
-
-# Check lint (expect 1 warning - intentional)
-npx eslint src/lib/pipeline/ocr-sanitizer.ts src/lib/pipeline/qa-gates.ts
 
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
@@ -298,38 +211,36 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 6 (+ documentation) |
-| Files changed | 6 |
-| New functions | 5 (isTurkishUpperChar, isAllTurkishUpper, stripControlChars, normalizeUnicode, no_control_chars gate) |
-| Bugs fixed | 4 |
-| Tests passing | 251 pipeline tests, 4600+ total |
-| Major focus | OCR Pipeline Unicode Improvements |
+| Commits this session | 1 (word boundary fix) |
+| Files changed | 2 |
+| Bugs fixed | 4 (TC Kimlik, word boundary, word merging, case change) |
+| Tests passing | 131 OCR tests, 5250+ total |
+| Major focus | Turkish Word Boundary Handling |
 
 ---
 
 ## Handoff Checklist
 
-- [x] All tests passing (251 pipeline tests)
+- [x] All tests passing (131 OCR tests, 5250+ total)
 - [x] TypeScript no errors
 - [x] Lint passing (1 intentional warning)
 - [x] Changes committed and pushed
-- [x] Production deployed via branch
-- [x] Documentation updated (CLAUDE.md)
+- [x] Documentation updated (CLAUDE.md entry #23)
 - [x] Session handoff updated
 
 ---
 
 ## Previous Session Context
 
-Previous session (Jan 20) focused on Admin-Managed AI Prompts:
-- Created prompt-service.ts
-- Seeded 16 AI prompts
-- Fixed 401 auth errors
-- Fixed API endpoint routing
+Earlier today focused on:
+- AI-powered Turkish OCR cleaner for spacing correction
+- Integration tests for user-reported OCR cleanup issues
+- Deterministic pre-clean module for Turkish OCR cleanup
+- Unicode-safe Turkish matching improvements
 
-This session continued with OCR pipeline improvements for better Turkish text handling.
+This afternoon session continued with word boundary fixes to handle Turkish characters properly in regex patterns.
 
 ---
 
-**Last Updated**: January 22, 2026
-**Next Session Focus**: Test OCR pipeline with real scanned Turkish documents
+**Last Updated**: January 22, 2026 (Afternoon)
+**Next Session Focus**: Test OCR pipeline with real scanned Turkish documents containing TC Kimlik numbers
