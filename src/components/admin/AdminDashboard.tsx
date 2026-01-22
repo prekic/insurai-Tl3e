@@ -19,6 +19,7 @@ import { PromptsTab } from './tabs/PromptsTab'
 import { UsersTab } from './tabs/UsersTab'
 import { PoliciesTab } from './tabs/PoliciesTab'
 import { PipelineTab } from './tabs/PipelineTab'
+import { OCRDashboardTab } from './tabs/OCRDashboardTab'
 import { SecurityTab } from './tabs/SecurityTab'
 import { ConfigTab } from './tabs/ConfigTab'
 import { AnalyticsTab } from './tabs/AnalyticsTab'
@@ -33,6 +34,7 @@ import {
   Users,
   FileText,
   Workflow,
+  Eye,
   Shield,
   Settings,
   BarChart3,
@@ -51,6 +53,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
   { id: 'policies', label: 'Policies', icon: <FileText className="h-4 w-4" /> },
   { id: 'pipeline', label: 'Pipeline', icon: <Workflow className="h-4 w-4" /> },
+  { id: 'ocr_dashboard', label: 'OCR Analytics', icon: <Eye className="h-4 w-4" /> },
   { id: 'security', label: 'Security', icon: <Shield className="h-4 w-4" /> },
   { id: 'config', label: 'Configuration', icon: <Settings className="h-4 w-4" /> },
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" /> },
@@ -177,6 +180,8 @@ export function AdminDashboard() {
         return <PoliciesTab />
       case 'pipeline':
         return <PipelineTab />
+      case 'ocr_dashboard':
+        return <OCRDashboardTab />
       case 'security':
         return <SecurityTab />
       case 'config':
