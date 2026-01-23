@@ -1,0 +1,309 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # INFRASTRUCTURE
+  # ============================================================================
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: insurai
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-insurai_dev}
+      POSTGRES_DB: insurai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../supabase/migrations:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U insurai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MinIO Object Storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  # Create default buckets
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 minioadmin minioadmin;
+      mc mb --ignore-existing minio/documents;
+      mc mb --ignore-existing minio/ocr-images;
+      mc mb --ignore-existing minio/ocr-artifacts;
+      mc mb --ignore-existing minio/audit-bundles;
+      mc mb --ignore-existing minio/extractions;
+      exit 0;
+      "
+
+  # Temporal Server
+  temporal:
+    image: temporalio/auto-setup:1.22
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=insurai
+      - POSTGRES_PWD=${POSTGRES_PASSWORD:-insurai_dev}
+      - POSTGRES_SEEDS=postgres
+      - DYNAMIC_CONFIG_FILE_PATH=/etc/temporal/config/dynamicconfig/development.yaml
+    volumes:
+      - ./temporal-config:/etc/temporal/config/dynamicconfig
+    ports:
+      - "7233:7233"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # Temporal Web UI
+  temporal-ui:
+    image: temporalio/ui:latest
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "8080:8080"
+    depends_on:
+      - temporal
+
+  # ============================================================================
+  # MICROSERVICES
+  # ============================================================================
+
+  # Document API Gateway
+  doc-api:
+    build:
+      context: .
+      dockerfile: doc-api/Dockerfile
+    environment:
+      - PORT=4002
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - DATABASE_URL=postgresql://insurai:${POSTGRES_PASSWORD:-insurai_dev}@postgres:5432/insurai
+      - TEMPORAL_ADDRESS=temporal:7233
+    ports:
+      - "4002:4002"
+    depends_on:
+      - postgres
+      - minio
+      - temporal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Render Service
+  render-svc:
+    build:
+      context: .
+      dockerfile: render-svc/Dockerfile
+    environment:
+      - PORT=4003
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - INPUT_BUCKET=documents
+      - OUTPUT_BUCKET=ocr-images
+    ports:
+      - "4003:4003"
+    depends_on:
+      - minio
+
+  # Preprocess Service
+  preproc-svc:
+    build:
+      context: .
+      dockerfile: preproc-svc/Dockerfile
+    environment:
+      - PORT=4004
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "4004:4004"
+    depends_on:
+      - minio
+
+  # Layout Service
+  layout-svc:
+    build:
+      context: .
+      dockerfile: layout-svc/Dockerfile
+    environment:
+      - PORT=4005
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "4005:4005"
+    depends_on:
+      - minio
+
+  # OCR Orchestrator
+  ocr-orch:
+    build:
+      context: .
+      dockerfile: ocr-orch/Dockerfile
+    environment:
+      - PORT=4006
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      # ABBYY Cloud OCR SDK
+      - ABBYY_API_URL=${ABBYY_API_URL:-}
+      - ABBYY_APP_ID=${ABBYY_APP_ID:-}
+      - ABBYY_PASSWORD=${ABBYY_PASSWORD:-}
+      # Google Cloud Document AI
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID:-}
+      - GCP_LOCATION=${GCP_LOCATION:-eu}
+      - GCP_DOCAI_PROCESSOR_ID=${GCP_DOCAI_PROCESSOR_ID:-}
+      - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-credentials.json
+      # Azure Document Intelligence
+      - AZURE_DI_ENDPOINT=${AZURE_DI_ENDPOINT:-}
+      - AZURE_DI_API_KEY=${AZURE_DI_API_KEY:-}
+    volumes:
+      - ${GCP_CREDENTIALS_PATH:-./gcp-credentials.json}:/app/gcp-credentials.json:ro
+    ports:
+      - "4006:4006"
+    depends_on:
+      - minio
+
+  # Reconcile Service
+  reconcile-svc:
+    build:
+      context: .
+      dockerfile: reconcile-svc/Dockerfile
+    environment:
+      - PORT=4007
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "4007:4007"
+    depends_on:
+      - minio
+
+  # Normalize Service
+  normalize-svc:
+    build:
+      context: .
+      dockerfile: normalize-svc/Dockerfile
+    environment:
+      - PORT=4008
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - DATABASE_URL=postgresql://insurai:${POSTGRES_PASSWORD:-insurai_dev}@postgres:5432/insurai
+    ports:
+      - "4008:4008"
+    depends_on:
+      - minio
+      - postgres
+
+  # Validate Service
+  validate-svc:
+    build:
+      context: .
+      dockerfile: validate-svc/Dockerfile
+    environment:
+      - PORT=4009
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - DATABASE_URL=postgresql://insurai:${POSTGRES_PASSWORD:-insurai_dev}@postgres:5432/insurai
+    ports:
+      - "4009:4009"
+    depends_on:
+      - minio
+      - postgres
+
+  # Extract Service
+  extract-svc:
+    build:
+      context: .
+      dockerfile: extract-svc/Dockerfile
+    environment:
+      - PORT=4010
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "4010:4010"
+    depends_on:
+      - minio
+
+  # Audit Service
+  audit-svc:
+    build:
+      context: .
+      dockerfile: audit-svc/Dockerfile
+    environment:
+      - PORT=4011
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - STORAGE_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - SIGNING_KEY=${AUDIT_SIGNING_KEY:-dev-signing-key}
+    ports:
+      - "4011:4011"
+    depends_on:
+      - minio
+
+  # Workflow Service (Temporal Worker)
+  workflow:
+    build:
+      context: .
+      dockerfile: workflow/Dockerfile
+    environment:
+      - TEMPORAL_ADDRESS=temporal:7233
+      - RENDER_SERVICE_URL=http://render-svc:4003
+      - PREPROC_SERVICE_URL=http://preproc-svc:4004
+      - LAYOUT_SERVICE_URL=http://layout-svc:4005
+      - OCR_ORCH_URL=http://ocr-orch:4006
+      - RECONCILE_SERVICE_URL=http://reconcile-svc:4007
+      - NORMALIZE_SERVICE_URL=http://normalize-svc:4008
+      - VALIDATE_SERVICE_URL=http://validate-svc:4009
+      - EXTRACT_SERVICE_URL=http://extract-svc:4010
+      - AUDIT_SERVICE_URL=http://audit-svc:4011
+      - DOC_API_URL=http://doc-api:4002
+    depends_on:
+      - temporal
+      - doc-api
+      - render-svc
+      - preproc-svc
+      - layout-svc
+      - ocr-orch
+      - reconcile-svc
+      - normalize-svc
+      - validate-svc
+      - extract-svc
+      - audit-svc
+
+volumes:
+  postgres_data:
+  minio_data:
+
+networks:
+  default:
+    name: insurai-ocr-network

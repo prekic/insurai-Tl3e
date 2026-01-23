@@ -1,0 +1,40 @@
+# Temporal Dynamic Configuration for Development
+
+# Frontend configuration
+frontend.enableClientVersionCheck:
+  - value: false
+    constraints: {}
+
+# History configuration
+history.persistenceMaxQPS:
+  - value: 3000
+    constraints: {}
+
+# Matching configuration
+matching.numTaskqueueReadPartitions:
+  - value: 5
+    constraints: {}
+
+matching.numTaskqueueWritePartitions:
+  - value: 5
+    constraints: {}
+
+# Worker configuration
+worker.enableBatcher:
+  - value: true
+    constraints: {}
+
+# System configuration
+system.forceSearchAttributesCacheRefreshOnRead:
+  - value: true
+    constraints: {}
+
+# Visibility configuration
+frontend.visibilityMaxPageSize:
+  - value: 1000
+    constraints: {}
+
+# Retention configuration (7 days for development)
+history.defaultRetentionPeriod:
+  - value: 168h
+    constraints: {}

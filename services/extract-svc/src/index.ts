@@ -127,7 +127,7 @@ export function isValidDate(dateStr: string): boolean {
 // FIELD PATTERNS BY LOCALE
 // ============================================================================
 
-const turkishPatterns: FieldPattern[] = [
+export const turkishPatterns: FieldPattern[] = [
   // Policy Number
   {
     id: 'policy_number',

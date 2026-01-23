@@ -1,10 +1,9 @@
 {
-  "name": "@insurai/ocr-orch",
+  "name": "@insurai/normalize-svc",
   "version": "1.0.0",
-  "description": "OCR Orchestrator - Multi-engine OCR coordination service with ensemble support (ABBYY, GCP DocAI, Azure DI, Tesseract)",
+  "description": "Text normalization service with rule pack support",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -14,6 +13,7 @@
   },
   "dependencies": {
     "@insurai/types": "workspace:*",
+    "@insurai/rule-packs": "workspace:*",
     "express": "^4.21.0"
   },
   "devDependencies": {

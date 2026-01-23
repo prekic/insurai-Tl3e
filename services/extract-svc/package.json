@@ -1,10 +1,9 @@
 {
-  "name": "@insurai/ocr-orch",
+  "name": "@insurai/extract-svc",
   "version": "1.0.0",
-  "description": "OCR Orchestrator - Multi-engine OCR coordination service with ensemble support (ABBYY, GCP DocAI, Azure DI, Tesseract)",
+  "description": "Field extraction service for insurance documents",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",

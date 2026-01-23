@@ -1679,6 +1679,43 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   const normalizedText = text.normalize('NFC')
   ```
 
+### 23. Turkish Word Boundary Handling in OCR Patterns (Fixed Jan 22, 2026)
+- **Problem**: OCR cleanup patterns had multiple issues:
+  - TC Kimlik numbers with repeated digits (e.g., `10000000146` with 7 zeros) removed as "repetitive noise"
+  - Turkish characters (`ı`,`ş`,`ğ`,`ü`,`ö`,`ç`) are NOT word characters in JS regex, causing `\b` to fail
+  - `despaceLeadingSplits` matched lowercase letters, merging "e sigorta" → "esigorta"
+  - Words without spacing changed case (e.g., "Anadolu" → "ANADOLU")
+  - General Turkish char patterns crossed word boundaries
+- **Root Causes**:
+  - `/(.)\1{6,}/` pattern caught valid identifier numbers
+  - `\b` (word boundary) doesn't work after Turkish chars because `\w` only matches `[A-Za-z0-9_]`
+  - Pattern `[TR_ALL]` included both upper and lowercase letters
+  - `fixOCRSpacing` replaced matches even without whitespace
+- **Solution**:
+  - Added exceptions for TC Kimlik/IBAN patterns and 10+ digit numbers in repetitive char detection
+  - Use `(?=\s|$)` instead of `\b` at end of patterns containing Turkish chars
+  - Changed `despaceLeadingSplits` to only match `[TR_UPPER]` (uppercase letters)
+  - Added whitespace check in `fixOCRSpacing` - only replace when `\s` exists in match
+  - Removed overly aggressive general Turkish char patterns
+- **Files Changed**:
+  - `src/lib/pipeline/deterministic-preclean.ts` - TC Kimlik exception, uppercase-only matching
+  - `src/lib/ai/document-normalizer.ts` - Word boundary fixes, whitespace check
+- **Key Patterns Fixed**:
+  ```typescript
+  // BEFORE (broken): Turkish chars not at word boundary
+  [/\bsigorta\s+l\s*ı\b/gi, 'sigortalı']  // \b after ı fails!
+
+  // AFTER (working): Use lookahead instead
+  [/\bsigorta\s+l\s*ı(?=\s|$)/gi, 'sigortalı']  // (?=\s|$) works
+
+  // TC Kimlik preservation
+  const hasIdentifierPattern = /\b(?:TC|Kimlik|IBAN|No|Poliçe)\b/i.test(line) ||
+                               /\b\d{10,26}\b/.test(line)
+  if (!hasIdentifierPattern && /(.)\1{6,}/.test(line)) {
+    return { isNoise: true }  // Only remove if NOT an identifier
+  }
+  ```
+
 ---
 
 ## Turkish Market Considerations

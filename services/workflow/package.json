@@ -1,10 +1,9 @@
 {
-  "name": "@insurai/ocr-orch",
+  "name": "@insurai/workflow-svc",
   "version": "1.0.0",
-  "description": "OCR Orchestrator - Multi-engine OCR coordination service with ensemble support (ABBYY, GCP DocAI, Azure DI, Tesseract)",
+  "description": "Temporal workflow orchestrator for OCR pipeline",
   "type": "module",
   "main": "dist/index.js",
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
@@ -14,10 +13,12 @@
   },
   "dependencies": {
     "@insurai/types": "workspace:*",
-    "express": "^4.21.0"
+    "@temporalio/client": "^1.9.0",
+    "@temporalio/worker": "^1.9.0",
+    "@temporalio/workflow": "^1.9.0",
+    "@temporalio/activity": "^1.9.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
     "@types/node": "^20.10.0",
     "tsx": "^4.6.0",
     "typescript": "^5.3.0",
