@@ -9,6 +9,8 @@ import {
   findFormField,
   TURKISH_FORM_FIELD_PATTERNS,
 } from './ocr'
+import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
+import { performUnifiedOCR, isOrchestratorConfigured } from './ocr-orchestrator-client'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
@@ -56,6 +58,7 @@ export interface ExtractionResult {
     tables?: Table[]
     backend: 'document-ai' | 'vision-api'
     fieldsUsed: number  // How many form fields were used to enhance extraction
+    tableCoveragesUsed: number  // How many coverages were extracted from tables
   }
 }
 
@@ -76,6 +79,7 @@ export interface ExtractionOptions {
   useOCR?: boolean
   useConsensus?: boolean
   useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
+  useOrchestrator?: boolean  // Use OCR orchestrator for multi-engine OCR (default: auto-detect)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
 }
@@ -197,6 +201,7 @@ export async function extractPolicyFromDocument(
     useOCR = true,
     useConsensus = true,
     useCleanRoom = true,  // Default to clean-room processing
+    useOrchestrator = isOrchestratorConfigured(),  // Auto-detect orchestrator
     primaryProvider,
     providers,
   } = options
@@ -257,7 +262,11 @@ export async function extractPolicyFromDocument(
 
     // Check if we should try OCR
     if (useOCR && isOCRConfigured()) {
-      const ocrResult = await performOCR(file)
+      // Use unified OCR (orchestrator if available, otherwise direct)
+      const ocrResult = useOrchestrator
+        ? await performUnifiedOCR(file, { preferOrchestrator: true })
+        : await performOCR(file)
+
       if (ocrResult.success && ocrResult.data.text.length > 50) {
         documentText = ocrResult.data.text
         usedOCR = true
@@ -265,8 +274,9 @@ export async function extractPolicyFromDocument(
         ocrFormFields = ocrResult.data.formFields
         ocrTables = ocrResult.data.tables
         ocrBackend = ocrResult.data.backend
-        if (import.meta.env.DEV && ocrFormFields?.length) {
-          console.log(`[Document AI] Extracted ${ocrFormFields.length} form fields, ${ocrTables?.length || 0} tables`)
+        if (import.meta.env.DEV) {
+          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
+          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
         }
       } else {
         if (useFallback) {
@@ -303,7 +313,11 @@ export async function extractPolicyFromDocument(
       isOCRConfigured() &&
       isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
     ) {
-      const ocrResult = await performOCR(file)
+      // Use unified OCR (orchestrator if available, otherwise direct)
+      const ocrResult = useOrchestrator
+        ? await performUnifiedOCR(file, { preferOrchestrator: true })
+        : await performOCR(file)
+
       if (ocrResult.success && ocrResult.data.text.length > parseResult.data.text.length) {
         documentText = ocrResult.data.text
         usedOCR = true
@@ -311,8 +325,9 @@ export async function extractPolicyFromDocument(
         ocrFormFields = ocrResult.data.formFields
         ocrTables = ocrResult.data.tables
         ocrBackend = ocrResult.data.backend
-        if (import.meta.env.DEV && ocrFormFields?.length) {
-          console.log(`[Document AI] Extracted ${ocrFormFields.length} form fields, ${ocrTables?.length || 0} tables`)
+        if (import.meta.env.DEV) {
+          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
+          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
         }
       } else {
         documentText = parseResult.data.text
@@ -585,6 +600,49 @@ export async function extractPolicyFromDocument(
       console.warn('Turkish pattern validation failed:', error)
     }
 
+    // ========================================================================
+    // TABLE-BASED COVERAGE ENHANCEMENT
+    // Parse Document AI tables to extract structured coverage information
+    // ========================================================================
+    let tableCoveragesUsed = 0
+
+    if (ocrTables && ocrTables.length > 0) {
+      try {
+        const tableData = parseTablesForCoverages(ocrTables)
+
+        if (tableData.coverages.length > 0) {
+          if (import.meta.env.DEV) {
+            console.log(`[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`)
+          }
+
+          // Merge table coverages with AI-extracted coverages
+          const mergedCoverages = mergeCoveragesWithTableData(
+            enhancedExtractedData.coverages,
+            tableData.coverages,
+            tableData.confidence, // Table parsing confidence
+            0.7 // Minimum confidence threshold
+          )
+
+          // Count how many table coverages were actually used
+          tableCoveragesUsed = mergedCoverages.length - enhancedExtractedData.coverages.length
+          if (tableCoveragesUsed < 0) tableCoveragesUsed = 0
+
+          // Update enhanced data with merged coverages
+          enhancedExtractedData = {
+            ...enhancedExtractedData,
+            coverages: mergedCoverages as ExtractedCoverage[],
+          }
+
+          if (import.meta.env.DEV && tableCoveragesUsed > 0) {
+            console.log(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
+          }
+        }
+      } catch (error) {
+        // Table parsing is optional, continue without it
+        console.warn('Table coverage parsing failed:', error)
+      }
+    }
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
     const policy = convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
@@ -618,6 +676,7 @@ export async function extractPolicyFromDocument(
         tables: ocrTables,
         backend: ocrBackend || 'vision-api',
         fieldsUsed: formFieldsUsed,
+        tableCoveragesUsed,
       } : undefined,
     }
   } catch (error) {
