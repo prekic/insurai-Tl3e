@@ -343,7 +343,7 @@ function despacePartialSequences(text: string): { text: string; count: number } 
 
   let result = text
   for (const pattern of patterns) {
-    result = result.replace(pattern, (match, ...groups) => {
+    result = result.replace(pattern, (_match, ...groups) => {
       count++
       return groups.slice(0, -2).join('')
     })
@@ -369,7 +369,7 @@ function despaceLeadingSplits(text: string): { text: string; count: number } {
     'gu'
   )
 
-  const result = text.replace(pattern, (match, letter, rest) => {
+  const result = text.replace(pattern, (_match, letter, rest) => {
     count++
     return letter + rest
   })
@@ -614,7 +614,7 @@ function normalizeSlashes(text: string): { text: string; count: number } {
   let count = 0
 
   // Fix "25 /1A" → "25/1A"
-  const result = text.replace(/(\d)\s*\/\s*([0-9A-Za-z])/g, (match, d, c) => {
+  const result = text.replace(/(\d)\s*\/\s*([0-9A-Za-z])/g, (_match, d, c) => {
     count++
     return `${d}/${c}`
   })

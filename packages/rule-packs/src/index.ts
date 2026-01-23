@@ -424,7 +424,7 @@ export function detectPolicyType(text: string, locale: string): PolicyTypeDetect
 // EXPORTS
 // ============================================================================
 
-export { turkishLocalePack } from './packs/locales/tr-TR'
+export { turkishLocalePack, validateTCKimlik } from './packs/locales/tr-TR'
 export { germanLocalePack } from './packs/locales/de-DE'
 export { englishGBLocalePack } from './packs/locales/en-GB'
 export { fallbackLocalePack } from './packs/locales/fallback'

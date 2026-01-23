@@ -15,7 +15,6 @@ import type {
   ExtractionResult,
   ExtractionTarget,
   ExtractedField,
-  PolicyType,
 } from '@insurai/types'
 
 // ============================================================================
@@ -52,10 +51,83 @@ export interface FieldPattern {
 }
 
 // ============================================================================
+// VALIDATION HELPERS
+// ============================================================================
+
+/**
+ * Validate Turkish TC Kimlik number using algorithm
+ */
+export function validateTCKimlik(tc: string): boolean {
+  if (!/^\d{11}$/.test(tc)) return false
+  if (tc[0] === '0') return false
+
+  const digits = tc.split('').map(Number)
+
+  // Algorithm check
+  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8]
+  const evenSum = digits[1] + digits[3] + digits[5] + digits[7]
+  const check10 = (oddSum * 7 - evenSum) % 10
+  const check11 = (digits.slice(0, 10).reduce((a, b) => a + b, 0)) % 10
+
+  return check10 === digits[9] && check11 === digits[10]
+}
+
+/**
+ * Validate VIN (Vehicle Identification Number)
+ * Note: Checksum validation is skipped as it's only required for North American VINs.
+ * European VINs (starting with W, S, etc.) don't use the checksum position.
+ */
+export function validateVIN(vin: string): boolean {
+  // Must be exactly 17 characters
+  if (vin.length !== 17) return false
+
+  // Must only contain valid VIN characters (no I, O, Q)
+  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return false
+
+  // Must be uppercase
+  if (vin !== vin.toUpperCase()) return false
+
+  return true
+}
+
+/**
+ * Normalize Turkish date format to ISO
+ */
+export function normalizeTurkishDate(date: string): string {
+  const parts = date.split(/[\.\/\-]/)
+  if (parts.length !== 3) return date
+
+  let [day, month, year] = parts
+  if (year.length === 2) {
+    year = parseInt(year) > 50 ? `19${year}` : `20${year}`
+  }
+
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+}
+
+/**
+ * Normalize currency value
+ */
+export function normalizeCurrency(value: string): string {
+  return value
+    .replace(/\./g, '') // Remove thousand separators
+    .replace(/,/g, '.') // Convert decimal comma to period
+    .replace(/[^\d.]/g, '') // Remove non-numeric
+}
+
+/**
+ * Check if date string is valid
+ */
+export function isValidDate(dateStr: string): boolean {
+  const date = new Date(dateStr)
+  return !isNaN(date.getTime())
+}
+
+// ============================================================================
 // FIELD PATTERNS BY LOCALE
 // ============================================================================
 
-const turkishPatterns: FieldPattern[] = [
+export const turkishPatterns: FieldPattern[] = [
   // Policy Number
   {
     id: 'policy_number',
@@ -127,12 +199,12 @@ const turkishPatterns: FieldPattern[] = [
     validate: v => isValidDate(v),
     confidence: 0.95,
   },
-  // Premium Amount
+  // Premium Amount (with currency symbol before or after)
   {
     id: 'premium',
     name: 'Premium',
     nameTr: 'Prim',
-    pattern: /(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*([0-9\.\,]+)\s*(?:TL|₺|TRY)?/i,
+    pattern: /(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*(?:₺|TL|TRY)?\s*([0-9][0-9\.\,]*)\s*(?:TL|₺|TRY)?/i,
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.9,
@@ -265,75 +337,6 @@ const propertyPatterns: FieldPattern[] = [
     confidence: 0.85,
   },
 ]
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function validateTCKimlik(tc: string): boolean {
-  if (!/^\d{11}$/.test(tc)) return false
-  if (tc[0] === '0') return false
-
-  const digits = tc.split('').map(Number)
-
-  // Algorithm check
-  const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8]
-  const evenSum = digits[1] + digits[3] + digits[5] + digits[7]
-  const check10 = (oddSum * 7 - evenSum) % 10
-  const check11 = (digits.slice(0, 10).reduce((a, b) => a + b, 0)) % 10
-
-  return check10 === digits[9] && check11 === digits[10]
-}
-
-function validateVIN(vin: string): boolean {
-  if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) return false
-
-  // VIN checksum validation
-  const transliteration: Record<string, number> = {
-    A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, G: 7, H: 8,
-    J: 1, K: 2, L: 3, M: 4, N: 5, P: 7, R: 9,
-    S: 2, T: 3, U: 4, V: 5, W: 6, X: 7, Y: 8, Z: 9,
-  }
-  const weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2]
-
-  let sum = 0
-  for (let i = 0; i < 17; i++) {
-    const char = vin[i]
-    const value = /\d/.test(char) ? parseInt(char) : transliteration[char]
-    sum += value * weights[i]
-  }
-
-  const remainder = sum % 11
-  const checkDigit = remainder === 10 ? 'X' : remainder.toString()
-
-  return vin[8] === checkDigit
-}
-
-function normalizeTurkishDate(date: string): string {
-  // Convert DD.MM.YYYY or DD/MM/YY to YYYY-MM-DD
-  const parts = date.split(/[\.\/\-]/)
-  if (parts.length !== 3) return date
-
-  let [day, month, year] = parts
-  if (year.length === 2) {
-    year = parseInt(year) > 50 ? `19${year}` : `20${year}`
-  }
-
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
-}
-
-function normalizeCurrency(value: string): string {
-  // Remove thousand separators and normalize decimal
-  return value
-    .replace(/\./g, '') // Remove thousand separators
-    .replace(/,/g, '.') // Convert decimal comma to period
-    .replace(/[^\d.]/g, '') // Remove non-numeric
-}
-
-function isValidDate(dateStr: string): boolean {
-  const date = new Date(dateStr)
-  return !isNaN(date.getTime())
-}
 
 // ============================================================================
 // FIELD EXTRACTOR
@@ -548,5 +551,3 @@ const PORT = process.env.PORT || 4010
 app.listen(PORT, () => {
   console.log(`[Extract Service] Listening on port ${PORT}`)
 })
-
-export { FieldExtractor }

@@ -9,6 +9,7 @@
  *
  * Features:
  * - Parallel OCR execution across engines
+ * - Engine health monitoring
  * - Quick classification on first page
  * - Region-based OCR for targeted re-processing
  * - Retry with exponential backoff
@@ -21,6 +22,7 @@ import type {
   OCRToken,
   BoundingBox,
   DocumentHints,
+  PreprocessVariant,
 } from '@insurai/types'
 
 // ============================================================================
@@ -58,6 +60,53 @@ const config = {
 // ============================================================================
 // TYPES
 // ============================================================================
+
+export interface OCROrchestrationOptions {
+  docId: string
+  pageNo: number
+  regionId: string
+  imageKey: string
+  variantId: PreprocessVariant
+  engines?: OCREngine[]
+  timeout?: number
+  minEngines?: number
+  locale?: string
+  documentType?: string
+}
+
+export interface OCROrchestrationResult {
+  docId: string
+  pageNo: number
+  regionId: string
+  results: Map<OCREngine, OCRResult>
+  failedEngines: Map<OCREngine, Error>
+  successfulEngines: OCREngine[]
+  aggregatedTokens: OCRToken[]
+  processingTimeMs: number
+  engineHealthSnapshot: Map<OCREngine, EngineHealth>
+}
+
+export interface EngineHealth {
+  engine: OCREngine
+  isHealthy: boolean
+  lastSuccess: Date | null
+  lastFailure: Date | null
+  successRate: number
+  avgLatencyMs: number
+  failureCount: number
+  successCount: number
+}
+
+export interface EngineConfig {
+  engine: OCREngine
+  weight: number
+  priority: number
+  timeoutMs: number
+  retries: number
+  requiredForDocTypes?: string[]
+  excludeForDocTypes?: string[]
+  minConfidenceThreshold: number
+}
 
 export interface OCRRequest {
   docId: string
@@ -108,6 +157,46 @@ export interface OCRAdapterResult {
   confidence: number
   processingTimeMs: number
   rawResponse?: unknown
+}
+
+// ============================================================================
+// DEFAULT ENGINE CONFIGURATIONS
+// ============================================================================
+
+export const DEFAULT_ENGINE_CONFIGS: Record<OCREngine, EngineConfig> = {
+  abbyy: {
+    engine: 'abbyy',
+    weight: 2.0,  // Highest quality
+    priority: 1,
+    timeoutMs: 30000,
+    retries: 2,
+    minConfidenceThreshold: 0.7,
+  },
+  gcp_docai: {
+    engine: 'gcp_docai',
+    weight: 1.5,
+    priority: 2,
+    timeoutMs: 25000,
+    retries: 2,
+    minConfidenceThreshold: 0.65,
+  },
+  azure_di: {
+    engine: 'azure_di',
+    weight: 1.3,
+    priority: 3,
+    timeoutMs: 25000,
+    retries: 2,
+    minConfidenceThreshold: 0.65,
+  },
+  tesseract: {
+    engine: 'tesseract',
+    weight: 0.8,  // Lower quality but always available
+    priority: 4,
+    timeoutMs: 60000,
+    retries: 1,
+    minConfidenceThreshold: 0.5,
+    excludeForDocTypes: ['handwriting'],
+  },
 }
 
 // ============================================================================
@@ -682,13 +771,79 @@ class TesseractAdapter implements OCRAdapter {
 }
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+/**
+ * Calculate IoU (Intersection over Union) for two bounding boxes
+ */
+export function calculateIoU(bbox1: BoundingBox, bbox2: BoundingBox): number {
+  const x1 = Math.max(bbox1.x, bbox2.x)
+  const y1 = Math.max(bbox1.y, bbox2.y)
+  const x2 = Math.min(bbox1.x + bbox1.width, bbox2.x + bbox2.width)
+  const y2 = Math.min(bbox1.y + bbox1.height, bbox2.y + bbox2.height)
+
+  if (x2 <= x1 || y2 <= y1) {
+    return 0
+  }
+
+  const intersection = (x2 - x1) * (y2 - y1)
+  const area1 = bbox1.width * bbox1.height
+  const area2 = bbox2.width * bbox2.height
+  const union = area1 + area2 - intersection
+
+  return union > 0 ? intersection / union : 0
+}
+
+/**
+ * Group tokens by bounding box proximity
+ */
+export function groupTokensByProximity(
+  tokens: OCRToken[],
+  iouThreshold: number = 0.5
+): OCRToken[][] {
+  const groups: OCRToken[][] = []
+  const assigned = new Set<number>()
+
+  for (let i = 0; i < tokens.length; i++) {
+    if (assigned.has(i)) continue
+
+    const group: OCRToken[] = [tokens[i]]
+    assigned.add(i)
+
+    for (let j = i + 1; j < tokens.length; j++) {
+      if (assigned.has(j)) continue
+
+      const iou = calculateIoU(tokens[i].bbox, tokens[j].bbox)
+      if (iou >= iouThreshold) {
+        group.push(tokens[j])
+        assigned.add(j)
+      }
+    }
+
+    groups.push(group)
+  }
+
+  return groups
+}
+
+// ============================================================================
 // OCR ORCHESTRATOR
 // ============================================================================
 
 export class OCROrchestrator {
   private adapters: Map<OCREngine, OCRAdapter> = new Map()
+  private engineConfigs: Map<OCREngine, EngineConfig> = new Map()
+  private engineHealth: Map<OCREngine, EngineHealth> = new Map()
+  private defaultEngines: OCREngine[] = ['abbyy', 'gcp_docai', 'azure_di', 'tesseract']
+  private minEnginesRequired: number = 1
 
   constructor() {
+    // Initialize engine configs
+    for (const [engine, engineConfig] of Object.entries(DEFAULT_ENGINE_CONFIGS)) {
+      this.engineConfigs.set(engine as OCREngine, engineConfig)
+    }
+
     // Register all adapters
     const adapters: OCRAdapter[] = [
       new ABBYYAdapter(),
@@ -703,6 +858,20 @@ export class OCROrchestrator {
         console.log(`[OCR] Registered adapter: ${adapter.name}`)
       }
     }
+
+    // Initialize health tracking
+    for (const engine of this.defaultEngines) {
+      this.engineHealth.set(engine, {
+        engine,
+        isHealthy: true,
+        lastSuccess: null,
+        lastFailure: null,
+        successRate: 1.0,
+        avgLatencyMs: 0,
+        failureCount: 0,
+        successCount: 0,
+      })
+    }
   }
 
   /**
@@ -713,6 +882,62 @@ export class OCROrchestrator {
   }
 
   /**
+   * Select engines based on document type and locale
+   */
+  selectEngines(options: {
+    requestedEngines?: OCREngine[]
+    documentType?: string
+    locale?: string
+    minEngines?: number
+  }): OCREngine[] {
+    const { requestedEngines, documentType, minEngines = this.minEnginesRequired } = options
+
+    let candidates: OCREngine[] = requestedEngines || this.defaultEngines
+
+    // Filter by availability
+    candidates = candidates.filter(engine => this.adapters.has(engine))
+
+    // Filter by document type exclusions
+    if (documentType) {
+      candidates = candidates.filter(engine => {
+        const engineConfig = this.engineConfigs.get(engine)
+        if (!engineConfig) return false
+
+        // Check exclusions
+        if (engineConfig.excludeForDocTypes?.includes(documentType)) {
+          return false
+        }
+
+        return true
+      })
+    }
+
+    // Filter by health
+    candidates = candidates.filter(engine => {
+      const health = this.engineHealth.get(engine)
+      return health?.isHealthy !== false
+    })
+
+    // Sort by priority
+    candidates.sort((a, b) => {
+      const configA = this.engineConfigs.get(a)
+      const configB = this.engineConfigs.get(b)
+      return (configA?.priority ?? 99) - (configB?.priority ?? 99)
+    })
+
+    // Ensure minimum engines
+    if (candidates.length < minEngines) {
+      // Add unhealthy engines back if needed
+      const unhealthyEngines = this.defaultEngines.filter(e =>
+        !candidates.includes(e) && this.adapters.has(e)
+      )
+      candidates = [...candidates, ...unhealthyEngines].slice(0, minEngines)
+    }
+
+    return candidates
+  }
+
+  /**
    * Run OCR across multiple engines in parallel
    */
   async runOCR(request: OCRRequest): Promise<OCRResult[]> {
@@ -720,7 +945,7 @@ export class OCROrchestrator {
     const { docId, regions, engines, variant } = request
 
     // Filter to available engines
-    const availableEngines = engines.filter(e => this.adapters.has(e))
+    const availableEngines = this.selectEngines({ requestedEngines: engines })
     if (availableEngines.length === 0) {
       throw new Error('No available OCR engines configured')
     }
@@ -741,8 +966,12 @@ export class OCROrchestrator {
             pageNo: region.pageNo,
             regionId: region.id,
             variant,
+          }).then(result => {
+            this.recordSuccess(engine, result.processingTimeMs)
+            return result
           }).catch(error => {
             console.error(`[OCR] ${engine} failed for ${region.id}:`, error.message)
+            this.recordFailure(engine, error)
             return null
           })
         )
@@ -927,6 +1156,80 @@ export class OCROrchestrator {
 
     return null
   }
+
+  /**
+   * Record successful OCR run
+   */
+  private recordSuccess(engine: OCREngine, latencyMs: number): void {
+    const health = this.engineHealth.get(engine)
+    if (!health) return
+
+    health.successCount++
+    health.lastSuccess = new Date()
+    health.isHealthy = true
+
+    // Update average latency
+    const totalOps = health.successCount + health.failureCount
+    health.avgLatencyMs = (health.avgLatencyMs * (totalOps - 1) + latencyMs) / totalOps
+
+    // Update success rate
+    health.successRate = health.successCount / totalOps
+  }
+
+  /**
+   * Record failed OCR run
+   */
+  private recordFailure(engine: OCREngine, _error: Error): void {
+    const health = this.engineHealth.get(engine)
+    if (!health) return
+
+    health.failureCount++
+    health.lastFailure = new Date()
+
+    // Update success rate
+    const totalOps = health.successCount + health.failureCount
+    health.successRate = health.successCount / totalOps
+
+    // Mark unhealthy if too many failures
+    if (health.successRate < 0.5 && totalOps >= 5) {
+      health.isHealthy = false
+    }
+  }
+
+  /**
+   * Get engine health status
+   */
+  getEngineHealth(engine: OCREngine): EngineHealth | undefined {
+    return this.engineHealth.get(engine)
+  }
+
+  /**
+   * Get all engine health statuses
+   */
+  getAllEngineHealth(): Map<OCREngine, EngineHealth> {
+    return new Map(this.engineHealth)
+  }
+
+  /**
+   * Get weighted confidence for combined results
+   */
+  calculateWeightedConfidence(results: Map<OCREngine, OCRResult>): number {
+    let totalWeight = 0
+    let weightedConfidence = 0
+
+    for (const [engine, result] of results) {
+      const engineConfig = this.engineConfigs.get(engine)
+      const weight = engineConfig?.weight ?? 1.0
+
+      totalWeight += weight
+      const avgConfidence = result.tokens.length > 0
+        ? result.tokens.reduce((sum, t) => sum + t.confidence, 0) / result.tokens.length
+        : 0
+      weightedConfidence += avgConfidence * weight
+    }
+
+    return totalWeight > 0 ? weightedConfidence / totalWeight : 0
+  }
 }
 
 // ============================================================================
@@ -945,6 +1248,7 @@ app.get('/health', (_, res) => {
   res.json({
     status: 'healthy',
     availableEngines: orchestrator.getAvailableEngines(),
+    engineHealth: Object.fromEntries(orchestrator.getAllEngineHealth()),
   })
 })
 
@@ -977,6 +1281,16 @@ app.get('/engines', (_, res) => {
   res.json({ engines: orchestrator.getAvailableEngines() })
 })
 
+// Engine health
+app.get('/health/:engine', (req, res) => {
+  const health = orchestrator.getEngineHealth(req.params.engine as OCREngine)
+  if (!health) {
+    res.status(404).json({ error: 'Engine not found' })
+    return
+  }
+  res.json(health)
+})
+
 const PORT = process.env.PORT || 4006
 
 app.listen(PORT, () => {
@@ -984,4 +1298,10 @@ app.listen(PORT, () => {
   console.log(`[OCR Orchestrator] Available engines: ${orchestrator.getAvailableEngines().join(', ')}`)
 })
 
-export { OCROrchestrator, ABBYYAdapter, GCPDocAIAdapter, AzureDIAdapter, TesseractAdapter }
+export {
+  OCROrchestrator,
+  ABBYYAdapter,
+  GCPDocAIAdapter,
+  AzureDIAdapter,
+  TesseractAdapter,
+}
