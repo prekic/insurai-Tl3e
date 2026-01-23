@@ -17,6 +17,11 @@ import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { RiskAssessmentService } from '@/lib/ml'
 import { GapDetectionService } from '@/lib/gap-detection'
 import { validateCurrencyRegion } from '@/lib/utils'
+import {
+  validateAndEnhanceExtraction,
+  mergeExtractionResults,
+  type ValidationResult,
+} from '@/lib/extraction'
 
 export interface ExtractionResult {
   success: true
@@ -31,6 +36,12 @@ export interface ExtractionResult {
   }
   // Clean-room processing output (when enabled)
   cleanRoomOutput?: CleanRoomResult
+  // Turkish pattern validation results
+  patternValidation?: {
+    errors: string[]
+    warnings: string[]
+    enhanced: string[]
+  }
 }
 
 export interface ExtractionError {
@@ -391,17 +402,97 @@ export async function extractPolicyFromDocument(
       }
     }
 
+    // ========================================================================
+    // TURKISH PATTERN VALIDATION & ENHANCEMENT
+    // Validate AI extraction using pattern matching and enhance with missing data
+    // ========================================================================
+    let patternValidation: ValidationResult | undefined
+    let enhancedExtractedData = extractedData
+
+    try {
+      // Convert AI extraction to format for validation
+      const aiResultForValidation: Record<string, unknown> = {
+        policyNumber: extractedData.policyNumber,
+        tcKimlik: extractedData.insuredName, // TC Kimlik might be in raw data
+        insuredName: extractedData.insuredName,
+        startDate: extractedData.startDate,
+        endDate: extractedData.endDate,
+        premium: extractedData.premium,
+        coverage: extractedData.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0),
+        vehiclePlate: (extractedData as unknown as Record<string, unknown>).vehiclePlate,
+        vin: (extractedData as unknown as Record<string, unknown>).vin,
+        vehicleYear: (extractedData as unknown as Record<string, unknown>).vehicleYear,
+      }
+
+      // Validate and enhance with Turkish patterns
+      patternValidation = validateAndEnhanceExtraction(aiResultForValidation, processedText)
+
+      // Log validation results in development
+      if (import.meta.env.DEV) {
+        if (patternValidation.errors.length > 0) {
+          console.warn('[Turkish Validation] Errors:', patternValidation.errors)
+        }
+        if (patternValidation.warnings.length > 0) {
+          console.warn('[Turkish Validation] Warnings:', patternValidation.warnings)
+        }
+        if (Object.keys(patternValidation.enhancements).length > 0) {
+          console.warn('[Turkish Validation] Enhancements:', patternValidation.enhancements)
+        }
+      }
+
+      // Merge enhancements into extracted data
+      if (Object.keys(patternValidation.enhancements).length > 0) {
+        const merged = mergeExtractionResults(aiResultForValidation, patternValidation)
+
+        // Update extractedData with enhancements
+        if (merged.policyNumber && !extractedData.policyNumber) {
+          enhancedExtractedData = { ...enhancedExtractedData, policyNumber: merged.policyNumber as string }
+        }
+        if (merged.startDate && !extractedData.startDate) {
+          enhancedExtractedData = { ...enhancedExtractedData, startDate: merged.startDate as string }
+        }
+        if (merged.endDate && !extractedData.endDate) {
+          enhancedExtractedData = { ...enhancedExtractedData, endDate: merged.endDate as string }
+        }
+        if (merged.premium && !extractedData.premium) {
+          enhancedExtractedData = { ...enhancedExtractedData, premium: merged.premium as number }
+        }
+        if (merged.insuredPerson && !extractedData.insuredName) {
+          enhancedExtractedData = { ...enhancedExtractedData, insuredName: merged.insuredPerson as string }
+        }
+      }
+    } catch (error) {
+      // Pattern validation is optional, continue without it
+      console.warn('Turkish pattern validation failed:', error)
+    }
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = convertToAnalyzedPolicy(extractedData, file, documentText, processedText)
+    const policy = convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
+
+    // Add validation warnings to AI insights
+    if (patternValidation) {
+      const validationInsights = [
+        ...patternValidation.errors.map(e => `❌ ${e}`),
+        ...patternValidation.warnings.map(w => `⚠️ ${w}`),
+      ]
+      if (validationInsights.length > 0 && policy.aiInsights) {
+        policy.aiInsights = [...validationInsights, ...policy.aiInsights]
+      }
+    }
 
     return {
       success: true,
       policy,
-      extractedData,
+      extractedData: enhancedExtractedData,
       source: usedOCR ? 'ocr' : 'ai',
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
+      patternValidation: patternValidation ? {
+        errors: patternValidation.errors,
+        warnings: patternValidation.warnings,
+        enhanced: Object.keys(patternValidation.enhancements),
+      } : undefined,
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
