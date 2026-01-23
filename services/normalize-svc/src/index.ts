@@ -556,5 +556,5 @@ export function normalizeTextSimple(
 // EXPORTS
 // ============================================================================
 
-export { Normalizer }
+// Normalizer class is already exported at definition
 export type { NormalizeOptions, NormalizeStats }

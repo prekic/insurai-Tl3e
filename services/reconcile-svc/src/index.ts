@@ -363,7 +363,12 @@ export class Reconciler {
   // ============================================================================
 
   private singleEngineResult(result: OCRResult): ReconcileResult {
-    const tokens: ReconciledToken[] = result.tokens.map((token, i) => ({
+    // Filter tokens by minimum confidence
+    const filteredTokens = result.tokens.filter(
+      token => token.confidence >= this.options.minConfidence
+    )
+
+    const tokens: ReconciledToken[] = filteredTokens.map((token, i) => ({
       id: `token-${i}`,
       text: token.text,
       bbox: token.bbox,
@@ -499,5 +504,5 @@ export function reconcileResults(
 // EXPORTS
 // ============================================================================
 
-export { Reconciler }
+// Reconciler class is already exported at definition
 export type { ReconcileOptions, AlignedTokenGroup }

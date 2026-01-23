@@ -694,5 +694,5 @@ export function validateDocument(options: ValidateOptions): ValidationGateResult
 // EXPORTS
 // ============================================================================
 
-export { Validator }
+// Validator class is already exported at definition
 export type { ValidateOptions, ValidateContext }
