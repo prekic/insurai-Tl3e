@@ -1,6 +1,14 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
-import { isLikelyScannedPDF, performOCR } from './ocr'
+import {
+  isLikelyScannedPDF,
+  performOCR,
+  type FormField,
+  type Table,
+  extractFormFieldMap,
+  findFormField,
+  TURKISH_FORM_FIELD_PATTERNS,
+} from './ocr'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
@@ -41,6 +49,13 @@ export interface ExtractionResult {
     errors: string[]
     warnings: string[]
     enhanced: string[]
+  }
+  // Document AI form fields and tables (when available)
+  documentAI?: {
+    formFields?: FormField[]
+    tables?: Table[]
+    backend: 'document-ai' | 'vision-api'
+    fieldsUsed: number  // How many form fields were used to enhance extraction
   }
 }
 
@@ -220,6 +235,11 @@ export async function extractPolicyFromDocument(
   let documentText: string
   let usedOCR = false
 
+  // Document AI enhanced data (form fields and tables)
+  let ocrFormFields: FormField[] | undefined
+  let ocrTables: Table[] | undefined
+  let ocrBackend: 'document-ai' | 'vision-api' | undefined
+
   if (!parseResult.success) {
     // Map PDF parser error codes to extraction error codes
     const mapPdfErrorCode = (pdfCode: string): ExtractionError['error']['code'] => {
@@ -241,6 +261,13 @@ export async function extractPolicyFromDocument(
       if (ocrResult.success && ocrResult.data.text.length > 50) {
         documentText = ocrResult.data.text
         usedOCR = true
+        // Store Document AI form fields and tables for later use
+        ocrFormFields = ocrResult.data.formFields
+        ocrTables = ocrResult.data.tables
+        ocrBackend = ocrResult.data.backend
+        if (import.meta.env.DEV && ocrFormFields?.length) {
+          console.log(`[Document AI] Extracted ${ocrFormFields.length} form fields, ${ocrTables?.length || 0} tables`)
+        }
       } else {
         if (useFallback) {
           return createFallbackResult(file)
@@ -280,6 +307,13 @@ export async function extractPolicyFromDocument(
       if (ocrResult.success && ocrResult.data.text.length > parseResult.data.text.length) {
         documentText = ocrResult.data.text
         usedOCR = true
+        // Store Document AI form fields and tables for later use
+        ocrFormFields = ocrResult.data.formFields
+        ocrTables = ocrResult.data.tables
+        ocrBackend = ocrResult.data.backend
+        if (import.meta.env.DEV && ocrFormFields?.length) {
+          console.log(`[Document AI] Extracted ${ocrFormFields.length} form fields, ${ocrTables?.length || 0} tables`)
+        }
       } else {
         documentText = parseResult.data.text
       }
@@ -403,25 +437,110 @@ export async function extractPolicyFromDocument(
     }
 
     // ========================================================================
+    // DOCUMENT AI FORM FIELD ENHANCEMENT
+    // Use high-confidence form fields from Document AI to enhance/override AI extraction
+    // ========================================================================
+    let enhancedExtractedData = extractedData
+    let formFieldsUsed = 0
+
+    if (ocrFormFields && ocrFormFields.length > 0) {
+      const formFieldMap = extractFormFieldMap(ocrFormFields)
+
+      if (import.meta.env.DEV) {
+        console.log('[Document AI] Form field map:', formFieldMap)
+      }
+
+      // Helper to find and use high-confidence form field value
+      const useFormField = (
+        patterns: readonly (string | RegExp)[],
+        currentValue: string | number | null | undefined,
+        minConfidence = 0.7
+      ): string | undefined => {
+        const field = findFormField(ocrFormFields!, patterns)
+        if (field && field.confidence >= minConfidence && field.value) {
+          formFieldsUsed++
+          return field.value
+        }
+        return currentValue?.toString()
+      }
+
+      // Use form fields for policy number (high priority - very reliable from Document AI)
+      const formPolicyNumber = useFormField(TURKISH_FORM_FIELD_PATTERNS.policyNumber, extractedData.policyNumber, 0.6)
+      if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
+        enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
+        if (import.meta.env.DEV) {
+          console.log(`[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`)
+        }
+      }
+
+      // Use form fields for insured name
+      const formInsuredName = useFormField(TURKISH_FORM_FIELD_PATTERNS.insuredName, extractedData.insuredName)
+      if (formInsuredName && formInsuredName !== extractedData.insuredName) {
+        enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
+        if (import.meta.env.DEV) {
+          console.log(`[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`)
+        }
+      }
+
+      // Use form fields for dates
+      const formStartDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.startDate, extractedData.startDate)
+      if (formStartDate && formStartDate !== extractedData.startDate) {
+        // Normalize date format if needed (DD.MM.YYYY → YYYY-MM-DD)
+        const normalizedDate = formStartDate.includes('.')
+          ? formStartDate.split('.').reverse().join('-')
+          : formStartDate
+        enhancedExtractedData = { ...enhancedExtractedData, startDate: normalizedDate }
+      }
+
+      const formEndDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.endDate, extractedData.endDate)
+      if (formEndDate && formEndDate !== extractedData.endDate) {
+        const normalizedDate = formEndDate.includes('.')
+          ? formEndDate.split('.').reverse().join('-')
+          : formEndDate
+        enhancedExtractedData = { ...enhancedExtractedData, endDate: normalizedDate }
+      }
+
+      // Use form fields for premium (parse Turkish number format)
+      const formPremium = useFormField(TURKISH_FORM_FIELD_PATTERNS.premium, extractedData.premium?.toString())
+      if (formPremium) {
+        // Parse Turkish currency format: "₺5.000,50" or "5.000,50 TL"
+        const cleanPremium = formPremium
+          .replace(/[₺TL\s]/g, '')
+          .replace(/\./g, '')
+          .replace(',', '.')
+        const parsedPremium = parseFloat(cleanPremium)
+        if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
+          enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
+          if (import.meta.env.DEV) {
+            console.log(`[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`)
+          }
+        }
+      }
+
+      if (import.meta.env.DEV && formFieldsUsed > 0) {
+        console.log(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
+      }
+    }
+
+    // ========================================================================
     // TURKISH PATTERN VALIDATION & ENHANCEMENT
     // Validate AI extraction using pattern matching and enhance with missing data
     // ========================================================================
     let patternValidation: ValidationResult | undefined
-    let enhancedExtractedData = extractedData
 
     try {
       // Convert AI extraction to format for validation
       const aiResultForValidation: Record<string, unknown> = {
-        policyNumber: extractedData.policyNumber,
-        tcKimlik: extractedData.insuredName, // TC Kimlik might be in raw data
-        insuredName: extractedData.insuredName,
-        startDate: extractedData.startDate,
-        endDate: extractedData.endDate,
-        premium: extractedData.premium,
-        coverage: extractedData.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0),
-        vehiclePlate: (extractedData as unknown as Record<string, unknown>).vehiclePlate,
-        vin: (extractedData as unknown as Record<string, unknown>).vin,
-        vehicleYear: (extractedData as unknown as Record<string, unknown>).vehicleYear,
+        policyNumber: enhancedExtractedData.policyNumber,
+        tcKimlik: enhancedExtractedData.insuredName, // TC Kimlik might be in raw data
+        insuredName: enhancedExtractedData.insuredName,
+        startDate: enhancedExtractedData.startDate,
+        endDate: enhancedExtractedData.endDate,
+        premium: enhancedExtractedData.premium,
+        coverage: enhancedExtractedData.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0),
+        vehiclePlate: (enhancedExtractedData as unknown as Record<string, unknown>).vehiclePlate,
+        vin: (enhancedExtractedData as unknown as Record<string, unknown>).vin,
+        vehicleYear: (enhancedExtractedData as unknown as Record<string, unknown>).vehicleYear,
       }
 
       // Validate and enhance with Turkish patterns
@@ -492,6 +611,13 @@ export async function extractPolicyFromDocument(
         errors: patternValidation.errors,
         warnings: patternValidation.warnings,
         enhanced: Object.keys(patternValidation.enhancements),
+      } : undefined,
+      // Document AI enhanced data (form fields and tables)
+      documentAI: (ocrFormFields || ocrTables) ? {
+        formFields: ocrFormFields,
+        tables: ocrTables,
+        backend: ocrBackend || 'vision-api',
+        fieldsUsed: formFieldsUsed,
       } : undefined,
     }
   } catch (error) {

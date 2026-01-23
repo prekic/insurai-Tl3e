@@ -546,7 +546,7 @@ export function extractFormFieldMap(formFields: FormField[]): Record<string, str
  */
 export function findFormField(
   formFields: FormField[],
-  patterns: (string | RegExp)[]
+  patterns: readonly (string | RegExp)[]
 ): FormField | undefined {
   for (const pattern of patterns) {
     const found = formFields.find((field) => {
