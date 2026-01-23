@@ -13,8 +13,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@insurai/types": "workspace:*",
-    "express": "^4.21.0"
+    "@insurai/types": "file:../../packages/types",
+    "express": "^4.21.0",
+    "tesseract.js": "^5.1.0"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
