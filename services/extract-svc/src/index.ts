@@ -551,5 +551,3 @@ const PORT = process.env.PORT || 4010
 app.listen(PORT, () => {
   console.log(`[Extract Service] Listening on port ${PORT}`)
 })
-
-export { turkishPatterns }
