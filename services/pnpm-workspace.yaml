@@ -1,0 +1,13 @@
+packages:
+  - 'workflow'
+  - 'ocr-orch'
+  - 'render-svc'
+  - 'preproc-svc'
+  - 'layout-svc'
+  - 'normalize-svc'
+  - 'reconcile-svc'
+  - 'validate-svc'
+  - 'extract-svc'
+  - 'audit-svc'
+  - 'doc-api'
+  - '../packages/*'

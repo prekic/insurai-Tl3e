@@ -1,0 +1,34 @@
+# OCR Orchestrator Dockerfile
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+COPY package*.json ./
+COPY pnpm-workspace.yaml ./
+COPY tsconfig.base.json ./
+COPY packages/ ./packages/
+COPY ocr-orch/ ./ocr-orch/
+
+RUN npm install -g pnpm
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @insurai/types build
+RUN pnpm --filter @insurai/ocr-orch-svc build
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN apk add --no-cache tini curl
+
+COPY --from=builder /app/packages/types/dist ./packages/types/dist
+COPY --from=builder /app/packages/types/package.json ./packages/types/
+COPY --from=builder /app/ocr-orch/dist ./ocr-orch/dist
+COPY --from=builder /app/ocr-orch/package.json ./ocr-orch/
+COPY --from=builder /app/node_modules ./node_modules
+
+WORKDIR /app/ocr-orch
+
+EXPOSE 4006
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "dist/index.js"]

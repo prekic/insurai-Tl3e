@@ -1,0 +1,25 @@
+{
+  "name": "@insurai/ocr-orch-svc",
+  "version": "1.0.0",
+  "description": "OCR orchestrator with ensemble engine support (ABBYY, GCP DocAI, Azure DI, Tesseract)",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@insurai/types": "workspace:*",
+    "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "tsx": "^4.6.0",
+    "typescript": "^5.3.0",
+    "vitest": "^2.1.0"
+  }
+}
