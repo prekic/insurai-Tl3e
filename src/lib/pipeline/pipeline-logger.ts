@@ -440,7 +440,7 @@ export function formatLogsAsText(collector: PipelineLogCollector): string {
 /**
  * Extended stage type for OCR pipeline stages
  */
-export type ExtendedPipelineStage = PipelineStage | 'pipeline' | 'chunking' | 'sanitization' | 'merge' | 'validation'
+export type ExtendedPipelineStage = PipelineStage | 'pipeline' | 'chunking' | 'sanitization' | 'merge' | 'validation' | 'preclean'
 
 /**
  * Pipeline log entry (alias for LogEntry)
