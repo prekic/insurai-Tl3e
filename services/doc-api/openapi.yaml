@@ -1,0 +1,936 @@
+openapi: 3.1.0
+info:
+  title: InsurAI OCR Document API
+  description: |
+    Enterprise-grade OCR pipeline API for insurance document processing.
+
+    Features:
+    - Ensemble OCR (ABBYY, GCP DocAI, Azure DI)
+    - Automatic locale and policy type detection
+    - Deterministic normalization with rule packs
+    - Validation gates with quarantine logic
+    - Full audit trail with provenance
+  version: 2.0.0
+  contact:
+    name: InsurAI Engineering
+    email: engineering@insurai.io
+
+servers:
+  - url: https://api.insurai.io/v1
+    description: Production
+  - url: https://staging-api.insurai.io/v1
+    description: Staging
+  - url: http://localhost:4001/v1
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Documents
+    description: Document upload and processing
+  - name: Rule Packs
+    description: Locale and policy rule management
+  - name: Operations
+    description: Health and metrics
+
+paths:
+  # ============================================================================
+  # DOCUMENTS
+  # ============================================================================
+
+  /documents:
+    post:
+      operationId: createDocument
+      summary: Upload a document for OCR processing
+      description: |
+        Creates a new document and returns a pre-signed upload URL.
+        After uploading the PDF to the URL, processing begins automatically.
+      tags: [Documents]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Document created, upload URL provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateDocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+    get:
+      operationId: listDocuments
+      summary: List documents
+      tags: [Documents]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+        - name: locale
+          in: query
+          schema:
+            type: string
+            example: tr-TR
+        - name: policyType
+          in: query
+          schema:
+            type: string
+            example: motor_kasko
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: List of documents
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+
+  /documents/{docId}:
+    get:
+      operationId: getDocument
+      summary: Get document status and details
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Document details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDocumentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /documents/{docId}/text:
+    get:
+      operationId: getDocumentText
+      summary: Get final reconciled and normalized text
+      description: |
+        Returns the final text output after OCR reconciliation and normalization.
+        Includes reading order blocks and evidence index for auditability.
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Document text with evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDocumentTextResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Document not yet processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/{docId}/fields:
+    get:
+      operationId: getDocumentFields
+      summary: Get extracted structured fields
+      description: |
+        Returns extracted fields with evidence (page, bbox, quote, confidence).
+        Only available after extraction stage completes.
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Extracted fields with evidence
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDocumentFieldsResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Document not yet extracted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /documents/{docId}/audit:
+    get:
+      operationId: getDocumentAudit
+      summary: Get full audit bundle
+      description: |
+        Returns complete provenance information:
+        - Per-engine OCR outputs
+        - Reconciliation decisions
+        - Normalization transforms
+        - Validation results
+        - Checksums
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Audit bundle with download URLs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetDocumentAuditResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /documents/{docId}/reprocess:
+    post:
+      operationId: reprocessDocument
+      summary: Reprocess document with overrides
+      description: |
+        Triggers reprocessing of a document, optionally with:
+        - Forced locale or policy type
+        - Specific OCR engines
+        - Reprocessing from a specific stage
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReprocessDocumentRequest'
+      responses:
+        '202':
+          description: Reprocessing initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  docId:
+                    type: string
+                  message:
+                    type: string
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # RULE PACKS
+  # ============================================================================
+
+  /rulepacks:
+    get:
+      operationId: listRulePacks
+      summary: List rule packs
+      tags: [Rule Packs]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [locale, policy]
+        - name: active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of rule packs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePackListResponse'
+
+    post:
+      operationId: createRulePack
+      summary: Create a new rule pack
+      tags: [Rule Packs]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRulePackRequest'
+      responses:
+        '201':
+          description: Rule pack created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePack'
+
+  /rulepacks/{packId}:
+    get:
+      operationId: getRulePack
+      summary: Get rule pack details
+      tags: [Rule Packs]
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule pack details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePack'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      operationId: updateRulePack
+      summary: Update a rule pack
+      description: Creates a new version of the rule pack
+      tags: [Rule Packs]
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRulePackRequest'
+      responses:
+        '200':
+          description: Rule pack updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RulePack'
+
+  /rulepacks/{packId}/activate:
+    post:
+      operationId: activateRulePack
+      summary: Activate a rule pack
+      tags: [Rule Packs]
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule pack activated
+
+  /rulepacks/{packId}/deactivate:
+    post:
+      operationId: deactivateRulePack
+      summary: Deactivate a rule pack
+      tags: [Rule Packs]
+      parameters:
+        - name: packId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rule pack deactivated
+
+  # ============================================================================
+  # OPERATIONS
+  # ============================================================================
+
+  /health:
+    get:
+      operationId: healthCheck
+      summary: Health check
+      tags: [Operations]
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '503':
+          description: Service is unhealthy
+
+  /metrics:
+    get:
+      operationId: getMetrics
+      summary: Prometheus metrics
+      tags: [Operations]
+      security: []
+      responses:
+        '200':
+          description: Prometheus metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  # ============================================================================
+  # SECURITY
+  # ============================================================================
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ============================================================================
+  # PARAMETERS
+  # ============================================================================
+
+  parameters:
+    docId:
+      name: docId
+      in: path
+      required: true
+      description: Document ID
+      schema:
+        type: string
+        format: uuid
+
+  # ============================================================================
+  # RESPONSES
+  # ============================================================================
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    RateLimited:
+      description: Rate limited
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  # ============================================================================
+  # SCHEMAS
+  # ============================================================================
+
+  schemas:
+    # Enums
+    DocumentStatus:
+      type: string
+      enum:
+        - PENDING
+        - INGESTED
+        - RENDERING
+        - PREPROCESSING
+        - LAYOUT_ANALYSIS
+        - OCR_IN_PROGRESS
+        - RECONCILING
+        - NORMALIZING
+        - VALIDATING
+        - EXTRACTING
+        - COMPLETED
+        - QUARANTINED
+        - FAILED
+
+    DocumentStage:
+      type: string
+      enum:
+        - ingest
+        - render
+        - preprocess
+        - layout
+        - ocr
+        - reconcile
+        - normalize
+        - validate
+        - extract
+        - finalize
+
+    ValidationSeverity:
+      type: string
+      enum: [info, warn, error, critical]
+
+    OCREngine:
+      type: string
+      enum: [abbyy, gcp_docai, azure_di, tesseract]
+
+    # Requests
+    CreateDocumentRequest:
+      type: object
+      required: [filename]
+      properties:
+        filename:
+          type: string
+          example: policy.pdf
+        hints:
+          type: object
+          properties:
+            locale:
+              type: string
+              example: tr-TR
+            policyType:
+              type: string
+              example: motor_kasko
+            forceEngines:
+              type: array
+              items:
+                $ref: '#/components/schemas/OCREngine'
+        metadata:
+          type: object
+          additionalProperties: true
+
+    ReprocessDocumentRequest:
+      type: object
+      properties:
+        forceLocale:
+          type: string
+        forcePolicyType:
+          type: string
+        forceEngines:
+          type: array
+          items:
+            $ref: '#/components/schemas/OCREngine'
+        reprocessFrom:
+          $ref: '#/components/schemas/DocumentStage'
+
+    CreateRulePackRequest:
+      type: object
+      required: [type, identifier, rules]
+      properties:
+        type:
+          type: string
+          enum: [locale, policy]
+        identifier:
+          type: string
+          example: tr-TR
+        rules:
+          type: object
+        description:
+          type: string
+
+    UpdateRulePackRequest:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: object
+        changelog:
+          type: string
+
+    # Responses
+    CreateDocumentResponse:
+      type: object
+      properties:
+        docId:
+          type: string
+          format: uuid
+        uploadUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+
+    GetDocumentResponse:
+      type: object
+      properties:
+        document:
+          $ref: '#/components/schemas/Document'
+        pages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Page'
+        progress:
+          type: object
+          properties:
+            completedStages:
+              type: array
+              items:
+                $ref: '#/components/schemas/DocumentStage'
+            currentStage:
+              $ref: '#/components/schemas/DocumentStage'
+            estimatedRemainingMs:
+              type: integer
+        rulePacks:
+          type: object
+          properties:
+            locale:
+              $ref: '#/components/schemas/RulePack'
+            policy:
+              $ref: '#/components/schemas/RulePack'
+        validationSummary:
+          type: object
+          properties:
+            criticalCount:
+              type: integer
+            errorCount:
+              type: integer
+            warningCount:
+              type: integer
+
+    GetDocumentTextResponse:
+      type: object
+      properties:
+        docId:
+          type: string
+        finalText:
+          type: string
+        readingOrderBlocks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReadingOrderBlock'
+        evidenceIndex:
+          $ref: '#/components/schemas/EvidenceIndex'
+        normalizationApplied:
+          type: array
+          items:
+            type: string
+
+    GetDocumentFieldsResponse:
+      type: object
+      properties:
+        docId:
+          type: string
+        schema:
+          type: string
+        schemaVersion:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExtractedField'
+        completeness:
+          type: number
+          minimum: 0
+          maximum: 1
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+
+    GetDocumentAuditResponse:
+      type: object
+      properties:
+        docId:
+          type: string
+        auditBundle:
+          $ref: '#/components/schemas/AuditBundle'
+        downloadUrls:
+          type: object
+          properties:
+            auditBundle:
+              type: string
+              format: uri
+            originalPdf:
+              type: string
+              format: uri
+            finalText:
+              type: string
+              format: uri
+            finalDocument:
+              type: string
+              format: uri
+
+    DocumentListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Document'
+        total:
+          type: integer
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrev:
+          type: boolean
+
+    RulePackListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/RulePack'
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        version:
+          type: string
+        uptime:
+          type: number
+        checks:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [pass, fail]
+              latencyMs:
+                type: number
+              message:
+                type: string
+
+    # Core Objects
+    Document:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenantId:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        stage:
+          $ref: '#/components/schemas/DocumentStage'
+        detectedLocale:
+          type: string
+        detectedRegion:
+          type: string
+        detectedPolicyType:
+          type: string
+        qualityScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+        quarantineReason:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Page:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        pageNo:
+          type: integer
+        width:
+          type: integer
+        height:
+          type: integer
+
+    ReadingOrderBlock:
+      type: object
+      properties:
+        id:
+          type: string
+        pageNo:
+          type: integer
+        bbox:
+          $ref: '#/components/schemas/BoundingBox'
+        text:
+          type: string
+        type:
+          type: string
+          enum: [paragraph, heading, list_item, table_cell, footer, header]
+        order:
+          type: integer
+
+    BoundingBox:
+      type: object
+      properties:
+        x:
+          type: number
+        y:
+          type: number
+        width:
+          type: number
+        height:
+          type: number
+
+    EvidenceIndex:
+      type: object
+      properties:
+        tokens:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+              span:
+                type: object
+                properties:
+                  start:
+                    type: integer
+                  end:
+                    type: integer
+              bbox:
+                $ref: '#/components/schemas/BoundingBox'
+              pageNo:
+                type: integer
+              confidence:
+                type: number
+
+    ExtractedField:
+      type: object
+      properties:
+        fieldPath:
+          type: string
+        valueRaw:
+          type: string
+        valueNormalized:
+          type: string
+        confidence:
+          type: number
+        evidence:
+          type: object
+          properties:
+            pageNo:
+              type: integer
+            bbox:
+              $ref: '#/components/schemas/BoundingBox'
+            quote:
+              type: string
+            extractionMethod:
+              type: string
+              enum: [regex, layout, llm, hybrid]
+        validationStatus:
+          type: string
+          enum: [valid, invalid, uncertain]
+
+    RulePack:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [locale, policy]
+        identifier:
+          type: string
+        version:
+          type: string
+        active:
+          type: boolean
+        rules:
+          type: object
+        description:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AuditBundle:
+      type: object
+      properties:
+        docId:
+          type: string
+        tenantId:
+          type: string
+        version:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        pipelineTrace:
+          type: array
+          items:
+            type: object
+        ocrOutputs:
+          type: array
+          items:
+            type: object
+        reconcileDecisions:
+          type: array
+          items:
+            type: object
+        normalizationTransforms:
+          type: array
+          items:
+            type: object
+        validationResults:
+          type: array
+          items:
+            type: object
+        checksums:
+          type: object
+          properties:
+            originalPdf:
+              type: string
+            finalText:
+              type: string
+            finalDocument:
+              type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+            traceId:
+              type: string
