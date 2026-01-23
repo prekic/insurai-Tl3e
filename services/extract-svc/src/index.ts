@@ -11,27 +11,32 @@
  * - Cross-field validation
  */
 
+import type {
+  ExtractionResult,
+  ExtractionTarget,
+  ExtractedField,
+} from '@insurai/types'
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const config = {
+  minFieldConfidence: 0.5,
+  storage: {
+    endpoint: process.env.STORAGE_ENDPOINT || 'http://localhost:9000',
+    bucket: process.env.EXTRACT_BUCKET || 'extractions',
+  },
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
 
-export interface ExtractedField {
-  id: string
-  name: string
-  nameTr: string
-  value: string
-  rawValue: string
-  confidence: number
-  source: 'pattern_match' | 'ner' | 'inference'
-  position?: { start: number; end: number }
-}
-
-export interface ExtractionResult {
+export interface ExtractRequest {
   docId: string
-  fields: ExtractedField[]
-  overallConfidence: number
-  validationErrors: string[]
-  processingTimeMs: number
+  locale: string
+  policyType: string | null
 }
 
 export interface FieldPattern {
@@ -119,7 +124,7 @@ export function isValidDate(dateStr: string): boolean {
 }
 
 // ============================================================================
-// DEFAULT TURKISH PATTERNS
+// FIELD PATTERNS BY LOCALE
 // ============================================================================
 
 const turkishPatterns: FieldPattern[] = [
@@ -153,6 +158,15 @@ const turkishPatterns: FieldPattern[] = [
     normalize: v => v.toLocaleUpperCase('tr-TR'),
     confidence: 0.85,
   },
+  // Address
+  {
+    id: 'address',
+    name: 'Address',
+    nameTr: 'Adres',
+    pattern: /(?:adres[i]?\s*[:\s]*)(.+?)(?=(?:Telefon|Tel|GSM|E-?mail|Faks|\n\n|\d{10,11}))/is,
+    extract: m => m[1].trim().replace(/\s+/g, ' '),
+    confidence: 0.75,
+  },
   // Phone Number
   {
     id: 'phone',
@@ -185,7 +199,7 @@ const turkishPatterns: FieldPattern[] = [
     validate: v => isValidDate(v),
     confidence: 0.95,
   },
-  // Premium Amount
+  // Premium Amount (with currency symbol before or after)
   {
     id: 'premium',
     name: 'Premium',
@@ -194,6 +208,25 @@ const turkishPatterns: FieldPattern[] = [
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.9,
+  },
+  // Coverage Amount
+  {
+    id: 'coverage',
+    name: 'Coverage',
+    nameTr: 'Teminat',
+    pattern: /(?:teminat\s*(?:tutar[ıi])?|sigorta\s*bedeli)\s*[:\s]*([0-9\.\,]+)\s*(?:TL|₺|TRY)?/i,
+    extract: m => m[1],
+    normalize: v => normalizeCurrency(v),
+    confidence: 0.85,
+  },
+  // Deductible
+  {
+    id: 'deductible',
+    name: 'Deductible',
+    nameTr: 'Muafiyet',
+    pattern: /(?:muafiyet|öz\s*risk)\s*[:\s]*([0-9\.\,]+\s*(?:TL|₺|TRY|%)?)/i,
+    extract: m => m[1].trim(),
+    confidence: 0.85,
   },
   // Vehicle Plate (for Kasko/Traffic)
   {
@@ -215,56 +248,168 @@ const turkishPatterns: FieldPattern[] = [
     validate: v => validateVIN(v),
     confidence: 0.95,
   },
+  // Insurance Company
+  {
+    id: 'insurer',
+    name: 'Insurance Company',
+    nameTr: 'Sigorta Şirketi',
+    pattern: /(?:sigorta\s*[şs]irketi|sigortac[ıi])\s*[:\s]*(.+?)(?=\s*(?:Acente|Poli[çc]e|Tel|\n))/i,
+    extract: m => m[1].trim(),
+    confidence: 0.8,
+  },
+  // Agency
+  {
+    id: 'agency',
+    name: 'Agency',
+    nameTr: 'Acente',
+    pattern: /(?:acent[ae])\s*[:\s]*(.+?)(?=\s*(?:Tel|Adres|Poli[çc]e|\n))/i,
+    extract: m => m[1].trim(),
+    confidence: 0.75,
+  },
+]
+
+// Additional patterns for Motor Kasko
+const motorKaskoPatterns: FieldPattern[] = [
+  {
+    id: 'vehicle_brand',
+    name: 'Vehicle Brand',
+    nameTr: 'Araç Markası',
+    pattern: /(?:marka)\s*[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)(?=\s*(?:Model|Tip|Yıl|\n))/i,
+    extract: m => m[1].trim(),
+    confidence: 0.85,
+  },
+  {
+    id: 'vehicle_model',
+    name: 'Vehicle Model',
+    nameTr: 'Araç Modeli',
+    pattern: /(?:model)\s*[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü0-9\s]+?)(?=\s*(?:Y[ıi]l|Tip|Renk|\n))/i,
+    extract: m => m[1].trim(),
+    confidence: 0.8,
+  },
+  {
+    id: 'vehicle_year',
+    name: 'Vehicle Year',
+    nameTr: 'Model Yılı',
+    pattern: /(?:model\s*y[ıi]l[ıi]|y[ıi]l)\s*[:\s]*((?:19|20)\d{2})/i,
+    extract: m => m[1],
+    validate: v => {
+      const year = parseInt(v)
+      return year >= 1950 && year <= new Date().getFullYear() + 1
+    },
+    confidence: 0.95,
+  },
+  {
+    id: 'vehicle_value',
+    name: 'Vehicle Value',
+    nameTr: 'Araç Değeri',
+    pattern: /(?:ara[çc]\s*de[ğg]eri|sigorta\s*de[ğg]eri|rayiç\s*de[ğg]er)\s*[:\s]*([0-9\.\,]+)\s*(?:TL|₺)?/i,
+    extract: m => m[1],
+    normalize: v => normalizeCurrency(v),
+    confidence: 0.85,
+  },
+]
+
+// Additional patterns for Property/Fire
+const propertyPatterns: FieldPattern[] = [
+  {
+    id: 'property_address',
+    name: 'Property Address',
+    nameTr: 'Riziko Adresi',
+    pattern: /(?:riziko\s*adresi|sigortal[ıi]\s*yer)\s*[:\s]*(.+?)(?=\s*(?:Bina|Yap[ıi]|Kat|\n\n))/is,
+    extract: m => m[1].trim().replace(/\s+/g, ' '),
+    confidence: 0.75,
+  },
+  {
+    id: 'building_type',
+    name: 'Building Type',
+    nameTr: 'Yapı Tarzı',
+    pattern: /(?:yap[ıi]\s*tarz[ıi]|bina\s*tipi)\s*[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)(?=\s*(?:Kat|Alan|m²|\n))/i,
+    extract: m => m[1].trim(),
+    confidence: 0.8,
+  },
+  {
+    id: 'floor_area',
+    name: 'Floor Area',
+    nameTr: 'Alan',
+    pattern: /(?:alan|brüt\s*alan)\s*[:\s]*([0-9\.\,]+)\s*(?:m²|m2|metrekare)?/i,
+    extract: m => m[1],
+    normalize: v => normalizeCurrency(v),
+    confidence: 0.85,
+  },
 ]
 
 // ============================================================================
-// FIELD EXTRACTOR CLASS
+// FIELD EXTRACTOR
 // ============================================================================
 
 export class FieldExtractor {
-  private patterns: FieldPattern[]
-  private minConfidence: number
+  private patterns: Map<string, FieldPattern[]> = new Map()
 
-  constructor(patterns: FieldPattern[] = turkishPatterns, minConfidence: number = 0.5) {
-    this.patterns = patterns
-    this.minConfidence = minConfidence
+  constructor() {
+    // Register patterns by policy type
+    this.patterns.set('default', turkishPatterns)
+    this.patterns.set('motor_kasko', [...turkishPatterns, ...motorKaskoPatterns])
+    this.patterns.set('motor_traffic', [...turkishPatterns, ...motorKaskoPatterns])
+    this.patterns.set('property_fire', [...turkishPatterns, ...propertyPatterns])
   }
 
   /**
    * Extract fields from normalized text
    */
-  extract(docId: string, text: string): ExtractionResult {
+  async extract(
+    docId: string,
+    normalizedText: string,
+    locale: string,
+    policyType: string | null
+  ): Promise<ExtractionResult> {
     const startTime = Date.now()
-    const fields: ExtractedField[] = []
-    const validationErrors: string[] = []
+    const extractedFields: ExtractedField[] = []
+    const targets: ExtractionTarget[] = []
+
+    // Get patterns for policy type
+    const patterns = this.patterns.get(policyType || 'default') || this.patterns.get('default')!
+
+    // Build extraction targets from patterns
+    for (const pattern of patterns) {
+      targets.push({
+        fieldId: pattern.id,
+        fieldName: pattern.name,
+        required: ['policy_number', 'start_date', 'end_date', 'premium'].includes(pattern.id),
+        patterns: [pattern.pattern.source],
+        validators: pattern.validate ? ['custom'] : [],
+      })
+    }
 
     // Extract each field
-    for (const pattern of this.patterns) {
-      const field = this.extractField(text, pattern)
+    for (const pattern of patterns) {
+      const field = await this.extractField(normalizedText, pattern)
       if (field) {
-        fields.push(field)
+        extractedFields.push(field)
       }
     }
 
     // Cross-field validation
-    const crossErrors = this.crossValidate(fields)
-    validationErrors.push(...crossErrors)
+    const validationErrors = this.crossValidate(extractedFields)
 
     // Calculate overall confidence
-    const overallConfidence = fields.length > 0
-      ? fields.reduce((sum, f) => sum + f.confidence, 0) / fields.length
+    const avgConfidence = extractedFields.length > 0
+      ? extractedFields.reduce((sum, f) => sum + f.confidence, 0) / extractedFields.length
       : 0
 
     return {
       docId,
-      fields,
-      overallConfidence,
+      fields: extractedFields,
+      targets,
+      overallConfidence: avgConfidence,
       validationErrors,
       processingTimeMs: Date.now() - startTime,
     }
   }
 
-  private extractField(text: string, pattern: FieldPattern): ExtractedField | null {
+  private async extractField(
+    text: string,
+    pattern: FieldPattern
+  ): Promise<ExtractedField | null> {
     const match = text.match(pattern.pattern)
     if (!match) return null
 
@@ -277,11 +422,9 @@ export class FieldExtractor {
 
     // Validate if defined
     const isValid = pattern.validate ? pattern.validate(value) : true
-    const confidence = isValid
-      ? (pattern.confidence || 0.8)
-      : (pattern.confidence || 0.8) * 0.5
+    const confidence = isValid ? (pattern.confidence || 0.8) : (pattern.confidence || 0.8) * 0.5
 
-    if (confidence < this.minConfidence) {
+    if (confidence < config.minFieldConfidence) {
       return null
     }
 
@@ -293,15 +436,14 @@ export class FieldExtractor {
       rawValue: match[0],
       confidence,
       source: 'pattern_match',
-      position: {
-        start: match.index || 0,
-        end: (match.index || 0) + match[0].length,
-      },
+      boundingBoxes: [], // Would be populated if we had token positions
     }
   }
 
   private crossValidate(fields: ExtractedField[]): string[] {
     const errors: string[] = []
+
+    // Get field map for easy lookup
     const fieldMap = new Map(fields.map(f => [f.id, f.value]))
 
     // Validate date range
@@ -315,27 +457,99 @@ export class FieldExtractor {
 
     // Validate premium vs coverage ratio
     const premium = parseFloat(fieldMap.get('premium') || '0')
-    if (premium > 0 && premium > 500000) {
-      errors.push('Premium unusually high')
+    const coverage = parseFloat(fieldMap.get('coverage') || '0')
+    if (premium > 0 && coverage > 0) {
+      const ratio = premium / coverage
+      if (ratio > 0.5) {
+        errors.push('Premium to coverage ratio unusually high')
+      }
+    }
+
+    // Validate vehicle year for motor policies
+    const vehicleYear = fieldMap.get('vehicle_year')
+    if (vehicleYear) {
+      const year = parseInt(vehicleYear)
+      if (year > new Date().getFullYear() + 1) {
+        errors.push('Vehicle year is in the future')
+      }
     }
 
     return errors
   }
 
   /**
-   * Get all available patterns
+   * Get extraction targets for a policy type
    */
-  getPatterns(): FieldPattern[] {
-    return this.patterns
-  }
+  getTargets(policyType: string | null): ExtractionTarget[] {
+    const patterns = this.patterns.get(policyType || 'default') || this.patterns.get('default')!
 
-  /**
-   * Add custom patterns
-   */
-  addPatterns(patterns: FieldPattern[]): void {
-    this.patterns.push(...patterns)
+    return patterns.map(p => ({
+      fieldId: p.id,
+      fieldName: p.name,
+      required: ['policy_number', 'start_date', 'end_date', 'premium'].includes(p.id),
+      patterns: [p.pattern.source],
+      validators: p.validate ? ['custom'] : [],
+    }))
   }
 }
 
-// Export default patterns
+// ============================================================================
+// EXPRESS SERVER
+// ============================================================================
+
+import express from 'express'
+
+const app = express()
+app.use(express.json({ limit: '10mb' }))
+
+const extractor = new FieldExtractor()
+
+// Health check
+app.get('/health', (_, res) => {
+  res.json({
+    status: 'healthy',
+    supportedPolicyTypes: ['motor_kasko', 'motor_traffic', 'property_fire', 'default'],
+  })
+})
+
+// Extract fields
+app.post('/extract', async (req, res) => {
+  try {
+    const { docId, locale, policyType, normalizedText } = req.body
+
+    // If normalizedText not provided, fetch from storage
+    const text = normalizedText || await fetchNormalizedText(docId)
+
+    const result = await extractor.extract(docId, text, locale, policyType)
+    res.json(result)
+  } catch (error) {
+    console.error('[Extract] Error:', error)
+    res.status(500).json({ error: (error as Error).message })
+  }
+})
+
+// Get extraction targets
+app.get('/targets/:policyType', (req, res) => {
+  const { policyType } = req.params
+  const targets = extractor.getTargets(policyType)
+  res.json({ targets })
+})
+
+async function fetchNormalizedText(docId: string): Promise<string> {
+  const url = `${config.storage.endpoint}/${config.storage.bucket}/${docId}/normalized.txt`
+
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch normalized text: ${response.statusText}`)
+  }
+
+  return response.text()
+}
+
+const PORT = process.env.PORT || 4010
+
+app.listen(PORT, () => {
+  console.log(`[Extract Service] Listening on port ${PORT}`)
+})
+
 export { turkishPatterns }
