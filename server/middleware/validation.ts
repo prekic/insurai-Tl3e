@@ -126,6 +126,26 @@ export const ocrSchema = z.object({
     .transform(sanitizeBase64),
 })
 
+/**
+ * Schema for Document AI OCR request
+ * Supports PDF and images with form field extraction
+ */
+export const documentAISchema = z.object({
+  documentBase64: z
+    .string()
+    .min(1, 'Document data is required')
+    .max(20 * 1024 * 1024, 'Document too large (max 20MB base64)')
+    .transform(sanitizeBase64),
+  mimeType: z
+    .enum(['application/pdf', 'image/png', 'image/jpeg', 'image/tiff', 'image/gif'])
+    .default('application/pdf'),
+  languageHints: z
+    .array(z.string().max(10))
+    .max(5)
+    .optional()
+    .default(['tr', 'en']),
+})
+
 // =============================================================================
 // Validation Middleware Factory
 // =============================================================================
@@ -263,6 +283,11 @@ export const validateAnthropicExtraction = validate(anthropicExtractionSchema)
 export const validateOCR = validate(ocrSchema)
 
 /**
+ * Validate Document AI request
+ */
+export const validateDocumentAI = validate(documentAISchema)
+
+/**
  * Validate request has JSON content type
  */
 export function validateJSON(req: Request, res: Response, next: NextFunction) {
@@ -360,5 +385,6 @@ export const validateChat = validate(chatSchema)
 export type OpenAIExtractionInput = z.infer<typeof openAIExtractionSchema>
 export type AnthropicExtractionInput = z.infer<typeof anthropicExtractionSchema>
 export type OCRInput = z.infer<typeof ocrSchema>
+export type DocumentAIInput = z.infer<typeof documentAISchema>
 export type ChatInput = z.infer<typeof chatSchema>
 export type ChatMessage = z.infer<typeof chatMessageSchema>

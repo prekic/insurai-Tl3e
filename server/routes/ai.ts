@@ -14,14 +14,24 @@ import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
   validateOCR,
+  validateDocumentAI,
   validateChat,
   validateJSON,
   type OpenAIExtractionInput,
   type AnthropicExtractionInput,
   type OCRInput,
+  type DocumentAIInput,
   type ChatInput,
   type ChatMessage,
 } from '../middleware/validation.js'
+import { GoogleAuth } from 'google-auth-library'
+import * as fs from 'fs'
+import * as path from 'path'
+import { fileURLToPath } from 'url'
+
+// ES Module directory resolution
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 
@@ -45,6 +55,112 @@ function getAnthropicClient(): Anthropic | null {
     anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
   }
   return anthropicClient
+}
+
+// ============================================================================
+// DOCUMENT AI CONFIGURATION
+// ============================================================================
+
+const GCP_CONFIG = {
+  projectId: process.env.GCP_PROJECT_ID || 'gen-lang-client-0171803889',
+  location: process.env.GCP_LOCATION || 'us',
+  processorId: process.env.GCP_DOCAI_PROCESSOR_ID || 'c2741b178ab61433',
+}
+
+/**
+ * Get the path to GCP service account credentials
+ */
+function getGCPCredentialsPath(): string | null {
+  // Check environment variable first
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    return process.env.GOOGLE_APPLICATION_CREDENTIALS
+  }
+
+  // Check common locations
+  const possiblePaths = [
+    path.join(process.cwd(), 'gcp-service-account.json'),
+    path.join(__dirname, '..', '..', 'gcp-service-account.json'),
+    path.join(__dirname, '..', '..', '..', 'gcp-service-account.json'),
+  ]
+
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      return p
+    }
+  }
+
+  return null
+}
+
+/**
+ * Check if Document AI is configured
+ */
+function isDocumentAIConfigured(): boolean {
+  const credentialsPath = getGCPCredentialsPath()
+  return !!credentialsPath && !!GCP_CONFIG.projectId && !!GCP_CONFIG.processorId
+}
+
+/**
+ * Get access token for Document AI
+ */
+async function getDocumentAIAccessToken(): Promise<string | null> {
+  const credentialsPath = getGCPCredentialsPath()
+  if (!credentialsPath) {
+    console.error('[Document AI] No credentials file found')
+    return null
+  }
+
+  try {
+    const auth = new GoogleAuth({
+      keyFile: credentialsPath,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    })
+    const token = await auth.getAccessToken()
+    return token as string
+  } catch (error) {
+    console.error('[Document AI] Failed to get access token:', error)
+    return null
+  }
+}
+
+// Document AI response types
+interface DocumentAIFormField {
+  fieldName?: { textAnchor?: { content?: string }; confidence?: number }
+  fieldValue?: { textAnchor?: { content?: string }; confidence?: number }
+  boundingPoly?: { normalizedVertices?: Array<{ x: number; y: number }> }
+}
+
+interface DocumentAITable {
+  headerRows?: DocumentAITableRow[]
+  bodyRows?: DocumentAITableRow[]
+}
+
+interface DocumentAITableRow {
+  cells?: DocumentAITableCell[]
+}
+
+interface DocumentAITableCell {
+  layout?: { textAnchor?: { content?: string }; confidence?: number }
+  rowSpan?: number
+  colSpan?: number
+}
+
+interface DocumentAIPage {
+  pageNumber?: number
+  formFields?: DocumentAIFormField[]
+  tables?: DocumentAITable[]
+  blocks?: Array<{ confidence?: number }>
+}
+
+interface DocumentAIResponse {
+  document?: {
+    text?: string
+    pages?: DocumentAIPage[]
+  }
+  error?: {
+    code: number
+    message: string
+  }
 }
 
 /**
@@ -475,6 +591,263 @@ router.post(
 )
 
 /**
+ * POST /api/ai/ocr/document-ai
+ * Google Document AI OCR with form field and table extraction
+ * Rate limited: 30 requests per hour
+ * Validated: documentBase64 required, max 20MB
+ * Returns enhanced OCR results with form fields and tables
+ */
+router.post(
+  '/ocr/document-ai',
+  validateJSON,
+  ocrLimiter,
+  validateDocumentAI,
+  async (req: Request, res: Response) => {
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+    const startTime = Date.now()
+
+    try {
+      // Check if Document AI is configured
+      if (!isDocumentAIConfigured()) {
+        return res.status(503).json({
+          error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI not configured',
+          code: 'PROVIDER_NOT_CONFIGURED',
+        })
+      }
+
+      // Get access token
+      const accessToken = await getDocumentAIAccessToken()
+      if (!accessToken) {
+        return res.status(503).json({
+          error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Failed to get Document AI access token',
+          code: 'AUTH_FAILED',
+        })
+      }
+
+      const { documentBase64, mimeType, languageHints } = req.body as DocumentAIInput
+
+      // Build Document AI endpoint
+      const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
+
+      // Call Document AI
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rawDocument: {
+            content: documentBase64,
+            mimeType,
+          },
+          // Language hints for better Turkish recognition
+          processOptions: {
+            ocrConfig: {
+              hints: {
+                languageHints: languageHints || ['tr', 'en'],
+              },
+            },
+          },
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}` } })) as DocumentAIResponse
+        throw new Error(errorData.error?.message || `Document AI error: ${response.status}`)
+      }
+
+      const result = await response.json() as DocumentAIResponse
+
+      if (!result.document) {
+        throw new Error('Empty response from Document AI')
+      }
+
+      const processingTimeMs = Date.now() - startTime
+
+      // Extract form fields
+      const formFields: Array<{
+        name: string
+        value: string
+        confidence: number
+        boundingBox?: { x: number; y: number; width: number; height: number }
+      }> = []
+
+      for (const page of result.document.pages || []) {
+        for (const field of page.formFields || []) {
+          const name = field.fieldName?.textAnchor?.content?.trim() || ''
+          const value = field.fieldValue?.textAnchor?.content?.trim() || ''
+          const confidence = (field.fieldName?.confidence || 0 + (field.fieldValue?.confidence || 0)) / 2
+
+          if (name || value) {
+            formFields.push({
+              name,
+              value,
+              confidence,
+              boundingBox: field.boundingPoly?.normalizedVertices
+                ? {
+                    x: field.boundingPoly.normalizedVertices[0]?.x || 0,
+                    y: field.boundingPoly.normalizedVertices[0]?.y || 0,
+                    width:
+                      (field.boundingPoly.normalizedVertices[2]?.x || 0) -
+                      (field.boundingPoly.normalizedVertices[0]?.x || 0),
+                    height:
+                      (field.boundingPoly.normalizedVertices[2]?.y || 0) -
+                      (field.boundingPoly.normalizedVertices[0]?.y || 0),
+                  }
+                : undefined,
+            })
+          }
+        }
+      }
+
+      // Extract tables
+      const tables: Array<{
+        rows: Array<{ cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }> }>
+        headerRows: number
+        confidence: number
+      }> = []
+
+      for (const page of result.document.pages || []) {
+        for (const table of page.tables || []) {
+          const rows: Array<{ cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }> }> = []
+
+          // Process header rows
+          const headerRowCount = table.headerRows?.length || 0
+          for (const row of table.headerRows || []) {
+            const cells = (row.cells || []).map((cell) => ({
+              text: cell.layout?.textAnchor?.content?.trim() || '',
+              rowSpan: cell.rowSpan || 1,
+              colSpan: cell.colSpan || 1,
+              confidence: cell.layout?.confidence || 0,
+            }))
+            rows.push({ cells })
+          }
+
+          // Process body rows
+          for (const row of table.bodyRows || []) {
+            const cells = (row.cells || []).map((cell) => ({
+              text: cell.layout?.textAnchor?.content?.trim() || '',
+              rowSpan: cell.rowSpan || 1,
+              colSpan: cell.colSpan || 1,
+              confidence: cell.layout?.confidence || 0,
+            }))
+            rows.push({ cells })
+          }
+
+          if (rows.length > 0) {
+            // Calculate average confidence
+            let totalConfidence = 0
+            let cellCount = 0
+            for (const row of rows) {
+              for (const cell of row.cells) {
+                totalConfidence += cell.confidence
+                cellCount++
+              }
+            }
+
+            tables.push({
+              rows,
+              headerRows: headerRowCount,
+              confidence: cellCount > 0 ? totalConfidence / cellCount : 0,
+            })
+          }
+        }
+      }
+
+      // Calculate overall confidence
+      let totalConfidence = 0
+      let blockCount = 0
+      for (const page of result.document.pages || []) {
+        for (const block of page.blocks || []) {
+          if (block.confidence !== undefined) {
+            totalConfidence += block.confidence
+            blockCount++
+          }
+        }
+      }
+      const avgConfidence = blockCount > 0 ? totalConfidence / blockCount : 0.8
+
+      // Track cost usage (Document AI charges per page)
+      // General OCR processor: ~$0.0015 per page
+      const pageCount = result.document.pages?.length || 1
+      const docaiCost = pageCount * 0.0015
+
+      // Record usage asynchronously
+      recordUsage({
+        provider: 'google',
+        model: 'document-ai-v1',
+        operation: 'ocr-document-ai',
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        inputCost: 0,
+        outputCost: 0,
+        totalCost: docaiCost,
+        timestamp: new Date().toISOString(),
+      }).catch((err) => {
+        if (!IS_PRODUCTION) console.error('[Cost Tracking Error]', err)
+      })
+
+      // Log success in development
+      if (!IS_PRODUCTION) {
+        console.log(`[Document AI] Processed ${pageCount} pages, ${formFields.length} form fields, ${tables.length} tables in ${processingTimeMs}ms`)
+      }
+
+      res.json({
+        success: true,
+        data: {
+          text: result.document.text || '',
+          confidence: avgConfidence,
+          pageCount,
+          formFields: formFields.length > 0 ? formFields : undefined,
+          tables: tables.length > 0 ? tables : undefined,
+          processingTimeMs,
+        },
+        cost: docaiCost,
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error'
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        provider: 'google-document-ai',
+        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+        message,
+        processingTimeMs: Date.now() - startTime,
+      }
+
+      if (!IS_PRODUCTION) {
+        console.error('[Document AI Error]', JSON.stringify(errorDetails, null, 2))
+      }
+
+      let code = 'DOCUMENT_AI_FAILED'
+      let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Document AI processing failed'
+
+      if (message.includes('PERMISSION_DENIED')) {
+        code = 'PERMISSION_DENIED'
+        userMessage = IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI permission denied - check service account permissions'
+      } else if (message.includes('NOT_FOUND')) {
+        code = 'PROCESSOR_NOT_FOUND'
+        userMessage = IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI processor not found - check processor ID'
+      } else if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429')) {
+        code = 'RATE_LIMIT_EXCEEDED'
+        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Document AI rate limit exceeded'
+      } else if (message.includes('INVALID_ARGUMENT')) {
+        code = 'INVALID_DOCUMENT'
+        userMessage = IS_PRODUCTION ? 'Unable to process this document format' : 'Invalid document format for Document AI'
+      }
+
+      res.status(500).json({
+        error: userMessage,
+        code,
+        ...(!IS_PRODUCTION && { details: message }),
+        timestamp: errorDetails.timestamp,
+      })
+    }
+  }
+)
+
+/**
  * Fallback system prompt for policy chat assistant (used when admin prompt unavailable)
  */
 const CHAT_SYSTEM_PROMPT_FALLBACK = `You are an expert insurance policy assistant for the Turkish insurance market. You help users understand their insurance policies, answer questions about coverage, compare policies, and identify potential gaps or issues.
@@ -708,6 +1081,7 @@ router.get('/providers', (_req: Request, res: Response) => {
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
     google: !!process.env.GOOGLE_CLOUD_API_KEY,
+    documentAI: isDocumentAIConfigured(),
   })
 })
 
