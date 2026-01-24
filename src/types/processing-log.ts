@@ -1,0 +1,260 @@
+/**
+ * Document Processing Log Types
+ *
+ * Defines the structure for tracking document processing through the extraction pipeline.
+ */
+
+/**
+ * Processing stage names that map to the pipeline steps
+ */
+export type ProcessingStage =
+  | 'upload'              // File received in browser
+  | 'pdf_extraction'      // Text extraction via pdf.js
+  | 'ocr_check'           // Density check to determine if OCR needed
+  | 'ocr_processing'      // OCR via Document AI/Vision/Tesseract
+  | 'text_preprocessing'  // Text normalization, OCR cleanup
+  | 'ai_extraction'       // GPT-4o/Claude structured extraction
+  | 'form_field_enhancement' // Document AI form fields applied
+  | 'table_parsing'       // Coverage table parsing
+  | 'validation'          // Data validation (Zod, business rules)
+  | 'duplicate_check'     // Duplicate/amendment detection
+  | 'conflict_resolution' // User resolved duplicate conflict
+  | 'database_save'       // Save to Supabase
+
+/**
+ * Status of a processing stage
+ */
+export type ProcessingStageStatus =
+  | 'pending'    // Not started
+  | 'running'    // In progress
+  | 'completed'  // Finished successfully
+  | 'failed'     // Failed with error
+  | 'skipped'    // Skipped (e.g., OCR not needed)
+  | 'partial'    // Completed with warnings
+
+/**
+ * Overall document processing status
+ */
+export type ProcessingStatus =
+  | 'pending'    // Queued but not started
+  | 'processing' // Currently being processed
+  | 'completed'  // All stages finished successfully
+  | 'failed'     // Processing failed
+  | 'partial'    // Some stages failed but document was saved
+
+/**
+ * A single processing stage record
+ */
+export interface ProcessingStageRecord {
+  stage: ProcessingStage
+  status: ProcessingStageStatus
+  started_at: string // ISO timestamp
+  completed_at?: string // ISO timestamp
+  duration_ms?: number
+  input?: Record<string, unknown>
+  output?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+  error?: string
+}
+
+/**
+ * Summary of extracted policy data (for display before full policy exists)
+ */
+export interface ExtractedSummary {
+  policy_number?: string
+  provider?: string
+  type?: string
+  type_tr?: string
+  insured_person?: string
+  premium?: number
+  coverage?: number
+  start_date?: string
+  expiry_date?: string
+}
+
+/**
+ * Complete document processing log record
+ */
+export interface DocumentProcessingLog {
+  id: string
+  document_id: string
+  policy_id?: string
+  user_id?: string
+
+  // File metadata
+  filename: string
+  file_size?: number
+  mime_type?: string
+  page_count?: number
+
+  // Processing data
+  stages: ProcessingStageRecord[]
+  status: ProcessingStatus
+
+  // Timing
+  started_at: string
+  completed_at?: string
+  total_duration_ms?: number
+
+  // Error tracking
+  error_message?: string
+  error_stage?: string
+  error_details?: Record<string, unknown>
+
+  // Summary flags for filtering
+  ocr_used: boolean
+  ocr_engine?: string
+  ai_provider?: string
+  extraction_confidence?: number
+
+  // Extracted summary
+  extracted_summary?: ExtractedSummary
+
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Stage configuration for UI display
+ */
+export interface StageConfig {
+  name: ProcessingStage
+  label: string
+  labelTr: string
+  description: string
+  descriptionTr: string
+  icon: string // Lucide icon name
+  color: string // Tailwind color class
+}
+
+/**
+ * Stage configurations for the pipeline visualization
+ */
+export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
+  upload: {
+    name: 'upload',
+    label: 'Upload',
+    labelTr: 'Yükleme',
+    description: 'File received and validated',
+    descriptionTr: 'Dosya alındı ve doğrulandı',
+    icon: 'Upload',
+    color: 'blue',
+  },
+  pdf_extraction: {
+    name: 'pdf_extraction',
+    label: 'PDF Extraction',
+    labelTr: 'PDF Metin Çıkarma',
+    description: 'Text extracted from PDF using pdf.js',
+    descriptionTr: 'pdf.js ile PDF\'den metin çıkarıldı',
+    icon: 'FileText',
+    color: 'indigo',
+  },
+  ocr_check: {
+    name: 'ocr_check',
+    label: 'OCR Check',
+    labelTr: 'OCR Kontrolü',
+    description: 'Checking if OCR is needed based on text density',
+    descriptionTr: 'Metin yoğunluğuna göre OCR gereksinimi kontrol edildi',
+    icon: 'Search',
+    color: 'purple',
+  },
+  ocr_processing: {
+    name: 'ocr_processing',
+    label: 'OCR Processing',
+    labelTr: 'OCR İşleme',
+    description: 'Optical Character Recognition for scanned documents',
+    descriptionTr: 'Taranan belgeler için optik karakter tanıma',
+    icon: 'ScanLine',
+    color: 'violet',
+  },
+  text_preprocessing: {
+    name: 'text_preprocessing',
+    label: 'Text Preprocessing',
+    labelTr: 'Metin Ön İşleme',
+    description: 'Text normalization and OCR cleanup',
+    descriptionTr: 'Metin normalizasyonu ve OCR temizliği',
+    icon: 'Wand2',
+    color: 'fuchsia',
+  },
+  ai_extraction: {
+    name: 'ai_extraction',
+    label: 'AI Extraction',
+    labelTr: 'AI Çıkarma',
+    description: 'Structured data extraction using AI (GPT-4o/Claude)',
+    descriptionTr: 'AI ile yapılandırılmış veri çıkarma (GPT-4o/Claude)',
+    icon: 'Brain',
+    color: 'pink',
+  },
+  form_field_enhancement: {
+    name: 'form_field_enhancement',
+    label: 'Form Fields',
+    labelTr: 'Form Alanları',
+    description: 'Enhancement using Document AI form field detection',
+    descriptionTr: 'Document AI form alanı tespiti ile zenginleştirme',
+    icon: 'FormInput',
+    color: 'rose',
+  },
+  table_parsing: {
+    name: 'table_parsing',
+    label: 'Table Parsing',
+    labelTr: 'Tablo Ayrıştırma',
+    description: 'Coverage table extraction and parsing',
+    descriptionTr: 'Teminat tablosu çıkarma ve ayrıştırma',
+    icon: 'Table',
+    color: 'orange',
+  },
+  validation: {
+    name: 'validation',
+    label: 'Validation',
+    labelTr: 'Doğrulama',
+    description: 'Data validation and business rules check',
+    descriptionTr: 'Veri doğrulama ve iş kuralları kontrolü',
+    icon: 'CheckCircle',
+    color: 'amber',
+  },
+  duplicate_check: {
+    name: 'duplicate_check',
+    label: 'Duplicate Check',
+    labelTr: 'Mükerrer Kontrol',
+    description: 'Checking for existing similar policies',
+    descriptionTr: 'Mevcut benzer poliçeler kontrol edildi',
+    icon: 'Copy',
+    color: 'yellow',
+  },
+  conflict_resolution: {
+    name: 'conflict_resolution',
+    label: 'Conflict Resolution',
+    labelTr: 'Çakışma Çözümü',
+    description: 'User resolved duplicate/amendment conflict',
+    descriptionTr: 'Kullanıcı mükerrer/değişiklik çakışmasını çözdü',
+    icon: 'GitMerge',
+    color: 'lime',
+  },
+  database_save: {
+    name: 'database_save',
+    label: 'Save',
+    labelTr: 'Kayıt',
+    description: 'Policy saved to database',
+    descriptionTr: 'Poliçe veritabanına kaydedildi',
+    icon: 'Database',
+    color: 'green',
+  },
+}
+
+/**
+ * Get ordered list of stages for pipeline display
+ */
+export const PIPELINE_STAGES: ProcessingStage[] = [
+  'upload',
+  'pdf_extraction',
+  'ocr_check',
+  'ocr_processing',
+  'text_preprocessing',
+  'ai_extraction',
+  'form_field_enhancement',
+  'table_parsing',
+  'validation',
+  'duplicate_check',
+  'conflict_resolution',
+  'database_save',
+]

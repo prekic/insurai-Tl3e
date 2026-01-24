@@ -1,0 +1,403 @@
+/**
+ * Processing Logger
+ *
+ * Utility for tracking document processing stages through the extraction pipeline.
+ * Supports both in-memory tracking and database persistence.
+ */
+
+import type {
+  ProcessingStage,
+  ProcessingStageRecord,
+  DocumentProcessingLog,
+  ExtractedSummary,
+} from '@/types/processing-log'
+
+/**
+ * Options for creating a new processing log
+ */
+export interface CreateLogOptions {
+  filename: string
+  file_size?: number
+  mime_type?: string
+  user_id?: string
+}
+
+/**
+ * Options for completing a stage
+ */
+export interface CompleteStageOptions {
+  output?: Record<string, unknown>
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Processing Logger class
+ *
+ * Tracks the complete processing journey of a document.
+ * Use createProcessingLogger() factory function to create instances.
+ */
+export class ProcessingLogger {
+  private documentId: string
+  private log: DocumentProcessingLog
+  private currentStage: ProcessingStage | null = null
+  private stageStartTime: number | null = null
+  private persistCallback?: (log: DocumentProcessingLog) => Promise<void>
+
+  constructor(options: CreateLogOptions, documentId?: string) {
+    this.documentId = documentId || crypto.randomUUID()
+
+    const now = new Date().toISOString()
+
+    this.log = {
+      id: crypto.randomUUID(),
+      document_id: this.documentId,
+      filename: options.filename,
+      file_size: options.file_size,
+      mime_type: options.mime_type,
+      user_id: options.user_id,
+      stages: [],
+      status: 'pending',
+      started_at: now,
+      ocr_used: false,
+      created_at: now,
+      updated_at: now,
+    }
+  }
+
+  /**
+   * Set callback for persisting log updates to database
+   */
+  setPersistCallback(callback: (log: DocumentProcessingLog) => Promise<void>): void {
+    this.persistCallback = callback
+  }
+
+  /**
+   * Get the document ID for this log
+   */
+  getDocumentId(): string {
+    return this.documentId
+  }
+
+  /**
+   * Get the current log state
+   */
+  getLog(): DocumentProcessingLog {
+    return { ...this.log }
+  }
+
+  /**
+   * Start a new processing stage
+   */
+  startStage(
+    stage: ProcessingStage,
+    input?: Record<string, unknown>
+  ): void {
+    // Complete any running stage first
+    if (this.currentStage) {
+      this.failStage('Stage interrupted by new stage')
+    }
+
+    this.currentStage = stage
+    this.stageStartTime = Date.now()
+
+    // Update overall status to processing
+    if (this.log.status === 'pending') {
+      this.log.status = 'processing'
+    }
+
+    const stageRecord: ProcessingStageRecord = {
+      stage,
+      status: 'running',
+      started_at: new Date().toISOString(),
+      input,
+    }
+
+    this.log.stages.push(stageRecord)
+    this.log.updated_at = new Date().toISOString()
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Complete the current stage successfully
+   */
+  completeStage(options?: CompleteStageOptions): void {
+    if (!this.currentStage) {
+      console.warn('[ProcessingLogger] completeStage called with no active stage')
+      return
+    }
+
+    const stageIndex = this.findCurrentStageIndex()
+    if (stageIndex === -1) return
+
+    const duration = this.stageStartTime ? Date.now() - this.stageStartTime : undefined
+
+    this.log.stages[stageIndex] = {
+      ...this.log.stages[stageIndex],
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      duration_ms: duration,
+      output: options?.output,
+      metadata: {
+        ...this.log.stages[stageIndex].metadata,
+        ...options?.metadata,
+      },
+    }
+
+    this.log.updated_at = new Date().toISOString()
+    this.currentStage = null
+    this.stageStartTime = null
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Fail the current stage with an error
+   */
+  failStage(error: string, details?: Record<string, unknown>): void {
+    if (!this.currentStage) {
+      console.warn('[ProcessingLogger] failStage called with no active stage')
+      return
+    }
+
+    const stageIndex = this.findCurrentStageIndex()
+    if (stageIndex === -1) return
+
+    const duration = this.stageStartTime ? Date.now() - this.stageStartTime : undefined
+
+    this.log.stages[stageIndex] = {
+      ...this.log.stages[stageIndex],
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      duration_ms: duration,
+      error,
+      metadata: {
+        ...this.log.stages[stageIndex].metadata,
+        error_details: details,
+      },
+    }
+
+    // Update overall error tracking
+    this.log.error_stage = this.currentStage
+    this.log.error_message = error
+    this.log.error_details = details
+    this.log.updated_at = new Date().toISOString()
+
+    this.currentStage = null
+    this.stageStartTime = null
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Skip a stage (e.g., OCR not needed)
+   */
+  skipStage(stage: ProcessingStage, reason?: string): void {
+    const stageRecord: ProcessingStageRecord = {
+      stage,
+      status: 'skipped',
+      started_at: new Date().toISOString(),
+      completed_at: new Date().toISOString(),
+      duration_ms: 0,
+      metadata: reason ? { skip_reason: reason } : undefined,
+    }
+
+    this.log.stages.push(stageRecord)
+    this.log.updated_at = new Date().toISOString()
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Set page count (usually determined during pdf_extraction)
+   */
+  setPageCount(count: number): void {
+    this.log.page_count = count
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Mark that OCR was used
+   */
+  setOCRUsed(engine: string): void {
+    this.log.ocr_used = true
+    this.log.ocr_engine = engine
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Set the AI provider used for extraction
+   */
+  setAIProvider(provider: string): void {
+    this.log.ai_provider = provider
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Set extraction confidence score
+   */
+  setExtractionConfidence(confidence: number): void {
+    this.log.extraction_confidence = confidence
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Set extracted summary for display
+   */
+  setExtractedSummary(summary: ExtractedSummary): void {
+    this.log.extracted_summary = summary
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Link to the saved policy ID
+   */
+  setPolicyId(policyId: string): void {
+    this.log.policy_id = policyId
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Mark processing as completed
+   */
+  complete(): void {
+    const now = new Date().toISOString()
+
+    // Check if any stages failed
+    const hasFailedStages = this.log.stages.some((s) => s.status === 'failed')
+
+    this.log.status = hasFailedStages ? 'partial' : 'completed'
+    this.log.completed_at = now
+    this.log.total_duration_ms = this.log.started_at
+      ? new Date(now).getTime() - new Date(this.log.started_at).getTime()
+      : undefined
+    this.log.updated_at = now
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Mark processing as failed
+   */
+  fail(error: string, details?: Record<string, unknown>): void {
+    const now = new Date().toISOString()
+
+    this.log.status = 'failed'
+    this.log.error_message = error
+    this.log.error_details = details
+    this.log.completed_at = now
+    this.log.total_duration_ms = this.log.started_at
+      ? new Date(now).getTime() - new Date(this.log.started_at).getTime()
+      : undefined
+    this.log.updated_at = now
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
+   * Get stage by name
+   */
+  getStage(stage: ProcessingStage): ProcessingStageRecord | undefined {
+    return this.log.stages.find((s) => s.stage === stage)
+  }
+
+  /**
+   * Check if a stage was completed successfully
+   */
+  isStageCompleted(stage: ProcessingStage): boolean {
+    const stageRecord = this.getStage(stage)
+    return stageRecord?.status === 'completed'
+  }
+
+  /**
+   * Get total processing time so far
+   */
+  getElapsedTime(): number {
+    if (!this.log.started_at) return 0
+    const end = this.log.completed_at
+      ? new Date(this.log.completed_at).getTime()
+      : Date.now()
+    return end - new Date(this.log.started_at).getTime()
+  }
+
+  /**
+   * Export log as JSON for API transmission
+   */
+  toJSON(): DocumentProcessingLog {
+    return { ...this.log }
+  }
+
+  /**
+   * Find the index of the current running stage
+   */
+  private findCurrentStageIndex(): number {
+    if (!this.currentStage) return -1
+    return this.log.stages.findIndex(
+      (s) => s.stage === this.currentStage && s.status === 'running'
+    )
+  }
+
+  /**
+   * Persist log to database (if callback is set)
+   */
+  private async persist(): Promise<void> {
+    if (this.persistCallback) {
+      try {
+        await this.persistCallback(this.log)
+      } catch (error) {
+        console.error('[ProcessingLogger] Failed to persist log:', error)
+      }
+    }
+  }
+}
+
+/**
+ * Factory function to create a new ProcessingLogger
+ */
+export function createProcessingLogger(
+  options: CreateLogOptions,
+  documentId?: string
+): ProcessingLogger {
+  return new ProcessingLogger(options, documentId)
+}
+
+/**
+ * Create a ProcessingLogger from an existing log (for resuming)
+ */
+export function resumeProcessingLogger(
+  existingLog: DocumentProcessingLog
+): ProcessingLogger {
+  const logger = new ProcessingLogger(
+    {
+      filename: existingLog.filename,
+      file_size: existingLog.file_size,
+      mime_type: existingLog.mime_type,
+      user_id: existingLog.user_id,
+    },
+    existingLog.document_id
+  )
+
+  // Restore the log state
+  // Note: This is a simplified restoration - full implementation would need more fields
+  return logger
+}
+
+/**
+ * Serialize a processing log for storage
+ */
+export function serializeProcessingLog(log: DocumentProcessingLog): string {
+  return JSON.stringify(log)
+}
+
+/**
+ * Deserialize a processing log from storage
+ */
+export function deserializeProcessingLog(json: string): DocumentProcessingLog {
+  return JSON.parse(json) as DocumentProcessingLog
+}

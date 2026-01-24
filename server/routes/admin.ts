@@ -2643,4 +2643,143 @@ router.post('/monitoring/alerts/:id/resolve', authenticateAdmin, async (req: Aut
   }
 })
 
+// ============================================================================
+// PROCESSING LOGS (Document Journey Tracking)
+// ============================================================================
+
+import * as processingLogService from '../services/processing-log-service.js'
+
+/**
+ * Get processing logs with filtering and pagination
+ * GET /api/admin/processing-logs
+ */
+router.get('/processing-logs', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      status,
+      ocr_used,
+      ai_provider,
+      from_date,
+      to_date,
+      search,
+      limit = '50',
+      offset = '0',
+    } = req.query
+
+    const filters = {
+      status: status as string | undefined,
+      ocr_used: ocr_used === 'true' ? true : ocr_used === 'false' ? false : undefined,
+      ai_provider: ai_provider as string | undefined,
+      from_date: from_date as string | undefined,
+      to_date: to_date as string | undefined,
+      search: search as string | undefined,
+      limit: parseInt(limit as string) || 50,
+      offset: parseInt(offset as string) || 0,
+    }
+
+    const result = await processingLogService.listProcessingLogs(filters)
+
+    res.json({
+      success: true,
+      data: result.logs,
+      total: result.total,
+      limit: filters.limit,
+      offset: filters.offset,
+    })
+  } catch (error) {
+    console.error('Failed to list processing logs:', error)
+    res.status(500).json({ success: false, error: 'Failed to list processing logs' })
+  }
+})
+
+/**
+ * Get processing statistics for dashboard
+ * GET /api/admin/processing-logs/stats
+ */
+router.get('/processing-logs/stats', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const days = parseInt(req.query.days as string) || 30
+    const stats = await processingLogService.getProcessingStats(days)
+
+    res.json({
+      success: true,
+      data: stats,
+    })
+  } catch (error) {
+    console.error('Failed to get processing stats:', error)
+    res.status(500).json({ success: false, error: 'Failed to get processing stats' })
+  }
+})
+
+/**
+ * Get a specific processing log by document ID
+ * GET /api/admin/processing-logs/:documentId
+ */
+router.get('/processing-logs/:documentId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { documentId } = req.params
+    const log = await processingLogService.getProcessingLog(documentId)
+
+    if (!log) {
+      res.status(404).json({ success: false, error: 'Processing log not found' })
+      return
+    }
+
+    res.json({
+      success: true,
+      data: log,
+    })
+  } catch (error) {
+    console.error('Failed to get processing log:', error)
+    res.status(500).json({ success: false, error: 'Failed to get processing log' })
+  }
+})
+
+/**
+ * Get processing log by policy ID
+ * GET /api/admin/processing-logs/by-policy/:policyId
+ */
+router.get('/processing-logs/by-policy/:policyId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { policyId } = req.params
+    const log = await processingLogService.getProcessingLogByPolicyId(policyId)
+
+    if (!log) {
+      res.status(404).json({ success: false, error: 'Processing log not found for this policy' })
+      return
+    }
+
+    res.json({
+      success: true,
+      data: log,
+    })
+  } catch (error) {
+    console.error('Failed to get processing log by policy:', error)
+    res.status(500).json({ success: false, error: 'Failed to get processing log' })
+  }
+})
+
+/**
+ * Clean up old processing logs
+ * POST /api/admin/processing-logs/cleanup
+ */
+router.post('/processing-logs/cleanup', authenticateAdmin, requireSuperAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const daysOld = parseInt(req.body.daysOld as string) || 90
+    const deletedCount = await processingLogService.deleteOldLogs(daysOld)
+
+    // Log the action
+    await logAdminAction(req, 'cleanup', 'processing_logs', undefined, undefined, { daysOld, deletedCount })
+
+    res.json({
+      success: true,
+      message: `Deleted ${deletedCount} logs older than ${daysOld} days`,
+      deletedCount,
+    })
+  } catch (error) {
+    console.error('Failed to cleanup processing logs:', error)
+    res.status(500).json({ success: false, error: 'Failed to cleanup processing logs' })
+  }
+})
+
 export default router
