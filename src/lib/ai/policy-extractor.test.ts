@@ -991,3 +991,71 @@ describe('Risk Assessment Integration', () => {
     }
   })
 })
+
+// =============================================================================
+// Error Tracking Integration Tests
+// =============================================================================
+
+describe('Error Tracking Integration', () => {
+  beforeEach(async () => {
+    vi.clearAllMocks()
+    global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+
+    const config = await import('./config')
+    vi.mocked(config.isAIConfigured).mockReturnValue(true)
+    vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+  })
+
+  it('should include stack and type in error response when AI fails', async () => {
+    const openai = await import('./providers/openai')
+    const testError = new TypeError('Cannot read property "overall" of undefined')
+    vi.mocked(openai.extractWithOpenAI).mockRejectedValue(testError)
+
+    const file = createMockFile('error.pdf', 'application/pdf')
+    const result = await extractPolicyFromDocument(file, { useFallback: false })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('AI_ERROR')
+      expect(result.error.details).toContain('Cannot read property')
+      expect(result.error.stack).toBeDefined()
+      expect(result.error.stack).toContain('TypeError')
+      expect(result.error.type).toBe('TypeError')
+    }
+  })
+
+  it('should include error type for custom errors', async () => {
+    const openai = await import('./providers/openai')
+    class RateLimitError extends Error {
+      constructor(message: string) {
+        super(message)
+        this.name = 'RateLimitError'
+      }
+    }
+    vi.mocked(openai.extractWithOpenAI).mockRejectedValue(new RateLimitError('Rate limit exceeded'))
+
+    const file = createMockFile('ratelimit.pdf', 'application/pdf')
+    const result = await extractPolicyFromDocument(file, { useFallback: false })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.type).toBe('RateLimitError')
+      expect(result.error.details).toContain('Rate limit exceeded')
+    }
+  })
+
+  it('should handle non-Error exceptions gracefully', async () => {
+    const openai = await import('./providers/openai')
+    vi.mocked(openai.extractWithOpenAI).mockRejectedValue('String error message')
+
+    const file = createMockFile('string-error.pdf', 'application/pdf')
+    const result = await extractPolicyFromDocument(file, { useFallback: false })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.code).toBe('AI_ERROR')
+      // String errors get wrapped
+      expect(result.error.details).toBeDefined()
+    }
+  })
+})
