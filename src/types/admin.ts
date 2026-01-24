@@ -817,6 +817,7 @@ export type AdminSection =
   | 'users'
   | 'policies'
   | 'pipeline'
+  | 'processing_logs'
   | 'ocr_dashboard'
   | 'security'
   | 'config'

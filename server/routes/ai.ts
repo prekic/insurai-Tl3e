@@ -1321,4 +1321,139 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
   })
 })
 
+// ============================================================================
+// PROCESSING LOGS (Document Journey Tracking)
+// ============================================================================
+
+import * as processingLogService from '../services/processing-log-service.js'
+
+/**
+ * Create a new processing log
+ * POST /api/ai/processing-log
+ */
+router.post('/processing-log', async (req: Request, res: Response) => {
+  try {
+    const log = req.body
+
+    if (!log.document_id || !log.filename) {
+      res.status(400).json({
+        success: false,
+        error: 'document_id and filename are required',
+      })
+      return
+    }
+
+    const result = await processingLogService.createProcessingLog(log)
+
+    if (!result) {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to create processing log (database not configured)',
+      })
+      return
+    }
+
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error('Failed to create processing log:', error)
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create processing log',
+    })
+  }
+})
+
+/**
+ * Update a processing log
+ * PATCH /api/ai/processing-log/:documentId
+ */
+router.patch('/processing-log/:documentId', async (req: Request, res: Response) => {
+  try {
+    const { documentId } = req.params
+    const updates = req.body
+
+    const result = await processingLogService.updateProcessingLog(documentId, updates)
+
+    if (!result) {
+      res.status(404).json({
+        success: false,
+        error: 'Processing log not found',
+      })
+      return
+    }
+
+    res.json({ success: true, data: result })
+  } catch (error) {
+    console.error('Failed to update processing log:', error)
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update processing log',
+    })
+  }
+})
+
+/**
+ * Add a stage to a processing log
+ * POST /api/ai/processing-log/:documentId/stage
+ */
+router.post('/processing-log/:documentId/stage', async (req: Request, res: Response) => {
+  try {
+    const { documentId } = req.params
+    const stage = req.body
+
+    if (!stage.stage || !stage.status) {
+      res.status(400).json({
+        success: false,
+        error: 'stage and status are required',
+      })
+      return
+    }
+
+    const success = await processingLogService.addProcessingStage(documentId, stage)
+
+    if (!success) {
+      res.status(404).json({
+        success: false,
+        error: 'Processing log not found',
+      })
+      return
+    }
+
+    res.json({ success: true })
+  } catch (error) {
+    console.error('Failed to add processing stage:', error)
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to add processing stage',
+    })
+  }
+})
+
+/**
+ * Get a processing log by document ID
+ * GET /api/ai/processing-log/:documentId
+ */
+router.get('/processing-log/:documentId', async (req: Request, res: Response) => {
+  try {
+    const { documentId } = req.params
+    const log = await processingLogService.getProcessingLog(documentId)
+
+    if (!log) {
+      res.status(404).json({
+        success: false,
+        error: 'Processing log not found',
+      })
+      return
+    }
+
+    res.json({ success: true, data: log })
+  } catch (error) {
+    console.error('Failed to get processing log:', error)
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get processing log',
+    })
+  }
+})
+
 export default router

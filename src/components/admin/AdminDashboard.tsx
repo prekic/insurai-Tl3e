@@ -25,6 +25,7 @@ import { ConfigTab } from './tabs/ConfigTab'
 import { AnalyticsTab } from './tabs/AnalyticsTab'
 import { AuditTab } from './tabs/AuditTab'
 import { AlertsTab } from './tabs/AlertsTab'
+import { ProcessingLogsTab } from './tabs/ProcessingLogsTab'
 
 // Icons
 import {
@@ -34,6 +35,7 @@ import {
   Users,
   FileText,
   Workflow,
+  Route,
   Eye,
   Shield,
   Settings,
@@ -53,6 +55,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
   { id: 'policies', label: 'Policies', icon: <FileText className="h-4 w-4" /> },
   { id: 'pipeline', label: 'Pipeline', icon: <Workflow className="h-4 w-4" /> },
+  { id: 'processing_logs', label: 'Document Journey', icon: <Route className="h-4 w-4" /> },
   { id: 'ocr_dashboard', label: 'OCR Analytics', icon: <Eye className="h-4 w-4" /> },
   { id: 'security', label: 'Security', icon: <Shield className="h-4 w-4" /> },
   { id: 'config', label: 'Configuration', icon: <Settings className="h-4 w-4" /> },
@@ -192,6 +195,8 @@ export function AdminDashboard() {
         return <AuditTab />
       case 'alerts':
         return <AlertsTab />
+      case 'processing_logs':
+        return <ProcessingLogsTab />
       default:
         return <OverviewTab systemHealth={systemHealth} />
     }
