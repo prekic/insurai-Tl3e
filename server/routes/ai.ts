@@ -176,17 +176,23 @@ router.post(
   aiExtractionLimiter,
   validateOpenAIExtraction,
   async (req: Request, res: Response) => {
+    const requestId = `ext-${Date.now()}`
+    console.log(`[${requestId}] 📥 Extraction request received`)
+
     try {
       const client = getOpenAIClient()
       if (!client) {
+        console.log(`[${requestId}] ❌ OpenAI client not configured`)
         return res.status(503).json({
           error: 'OpenAI not configured',
           code: 'PROVIDER_NOT_CONFIGURED',
         })
       }
+      console.log(`[${requestId}] ✅ OpenAI client ready`)
 
       // Body is validated and sanitized by middleware
       const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as OpenAIExtractionInput & { policyType?: string }
+      console.log(`[${requestId}] 📄 Document: ${documentText?.length || 0} chars, type: ${policyType || 'auto-detect'}, model: ${model || 'gpt-4o'}`)
 
       // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
       let finalSystemPrompt: string
@@ -253,6 +259,7 @@ router.post(
         }
       })
 
+      console.log(`[${requestId}] ✅ Extraction successful: ${inputTokens}+${outputTokens} tokens, $${cost.totalCost.toFixed(4)}`)
       res.json({
         success: true,
         data: JSON.parse(content),
@@ -263,16 +270,15 @@ router.post(
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       const errorDetails = {
+        requestId,
         timestamp: new Date().toISOString(),
         provider: 'openai',
         errorType: error instanceof Error ? error.constructor.name : 'Unknown',
         message,
         documentTextLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
       }
-      // Only log full error details in development
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[OpenAI Extraction Error]', JSON.stringify(errorDetails, null, 2))
-      }
+      // Always log errors (safe info only)
+      console.error(`[${requestId}] ❌ Extraction failed:`, errorDetails.errorType, '-', message.substring(0, 200))
 
       // Determine specific error code
       // In production, show generic messages; in dev/staging, show specific ones
