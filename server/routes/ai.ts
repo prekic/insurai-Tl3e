@@ -216,6 +216,10 @@ router.post(
         }
       }
 
+      console.log(`[${requestId}] 🤖 Calling OpenAI API...`)
+      console.log(`[${requestId}] 📝 System prompt: ${finalSystemPrompt.substring(0, 100)}...`)
+      console.log(`[${requestId}] 📝 User prompt length: ${finalUserPrompt.length} chars`)
+
       const response = await client.chat.completions.create({
         model: model || 'gpt-4o',
         messages: [
@@ -226,6 +230,7 @@ router.post(
         max_tokens: 4096,
         temperature: 0.1,
       })
+      console.log(`[${requestId}] ✅ OpenAI responded`)
 
       const content = response.choices[0]?.message?.content
       if (!content) {
