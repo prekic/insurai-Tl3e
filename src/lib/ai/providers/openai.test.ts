@@ -440,4 +440,80 @@ describe('extractWithOpenAI - Missing Schema Fields', () => {
     expect(result.amendmentInfo).toBeDefined()
     expect(result.amendmentInfo.isAmendment).toBe(false)
   })
+
+  it('should handle AI returning snake_case fields instead of camelCase', async () => {
+    // This is what the AI was returning before we added json_schema enforcement
+    // The AI returned snake_case fields like policy_number instead of policyNumber
+    const snakeCaseResponse = {
+      policy_number: 'POL-123',
+      policy_type: 'kasko',
+      premium: {
+        amount: 31140,
+        tax: 1482.86,
+        currency: 'TRY',
+      },
+      confidence: 0.95, // Simple number instead of nested object
+      // No provider field at all!
+      coverages_count: 0,
+    }
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(snakeCaseResponse) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    const result = await extractWithOpenAI('Test document')
+    expect(result).toBeDefined()
+
+    // IMPORTANT: This test documents the problematic behavior before our fix
+    // When AI returns wrong schema:
+    // - camelCase fields like policyNumber are undefined (AI sent policy_number)
+    // - confidence is the wrong type (number instead of object)
+    // - coverages is missing
+    expect(result.policyNumber).toBeUndefined() // AI sent policy_number, not policyNumber
+    expect(result.provider).toBeUndefined() // AI didn't send provider at all
+    expect(result.confidence).toBe(0.95) // Wrong type: should be object, got number
+
+    // The fix deployed on server uses json_schema format which ENFORCES
+    // the correct field names. This test documents what happens WITHOUT schema.
+  })
+
+  it('should handle response with missing provider field', async () => {
+    const responseWithoutProvider = {
+      policyNumber: 'POL-123',
+      // NO provider field!
+      policyType: 'home',
+      insuredName: 'Test User',
+      startDate: '2024-01-01',
+      endDate: '2025-01-01',
+      premium: 1000,
+      coverages: [],
+      confidence: { overall: 0.8, policyNumber: 0.9, provider: 0.5, dates: 0.8, premium: 0.8, coverages: 0.7 },
+    }
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(responseWithoutProvider) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    const result = await extractWithOpenAI('Test document')
+    expect(result).toBeDefined()
+    expect(result.policyNumber).toBe('POL-123')
+    // provider should be undefined or null - this is handled downstream in convertToAnalyzedPolicy
+    expect(result.provider).toBeUndefined()
+  })
 })
