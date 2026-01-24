@@ -2782,4 +2782,109 @@ router.post('/processing-logs/cleanup', authenticateAdmin, requireSuperAdmin, as
   }
 })
 
+// ============================================================================
+// ADMIN NOTIFICATIONS
+// ============================================================================
+
+import * as adminNotificationService from '../services/admin-notification-service.js'
+
+/**
+ * Get unacknowledged notifications (for badge count)
+ * GET /api/admin/notifications/unacknowledged
+ */
+router.get('/notifications/unacknowledged', authenticateAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const notifications = await adminNotificationService.getUnacknowledgedNotifications()
+    res.json({
+      success: true,
+      data: notifications,
+      count: notifications.length,
+    })
+  } catch (error) {
+    console.error('Failed to get unacknowledged notifications:', error)
+    res.status(500).json({ success: false, error: 'Failed to get notifications' })
+  }
+})
+
+/**
+ * Get all notifications with pagination
+ * GET /api/admin/notifications
+ */
+router.get('/notifications', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const limit = parseInt(req.query.limit as string) || 50
+    const offset = parseInt(req.query.offset as string) || 0
+    const category = req.query.category as adminNotificationService.NotificationCategory | undefined
+
+    const result = await adminNotificationService.getNotifications({ limit, offset, category })
+    res.json({
+      success: true,
+      data: result.notifications,
+      total: result.total,
+      limit,
+      offset,
+    })
+  } catch (error) {
+    console.error('Failed to get notifications:', error)
+    res.status(500).json({ success: false, error: 'Failed to get notifications' })
+  }
+})
+
+/**
+ * Acknowledge a notification
+ * POST /api/admin/notifications/:id/acknowledge
+ */
+router.post('/notifications/:id/acknowledge', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const acknowledgedBy = req.adminUser?.email || 'unknown'
+
+    const success = await adminNotificationService.acknowledgeNotification(id, acknowledgedBy)
+
+    if (!success) {
+      res.status(404).json({ success: false, error: 'Notification not found' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'acknowledge', 'notification', id)
+
+    res.json({ success: true, message: 'Notification acknowledged' })
+  } catch (error) {
+    console.error('Failed to acknowledge notification:', error)
+    res.status(500).json({ success: false, error: 'Failed to acknowledge notification' })
+  }
+})
+
+/**
+ * Acknowledge all notifications
+ * POST /api/admin/notifications/acknowledge-all
+ */
+router.post('/notifications/acknowledge-all', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const acknowledgedBy = req.adminUser?.email || 'unknown'
+    const notifications = await adminNotificationService.getUnacknowledgedNotifications()
+
+    let acknowledgedCount = 0
+    for (const notification of notifications) {
+      if (notification.id) {
+        const success = await adminNotificationService.acknowledgeNotification(notification.id, acknowledgedBy)
+        if (success) acknowledgedCount++
+      }
+    }
+
+    // Log action
+    await logAdminAction(req, 'acknowledge_all', 'notifications', undefined, undefined, { count: acknowledgedCount })
+
+    res.json({
+      success: true,
+      message: `Acknowledged ${acknowledgedCount} notifications`,
+      acknowledgedCount,
+    })
+  } catch (error) {
+    console.error('Failed to acknowledge all notifications:', error)
+    res.status(500).json({ success: false, error: 'Failed to acknowledge notifications' })
+  }
+})
+
 export default router
