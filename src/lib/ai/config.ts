@@ -230,6 +230,8 @@ export async function extractViaProxy(
   }
 
   try {
+    console.log('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`)
+
     // Use unified endpoint with automatic fallback
     const response = await fetch(`${proxyUrl}/api/ai/extract`, {
       method: 'POST',
@@ -240,15 +242,39 @@ export async function extractViaProxy(
       }),
     })
 
+    console.log('[extractViaProxy] Response status:', response.status, response.statusText)
+
     const result = await response.json()
 
+    console.log('[extractViaProxy] Parsed response:', {
+      success: result.success,
+      hasData: !!result.data,
+      dataType: result.data ? typeof result.data : 'undefined',
+      dataKeys: result.data && typeof result.data === 'object' ? Object.keys(result.data).slice(0, 15) : [],
+      provider: result.provider,
+      fallback: result.fallback,
+      error: result.error,
+      hasUsage: !!result.usage,
+    })
+
     if (!response.ok) {
+      console.error('[extractViaProxy] HTTP error:', result.error || `HTTP ${response.status}`)
       return {
         success: false,
         error: result.error || `HTTP ${response.status}`,
       }
     }
 
+    // Check if result.data exists and has expected structure
+    if (!result.data) {
+      console.error('[extractViaProxy] Server returned success but no data!')
+      return {
+        success: false,
+        error: 'Server returned success but no data',
+      }
+    }
+
+    console.log('[extractViaProxy] Returning successful result with data')
     return {
       success: true,
       data: result.data,
@@ -257,6 +283,7 @@ export async function extractViaProxy(
       usage: result.usage,
     }
   } catch (error) {
+    console.error('[extractViaProxy] Exception:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Network error',

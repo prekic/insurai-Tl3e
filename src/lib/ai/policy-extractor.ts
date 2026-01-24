@@ -530,11 +530,20 @@ export async function extractPolicyFromDocument(
       }
     } else {
       // Use single provider (use processed text for better extraction)
+      console.log('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
       extractedData = await extractWithProvider(provider, processedText)
+      console.log('[PolicyExtractor] extractWithProvider returned:', {
+        hasData: !!extractedData,
+        policyNumber: extractedData?.policyNumber,
+        provider: extractedData?.provider,
+        hasConfidence: !!extractedData?.confidence,
+        hasCoverages: !!extractedData?.coverages,
+      })
     }
 
     // Log AI extraction success
     const confidenceOverall = extractedData.confidence?.overall ?? 0.7
+    console.log('[PolicyExtractor] Confidence overall:', confidenceOverall)
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {
