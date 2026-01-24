@@ -255,15 +255,21 @@ export function PolicyUpload() {
       user_id: user?.id,
     })
 
+    // Track whether we've created the log in the database
+    let logCreated = false
+
     // Set up persistence callback to save log updates to database
     logger.setPersistCallback(async (log) => {
       try {
         // Create or update the log in the database
-        if (log.stages.length === 1 && log.stages[0].stage === 'upload') {
-          // First stage - create the log
-          await createProcessingLog(log)
+        if (!logCreated) {
+          // First persist call - create the log
+          const result = await createProcessingLog(log)
+          if (result) {
+            logCreated = true
+          }
         } else {
-          // Subsequent stages - update the log
+          // Subsequent persist calls - update the log
           await updateProcessingLog(log.document_id, log)
         }
       } catch (err) {
