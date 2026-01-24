@@ -893,13 +893,10 @@ export async function extractPolicyFromDocument(
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
     const errorStack = error instanceof Error ? error.stack : undefined
 
-    // Log extraction failure with full details
-    console.error('[PolicyExtractor] EXTRACTION FAILED:', {
-      errorMessage,
-      errorStack,
-      errorType: error?.constructor?.name,
-      error,
-    })
+    // Log extraction failure with explicit string for production visibility
+    console.error('[PolicyExtractor] EXTRACTION FAILED - Message:', errorMessage)
+    console.error('[PolicyExtractor] EXTRACTION FAILED - Stack:', errorStack)
+    console.error('[PolicyExtractor] EXTRACTION FAILED - Type:', error?.constructor?.name)
 
     logger?.fail(errorMessage)
 
@@ -944,6 +941,30 @@ async function extractWithProvider(provider: AIProvider, documentText: string): 
 function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?: string, processedText?: string): AnalyzedPolicy {
   const now = new Date()
 
+  // Debug logging for production troubleshooting
+  console.log('[convertToAnalyzedPolicy] Input data:', {
+    hasCoverages: !!data.coverages,
+    coveragesIsArray: Array.isArray(data.coverages),
+    coveragesLength: Array.isArray(data.coverages) ? data.coverages.length : 'N/A',
+    policyType: data.policyType,
+    hasExclusions: !!data.exclusions,
+    hasSpecialConditions: !!data.specialConditions,
+  })
+
+  // Ensure coverages is always an array (defensive check)
+  if (!data.coverages || !Array.isArray(data.coverages)) {
+    console.warn('[convertToAnalyzedPolicy] coverages missing or not array, defaulting to []')
+    data.coverages = []
+  }
+
+  // Ensure exclusions and specialConditions are arrays
+  if (!data.exclusions || !Array.isArray(data.exclusions)) {
+    data.exclusions = []
+  }
+  if (!data.specialConditions || !Array.isArray(data.specialConditions)) {
+    data.specialConditions = []
+  }
+
   // Determine status based on dates
   let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
   const expiryDateStr = data.endDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -977,9 +998,13 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
   // For other types: use the main coverage or sum of main coverages
   const totalCoverage = calculateMainCoverage(data.policyType ?? 'home', coverages)
 
-  // Get policy type info
+  // Get policy type info with fallback for unknown types
   const policyType = data.policyType ?? 'home'
-  const typeInfo = POLICY_TYPES[policyType]
+  const typeInfo = POLICY_TYPES[policyType] ?? POLICY_TYPES['home']
+
+  if (!POLICY_TYPES[policyType]) {
+    console.warn(`[convertToAnalyzedPolicy] Unknown policy type: ${policyType}, falling back to 'home'`)
+  }
 
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
