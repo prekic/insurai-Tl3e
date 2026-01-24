@@ -134,7 +134,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       provider: 'anthropic',
       documentLength: truncatedText.length,
       cacheHit: true,
-      confidence: cached.confidence.overall,
+      confidence: cached.confidence?.overall ?? 0.7,
     }, { userId, success: true })
     return cached
   }
@@ -154,6 +154,39 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
+
+      // Ensure required fields exist (server may not enforce schema)
+      // Add defaults for any missing required fields
+      if (!result.confidence) {
+        result.confidence = {
+          overall: 0.7,
+          policyNumber: 0.7,
+          provider: 0.7,
+          dates: 0.7,
+          premium: 0.7,
+          coverages: 0.7,
+        }
+      }
+      if (!result.coverages) {
+        result.coverages = []
+      }
+      if (!result.specialConditions) {
+        result.specialConditions = []
+      }
+      if (!result.exclusions) {
+        result.exclusions = []
+      }
+      if (!result.amendmentInfo) {
+        result.amendmentInfo = {
+          isAmendment: false,
+          amendmentNumber: null,
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
+        }
+      }
+
       // Estimate output tokens from response
       actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
@@ -235,9 +268,10 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'anthropic', result)
 
     // Log successful extraction with cost info
+    console.log('[Claude Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'anthropic',
-      confidence: result.confidence.overall,
+      confidence: result.confidence?.overall ?? 0.7,
       cacheHit: false,
       inputTokens: actualInputTokens,
       outputTokens: actualOutputTokens,

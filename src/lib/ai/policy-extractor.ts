@@ -530,11 +530,21 @@ export async function extractPolicyFromDocument(
       }
     } else {
       // Use single provider (use processed text for better extraction)
+      console.log('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
       extractedData = await extractWithProvider(provider, processedText)
+      console.log('[PolicyExtractor] extractWithProvider returned:', {
+        hasData: !!extractedData,
+        policyNumber: extractedData?.policyNumber,
+        provider: extractedData?.provider,
+        hasConfidence: !!extractedData?.confidence,
+        hasCoverages: !!extractedData?.coverages,
+      })
     }
 
     // Log AI extraction success
-    logger?.setExtractionConfidence(extractedData.confidence.overall * 100)
+    const confidenceOverall = extractedData.confidence?.overall ?? 0.7
+    console.log('[PolicyExtractor] Confidence overall:', confidenceOverall)
+    logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {
         policy_number: extractedData.policyNumber,
@@ -544,21 +554,21 @@ export async function extractPolicyFromDocument(
         premium: extractedData.premium,
         start_date: extractedData.startDate,
         end_date: extractedData.endDate,
-        coverages_count: extractedData.coverages.length,
+        coverages_count: extractedData.coverages?.length ?? 0,
         confidence: extractedData.confidence,
       },
       metadata: {
         consensus: consensusInfo,
-        coverages: extractedData.coverages.slice(0, 5),  // First 5 coverages for preview
-        exclusions_count: extractedData.exclusions?.length || 0,
+        coverages: extractedData.coverages?.slice(0, 5) ?? [],  // First 5 coverages for preview
+        exclusions_count: extractedData.exclusions?.length ?? 0,
       },
     })
 
     // Check confidence threshold
-    if (extractedData.confidence.overall < AI_CONFIG.minConfidence) {
+    if (confidenceOverall < AI_CONFIG.minConfidence) {
       if (useFallback) {
         console.warn(
-          `Low confidence extraction (${extractedData.confidence.overall}), using fallback`
+          `Low confidence extraction (${confidenceOverall}), using fallback`
         )
         return createFallbackResult(file, extractedData)
       }
@@ -566,7 +576,7 @@ export async function extractPolicyFromDocument(
         success: false,
         error: {
           code: 'LOW_CONFIDENCE',
-          message: `Extraction confidence too low: ${Math.round(extractedData.confidence.overall * 100)}%`,
+          message: `Extraction confidence too low: ${Math.round(confidenceOverall * 100)}%`,
           details: 'The AI could not reliably extract policy information',
         },
         fallbackAvailable: false,
@@ -881,8 +891,16 @@ export async function extractPolicyFromDocument(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
+    const errorStack = error instanceof Error ? error.stack : undefined
 
-    // Log extraction failure
+    // Log extraction failure with full details
+    console.error('[PolicyExtractor] EXTRACTION FAILED:', {
+      errorMessage,
+      errorStack,
+      errorType: error?.constructor?.name,
+      error,
+    })
+
     logger?.fail(errorMessage)
 
     if (useFallback) {
@@ -990,7 +1008,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
     currency: data.currency ?? 'TRY',
-    aiConfidence: data.confidence.overall,
+    aiConfidence: data.confidence?.overall ?? 0.7,
     aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
     extractedText: rawText,
@@ -1006,7 +1024,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
       overall: quickRisk.score,
       level: quickRisk.level,
       topIssue: quickRisk.topIssue,
-      confidence: data.confidence.overall,
+      confidence: data.confidence?.overall ?? 0.7,
     }
 
     basePolicy.riskActions = actionItems
@@ -1054,7 +1072,7 @@ function createFallbackResult(
     id: crypto.randomUUID(),
     documentUrl: URL.createObjectURL(file),
     uploadDate: new Date().toISOString().split('T')[0],
-    aiConfidence: partialData?.confidence.overall ?? 0.5,
+    aiConfidence: partialData?.confidence?.overall ?? 0.5,
   }
 
   return {

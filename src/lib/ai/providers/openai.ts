@@ -99,7 +99,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       provider: 'openai',
       documentLength: truncatedText.length,
       cacheHit: true,
-      confidence: cached.confidence.overall,
+      confidence: cached.confidence?.overall ?? 0.7,
     }, { userId, success: true })
     return cached
   }
@@ -112,13 +112,76 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
   try {
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
+      console.log('[OpenAI Extract] Using proxy, calling extractViaProxy...')
       const proxyResult = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT)
 
+      console.log('[OpenAI Extract] Proxy response received:', {
+        success: proxyResult.success,
+        hasData: !!proxyResult.data,
+        error: proxyResult.error,
+        provider: proxyResult.provider,
+        fallback: proxyResult.fallback,
+        dataType: proxyResult.data ? typeof proxyResult.data : 'undefined',
+        dataKeys: proxyResult.data ? Object.keys(proxyResult.data).slice(0, 10) : [],
+      })
+
       if (!proxyResult.success || !proxyResult.data) {
-        throw new Error(proxyResult.error || 'OpenAI extraction via proxy failed')
+        const errorMsg = proxyResult.error || 'OpenAI extraction via proxy failed'
+        console.error('[OpenAI Extract] Proxy failed:', errorMsg)
+        throw new Error(errorMsg)
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
+
+      console.log('[OpenAI Extract] Parsed result:', {
+        hasConfidence: !!result.confidence,
+        confidenceOverall: result.confidence?.overall,
+        hasCoverages: !!result.coverages,
+        coveragesIsArray: Array.isArray(result.coverages),
+        coveragesLength: Array.isArray(result.coverages) ? result.coverages.length : 'N/A',
+        hasAmendmentInfo: !!result.amendmentInfo,
+        policyNumber: result.policyNumber,
+        provider: result.provider,
+        policyType: result.policyType,
+      })
+
+      // Ensure required fields exist (server may not enforce schema)
+      // Add defaults for any missing required fields
+      if (!result.confidence) {
+        console.log('[OpenAI Extract] Adding default confidence scores')
+        result.confidence = {
+          overall: 0.7,
+          policyNumber: 0.7,
+          provider: 0.7,
+          dates: 0.7,
+          premium: 0.7,
+          coverages: 0.7,
+        }
+      }
+      if (!result.coverages || !Array.isArray(result.coverages)) {
+        console.log('[OpenAI Extract] Adding default coverages array')
+        result.coverages = []
+      }
+      if (!result.specialConditions || !Array.isArray(result.specialConditions)) {
+        result.specialConditions = []
+      }
+      if (!result.exclusions || !Array.isArray(result.exclusions)) {
+        result.exclusions = []
+      }
+      if (!result.amendmentInfo) {
+        console.log('[OpenAI Extract] Adding default amendmentInfo')
+        result.amendmentInfo = {
+          isAmendment: false,
+          amendmentNumber: null,
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
+        }
+      }
+
+      console.log('[OpenAI Extract] After applying defaults - returning result')
+
       // Estimate output tokens from response
       actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
@@ -186,9 +249,10 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'openai', result)
 
     // Log successful extraction with cost info
+    console.log('[OpenAI Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'openai',
-      confidence: result.confidence.overall,
+      confidence: result.confidence?.overall ?? 0.7,
       cacheHit: false,
       inputTokens: actualInputTokens,
       outputTokens: actualOutputTokens,
