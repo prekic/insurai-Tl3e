@@ -208,15 +208,20 @@ export function getGoogleCloudApiKey(): string | null {
 
 /**
  * Extract policy data via secure backend proxy
+ * Uses unified /api/ai/extract endpoint with automatic Anthropic->OpenAI fallback
+ * The 'provider' parameter is kept for backward compatibility but is now ignored
+ * (the server decides which provider to use with automatic fallback)
  */
 export async function extractViaProxy(
-  provider: 'openai' | 'anthropic',
+  _provider: 'openai' | 'anthropic',
   documentText: string,
   systemPrompt: string
 ): Promise<{
   success: boolean
   data?: Record<string, unknown>
   error?: string
+  provider?: 'openai' | 'anthropic'
+  fallback?: boolean
   usage?: { input_tokens?: number; output_tokens?: number }
 }> {
   const proxyUrl = getProxyUrl()
@@ -225,14 +230,13 @@ export async function extractViaProxy(
   }
 
   try {
-    const response = await fetch(`${proxyUrl}/api/ai/extract/${provider}`, {
+    // Use unified endpoint with automatic fallback
+    const response = await fetch(`${proxyUrl}/api/ai/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         documentText,
         systemPrompt,
-        model:
-          provider === 'openai' ? AI_CONFIG.openai.extractionModel : AI_CONFIG.anthropic.extractionModel,
       }),
     })
 
@@ -248,6 +252,8 @@ export async function extractViaProxy(
     return {
       success: true,
       data: result.data,
+      provider: result.provider,
+      fallback: result.fallback,
       usage: result.usage,
     }
   } catch (error) {
