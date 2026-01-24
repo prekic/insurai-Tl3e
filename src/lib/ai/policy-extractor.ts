@@ -69,6 +69,9 @@ export interface ExtractionError {
     code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'PDF_TIMEOUT' | 'PDF_WORKER_ERROR' | 'FILE_READ_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE' | 'OCR_ERROR'
     message: string
     details?: string
+    // Enhanced error info for debugging
+    stack?: string
+    type?: string
   }
   fallbackAvailable: boolean
 }
@@ -508,10 +511,12 @@ export async function extractPolicyFromDocument(
   })
   logger?.setAIProvider(provider)
 
+  // Declare extractedData outside try block so it's accessible in catch for error context
+  let extractedData: ExtractedPolicyData | undefined
+  let consensusInfo: ExtractionResult['consensus'] | undefined
+
   // Call AI for extraction (use processed text for better results)
   try {
-    let extractedData: ExtractedPolicyData
-    let consensusInfo: ExtractionResult['consensus'] | undefined
 
     if (useMultiProvider) {
       // Use multi-model consensus (use processed text for better extraction)
@@ -892,13 +897,28 @@ export async function extractPolicyFromDocument(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
     const errorStack = error instanceof Error ? error.stack : undefined
+    const errorType = error instanceof Error ? error.constructor.name : 'Unknown'
 
     // Log extraction failure with explicit string for production visibility
     console.error('[PolicyExtractor] EXTRACTION FAILED - Message:', errorMessage)
     console.error('[PolicyExtractor] EXTRACTION FAILED - Stack:', errorStack)
-    console.error('[PolicyExtractor] EXTRACTION FAILED - Type:', error?.constructor?.name)
+    console.error('[PolicyExtractor] EXTRACTION FAILED - Type:', errorType)
 
-    logger?.fail(errorMessage)
+    // Log detailed error to ProcessingLogger for admin dashboard visibility
+    if (logger) {
+      logger.failWithDetails(error instanceof Error ? error : new Error(errorMessage), {
+        extraction_provider: primaryProvider || 'unknown',
+        document_length: documentText?.length || 0,
+        ocr_used: usedOCR,
+        data_at_failure: {
+          file_name: file.name,
+          file_size: file.size,
+          had_extracted_data: extractedData !== undefined,
+          extracted_policy_number: extractedData?.policyNumber,
+          extracted_provider: extractedData?.provider,
+        },
+      })
+    }
 
     if (useFallback) {
       console.warn(`AI extraction failed: ${errorMessage}, using fallback`)
@@ -911,6 +931,8 @@ export async function extractPolicyFromDocument(
         code: 'AI_ERROR',
         message: 'Failed to extract policy data',
         details: errorMessage,
+        stack: errorStack,
+        type: errorType,
       },
       fallbackAvailable: false,
     }

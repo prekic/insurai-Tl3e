@@ -301,6 +301,53 @@ export class ProcessingLogger {
   }
 
   /**
+   * Mark processing as failed with comprehensive error details for admin debugging
+   */
+  failWithDetails(
+    error: Error | string,
+    context?: {
+      extraction_provider?: string
+      document_length?: number
+      ocr_used?: boolean
+      data_at_failure?: Record<string, unknown>
+    }
+  ): void {
+    const now = new Date().toISOString()
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    const errorType = error instanceof Error ? error.constructor.name : 'Unknown'
+
+    // Find the last successful stage
+    const completedStages = this.log.stages.filter(s => s.status === 'completed')
+    const lastSuccessfulStage = completedStages.length > 0
+      ? completedStages[completedStages.length - 1].stage
+      : undefined
+
+    this.log.status = 'failed'
+    this.log.error_message = errorMessage
+    this.log.error_stack = errorStack
+    this.log.error_type = errorType
+    this.log.error_stage = this.currentStage || undefined
+    this.log.error_context = {
+      extraction_provider: context?.extraction_provider || this.log.ai_provider,
+      document_length: context?.document_length,
+      ocr_used: context?.ocr_used ?? this.log.ocr_used,
+      last_successful_stage: lastSuccessfulStage,
+      data_at_failure: context?.data_at_failure,
+      browser_info: typeof navigator !== 'undefined' ? navigator.userAgent : 'server',
+      timestamp: now,
+    }
+    this.log.completed_at = now
+    this.log.total_duration_ms = this.log.started_at
+      ? new Date(now).getTime() - new Date(this.log.started_at).getTime()
+      : undefined
+    this.log.updated_at = now
+
+    // Persist async
+    this.persist()
+  }
+
+  /**
    * Get stage by name
    */
   getStage(stage: ProcessingStage): ProcessingStageRecord | undefined {
