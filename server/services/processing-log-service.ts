@@ -97,9 +97,13 @@ function getSupabase(): SupabaseClient | null {
  */
 export async function createProcessingLog(
   log: Omit<DocumentProcessingLog, 'id' | 'created_at' | 'updated_at'>
-): Promise<DocumentProcessingLog | null> {
+): Promise<{ data: DocumentProcessingLog | null; error: string | null }> {
   const client = getSupabase()
-  if (!client) return null
+  if (!client) {
+    return { data: null, error: 'Supabase client not configured' }
+  }
+
+  console.log('[ProcessingLogService] Inserting log for document:', log.document_id)
 
   const { data, error } = await client
     .from('document_processing_logs')
@@ -109,10 +113,11 @@ export async function createProcessingLog(
 
   if (error) {
     console.error('[ProcessingLogService] Failed to create log:', error)
-    return null
+    return { data: null, error: `${error.code}: ${error.message}` }
   }
 
-  return data as DocumentProcessingLog
+  console.log('[ProcessingLogService] Log created successfully:', data?.id)
+  return { data: data as DocumentProcessingLog, error: null }
 }
 
 /**

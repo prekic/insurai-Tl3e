@@ -1345,17 +1345,15 @@ router.post('/processing-log', async (req: Request, res: Response) => {
 
     const result = await processingLogService.createProcessingLog(log)
 
-    if (!result) {
-      const hasUrl = !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)
-      const hasKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (result.error || !result.data) {
       res.status(500).json({
         success: false,
-        error: `Failed to create processing log - missing: ${!hasUrl ? 'SUPABASE_URL' : ''} ${!hasKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''}`.trim() || 'database error',
+        error: result.error || 'Unknown database error',
       })
       return
     }
 
-    res.json({ success: true, data: result })
+    res.json({ success: true, data: result.data })
   } catch (error) {
     console.error('Failed to create processing log:', error)
     res.status(500).json({
