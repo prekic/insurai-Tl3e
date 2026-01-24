@@ -891,8 +891,16 @@ export async function extractPolicyFromDocument(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
+    const errorStack = error instanceof Error ? error.stack : undefined
 
-    // Log extraction failure
+    // Log extraction failure with full details
+    console.error('[PolicyExtractor] EXTRACTION FAILED:', {
+      errorMessage,
+      errorStack,
+      errorType: error?.constructor?.name,
+      error,
+    })
+
     logger?.fail(errorMessage)
 
     if (useFallback) {
@@ -1000,7 +1008,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
     currency: data.currency ?? 'TRY',
-    aiConfidence: data.confidence.overall,
+    aiConfidence: data.confidence?.overall ?? 0.7,
     aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
     extractedText: rawText,
@@ -1016,7 +1024,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
       overall: quickRisk.score,
       level: quickRisk.level,
       topIssue: quickRisk.topIssue,
-      confidence: data.confidence.overall,
+      confidence: data.confidence?.overall ?? 0.7,
     }
 
     basePolicy.riskActions = actionItems
@@ -1064,7 +1072,7 @@ function createFallbackResult(
     id: crypto.randomUUID(),
     documentUrl: URL.createObjectURL(file),
     uploadDate: new Date().toISOString().split('T')[0],
-    aiConfidence: partialData?.confidence.overall ?? 0.5,
+    aiConfidence: partialData?.confidence?.overall ?? 0.5,
   }
 
   return {

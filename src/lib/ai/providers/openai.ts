@@ -99,7 +99,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       provider: 'openai',
       documentLength: truncatedText.length,
       cacheHit: true,
-      confidence: cached.confidence.overall,
+      confidence: cached.confidence?.overall ?? 0.7,
     }, { userId, success: true })
     return cached
   }
@@ -249,9 +249,10 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'openai', result)
 
     // Log successful extraction with cost info
+    console.log('[OpenAI Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'openai',
-      confidence: result.confidence.overall,
+      confidence: result.confidence?.overall ?? 0.7,
       cacheHit: false,
       inputTokens: actualInputTokens,
       outputTokens: actualOutputTokens,

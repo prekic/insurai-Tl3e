@@ -134,7 +134,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       provider: 'anthropic',
       documentLength: truncatedText.length,
       cacheHit: true,
-      confidence: cached.confidence.overall,
+      confidence: cached.confidence?.overall ?? 0.7,
     }, { userId, success: true })
     return cached
   }
@@ -268,9 +268,10 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'anthropic', result)
 
     // Log successful extraction with cost info
+    console.log('[Claude Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'anthropic',
-      confidence: result.confidence.overall,
+      confidence: result.confidence?.overall ?? 0.7,
       cacheHit: false,
       inputTokens: actualInputTokens,
       outputTokens: actualOutputTokens,
