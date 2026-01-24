@@ -79,10 +79,15 @@ function getSupabase(): SupabaseClient | null {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    console.warn('[ProcessingLogService] Supabase not configured')
+    console.warn('[ProcessingLogService] Supabase not configured:', {
+      hasUrl: !!url,
+      hasKey: !!key,
+      urlSource: process.env.SUPABASE_URL ? 'SUPABASE_URL' : (process.env.VITE_SUPABASE_URL ? 'VITE_SUPABASE_URL' : 'none'),
+    })
     return null
   }
 
+  console.log('[ProcessingLogService] Supabase configured with URL:', url.substring(0, 30) + '...')
   supabase = createClient(url, key)
   return supabase
 }

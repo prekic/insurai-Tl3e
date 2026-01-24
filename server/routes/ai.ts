@@ -1346,9 +1346,11 @@ router.post('/processing-log', async (req: Request, res: Response) => {
     const result = await processingLogService.createProcessingLog(log)
 
     if (!result) {
+      const hasUrl = !!(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)
+      const hasKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
       res.status(500).json({
         success: false,
-        error: 'Failed to create processing log (database not configured)',
+        error: `Failed to create processing log - missing: ${!hasUrl ? 'SUPABASE_URL' : ''} ${!hasKey ? 'SUPABASE_SERVICE_ROLE_KEY' : ''}`.trim() || 'database error',
       })
       return
     }
