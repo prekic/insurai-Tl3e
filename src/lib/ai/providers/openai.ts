@@ -120,7 +120,8 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
 
       result = proxyResult.data as unknown as ExtractedPolicyData
 
-      // Ensure confidence scores exist (server may not enforce schema)
+      // Ensure required fields exist (server may not enforce schema)
+      // Add defaults for any missing required fields
       if (!result.confidence) {
         result.confidence = {
           overall: 0.7,
@@ -129,6 +130,25 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
           dates: 0.7,
           premium: 0.7,
           coverages: 0.7,
+        }
+      }
+      if (!result.coverages) {
+        result.coverages = []
+      }
+      if (!result.specialConditions) {
+        result.specialConditions = []
+      }
+      if (!result.exclusions) {
+        result.exclusions = []
+      }
+      if (!result.amendmentInfo) {
+        result.amendmentInfo = {
+          isAmendment: false,
+          amendmentNumber: null,
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
         }
       }
 
