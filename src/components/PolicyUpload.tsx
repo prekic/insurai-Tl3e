@@ -435,13 +435,21 @@ export function PolicyUpload() {
             },
           })
         } catch (saveError) {
-          // Only log save errors in development
-          if (import.meta.env.DEV) {
-            console.warn('Failed to save policy to database:', saveError)
+          // Log save errors with full details
+          const errorMessage = saveError instanceof Error ? saveError.message : String(saveError)
+          const errorDetails = {
+            error_type: saveError instanceof Error ? saveError.constructor.name : 'Unknown',
+            error_message: errorMessage,
+            policy_id: policy.id,
+            policy_number: policy.policyNumber,
+            provider: policy.provider,
           }
-          logger.completeStage({
-            output: { saved_to_cloud: false, error: 'database_save_failed' },
-          })
+
+          console.error('[PolicyUpload] Database save failed:', errorMessage, errorDetails)
+
+          // Mark stage as failed with full error details
+          logger.failStage(`Database save failed: ${errorMessage}`, errorDetails)
+
           // Continue even if save fails - policy is still in local state
         }
       } else {

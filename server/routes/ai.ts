@@ -35,6 +35,7 @@ const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
+import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 
 const router = Router()
 
@@ -236,7 +237,10 @@ router.post(
           { role: 'system', content: systemPromptWithJson },
           { role: 'user', content: userPromptWithJson },
         ],
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: EXTRACTION_JSON_SCHEMA,
+        },
         max_tokens: 4096,
         temperature: 0.1,
       })
@@ -647,7 +651,10 @@ router.post(
             { role: 'system', content: systemPromptWithJson },
             { role: 'user', content: userPromptWithJson },
           ],
-          response_format: { type: 'json_object' },
+          response_format: {
+            type: 'json_schema',
+            json_schema: EXTRACTION_JSON_SCHEMA,
+          },
           max_tokens: 4096,
           temperature: 0.1,
         })
