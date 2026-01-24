@@ -119,6 +119,19 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
+
+      // Ensure confidence scores exist (server may not enforce schema)
+      if (!result.confidence) {
+        result.confidence = {
+          overall: 0.7,
+          policyNumber: 0.7,
+          provider: 0.7,
+          dates: 0.7,
+          premium: 0.7,
+          coverages: 0.7,
+        }
+      }
+
       // Estimate output tokens from response
       actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
