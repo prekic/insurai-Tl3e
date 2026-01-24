@@ -220,11 +220,20 @@ router.post(
       console.log(`[${requestId}] 📝 System prompt: ${finalSystemPrompt.substring(0, 100)}...`)
       console.log(`[${requestId}] 📝 User prompt length: ${finalUserPrompt.length} chars`)
 
+      // Ensure "json" is in the prompt (required by OpenAI when using response_format: json_object)
+      const jsonReminder = '\n\nRespond with valid JSON only.'
+      const systemPromptWithJson = finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
+        ? finalSystemPrompt
+        : finalSystemPrompt + jsonReminder
+      const userPromptWithJson = finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON') || systemPromptWithJson.includes('json')
+        ? finalUserPrompt
+        : finalUserPrompt + jsonReminder
+
       const response = await client.chat.completions.create({
         model: model || 'gpt-4o',
         messages: [
-          { role: 'system', content: finalSystemPrompt },
-          { role: 'user', content: finalUserPrompt },
+          { role: 'system', content: systemPromptWithJson },
+          { role: 'user', content: userPromptWithJson },
         ],
         response_format: { type: 'json_object' },
         max_tokens: 4096,

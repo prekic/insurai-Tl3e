@@ -37,6 +37,11 @@ import {
 initServerSentry()
 
 const app = express()
+
+// Trust proxy for Railway/cloud deployments (required for rate limiting to work correctly)
+// This tells Express to trust X-Forwarded-For headers from reverse proxies
+app.set('trust proxy', 1)
+
 // Railway sets PORT automatically, fallback to API_PORT or 4001
 const PORT = process.env.PORT || process.env.API_PORT || 4001
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
