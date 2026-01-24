@@ -34,6 +34,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
+import * as adminNotificationService from '../services/admin-notification-service.js'
 
 const router = Router()
 
@@ -443,24 +444,48 @@ router.post(
       // Always log errors for debugging
       console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
 
-      // Determine specific error code
-      // In production, show generic messages; in dev/staging, show specific ones
+      // Determine specific error code and notify admin for certain errors
       const IS_PRODUCTION = process.env.NODE_ENV === 'production'
       let code = 'EXTRACTION_FAILED'
       let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Anthropic extraction failed'
+      let shouldNotifyAdmin = false
+      let notificationCategory: 'billing' | 'api_error' | 'rate_limit' = 'api_error'
 
       if (message.includes('401') || message.includes('invalid x-api-key') || message.includes('Invalid API Key')) {
         code = 'INVALID_API_KEY'
         userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic API key is invalid'
+        shouldNotifyAdmin = true
+        notificationCategory = 'api_error'
       } else if (message.includes('429') || message.includes('rate_limit')) {
         code = 'RATE_LIMIT_EXCEEDED'
         userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Anthropic rate limit exceeded - please wait and retry'
+        shouldNotifyAdmin = true
+        notificationCategory = 'rate_limit'
       } else if (message.includes('credit') || message.includes('billing') || message.includes('overloaded')) {
         code = 'BILLING_ERROR'
         userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic billing issue - check your account'
+        shouldNotifyAdmin = true
+        notificationCategory = 'billing'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
         userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
+      }
+
+      // Create admin notification for critical errors
+      if (shouldNotifyAdmin) {
+        if (notificationCategory === 'billing') {
+          adminNotificationService.notifyBillingIssue('Anthropic', message, errorDetails).catch((err) => {
+            console.error('[Admin Notification Error]', err)
+          })
+        } else if (notificationCategory === 'rate_limit') {
+          adminNotificationService.notifyRateLimit('Anthropic', errorDetails).catch((err) => {
+            console.error('[Admin Notification Error]', err)
+          })
+        } else {
+          adminNotificationService.notifyAPIError('Anthropic', code, message, errorDetails).catch((err) => {
+            console.error('[Admin Notification Error]', err)
+          })
+        }
       }
 
       res.status(500).json({
@@ -471,6 +496,222 @@ router.post(
         timestamp: errorDetails.timestamp,
       })
     }
+  }
+)
+
+/**
+ * POST /api/ai/extract
+ * Unified extraction endpoint with automatic fallback
+ * Tries primary provider first (Anthropic), falls back to OpenAI if it fails
+ * Rate limited: 20 requests per hour
+ * Creates admin notifications on critical errors
+ */
+router.post(
+  '/extract',
+  validateJSON,
+  aiExtractionLimiter,
+  validateAnthropicExtraction, // Use same validation
+  async (req: Request, res: Response) => {
+    const requestId = `ext-${Date.now()}`
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+    console.log(`[${requestId}] Unified extraction request received`)
+
+    const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
+
+    // Get extraction prompt (shared between providers)
+    let finalSystemPrompt: string
+    let finalUserPrompt = documentText
+
+    if (clientPrompt) {
+      finalSystemPrompt = clientPrompt
+    } else {
+      const renderedPrompt = await getExtractionPrompt(documentText, policyType)
+      if (renderedPrompt) {
+        finalSystemPrompt = renderedPrompt.systemPrompt
+        finalUserPrompt = renderedPrompt.userPrompt
+        console.log(`[${requestId}] Using prompt template: ${renderedPrompt.templateName} v${renderedPrompt.version}`)
+      } else {
+        finalSystemPrompt = 'Extract policy information as JSON.'
+        console.log(`[${requestId}] Using fallback prompt`)
+      }
+    }
+
+    // Try Anthropic first if available
+    const anthropicClient = getAnthropicClient()
+    const openaiClient = getOpenAIClient()
+
+    if (anthropicClient) {
+      console.log(`[${requestId}] Trying Anthropic first...`)
+      try {
+        const response = await anthropicClient.messages.create({
+          model: model || 'claude-sonnet-4-20250514',
+          max_tokens: 4096,
+          system: finalSystemPrompt,
+          messages: [{ role: 'user', content: finalUserPrompt }],
+        })
+
+        const textBlock = response.content.find((block) => block.type === 'text')
+        if (!textBlock || textBlock.type !== 'text') {
+          throw new Error('Empty response from Anthropic')
+        }
+
+        // Parse JSON from response
+        let jsonContent = textBlock.text
+        const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[1].trim()
+        }
+
+        // Track cost
+        const usedModel = response.model || model || 'claude-sonnet-4-20250514'
+        const inputTokens = response.usage.input_tokens
+        const outputTokens = response.usage.output_tokens
+        const cost = calculateCost(usedModel, inputTokens, outputTokens)
+
+        recordUsage({
+          provider: 'anthropic',
+          model: usedModel,
+          operation: 'extraction',
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch(() => {})
+
+        console.log(`[${requestId}] Anthropic extraction successful`)
+        return res.json({
+          success: true,
+          data: JSON.parse(jsonContent),
+          usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+          model: response.model,
+          provider: 'anthropic',
+          cost: cost.totalCost,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[${requestId}] Anthropic failed:`, message)
+
+        // Determine if we should notify admin and fall back
+        const isBillingError = message.includes('credit') || message.includes('billing')
+        const isRateLimitError = message.includes('429') || message.includes('rate_limit')
+        const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
+
+        // Notify admin for critical errors
+        if (isBillingError) {
+          console.log(`[${requestId}] Anthropic billing error - notifying admin and falling back to OpenAI`)
+          adminNotificationService.notifyBillingIssue('Anthropic', message, {
+            requestId,
+            errorMessage: message,
+            timestamp: new Date().toISOString(),
+          }).catch(() => {})
+        } else if (isRateLimitError) {
+          console.log(`[${requestId}] Anthropic rate limit - notifying admin and falling back to OpenAI`)
+          adminNotificationService.notifyRateLimit('Anthropic', {
+            requestId,
+            errorMessage: message,
+            timestamp: new Date().toISOString(),
+          }).catch(() => {})
+        } else if (isAuthError) {
+          console.log(`[${requestId}] Anthropic auth error - notifying admin and falling back to OpenAI`)
+          adminNotificationService.notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
+            requestId,
+            timestamp: new Date().toISOString(),
+          }).catch(() => {})
+        }
+
+        // Fall back to OpenAI if available
+        if (openaiClient) {
+          console.log(`[${requestId}] Falling back to OpenAI...`)
+        }
+      }
+    }
+
+    // Try OpenAI (either as fallback or primary)
+    if (openaiClient) {
+      try {
+        // Ensure "json" is in the prompt for OpenAI
+        const jsonReminder = '\n\nRespond with valid JSON only.'
+        const systemPromptWithJson = finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
+          ? finalSystemPrompt
+          : finalSystemPrompt + jsonReminder
+        const userPromptWithJson = finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON') || systemPromptWithJson.includes('json')
+          ? finalUserPrompt
+          : finalUserPrompt + jsonReminder
+
+        const response = await openaiClient.chat.completions.create({
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemPromptWithJson },
+            { role: 'user', content: userPromptWithJson },
+          ],
+          response_format: { type: 'json_object' },
+          max_tokens: 4096,
+          temperature: 0.1,
+        })
+
+        const content = response.choices[0]?.message?.content
+        if (!content) {
+          throw new Error('Empty response from OpenAI')
+        }
+
+        // Track cost
+        const usedModel = response.model || 'gpt-4o'
+        const inputTokens = response.usage?.prompt_tokens || 0
+        const outputTokens = response.usage?.completion_tokens || 0
+        const cost = calculateCost(usedModel, inputTokens, outputTokens)
+
+        recordUsage({
+          provider: 'openai',
+          model: usedModel,
+          operation: 'extraction',
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          inputCost: cost.inputCost,
+          outputCost: cost.outputCost,
+          totalCost: cost.totalCost,
+          timestamp: new Date().toISOString(),
+        }).catch(() => {})
+
+        console.log(`[${requestId}] OpenAI extraction successful (fallback: ${!!anthropicClient})`)
+        return res.json({
+          success: true,
+          data: JSON.parse(content),
+          usage: response.usage,
+          model: response.model,
+          provider: 'openai',
+          fallback: !!anthropicClient, // Indicates if we fell back from Anthropic
+          cost: cost.totalCost,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error(`[${requestId}] OpenAI also failed:`, message)
+
+        // Notify admin about OpenAI failure too
+        if (message.includes('insufficient_quota') || message.includes('billing')) {
+          adminNotificationService.notifyBillingIssue('OpenAI', message, {
+            requestId,
+            timestamp: new Date().toISOString(),
+          }).catch(() => {})
+        }
+
+        return res.status(500).json({
+          error: IS_PRODUCTION ? 'Unable to process document' : 'All AI providers failed',
+          code: 'ALL_PROVIDERS_FAILED',
+          ...(process.env.NODE_ENV !== 'production' && { details: message }),
+          timestamp: new Date().toISOString(),
+        })
+      }
+    }
+
+    // No providers available
+    return res.status(503).json({
+      error: IS_PRODUCTION ? 'AI service unavailable' : 'No AI providers configured',
+      code: 'NO_PROVIDERS_CONFIGURED',
+    })
   }
 )
 

@@ -26,6 +26,7 @@ import { AnalyticsTab } from './tabs/AnalyticsTab'
 import { AuditTab } from './tabs/AuditTab'
 import { AlertsTab } from './tabs/AlertsTab'
 import { ProcessingLogsTab } from './tabs/ProcessingLogsTab'
+import { NotificationsTab } from './tabs/NotificationsTab'
 
 // Icons
 import {
@@ -42,6 +43,7 @@ import {
   BarChart3,
   ScrollText,
   Bell,
+  BellRing,
   RefreshCw,
   AlertTriangle,
   CheckCircle,
@@ -50,6 +52,7 @@ import {
 
 const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="h-4 w-4" /> },
+  { id: 'notifications', label: 'Notifications', icon: <BellRing className="h-4 w-4" /> },
   { id: 'ai_operations', label: 'AI Operations', icon: <Brain className="h-4 w-4" /> },
   { id: 'prompts', label: 'Prompts', icon: <MessageSquare className="h-4 w-4" /> },
   { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
@@ -173,6 +176,8 @@ export function AdminDashboard() {
     switch (activeTab) {
       case 'overview':
         return <OverviewTab systemHealth={systemHealth} />
+      case 'notifications':
+        return <NotificationsTab />
       case 'ai_operations':
         return <AIOperationsTab />
       case 'prompts':

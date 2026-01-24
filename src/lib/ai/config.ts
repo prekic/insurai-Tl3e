@@ -259,6 +259,62 @@ export async function extractViaProxy(
 }
 
 /**
+ * Extract policy data via secure backend proxy with automatic fallback
+ * Uses unified /api/ai/extract endpoint that tries Anthropic first, then OpenAI
+ */
+export async function extractWithFallback(
+  documentText: string,
+  systemPrompt?: string,
+  policyType?: string
+): Promise<{
+  success: boolean
+  data?: Record<string, unknown>
+  error?: string
+  provider?: 'openai' | 'anthropic'
+  fallback?: boolean
+  usage?: { input_tokens?: number; output_tokens?: number }
+}> {
+  const proxyUrl = getProxyUrl()
+  if (!proxyUrl) {
+    return { success: false, error: 'Proxy not configured' }
+  }
+
+  try {
+    const response = await fetch(`${proxyUrl}/api/ai/extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        documentText,
+        systemPrompt,
+        policyType,
+      }),
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: result.error || `HTTP ${response.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      data: result.data,
+      provider: result.provider,
+      fallback: result.fallback,
+      usage: result.usage,
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Network error',
+    }
+  }
+}
+
+/**
  * Perform OCR via secure backend proxy
  */
 export async function ocrViaProxy(imageBase64: string): Promise<{

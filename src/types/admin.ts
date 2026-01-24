@@ -824,6 +824,7 @@ export type AdminSection =
   | 'analytics'
   | 'audit'
   | 'alerts'
+  | 'notifications'
 
 export interface AdminFilters {
   dateRange: {
