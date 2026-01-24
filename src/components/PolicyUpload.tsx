@@ -264,21 +264,22 @@ export function PolicyUpload() {
       try {
         if (!createPromise) {
           // First call - create a promise for the create operation
+          console.log('[ProcessingLog] Creating new log for document:', log.document_id)
           createPromise = (async () => {
             const result = await createProcessingLog(log)
+            console.log('[ProcessingLog] Create result:', result ? 'success' : 'failed')
             return !!result
           })()
           await createPromise
         } else {
           // Wait for create to finish, then update
+          console.log('[ProcessingLog] Updating log for document:', log.document_id, 'stages:', log.stages.length)
           await createPromise
           await updateProcessingLog(log.document_id, log)
         }
       } catch (err) {
-        // Non-critical - don't fail the upload if logging fails
-        if (import.meta.env.DEV) {
-          console.warn('[ProcessingLogger] Failed to persist log:', err)
-        }
+        // Log errors in both dev and prod for debugging
+        console.error('[ProcessingLogger] Failed to persist log:', err)
       }
     })
 

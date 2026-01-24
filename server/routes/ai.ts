@@ -440,10 +440,8 @@ router.post(
         message,
         documentTextLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
       }
-      // Only log full error details in development
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
-      }
+      // Always log errors for debugging
+      console.error('[Anthropic Extraction Error]', JSON.stringify(errorDetails, null, 2))
 
       // Determine specific error code
       // In production, show generic messages; in dev/staging, show specific ones
