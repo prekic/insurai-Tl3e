@@ -255,21 +255,23 @@ export function PolicyUpload() {
       user_id: user?.id,
     })
 
-    // Track whether we've created the log in the database
-    let logCreated = false
+    // Use a promise-based lock to prevent race conditions
+    // First call creates, all others wait then update
+    let createPromise: Promise<boolean> | null = null
 
     // Set up persistence callback to save log updates to database
     logger.setPersistCallback(async (log) => {
       try {
-        // Create or update the log in the database
-        if (!logCreated) {
-          // First persist call - create the log
-          const result = await createProcessingLog(log)
-          if (result) {
-            logCreated = true
-          }
+        if (!createPromise) {
+          // First call - create a promise for the create operation
+          createPromise = (async () => {
+            const result = await createProcessingLog(log)
+            return !!result
+          })()
+          await createPromise
         } else {
-          // Subsequent persist calls - update the log
+          // Wait for create to finish, then update
+          await createPromise
           await updateProcessingLog(log.document_id, log)
         }
       } catch (err) {
