@@ -71,7 +71,7 @@ export function ProcessingLogsTab() {
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await adminFetch('/processing-logs/stats?days=30')
+      const response = await adminFetch('/api/admin/processing-logs/stats?days=30')
       const data = await response.json()
       if (data.success) {
         setStats(data.data)
@@ -97,7 +97,7 @@ export function ProcessingLogsTab() {
       if (filters.from_date) params.set('from_date', filters.from_date)
       if (filters.to_date) params.set('to_date', filters.to_date)
 
-      const response = await adminFetch(`/processing-logs?${params.toString()}`)
+      const response = await adminFetch(`/api/admin/processing-logs?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
