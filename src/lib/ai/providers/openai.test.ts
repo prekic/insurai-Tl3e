@@ -299,3 +299,145 @@ describe('extractWithOpenAI - Error Handling', () => {
     )
   })
 })
+
+describe('extractWithOpenAI - Missing Schema Fields', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockConsume.mockReturnValue({ allowed: true })
+    mockGetExtraction.mockResolvedValue(null)
+    mockInitialize.mockResolvedValue(undefined)
+  })
+
+  it('should handle response without confidence object', async () => {
+    // This is what the AI might return when json_object format doesn't enforce schema
+    const responseWithoutConfidence = {
+      policyNumber: 'POL-123',
+      provider: 'Allianz',
+      policyType: 'home',
+      insuredName: 'Test User',
+      startDate: '2024-01-01',
+      endDate: '2025-01-01',
+      premium: 1000,
+      coverages: [],
+      // NO confidence object!
+    }
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(responseWithoutConfidence) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    const result = await extractWithOpenAI('Test document')
+
+    // Should NOT throw - should add default confidence
+    expect(result).toBeDefined()
+    // extractWithOpenAI returns ExtractedPolicyData directly with confidence object
+    expect(result.confidence).toBeDefined()
+    expect(result.confidence.overall).toBeGreaterThanOrEqual(0)
+    expect(result.confidence.overall).toBe(0.7) // default value
+  })
+
+  it('should handle response without coverages array', async () => {
+    const responseWithoutCoverages = {
+      policyNumber: 'POL-123',
+      provider: 'Allianz',
+      policyType: 'home',
+      insuredName: 'Test User',
+      startDate: '2024-01-01',
+      endDate: '2025-01-01',
+      premium: 1000,
+      confidence: { overall: 0.8, policyNumber: 0.9, provider: 0.8, dates: 0.8, premium: 0.8, coverages: 0.7 },
+      // NO coverages array!
+    }
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(responseWithoutCoverages) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    const result = await extractWithOpenAI('Test document')
+
+    expect(result).toBeDefined()
+    // Should return data even without coverages - coverages defaults to empty array
+    expect(result.policyNumber).toBe('POL-123')
+    expect(result.coverages).toEqual([])
+  })
+
+  it('should handle response with null confidence.overall', async () => {
+    const responseWithNullConfidence = {
+      policyNumber: 'POL-123',
+      provider: 'Allianz',
+      policyType: 'home',
+      insuredName: 'Test User',
+      startDate: '2024-01-01',
+      endDate: '2025-01-01',
+      premium: 1000,
+      coverages: [],
+      confidence: { overall: null, policyNumber: 0.9, provider: 0.8, dates: 0.8, premium: 0.8, coverages: 0.7 }, // null overall!
+    }
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(responseWithNullConfidence) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    const result = await extractWithOpenAI('Test document')
+
+    // Should NOT throw - should handle null gracefully
+    expect(result).toBeDefined()
+    expect(result.confidence).toBeDefined()
+    // confidence.overall is null but object exists, so it's preserved
+    expect(result.confidence.overall).toBeNull()
+  })
+
+  it('should handle completely empty response object', async () => {
+    const emptyResponse = {}
+
+    const { getOpenAIClient } = await import('../config')
+    vi.mocked(getOpenAIClient).mockReturnValue({
+      chat: {
+        completions: {
+          create: vi.fn().mockResolvedValue({
+            choices: [{ message: { content: JSON.stringify(emptyResponse) } }],
+            usage: { prompt_tokens: 100, completion_tokens: 50 },
+          }),
+        },
+      },
+    } as unknown as ReturnType<typeof getOpenAIClient>)
+
+    // Should not throw, should handle gracefully
+    const result = await extractWithOpenAI('Test document')
+    expect(result).toBeDefined()
+    // Should have default confidence added
+    expect(result.confidence).toBeDefined()
+    expect(result.confidence.overall).toBe(0.7)
+    // Should have default arrays
+    expect(result.coverages).toEqual([])
+    expect(result.exclusions).toEqual([])
+    expect(result.specialConditions).toEqual([])
+    // Should have default amendmentInfo
+    expect(result.amendmentInfo).toBeDefined()
+    expect(result.amendmentInfo.isAmendment).toBe(false)
+  })
+})

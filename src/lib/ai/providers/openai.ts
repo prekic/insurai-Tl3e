@@ -220,6 +220,39 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
 
       result = JSON.parse(content) as ExtractedPolicyData
 
+      // Ensure required fields exist (direct API may also have missing fields)
+      // This matches the proxy path defaults for consistency
+      if (!result.confidence) {
+        console.log('[OpenAI Extract] Direct API: Adding default confidence scores')
+        result.confidence = {
+          overall: 0.7,
+          policyNumber: 0.7,
+          provider: 0.7,
+          dates: 0.7,
+          premium: 0.7,
+          coverages: 0.7,
+        }
+      }
+      if (!result.coverages || !Array.isArray(result.coverages)) {
+        result.coverages = []
+      }
+      if (!result.specialConditions || !Array.isArray(result.specialConditions)) {
+        result.specialConditions = []
+      }
+      if (!result.exclusions || !Array.isArray(result.exclusions)) {
+        result.exclusions = []
+      }
+      if (!result.amendmentInfo) {
+        result.amendmentInfo = {
+          isAmendment: false,
+          amendmentNumber: null,
+          amendmentDate: null,
+          basePolicyNumber: null,
+          amendmentReason: null,
+          premiumDifference: null,
+        }
+      }
+
       // Use actual token counts from response if available
       if (response.usage) {
         actualInputTokens = response.usage.prompt_tokens
