@@ -96,10 +96,23 @@ export interface DocumentProcessingLog {
   completed_at?: string
   total_duration_ms?: number
 
-  // Error tracking
+  // Error tracking - enhanced for admin visibility
   error_message?: string
   error_stage?: string
   error_details?: Record<string, unknown>
+  // Detailed error information for debugging
+  error_stack?: string
+  error_type?: string
+  error_code?: string
+  error_context?: {
+    extraction_provider?: string
+    document_length?: number
+    ocr_used?: boolean
+    last_successful_stage?: string
+    data_at_failure?: Record<string, unknown>
+    browser_info?: string
+    timestamp?: string
+  }
 
   // Summary flags for filtering
   ocr_used: boolean

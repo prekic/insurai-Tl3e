@@ -384,13 +384,123 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
           </div>
         )}
 
-        {/* Error details */}
+        {/* Detailed Error Information Panel */}
         {log.error_message && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="text-sm font-medium text-red-800 mb-1">
-              Error at stage: {log.error_stage}
+          <div className="mt-6 bg-red-50 border border-red-300 rounded-lg overflow-hidden">
+            {/* Error Header */}
+            <div className="bg-red-100 border-b border-red-200 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <XCircle className="text-red-600" size={20} />
+                <span className="font-semibold text-red-800">Extraction Failed</span>
+                {log.error_stage && (
+                  <span className="text-sm text-red-600">at stage: {log.error_stage}</span>
+                )}
+              </div>
             </div>
-            <div className="text-sm text-red-700">{log.error_message}</div>
+
+            {/* Error Content */}
+            <div className="p-4 space-y-4">
+              {/* Error Message */}
+              <div>
+                <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Error Message</div>
+                <div className="bg-white border border-red-200 rounded p-3 font-mono text-sm text-red-900">
+                  {log.error_message}
+                </div>
+              </div>
+
+              {/* Error Type */}
+              {log.error_type && (
+                <div>
+                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Error Type</div>
+                  <div className="inline-flex px-2 py-1 bg-red-100 text-red-800 rounded text-sm font-medium">
+                    {log.error_type}
+                  </div>
+                </div>
+              )}
+
+              {/* Error Context Grid */}
+              {log.error_context && (
+                <div>
+                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-2">Error Context</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    {log.error_context.extraction_provider && (
+                      <div className="bg-white border border-red-200 rounded p-2">
+                        <div className="text-xs text-gray-500">Provider</div>
+                        <div className="font-medium text-gray-900">{log.error_context.extraction_provider}</div>
+                      </div>
+                    )}
+                    {log.error_context.document_length !== undefined && (
+                      <div className="bg-white border border-red-200 rounded p-2">
+                        <div className="text-xs text-gray-500">Document Length</div>
+                        <div className="font-medium text-gray-900">{log.error_context.document_length.toLocaleString()} chars</div>
+                      </div>
+                    )}
+                    {log.error_context.last_successful_stage && (
+                      <div className="bg-white border border-red-200 rounded p-2">
+                        <div className="text-xs text-gray-500">Last OK Stage</div>
+                        <div className="font-medium text-gray-900">{log.error_context.last_successful_stage}</div>
+                      </div>
+                    )}
+                    {log.error_context.ocr_used !== undefined && (
+                      <div className="bg-white border border-red-200 rounded p-2">
+                        <div className="text-xs text-gray-500">OCR Used</div>
+                        <div className="font-medium text-gray-900">{log.error_context.ocr_used ? 'Yes' : 'No'}</div>
+                      </div>
+                    )}
+                    {log.error_context.timestamp && (
+                      <div className="bg-white border border-red-200 rounded p-2">
+                        <div className="text-xs text-gray-500">Timestamp</div>
+                        <div className="font-medium text-gray-900 text-xs">
+                          {new Date(log.error_context.timestamp).toLocaleString('tr-TR')}
+                        </div>
+                      </div>
+                    )}
+                    {log.error_context.browser_info && (
+                      <div className="bg-white border border-red-200 rounded p-2 col-span-2">
+                        <div className="text-xs text-gray-500">Browser/Environment</div>
+                        <div className="font-medium text-gray-900 text-xs truncate">
+                          {log.error_context.browser_info.substring(0, 50)}...
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Data at Failure */}
+              {log.error_context?.data_at_failure && Object.keys(log.error_context.data_at_failure).length > 0 && (
+                <div>
+                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Data at Failure</div>
+                  <pre className="bg-white border border-red-200 rounded p-3 text-xs overflow-x-auto max-h-40">
+                    {JSON.stringify(log.error_context.data_at_failure, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Stack Trace (Collapsible) */}
+              {log.error_stack && (
+                <details className="group">
+                  <summary className="text-xs font-medium text-red-700 uppercase tracking-wide cursor-pointer hover:text-red-800">
+                    Stack Trace (click to expand)
+                  </summary>
+                  <pre className="mt-2 bg-gray-900 text-green-400 rounded p-3 text-xs overflow-x-auto max-h-60 font-mono">
+                    {log.error_stack}
+                  </pre>
+                </details>
+              )}
+
+              {/* Additional Error Details (if any) */}
+              {log.error_details && Object.keys(log.error_details).length > 0 && (
+                <details className="group">
+                  <summary className="text-xs font-medium text-red-700 uppercase tracking-wide cursor-pointer hover:text-red-800">
+                    Additional Details (click to expand)
+                  </summary>
+                  <pre className="mt-2 bg-white border border-red-200 rounded p-3 text-xs overflow-x-auto max-h-40">
+                    {JSON.stringify(log.error_details, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -40,6 +40,153 @@ interface ProcessingStats {
   ai_provider_breakdown: Record<string, number>
 }
 
+// Error panel component for showing recent failures
+function RecentErrorsPanel({
+  errors,
+  onViewLog,
+}: {
+  errors: DocumentProcessingLog[]
+  onViewLog: (log: DocumentProcessingLog) => void
+}) {
+  const [expandedError, setExpandedError] = useState<string | null>(null)
+
+  if (errors.length === 0) return null
+
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+      <div className="flex items-center gap-2 text-red-800 font-medium mb-3">
+        <XCircle size={20} />
+        Recent Extraction Failures ({errors.length})
+      </div>
+      <div className="space-y-3">
+        {errors.map((log) => (
+          <div
+            key={log.id || log.document_id}
+            className="bg-white border border-red-200 rounded-lg overflow-hidden"
+          >
+            {/* Error Header */}
+            <div
+              className="p-3 cursor-pointer hover:bg-red-50 transition-colors"
+              onClick={() => setExpandedError(
+                expandedError === log.document_id ? null : log.document_id
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="text-red-500" size={16} />
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">
+                      {log.filename}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {log.error_stage && `Stage: ${log.error_stage} • `}
+                      {new Date(log.started_at).toLocaleString('tr-TR')}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onViewLog(log)
+                    }}
+                  >
+                    <Eye size={14} className="mr-1" />
+                    Details
+                  </Button>
+                  {expandedError === log.document_id ? (
+                    <ChevronUp size={16} className="text-gray-400" />
+                  ) : (
+                    <ChevronDown size={16} className="text-gray-400" />
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Expanded Error Details */}
+            {expandedError === log.document_id && (
+              <div className="border-t border-red-200 p-3 bg-red-50/50">
+                {/* Error Message */}
+                <div className="mb-3">
+                  <div className="text-xs font-medium text-red-700 mb-1">Error Message</div>
+                  <div className="text-sm text-red-900 font-mono bg-white p-2 rounded border border-red-200">
+                    {log.error_message || 'No error message'}
+                  </div>
+                </div>
+
+                {/* Error Type */}
+                {log.error_type && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-red-700 mb-1">Error Type</div>
+                    <div className="text-sm text-red-900">
+                      {log.error_type}
+                    </div>
+                  </div>
+                )}
+
+                {/* Error Context */}
+                {log.error_context && (
+                  <div className="mb-3">
+                    <div className="text-xs font-medium text-red-700 mb-1">Context</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                      {log.error_context.extraction_provider && (
+                        <div className="bg-white p-2 rounded border border-red-200">
+                          <span className="text-gray-500">Provider:</span>{' '}
+                          <span className="font-medium">{log.error_context.extraction_provider}</span>
+                        </div>
+                      )}
+                      {log.error_context.document_length && (
+                        <div className="bg-white p-2 rounded border border-red-200">
+                          <span className="text-gray-500">Doc Length:</span>{' '}
+                          <span className="font-medium">{log.error_context.document_length.toLocaleString()} chars</span>
+                        </div>
+                      )}
+                      {log.error_context.last_successful_stage && (
+                        <div className="bg-white p-2 rounded border border-red-200">
+                          <span className="text-gray-500">Last OK Stage:</span>{' '}
+                          <span className="font-medium">{log.error_context.last_successful_stage}</span>
+                        </div>
+                      )}
+                      {log.error_context.ocr_used !== undefined && (
+                        <div className="bg-white p-2 rounded border border-red-200">
+                          <span className="text-gray-500">OCR Used:</span>{' '}
+                          <span className="font-medium">{log.error_context.ocr_used ? 'Yes' : 'No'}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Stack Trace */}
+                {log.error_stack && (
+                  <div>
+                    <div className="text-xs font-medium text-red-700 mb-1">Stack Trace</div>
+                    <pre className="text-xs text-red-800 bg-white p-2 rounded border border-red-200 overflow-x-auto max-h-32">
+                      {log.error_stack}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Data at Failure */}
+                {log.error_context?.data_at_failure && Object.keys(log.error_context.data_at_failure).length > 0 && (
+                  <div className="mt-3">
+                    <div className="text-xs font-medium text-red-700 mb-1">Data at Failure</div>
+                    <pre className="text-xs text-red-800 bg-white p-2 rounded border border-red-200 overflow-x-auto max-h-32">
+                      {JSON.stringify(log.error_context.data_at_failure, null, 2)}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 interface Filters {
   status: string
   ocr_used: string
@@ -51,6 +198,7 @@ interface Filters {
 
 export function ProcessingLogsTab() {
   const [logs, setLogs] = useState<DocumentProcessingLog[]>([])
+  const [recentErrors, setRecentErrors] = useState<DocumentProcessingLog[]>([])
   const [stats, setStats] = useState<ProcessingStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,6 +216,27 @@ export function ProcessingLogsTab() {
     from_date: '',
     to_date: '',
   })
+
+  // Fetch recent errors for prominent display
+  const fetchRecentErrors = useCallback(async () => {
+    try {
+      const params = new URLSearchParams()
+      params.set('limit', '10')
+      params.set('status', 'failed')
+      // Get errors from last 7 days
+      const sevenDaysAgo = new Date()
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+      params.set('from_date', sevenDaysAgo.toISOString().split('T')[0])
+
+      const response = await adminFetch(`/api/admin/processing-logs?${params.toString()}`)
+      const data = await response.json()
+      if (data.success) {
+        setRecentErrors(data.data)
+      }
+    } catch (err) {
+      console.error('Failed to fetch recent errors:', err)
+    }
+  }, [])
 
   const fetchStats = useCallback(async () => {
     try {
@@ -116,11 +285,13 @@ export function ProcessingLogsTab() {
   useEffect(() => {
     fetchLogs()
     fetchStats()
-  }, [fetchLogs, fetchStats])
+    fetchRecentErrors()
+  }, [fetchLogs, fetchStats, fetchRecentErrors])
 
   const handleRefresh = () => {
     fetchLogs()
     fetchStats()
+    fetchRecentErrors()
   }
 
   const handleFilterChange = (key: keyof Filters, value: string) => {
@@ -285,6 +456,12 @@ export function ProcessingLogsTab() {
           </div>
         </div>
       )}
+
+      {/* Recent Errors Panel - Prominent display for admin */}
+      <RecentErrorsPanel
+        errors={recentErrors}
+        onViewLog={setSelectedLog}
+      />
 
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
