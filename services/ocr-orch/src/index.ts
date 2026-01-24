@@ -353,6 +353,7 @@ class ABBYYAdapter implements OCRAdapter {
             height: wordBbox.height - wordBbox.y,
           },
           confidence: wordConfidences.reduce((a, b) => a + b, 0) / wordConfidences.length / 100,
+          engine: 'abbyy',
           pageNo: options.pageNo,
           regionId: options.regionId,
           lineIndex: 0,
@@ -383,6 +384,7 @@ class ABBYYAdapter implements OCRAdapter {
           height: wordBbox.height - wordBbox.y,
         },
         confidence: wordConfidences.reduce((a, b) => a + b, 0) / wordConfidences.length / 100,
+        engine: 'abbyy',
         pageNo: options.pageNo,
         regionId: options.regionId,
         lineIndex: 0,
@@ -485,6 +487,7 @@ class GCPDocAIAdapter implements OCRAdapter {
           text: this.extractText(document.text, token.layout?.textAnchor),
           bbox,
           confidence: token.layout?.confidence || 0,
+          engine: 'gcp_docai',
           pageNo: options.pageNo,
           regionId: options.regionId,
           lineIndex: 0,
@@ -672,6 +675,7 @@ class AzureDIAdapter implements OCRAdapter {
           text: word.content,
           bbox,
           confidence: word.confidence || 0,
+          engine: 'azure_di',
           pageNo: options.pageNo,
           regionId: options.regionId,
           lineIndex: 0,
@@ -720,11 +724,53 @@ interface AzureAnalyzeResult {
 // TESSERACT ADAPTER (FALLBACK)
 // ============================================================================
 
+import { createWorker, Worker, PSM } from 'tesseract.js'
+
 class TesseractAdapter implements OCRAdapter {
   name: OCREngine = 'tesseract'
+  private worker: Worker | null = null
+  private initPromise: Promise<Worker> | null = null
 
   isAvailable(): boolean {
     return config.tesseract.enabled
+  }
+
+  private async getWorker(): Promise<Worker> {
+    if (this.worker) return this.worker
+
+    if (!this.initPromise) {
+      this.initPromise = this.initWorker()
+    }
+
+    return this.initPromise
+  }
+
+  private async initWorker(): Promise<Worker> {
+    // Initialize worker with Turkish, English, and German support
+    const langString = config.tesseract.languages.join('+')
+    console.log(`[Tesseract] Initializing worker with languages: ${langString}`)
+
+    const worker = await createWorker(langString, 1, {
+      logger: (m: { status: string; progress: number }) => {
+        if (m.status === 'recognizing text') {
+          // Only log progress at 25% intervals
+          if (Math.floor(m.progress * 4) !== Math.floor((m.progress - 0.01) * 4)) {
+            console.log(`[Tesseract] Progress: ${Math.round(m.progress * 100)}%`)
+          }
+        }
+      },
+    })
+
+    // Configure for better Turkish character recognition
+    await worker.setParameters({
+      tessedit_pageseg_mode: PSM.AUTO, // Automatic page segmentation
+      preserve_interword_spaces: '1',
+      tessedit_char_whitelist: '', // Allow all characters
+    })
+
+    this.worker = worker
+    console.log('[Tesseract] Worker initialized successfully')
+    return worker
   }
 
   async processImage(
@@ -733,40 +779,89 @@ class TesseractAdapter implements OCRAdapter {
   ): Promise<OCRAdapterResult> {
     const startTime = Date.now()
 
-    // In production, use tesseract.js or call tesseract CLI
-    // This is a simplified implementation
+    // Download image
     const response = await fetch(imageUrl)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`)
+    }
     const imageBuffer = Buffer.from(await response.arrayBuffer())
 
-    // Mock tesseract processing (in production, integrate with tesseract.js)
-    const tokens = await this.runTesseract(imageBuffer, options)
+    // Get or initialize worker
+    const worker = await this.getWorker()
+
+    // Run OCR
+    const { data } = await worker.recognize(imageBuffer)
+
+    // Parse results to tokens
+    const tokens = this.parseResults(data, options)
 
     return {
       tokens,
-      confidence: this.calculateAverageConfidence(tokens),
+      confidence: data.confidence / 100, // Tesseract returns 0-100
       processingTimeMs: Date.now() - startTime,
+      rawResponse: data,
     }
   }
 
-  private async runTesseract(
-    _imageBuffer: Buffer,
+  private parseResults(
+    data: Tesseract.Page,
     options: OCRAdapterOptions
-  ): Promise<OCRToken[]> {
-    // In production, this would call tesseract.js or tesseract CLI
-    // For now, return empty array as fallback indication
-    console.log(`[Tesseract] Processing page ${options.pageNo}, region ${options.regionId}`)
+  ): OCRToken[] {
+    const tokens: OCRToken[] = []
 
-    // This would be replaced with actual tesseract.js integration:
-    // const worker = await createWorker('tur+eng+deu')
-    // const { data } = await worker.recognize(imageBuffer)
-    // return data.words.map(...)
+    if (!data.words) return tokens
 
-    return []
+    for (let i = 0; i < data.words.length; i++) {
+      const word = data.words[i]
+
+      // Skip empty words
+      if (!word.text.trim()) continue
+
+      tokens.push({
+        id: `tess-${options.pageNo}-${options.regionId}-${i}`,
+        text: word.text,
+        bbox: {
+          x: word.bbox.x0,
+          y: word.bbox.y0,
+          width: word.bbox.x1 - word.bbox.x0,
+          height: word.bbox.y1 - word.bbox.y0,
+        },
+        confidence: word.confidence / 100, // Normalize to 0-1
+        engine: 'tesseract',
+        pageNo: options.pageNo,
+        regionId: options.regionId,
+        lineIndex: word.line?.baseline?.y0 || 0,
+        wordIndex: i,
+      })
+    }
+
+    return tokens
   }
 
-  private calculateAverageConfidence(tokens: OCRToken[]): number {
-    if (tokens.length === 0) return 0
-    return tokens.reduce((sum, t) => sum + t.confidence, 0) / tokens.length
+  /**
+   * Cleanup worker when done
+   */
+  async terminate(): Promise<void> {
+    if (this.worker) {
+      await this.worker.terminate()
+      this.worker = null
+      this.initPromise = null
+      console.log('[Tesseract] Worker terminated')
+    }
+  }
+}
+
+// Tesseract.js type declarations (subset)
+declare namespace Tesseract {
+  interface Page {
+    confidence: number
+    words?: Word[]
+  }
+  interface Word {
+    text: string
+    confidence: number
+    bbox: { x0: number; y0: number; x1: number; y1: number }
+    line?: { baseline?: { y0: number } }
   }
 }
 
@@ -994,11 +1089,14 @@ export class OCROrchestrator {
     // Convert to OCRResult array
     for (const [engine, tokens] of engineResults) {
       results.push({
-        docId,
         engine,
         tokens,
+        fullText: tokens.map(t => t.text).join(' '),
+        confidence: tokens.length > 0
+          ? tokens.reduce((sum, t) => sum + t.confidence, 0) / tokens.length
+          : 0,
         processingTimeMs: 0, // Aggregate time not tracked
-        rawStorageKey: `ocr/${docId}/${engine}/raw.json`,
+        rawOutput: null,
       })
     }
 
@@ -1067,11 +1165,12 @@ export class OCROrchestrator {
       try {
         const result = await adapter.processImage(imageUrl, options)
         return {
-          docId: '', // Will be set by caller
           engine: adapter.name,
           tokens: result.tokens,
+          fullText: result.tokens.map(t => t.text).join(' '),
+          confidence: result.confidence,
           processingTimeMs: result.processingTimeMs,
-          rawStorageKey: '',
+          rawOutput: result.rawResponse || null,
         }
       } catch (error) {
         lastError = error as Error
@@ -1299,7 +1398,6 @@ app.listen(PORT, () => {
 })
 
 export {
-  OCROrchestrator,
   ABBYYAdapter,
   GCPDocAIAdapter,
   AzureDIAdapter,

@@ -1,6 +1,16 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
-import { isLikelyScannedPDF, performOCR } from './ocr'
+import {
+  isLikelyScannedPDF,
+  performOCR,
+  type FormField,
+  type Table,
+  extractFormFieldMap,
+  findFormField,
+  TURKISH_FORM_FIELD_PATTERNS,
+} from './ocr'
+import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
+import { performUnifiedOCR, isOrchestratorConfigured } from './ocr-orchestrator-client'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
@@ -17,6 +27,11 @@ import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
 import { RiskAssessmentService } from '@/lib/ml'
 import { GapDetectionService } from '@/lib/gap-detection'
 import { validateCurrencyRegion } from '@/lib/utils'
+import {
+  validateAndEnhanceExtraction,
+  mergeExtractionResults,
+  type ValidationResult,
+} from '@/lib/extraction'
 
 export interface ExtractionResult {
   success: true
@@ -31,6 +46,20 @@ export interface ExtractionResult {
   }
   // Clean-room processing output (when enabled)
   cleanRoomOutput?: CleanRoomResult
+  // Turkish pattern validation results
+  patternValidation?: {
+    errors: string[]
+    warnings: string[]
+    enhanced: string[]
+  }
+  // Document AI form fields and tables (when available)
+  documentAI?: {
+    formFields?: FormField[]
+    tables?: Table[]
+    backend: 'document-ai' | 'vision-api'
+    fieldsUsed: number  // How many form fields were used to enhance extraction
+    tableCoveragesUsed: number  // How many coverages were extracted from tables
+  }
 }
 
 export interface ExtractionError {
@@ -50,6 +79,7 @@ export interface ExtractionOptions {
   useOCR?: boolean
   useConsensus?: boolean
   useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
+  useOrchestrator?: boolean  // Use OCR orchestrator for multi-engine OCR (default: auto-detect)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
 }
@@ -171,6 +201,7 @@ export async function extractPolicyFromDocument(
     useOCR = true,
     useConsensus = true,
     useCleanRoom = true,  // Default to clean-room processing
+    useOrchestrator = isOrchestratorConfigured(),  // Auto-detect orchestrator
     primaryProvider,
     providers,
   } = options
@@ -209,6 +240,11 @@ export async function extractPolicyFromDocument(
   let documentText: string
   let usedOCR = false
 
+  // Document AI enhanced data (form fields and tables)
+  let ocrFormFields: FormField[] | undefined
+  let ocrTables: Table[] | undefined
+  let ocrBackend: 'document-ai' | 'vision-api' | undefined
+
   if (!parseResult.success) {
     // Map PDF parser error codes to extraction error codes
     const mapPdfErrorCode = (pdfCode: string): ExtractionError['error']['code'] => {
@@ -226,10 +262,22 @@ export async function extractPolicyFromDocument(
 
     // Check if we should try OCR
     if (useOCR && isOCRConfigured()) {
-      const ocrResult = await performOCR(file)
+      // Use unified OCR (orchestrator if available, otherwise direct)
+      const ocrResult = useOrchestrator
+        ? await performUnifiedOCR(file, { preferOrchestrator: true })
+        : await performOCR(file)
+
       if (ocrResult.success && ocrResult.data.text.length > 50) {
         documentText = ocrResult.data.text
         usedOCR = true
+        // Store Document AI form fields and tables for later use
+        ocrFormFields = ocrResult.data.formFields
+        ocrTables = ocrResult.data.tables
+        ocrBackend = ocrResult.data.backend
+        if (import.meta.env.DEV) {
+          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
+          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
+        }
       } else {
         if (useFallback) {
           return createFallbackResult(file)
@@ -265,10 +313,22 @@ export async function extractPolicyFromDocument(
       isOCRConfigured() &&
       isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
     ) {
-      const ocrResult = await performOCR(file)
+      // Use unified OCR (orchestrator if available, otherwise direct)
+      const ocrResult = useOrchestrator
+        ? await performUnifiedOCR(file, { preferOrchestrator: true })
+        : await performOCR(file)
+
       if (ocrResult.success && ocrResult.data.text.length > parseResult.data.text.length) {
         documentText = ocrResult.data.text
         usedOCR = true
+        // Store Document AI form fields and tables for later use
+        ocrFormFields = ocrResult.data.formFields
+        ocrTables = ocrResult.data.tables
+        ocrBackend = ocrResult.data.backend
+        if (import.meta.env.DEV) {
+          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
+          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
+        }
       } else {
         documentText = parseResult.data.text
       }
@@ -391,17 +451,233 @@ export async function extractPolicyFromDocument(
       }
     }
 
+    // ========================================================================
+    // DOCUMENT AI FORM FIELD ENHANCEMENT
+    // Use high-confidence form fields from Document AI to enhance/override AI extraction
+    // ========================================================================
+    let enhancedExtractedData = extractedData
+    let formFieldsUsed = 0
+
+    if (ocrFormFields && ocrFormFields.length > 0) {
+      const formFieldMap = extractFormFieldMap(ocrFormFields)
+
+      if (import.meta.env.DEV) {
+        console.log('[Document AI] Form field map:', formFieldMap)
+      }
+
+      // Helper to find and use high-confidence form field value
+      const useFormField = (
+        patterns: readonly (string | RegExp)[],
+        currentValue: string | number | null | undefined,
+        minConfidence = 0.7
+      ): string | undefined => {
+        const field = findFormField(ocrFormFields!, patterns)
+        if (field && field.confidence >= minConfidence && field.value) {
+          formFieldsUsed++
+          return field.value
+        }
+        return currentValue?.toString()
+      }
+
+      // Use form fields for policy number (high priority - very reliable from Document AI)
+      const formPolicyNumber = useFormField(TURKISH_FORM_FIELD_PATTERNS.policyNumber, extractedData.policyNumber, 0.6)
+      if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
+        enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
+        if (import.meta.env.DEV) {
+          console.log(`[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`)
+        }
+      }
+
+      // Use form fields for insured name
+      const formInsuredName = useFormField(TURKISH_FORM_FIELD_PATTERNS.insuredName, extractedData.insuredName)
+      if (formInsuredName && formInsuredName !== extractedData.insuredName) {
+        enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
+        if (import.meta.env.DEV) {
+          console.log(`[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`)
+        }
+      }
+
+      // Use form fields for dates
+      const formStartDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.startDate, extractedData.startDate)
+      if (formStartDate && formStartDate !== extractedData.startDate) {
+        // Normalize date format if needed (DD.MM.YYYY → YYYY-MM-DD)
+        const normalizedDate = formStartDate.includes('.')
+          ? formStartDate.split('.').reverse().join('-')
+          : formStartDate
+        enhancedExtractedData = { ...enhancedExtractedData, startDate: normalizedDate }
+      }
+
+      const formEndDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.endDate, extractedData.endDate)
+      if (formEndDate && formEndDate !== extractedData.endDate) {
+        const normalizedDate = formEndDate.includes('.')
+          ? formEndDate.split('.').reverse().join('-')
+          : formEndDate
+        enhancedExtractedData = { ...enhancedExtractedData, endDate: normalizedDate }
+      }
+
+      // Use form fields for premium (parse Turkish number format)
+      const formPremium = useFormField(TURKISH_FORM_FIELD_PATTERNS.premium, extractedData.premium?.toString())
+      if (formPremium) {
+        // Parse Turkish currency format: "₺5.000,50" or "5.000,50 TL"
+        const cleanPremium = formPremium
+          .replace(/[₺TL\s]/g, '')
+          .replace(/\./g, '')
+          .replace(',', '.')
+        const parsedPremium = parseFloat(cleanPremium)
+        if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
+          enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
+          if (import.meta.env.DEV) {
+            console.log(`[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`)
+          }
+        }
+      }
+
+      if (import.meta.env.DEV && formFieldsUsed > 0) {
+        console.log(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
+      }
+    }
+
+    // ========================================================================
+    // TURKISH PATTERN VALIDATION & ENHANCEMENT
+    // Validate AI extraction using pattern matching and enhance with missing data
+    // ========================================================================
+    let patternValidation: ValidationResult | undefined
+
+    try {
+      // Convert AI extraction to format for validation
+      const aiResultForValidation: Record<string, unknown> = {
+        policyNumber: enhancedExtractedData.policyNumber,
+        tcKimlik: enhancedExtractedData.insuredName, // TC Kimlik might be in raw data
+        insuredName: enhancedExtractedData.insuredName,
+        startDate: enhancedExtractedData.startDate,
+        endDate: enhancedExtractedData.endDate,
+        premium: enhancedExtractedData.premium,
+        coverage: enhancedExtractedData.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0),
+        vehiclePlate: (enhancedExtractedData as unknown as Record<string, unknown>).vehiclePlate,
+        vin: (enhancedExtractedData as unknown as Record<string, unknown>).vin,
+        vehicleYear: (enhancedExtractedData as unknown as Record<string, unknown>).vehicleYear,
+      }
+
+      // Validate and enhance with Turkish patterns
+      patternValidation = validateAndEnhanceExtraction(aiResultForValidation, processedText)
+
+      // Log validation results in development
+      if (import.meta.env.DEV) {
+        if (patternValidation.errors.length > 0) {
+          console.warn('[Turkish Validation] Errors:', patternValidation.errors)
+        }
+        if (patternValidation.warnings.length > 0) {
+          console.warn('[Turkish Validation] Warnings:', patternValidation.warnings)
+        }
+        if (Object.keys(patternValidation.enhancements).length > 0) {
+          console.warn('[Turkish Validation] Enhancements:', patternValidation.enhancements)
+        }
+      }
+
+      // Merge enhancements into extracted data
+      if (Object.keys(patternValidation.enhancements).length > 0) {
+        const merged = mergeExtractionResults(aiResultForValidation, patternValidation)
+
+        // Update extractedData with enhancements
+        if (merged.policyNumber && !extractedData.policyNumber) {
+          enhancedExtractedData = { ...enhancedExtractedData, policyNumber: merged.policyNumber as string }
+        }
+        if (merged.startDate && !extractedData.startDate) {
+          enhancedExtractedData = { ...enhancedExtractedData, startDate: merged.startDate as string }
+        }
+        if (merged.endDate && !extractedData.endDate) {
+          enhancedExtractedData = { ...enhancedExtractedData, endDate: merged.endDate as string }
+        }
+        if (merged.premium && !extractedData.premium) {
+          enhancedExtractedData = { ...enhancedExtractedData, premium: merged.premium as number }
+        }
+        if (merged.insuredPerson && !extractedData.insuredName) {
+          enhancedExtractedData = { ...enhancedExtractedData, insuredName: merged.insuredPerson as string }
+        }
+      }
+    } catch (error) {
+      // Pattern validation is optional, continue without it
+      console.warn('Turkish pattern validation failed:', error)
+    }
+
+    // ========================================================================
+    // TABLE-BASED COVERAGE ENHANCEMENT
+    // Parse Document AI tables to extract structured coverage information
+    // ========================================================================
+    let tableCoveragesUsed = 0
+
+    if (ocrTables && ocrTables.length > 0) {
+      try {
+        const tableData = parseTablesForCoverages(ocrTables)
+
+        if (tableData.coverages.length > 0) {
+          if (import.meta.env.DEV) {
+            console.log(`[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`)
+          }
+
+          // Merge table coverages with AI-extracted coverages
+          const mergedCoverages = mergeCoveragesWithTableData(
+            enhancedExtractedData.coverages,
+            tableData.coverages,
+            tableData.confidence, // Table parsing confidence
+            0.7 // Minimum confidence threshold
+          )
+
+          // Count how many table coverages were actually used
+          tableCoveragesUsed = mergedCoverages.length - enhancedExtractedData.coverages.length
+          if (tableCoveragesUsed < 0) tableCoveragesUsed = 0
+
+          // Update enhanced data with merged coverages
+          enhancedExtractedData = {
+            ...enhancedExtractedData,
+            coverages: mergedCoverages as ExtractedCoverage[],
+          }
+
+          if (import.meta.env.DEV && tableCoveragesUsed > 0) {
+            console.log(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
+          }
+        }
+      } catch (error) {
+        // Table parsing is optional, continue without it
+        console.warn('Table coverage parsing failed:', error)
+      }
+    }
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = convertToAnalyzedPolicy(extractedData, file, documentText, processedText)
+    const policy = convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
+
+    // Add validation warnings to AI insights
+    if (patternValidation) {
+      const validationInsights = [
+        ...patternValidation.errors.map(e => `❌ ${e}`),
+        ...patternValidation.warnings.map(w => `⚠️ ${w}`),
+      ]
+      if (validationInsights.length > 0 && policy.aiInsights) {
+        policy.aiInsights = [...validationInsights, ...policy.aiInsights]
+      }
+    }
 
     return {
       success: true,
       policy,
-      extractedData,
+      extractedData: enhancedExtractedData,
       source: usedOCR ? 'ocr' : 'ai',
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
+      patternValidation: patternValidation ? {
+        errors: patternValidation.errors,
+        warnings: patternValidation.warnings,
+        enhanced: Object.keys(patternValidation.enhancements),
+      } : undefined,
+      // Document AI enhanced data (form fields and tables)
+      documentAI: (ocrFormFields || ocrTables) ? {
+        formFields: ocrFormFields,
+        tables: ocrTables,
+        backend: ocrBackend || 'vision-api',
+        fieldsUsed: formFieldsUsed,
+        tableCoveragesUsed,
+      } : undefined,
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
