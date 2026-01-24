@@ -1,4 +1,4 @@
-import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
+import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, isProxyConfigured, type AIProvider } from './config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import {
@@ -497,7 +497,8 @@ export async function extractPolicyFromDocument(
 
   // ========== AI EXTRACTION STAGE ==========
   const configuredProviders = getConfiguredProviders()
-  const useMultiProvider = useConsensus && configuredProviders.length > 1
+  // When proxy is configured, bypass consensus - the unified endpoint handles Anthropic→OpenAI fallback
+  const useMultiProvider = useConsensus && configuredProviders.length > 1 && !isProxyConfigured()
   const provider = primaryProvider || configuredProviders[0]
 
   logger?.startStage('ai_extraction', {
