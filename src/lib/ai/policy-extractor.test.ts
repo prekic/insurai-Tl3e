@@ -11,6 +11,7 @@ import type { ExtractionOptions } from './policy-extractor'
 vi.mock('./config', () => ({
   isAIConfigured: vi.fn(() => false),
   isOCRConfigured: vi.fn(() => false),
+  isProxyConfigured: vi.fn(() => false),
   AI_CONFIG: { minConfidence: 0.7 },
   getConfiguredProviders: vi.fn(() => []),
 }))
