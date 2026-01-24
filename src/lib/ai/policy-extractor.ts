@@ -1,4 +1,5 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, type AIProvider } from './config'
+import type { ProcessingLogger } from '@/lib/processing-logger'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import {
   isLikelyScannedPDF,
@@ -82,6 +83,8 @@ export interface ExtractionOptions {
   useOrchestrator?: boolean  // Use OCR orchestrator for multi-engine OCR (default: auto-detect)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
+  /** Optional logger for tracking processing stages with actual data */
+  logger?: ProcessingLogger
 }
 
 /**
@@ -204,10 +207,12 @@ export async function extractPolicyFromDocument(
     useOrchestrator = isOrchestratorConfigured(),  // Auto-detect orchestrator
     primaryProvider,
     providers,
+    logger,  // Optional processing logger for tracking stages
   } = options
 
   // Validate file type
   if (!isPDFFile(file)) {
+    logger?.fail('Invalid file type: ' + file.type)
     return {
       success: false,
       error: {
@@ -224,6 +229,7 @@ export async function extractPolicyFromDocument(
     if (useFallback) {
       return createFallbackResult(file)
     }
+    logger?.fail('AI not configured')
     return {
       success: false,
       error: {
@@ -234,6 +240,9 @@ export async function extractPolicyFromDocument(
       fallbackAvailable: false,
     }
   }
+
+  // ========== PDF EXTRACTION STAGE ==========
+  logger?.startStage('pdf_extraction', { filename: file.name, file_size: file.size })
 
   // Extract text from PDF (with automatic retry for transient errors)
   const parseResult = await extractTextFromPDFWithRetry(file)
@@ -260,8 +269,19 @@ export async function extractPolicyFromDocument(
       }
     }
 
+    // PDF extraction failed - log and check for OCR
+    logger?.failStage('PDF text extraction failed: ' + parseResult.error.message)
+
+    // ========== OCR CHECK STAGE ==========
+    logger?.startStage('ocr_check', { pdf_failed: true, ocr_configured: isOCRConfigured() })
+
     // Check if we should try OCR
     if (useOCR && isOCRConfigured()) {
+      logger?.completeStage({ output: { needs_ocr: true, reason: 'pdf_extraction_failed' } })
+
+      // ========== OCR PROCESSING STAGE ==========
+      logger?.startStage('ocr_processing', { method: useOrchestrator ? 'orchestrator' : 'direct' })
+
       // Use unified OCR (orchestrator if available, otherwise direct)
       const ocrResult = useOrchestrator
         ? await performUnifiedOCR(file, { preferOrchestrator: true })
@@ -274,11 +294,29 @@ export async function extractPolicyFromDocument(
         ocrFormFields = ocrResult.data.formFields
         ocrTables = ocrResult.data.tables
         ocrBackend = ocrResult.data.backend
+
+        // Log OCR success with details
+        logger?.setOCRUsed(ocrBackend || 'unknown')
+        logger?.completeStage({
+          output: {
+            text_length: documentText.length,
+            text_preview: documentText.substring(0, 500) + '...',
+            form_fields_count: ocrFormFields?.length || 0,
+            tables_count: ocrTables?.length || 0,
+            backend: ocrBackend,
+          },
+          metadata: {
+            form_fields: ocrFormFields?.slice(0, 10),  // First 10 for preview
+            tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
+          },
+        })
+
         if (import.meta.env.DEV) {
           const method = 'method' in ocrResult ? ocrResult.method : 'direct'
           console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
         }
       } else {
+        logger?.failStage('OCR failed or produced insufficient text')
         if (useFallback) {
           return createFallbackResult(file)
         }
@@ -307,12 +345,33 @@ export async function extractPolicyFromDocument(
       }
     }
   } else {
+    // PDF extraction succeeded
+    logger?.setPageCount(parseResult.data.pageCount)
+    logger?.completeStage({
+      output: {
+        text_length: parseResult.data.text.length,
+        text_preview: parseResult.data.text.substring(0, 500) + '...',
+        page_count: parseResult.data.pageCount,
+        chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
+      },
+    })
+
+    // ========== OCR CHECK STAGE ==========
+    const isScanned = isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
+    logger?.startStage('ocr_check', {
+      text_length: parseResult.data.text.length,
+      page_count: parseResult.data.pageCount,
+      chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
+      ocr_configured: isOCRConfigured(),
+    })
+
     // Check if PDF appears to be scanned and OCR is available
-    if (
-      useOCR &&
-      isOCRConfigured() &&
-      isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
-    ) {
+    if (useOCR && isOCRConfigured() && isScanned) {
+      logger?.completeStage({ output: { needs_ocr: true, reason: 'low_text_density' } })
+
+      // ========== OCR PROCESSING STAGE ==========
+      logger?.startStage('ocr_processing', { method: useOrchestrator ? 'orchestrator' : 'direct' })
+
       // Use unified OCR (orchestrator if available, otherwise direct)
       const ocrResult = useOrchestrator
         ? await performUnifiedOCR(file, { preferOrchestrator: true })
@@ -325,17 +384,40 @@ export async function extractPolicyFromDocument(
         ocrFormFields = ocrResult.data.formFields
         ocrTables = ocrResult.data.tables
         ocrBackend = ocrResult.data.backend
+
+        // Log OCR success with details
+        logger?.setOCRUsed(ocrBackend || 'unknown')
+        logger?.completeStage({
+          output: {
+            text_length: documentText.length,
+            text_preview: documentText.substring(0, 500) + '...',
+            form_fields_count: ocrFormFields?.length || 0,
+            tables_count: ocrTables?.length || 0,
+            backend: ocrBackend,
+          },
+          metadata: {
+            form_fields: ocrFormFields?.slice(0, 10),
+            tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
+          },
+        })
+
         if (import.meta.env.DEV) {
           const method = 'method' in ocrResult ? ocrResult.method : 'direct'
           console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
         }
       } else {
         documentText = parseResult.data.text
+        logger?.completeStage({ output: { ocr_improved: false, using_pdf_text: true } })
       }
     } else {
       documentText = parseResult.data.text
+      logger?.skipStage('ocr_processing', isScanned ? 'OCR not configured' : 'Text density sufficient')
+      logger?.completeStage({ output: { needs_ocr: false, reason: isScanned ? 'ocr_not_configured' : 'sufficient_text' } })
     }
   }
+
+  // ========== TEXT PREPROCESSING STAGE ==========
+  logger?.startStage('text_preprocessing', { text_length: documentText.length, use_clean_room: useCleanRoom })
 
   // Process text to correct OCR errors and improve readability
   let processedText = documentText
@@ -403,11 +485,30 @@ export async function extractPolicyFromDocument(
     }
   }
 
+  // Log text preprocessing completion
+  logger?.completeStage({
+    output: {
+      processed_text_length: processedText.length,
+      processed_text_preview: processedText.substring(0, 500) + '...',
+      chars_changed: documentText.length - processedText.length,
+      clean_room_used: useCleanRoom,
+    },
+  })
+
+  // ========== AI EXTRACTION STAGE ==========
+  const configuredProviders = getConfiguredProviders()
+  const useMultiProvider = useConsensus && configuredProviders.length > 1
+  const provider = primaryProvider || configuredProviders[0]
+
+  logger?.startStage('ai_extraction', {
+    text_length: processedText.length,
+    provider: useMultiProvider ? 'consensus' : provider,
+    multi_provider: useMultiProvider,
+  })
+  logger?.setAIProvider(provider)
+
   // Call AI for extraction (use processed text for better results)
   try {
-    const configuredProviders = getConfiguredProviders()
-    const useMultiProvider = useConsensus && configuredProviders.length > 1
-
     let extractedData: ExtractedPolicyData
     let consensusInfo: ExtractionResult['consensus'] | undefined
 
@@ -428,9 +529,29 @@ export async function extractPolicyFromDocument(
       }
     } else {
       // Use single provider (use processed text for better extraction)
-      const provider = primaryProvider || configuredProviders[0]
       extractedData = await extractWithProvider(provider, processedText)
     }
+
+    // Log AI extraction success
+    logger?.setExtractionConfidence(extractedData.confidence.overall * 100)
+    logger?.completeStage({
+      output: {
+        policy_number: extractedData.policyNumber,
+        provider: extractedData.provider,
+        policy_type: extractedData.policyType,
+        insured_name: extractedData.insuredName,
+        premium: extractedData.premium,
+        start_date: extractedData.startDate,
+        end_date: extractedData.endDate,
+        coverages_count: extractedData.coverages.length,
+        confidence: extractedData.confidence,
+      },
+      metadata: {
+        consensus: consensusInfo,
+        coverages: extractedData.coverages.slice(0, 5),  // First 5 coverages for preview
+        exclusions_count: extractedData.exclusions?.length || 0,
+      },
+    })
 
     // Check confidence threshold
     if (extractedData.confidence.overall < AI_CONFIG.minConfidence) {
@@ -458,7 +579,12 @@ export async function extractPolicyFromDocument(
     let enhancedExtractedData = extractedData
     let formFieldsUsed = 0
 
+    // ========== FORM FIELD ENHANCEMENT STAGE ==========
     if (ocrFormFields && ocrFormFields.length > 0) {
+      logger?.startStage('form_field_enhancement', {
+        form_fields_available: ocrFormFields.length,
+        backend: ocrBackend,
+      })
       const formFieldMap = extractFormFieldMap(ocrFormFields)
 
       if (import.meta.env.DEV) {
@@ -535,6 +661,18 @@ export async function extractPolicyFromDocument(
       if (import.meta.env.DEV && formFieldsUsed > 0) {
         console.log(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
       }
+
+      // Log form field enhancement completion
+      logger?.completeStage({
+        output: {
+          fields_used: formFieldsUsed,
+          enhanced_policy_number: enhancedExtractedData.policyNumber !== extractedData.policyNumber,
+          enhanced_insured_name: enhancedExtractedData.insuredName !== extractedData.insuredName,
+          enhanced_premium: enhancedExtractedData.premium !== extractedData.premium,
+        },
+      })
+    } else {
+      logger?.skipStage('form_field_enhancement', 'No form fields available')
     }
 
     // ========================================================================
@@ -606,7 +744,16 @@ export async function extractPolicyFromDocument(
     // ========================================================================
     let tableCoveragesUsed = 0
 
+    // ========== TABLE PARSING STAGE ==========
     if (ocrTables && ocrTables.length > 0) {
+      logger?.startStage('table_parsing', {
+        tables_count: ocrTables.length,
+        tables_structure: ocrTables.map(t => ({
+          rows: t.rows?.length || 0,
+          cols: t.rows?.[0]?.cells?.length || 0,
+        })),
+      })
+
       try {
         const tableData = parseTablesForCoverages(ocrTables)
 
@@ -633,15 +780,41 @@ export async function extractPolicyFromDocument(
             coverages: mergedCoverages as ExtractedCoverage[],
           }
 
+          // Log table parsing success
+          logger?.completeStage({
+            output: {
+              coverages_extracted: tableData.coverages.length,
+              coverages_merged: tableCoveragesUsed,
+              total_coverages: mergedCoverages.length,
+              table_confidence: tableData.confidence,
+            },
+            metadata: {
+              extracted_coverages: tableData.coverages.slice(0, 5),  // First 5 for preview
+            },
+          })
+
           if (import.meta.env.DEV && tableCoveragesUsed > 0) {
             console.log(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
           }
+        } else {
+          logger?.completeStage({
+            output: { coverages_extracted: 0, reason: 'no_coverage_tables_found' },
+          })
         }
       } catch (error) {
         // Table parsing is optional, continue without it
         console.warn('Table coverage parsing failed:', error)
+        logger?.failStage('Table parsing failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
       }
+    } else {
+      logger?.skipStage('table_parsing', 'No tables available')
     }
+
+    // ========== VALIDATION STAGE ==========
+    logger?.startStage('validation', {
+      has_pattern_validation: !!patternValidation,
+      coverages_count: enhancedExtractedData.coverages.length,
+    })
 
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
@@ -657,6 +830,32 @@ export async function extractPolicyFromDocument(
         policy.aiInsights = [...validationInsights, ...policy.aiInsights]
       }
     }
+
+    // Log validation completion
+    logger?.completeStage({
+      output: {
+        validation_errors: patternValidation?.errors?.length || 0,
+        validation_warnings: patternValidation?.warnings?.length || 0,
+        enhancements_applied: patternValidation ? Object.keys(patternValidation.enhancements).length : 0,
+        final_policy_id: policy.id,
+      },
+    })
+
+    // Set extracted summary for admin display
+    logger?.setExtractedSummary({
+      policy_number: policy.policyNumber,
+      provider: policy.provider,
+      type: policy.type,
+      type_tr: policy.typeTr,
+      insured_person: policy.insuredPerson,
+      premium: policy.premium,
+      coverage: policy.coverage,
+      start_date: policy.startDate,
+      expiry_date: policy.expiryDate,
+    })
+
+    // Mark extraction as complete
+    logger?.complete()
 
     return {
       success: true,
@@ -681,6 +880,9 @@ export async function extractPolicyFromDocument(
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
+
+    // Log extraction failure
+    logger?.fail(errorMessage)
 
     if (useFallback) {
       console.warn(`AI extraction failed: ${errorMessage}, using fallback`)

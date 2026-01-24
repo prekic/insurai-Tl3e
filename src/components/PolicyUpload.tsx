@@ -19,6 +19,8 @@ import {
   handlePolicyAmendment,
   handleDuplicateResolution,
 } from '@/lib/policy-upload-check'
+import { createProcessingLogger } from '@/lib/processing-logger'
+import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
 
 /**
  * Convert AnalyzedPolicy to Supabase PolicyInsert format
@@ -245,7 +247,41 @@ export function PolicyUpload() {
   }
 
   const processFileAsync = async (fileId: string, file: File) => {
+    // Create processing logger for tracking the document journey
+    const logger = createProcessingLogger({
+      filename: file.name,
+      file_size: file.size,
+      mime_type: file.type,
+      user_id: user?.id,
+    })
+
+    // Set up persistence callback to save log updates to database
+    logger.setPersistCallback(async (log) => {
+      try {
+        // Create or update the log in the database
+        if (log.stages.length === 1 && log.stages[0].stage === 'upload') {
+          // First stage - create the log
+          await createProcessingLog(log)
+        } else {
+          // Subsequent stages - update the log
+          await updateProcessingLog(log.document_id, log)
+        }
+      } catch (err) {
+        // Non-critical - don't fail the upload if logging fails
+        if (import.meta.env.DEV) {
+          console.warn('[ProcessingLogger] Failed to persist log:', err)
+        }
+      }
+    })
+
     try {
+      // ========== UPLOAD STAGE ==========
+      logger.startStage('upload', {
+        filename: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+      })
+
       // Update to uploading state with progress
       for (let i = 0; i <= 100; i += 25) {
         await new Promise((resolve) => setTimeout(resolve, 100))
@@ -256,6 +292,10 @@ export function PolicyUpload() {
         )
       }
 
+      logger.completeStage({
+        output: { upload_complete: true },
+      })
+
       // Switch to analyzing state
       setFiles((prev) =>
         prev.map((f) =>
@@ -263,14 +303,24 @@ export function PolicyUpload() {
         )
       )
 
-      // Use real AI extraction - no silent fallback to demo data
-      const result = await extractPolicyFromDocument(file, { useFallback: false })
+      // Use real AI extraction - pass the logger for tracking
+      const result = await extractPolicyFromDocument(file, {
+        useFallback: false,
+        logger,  // Pass logger to track extraction stages
+      })
 
       if (!result.success) {
         throw new Error(result.error.message)
       }
 
       const { policy, source, extractedData } = result
+
+      // ========== DUPLICATE CHECK STAGE ==========
+      logger.startStage('duplicate_check', {
+        policy_number: policy.policyNumber,
+        provider: policy.provider,
+        insured_person: policy.insuredPerson,
+      })
 
       // Check for conflicts before saving (only if using Supabase)
       let conflictResult: PreUploadCheckResult = { type: 'noConflict' }
@@ -286,8 +336,21 @@ export function PolicyUpload() {
         }
       }
 
+      logger.completeStage({
+        output: {
+          conflict_type: conflictResult.type,
+          has_conflict: conflictResult.type !== 'noConflict',
+          existing_policy_id: conflictResult.type !== 'noConflict' ? conflictResult.existingPolicy?.id : undefined,
+        },
+      })
+
       // If conflict detected, show resolution dialog instead of saving immediately
       if (conflictResult.type !== 'noConflict') {
+        // Log that we're waiting for conflict resolution
+        logger.startStage('conflict_resolution', {
+          conflict_type: conflictResult.type,
+          existing_policy: conflictResult.existingPolicy?.policyNumber,
+        })
         setFiles((prev) =>
           prev.map((f) =>
             f.id === fileId
@@ -323,6 +386,12 @@ export function PolicyUpload() {
         return // Don't proceed with normal save
       }
 
+      // ========== DATABASE SAVE STAGE ==========
+      logger.startStage('database_save', {
+        use_supabase: useSupabase,
+        policy_id: policy.id,
+      })
+
       // If using Supabase, save policy to database and upload document
       let savedToCloud = false
       if (useSupabase && user) {
@@ -331,6 +400,9 @@ export function PolicyUpload() {
           const supabasePolicy = convertToSupabasePolicy(policy, user.id)
           await createPolicy(supabasePolicy)
           savedToCloud = true
+
+          // Link policy ID to the processing log
+          logger.setPolicyId(policy.id)
 
           // Refresh local context so policy is immediately available
           await refreshPolicies()
@@ -345,14 +417,32 @@ export function PolicyUpload() {
             }
             // Don't fail if storage upload fails - policy is already saved
           }
+
+          logger.completeStage({
+            output: {
+              saved_to_cloud: true,
+              policy_id: policy.id,
+              document_uploaded: true,
+            },
+          })
         } catch (saveError) {
           // Only log save errors in development
           if (import.meta.env.DEV) {
             console.warn('Failed to save policy to database:', saveError)
           }
+          logger.completeStage({
+            output: { saved_to_cloud: false, error: 'database_save_failed' },
+          })
           // Continue even if save fails - policy is still in local state
         }
+      } else {
+        logger.completeStage({
+          output: { saved_to_cloud: false, reason: 'local_only_mode' },
+        })
       }
+
+      // Mark the entire processing as complete
+      logger.complete()
 
       setFiles((prev) =>
         prev.map((f) =>
@@ -380,6 +470,12 @@ export function PolicyUpload() {
       })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+
+      // Log the failure in the processing log
+      logger.fail(errorMessage, {
+        error_type: error instanceof Error ? error.name : 'UnknownError',
+        stack: error instanceof Error ? error.stack : undefined,
+      })
 
       // Provide user-friendly error messages based on the error
       // In production (SaaS), hide technical details like .env references
