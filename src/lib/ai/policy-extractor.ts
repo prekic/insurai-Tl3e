@@ -534,7 +534,8 @@ export async function extractPolicyFromDocument(
     }
 
     // Log AI extraction success
-    logger?.setExtractionConfidence(extractedData.confidence.overall * 100)
+    const confidenceOverall = extractedData.confidence?.overall ?? 0.7
+    logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {
         policy_number: extractedData.policyNumber,
@@ -544,21 +545,21 @@ export async function extractPolicyFromDocument(
         premium: extractedData.premium,
         start_date: extractedData.startDate,
         end_date: extractedData.endDate,
-        coverages_count: extractedData.coverages.length,
+        coverages_count: extractedData.coverages?.length ?? 0,
         confidence: extractedData.confidence,
       },
       metadata: {
         consensus: consensusInfo,
-        coverages: extractedData.coverages.slice(0, 5),  // First 5 coverages for preview
-        exclusions_count: extractedData.exclusions?.length || 0,
+        coverages: extractedData.coverages?.slice(0, 5) ?? [],  // First 5 coverages for preview
+        exclusions_count: extractedData.exclusions?.length ?? 0,
       },
     })
 
     // Check confidence threshold
-    if (extractedData.confidence.overall < AI_CONFIG.minConfidence) {
+    if (confidenceOverall < AI_CONFIG.minConfidence) {
       if (useFallback) {
         console.warn(
-          `Low confidence extraction (${extractedData.confidence.overall}), using fallback`
+          `Low confidence extraction (${confidenceOverall}), using fallback`
         )
         return createFallbackResult(file, extractedData)
       }
@@ -566,7 +567,7 @@ export async function extractPolicyFromDocument(
         success: false,
         error: {
           code: 'LOW_CONFIDENCE',
-          message: `Extraction confidence too low: ${Math.round(extractedData.confidence.overall * 100)}%`,
+          message: `Extraction confidence too low: ${Math.round(confidenceOverall * 100)}%`,
           details: 'The AI could not reliably extract policy information',
         },
         fallbackAvailable: false,
