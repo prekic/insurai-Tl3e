@@ -1,13 +1,20 @@
 /**
  * Server-side Extraction Schema
  *
- * JSON Schema for OpenAI structured output.
- * This ensures the AI returns data in the exact expected format.
+ * JSON Schema for OpenAI structured output with strict mode.
+ *
+ * IMPORTANT: OpenAI strict mode requirements:
+ * 1. ALL properties must be listed in 'required' at every level
+ * 2. additionalProperties must be false at every level
+ * 3. For nullable types, use type: ['string', 'null'] etc.
+ * 4. For nullable enums, include null in the enum array AND in the type array
  */
 
 /**
  * JSON Schema for OpenAI structured output
  * Mirrors the client-side EXTRACTION_JSON_SCHEMA
+ *
+ * When strict: true, ALL properties at ALL levels must be in required.
  */
 export const EXTRACTION_JSON_SCHEMA = {
   name: 'policy_extraction',
@@ -85,7 +92,8 @@ export const EXTRACTION_JSON_SCHEMA = {
                 'Coverage category: main (Ana Teminat), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans), legal (Hukuki Koruma), other',
             },
           },
-          required: ['name', 'isUnlimited', 'isMarketValue'],
+          // STRICT MODE: ALL properties must be in required
+          required: ['name', 'limit', 'deductible', 'description', 'isUnlimited', 'isMarketValue', 'category'],
           additionalProperties: false,
         },
         description: 'List of coverage items found in the policy',
