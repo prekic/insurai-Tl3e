@@ -114,7 +114,7 @@ c4231e6 Add null safety for coverage.name to prevent validation failures
 | `VITE_SUPABASE_ANON_KEY` | Frontend Supabase client | Build-time |
 
 ### Important Notes
-- `VITE_API_PROXY_URL` auto-detected via `window.location.origin` in production
+- `VITE_API_PROXY_URL` auto-detected via `window.location.origin` in production (see `src/lib/env.ts`)
 - `VITE_*` vars baked at build time - need redeploy not just restart
 - Don't add quotes in Railway UI - they're added automatically
 - Server needs `SUPABASE_URL` (not `VITE_SUPABASE_URL`) for runtime DB access
