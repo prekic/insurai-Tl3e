@@ -91,10 +91,19 @@ export interface ExtractionOptions {
 }
 
 /**
+ * Safely get lowercase name from coverage, handling undefined/null
+ */
+function getCoverageName(coverage: { name?: string | null; description?: string | null } | undefined | null): string {
+  if (!coverage) return ''
+  // Try name first, fall back to description
+  return (coverage.name || coverage.description || '').toLowerCase()
+}
+
+/**
  * Determine coverage importance based on category and characteristics
  */
 function determineCoverageImportance(coverage: ExtractedCoverage): CoverageImportance {
-  const nameLower = coverage.name.toLowerCase()
+  const nameLower = getCoverageName(coverage)
 
   // Critical coverages - main coverage, high limits, or essential protections
   if (coverage.category === 'main') return 'critical'
@@ -143,7 +152,7 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
 
     // Look for coverage that looks like vehicle value
     const vehicleValue = coverages.find(c => {
-      const nameLower = c.name.toLowerCase()
+      const nameLower = getCoverageName(c)
       return (
         nameLower.includes('araç bedeli') ||
         nameLower.includes('araç değeri') ||
@@ -156,12 +165,13 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
     }
 
     // Fallback: find the highest non-liability coverage
-    const nonLiabilityCoverages = coverages.filter(c =>
-      c.category !== 'liability' &&
-      !c.name.toLowerCase().includes('mali sorumluluk') &&
-      !c.name.toLowerCase().includes('hukuki') &&
-      c.limit > 0
-    )
+    const nonLiabilityCoverages = coverages.filter(c => {
+      const nameLower = getCoverageName(c)
+      return c.category !== 'liability' &&
+        !nameLower.includes('mali sorumluluk') &&
+        !nameLower.includes('hukuki') &&
+        c.limit > 0
+    })
     if (nonLiabilityCoverages.length > 0) {
       return Math.max(...nonLiabilityCoverages.map(c => c.limit))
     }
@@ -169,10 +179,10 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
 
   // For traffic insurance: use the highest bodily injury limit
   if (policyType === 'traffic') {
-    const bodilyInjury = coverages.find(c =>
-      c.name.toLowerCase().includes('bedeni') ||
-      c.name.toLowerCase().includes('ölüm')
-    )
+    const bodilyInjury = coverages.find(c => {
+      const nameLower = getCoverageName(c)
+      return nameLower.includes('bedeni') || nameLower.includes('ölüm')
+    })
     if (bodilyInjury && bodilyInjury.limit > 0) {
       return bodilyInjury.limit
     }
@@ -1007,18 +1017,22 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
   }
 
   // Convert coverages with Turkish names and enhanced metadata
-  const coverages: Coverage[] = data.coverages.map((c) => ({
-    name: c.name,
-    nameTr: c.name, // AI extracts in original language
-    limit: c.limit ?? 0,
-    deductible: c.deductible ?? 0,
-    included: true,
-    description: c.description ?? undefined,
-    isUnlimited: c.isUnlimited ?? false,
-    isMarketValue: c.isMarketValue ?? false,
-    category: c.category ?? 'other',
-    importance: determineCoverageImportance(c),
-  }))
+  // Handle cases where AI returns description instead of name, or both are missing
+  const coverages: Coverage[] = data.coverages.map((c) => {
+    const coverageName = c.name || c.description || 'Unnamed Coverage'
+    return {
+      name: coverageName,
+      nameTr: coverageName, // AI extracts in original language
+      limit: c.limit ?? 0,
+      deductible: c.deductible ?? 0,
+      included: true,
+      description: c.description ?? undefined,
+      isUnlimited: c.isUnlimited ?? false,
+      isMarketValue: c.isMarketValue ?? false,
+      category: c.category ?? 'other',
+      importance: determineCoverageImportance(c),
+    }
+  })
 
   // Get policy type - handle both camelCase and snake_case
   const rawPolicyType = data.policyType ?? rawData.policy_type as string | undefined
@@ -1251,7 +1265,7 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
  */
 function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
   return coverages.some(c => {
-    const nameLower = c.name.toLowerCase()
+    const nameLower = getCoverageName(c)
     return (
       nameLower === 'kasko' ||
       nameLower.includes('tam kasko') ||
@@ -1320,7 +1334,7 @@ function generateGaps(data: ExtractedPolicyData): string[] {
     // For kasko: skip implicit coverages if base kasko exists
     if (hasBaseKasko) {
       const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(implicit =>
-        criticalNameLower.includes(implicit) || critical.name.toLowerCase().includes(implicit)
+        criticalNameLower.includes(implicit) || getCoverageName(critical).includes(implicit)
       )
       if (isImplicitCoverage) {
         continue // Skip - this is included in base kasko coverage
@@ -1332,11 +1346,11 @@ function generateGaps(data: ExtractedPolicyData): string[] {
     const criticalBaseName = baseNameMatch ? baseNameMatch[1].trim() : criticalNameLower
 
     const hasCoverage = data.coverages.some(c => {
-      const coverageNameLower = c.name.toLowerCase()
+      const coverageNameLower = getCoverageName(c)
       const coverageLimit = c.limit ?? 0
 
       // Direct match
-      if (coverageNameLower.includes(critical.name.toLowerCase()) ||
+      if (coverageNameLower.includes(getCoverageName(critical)) ||
           coverageNameLower.includes(criticalNameLower)) {
         return true
       }
@@ -1368,7 +1382,7 @@ function generateGaps(data: ExtractedPolicyData): string[] {
       // since policies often only show the per-accident (higher) limit
       if (isTrafficPolicy && criticalNameLower.includes('kişi başı')) {
         const hasPerAccident = data.coverages.some(c =>
-          c.name.toLowerCase().includes(criticalBaseName) &&
+          getCoverageName(c).includes(criticalBaseName) &&
           (c.limit ?? 0) >= critical.typicalLimit
         )
         if (hasPerAccident) continue // Skip this gap, per-accident coverage exists
@@ -1386,11 +1400,12 @@ function generateGaps(data: ExtractedPolicyData): string[] {
 
   // DASK check for home policies
   if (policyType === 'home') {
-    const hasDaskMention = data.coverages.some(c =>
-      c.name.toLowerCase().includes('deprem') ||
-      c.name.toLowerCase().includes('dask') ||
-      c.name.toLowerCase().includes('earthquake')
-    )
+    const hasDaskMention = data.coverages.some(c => {
+      const nameLower = getCoverageName(c)
+      return nameLower.includes('deprem') ||
+        nameLower.includes('dask') ||
+        nameLower.includes('earthquake')
+    })
     if (!hasDaskMention) {
       gaps.push('Consider adding DASK earthquake insurance if not included')
     }
@@ -1432,7 +1447,10 @@ function generateRecommendations(data: ExtractedPolicyData): string[] {
   } else if (policyType === 'health') {
     recommendations.push('Review network hospitals and coverage scope before renewal')
   } else if (policyType === 'business') {
-    if (!data.coverages.some(c => c.name.toLowerCase().includes('siber') || c.name.toLowerCase().includes('cyber'))) {
+    if (!data.coverages.some(c => {
+      const nameLower = getCoverageName(c)
+      return nameLower.includes('siber') || nameLower.includes('cyber')
+    })) {
       recommendations.push('Consider cyber insurance for digital business risks')
     }
   }
