@@ -1,0 +1,107 @@
+{
+  "locale_code": "de",
+  "locale_name": "German",
+  "language_detection": {
+    "sample_terms": ["versicherung", "police", "deckung", "prämie", "und", "für", "mit", "der", "die", "das"],
+    "min_matches_for_detection": 3,
+    "character_sets": ["latin", "german_special"],
+    "special_characters": ["ä", "ö", "ü", "ß", "Ä", "Ö", "Ü"]
+  },
+  "encoding_validation": {
+    "expected_characters": "a-zA-ZäöüßÄÖÜ0-9",
+    "garbage_patterns": [
+      "[ï¿½]{2,}",
+      "[�]{2,}",
+      "Ã¤",
+      "Ã¶",
+      "Ã¼",
+      "ÃŸ"
+    ]
+  },
+  "insurance_terminology": {
+    "core_terms": [
+      "versicherung",
+      "police",
+      "polizze",
+      "versicherungsschein",
+      "deckung",
+      "prämie",
+      "versicherter",
+      "selbstbeteiligung",
+      "schaden",
+      "entschädigung",
+      "risiko",
+      "vermittler",
+      "begünstigter",
+      "versicherungsnehmer",
+      "versicherer"
+    ],
+    "document_structure_terms": [
+      "artikel",
+      "klausel",
+      "bedingungen",
+      "umfang",
+      "limit",
+      "nachtrag",
+      "allgemeine bedingungen",
+      "besondere bedingungen",
+      "leistungsübersicht"
+    ],
+    "common_values": [
+      "EUR",
+      "datum",
+      "nummer",
+      "adresse",
+      "telefon",
+      "laufzeit",
+      "beginn",
+      "ablauf"
+    ]
+  },
+  "date_formats": [
+    "DD.MM.YYYY",
+    "DD/MM/YYYY",
+    "YYYY-MM-DD"
+  ],
+  "date_patterns": [
+    "\\d{2}\\.\\d{2}\\.\\d{4}",
+    "\\d{2}/\\d{2}/\\d{4}",
+    "\\d{4}-\\d{2}-\\d{2}"
+  ],
+  "currency": {
+    "code": "EUR",
+    "symbol": "€",
+    "patterns": [
+      "€\\s*([\\d.,]+)",
+      "([\\d.,]+)\\s*€",
+      "([\\d.,]+)\\s*EUR",
+      "EUR\\s*([\\d.,]+)"
+    ],
+    "decimal_separator": ",",
+    "thousands_separator": "."
+  },
+  "number_formats": {
+    "decimal_separator": ",",
+    "thousands_separator": ".",
+    "patterns": [
+      "([\\d.]+,\\d{2})"
+    ]
+  },
+  "identifiers": {
+    "steuernummer": {
+      "name": "Steuernummer",
+      "pattern": "\\d{2,3}/\\d{3}/\\d{5}",
+      "description": "German tax number"
+    },
+    "iban": {
+      "name": "IBAN",
+      "pattern": "DE\\d{2}\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\s*\\d{4}\\s*\\d{2}",
+      "description": "German IBAN"
+    },
+    "kennzeichen": {
+      "name": "Kfz-Kennzeichen",
+      "pattern": "[A-ZÄÖÜ]{1,3}[\\s-]?[A-Z]{1,2}[\\s-]?\\d{1,4}[EH]?",
+      "description": "German vehicle registration"
+    }
+  }
+}

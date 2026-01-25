@@ -1,0 +1,169 @@
+{
+  "policy_type_id": "property_fire",
+  "policy_type_name": "Fire and Allied Perils Insurance",
+  "description": "Property insurance covering fire and associated risks",
+  "category": "property",
+  "version": "1.0",
+
+  "classification": {
+    "detection_terms": {
+      "tr": ["yangın sigortası", "yangın poliçesi", "yangın teminatı", "itfaiye", "konut sigortası"],
+      "en": ["fire insurance", "fire policy", "fire and perils", "property fire", "homeowners"],
+      "de": ["feuerversicherung", "brandversicherung", "gebäudeversicherung"],
+      "fr": ["assurance incendie", "police incendie", "multirisque habitation"]
+    },
+    "confidence_threshold": 0.6
+  },
+
+  "required_fields": {
+    "policy_number": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["Poliçe\\s*No[.:\\s]*(\\d{8,})"],
+        "en": ["Policy\\s*(?:No|Number)[.:\\s]*([A-Z0-9\\-/]+)"],
+        "_universal": ["(?:policy|poliçe)[.:\\s]*(?:no|number)[.:\\s]*([A-Z0-9\\-/]+)"]
+      }
+    },
+    "property_address": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Riziko\\s*Adresi[.:\\s]*(.+?)(?:\\n\\n|$)",
+          "Sigorta\\s*Yeri[.:\\s]*(.+?)(?:\\n\\n|$)",
+          "(?:Gayrimenkul|Bina)\\s*Adresi[.:\\s]*(.+?)(?:\\n\\n|$)"
+        ],
+        "en": [
+          "(?:Risk|Property)\\s*Address[.:\\s]*(.+?)(?:\\n\\n|$)",
+          "Location\\s*of\\s*Risk[.:\\s]*(.+?)(?:\\n\\n|$)",
+          "Premises\\s*Address[.:\\s]*(.+?)(?:\\n\\n|$)"
+        ],
+        "_universal": [
+          "(?:address|adres|adresse|indirizzo)[.:\\s]*(.+?)(?:\\n\\n|$)"
+        ]
+      }
+    },
+    "sum_insured": {
+      "required": true,
+      "criticality": "high",
+      "sub_fields": {
+        "building": {
+          "patterns": {
+            "tr": ["Bina\\s*(?:Bedeli|Değeri)[.:\\s]*([\\d.,]+)"],
+            "en": ["Building\\s*(?:Value|Sum)[.:\\s]*([\\d.,]+)"]
+          }
+        },
+        "contents": {
+          "patterns": {
+            "tr": ["(?:Muhteviyat|Demirbaş|Emtia|Eşya)[.:\\s]*([\\d.,]+)"],
+            "en": ["(?:Contents|Stock|Machinery|Furniture)[.:\\s]*([\\d.,]+)"]
+          }
+        },
+        "total": {
+          "patterns": {
+            "tr": ["Toplam\\s*(?:Sigorta\\s*)?Bedel[.:\\s]*([\\d.,]+)"],
+            "en": ["Total\\s*Sum\\s*Insured[.:\\s]*([\\d.,]+)"]
+          }
+        }
+      }
+    },
+    "premium": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["(?:Toplam\\s*Prim|Ödenecek\\s*Tutar)[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Total\\s*Premium|Premium\\s*Payable)[.:\\s]*([\\d.,]+)"]
+      }
+    },
+    "insured_name": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["Sigortalı[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Insured|Policyholder)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "policy_period": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})"
+        ]
+      }
+    }
+  },
+
+  "optional_fields": {
+    "construction_type": {
+      "patterns": {
+        "tr": ["(?:İnşaat\\s*Tarzı|Yapı\\s*Tarzı|Bina\\s*Türü)[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Construction\\s*Type|Building\\s*Type|Class)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "occupancy": {
+      "patterns": {
+        "tr": ["(?:Meslek|Faaliyet|Kullanım\\s*Amacı)[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Occupancy|Business\\s*Activity|Use)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "deductible": {
+      "patterns": {
+        "tr": ["Muafiyet[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Deductible|Excess)[.:\\s]*([\\d.,]+)"]
+      }
+    }
+  },
+
+  "coverage_sections": {
+    "fire": {
+      "detection_terms": {
+        "tr": ["yangın", "yanma"],
+        "en": ["fire", "burning"]
+      }
+    },
+    "lightning": {
+      "detection_terms": {
+        "tr": ["yıldırım"],
+        "en": ["lightning"]
+      }
+    },
+    "explosion": {
+      "detection_terms": {
+        "tr": ["patlama", "infilak"],
+        "en": ["explosion"]
+      }
+    },
+    "earthquake": {
+      "detection_terms": {
+        "tr": ["deprem"],
+        "en": ["earthquake"]
+      }
+    },
+    "flood": {
+      "detection_terms": {
+        "tr": ["sel", "su baskını"],
+        "en": ["flood", "inundation"]
+      }
+    },
+    "storm": {
+      "detection_terms": {
+        "tr": ["fırtına", "dolu"],
+        "en": ["storm", "hail", "windstorm"]
+      }
+    },
+    "theft": {
+      "detection_terms": {
+        "tr": ["hırsızlık"],
+        "en": ["theft", "burglary"]
+      }
+    }
+  },
+
+  "quality_thresholds": {
+    "min_required_fields_rate": 0.70,
+    "min_quality_score": 0.30,
+    "ocr_trigger_confidence": 0.65
+  }
+}

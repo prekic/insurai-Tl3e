@@ -1,0 +1,106 @@
+{
+  "policy_type_id": "_generic",
+  "policy_type_name": "Generic Insurance Policy",
+  "description": "Universal fallback configuration for unrecognized policy types",
+  "category": "generic",
+  "version": "1.0",
+
+  "classification": {
+    "detection_terms": {},
+    "confidence_threshold": 0.0,
+    "is_fallback": true
+  },
+
+  "required_fields": {
+    "policy_number": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(?:policy|poliçe|police|polizza|versicherung)\\s*(?:no|number|nr|num)[.:\\s]*([A-Z0-9\\-/]+)",
+          "(?:no|number|nr)[.:\\s]*([A-Z0-9]{6,})"
+        ]
+      },
+      "validation": {
+        "min_length": 4,
+        "max_length": 30,
+        "pattern": "^[A-Z0-9\\-/]+$"
+      }
+    },
+    "premium": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(?:premium|prim|prime|premio|prämie)[.:\\s]*([\\d.,]+)",
+          "(?:total|toplam|gesamt)[.:\\s]*([\\d.,]+)"
+        ]
+      },
+      "validation": {
+        "type": "currency",
+        "min_value": 0
+      }
+    },
+    "insured_name": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(?:insured|sigortalı|assuré|assicurato|versicherter)[.:\\s]*(.+?)(?:\\n|$)",
+          "(?:name|ad|nom|nome|name)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      },
+      "validation": {
+        "min_length": 2,
+        "max_length": 200
+      }
+    },
+    "policy_period": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})",
+          "(?:period|vade|période|periodo|zeitraum)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      },
+      "validation": {
+        "type": "date_range"
+      }
+    },
+    "insurer_name": {
+      "required": true,
+      "criticality": "medium",
+      "patterns": {
+        "_universal": [
+          "(?:insurer|sigortacı|assureur|assicuratore|versicherer)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      }
+    }
+  },
+
+  "optional_fields": {
+    "agent_broker": {
+      "patterns": {
+        "_universal": ["(?:agent|broker|acente)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "sum_insured": {
+      "patterns": {
+        "_universal": ["(?:sum insured|sigorta bedeli|somme assurée|summe)[.:\\s]*([\\d.,]+)"]
+      }
+    }
+  },
+
+  "document_structure": {
+    "expected_sections": [],
+    "min_pages": 1,
+    "typical_page_range": [1, 50]
+  },
+
+  "quality_thresholds": {
+    "min_required_fields_rate": 0.50,
+    "min_quality_score": 0.25,
+    "ocr_trigger_confidence": 0.60
+  }
+}

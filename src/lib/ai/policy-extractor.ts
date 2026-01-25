@@ -2,7 +2,6 @@ import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, isP
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
 import {
-  isLikelyScannedPDF,
   performOCR,
   type FormField,
   type Table,
@@ -10,6 +9,7 @@ import {
   findFormField,
   TURKISH_FORM_FIELD_PATTERNS,
 } from './ocr'
+import { getOCRDecisionEngine } from '@/lib/ocr-decision'
 import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
 import { performUnifiedOCR, isOrchestratorConfigured } from './ocr-orchestrator-client'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
@@ -374,13 +374,30 @@ export async function extractPolicyFromDocument(
     })
 
     // ========== OCR CHECK STAGE ==========
-    const isScanned = isLikelyScannedPDF(parseResult.data.text, parseResult.data.pageCount)
+    // Use the new configuration-driven OCR decision engine
+    const ocrDecisionEngine = getOCRDecisionEngine()
+    const ocrDecision = ocrDecisionEngine.analyzeDocument(parseResult.data.text)
+
+    // Log the comprehensive OCR decision analysis
     logger?.startStage('ocr_check', {
       text_length: parseResult.data.text.length,
       page_count: parseResult.data.pageCount,
       chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
       ocr_configured: isOCRConfigured(),
+      // New: OCR decision engine metadata
+      ocr_decision: {
+        action: ocrDecision.action,
+        confidence: ocrDecision.confidence,
+        detected_language: ocrDecision.document_classification.detected_language.locale_code,
+        language_confidence: ocrDecision.document_classification.detected_language.confidence,
+        detected_policy_type: ocrDecision.document_classification.detected_policy_type.policy_type_id,
+        policy_type_confidence: ocrDecision.document_classification.detected_policy_type.confidence,
+        matched_terms: ocrDecision.document_classification.detected_policy_type.matched_terms,
+      },
     })
+
+    // Backward compatibility: derive isScanned from the new decision
+    const isScanned = ocrDecision.action !== 'skip_ocr'
 
     // Check if PDF appears to be scanned and OCR is available
     if (useOCR && isOCRConfigured() && isScanned) {
@@ -431,48 +448,111 @@ export async function extractPolicyFromDocument(
     } else {
       documentText = parseResult.data.text
 
-      // Calculate values for decision context
-      const textLength = parseResult.data.text.length
-      const pageCount = parseResult.data.pageCount
-      const charsPerPage = Math.round(textLength / Math.max(1, pageCount))
-      const OCR_THRESHOLD = 200 // chars per page
+      // Use comprehensive OCR decision data for detailed context
+      const densityAnalysis = ocrDecision.analysis.density
+      const qualityAnalysis = ocrDecision.analysis.text_quality
+      const fieldAnalysis = ocrDecision.analysis.field_extraction
+      const confidenceBreakdown = ocrDecision.analysis.confidence_breakdown
 
-      // Provide detailed decision context for why OCR was skipped
+      // Provide detailed decision context with full OCR decision engine output
       logger?.skipStage('ocr_processing', {
-        reason: isScanned ? 'OCR not configured' : 'Text density sufficient',
+        reason: isScanned ? 'OCR not configured' : 'Text density and quality sufficient',
         decision_context: {
-          assessment_performed: 'Text density analysis to determine if document is scanned/image-based',
+          assessment_performed: 'Comprehensive document analysis including language detection, policy type classification, text quality, and field extraction testing',
           threshold: {
-            name: 'chars_per_page',
-            value: OCR_THRESHOLD,
-            unit: 'characters per page',
-            comparison: 'less_than',
+            name: 'overall_confidence',
+            value: 0.85,
+            unit: 'confidence score (0-1)',
+            comparison: 'greater_than',
           },
           actual_values: {
-            total_characters: textLength,
-            page_count: pageCount,
-            chars_per_page: charsPerPage,
-            is_likely_scanned: isScanned,
+            // Basic density metrics
+            total_characters: densityAnalysis.total_characters,
+            total_pages: densityAnalysis.total_pages,
+            chars_per_page: densityAnalysis.average_chars_per_page,
+            chars_threshold: densityAnalysis.threshold_used,
+            pages_below_threshold: densityAnalysis.pages_below_threshold.length,
+            // Language detection
+            detected_language: ocrDecision.document_classification.detected_language.locale_code,
+            language_confidence: `${(ocrDecision.document_classification.detected_language.confidence * 100).toFixed(0)}%`,
+            // Policy type classification
+            detected_policy_type: ocrDecision.document_classification.detected_policy_type.policy_type_name,
+            policy_confidence: `${(ocrDecision.document_classification.detected_policy_type.confidence * 100).toFixed(0)}%`,
+            matched_terms: ocrDecision.document_classification.detected_policy_type.matched_terms.join(', '),
+            // Text quality
+            text_quality_score: `${(qualityAnalysis.quality_score * 100).toFixed(0)}%`,
+            insurance_terms_found: `${qualityAnalysis.terms_found}/${qualityAnalysis.terms_checked}`,
+            encoding_issues: qualityAnalysis.encoding_issues,
+            // Field extraction
+            required_fields_found: `${fieldAnalysis.required_fields_found}/${fieldAnalysis.required_fields_total}`,
+            extraction_rate: `${(fieldAnalysis.extraction_rate * 100).toFixed(0)}%`,
+            // Overall decision
+            overall_confidence: `${(ocrDecision.confidence * 100).toFixed(0)}%`,
+            ocr_action: ocrDecision.action,
             ocr_configured: isOCRConfigured(),
             useOCR_option: useOCR,
-            typical_text_pdf_range: '1000-5000 chars/page',
-            typical_scanned_pdf_range: '<100 chars/page',
           },
-          decision_logic: isScanned
-            ? `Document appears scanned (${charsPerPage} chars/page < ${OCR_THRESHOLD} threshold), but OCR is not configured. Using PDF-extracted text.`
-            : `Text density is sufficient (${charsPerPage} chars/page >= ${OCR_THRESHOLD} threshold). PDF text extraction produced readable content, OCR not needed.`,
+          decision_logic: ocrDecision.reasoning.join(' '),
           alternatives: isScanned
             ? [
                 'Configure Google Document AI or Vision API for OCR processing',
                 'Set GOOGLE_CLOUD_API_KEY and GCP_DOCAI_PROCESSOR_ID environment variables',
+                `Lower the skip_ocr threshold from 0.85 (current confidence: ${(ocrDecision.confidence * 100).toFixed(0)}%)`,
               ]
             : [
-                `OCR would be triggered if chars_per_page < ${OCR_THRESHOLD}`,
-                'OCR is typically needed for scanned documents, photos of documents, or image-based PDFs',
+                `OCR would be triggered if overall_confidence < 0.60`,
+                `Currently detecting ${ocrDecision.document_classification.detected_language.locale_code.toUpperCase()} ${ocrDecision.document_classification.detected_policy_type.policy_type_name} policy`,
+                'Add more detection terms in config if policy type was misclassified',
               ],
         },
       })
-      logger?.completeStage({ output: { needs_ocr: false, reason: isScanned ? 'ocr_not_configured' : 'sufficient_text' } })
+
+      // Log comprehensive OCR decision output for admin viewing
+      logger?.completeStage({
+        output: {
+          needs_ocr: false,
+          reason: isScanned ? 'ocr_not_configured' : 'sufficient_text_and_quality',
+          ocr_decision_summary: {
+            action: ocrDecision.action,
+            confidence: ocrDecision.confidence,
+            duration_ms: ocrDecision.duration_ms,
+          },
+        },
+        // Full OCR decision metadata for Document Journey viewer
+        metadata: {
+          document_classification: ocrDecision.document_classification,
+          configurations_used: ocrDecision.configurations_used,
+          analysis: {
+            density: {
+              total_pages: densityAnalysis.total_pages,
+              total_characters: densityAnalysis.total_characters,
+              average_chars_per_page: densityAnalysis.average_chars_per_page,
+              threshold_used: densityAnalysis.threshold_used,
+              pages_below_threshold: densityAnalysis.pages_below_threshold,
+              min_chars_page: densityAnalysis.min_chars_page,
+              max_chars_page: densityAnalysis.max_chars_page,
+            },
+            text_quality: {
+              quality_score: qualityAnalysis.quality_score,
+              terms_found: qualityAnalysis.terms_found,
+              terms_checked: qualityAnalysis.terms_checked,
+              found_terms_sample: qualityAnalysis.found_terms_sample,
+              encoding_issues: qualityAnalysis.encoding_issues,
+              locale_used: qualityAnalysis.locale_used,
+            },
+            field_extraction: {
+              fields_checked: fieldAnalysis.fields_checked,
+              fields_found: fieldAnalysis.fields_found,
+              required_fields_found: fieldAnalysis.required_fields_found,
+              required_fields_total: fieldAnalysis.required_fields_total,
+              extraction_rate: fieldAnalysis.extraction_rate,
+              field_results: fieldAnalysis.field_results,
+            },
+            confidence_breakdown: confidenceBreakdown,
+          },
+          reasoning: ocrDecision.reasoning,
+        },
+      })
     }
   }
 

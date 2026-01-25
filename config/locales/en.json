@@ -1,0 +1,117 @@
+{
+  "locale_code": "en",
+  "locale_name": "English",
+  "language_detection": {
+    "sample_terms": ["insurance", "policy", "coverage", "premium", "the", "and", "for", "insured", "underwriter"],
+    "min_matches_for_detection": 3,
+    "character_sets": ["latin"],
+    "special_characters": []
+  },
+  "encoding_validation": {
+    "expected_characters": "a-zA-Z0-9",
+    "garbage_patterns": [
+      "[ï¿½]{2,}",
+      "[�]{2,}"
+    ]
+  },
+  "insurance_terminology": {
+    "core_terms": [
+      "insurance",
+      "policy",
+      "coverage",
+      "premium",
+      "insured",
+      "deductible",
+      "claim",
+      "indemnity",
+      "risk",
+      "agent",
+      "beneficiary",
+      "policyholder",
+      "insurer",
+      "underwriter",
+      "endorsement"
+    ],
+    "document_structure_terms": [
+      "article",
+      "clause",
+      "conditions",
+      "scope",
+      "limit",
+      "endorsement",
+      "general conditions",
+      "special conditions",
+      "schedule",
+      "declarations",
+      "exclusions"
+    ],
+    "common_values": [
+      "USD",
+      "GBP",
+      "EUR",
+      "date",
+      "number",
+      "address",
+      "phone",
+      "period",
+      "effective",
+      "expiry"
+    ]
+  },
+  "date_formats": [
+    "MM/DD/YYYY",
+    "DD/MM/YYYY",
+    "YYYY-MM-DD",
+    "Month DD, YYYY"
+  ],
+  "date_patterns": [
+    "\\d{2}/\\d{2}/\\d{4}",
+    "\\d{4}-\\d{2}-\\d{2}",
+    "[A-Z][a-z]+ \\d{1,2}, \\d{4}",
+    "\\d{1,2}\\s+[A-Z][a-z]+\\s+\\d{4}"
+  ],
+  "currency": {
+    "code": "USD",
+    "symbol": "$",
+    "patterns": [
+      "\\$([\\d,]+\\.?\\d*)",
+      "([\\d,]+\\.?\\d*)\\s*USD",
+      "USD\\s*([\\d,]+\\.?\\d*)",
+      "£([\\d,]+\\.?\\d*)",
+      "€([\\d,]+\\.?\\d*)",
+      "GBP\\s*([\\d,]+\\.?\\d*)",
+      "EUR\\s*([\\d,]+\\.?\\d*)"
+    ],
+    "decimal_separator": ".",
+    "thousands_separator": ","
+  },
+  "number_formats": {
+    "decimal_separator": ".",
+    "thousands_separator": ",",
+    "patterns": [
+      "([\\d,]+\\.\\d{2})"
+    ]
+  },
+  "identifiers": {
+    "ssn": {
+      "name": "Social Security Number",
+      "pattern": "\\d{3}-\\d{2}-\\d{4}",
+      "description": "US Social Security Number"
+    },
+    "ein": {
+      "name": "Employer ID Number",
+      "pattern": "\\d{2}-\\d{7}",
+      "description": "US Employer Identification Number"
+    },
+    "phone": {
+      "name": "Phone",
+      "pattern": "(?:\\+1)?\\s*(?:\\(\\d{3}\\)|\\d{3})[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
+      "description": "US phone number"
+    },
+    "vin": {
+      "name": "VIN",
+      "pattern": "[A-HJ-NPR-Z0-9]{17}",
+      "description": "Vehicle Identification Number"
+    }
+  }
+}
