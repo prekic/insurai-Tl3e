@@ -1,0 +1,70 @@
+{
+  "locale_code": "_universal",
+  "locale_name": "Universal Fallback",
+  "description": "Language-agnostic patterns for basic document processing",
+  "universal_patterns": {
+    "numbers": [
+      "\\d+",
+      "[\\d.,]+",
+      "[\\d,]+\\.\\d{2}",
+      "[\\d.]+,\\d{2}"
+    ],
+    "dates": [
+      "\\d{2}[./\\-]\\d{2}[./\\-]\\d{4}",
+      "\\d{4}[./\\-]\\d{2}[./\\-]\\d{2}",
+      "\\d{1,2}[./\\-]\\d{1,2}[./\\-]\\d{2,4}"
+    ],
+    "percentages": [
+      "\\d+[,.]?\\d*\\s*%",
+      "%\\s*\\d+[,.]?\\d*"
+    ],
+    "emails": [
+      "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    ],
+    "phone_numbers": [
+      "\\+?\\d[\\d\\s\\-()]{8,}\\d"
+    ],
+    "urls": [
+      "https?://[^\\s]+"
+    ],
+    "policy_numbers": [
+      "(?:policy|poliçe|police|polizza|polizze)[.:\\s]*(?:no|number|nr|num)[.:\\s]*([A-Z0-9\\-/]+)",
+      "(?:no|number|nr|num)[.:\\s]*([A-Z0-9]{6,})"
+    ],
+    "date_ranges": [
+      "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})"
+    ]
+  },
+  "currency_symbols": ["$", "€", "£", "¥", "₺", "₹", "CHF", "AUD", "CAD", "kr", "zł", "Kč"],
+  "common_abbreviations": ["no", "nr", "ref", "id", "tel", "fax", "www", "http", "https"],
+  "insurance_indicators": {
+    "document_type_hints": [
+      "insurance",
+      "policy",
+      "certificate",
+      "schedule",
+      "endorsement",
+      "sigorta",
+      "poliçe",
+      "versicherung",
+      "assurance",
+      "assicurazione",
+      "seguro"
+    ],
+    "coverage_indicators": [
+      "coverage",
+      "cover",
+      "teminat",
+      "deckung",
+      "couverture",
+      "cobertura"
+    ],
+    "premium_indicators": [
+      "premium",
+      "prim",
+      "prämie",
+      "prime",
+      "premio"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "version": "2.0",
+  "last_updated": "2026-01-25",
+
+  "density_analysis": {
+    "chars_per_page_threshold": 200,
+    "min_pages_for_average_calculation": 3,
+    "enable_page_level_analysis": true,
+    "page_variance_threshold": 0.5,
+    "min_chars_for_valid_page": 50
+  },
+
+  "confidence_calculation": {
+    "weights": {
+      "char_density": 0.25,
+      "text_quality": 0.30,
+      "page_variance": 0.15,
+      "encoding_check": 0.15,
+      "field_extraction": 0.15
+    },
+    "thresholds": {
+      "skip_ocr": 0.85,
+      "selective_ocr": 0.60,
+      "full_ocr": 0.00
+    }
+  },
+
+  "ocr_providers": {
+    "primary": "google_vision",
+    "fallback": "tesseract",
+    "available": {
+      "google_vision": {
+        "enabled": true,
+        "languages": ["auto"],
+        "confidence_threshold": 0.80,
+        "max_pages": 50
+      },
+      "google_document_ai": {
+        "enabled": true,
+        "languages": ["auto"],
+        "confidence_threshold": 0.85,
+        "form_parsing": true,
+        "table_parsing": true
+      },
+      "tesseract": {
+        "enabled": true,
+        "languages": ["eng", "tur", "deu", "fra", "spa", "ara"],
+        "confidence_threshold": 0.70
+      }
+    }
+  },
+
+  "language_detection": {
+    "enabled": true,
+    "min_confidence": 0.70,
+    "fallback_locale": "en",
+    "supported_locales": ["tr", "en", "de", "fr", "es", "ar", "it", "nl", "pt"],
+    "multi_language_support": true,
+    "sample_size": 2000
+  },
+
+  "policy_type_detection": {
+    "enabled": true,
+    "min_confidence": 0.50,
+    "fallback_type": "_generic",
+    "use_ml_classifier": false
+  },
+
+  "performance": {
+    "max_pages_for_quick_analysis": 5,
+    "timeout_seconds": 30,
+    "parallel_page_processing": true,
+    "cache_extracted_text": true,
+    "max_text_length": 500000
+  },
+
+  "feedback_logging": {
+    "enabled": true,
+    "log_level": "detailed",
+    "track_extraction_failures": true,
+    "improvement_threshold": 0.80
+  },
+
+  "quality_checks": {
+    "min_word_length_average": 2,
+    "max_garbage_char_ratio": 0.10,
+    "min_alphanumeric_ratio": 0.60,
+    "check_encoding_issues": true
+  }
+}

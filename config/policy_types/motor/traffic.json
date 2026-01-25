@@ -1,0 +1,144 @@
+{
+  "policy_type_id": "motor_traffic",
+  "policy_type_name": "Motor Third Party Liability (Traffic/MTPL)",
+  "description": "Compulsory motor third party liability insurance",
+  "category": "motor",
+  "parent_config": "_motor_base",
+  "version": "1.0",
+
+  "classification": {
+    "detection_terms": {
+      "tr": ["trafik sigortası", "zorunlu mali sorumluluk", "zmss", "zmms", "trafik poliçesi", "karayolu motorlu"],
+      "en": ["third party liability", "mtpl", "motor third party", "compulsory liability", "traffic insurance", "tpl"],
+      "de": ["kfz-haftpflicht", "haftpflichtversicherung", "pflichtversicherung"],
+      "fr": ["responsabilité civile", "assurance obligatoire"]
+    },
+    "confidence_threshold": 0.6,
+    "exclude_if_contains": {
+      "tr": ["kasko", "ihtiyari"],
+      "en": ["comprehensive", "own damage", "casco"]
+    }
+  },
+
+  "required_fields": {
+    "policy_number": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Poliçe\\s*No[.:\\s]*(\\d{8,})",
+          "Poliçe\\s*Numarası[.:\\s]*(\\d{8,})",
+          "POLİÇE\\s*NO[.:\\s]*(\\d{8,})"
+        ],
+        "en": [
+          "Policy\\s*(?:No|Number)[.:\\s]*([A-Z0-9\\-/]+)"
+        ],
+        "_universal": [
+          "(?:policy|poliçe)[.:\\s]*(?:no|number|nr)[.:\\s]*([A-Z0-9\\-/]+)"
+        ]
+      }
+    },
+    "vehicle_plate": {
+      "required": true,
+      "criticality": "high",
+      "inherit_from": "_motor_base.shared_fields.vehicle_plate"
+    },
+    "premium": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "(?:Ödenecek\\s*Tutar|Toplam\\s*Prim|Net\\s*Prim)[.:\\s]*([\\d.,]+)\\s*TL",
+          "PRİM[.:\\s]*([\\d.,]+)"
+        ],
+        "en": [
+          "(?:Total\\s*Premium|Premium\\s*Payable)[.:\\s]*([\\d.,]+)"
+        ],
+        "_universal": [
+          "(?:premium|prim|prämie)[.:\\s]*([\\d.,]+)"
+        ]
+      }
+    },
+    "insured_name": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Sigortalı[.:\\s]*(.+?)(?:\\n|T\\.?C|$)",
+          "Sigorta\\s*Ettiren[.:\\s]*(.+?)(?:\\n|$)"
+        ],
+        "en": [
+          "(?:Insured|Policyholder)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      }
+    },
+    "policy_period": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "(\\d{2}[./]\\d{2}[./]\\d{4})\\s*[-–]\\s*(\\d{2}[./]\\d{2}[./]\\d{4})"
+        ],
+        "_universal": [
+          "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})"
+        ]
+      }
+    },
+    "liability_limits": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "(?:Bedensel|Maddi)\\s*(?:Hasar)?\\s*(?:Limit|Teminat)[.:\\s]*([\\d.,]+)",
+          "(?:Kişi\\s*Başına|Kaza\\s*Başına)[.:\\s]*([\\d.,]+)"
+        ],
+        "en": [
+          "(?:Bodily\\s*Injury|Property\\s*Damage)\\s*(?:Limit)?[.:\\s]*([\\d.,]+)",
+          "(?:Per\\s*Person|Per\\s*Accident)[.:\\s]*([\\d.,]+)"
+        ]
+      }
+    }
+  },
+
+  "optional_fields": {
+    "vehicle_class": {
+      "patterns": {
+        "tr": ["(?:Araç\\s*Cinsi|Taşıt\\s*Türü)[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Vehicle\\s*Class|Vehicle\\s*Type)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    }
+  },
+
+  "coverage_sections": {
+    "bodily_injury": {
+      "detection_terms": {
+        "tr": ["bedensel hasar", "ölüm", "yaralanma", "tedavi"],
+        "en": ["bodily injury", "death", "injury", "medical"]
+      }
+    },
+    "property_damage": {
+      "detection_terms": {
+        "tr": ["maddi hasar", "mal hasarı"],
+        "en": ["property damage", "material damage"]
+      }
+    }
+  },
+
+  "regulatory_info": {
+    "tr": {
+      "regulator": "SEDDK",
+      "law": "2918 Sayılı Karayolları Trafik Kanunu",
+      "mandatory": true
+    },
+    "en": {
+      "regulator": "varies by country",
+      "mandatory": true
+    }
+  },
+
+  "quality_thresholds": {
+    "min_required_fields_rate": 0.70,
+    "min_quality_score": 0.30,
+    "ocr_trigger_confidence": 0.65
+  }
+}

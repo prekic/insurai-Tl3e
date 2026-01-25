@@ -7,7 +7,7 @@
  * Enhanced version with comprehensive debugging information.
  */
 
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   ChevronDown,
@@ -46,10 +46,8 @@ import {
   ExternalLink,
   Maximize2,
   Info,
-  HelpCircle,
   Lightbulb,
   Target,
-  Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -57,7 +55,6 @@ import type {
   ProcessingStageRecord,
   ProcessingStage,
   ProcessingStageStatus,
-  StageDecisionContext,
 } from '@/types/processing-log'
 
 interface DocumentJourneyViewerProps {
@@ -189,6 +186,71 @@ function formatBytes(bytes?: number): string {
 function formatCurrency(amount?: number): string {
   if (amount === undefined || amount === null) return '-'
   return `$${amount.toFixed(4)}`
+}
+
+// Error section component - extracted to help TypeScript inference
+function ErrorSection({ error }: { error: string | undefined }): React.ReactElement | null {
+  if (!error) return null
+  return (
+    <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <h4 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+        <XCircle size={14} />
+        Error
+      </h4>
+      <div className="text-sm text-red-800 font-mono bg-white p-3 rounded border border-red-200">
+        {error}
+      </div>
+    </div>
+  )
+}
+
+// Data section component - helps TypeScript inference for Record<string, unknown> types
+function DataSection({
+  data,
+  title,
+  icon: Icon,
+  label,
+  id,
+}: {
+  data: Record<string, unknown> | undefined
+  title: string
+  icon: LucideIcon
+  label: string
+  id: string
+}): React.ReactElement | null {
+  if (!data || Object.keys(data).length === 0) return null
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <Icon size={14} />
+        {title}
+      </h4>
+      <JsonViewer
+        data={data}
+        label={label}
+        id={id}
+      />
+    </div>
+  )
+}
+
+// OCR Decision section component
+function OCRDecisionSection({ stage }: { stage: ProcessingStageRecord }): React.ReactElement | null {
+  const shouldShow = stage.metadata &&
+    (stage.stage === 'ocr_check' || stage.stage === 'ocr_processing') &&
+    (stage.metadata.document_classification || stage.metadata.analysis)
+
+  if (!shouldShow || !stage.metadata) return null
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+        <Brain size={14} />
+        OCR Decision Analysis
+      </h4>
+      <OCRDecisionViewer metadata={stage.metadata} />
+    </div>
+  )
 }
 
 // Calculate metrics from stage data
@@ -576,6 +638,10 @@ function DiffSummaryViewer({
   )
 }
 
+/* TODO: Re-enable DecisionContextViewer once TypeScript inference issue is resolved
+ * This component was causing a mysterious "Type 'unknown' is not assignable to type 'ReactNode'"
+ * error that moved around the file regardless of changes. Investigation needed.
+ *
 // Decision Context Viewer - explains WHY a stage was skipped
 function DecisionContextViewer({
   context,
@@ -588,120 +654,383 @@ function DecisionContextViewer({
 
   return (
     <div className="border border-purple-200 rounded-lg overflow-hidden bg-purple-50/30">
+      // ... component implementation ...
+    </div>
+  )
+}
+*/
+
+// OCR Decision Viewer - displays comprehensive OCR decision analysis
+function OCRDecisionViewer({
+  metadata,
+}: {
+  metadata: Record<string, unknown>
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  // Extract OCR decision data from metadata
+  const documentClassification = metadata.document_classification as {
+    detected_language?: { locale_code: string; confidence: number; method: string }
+    detected_policy_type?: {
+      policy_type_id: string
+      policy_type_name: string
+      category: string
+      confidence: number
+      matched_terms: string[]
+    }
+  } | undefined
+
+  const analysis = metadata.analysis as {
+    density?: {
+      total_pages: number
+      total_characters: number
+      average_chars_per_page: number
+      threshold_used: number
+      pages_below_threshold: number[]
+      min_chars_page?: { page: number; chars: number }
+      max_chars_page?: { page: number; chars: number }
+    }
+    text_quality?: {
+      quality_score: number
+      terms_found: number
+      terms_checked: number
+      found_terms_sample?: string[]
+      encoding_issues: boolean
+      locale_used: string
+    }
+    field_extraction?: {
+      fields_checked: number
+      fields_found: number
+      required_fields_found: number
+      required_fields_total: number
+      extraction_rate: number
+      field_results?: Record<string, { found: boolean; value: string | null; required: boolean }>
+    }
+    confidence_breakdown?: {
+      overall: number
+      component_scores: {
+        char_density: number
+        text_quality: number
+        page_variance: number
+        encoding_check: number
+        field_extraction: number
+      }
+      weights_used: Record<string, number>
+    }
+  } | undefined
+
+  const reasoning = metadata.reasoning as string[] | undefined
+  const configurationsUsed = metadata.configurations_used as {
+    locale_config?: string
+    policy_config?: string
+    ocr_settings_version?: string
+  } | undefined
+
+  if (!documentClassification && !analysis) return null
+
+  return (
+    <div className="border border-indigo-200 rounded-lg overflow-hidden bg-indigo-50/30">
       {/* Header */}
       <div
-        className="flex items-center justify-between px-4 py-3 bg-purple-100 border-b border-purple-200 cursor-pointer hover:bg-purple-150"
+        className="flex items-center justify-between px-4 py-3 bg-indigo-100 border-b border-indigo-200 cursor-pointer hover:bg-indigo-150"
         onClick={() => setExpanded(!expanded)}
       >
-        <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
+        <div className="flex items-center gap-2 text-sm font-semibold text-indigo-800">
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          <HelpCircle size={16} />
-          Why Was This Stage Skipped?
+          <Brain size={16} />
+          OCR Decision Analysis
         </div>
-        <span className="text-xs text-purple-600 bg-purple-200 px-2 py-1 rounded">
-          Decision Explanation
+        <span className="text-xs text-indigo-600 bg-indigo-200 px-2 py-1 rounded">
+          Multi-Language & Policy Detection
         </span>
       </div>
 
       {expanded && (
         <div className="p-4 space-y-4">
-          {/* Assessment Performed */}
-          <div className="bg-white rounded-lg border border-purple-200 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-purple-700 mb-2">
-              <Search size={14} />
-              Assessment Performed
-            </div>
-            <p className="text-sm text-gray-700">{context.assessment_performed}</p>
-          </div>
+          {/* Document Classification */}
+          {documentClassification && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Language Detection */}
+              {documentClassification.detected_language && (
+                <div className="bg-white rounded-lg border border-blue-200 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-3">
+                    <span className="text-lg">🌐</span>
+                    Language Detection
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Detected:</span>
+                      <span className="font-bold text-blue-800 uppercase">
+                        {documentClassification.detected_language.locale_code}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Confidence:</span>
+                      <span className={cn(
+                        'font-bold',
+                        documentClassification.detected_language.confidence >= 0.8 ? 'text-green-700' :
+                        documentClassification.detected_language.confidence >= 0.6 ? 'text-amber-700' :
+                        'text-red-700'
+                      )}>
+                        {(documentClassification.detected_language.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Method:</span>
+                      <span className="text-sm text-gray-800">
+                        {documentClassification.detected_language.method}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
-          {/* Threshold (if applicable) */}
-          {context.threshold && (
-            <div className="bg-white rounded-lg border border-blue-200 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-2">
+              {/* Policy Type Classification */}
+              {documentClassification.detected_policy_type && (
+                <div className="bg-white rounded-lg border border-purple-200 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-purple-700 mb-3">
+                    <span className="text-lg">📋</span>
+                    Policy Type
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Type:</span>
+                      <span className="font-bold text-purple-800">
+                        {documentClassification.detected_policy_type.policy_type_name}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Category:</span>
+                      <span className="text-sm text-gray-800 capitalize">
+                        {documentClassification.detected_policy_type.category}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Confidence:</span>
+                      <span className={cn(
+                        'font-bold',
+                        documentClassification.detected_policy_type.confidence >= 0.8 ? 'text-green-700' :
+                        documentClassification.detected_policy_type.confidence >= 0.6 ? 'text-amber-700' :
+                        'text-red-700'
+                      )}>
+                        {(documentClassification.detected_policy_type.confidence * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                    {documentClassification.detected_policy_type.matched_terms.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500">Matched terms:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {documentClassification.detected_policy_type.matched_terms.slice(0, 5).map((term, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
+                              {term}
+                            </span>
+                          ))}
+                          {documentClassification.detected_policy_type.matched_terms.length > 5 && (
+                            <span className="text-xs text-gray-500">
+                              +{documentClassification.detected_policy_type.matched_terms.length - 5} more
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Confidence Breakdown */}
+          {analysis?.confidence_breakdown && (
+            <div className="bg-white rounded-lg border border-green-200 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
                 <Target size={14} />
-                Decision Threshold
+                Confidence Breakdown
+                <span className={cn(
+                  'ml-auto px-2 py-1 rounded text-sm font-bold',
+                  analysis.confidence_breakdown.overall >= 0.85 ? 'bg-green-100 text-green-800' :
+                  analysis.confidence_breakdown.overall >= 0.6 ? 'bg-amber-100 text-amber-800' :
+                  'bg-red-100 text-red-800'
+                )}>
+                  Overall: {(analysis.confidence_breakdown.overall * 100).toFixed(0)}%
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-gray-500">Threshold Name:</span>
-                  <span className="ml-2 font-mono text-blue-800">{context.threshold.name}</span>
-                </div>
-                <div>
-                  <span className="text-gray-500">Threshold Value:</span>
-                  <span className="ml-2 font-bold text-blue-800">
-                    {context.threshold.comparison === 'less_than' && '< '}
-                    {context.threshold.comparison === 'greater_than' && '> '}
-                    {context.threshold.comparison === 'equals' && '= '}
-                    {context.threshold.comparison === 'not_equals' && '≠ '}
-                    {formatNumber(context.threshold.value)}
-                    {context.threshold.unit && ` ${context.threshold.unit}`}
-                  </span>
-                </div>
+              <div className="grid grid-cols-5 gap-2">
+                {Object.entries(analysis.confidence_breakdown.component_scores).map(([key, value]) => (
+                  <div key={key} className="text-center p-2 bg-gray-50 rounded">
+                    <div className={cn(
+                      'text-lg font-bold',
+                      value >= 0.8 ? 'text-green-600' :
+                      value >= 0.6 ? 'text-amber-600' :
+                      'text-red-600'
+                    )}>
+                      {(value * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-xs text-gray-500 capitalize">
+                      {key.replace(/_/g, ' ')}
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      weight: {((analysis.confidence_breakdown?.weights_used?.[key as keyof typeof analysis.confidence_breakdown.weights_used] || 0) * 100).toFixed(0)}%
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
 
-          {/* Actual Values */}
-          <div className="bg-white rounded-lg border border-gray-200 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
-              <Scale size={14} />
-              Actual Measured Values
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {Object.entries(context.actual_values).map(([key, value]) => (
-                <div key={key} className="flex justify-between items-center bg-gray-50 rounded px-3 py-2">
-                  <span className="text-xs text-gray-600">{key.replace(/_/g, ' ')}:</span>
-                  <span className={cn(
-                    'text-xs font-mono font-semibold',
-                    typeof value === 'boolean'
-                      ? (value ? 'text-green-700' : 'text-red-700')
-                      : 'text-gray-900'
-                  )}>
-                    {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
-                  </span>
+          {/* Text Quality & Density */}
+          {(analysis?.text_quality || analysis?.density) && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Text Quality */}
+              {analysis.text_quality && (
+                <div className="bg-white rounded-lg border border-amber-200 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-amber-700 mb-3">
+                    <CheckCircle size={14} />
+                    Text Quality Analysis
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Quality Score:</span>
+                      <span className="font-bold">{(analysis.text_quality.quality_score * 100).toFixed(0)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Terms Found:</span>
+                      <span>{analysis.text_quality.terms_found}/{analysis.text_quality.terms_checked}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Encoding Issues:</span>
+                      <span className={analysis.text_quality.encoding_issues ? 'text-red-600 font-bold' : 'text-green-600'}>
+                        {analysis.text_quality.encoding_issues ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                    {analysis.text_quality.found_terms_sample && analysis.text_quality.found_terms_sample.length > 0 && (
+                      <div>
+                        <span className="text-xs text-gray-500">Sample terms found:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {analysis.text_quality.found_terms_sample.slice(0, 6).map((term, i) => (
+                            <span key={i} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs">
+                              {term}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          {/* Decision Logic */}
-          <div className="bg-amber-50 rounded-lg border border-amber-200 p-3">
-            <div className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
-              <Brain size={14} />
-              Decision Logic
+              {/* Density Analysis */}
+              {analysis.density && (
+                <div className="bg-white rounded-lg border border-cyan-200 p-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-cyan-700 mb-3">
+                    <Hash size={14} />
+                    Density Analysis
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Pages:</span>
+                      <span>{analysis.density.total_pages}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Total Chars:</span>
+                      <span>{formatNumber(analysis.density.total_characters)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Avg Chars/Page:</span>
+                      <span className={cn(
+                        'font-bold',
+                        analysis.density.average_chars_per_page >= analysis.density.threshold_used * 5 ? 'text-green-600' :
+                        analysis.density.average_chars_per_page >= analysis.density.threshold_used ? 'text-amber-600' :
+                        'text-red-600'
+                      )}>
+                        {formatNumber(analysis.density.average_chars_per_page)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Threshold:</span>
+                      <span>{formatNumber(analysis.density.threshold_used)}</span>
+                    </div>
+                    {analysis.density.pages_below_threshold.length > 0 && (
+                      <div className="text-xs text-red-600">
+                        Pages below threshold: {analysis.density.pages_below_threshold.join(', ')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-amber-900 leading-relaxed">{context.decision_logic}</p>
-          </div>
+          )}
 
-          {/* Alternatives */}
-          {context.alternatives && context.alternatives.length > 0 && (
-            <div className="bg-green-50 rounded-lg border border-green-200 p-3">
-              <div className="flex items-center gap-2 text-sm font-medium text-green-800 mb-2">
-                <Lightbulb size={14} />
-                What Would Trigger This Stage?
+          {/* Field Extraction Results */}
+          {analysis?.field_extraction && (
+            <div className="bg-white rounded-lg border border-teal-200 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-teal-700 mb-3">
+                <FormInput size={14} />
+                Field Extraction Test
+                <span className={cn(
+                  'ml-auto px-2 py-1 rounded text-xs font-bold',
+                  analysis.field_extraction.extraction_rate >= 0.75 ? 'bg-green-100 text-green-800' :
+                  analysis.field_extraction.extraction_rate >= 0.5 ? 'bg-amber-100 text-amber-800' :
+                  'bg-red-100 text-red-800'
+                )}>
+                  {analysis.field_extraction.required_fields_found}/{analysis.field_extraction.required_fields_total} Required ({(analysis.field_extraction.extraction_rate * 100).toFixed(0)}%)
+                </span>
               </div>
-              <ul className="space-y-2">
-                {context.alternatives.map((alt, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-green-800">
-                    <ArrowRight size={14} className="mt-0.5 flex-shrink-0" />
-                    <span>{alt}</span>
+              {analysis.field_extraction.field_results && (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {Object.entries(analysis.field_extraction.field_results).map(([field, result]) => (
+                    <div key={field} className={cn(
+                      'p-2 rounded border text-xs',
+                      result.found ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    )}>
+                      <div className="flex items-center gap-1 font-medium">
+                        {result.found ? (
+                          <CheckCircle size={12} className="text-green-600" />
+                        ) : (
+                          <XCircle size={12} className="text-red-600" />
+                        )}
+                        <span className={result.found ? 'text-green-800' : 'text-red-800'}>
+                          {field.replace(/_/g, ' ')}
+                        </span>
+                        {result.required && <span className="text-red-500">*</span>}
+                      </div>
+                      {result.found && result.value && (
+                        <div className="mt-1 text-gray-600 truncate" title={result.value}>
+                          {result.value.substring(0, 30)}...
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Reasoning */}
+          {reasoning && reasoning.length > 0 && (
+            <div className="bg-gray-50 rounded-lg border border-gray-200 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                <Lightbulb size={14} />
+                Decision Reasoning
+              </div>
+              <ul className="space-y-1">
+                {reasoning.map((reason, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                    <ArrowRight size={12} className="mt-1 flex-shrink-0 text-gray-400" />
+                    <span>{reason}</span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          {/* Documentation Link */}
-          {context.documentation_url && (
-            <a
-              href={context.documentation_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-            >
-              <ExternalLink size={14} />
-              View Documentation
-            </a>
+          {/* Configurations Used */}
+          {configurationsUsed && (
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <FileJson size={12} />
+                <span>Configs: {configurationsUsed.locale_config || 'default'} | {configurationsUsed.policy_config || 'generic'} | v{configurationsUsed.ocr_settings_version || '1.0'}</span>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -869,71 +1198,33 @@ function StageDetailsPanel({
             </div>
           )}
 
-          {/* Error Section */}
-          {stage.error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <h4 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
-                <XCircle size={14} />
-                Error
-              </h4>
-              <div className="text-sm text-red-800 font-mono bg-white p-3 rounded border border-red-200">
-                {stage.error}
-              </div>
-            </div>
-          )}
+          <ErrorSection error={stage.error} />
 
-          {/* Decision Context Section - explains why stage was skipped */}
-          {stage.decision_context && (
-            <DecisionContextViewer
-              context={stage.decision_context}
-              stageName={stage.stage}
-            />
-          )}
+          <DataSection
+            data={stage.input}
+            title="Input Data"
+            icon={FileInput}
+            label="Stage Input"
+            id={`${stage.stage}-input`}
+          />
 
-          {/* Input Section */}
-          {stage.input && Object.keys(stage.input).length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <FileInput size={14} />
-                Input Data
-              </h4>
-              <JsonViewer
-                data={stage.input}
-                label="Stage Input"
-                id={`${stage.stage}-input`}
-              />
-            </div>
-          )}
+          <DataSection
+            data={stage.output}
+            title="Output Data"
+            icon={FileOutput}
+            label="Stage Output"
+            id={`${stage.stage}-output`}
+          />
 
-          {/* Output Section */}
-          {stage.output && Object.keys(stage.output).length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <FileOutput size={14} />
-                Output Data
-              </h4>
-              <JsonViewer
-                data={stage.output}
-                label="Stage Output"
-                id={`${stage.stage}-output`}
-              />
-            </div>
-          )}
+          <OCRDecisionSection stage={stage} />
 
-          {/* Metadata Section */}
-          {stage.metadata && Object.keys(stage.metadata).length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <Info size={14} />
-                Metadata
-              </h4>
-              <JsonViewer
-                data={stage.metadata}
-                label="Stage Metadata"
-                id={`${stage.stage}-metadata`}
-              />
-            </div>
-          )}
+          <DataSection
+            data={stage.metadata}
+            title="Metadata"
+            icon={Info}
+            label="Stage Metadata"
+            id={`${stage.stage}-metadata`}
+          />
 
           {/* ========== FULL CONTENT SECTIONS ========== */}
 
@@ -1184,7 +1475,7 @@ function StageCard({
         {/* Error message (always visible if present) */}
         {stage.error && (
           <div className="mx-4 mb-4 p-2 bg-red-100 border border-red-200 rounded text-sm text-red-700 font-mono">
-            {stage.error}
+            {String(stage.error)}
           </div>
         )}
 

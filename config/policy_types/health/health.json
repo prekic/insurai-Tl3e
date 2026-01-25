@@ -1,0 +1,116 @@
+{
+  "policy_type_id": "health_individual",
+  "policy_type_name": "Health Insurance",
+  "description": "Individual and group health insurance policies",
+  "category": "health",
+  "version": "1.0",
+
+  "classification": {
+    "detection_terms": {
+      "tr": ["sağlık sigortası", "sağlık poliçesi", "tamamlayıcı sağlık", "tss", "özel sağlık", "tedavi giderleri"],
+      "en": ["health insurance", "medical insurance", "healthcare", "medical expenses", "hospital cover"],
+      "de": ["krankenversicherung", "gesundheitsversicherung", "krankenkasse"],
+      "fr": ["assurance maladie", "assurance santé", "mutuelle santé"]
+    },
+    "confidence_threshold": 0.6
+  },
+
+  "required_fields": {
+    "policy_number": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["Poliçe\\s*No[.:\\s]*(\\d{8,})"],
+        "en": ["Policy\\s*(?:No|Number)[.:\\s]*([A-Z0-9\\-/]+)"],
+        "_universal": ["(?:policy|poliçe)[.:\\s]*(?:no|number)[.:\\s]*([A-Z0-9\\-/]+)"]
+      }
+    },
+    "insured_name": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["Sigortalı[.:\\s]*(.+?)(?:\\n|$)", "Hasta\\s*Adı[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Insured|Member|Patient)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "premium": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["(?:Toplam\\s*Prim|Yıllık\\s*Prim|Aylık\\s*Prim)[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Total\\s*Premium|Annual\\s*Premium|Monthly\\s*Premium)[.:\\s]*([\\d.,]+)"]
+      }
+    },
+    "policy_period": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "_universal": [
+          "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})"
+        ]
+      }
+    },
+    "date_of_birth": {
+      "required": false,
+      "criticality": "medium",
+      "patterns": {
+        "tr": ["Doğum\\s*Tarihi[.:\\s]*(\\d{2}[./]\\d{2}[./]\\d{4})"],
+        "en": ["(?:Date\\s*of\\s*Birth|DOB|Birth\\s*Date)[.:\\s]*(\\d{2}[./]\\d{2}[./]\\d{4})"]
+      }
+    }
+  },
+
+  "optional_fields": {
+    "network_type": {
+      "patterns": {
+        "tr": ["(?:Plan|Ürün)\\s*(?:Tipi|Türü)[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Plan|Network)\\s*Type[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "annual_limit": {
+      "patterns": {
+        "tr": ["Yıllık\\s*(?:Limit|Tavan)[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Annual|Yearly)\\s*(?:Limit|Maximum)[.:\\s]*([\\d.,]+)"]
+      }
+    }
+  },
+
+  "coverage_sections": {
+    "hospitalization": {
+      "detection_terms": {
+        "tr": ["yatarak tedavi", "hastane", "ameliyat"],
+        "en": ["hospitalization", "inpatient", "surgery"]
+      }
+    },
+    "outpatient": {
+      "detection_terms": {
+        "tr": ["ayakta tedavi", "poliklinik"],
+        "en": ["outpatient", "clinic", "doctor visits"]
+      }
+    },
+    "maternity": {
+      "detection_terms": {
+        "tr": ["doğum", "hamilelik", "gebelik"],
+        "en": ["maternity", "pregnancy", "childbirth"]
+      }
+    },
+    "dental": {
+      "detection_terms": {
+        "tr": ["diş", "dental"],
+        "en": ["dental", "teeth"]
+      }
+    },
+    "optical": {
+      "detection_terms": {
+        "tr": ["göz", "optik", "gözlük"],
+        "en": ["optical", "vision", "eye care"]
+      }
+    }
+  },
+
+  "quality_thresholds": {
+    "min_required_fields_rate": 0.70,
+    "min_quality_score": 0.30,
+    "ocr_trigger_confidence": 0.65
+  }
+}

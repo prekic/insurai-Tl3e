@@ -1,0 +1,115 @@
+{
+  "policy_type_id": "_motor_base",
+  "policy_type_name": "Motor Insurance Base",
+  "description": "Base configuration for all motor insurance types",
+  "category": "motor",
+  "version": "1.0",
+  "is_base_config": true,
+
+  "shared_fields": {
+    "vehicle_plate": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Plaka\\s*(?:No)?[.:\\s]*(\\d{2}\\s*[A-ZİĞÜŞÖÇ]{1,3}\\s*\\d{2,5})",
+          "Plaka[.:\\s]*(\\d{2}\\s*[A-Z]+\\s*\\d+)"
+        ],
+        "en": [
+          "(?:Registration|License|Plate)\\s*(?:No|Number)?[.:\\s]*([A-Z0-9\\-\\s]+)"
+        ],
+        "de": [
+          "(?:Kennzeichen|Kfz-Kennzeichen)[.:\\s]*([A-ZÄÖÜ]{1,3}[\\s\\-]?[A-Z]{1,2}[\\s\\-]?\\d{1,4})"
+        ],
+        "_universal": [
+          "(?:plate|plaka|registration|kennzeichen|immatriculation)[.:\\s]*([A-Z0-9\\-\\s]+)"
+        ]
+      }
+    },
+    "vehicle_make": {
+      "required": false,
+      "criticality": "medium",
+      "patterns": {
+        "tr": ["(?:Marka|Araç\\s*Markası)[.:\\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\\s]+)"],
+        "en": ["(?:Make|Manufacturer|Brand)[.:\\s]*([A-Za-z\\s]+)"],
+        "_universal": ["(?:make|marka|marke|marque)[.:\\s]*([A-Za-z\\s]+)"]
+      }
+    },
+    "vehicle_model": {
+      "required": false,
+      "criticality": "medium",
+      "patterns": {
+        "tr": ["Model[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["Model[.:\\s]*(.+?)(?:\\n|$)"],
+        "_universal": ["model[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "vehicle_year": {
+      "required": false,
+      "criticality": "medium",
+      "patterns": {
+        "tr": ["Model\\s*Yılı[.:\\s]*(\\d{4})"],
+        "en": ["(?:Model\\s*Year|Year)[.:\\s]*(\\d{4})"],
+        "_universal": ["(?:year|yıl|jahr|année)[.:\\s]*(\\d{4})"]
+      }
+    },
+    "chassis_number": {
+      "required": false,
+      "criticality": "high",
+      "patterns": {
+        "tr": ["(?:Şasi|Motor)\\s*No[.:\\s]*([A-Z0-9]{17})"],
+        "en": ["(?:VIN|Chassis|Frame)[.:\\s]*([A-Z0-9]{17})"],
+        "_universal": ["(?:vin|chassis|şasi|fahrgestell)[.:\\s]*([A-HJ-NPR-Z0-9]{17})"]
+      }
+    }
+  },
+
+  "coverage_types": {
+    "own_damage": {
+      "names": {
+        "tr": ["maddi hasar", "araç hasarı", "kendi hasarı"],
+        "en": ["own damage", "collision", "comprehensive"],
+        "de": ["vollkasko", "teilkasko", "kaskoversicherung"]
+      }
+    },
+    "theft": {
+      "names": {
+        "tr": ["hırsızlık", "çalınma"],
+        "en": ["theft", "stolen"],
+        "de": ["diebstahl"]
+      }
+    },
+    "third_party": {
+      "names": {
+        "tr": ["mali sorumluluk", "üçüncü şahıs"],
+        "en": ["third party", "liability", "tpl"],
+        "de": ["haftpflicht", "kfz-haftpflicht"]
+      }
+    },
+    "natural_disasters": {
+      "names": {
+        "tr": ["deprem", "sel", "fırtına", "dolu", "doğal afet"],
+        "en": ["earthquake", "flood", "storm", "hail", "natural disaster"],
+        "de": ["naturkatastrophen", "erdbeben", "überschwemmung"]
+      }
+    },
+    "fire": {
+      "names": {
+        "tr": ["yangın"],
+        "en": ["fire"],
+        "de": ["brand", "feuer"]
+      }
+    }
+  },
+
+  "document_structure": {
+    "expected_sections": [
+      "policy_details",
+      "vehicle_information",
+      "coverage_summary",
+      "premium_details"
+    ],
+    "min_pages": 2,
+    "typical_page_range": [4, 20]
+  }
+}

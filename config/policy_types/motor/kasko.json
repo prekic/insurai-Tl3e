@@ -1,0 +1,246 @@
+{
+  "policy_type_id": "motor_kasko",
+  "policy_type_name": "Motor Own Damage (Kasko)",
+  "description": "Comprehensive motor vehicle insurance covering own damage",
+  "category": "motor",
+  "parent_config": "_motor_base",
+  "version": "1.0",
+
+  "classification": {
+    "detection_terms": {
+      "tr": ["kasko", "araç sigortası", "oto sigorta", "motorlu kara taşıtları", "kasko sigortası"],
+      "en": ["comprehensive", "own damage", "motor", "vehicle insurance", "auto insurance", "casco"],
+      "de": ["kaskoversicherung", "vollkasko", "teilkasko", "kfz-versicherung", "autoversicherung"],
+      "fr": ["assurance auto", "tous risques", "dommages collision"],
+      "es": ["seguro de auto", "todo riesgo", "daños propios"]
+    },
+    "confidence_threshold": 0.6,
+    "exclude_if_contains": {
+      "tr": ["zorunlu mali sorumluluk", "trafik sigortası", "zmss"],
+      "en": ["third party only", "liability only", "tplo"]
+    }
+  },
+
+  "required_fields": {
+    "policy_number": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Poliçe\\s*No[.:\\s]*(\\d{8,})",
+          "Poliçe\\s*Numarası[.:\\s]*(\\d{8,})",
+          "POLİÇE\\s*NO[.:\\s]*(\\d{8,})",
+          "(?:Poliçe|Police)\\s*(?:No|Numarası)?[.:\\s]*([A-Z0-9\\-/]{6,})"
+        ],
+        "en": [
+          "Policy\\s*(?:No|Number)[.:\\s]*([A-Z0-9\\-/]+)",
+          "Policy\\s*#[.:\\s]*([A-Z0-9\\-/]+)"
+        ],
+        "de": [
+          "(?:Versicherungsschein|Polizze)\\s*(?:Nr|Nummer)[.:\\s]*([A-Z0-9\\-/]+)"
+        ],
+        "_universal": [
+          "(?:policy|poliçe)[.:\\s]*(?:no|number|nr)[.:\\s]*([A-Z0-9\\-/]+)"
+        ]
+      }
+    },
+    "vehicle_plate": {
+      "required": true,
+      "criticality": "high",
+      "inherit_from": "_motor_base.shared_fields.vehicle_plate"
+    },
+    "vehicle_info": {
+      "required": true,
+      "criticality": "high",
+      "sub_fields": {
+        "make": {
+          "patterns": {
+            "tr": ["Marka[.:\\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\\s]+)"],
+            "en": ["Make[.:\\s]*([A-Za-z\\s]+)"],
+            "_universal": ["(?:make|marka|marke|marque)[.:\\s]*([A-Za-z\\s]+)"]
+          }
+        },
+        "model": {
+          "patterns": {
+            "tr": ["Model[.:\\s]*(.+?)(?:\\n|Tip|$)"],
+            "en": ["Model[.:\\s]*(.+?)(?:\\n|$)"],
+            "_universal": ["model[.:\\s]*(.+?)(?:\\n|$)"]
+          }
+        },
+        "year": {
+          "patterns": {
+            "tr": ["Model\\s*Yılı[.:\\s]*(\\d{4})", "Yıl[.:\\s]*(\\d{4})"],
+            "en": ["(?:Model\\s*Year|Year)[.:\\s]*(\\d{4})"],
+            "_universal": ["(?:year|yıl|jahr|année)[.:\\s]*(\\d{4})"]
+          }
+        },
+        "chassis_number": {
+          "patterns": {
+            "tr": ["Şasi\\s*No[.:\\s]*([A-Z0-9]{17})", "Şasi\\s*Numarası[.:\\s]*([A-Z0-9]{17})"],
+            "en": ["(?:VIN|Chassis)[.:\\s]*([A-Z0-9]{17})"],
+            "_universal": ["(?:vin|chassis|şasi|fahrgestell)[.:\\s]*([A-HJ-NPR-Z0-9]{17})"]
+          }
+        }
+      }
+    },
+    "premium": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "(?:Ödenecek\\s*Tutar|Toplam\\s*Prim|Net\\s*Prim)[.:\\s]*([\\d.,]+)\\s*TL",
+          "PRİM[.:\\s]*([\\d.,]+)",
+          "(?:Brüt|Net)?\\s*Prim[.:\\s]*([\\d.,]+)"
+        ],
+        "en": [
+          "(?:Total\\s*Premium|Premium\\s*Payable|Net\\s*Premium)[.:\\s]*([\\d.,]+)",
+          "Premium[.:\\s]*(?:USD|GBP|EUR)?\\s*([\\d.,]+)"
+        ],
+        "_universal": [
+          "(?:premium|prim|prämie|prime|premio)[.:\\s]*([\\d.,]+)"
+        ]
+      }
+    },
+    "insured_name": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "Sigortalı\\s*(?:Adı|Ad[ıi]/Unvan)?[.:\\s]*(.+?)(?:\\n|T\\.?C|$)",
+          "SİGORTALI[.:\\s]*(.+?)(?:\\n|$)",
+          "Sigorta\\s*Ettiren[.:\\s]*(.+?)(?:\\n|$)"
+        ],
+        "en": [
+          "(?:Insured|Policyholder|Named\\s*Insured)[.:\\s]*(.+?)(?:\\n|$)"
+        ],
+        "_universal": [
+          "(?:insured|sigortalı|versicherter|assuré)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      }
+    },
+    "policy_period": {
+      "required": true,
+      "criticality": "high",
+      "patterns": {
+        "tr": [
+          "(?:Poliçe\\s*)?Vade(?:si)?[.:\\s]*(.+?)(?:\\n|$)",
+          "(\\d{2}[./]\\d{2}[./]\\d{4})\\s*[-–]\\s*(\\d{2}[./]\\d{2}[./]\\d{4})",
+          "Başlangıç[.:\\s]*(\\d{2}[./]\\d{2}[./]\\d{4}).*?Bitiş[.:\\s]*(\\d{2}[./]\\d{2}[./]\\d{4})"
+        ],
+        "en": [
+          "Policy\\s*Period[.:\\s]*(.+?)(?:\\n|$)",
+          "(?:From|Effective)[.:\\s]*(\\d{2}/\\d{2}/\\d{4})\\s*(?:To|Until)[.:\\s]*(\\d{2}/\\d{2}/\\d{4})"
+        ],
+        "_universal": [
+          "(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})\\s*[-–to]+\\s*(\\d{2}[./\\-]\\d{2}[./\\-]\\d{4})"
+        ]
+      }
+    },
+    "insurer_name": {
+      "required": true,
+      "criticality": "medium",
+      "patterns": {
+        "tr": [
+          "(?:Sigorta\\s*Şirketi|Sigortacı)[.:\\s]*(.+?)(?:\\n|$)",
+          "SİGORTA\\s*ŞİRKETİ[.:\\s]*(.+?)(?:\\n|$)"
+        ],
+        "en": [
+          "(?:Insurance\\s*Company|Insurer|Underwriter)[.:\\s]*(.+?)(?:\\n|$)"
+        ],
+        "_universal": [
+          "(?:insurer|sigortacı|versicherer|assureur)[.:\\s]*(.+?)(?:\\n|$)"
+        ]
+      }
+    }
+  },
+
+  "optional_fields": {
+    "coverage_type": {
+      "patterns": {
+        "tr": ["(?:Teminat\\s*Türü|Kasko\\s*Türü)[.:\\s]*(.+?)(?:\\n|$)"],
+        "en": ["(?:Coverage\\s*Type|Cover\\s*Type)[.:\\s]*(.+?)(?:\\n|$)"]
+      }
+    },
+    "deductible": {
+      "patterns": {
+        "tr": ["(?:Muafiyet|Tenzili\\s*Muafiyet)[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Deductible|Excess)[.:\\s]*([\\d.,]+)"]
+      }
+    },
+    "no_claims_discount": {
+      "patterns": {
+        "tr": ["Hasarsızlık\\s*(?:İndirimi|Oranı)[.:\\s]*%?([\\d.,]+)"],
+        "en": ["(?:No\\s*Claims\\s*Discount|NCD|Bonus)[.:\\s]*%?([\\d.,]+)"]
+      }
+    },
+    "sum_insured": {
+      "patterns": {
+        "tr": ["(?:Sigorta\\s*Bedeli|Araç\\s*Değeri|Bedel)[.:\\s]*([\\d.,]+)"],
+        "en": ["(?:Sum\\s*Insured|Vehicle\\s*Value|Insured\\s*Value)[.:\\s]*([\\d.,]+)"]
+      }
+    }
+  },
+
+  "coverage_sections": {
+    "own_damage": {
+      "detection_terms": {
+        "tr": ["maddi hasar", "araç hasarı", "kendi hasarı", "çarpma", "çarpışma"],
+        "en": ["own damage", "collision", "comprehensive"]
+      }
+    },
+    "theft": {
+      "detection_terms": {
+        "tr": ["hırsızlık", "çalınma"],
+        "en": ["theft", "stolen"]
+      }
+    },
+    "third_party_extension": {
+      "detection_terms": {
+        "tr": ["ihtiyari mali sorumluluk", "mali sorumluluk", "imm"],
+        "en": ["voluntary third party", "additional liability"]
+      }
+    },
+    "natural_disasters": {
+      "detection_terms": {
+        "tr": ["deprem", "sel", "fırtına", "dolu", "doğal afet", "su baskını"],
+        "en": ["earthquake", "flood", "storm", "hail", "natural disaster"]
+      }
+    },
+    "fire": {
+      "detection_terms": {
+        "tr": ["yangın"],
+        "en": ["fire"]
+      }
+    },
+    "personal_accident": {
+      "detection_terms": {
+        "tr": ["ferdi kaza", "koltuk", "şoför"],
+        "en": ["personal accident", "pa", "driver accident"]
+      }
+    }
+  },
+
+  "implicit_coverages": {
+    "tr": ["çarpma", "çarpışma", "hırsızlık", "yangın", "doğal afetler", "sel", "deprem"],
+    "en": ["collision", "theft", "fire", "natural disasters", "flood", "earthquake"],
+    "description": "These coverages are typically included in base kasko and should not be flagged as missing"
+  },
+
+  "document_structure": {
+    "expected_sections": [
+      "policy_details",
+      "vehicle_information",
+      "coverage_summary",
+      "premium_details",
+      "terms_and_conditions"
+    ],
+    "min_pages": 2,
+    "typical_page_range": [4, 20]
+  },
+
+  "quality_thresholds": {
+    "min_required_fields_rate": 0.75,
+    "min_quality_score": 0.30,
+    "ocr_trigger_confidence": 0.65
+  }
+}
