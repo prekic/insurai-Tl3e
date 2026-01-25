@@ -2,10 +2,12 @@
  * Document Journey Viewer
  *
  * Displays the complete processing journey of a document through the extraction pipeline.
- * Shows each stage with inputs, outputs, timing, and status.
+ * Shows each stage with inputs, outputs, timing, metrics, and status.
+ *
+ * Enhanced version with comprehensive debugging information.
  */
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import {
   ChevronDown,
@@ -30,6 +32,20 @@ import {
   Database,
   FileJson,
   ArrowRight,
+  ArrowDown,
+  ArrowUp,
+  DollarSign,
+  Hash,
+  Zap,
+  Timer,
+  FileInput,
+  FileOutput,
+  Clipboard,
+  Check,
+  X,
+  ExternalLink,
+  Maximize2,
+  Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -61,19 +77,19 @@ const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
 }
 
 // Stage labels
-const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string }> = {
-  upload: { en: 'Upload', tr: 'Yükleme' },
-  pdf_extraction: { en: 'PDF Extraction', tr: 'PDF Metin Çıkarma' },
-  ocr_check: { en: 'OCR Check', tr: 'OCR Kontrolü' },
-  ocr_processing: { en: 'OCR Processing', tr: 'OCR İşleme' },
-  text_preprocessing: { en: 'Text Preprocessing', tr: 'Metin Ön İşleme' },
-  ai_extraction: { en: 'AI Extraction', tr: 'AI Çıkarma' },
-  form_field_enhancement: { en: 'Form Fields', tr: 'Form Alanları' },
-  table_parsing: { en: 'Table Parsing', tr: 'Tablo Ayrıştırma' },
-  validation: { en: 'Validation', tr: 'Doğrulama' },
-  duplicate_check: { en: 'Duplicate Check', tr: 'Mükerrer Kontrol' },
-  conflict_resolution: { en: 'Conflict Resolution', tr: 'Çakışma Çözümü' },
-  database_save: { en: 'Save', tr: 'Kayıt' },
+const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; description: string }> = {
+  upload: { en: 'Upload', tr: 'Yükleme', description: 'File received and validated in browser' },
+  pdf_extraction: { en: 'PDF Extraction', tr: 'PDF Metin Çıkarma', description: 'Text extracted from PDF using pdf.js' },
+  ocr_check: { en: 'OCR Check', tr: 'OCR Kontrolü', description: 'Checking text density to determine if OCR is needed' },
+  ocr_processing: { en: 'OCR Processing', tr: 'OCR İşleme', description: 'Optical character recognition for scanned documents' },
+  text_preprocessing: { en: 'Text Preprocessing', tr: 'Metin Ön İşleme', description: 'Text normalization, Turkish OCR cleanup, spacing fixes' },
+  ai_extraction: { en: 'AI Extraction', tr: 'AI Çıkarma', description: 'Structured data extraction using AI (GPT-4o/Claude)' },
+  form_field_enhancement: { en: 'Form Fields', tr: 'Form Alanları', description: 'Enhancement using Document AI form field detection' },
+  table_parsing: { en: 'Table Parsing', tr: 'Tablo Ayrıştırma', description: 'Coverage table extraction and parsing' },
+  validation: { en: 'Validation', tr: 'Doğrulama', description: 'Data validation, business rules, Turkish pattern matching' },
+  duplicate_check: { en: 'Duplicate Check', tr: 'Mükerrer Kontrol', description: 'Checking for existing similar policies with fuzzy matching' },
+  conflict_resolution: { en: 'Conflict Resolution', tr: 'Çakışma Çözümü', description: 'User resolved duplicate/amendment conflict' },
+  database_save: { en: 'Save', tr: 'Kayıt', description: 'Policy saved to database' },
 }
 
 // Status colors and icons
@@ -82,6 +98,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
   bgColor: string
   borderColor: string
   icon: LucideIcon
+  label: string
 } {
   switch (status) {
     case 'completed':
@@ -90,6 +107,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-green-50',
         borderColor: 'border-green-200',
         icon: CheckCircle,
+        label: 'Completed',
       }
     case 'failed':
       return {
@@ -97,6 +115,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-red-50',
         borderColor: 'border-red-200',
         icon: XCircle,
+        label: 'Failed',
       }
     case 'running':
       return {
@@ -104,6 +123,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-blue-50',
         borderColor: 'border-blue-200',
         icon: Loader2,
+        label: 'Running',
       }
     case 'skipped':
       return {
@@ -111,6 +131,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-gray-50',
         borderColor: 'border-gray-200',
         icon: SkipForward,
+        label: 'Skipped',
       }
     case 'partial':
       return {
@@ -118,6 +139,7 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-amber-50',
         borderColor: 'border-amber-200',
         icon: AlertCircle,
+        label: 'Partial',
       }
     default:
       return {
@@ -125,12 +147,14 @@ function getStatusInfo(status: ProcessingStageStatus): {
         bgColor: 'bg-gray-50',
         borderColor: 'border-gray-200',
         icon: Clock,
+        label: 'Pending',
       }
   }
 }
 
 function formatDuration(ms?: number): string {
-  if (!ms) return '-'
+  if (ms === undefined || ms === null) return '-'
+  if (ms === 0) return '0ms'
   if (ms < 1000) return `${ms}ms`
   if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`
   return `${(ms / 60000).toFixed(1)}m`
@@ -145,21 +169,499 @@ function formatTimestamp(iso?: string): string {
   })
 }
 
+function formatNumber(n?: number): string {
+  if (n === undefined || n === null) return '-'
+  return n.toLocaleString('tr-TR')
+}
+
+function formatBytes(bytes?: number): string {
+  if (bytes === undefined || bytes === null) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
+}
+
+function formatCurrency(amount?: number): string {
+  if (amount === undefined || amount === null) return '-'
+  return `$${amount.toFixed(4)}`
+}
+
+// Calculate metrics from stage data
+interface StageMetrics {
+  inputSize?: number
+  outputSize?: number
+  charsDelta?: number
+  charsPercent?: number
+  tokens?: { input?: number; output?: number; total?: number }
+  cost?: number
+  confidence?: number
+  itemCount?: number
+  errorCount?: number
+  warningCount?: number
+}
+
+function calculateMetrics(stage: ProcessingStageRecord): StageMetrics {
+  const metrics: StageMetrics = {}
+
+  // Calculate input size
+  if (stage.input) {
+    const inputStr = JSON.stringify(stage.input)
+    metrics.inputSize = inputStr.length
+
+    // Extract specific metrics from input
+    if ('text_length' in stage.input && typeof stage.input.text_length === 'number') {
+      metrics.inputSize = stage.input.text_length
+    }
+  }
+
+  // Calculate output size
+  if (stage.output) {
+    const outputStr = JSON.stringify(stage.output)
+    metrics.outputSize = outputStr.length
+
+    // Extract specific metrics from output
+    if ('text_length' in stage.output && typeof stage.output.text_length === 'number') {
+      metrics.outputSize = stage.output.text_length
+    }
+    if ('processed_text_length' in stage.output && typeof stage.output.processed_text_length === 'number') {
+      metrics.outputSize = stage.output.processed_text_length
+    }
+    if ('chars_changed' in stage.output && typeof stage.output.chars_changed === 'number') {
+      metrics.charsDelta = stage.output.chars_changed
+    }
+    if ('confidence' in stage.output && typeof stage.output.confidence === 'number') {
+      metrics.confidence = stage.output.confidence
+    }
+    if ('coverages_count' in stage.output && typeof stage.output.coverages_count === 'number') {
+      metrics.itemCount = stage.output.coverages_count
+    }
+    if ('validation_errors' in stage.output && typeof stage.output.validation_errors === 'number') {
+      metrics.errorCount = stage.output.validation_errors
+    }
+    if ('validation_warnings' in stage.output && typeof stage.output.validation_warnings === 'number') {
+      metrics.warningCount = stage.output.validation_warnings
+    }
+  }
+
+  // Calculate delta percentage
+  if (metrics.inputSize && metrics.outputSize) {
+    metrics.charsPercent = ((metrics.outputSize - metrics.inputSize) / metrics.inputSize) * 100
+  }
+
+  // Extract token/cost from metadata
+  if (stage.metadata) {
+    if ('usage' in stage.metadata) {
+      const usage = stage.metadata.usage as Record<string, unknown>
+      metrics.tokens = {
+        input: usage.input_tokens as number,
+        output: usage.output_tokens as number,
+        total: (usage.input_tokens as number || 0) + (usage.output_tokens as number || 0),
+      }
+    }
+    if ('cost' in stage.metadata && typeof stage.metadata.cost === 'number') {
+      metrics.cost = stage.metadata.cost
+    }
+  }
+
+  return metrics
+}
+
+// Copy to clipboard hook
+function useCopyToClipboard() {
+  const [copied, setCopied] = useState<string | null>(null)
+
+  const copy = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopied(id)
+      setTimeout(() => setCopied(null), 2000)
+    } catch {
+      console.error('Failed to copy')
+    }
+  }
+
+  return { copied, copy }
+}
+
+// Metric Badge Component
+function MetricBadge({
+  icon: Icon,
+  label,
+  value,
+  subValue,
+  color = 'gray',
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  subValue?: string
+  color?: 'gray' | 'green' | 'red' | 'blue' | 'amber' | 'purple'
+}) {
+  const colorClasses = {
+    gray: 'bg-gray-100 text-gray-700',
+    green: 'bg-green-100 text-green-700',
+    red: 'bg-red-100 text-red-700',
+    blue: 'bg-blue-100 text-blue-700',
+    amber: 'bg-amber-100 text-amber-700',
+    purple: 'bg-purple-100 text-purple-700',
+  }
+
+  return (
+    <div className={cn('flex items-center gap-2 px-3 py-2 rounded-lg', colorClasses[color])}>
+      <Icon size={14} className="flex-shrink-0" />
+      <div className="min-w-0">
+        <div className="text-xs opacity-75">{label}</div>
+        <div className="font-semibold text-sm truncate">{value}</div>
+        {subValue && <div className="text-xs opacity-75">{subValue}</div>}
+      </div>
+    </div>
+  )
+}
+
+// JSON Viewer with syntax highlighting
+function JsonViewer({
+  data,
+  label,
+  maxHeight = 'max-h-96',
+  id,
+}: {
+  data: unknown
+  label: string
+  maxHeight?: string
+  id: string
+}) {
+  const { copied, copy } = useCopyToClipboard()
+  const jsonString = JSON.stringify(data, null, 2)
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200">
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <FileJson size={14} />
+          {label}
+          <span className="text-xs text-gray-500">({formatBytes(jsonString.length)})</span>
+        </div>
+        <button
+          onClick={() => copy(jsonString, id)}
+          className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-gray-200 transition-colors"
+        >
+          {copied === id ? (
+            <>
+              <Check size={12} className="text-green-600" />
+              <span className="text-green-600">Copied!</span>
+            </>
+          ) : (
+            <>
+              <Clipboard size={12} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className={cn('p-3 text-xs overflow-auto bg-gray-50 font-mono', maxHeight)}>
+        {jsonString}
+      </pre>
+    </div>
+  )
+}
+
+// Stage Details Panel Component
+function StageDetailsPanel({
+  stage,
+  onClose,
+}: {
+  stage: ProcessingStageRecord
+  onClose: () => void
+}) {
+  const statusInfo = getStatusInfo(stage.status)
+  const StageIcon = STAGE_ICONS[stage.stage as ProcessingStage] || FileText
+  const StatusIcon = statusInfo.icon
+  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage, description: '' }
+  const metrics = calculateMetrics(stage)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className={cn('flex items-center justify-between px-6 py-4 border-b', statusInfo.bgColor)}>
+          <div className="flex items-center gap-3">
+            <div className={cn('w-12 h-12 rounded-lg flex items-center justify-center',
+              stage.status === 'completed' ? 'bg-green-200' :
+              stage.status === 'failed' ? 'bg-red-200' :
+              stage.status === 'running' ? 'bg-blue-200' :
+              'bg-gray-200'
+            )}>
+              <StageIcon className={statusInfo.color} size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold text-gray-900">{labels.en}</h3>
+                <span className="text-sm text-gray-500">({labels.tr})</span>
+              </div>
+              <div className="text-sm text-gray-600">{labels.description}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <StatusIcon className={cn(statusInfo.color, stage.status === 'running' && 'animate-spin')} size={20} />
+              <span className={cn('font-medium', statusInfo.color)}>{statusInfo.label}</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-auto p-6 space-y-6">
+          {/* Timing Section */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <MetricBadge
+              icon={Clock}
+              label="Started At"
+              value={formatTimestamp(stage.started_at)}
+              color="blue"
+            />
+            <MetricBadge
+              icon={Timer}
+              label="Duration"
+              value={formatDuration(stage.duration_ms)}
+              color={stage.duration_ms && stage.duration_ms > 5000 ? 'amber' : 'green'}
+            />
+            <MetricBadge
+              icon={Clock}
+              label="Completed At"
+              value={formatTimestamp(stage.completed_at)}
+              color="blue"
+            />
+            <MetricBadge
+              icon={Zap}
+              label="Status"
+              value={statusInfo.label}
+              color={stage.status === 'completed' ? 'green' : stage.status === 'failed' ? 'red' : 'gray'}
+            />
+          </div>
+
+          {/* Metrics Section */}
+          {(metrics.inputSize || metrics.outputSize || metrics.tokens || metrics.cost || metrics.confidence) && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Hash size={14} />
+                Metrics
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {metrics.inputSize !== undefined && (
+                  <MetricBadge
+                    icon={FileInput}
+                    label="Input Size"
+                    value={formatNumber(metrics.inputSize)}
+                    subValue="characters"
+                    color="gray"
+                  />
+                )}
+                {metrics.outputSize !== undefined && (
+                  <MetricBadge
+                    icon={FileOutput}
+                    label="Output Size"
+                    value={formatNumber(metrics.outputSize)}
+                    subValue="characters"
+                    color="gray"
+                  />
+                )}
+                {metrics.charsDelta !== undefined && (
+                  <MetricBadge
+                    icon={metrics.charsDelta >= 0 ? ArrowUp : ArrowDown}
+                    label="Chars Changed"
+                    value={`${metrics.charsDelta >= 0 ? '+' : ''}${formatNumber(metrics.charsDelta)}`}
+                    subValue={metrics.charsPercent ? `${metrics.charsPercent.toFixed(1)}%` : undefined}
+                    color={metrics.charsDelta > 0 ? 'green' : metrics.charsDelta < 0 ? 'amber' : 'gray'}
+                  />
+                )}
+                {metrics.confidence !== undefined && (
+                  <MetricBadge
+                    icon={Zap}
+                    label="Confidence"
+                    value={`${(metrics.confidence * 100).toFixed(0)}%`}
+                    color={metrics.confidence >= 0.8 ? 'green' : metrics.confidence >= 0.6 ? 'amber' : 'red'}
+                  />
+                )}
+                {metrics.tokens?.total !== undefined && (
+                  <MetricBadge
+                    icon={Hash}
+                    label="Tokens"
+                    value={formatNumber(metrics.tokens.total)}
+                    subValue={`In: ${formatNumber(metrics.tokens.input)} / Out: ${formatNumber(metrics.tokens.output)}`}
+                    color="purple"
+                  />
+                )}
+                {metrics.cost !== undefined && (
+                  <MetricBadge
+                    icon={DollarSign}
+                    label="API Cost"
+                    value={formatCurrency(metrics.cost)}
+                    color="amber"
+                  />
+                )}
+                {metrics.itemCount !== undefined && (
+                  <MetricBadge
+                    icon={Hash}
+                    label="Items Found"
+                    value={formatNumber(metrics.itemCount)}
+                    color="blue"
+                  />
+                )}
+                {(metrics.errorCount !== undefined || metrics.warningCount !== undefined) && (
+                  <MetricBadge
+                    icon={AlertCircle}
+                    label="Issues"
+                    value={`${metrics.errorCount || 0} errors, ${metrics.warningCount || 0} warnings`}
+                    color={metrics.errorCount ? 'red' : metrics.warningCount ? 'amber' : 'green'}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error Section */}
+          {stage.error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h4 className="text-sm font-semibold text-red-700 mb-2 flex items-center gap-2">
+                <XCircle size={14} />
+                Error
+              </h4>
+              <div className="text-sm text-red-800 font-mono bg-white p-3 rounded border border-red-200">
+                {stage.error}
+              </div>
+            </div>
+          )}
+
+          {/* Input Section */}
+          {stage.input && Object.keys(stage.input).length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileInput size={14} />
+                Input Data
+              </h4>
+              <JsonViewer
+                data={stage.input}
+                label="Stage Input"
+                id={`${stage.stage}-input`}
+              />
+            </div>
+          )}
+
+          {/* Output Section */}
+          {stage.output && Object.keys(stage.output).length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileOutput size={14} />
+                Output Data
+              </h4>
+              <JsonViewer
+                data={stage.output}
+                label="Stage Output"
+                id={`${stage.stage}-output`}
+              />
+            </div>
+          )}
+
+          {/* Metadata Section */}
+          {stage.metadata && Object.keys(stage.metadata).length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Info size={14} />
+                Metadata
+              </h4>
+              <JsonViewer
+                data={stage.metadata}
+                label="Stage Metadata"
+                id={`${stage.stage}-metadata`}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between px-6 py-4 border-t bg-gray-50">
+          <div className="text-sm text-gray-500">
+            Stage: <code className="bg-gray-200 px-1 rounded">{stage.stage}</code>
+          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // Stage Card Component
 function StageCard({
   stage,
   isLast,
+  onViewDetails,
 }: {
   stage: ProcessingStageRecord
   isLast: boolean
+  onViewDetails: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const statusInfo = getStatusInfo(stage.status)
   const StageIcon = STAGE_ICONS[stage.stage as ProcessingStage] || FileText
   const StatusIcon = statusInfo.icon
-  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage }
+  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage, description: '' }
+  const metrics = calculateMetrics(stage)
 
   const hasDetails = stage.input || stage.output || stage.metadata || stage.error
+
+  // Calculate quick summary metrics for collapsed view
+  const quickMetrics = useMemo(() => {
+    const items: Array<{ label: string; value: string; color?: string }> = []
+
+    if (stage.duration_ms) {
+      items.push({ label: 'Time', value: formatDuration(stage.duration_ms) })
+    }
+
+    if (metrics.outputSize) {
+      items.push({ label: 'Chars', value: formatNumber(metrics.outputSize) })
+    }
+
+    if (metrics.charsDelta !== undefined && metrics.charsDelta !== 0) {
+      items.push({
+        label: 'Delta',
+        value: `${metrics.charsDelta >= 0 ? '+' : ''}${formatNumber(metrics.charsDelta)}`,
+        color: metrics.charsDelta > 0 ? 'text-green-600' : 'text-amber-600'
+      })
+    }
+
+    if (metrics.confidence !== undefined) {
+      items.push({
+        label: 'Conf',
+        value: `${(metrics.confidence * 100).toFixed(0)}%`,
+        color: metrics.confidence >= 0.8 ? 'text-green-600' : 'text-amber-600'
+      })
+    }
+
+    if (metrics.itemCount !== undefined) {
+      items.push({ label: 'Items', value: String(metrics.itemCount) })
+    }
+
+    if (metrics.tokens?.total) {
+      items.push({ label: 'Tokens', value: formatNumber(metrics.tokens.total) })
+    }
+
+    if (metrics.cost !== undefined) {
+      items.push({ label: 'Cost', value: formatCurrency(metrics.cost), color: 'text-amber-600' })
+    }
+
+    return items
+  }, [stage, metrics])
 
   return (
     <div className="relative">
@@ -171,19 +673,23 @@ function StageCard({
       {/* Stage card */}
       <div
         className={cn(
-          'relative border rounded-lg p-4 transition-all',
+          'relative border rounded-lg transition-all',
           statusInfo.bgColor,
           statusInfo.borderColor,
-          hasDetails && 'cursor-pointer hover:shadow-md'
         )}
-        onClick={() => hasDetails && setExpanded(!expanded)}
       >
-        {/* Header row */}
-        <div className="flex items-center gap-3">
+        {/* Header row - Always clickable to expand */}
+        <div
+          className={cn(
+            'flex items-center gap-3 p-4',
+            hasDetails && 'cursor-pointer hover:bg-white/50'
+          )}
+          onClick={() => hasDetails && setExpanded(!expanded)}
+        >
           {/* Stage icon */}
           <div
             className={cn(
-              'w-10 h-10 rounded-lg flex items-center justify-center',
+              'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
               stage.status === 'completed' ? 'bg-green-100' :
               stage.status === 'failed' ? 'bg-red-100' :
               stage.status === 'running' ? 'bg-blue-100' :
@@ -195,26 +701,33 @@ function StageCard({
 
           {/* Stage info */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-gray-900">{labels.en}</span>
               <span className="text-sm text-gray-500">({labels.tr})</span>
             </div>
-            <div className="flex items-center gap-3 text-sm text-gray-500">
+            <div className="flex items-center gap-3 text-sm text-gray-500 flex-wrap">
               <span className="flex items-center gap-1">
                 <Clock size={12} />
                 {formatTimestamp(stage.started_at)}
               </span>
-              {stage.duration_ms && (
+              {stage.duration_ms !== undefined && stage.duration_ms !== 0 && (
                 <span className="flex items-center gap-1">
                   <ArrowRight size={12} />
                   {formatDuration(stage.duration_ms)}
                 </span>
               )}
+              {/* Quick metrics */}
+              {quickMetrics.slice(0, 4).map((m, i) => (
+                <span key={i} className={cn('hidden sm:inline-flex items-center gap-1', m.color)}>
+                  <span className="text-gray-400">{m.label}:</span>
+                  <span className="font-medium">{m.value}</span>
+                </span>
+              ))}
             </div>
           </div>
 
-          {/* Status */}
-          <div className="flex items-center gap-2">
+          {/* Status and actions */}
+          <div className="flex items-center gap-2 flex-shrink-0">
             <StatusIcon
               className={cn(
                 statusInfo.color,
@@ -222,9 +735,24 @@ function StageCard({
               )}
               size={20}
             />
-            <span className={cn('text-sm font-medium', statusInfo.color)}>
-              {stage.status.charAt(0).toUpperCase() + stage.status.slice(1)}
+            <span className={cn('text-sm font-medium hidden sm:inline', statusInfo.color)}>
+              {statusInfo.label}
             </span>
+
+            {/* View Details button */}
+            {hasDetails && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onViewDetails()
+                }}
+                className="p-2 hover:bg-white rounded-lg transition-colors"
+                title="View Full Details"
+              >
+                <Maximize2 size={16} className="text-gray-500" />
+              </button>
+            )}
+
             {hasDetails && (
               <div className="text-gray-400">
                 {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -235,22 +763,34 @@ function StageCard({
 
         {/* Error message (always visible if present) */}
         {stage.error && (
-          <div className="mt-3 p-2 bg-red-100 border border-red-200 rounded text-sm text-red-700">
+          <div className="mx-4 mb-4 p-2 bg-red-100 border border-red-200 rounded text-sm text-red-700 font-mono">
             {stage.error}
           </div>
         )}
 
-        {/* Expanded details */}
+        {/* Expanded details (inline preview) */}
         {expanded && hasDetails && (
-          <div className="mt-4 space-y-3 border-t border-gray-200 pt-3">
+          <div className="border-t border-gray-200 p-4 space-y-3 bg-white/50">
+            {/* Quick metrics grid */}
+            {quickMetrics.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {quickMetrics.map((m, i) => (
+                  <div key={i} className="flex items-center gap-1 px-2 py-1 bg-white rounded border border-gray-200 text-xs">
+                    <span className="text-gray-500">{m.label}:</span>
+                    <span className={cn('font-semibold', m.color || 'text-gray-900')}>{m.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Input */}
             {stage.input && Object.keys(stage.input).length > 0 && (
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                  <FileJson size={14} />
+                  <FileInput size={14} />
                   Input
                 </div>
-                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-40">
+                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-32">
                   {JSON.stringify(stage.input, null, 2)}
                 </pre>
               </div>
@@ -260,10 +800,10 @@ function StageCard({
             {stage.output && Object.keys(stage.output).length > 0 && (
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                  <FileJson size={14} />
+                  <FileOutput size={14} />
                   Output
                 </div>
-                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-40">
+                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-32">
                   {JSON.stringify(stage.output, null, 2)}
                 </pre>
               </div>
@@ -273,14 +813,26 @@ function StageCard({
             {stage.metadata && Object.keys(stage.metadata).length > 0 && (
               <div>
                 <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                  <FileJson size={14} />
+                  <Info size={14} />
                   Metadata
                 </div>
-                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-40">
+                <pre className="p-2 bg-white rounded border border-gray-200 text-xs overflow-x-auto max-h-32">
                   {JSON.stringify(stage.metadata, null, 2)}
                 </pre>
               </div>
             )}
+
+            {/* Full details button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onViewDetails()
+              }}
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              <ExternalLink size={14} />
+              View Full Stage Details
+            </button>
           </div>
         )}
       </div>
@@ -289,8 +841,29 @@ function StageCard({
 }
 
 export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerProps) {
+  const [selectedStage, setSelectedStage] = useState<ProcessingStageRecord | null>(null)
+  const { copied, copy } = useCopyToClipboard()
+
   const overallStatusInfo = getStatusInfo(log.status as ProcessingStageStatus)
   const OverallStatusIcon = overallStatusInfo.icon
+
+  // Calculate overall stats
+  const stats = useMemo(() => {
+    const completedStages = log.stages.filter(s => s.status === 'completed').length
+    const failedStages = log.stages.filter(s => s.status === 'failed').length
+    const skippedStages = log.stages.filter(s => s.status === 'skipped').length
+
+    let totalTokens = 0
+    let totalCost = 0
+
+    log.stages.forEach(stage => {
+      const m = calculateMetrics(stage)
+      if (m.tokens?.total) totalTokens += m.tokens.total
+      if (m.cost) totalCost += m.cost
+    })
+
+    return { completedStages, failedStages, skippedStages, totalTokens, totalCost }
+  }, [log.stages])
 
   return (
     <div className={cn('space-y-6', className)}>
@@ -299,9 +872,9 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
         <div className="flex items-start justify-between">
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{log.filename}</h3>
-            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500">
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
               {log.file_size && (
-                <span>{(log.file_size / 1024).toFixed(1)} KB</span>
+                <span>{formatBytes(log.file_size)}</span>
               )}
               {log.page_count && (
                 <span>{log.page_count} page{log.page_count !== 1 ? 's' : ''}</span>
@@ -321,7 +894,7 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
         </div>
 
         {/* Summary stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6">
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-sm text-gray-500">Total Duration</div>
             <div className="text-lg font-semibold text-gray-900">
@@ -332,7 +905,10 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-sm text-gray-500">Stages</div>
             <div className="text-lg font-semibold text-gray-900">
-              {log.stages.length}
+              {stats.completedStages}/{log.stages.length}
+              {stats.failedStages > 0 && (
+                <span className="text-red-600 text-sm ml-1">({stats.failedStages} failed)</span>
+              )}
             </div>
           </div>
 
@@ -349,6 +925,33 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {log.ai_provider || '-'}
             </div>
           </div>
+
+          {stats.totalTokens > 0 && (
+            <div className="bg-purple-50 rounded-lg p-3">
+              <div className="text-sm text-purple-600">Total Tokens</div>
+              <div className="text-lg font-semibold text-purple-900">
+                {formatNumber(stats.totalTokens)}
+              </div>
+            </div>
+          )}
+
+          {stats.totalCost > 0 && (
+            <div className="bg-amber-50 rounded-lg p-3">
+              <div className="text-sm text-amber-600">Total Cost</div>
+              <div className="text-lg font-semibold text-amber-900">
+                {formatCurrency(stats.totalCost)}
+              </div>
+            </div>
+          )}
+
+          {log.extraction_confidence && (
+            <div className="bg-blue-50 rounded-lg p-3">
+              <div className="text-sm text-blue-600">Confidence</div>
+              <div className="text-lg font-semibold text-blue-900">
+                {log.extraction_confidence}%
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Extracted summary */}
@@ -359,25 +962,37 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {log.extracted_summary.policy_number && (
                 <div>
                   <span className="text-blue-600">Policy #:</span>{' '}
-                  <span className="text-blue-900">{log.extracted_summary.policy_number}</span>
+                  <span className="text-blue-900 font-medium">{log.extracted_summary.policy_number}</span>
                 </div>
               )}
               {log.extracted_summary.provider && (
                 <div>
                   <span className="text-blue-600">Provider:</span>{' '}
-                  <span className="text-blue-900">{log.extracted_summary.provider}</span>
+                  <span className="text-blue-900 font-medium">{log.extracted_summary.provider}</span>
                 </div>
               )}
               {log.extracted_summary.type_tr && (
                 <div>
                   <span className="text-blue-600">Type:</span>{' '}
-                  <span className="text-blue-900">{log.extracted_summary.type_tr}</span>
+                  <span className="text-blue-900 font-medium">{log.extracted_summary.type_tr}</span>
                 </div>
               )}
               {log.extracted_summary.insured_person && (
                 <div>
                   <span className="text-blue-600">Insured:</span>{' '}
-                  <span className="text-blue-900">{log.extracted_summary.insured_person}</span>
+                  <span className="text-blue-900 font-medium">{log.extracted_summary.insured_person}</span>
+                </div>
+              )}
+              {log.extracted_summary.premium && (
+                <div>
+                  <span className="text-blue-600">Premium:</span>{' '}
+                  <span className="text-blue-900 font-medium">₺{formatNumber(log.extracted_summary.premium)}</span>
+                </div>
+              )}
+              {log.extracted_summary.coverage && (
+                <div>
+                  <span className="text-blue-600">Coverage:</span>{' '}
+                  <span className="text-blue-900 font-medium">₺{formatNumber(log.extracted_summary.coverage)}</span>
                 </div>
               )}
             </div>
@@ -507,7 +1122,27 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
 
       {/* Timeline / Pipeline */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <h4 className="text-md font-semibold text-gray-900 mb-4">Processing Pipeline</h4>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-md font-semibold text-gray-900">Processing Pipeline</h4>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span className="flex items-center gap-1">
+              <CheckCircle size={12} className="text-green-600" />
+              {stats.completedStages}
+            </span>
+            {stats.failedStages > 0 && (
+              <span className="flex items-center gap-1">
+                <XCircle size={12} className="text-red-600" />
+                {stats.failedStages}
+              </span>
+            )}
+            {stats.skippedStages > 0 && (
+              <span className="flex items-center gap-1">
+                <SkipForward size={12} className="text-gray-400" />
+                {stats.skippedStages}
+              </span>
+            )}
+          </div>
+        </div>
 
         <div className="space-y-4">
           {log.stages.map((stage, index) => (
@@ -515,6 +1150,7 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               key={`${stage.stage}-${index}`}
               stage={stage}
               isLast={index === log.stages.length - 1}
+              onViewDetails={() => setSelectedStage(stage)}
             />
           ))}
         </div>
@@ -528,8 +1164,28 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
 
       {/* Raw log data (collapsible) */}
       <details className="bg-white border border-gray-200 rounded-xl">
-        <summary className="p-4 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50">
-          View Raw Log Data
+        <summary className="p-4 cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-between">
+          <span>View Raw Log Data</span>
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              copy(JSON.stringify(log, null, 2), 'raw-log')
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-gray-200 transition-colors"
+          >
+            {copied === 'raw-log' ? (
+              <>
+                <Check size={12} className="text-green-600" />
+                <span className="text-green-600">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Clipboard size={12} />
+                <span>Copy All</span>
+              </>
+            )}
+          </button>
         </summary>
         <div className="p-4 border-t border-gray-200">
           <pre className="text-xs overflow-x-auto bg-gray-50 p-4 rounded-lg max-h-96">
@@ -537,6 +1193,14 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
           </pre>
         </div>
       </details>
+
+      {/* Stage Details Modal */}
+      {selectedStage && (
+        <StageDetailsPanel
+          stage={selectedStage}
+          onClose={() => setSelectedStage(null)}
+        />
+      )}
     </div>
   )
 }
