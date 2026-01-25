@@ -58,9 +58,10 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
       expect(props.isUnlimited.type).toBe('boolean')
       expect(props.isMarketValue.type).toBe('boolean')
 
-      // category is nullable enum
-      expect(props.category.type).toContain('null')
-      expect(props.category.enum).toContain(null)
+      // category is nullable enum using anyOf pattern
+      const category = props.category as { anyOf: Array<{ type: string; enum?: string[] }> }
+      expect(category.anyOf).toBeDefined()
+      expect(category.anyOf).toHaveLength(2)
     })
   })
 
@@ -109,50 +110,74 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
     })
   })
 
-  describe('nullable enums', () => {
-    it('should include null in both type and enum for policyType', () => {
-      const policyType = EXTRACTION_JSON_SCHEMA.schema.properties.policyType
+  describe('nullable enums with anyOf pattern', () => {
+    it('should use anyOf pattern for nullable policyType enum', () => {
+      const policyType = EXTRACTION_JSON_SCHEMA.schema.properties.policyType as {
+        anyOf: Array<{ type: string; enum?: string[] }>
+      }
 
-      expect(policyType.type).toContain('null')
-      expect(policyType.enum).toContain(null)
+      expect(policyType.anyOf).toBeDefined()
+      expect(policyType.anyOf).toHaveLength(2)
 
-      // Valid policy types
-      expect(policyType.enum).toContain('kasko')
-      expect(policyType.enum).toContain('traffic')
-      expect(policyType.enum).toContain('home')
-      expect(policyType.enum).toContain('health')
-      expect(policyType.enum).toContain('life')
-      expect(policyType.enum).toContain('dask')
-      expect(policyType.enum).toContain('business')
-      expect(policyType.enum).toContain('nakliyat')
+      // First option: string enum
+      const stringOption = policyType.anyOf.find((opt) => opt.type === 'string')
+      expect(stringOption).toBeDefined()
+      expect(stringOption?.enum).toContain('kasko')
+      expect(stringOption?.enum).toContain('traffic')
+      expect(stringOption?.enum).toContain('home')
+      expect(stringOption?.enum).toContain('health')
+      expect(stringOption?.enum).toContain('life')
+      expect(stringOption?.enum).toContain('dask')
+      expect(stringOption?.enum).toContain('business')
+      expect(stringOption?.enum).toContain('nakliyat')
+
+      // Second option: null
+      const nullOption = policyType.anyOf.find((opt) => opt.type === 'null')
+      expect(nullOption).toBeDefined()
     })
 
-    it('should include null in both type and enum for paymentFrequency', () => {
-      const paymentFreq = EXTRACTION_JSON_SCHEMA.schema.properties.paymentFrequency
+    it('should use anyOf pattern for nullable paymentFrequency enum', () => {
+      const paymentFreq = EXTRACTION_JSON_SCHEMA.schema.properties.paymentFrequency as {
+        anyOf: Array<{ type: string; enum?: string[] }>
+      }
 
-      expect(paymentFreq.type).toContain('null')
-      expect(paymentFreq.enum).toContain(null)
+      expect(paymentFreq.anyOf).toBeDefined()
+      expect(paymentFreq.anyOf).toHaveLength(2)
 
-      // Valid frequencies
-      expect(paymentFreq.enum).toContain('annual')
-      expect(paymentFreq.enum).toContain('semi-annual')
-      expect(paymentFreq.enum).toContain('quarterly')
-      expect(paymentFreq.enum).toContain('monthly')
+      // First option: string enum
+      const stringOption = paymentFreq.anyOf.find((opt) => opt.type === 'string')
+      expect(stringOption).toBeDefined()
+      expect(stringOption?.enum).toContain('annual')
+      expect(stringOption?.enum).toContain('semi-annual')
+      expect(stringOption?.enum).toContain('quarterly')
+      expect(stringOption?.enum).toContain('monthly')
+
+      // Second option: null
+      const nullOption = paymentFreq.anyOf.find((opt) => opt.type === 'null')
+      expect(nullOption).toBeDefined()
     })
 
-    it('should include null in both type and enum for coverage category', () => {
-      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties.category
+    it('should use anyOf pattern for nullable coverage category enum', () => {
+      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties.category as {
+        anyOf: Array<{ type: string; enum?: string[] }>
+      }
 
-      expect(category.type).toContain('null')
-      expect(category.enum).toContain(null)
+      expect(category.anyOf).toBeDefined()
+      expect(category.anyOf).toHaveLength(2)
 
-      // Valid categories
-      expect(category.enum).toContain('main')
-      expect(category.enum).toContain('liability')
-      expect(category.enum).toContain('supplementary')
-      expect(category.enum).toContain('assistance')
-      expect(category.enum).toContain('legal')
-      expect(category.enum).toContain('other')
+      // First option: string enum
+      const stringOption = category.anyOf.find((opt) => opt.type === 'string')
+      expect(stringOption).toBeDefined()
+      expect(stringOption?.enum).toContain('main')
+      expect(stringOption?.enum).toContain('liability')
+      expect(stringOption?.enum).toContain('supplementary')
+      expect(stringOption?.enum).toContain('assistance')
+      expect(stringOption?.enum).toContain('legal')
+      expect(stringOption?.enum).toContain('other')
+
+      // Second option: null
+      const nullOption = category.anyOf.find((opt) => opt.type === 'null')
+      expect(nullOption).toBeDefined()
     })
   })
 
