@@ -55,6 +55,18 @@ export interface ProcessingStageRecord {
   output?: Record<string, unknown>
   metadata?: Record<string, unknown>
   error?: string
+
+  // Full text content for admin debugging
+  // These are stored separately to allow UI to show previews first
+  full_input_text?: string       // Full input text before this stage
+  full_output_text?: string      // Full output text after this stage
+  full_extracted_json?: string   // Full extracted JSON (for ai_extraction stage)
+  diff_summary?: {               // Text difference summary for preprocessing stages
+    characters_added: number
+    characters_removed: number
+    lines_changed: number
+    major_changes: string[]      // List of significant changes made
+  }
 }
 
 /**
