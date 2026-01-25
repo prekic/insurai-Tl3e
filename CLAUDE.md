@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture
 - **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 22, 2026
+- **Last Updated**: January 25, 2026
 
 ---
 
@@ -121,6 +121,20 @@ insurai/
 | `src/components/ConflictResolutionDialog.tsx` | **NEW** Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | Main nav with auth state |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
+
+### Admin Components (Updated Jan 25, 2026)
+| File | Purpose |
+|------|---------|
+| `src/components/admin/DocumentJourneyViewer.tsx` | **ENHANCED** Full pipeline visualization with content capture and decision context |
+| `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
+| `src/components/admin/AdminLogin.tsx` | Admin login page |
+| `src/components/admin/tabs/PromptsTab.tsx` | Manage AI prompt templates |
+
+### Processing Logger (Updated Jan 25, 2026)
+| File | Purpose |
+|------|---------|
+| `src/lib/processing-logger.ts` | **ENHANCED** Stage logging with full text capture and decision context |
+| `src/types/processing-log.ts` | **ENHANCED** Types for `StageDecisionContext`, full content fields |
 
 ### Authentication & Database
 | File | Purpose |
@@ -1716,6 +1730,63 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   }
   ```
 
+### 24. Document Journey Full Content Capture (Added Jan 25, 2026)
+- **Feature**: Admin Document Journey viewer now shows actual text content at each stage, not just metadata
+- **Problem**: Admins could only see summaries like `text_length: 62459` but not the actual content
+- **Solution**:
+  - Added `full_input_text`, `full_output_text`, `full_extracted_json` fields to `ProcessingStageRecord`
+  - Added `diff_summary` with characters added/removed and sample changes
+  - Created `TextContentViewer` component with expandable sections and copy-to-clipboard
+  - Created `DiffSummaryViewer` component with side-by-side comparison
+  - Updated policy-extractor to log full text at key stages
+- **Files Changed**:
+  - `src/types/processing-log.ts` - New fields for full content
+  - `src/lib/processing-logger.ts` - Updated `CompleteStageOptions` interface
+  - `src/lib/ai/policy-extractor.ts` - Log full text at pdf_extraction, text_preprocessing, ai_extraction, validation
+  - `src/components/admin/DocumentJourneyViewer.tsx` - New viewer components
+- **Stages with Full Content**:
+  - `pdf_extraction`: Full extracted PDF text
+  - `text_preprocessing`: Before/after text with diff summary
+  - `ai_extraction`: Input text and full extracted JSON
+  - `validation`: Final validated policy JSON
+
+### 25. Document Journey Decision Context for Skipped Stages (Added Jan 25, 2026)
+- **Feature**: When pipeline stages are skipped, admins now see detailed explanation of WHY
+- **Problem**: Skipped stages only showed "Text density sufficient" without context
+- **Solution**:
+  - Added `StageDecisionContext` interface with threshold, actual_values, decision_logic, alternatives
+  - Updated `skipStage()` to accept detailed options
+  - Added `DecisionContextViewer` component showing:
+    - Assessment performed (what was checked)
+    - Decision threshold (e.g., chars_per_page < 200)
+    - Actual measured values (formatted table)
+    - Decision logic explanation
+    - What would trigger the stage
+- **Files Changed**:
+  - `src/types/processing-log.ts` - Added `StageDecisionContext` interface
+  - `src/lib/processing-logger.ts` - Updated `skipStage()` method
+  - `src/lib/ai/policy-extractor.ts` - Detailed context for ocr_processing, form_field_enhancement, table_parsing skips
+  - `src/components/admin/DocumentJourneyViewer.tsx` - `DecisionContextViewer` component
+- **Example Decision Context** (for skipped OCR):
+  ```typescript
+  {
+    assessment_performed: 'Text density analysis',
+    threshold: { name: 'chars_per_page', value: 200, comparison: 'less_than' },
+    actual_values: { chars_per_page: 12492, is_likely_scanned: false },
+    decision_logic: 'Text density sufficient (12492 >= 200 threshold)',
+    alternatives: ['OCR triggered if chars_per_page < 200']
+  }
+  ```
+
+### 26. Coverage Name Null Safety (Fixed Jan 25, 2026)
+- **Problem**: Validation stage failed with `Cannot read property 'toLowerCase' of undefined` on coverage.name
+- **Root Cause**: AI extraction could return coverages with `description` but no `name` field
+- **Solution**:
+  - Added `getCoverageName()` helper function for null-safe access
+  - Updated `convertToAnalyzedPolicy` to fallback name to description
+  - Fixed 12+ locations using `.name.toLowerCase()` to use `getCoverageName()`
+- **File**: `src/lib/ai/policy-extractor.ts`
+
 ---
 
 ## Turkish Market Considerations
@@ -2057,4 +2128,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 4500+ tests, all passing
-**Last Updated**: January 20, 2026
+**Last Updated**: January 25, 2026
