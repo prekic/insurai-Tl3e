@@ -213,6 +213,19 @@ function fixSpacedTurkishCharacters(text: string): { text: string; fixCount: num
     [/H\s*A\s*S\s*A\s*R/gi, 'HASAR'],
     [/T\s*A\s*R\s*İ\s*H/gi, 'TARİH'],
     [/P\s*L\s*A\s*K\s*A/gi, 'PLAKA'],
+
+    // Missing critical terms from production logs
+    [/S\s*Ö\s*Z\s*L\s*E\s*Ş\s*M\s*E/gi, 'SÖZLEŞME'],
+    [/T\s*Ü\s*R\s*K/gi, 'TÜRK'],
+    [/T\s*A\s*R\s*A\s*F\s*L\s*A\s*R/gi, 'TARAFLAR'],
+    [/U\s*N\s*V\s*A\s*N/gi, 'UNVAN'],
+    [/A\s*D\s*R\s*E\s*S/gi, 'ADRES'],
+    [/B\s*E\s*Y\s*K\s*O\s*Z/gi, 'BEYKOZ'],
+    [/A\s*N\s*O\s*N\s*İ\s*M/gi, 'ANONİM'],
+    [/V\s*A\s*D\s*E/gi, 'VADE'],
+    [/A\s*C\s*E\s*N\s*T\s*E/gi, 'ACENTE'],
+    [/Y\s*E\s*N\s*İ\s*L\s*E\s*M\s*E/gi, 'YENİLEME'],
+    [/S\s*Ü\s*R\s*E\s*S\s*İ/gi, 'SÜRESİ'],
   ]
 
   for (const [pattern, replacement] of knownSpacedWords) {
@@ -1679,6 +1692,15 @@ export async function processTextEnhanced(
     // Use deterministic clean-room processing
     const cleanRoomResult = processDocumentCleanRoom(rawText, { source, title })
 
+    // IMPORTANT: Clean-room has limited OCR spacing patterns.
+    // Apply comprehensive Turkish spacing fix on the clean copy.
+    const turkishFixResult = fixSpacedTurkishCharacters(cleanRoomResult.cleanCopy)
+    const fixedCleanCopy = turkishFixResult.text
+    const spacedCharsFixed = turkishFixResult.fixCount
+
+    // Update clean copy with fixed text
+    cleanRoomResult.cleanCopy = fixedCleanCopy
+
     // Map clean-room stats to ProcessedTextResult format
     const corrections: TextCorrection[] = []
     if (cleanRoomResult.validationReport.issues.length > 0) {
@@ -1695,7 +1717,7 @@ export async function processTextEnhanced(
       garbageBlocksRemoved: 0, // Clean-room doesn't track this granularly
       qrBlocksRemoved: 0,
       eSigortaArtifactsRemoved: 0,
-      spacedCharsFixed: 0,
+      spacedCharsFixed: spacedCharsFixed, // From Turkish spacing fix
       urlsCleaned: 0,
       linesRemoved: 0,
       totalCharactersRemoved: rawText.length - cleanRoomResult.cleanCopy.length,
