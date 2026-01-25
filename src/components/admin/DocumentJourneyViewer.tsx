@@ -46,6 +46,10 @@ import {
   ExternalLink,
   Maximize2,
   Info,
+  HelpCircle,
+  Lightbulb,
+  Target,
+  Scale,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -53,6 +57,7 @@ import type {
   ProcessingStageRecord,
   ProcessingStage,
   ProcessingStageStatus,
+  StageDecisionContext,
 } from '@/types/processing-log'
 
 interface DocumentJourneyViewerProps {
@@ -571,6 +576,139 @@ function DiffSummaryViewer({
   )
 }
 
+// Decision Context Viewer - explains WHY a stage was skipped
+function DecisionContextViewer({
+  context,
+  stageName: _stageName,
+}: {
+  context: StageDecisionContext
+  stageName: string
+}) {
+  const [expanded, setExpanded] = useState(true)
+
+  return (
+    <div className="border border-purple-200 rounded-lg overflow-hidden bg-purple-50/30">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-purple-100 border-b border-purple-200 cursor-pointer hover:bg-purple-150"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <HelpCircle size={16} />
+          Why Was This Stage Skipped?
+        </div>
+        <span className="text-xs text-purple-600 bg-purple-200 px-2 py-1 rounded">
+          Decision Explanation
+        </span>
+      </div>
+
+      {expanded && (
+        <div className="p-4 space-y-4">
+          {/* Assessment Performed */}
+          <div className="bg-white rounded-lg border border-purple-200 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-purple-700 mb-2">
+              <Search size={14} />
+              Assessment Performed
+            </div>
+            <p className="text-sm text-gray-700">{context.assessment_performed}</p>
+          </div>
+
+          {/* Threshold (if applicable) */}
+          {context.threshold && (
+            <div className="bg-white rounded-lg border border-blue-200 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-700 mb-2">
+                <Target size={14} />
+                Decision Threshold
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <span className="text-gray-500">Threshold Name:</span>
+                  <span className="ml-2 font-mono text-blue-800">{context.threshold.name}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Threshold Value:</span>
+                  <span className="ml-2 font-bold text-blue-800">
+                    {context.threshold.comparison === 'less_than' && '< '}
+                    {context.threshold.comparison === 'greater_than' && '> '}
+                    {context.threshold.comparison === 'equals' && '= '}
+                    {context.threshold.comparison === 'not_equals' && '≠ '}
+                    {formatNumber(context.threshold.value)}
+                    {context.threshold.unit && ` ${context.threshold.unit}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Actual Values */}
+          <div className="bg-white rounded-lg border border-gray-200 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-3">
+              <Scale size={14} />
+              Actual Measured Values
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {Object.entries(context.actual_values).map(([key, value]) => (
+                <div key={key} className="flex justify-between items-center bg-gray-50 rounded px-3 py-2">
+                  <span className="text-xs text-gray-600">{key.replace(/_/g, ' ')}:</span>
+                  <span className={cn(
+                    'text-xs font-mono font-semibold',
+                    typeof value === 'boolean'
+                      ? (value ? 'text-green-700' : 'text-red-700')
+                      : 'text-gray-900'
+                  )}>
+                    {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Decision Logic */}
+          <div className="bg-amber-50 rounded-lg border border-amber-200 p-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
+              <Brain size={14} />
+              Decision Logic
+            </div>
+            <p className="text-sm text-amber-900 leading-relaxed">{context.decision_logic}</p>
+          </div>
+
+          {/* Alternatives */}
+          {context.alternatives && context.alternatives.length > 0 && (
+            <div className="bg-green-50 rounded-lg border border-green-200 p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-green-800 mb-2">
+                <Lightbulb size={14} />
+                What Would Trigger This Stage?
+              </div>
+              <ul className="space-y-2">
+                {context.alternatives.map((alt, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-green-800">
+                    <ArrowRight size={14} className="mt-0.5 flex-shrink-0" />
+                    <span>{alt}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Documentation Link */}
+          {context.documentation_url && (
+            <a
+              href={context.documentation_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              <ExternalLink size={14} />
+              View Documentation
+            </a>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Stage Details Panel Component
 function StageDetailsPanel({
   stage,
@@ -742,6 +880,14 @@ function StageDetailsPanel({
                 {stage.error}
               </div>
             </div>
+          )}
+
+          {/* Decision Context Section - explains why stage was skipped */}
+          {stage.decision_context && (
+            <DecisionContextViewer
+              context={stage.decision_context}
+              stageName={stage.stage}
+            />
           )}
 
           {/* Input Section */}
