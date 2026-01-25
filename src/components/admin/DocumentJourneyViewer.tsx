@@ -365,6 +365,212 @@ function JsonViewer({
   )
 }
 
+// Full Text Content Viewer with expandable sections
+function TextContentViewer({
+  text,
+  label,
+  id,
+  icon: Icon = FileText,
+  defaultExpanded = false,
+}: {
+  text: string
+  label: string
+  id: string
+  icon?: LucideIcon
+  defaultExpanded?: boolean
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
+  const [showFullText, setShowFullText] = useState(false)
+  const { copied, copy } = useCopyToClipboard()
+
+  const lineCount = text.split('\n').length
+  const charCount = text.length
+  const previewLines = 20
+  const previewText = text.split('\n').slice(0, previewLines).join('\n')
+  const hasMore = lineCount > previewLines
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      {/* Header - always visible, clickable to expand */}
+      <div
+        className={cn(
+          'flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-150',
+        )}
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          <Icon size={14} />
+          {label}
+          <span className="text-xs text-gray-500">
+            ({formatNumber(charCount)} chars, {formatNumber(lineCount)} lines)
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              copy(text, id)
+            }}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded hover:bg-gray-200 transition-colors"
+          >
+            {copied === id ? (
+              <>
+                <Check size={12} className="text-green-600" />
+                <span className="text-green-600">Copied!</span>
+              </>
+            ) : (
+              <>
+                <Clipboard size={12} />
+                <span>Copy All</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Content - shown when expanded */}
+      {expanded && (
+        <div className="relative">
+          <pre className={cn(
+            'p-3 text-xs overflow-auto bg-gray-50 font-mono whitespace-pre-wrap break-words',
+            showFullText ? 'max-h-[70vh]' : 'max-h-96'
+          )}>
+            {showFullText ? text : previewText}
+            {!showFullText && hasMore && '\n...'}
+          </pre>
+
+          {/* Show more/less button */}
+          {hasMore && (
+            <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-gray-100 to-transparent py-3 px-4">
+              <button
+                onClick={() => setShowFullText(!showFullText)}
+                className="flex items-center gap-2 mx-auto px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
+              >
+                {showFullText ? (
+                  <>
+                    <ArrowUp size={14} />
+                    Show Less
+                  </>
+                ) : (
+                  <>
+                    <ArrowDown size={14} />
+                    Show All {formatNumber(lineCount - previewLines)} More Lines
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Diff Summary Viewer for text preprocessing
+function DiffSummaryViewer({
+  diffSummary,
+  inputText,
+  outputText,
+}: {
+  diffSummary: {
+    characters_added: number
+    characters_removed: number
+    lines_changed: number
+    major_changes: string[]
+  }
+  inputText?: string
+  outputText?: string
+}) {
+  const [showSideBySide, setShowSideBySide] = useState(false)
+  const netChange = diffSummary.characters_added - diffSummary.characters_removed
+
+  return (
+    <div className="border border-gray-200 rounded-lg overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-b border-gray-200">
+        <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+          <GitMerge size={14} />
+          Text Diff Summary
+        </div>
+        {inputText && outputText && (
+          <button
+            onClick={() => setShowSideBySide(!showSideBySide)}
+            className="flex items-center gap-1 px-2 py-1 text-xs rounded bg-amber-100 hover:bg-amber-200 transition-colors text-amber-800"
+          >
+            <Maximize2 size={12} />
+            {showSideBySide ? 'Hide Comparison' : 'Side-by-Side'}
+          </button>
+        )}
+      </div>
+
+      <div className="p-4 space-y-4">
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-green-700">+{formatNumber(diffSummary.characters_added)}</div>
+            <div className="text-xs text-green-600">Characters Added</div>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+            <div className="text-lg font-bold text-red-700">-{formatNumber(diffSummary.characters_removed)}</div>
+            <div className="text-xs text-red-600">Characters Removed</div>
+          </div>
+          <div className={cn(
+            'border rounded-lg p-3 text-center',
+            netChange >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
+          )}>
+            <div className={cn('text-lg font-bold', netChange >= 0 ? 'text-blue-700' : 'text-amber-700')}>
+              {netChange >= 0 ? '+' : ''}{formatNumber(netChange)}
+            </div>
+            <div className={cn('text-xs', netChange >= 0 ? 'text-blue-600' : 'text-amber-600')}>Net Change</div>
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-lg p-3">
+          <div className="text-sm font-medium text-gray-700 mb-1">Lines Changed: {formatNumber(diffSummary.lines_changed)}</div>
+        </div>
+
+        {/* Major changes */}
+        {diffSummary.major_changes.length > 0 && (
+          <div>
+            <h5 className="text-sm font-semibold text-gray-700 mb-2">Sample Changes:</h5>
+            <div className="space-y-2 max-h-48 overflow-auto">
+              {diffSummary.major_changes.map((change, i) => (
+                <div key={i} className="bg-gray-50 rounded p-2 text-xs font-mono text-gray-700">
+                  {change}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Side-by-side comparison */}
+        {showSideBySide && inputText && outputText && (
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-red-50 px-3 py-2 text-sm font-medium text-red-800 border-b border-gray-200">
+                Before (Input)
+              </div>
+              <pre className="p-2 text-xs max-h-64 overflow-auto bg-gray-50 font-mono whitespace-pre-wrap">
+                {inputText.substring(0, 5000)}
+                {inputText.length > 5000 && `\n\n... (${formatNumber(inputText.length - 5000)} more characters)`}
+              </pre>
+            </div>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-green-50 px-3 py-2 text-sm font-medium text-green-800 border-b border-gray-200">
+                After (Output)
+              </div>
+              <pre className="p-2 text-xs max-h-64 overflow-auto bg-gray-50 font-mono whitespace-pre-wrap">
+                {outputText.substring(0, 5000)}
+                {outputText.length > 5000 && `\n\n... (${formatNumber(outputText.length - 5000)} more characters)`}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // Stage Details Panel Component
 function StageDetailsPanel({
   stage,
@@ -579,6 +785,74 @@ function StageDetailsPanel({
                 data={stage.metadata}
                 label="Stage Metadata"
                 id={`${stage.stage}-metadata`}
+              />
+            </div>
+          )}
+
+          {/* ========== FULL CONTENT SECTIONS ========== */}
+
+          {/* Diff Summary for text preprocessing */}
+          {stage.diff_summary && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <GitMerge size={14} />
+                Text Changes (Diff Summary)
+              </h4>
+              <DiffSummaryViewer
+                diffSummary={stage.diff_summary}
+                inputText={stage.full_input_text}
+                outputText={stage.full_output_text}
+              />
+            </div>
+          )}
+
+          {/* Full Input Text */}
+          {stage.full_input_text && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileInput size={14} />
+                Full Input Text
+              </h4>
+              <TextContentViewer
+                text={stage.full_input_text}
+                label="Input Text (Before Processing)"
+                id={`${stage.stage}-full-input`}
+                icon={FileInput}
+                defaultExpanded={false}
+              />
+            </div>
+          )}
+
+          {/* Full Output Text */}
+          {stage.full_output_text && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileOutput size={14} />
+                Full Output Text
+              </h4>
+              <TextContentViewer
+                text={stage.full_output_text}
+                label="Output Text (After Processing)"
+                id={`${stage.stage}-full-output`}
+                icon={FileOutput}
+                defaultExpanded={false}
+              />
+            </div>
+          )}
+
+          {/* Full Extracted JSON */}
+          {stage.full_extracted_json && (
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <FileJson size={14} />
+                Full Extracted Data (JSON)
+              </h4>
+              <TextContentViewer
+                text={stage.full_extracted_json}
+                label="Extracted JSON"
+                id={`${stage.stage}-full-json`}
+                icon={FileJson}
+                defaultExpanded={false}
               />
             </div>
           )}

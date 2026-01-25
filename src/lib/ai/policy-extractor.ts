@@ -322,6 +322,8 @@ export async function extractPolicyFromDocument(
             form_fields: ocrFormFields?.slice(0, 10),  // First 10 for preview
             tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
           },
+          // Full text for admin debugging
+          full_output_text: documentText,
         })
 
         if (import.meta.env.DEV) {
@@ -367,6 +369,8 @@ export async function extractPolicyFromDocument(
         page_count: parseResult.data.pageCount,
         chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
       },
+      // Full text for admin debugging
+      full_output_text: parseResult.data.text,
     })
 
     // ========== OCR CHECK STAGE ==========
@@ -412,6 +416,8 @@ export async function extractPolicyFromDocument(
             form_fields: ocrFormFields?.slice(0, 10),
             tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
           },
+          // Full text for admin debugging
+          full_output_text: documentText,
         })
 
         if (import.meta.env.DEV) {
@@ -498,7 +504,34 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // Log text preprocessing completion
+  // Calculate diff summary for admin debugging
+  const calculateDiffSummary = (before: string, after: string) => {
+    const beforeLines = before.split('\n')
+    const afterLines = after.split('\n')
+    const changedLines = beforeLines.filter((line, i) => line !== afterLines[i]).length
+
+    // Find major changes (lines that are substantially different)
+    const majorChanges: string[] = []
+    for (let i = 0; i < Math.min(beforeLines.length, afterLines.length, 100); i++) {
+      if (beforeLines[i] !== afterLines[i]) {
+        const before_trimmed = beforeLines[i]?.substring(0, 50) || ''
+        const after_trimmed = afterLines[i]?.substring(0, 50) || ''
+        if (before_trimmed.length > 5 || after_trimmed.length > 5) {
+          majorChanges.push(`Line ${i + 1}: "${before_trimmed}..." → "${after_trimmed}..."`)
+          if (majorChanges.length >= 10) break
+        }
+      }
+    }
+
+    return {
+      characters_added: Math.max(0, after.length - before.length),
+      characters_removed: Math.max(0, before.length - after.length),
+      lines_changed: changedLines,
+      major_changes: majorChanges,
+    }
+  }
+
+  // Log text preprocessing completion with full content for admin debugging
   logger?.completeStage({
     output: {
       processed_text_length: processedText.length,
@@ -506,6 +539,10 @@ export async function extractPolicyFromDocument(
       chars_changed: documentText.length - processedText.length,
       clean_room_used: useCleanRoom,
     },
+    // Full text content for admin debugging
+    full_input_text: documentText,
+    full_output_text: processedText,
+    diff_summary: calculateDiffSummary(documentText, processedText),
   })
 
   // ========== AI EXTRACTION STAGE ==========
@@ -577,6 +614,9 @@ export async function extractPolicyFromDocument(
         coverages: extractedData.coverages?.slice(0, 5) ?? [],  // First 5 coverages for preview
         exclusions_count: extractedData.exclusions?.length ?? 0,
       },
+      // Full content for admin debugging
+      full_input_text: processedText,
+      full_extracted_json: JSON.stringify(extractedData, null, 2),
     })
 
     // Check confidence threshold
@@ -857,7 +897,7 @@ export async function extractPolicyFromDocument(
       }
     }
 
-    // Log validation completion
+    // Log validation completion with full policy data for admin debugging
     logger?.completeStage({
       output: {
         validation_errors: patternValidation?.errors?.length || 0,
@@ -865,6 +905,8 @@ export async function extractPolicyFromDocument(
         enhancements_applied: patternValidation ? Object.keys(patternValidation.enhancements).length : 0,
         final_policy_id: policy.id,
       },
+      // Full policy JSON for admin debugging
+      full_extracted_json: JSON.stringify(policy, null, 2),
     })
 
     // Set extracted summary for admin display

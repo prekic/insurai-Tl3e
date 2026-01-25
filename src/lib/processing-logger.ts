@@ -28,6 +28,16 @@ export interface CreateLogOptions {
 export interface CompleteStageOptions {
   output?: Record<string, unknown>
   metadata?: Record<string, unknown>
+  // Full text content for admin debugging
+  full_input_text?: string
+  full_output_text?: string
+  full_extracted_json?: string
+  diff_summary?: {
+    characters_added: number
+    characters_removed: number
+    lines_changed: number
+    major_changes: string[]
+  }
 }
 
 /**
@@ -143,6 +153,11 @@ export class ProcessingLogger {
         ...this.log.stages[stageIndex].metadata,
         ...options?.metadata,
       },
+      // Store full text content for admin debugging
+      full_input_text: options?.full_input_text,
+      full_output_text: options?.full_output_text,
+      full_extracted_json: options?.full_extracted_json,
+      diff_summary: options?.diff_summary,
     }
 
     this.log.updated_at = new Date().toISOString()
