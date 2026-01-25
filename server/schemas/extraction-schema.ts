@@ -31,8 +31,10 @@ export const EXTRACTION_JSON_SCHEMA = {
         description: 'Insurance company name (e.g., Allianz, Axa, Anadolu Sigorta)',
       },
       policyType: {
-        type: ['string', 'null'],
-        enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat', null],
+        anyOf: [
+          { type: 'string', enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat'] },
+          { type: 'null' },
+        ],
         description: 'Type of insurance policy',
       },
       insuredName: {
@@ -61,8 +63,10 @@ export const EXTRACTION_JSON_SCHEMA = {
           'Currency code - Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR. Default to TRY if not found.',
       },
       paymentFrequency: {
-        type: ['string', 'null'],
-        enum: ['annual', 'semi-annual', 'quarterly', 'monthly', null],
+        anyOf: [
+          { type: 'string', enum: ['annual', 'semi-annual', 'quarterly', 'monthly'] },
+          { type: 'null' },
+        ],
         description: 'How often premium is paid',
       },
       coverages: {
@@ -86,8 +90,10 @@ export const EXTRACTION_JSON_SCHEMA = {
               description: 'Set to true if limit shows "Rayiç Değer" (market value)',
             },
             category: {
-              type: ['string', 'null'],
-              enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other', null],
+              anyOf: [
+                { type: 'string', enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other'] },
+                { type: 'null' },
+              ],
               description:
                 'Coverage category: main (Ana Teminat), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans), legal (Hukuki Koruma), other',
             },
