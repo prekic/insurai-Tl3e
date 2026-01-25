@@ -987,11 +987,16 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     data.specialConditions = []
   }
 
+  // Cast data to allow accessing snake_case fields that AI might return
+  const rawData = data as unknown as Record<string, unknown>
+
   // Determine status based on dates
+  // Handle both camelCase (endDate) and snake_case (end_date) from AI
+  const rawEndDate = data.endDate ?? rawData.end_date as string | undefined
   let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
-  const expiryDateStr = data.endDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  if (data.endDate) {
-    const endDate = new Date(data.endDate)
+  const expiryDateStr = rawEndDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  if (rawEndDate) {
+    const endDate = new Date(rawEndDate)
     const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
 
     if (daysUntilExpiry < 0) {
@@ -1015,47 +1020,65 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     importance: determineCoverageImportance(c),
   }))
 
+  // Get policy type - handle both camelCase and snake_case
+  const rawPolicyType = data.policyType ?? rawData.policy_type as string | undefined
+  const policyType = (rawPolicyType && rawPolicyType in POLICY_TYPES ? rawPolicyType : 'home') as PolicyType
+  const typeInfo = POLICY_TYPES[policyType]
+
+  if (rawPolicyType && !(rawPolicyType in POLICY_TYPES)) {
+    console.warn(`[convertToAnalyzedPolicy] Unknown policy type: ${rawPolicyType}, falling back to 'home'`)
+  }
+
   // Calculate total coverage based on policy type
   // For kasko: use vehicle value (main coverage or market value), NOT sum of all limits
   // For other types: use the main coverage or sum of main coverages
-  const totalCoverage = calculateMainCoverage(data.policyType ?? 'home', coverages)
+  const totalCoverage = calculateMainCoverage(policyType, coverages)
 
-  // Get policy type info with fallback for unknown types
-  const policyType = data.policyType ?? 'home'
-  const typeInfo = POLICY_TYPES[policyType] ?? POLICY_TYPES['home']
-
-  if (!POLICY_TYPES[policyType]) {
-    console.warn(`[convertToAnalyzedPolicy] Unknown policy type: ${policyType}, falling back to 'home'`)
+  // Handle premium - AI might return a number or an object with 'amount' field
+  let premiumValue = 0
+  if (typeof data.premium === 'number') {
+    premiumValue = data.premium
+  } else if (data.premium && typeof data.premium === 'object' && 'amount' in data.premium) {
+    premiumValue = (data.premium as { amount: number }).amount
+    console.log('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
   }
+
+  // Handle policyNumber - AI might return camelCase or snake_case
+  const policyNumber = data.policyNumber ?? rawData.policy_number as string ?? `POL-${Date.now()}`
+
+  // Handle provider - AI might return camelCase or snake_case
+  const provider = data.provider ?? rawData.provider as string ?? 'Unknown Provider'
 
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
     id: crypto.randomUUID(),
-    policyNumber: data.policyNumber ?? `POL-${Date.now()}`,
+    policyNumber,
     type: policyType,
     typeTr: typeInfo.labelTr,
-    provider: data.provider ?? 'Unknown Provider',
+    provider,
     logo: '', // Would need to be mapped from provider name
     coverage: totalCoverage,
-    premium: data.premium ?? 0,
-    monthlyPremium: (data.premium ?? 0) / 12,
+    premium: premiumValue,
+    monthlyPremium: premiumValue / 12,
     deductible: coverages[0]?.deductible ?? 0,
-    startDate: data.startDate ?? now.toISOString().split('T')[0],
+    startDate: data.startDate ?? rawData.start_date as string ?? now.toISOString().split('T')[0],
     expiryDate: expiryDateStr,
     status,
     uploadDate: now.toISOString().split('T')[0],
     fileName: file.name,
     documentType: 'PDF',
     documentUrl: URL.createObjectURL(file),
-    insuredPerson: data.insuredName ?? undefined,
-    location: data.insuredAddress ?? undefined,
-    insuredAddress: data.insuredAddress ?? undefined,
+    insuredPerson: data.insuredName ?? rawData.insured_name as string ?? undefined,
+    location: data.insuredAddress ?? rawData.insured_address as string ?? undefined,
+    insuredAddress: data.insuredAddress ?? rawData.insured_address as string ?? undefined,
     coverages,
     exclusions: data.exclusions,
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
-    currency: data.currency ?? 'TRY',
-    aiConfidence: data.confidence?.overall ?? 0.7,
+    // Currency might be in data.currency, data.premium.currency, or snake_case
+    currency: data.currency ?? (data.premium && typeof data.premium === 'object' ? (data.premium as { currency?: string }).currency : undefined) ?? 'TRY',
+    // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
+    aiConfidence: typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
     aiInsights: generateAIInsights(data),
     marketComparison: generateMarketComparison(data),
     extractedText: rawText,
