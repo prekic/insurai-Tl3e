@@ -481,7 +481,7 @@ describe('PolicyUpload View Analysis', () => {
     await user.click(screen.getByRole('button', { name: /view analysis/i }))
 
     expect(mockAddPolicies).toHaveBeenCalled()
-    expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard', { replace: true })
   })
 
   it('should show view policy button for completed files', async () => {
