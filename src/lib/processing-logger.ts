@@ -41,6 +41,26 @@ export interface CompleteStageOptions {
 }
 
 /**
+ * Options for skipping a stage with detailed decision context
+ */
+export interface SkipStageOptions {
+  reason: string                    // Human-readable reason
+  decision_context: {
+    assessment_performed: string    // What was checked
+    threshold?: {
+      name: string                  // e.g., "chars_per_page"
+      value: number                 // The threshold value
+      unit?: string                 // e.g., "characters", "percent"
+      comparison: 'less_than' | 'greater_than' | 'equals' | 'not_equals'
+    }
+    actual_values: Record<string, number | string | boolean>  // Actual measured values
+    decision_logic: string          // How the decision was made
+    alternatives?: string[]         // What would have triggered the stage
+    documentation_url?: string      // Link to relevant docs
+  }
+}
+
+/**
  * Processing Logger class
  *
  * Tracks the complete processing journey of a document.
@@ -209,15 +229,23 @@ export class ProcessingLogger {
 
   /**
    * Skip a stage (e.g., OCR not needed)
+   * @param stage - The stage to skip
+   * @param reasonOrOptions - Either a simple reason string (legacy) or full SkipStageOptions
    */
-  skipStage(stage: ProcessingStage, reason?: string): void {
+  skipStage(stage: ProcessingStage, reasonOrOptions?: string | SkipStageOptions): void {
+    const isDetailedOptions = typeof reasonOrOptions === 'object' && reasonOrOptions !== null
+
     const stageRecord: ProcessingStageRecord = {
       stage,
       status: 'skipped',
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
       duration_ms: 0,
-      metadata: reason ? { skip_reason: reason } : undefined,
+      metadata: isDetailedOptions
+        ? { skip_reason: reasonOrOptions.reason }
+        : (reasonOrOptions ? { skip_reason: reasonOrOptions } : undefined),
+      // Add detailed decision context if provided
+      decision_context: isDetailedOptions ? reasonOrOptions.decision_context : undefined,
     }
 
     this.log.stages.push(stageRecord)

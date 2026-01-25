@@ -430,7 +430,48 @@ export async function extractPolicyFromDocument(
       }
     } else {
       documentText = parseResult.data.text
-      logger?.skipStage('ocr_processing', isScanned ? 'OCR not configured' : 'Text density sufficient')
+
+      // Calculate values for decision context
+      const textLength = parseResult.data.text.length
+      const pageCount = parseResult.data.pageCount
+      const charsPerPage = Math.round(textLength / Math.max(1, pageCount))
+      const OCR_THRESHOLD = 200 // chars per page
+
+      // Provide detailed decision context for why OCR was skipped
+      logger?.skipStage('ocr_processing', {
+        reason: isScanned ? 'OCR not configured' : 'Text density sufficient',
+        decision_context: {
+          assessment_performed: 'Text density analysis to determine if document is scanned/image-based',
+          threshold: {
+            name: 'chars_per_page',
+            value: OCR_THRESHOLD,
+            unit: 'characters per page',
+            comparison: 'less_than',
+          },
+          actual_values: {
+            total_characters: textLength,
+            page_count: pageCount,
+            chars_per_page: charsPerPage,
+            is_likely_scanned: isScanned,
+            ocr_configured: isOCRConfigured(),
+            useOCR_option: useOCR,
+            typical_text_pdf_range: '1000-5000 chars/page',
+            typical_scanned_pdf_range: '<100 chars/page',
+          },
+          decision_logic: isScanned
+            ? `Document appears scanned (${charsPerPage} chars/page < ${OCR_THRESHOLD} threshold), but OCR is not configured. Using PDF-extracted text.`
+            : `Text density is sufficient (${charsPerPage} chars/page >= ${OCR_THRESHOLD} threshold). PDF text extraction produced readable content, OCR not needed.`,
+          alternatives: isScanned
+            ? [
+                'Configure Google Document AI or Vision API for OCR processing',
+                'Set GOOGLE_CLOUD_API_KEY and GCP_DOCAI_PROCESSOR_ID environment variables',
+              ]
+            : [
+                `OCR would be triggered if chars_per_page < ${OCR_THRESHOLD}`,
+                'OCR is typically needed for scanned documents, photos of documents, or image-based PDFs',
+              ],
+        },
+      })
       logger?.completeStage({ output: { needs_ocr: false, reason: isScanned ? 'ocr_not_configured' : 'sufficient_text' } })
     }
   }
@@ -738,7 +779,31 @@ export async function extractPolicyFromDocument(
         },
       })
     } else {
-      logger?.skipStage('form_field_enhancement', 'No form fields available')
+      // Provide detailed decision context for why form field enhancement was skipped
+      logger?.skipStage('form_field_enhancement', {
+        reason: 'No form fields available',
+        decision_context: {
+          assessment_performed: 'Check for Document AI form fields from OCR stage',
+          actual_values: {
+            form_fields_count: ocrFormFields?.length || 0,
+            ocr_used: usedOCR,
+            ocr_backend: ocrBackend || 'none',
+            has_form_fields: !!(ocrFormFields && ocrFormFields.length > 0),
+          },
+          decision_logic: usedOCR
+            ? `OCR was performed with ${ocrBackend || 'unknown'} backend, but no form fields were detected. Document may not have structured form fields, or OCR backend may not support form field extraction.`
+            : 'OCR was not performed (text PDF with sufficient density), so no Document AI form fields are available. Form field enhancement only works with Document AI OCR output.',
+          alternatives: usedOCR
+            ? [
+                'Use Google Document AI which has better form field detection',
+                'Document may need cleaner scan quality for form field detection',
+              ]
+            : [
+                'Form fields are only available when using Document AI OCR',
+                'For native text PDFs, AI extraction typically captures all data without needing form field enhancement',
+              ],
+        },
+      })
     }
 
     // ========================================================================
@@ -873,7 +938,34 @@ export async function extractPolicyFromDocument(
         logger?.failStage('Table parsing failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
       }
     } else {
-      logger?.skipStage('table_parsing', 'No tables available')
+      // Provide detailed decision context for why table parsing was skipped
+      logger?.skipStage('table_parsing', {
+        reason: 'No tables available',
+        decision_context: {
+          assessment_performed: 'Check for Document AI tables from OCR stage',
+          actual_values: {
+            tables_count: ocrTables?.length || 0,
+            ocr_used: usedOCR,
+            ocr_backend: ocrBackend || 'none',
+            has_tables: !!(ocrTables && ocrTables.length > 0),
+            ai_coverages_count: enhancedExtractedData.coverages?.length || 0,
+          },
+          decision_logic: usedOCR
+            ? `OCR was performed with ${ocrBackend || 'unknown'} backend, but no tables were detected in the document. The AI extraction found ${enhancedExtractedData.coverages?.length || 0} coverages from the text.`
+            : 'OCR was not performed (text PDF with sufficient density), so no Document AI tables are available. Table parsing only works with Document AI OCR output that detects structured tables.',
+          alternatives: usedOCR
+            ? [
+                'Use Google Document AI which has better table detection',
+                'Document may not contain structured coverage tables',
+                'Coverage information may be in paragraph form rather than tables',
+              ]
+            : [
+                'Tables are only available when using Document AI OCR',
+                'For native text PDFs, AI extraction parses coverages from the text directly',
+                'Consider if document actually contains tabular coverage data',
+              ],
+        },
+      })
     }
 
     // ========== VALIDATION STAGE ==========

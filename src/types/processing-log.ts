@@ -43,6 +43,23 @@ export type ProcessingStatus =
   | 'partial'    // Some stages failed but document was saved
 
 /**
+ * Decision context for skipped stages - explains WHY a stage was skipped
+ */
+export interface StageDecisionContext {
+  assessment_performed: string    // What was checked (e.g., "Text density analysis")
+  threshold?: {
+    name: string                  // e.g., "chars_per_page"
+    value: number                 // The threshold value (e.g., 200)
+    unit?: string                 // e.g., "characters per page"
+    comparison: 'less_than' | 'greater_than' | 'equals' | 'not_equals'
+  }
+  actual_values: Record<string, number | string | boolean>  // Actual measured values
+  decision_logic: string          // How the decision was made
+  alternatives?: string[]         // What would have triggered the stage
+  documentation_url?: string      // Link to relevant docs
+}
+
+/**
  * A single processing stage record
  */
 export interface ProcessingStageRecord {
@@ -67,6 +84,9 @@ export interface ProcessingStageRecord {
     lines_changed: number
     major_changes: string[]      // List of significant changes made
   }
+
+  // Decision context for skipped stages - explains WHY it was skipped
+  decision_context?: StageDecisionContext
 }
 
 /**
