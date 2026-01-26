@@ -1,6 +1,7 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, isProxyConfigured, type AIProvider } from './config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
+import { extractWithFallback, type ServerExtractionQuality } from '@/lib/pdf'
 import {
   performOCR,
   type FormField,
@@ -60,6 +61,13 @@ export interface ExtractionResult {
     backend: 'document-ai' | 'vision-api'
     fieldsUsed: number  // How many form fields were used to enhance extraction
     tableCoveragesUsed: number  // How many coverages were extracted from tables
+  }
+  // PDF extraction quality metrics (when available)
+  textQuality?: {
+    score: number
+    method: 'server-cleaned' | 'server-raw' | 'client'
+    issues: string[]
+    ocrRecommended: boolean
   }
 }
 
@@ -257,17 +265,25 @@ export async function extractPolicyFromDocument(
   // ========== PDF EXTRACTION STAGE ==========
   logger?.startStage('pdf_extraction', { filename: file.name, file_size: file.size })
 
-  // Extract text from PDF (with automatic retry for transient errors)
-  const parseResult = await extractTextFromPDFWithRetry(file)
+  // Extract text from PDF using server-side extraction with quality analysis
+  // Falls back to client-side if server unavailable
+  const extractionResult = await extractWithFallback(file, extractTextFromPDFWithRetry)
+
   let documentText: string
   let usedOCR = false
+  let textQuality: ServerExtractionQuality | undefined
 
   // Document AI enhanced data (form fields and tables)
   let ocrFormFields: FormField[] | undefined
   let ocrTables: Table[] | undefined
   let ocrBackend: 'document-ai' | 'vision-api' | undefined
 
-  if (!parseResult.success) {
+  // Track extraction method for result
+  let extractionMethod: 'server-cleaned' | 'server-raw' | 'client' = 'client'
+
+  if (!extractionResult.success) {
+    // Map to legacy result format for error handling
+    const parseResult = { success: false as const, error: extractionResult.error }
     // Map PDF parser error codes to extraction error codes
     const mapPdfErrorCode = (pdfCode: string): ExtractionError['error']['code'] => {
       switch (pdfCode) {
@@ -361,30 +377,49 @@ export async function extractPolicyFromDocument(
     }
   } else {
     // PDF extraction succeeded
-    logger?.setPageCount(parseResult.data.pageCount)
+    const extractedData = extractionResult.data
+    textQuality = extractedData.quality
+    extractionMethod = extractedData.method
+
+    logger?.setPageCount(extractedData.pageCount)
     logger?.completeStage({
       output: {
-        text_length: parseResult.data.text.length,
-        text_preview: parseResult.data.text.substring(0, 500) + '...',
-        page_count: parseResult.data.pageCount,
-        chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
+        text_length: extractedData.text.length,
+        text_preview: extractedData.text.substring(0, 500) + '...',
+        page_count: extractedData.pageCount,
+        chars_per_page: Math.round(extractedData.text.length / extractedData.pageCount),
+        // New: quality metrics from server-side extraction
+        extraction_method: extractedData.method,
+        quality_score: extractedData.quality?.qualityScore,
+        quality_ok: extractedData.quality?.qualityOk,
+        quality_issues: extractedData.quality?.issues,
+        ocr_recommended: extractedData.ocrRecommended,
       },
       // Full text for admin debugging
-      full_output_text: parseResult.data.text,
+      full_output_text: extractedData.text,
     })
 
     // ========== OCR CHECK STAGE ==========
     // Use the new configuration-driven OCR decision engine
     const ocrDecisionEngine = getOCRDecisionEngine()
-    const ocrDecision = ocrDecisionEngine.analyzeDocument(parseResult.data.text)
+    const ocrDecision = ocrDecisionEngine.analyzeDocument(extractedData.text)
+
+    // Also check server-side quality assessment
+    const serverRecommendsOCR = extractedData.ocrRecommended
 
     // Log the comprehensive OCR decision analysis
     logger?.startStage('ocr_check', {
-      text_length: parseResult.data.text.length,
-      page_count: parseResult.data.pageCount,
-      chars_per_page: Math.round(parseResult.data.text.length / parseResult.data.pageCount),
+      text_length: extractedData.text.length,
+      page_count: extractedData.pageCount,
+      chars_per_page: Math.round(extractedData.text.length / extractedData.pageCount),
       ocr_configured: isOCRConfigured(),
-      // New: OCR decision engine metadata
+      // Server-side quality analysis
+      server_quality: {
+        score: textQuality?.qualityScore,
+        issues: textQuality?.issues,
+        ocr_recommended: serverRecommendsOCR,
+      },
+      // OCR decision engine metadata
       ocr_decision: {
         action: ocrDecision.action,
         confidence: ocrDecision.confidence,
@@ -396,10 +431,10 @@ export async function extractPolicyFromDocument(
       },
     })
 
-    // Backward compatibility: derive isScanned from the new decision
-    const isScanned = ocrDecision.action !== 'skip_ocr'
+    // Derive OCR recommendation from both sources
+    const isScanned = ocrDecision.action !== 'skip_ocr' || serverRecommendsOCR
 
-    // Check if PDF appears to be scanned and OCR is available
+    // Check if PDF appears to be scanned/poor quality and OCR is available
     if (useOCR && isOCRConfigured() && isScanned) {
       logger?.completeStage({ output: { needs_ocr: true, reason: 'low_text_density' } })
 
@@ -411,7 +446,7 @@ export async function extractPolicyFromDocument(
         ? await performUnifiedOCR(file, { preferOrchestrator: true })
         : await performOCR(file)
 
-      if (ocrResult.success && ocrResult.data.text.length > parseResult.data.text.length) {
+      if (ocrResult.success && ocrResult.data.text.length > extractedData.text.length) {
         documentText = ocrResult.data.text
         usedOCR = true
         // Store Document AI form fields and tables for later use
@@ -442,11 +477,11 @@ export async function extractPolicyFromDocument(
           console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
         }
       } else {
-        documentText = parseResult.data.text
+        documentText = extractedData.text
         logger?.completeStage({ output: { ocr_improved: false, using_pdf_text: true } })
       }
     } else {
-      documentText = parseResult.data.text
+      documentText = extractedData.text
 
       // Use comprehensive OCR decision data for detailed context
       const densityAnalysis = ocrDecision.analysis.density
@@ -1116,6 +1151,13 @@ export async function extractPolicyFromDocument(
         backend: ocrBackend || 'vision-api',
         fieldsUsed: formFieldsUsed,
         tableCoveragesUsed,
+      } : undefined,
+      // PDF extraction quality metrics
+      textQuality: textQuality ? {
+        score: textQuality.qualityScore,
+        method: extractionMethod,
+        issues: textQuality.issues,
+        ocrRecommended: !textQuality.qualityOk,
       } : undefined,
     }
   } catch (error) {
