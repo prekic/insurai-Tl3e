@@ -1,18 +1,15 @@
-import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isOCRConfigured, isProxyConfigured, type AIProvider } from './config'
+import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isProxyConfigured, type AIProvider } from './config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
-import { extractTextFromPDFWithRetry, isPDFFile } from './pdf-parser'
-import { extractWithFallback, type ServerExtractionQuality } from '@/lib/pdf'
+import { isPDFFile } from './pdf-parser'
 import {
-  performOCR,
+  extractWithDocumentAI,
+  isDocumentOCRAvailable,
+  type PageText,
   type FormField,
   type Table,
-  extractFormFieldMap,
-  findFormField,
-  TURKISH_FORM_FIELD_PATTERNS,
-} from './ocr'
-import { getOCRDecisionEngine } from '@/lib/ocr-decision'
+} from './document-ocr'
+import { extractFormFieldMap, findFormField, TURKISH_FORM_FIELD_PATTERNS } from './ocr'
 import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
-import { performUnifiedOCR, isOrchestratorConfigured } from './ocr-orchestrator-client'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
@@ -54,20 +51,26 @@ export interface ExtractionResult {
     warnings: string[]
     enhanced: string[]
   }
-  // Document AI form fields and tables (when available)
-  documentAI?: {
-    formFields?: FormField[]
-    tables?: Table[]
-    backend: 'document-ai' | 'vision-api'
-    fieldsUsed: number  // How many form fields were used to enhance extraction
-    tableCoveragesUsed: number  // How many coverages were extracted from tables
-  }
-  // PDF extraction quality metrics (when available)
-  textQuality?: {
-    score: number
-    method: 'server-cleaned' | 'server-raw' | 'client'
-    issues: string[]
-    ocrRecommended: boolean
+  // Document AI OCR data (always present with OCR-first approach)
+  documentOCR?: {
+    /** SHA-256 hash of original PDF */
+    pdfHash: string
+    /** Per-page text extraction */
+    pages: PageText[]
+    /** Overall OCR confidence */
+    confidence: number
+    /** Form fields extracted */
+    formFields: FormField[]
+    /** Tables extracted */
+    tables: Table[]
+    /** Fields used to enhance AI extraction */
+    fieldsUsed: number
+    /** Coverages extracted from tables */
+    tableCoveragesUsed: number
+    /** Processing time in ms */
+    processingTimeMs: number
+    /** Warnings from OCR */
+    warnings: string[]
   }
 }
 
@@ -88,10 +91,9 @@ export type ExtractionResponse = ExtractionResult | ExtractionError
 
 export interface ExtractionOptions {
   useFallback?: boolean
-  useOCR?: boolean
+  useOCR?: boolean  // Legacy option, OCR-first is now always used
   useConsensus?: boolean
   useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
-  useOrchestrator?: boolean  // Use OCR orchestrator for multi-engine OCR (default: auto-detect)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
   /** Optional logger for tracking processing stages with actual data */
@@ -222,10 +224,9 @@ export async function extractPolicyFromDocument(
 ): Promise<ExtractionResponse> {
   const {
     useFallback = true,
-    useOCR = true,
+    // useOCR is a legacy option, OCR-first is now always used
     useConsensus = true,
     useCleanRoom = true,  // Default to clean-room processing
-    useOrchestrator = isOrchestratorConfigured(),  // Auto-detect orchestrator
     primaryProvider,
     providers,
     logger,  // Optional processing logger for tracking stages
@@ -262,333 +263,99 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // ========== PDF EXTRACTION STAGE ==========
-  logger?.startStage('pdf_extraction', { filename: file.name, file_size: file.size })
+  // ========== DOCUMENT AI OCR EXTRACTION STAGE ==========
+  // OCR-first approach: ALWAYS use Document AI OCR for text extraction
+  // This ensures consistent, high-quality text for all PDFs (native or scanned)
+  logger?.startStage('ocr_processing', {
+    filename: file.name,
+    file_size: file.size,
+    strategy: 'ocr-first',
+    backend: 'document-ai',
+  })
 
-  // Extract text from PDF using server-side extraction with quality analysis
-  // Falls back to client-side if server unavailable
-  const extractionResult = await extractWithFallback(file, extractTextFromPDFWithRetry)
-
-  let documentText: string
-  let usedOCR = false
-  let textQuality: ServerExtractionQuality | undefined
-
-  // Document AI enhanced data (form fields and tables)
-  let ocrFormFields: FormField[] | undefined
-  let ocrTables: Table[] | undefined
-  let ocrBackend: 'document-ai' | 'vision-api' | undefined
-
-  // Track extraction method for result
-  let extractionMethod: 'server-cleaned' | 'server-raw' | 'client' = 'client'
-
-  if (!extractionResult.success) {
-    // Map to legacy result format for error handling
-    const parseResult = { success: false as const, error: extractionResult.error }
-    // Map PDF parser error codes to extraction error codes
-    const mapPdfErrorCode = (pdfCode: string): ExtractionError['error']['code'] => {
-      switch (pdfCode) {
-        case 'TIMEOUT_ERROR':
-          return 'PDF_TIMEOUT'
-        case 'WORKER_ERROR':
-          return 'PDF_WORKER_ERROR'
-        case 'FILE_READ_ERROR':
-          return 'FILE_READ_ERROR'
-        default:
-          return 'PDF_PARSE_ERROR'
-      }
+  // Check if Document AI OCR is available
+  if (!isDocumentOCRAvailable()) {
+    logger?.failStage('Document AI OCR not configured')
+    if (useFallback) {
+      return createFallbackResult(file)
     }
-
-    // PDF extraction failed - log and check for OCR
-    logger?.failStage('PDF text extraction failed: ' + parseResult.error.message)
-
-    // ========== OCR CHECK STAGE ==========
-    logger?.startStage('ocr_check', { pdf_failed: true, ocr_configured: isOCRConfigured() })
-
-    // Check if we should try OCR
-    if (useOCR && isOCRConfigured()) {
-      logger?.completeStage({ output: { needs_ocr: true, reason: 'pdf_extraction_failed' } })
-
-      // ========== OCR PROCESSING STAGE ==========
-      logger?.startStage('ocr_processing', { method: useOrchestrator ? 'orchestrator' : 'direct' })
-
-      // Use unified OCR (orchestrator if available, otherwise direct)
-      const ocrResult = useOrchestrator
-        ? await performUnifiedOCR(file, { preferOrchestrator: true })
-        : await performOCR(file)
-
-      if (ocrResult.success && ocrResult.data.text.length > 50) {
-        documentText = ocrResult.data.text
-        usedOCR = true
-        // Store Document AI form fields and tables for later use
-        ocrFormFields = ocrResult.data.formFields
-        ocrTables = ocrResult.data.tables
-        ocrBackend = ocrResult.data.backend
-
-        // Log OCR success with details
-        logger?.setOCRUsed(ocrBackend || 'unknown')
-        logger?.completeStage({
-          output: {
-            text_length: documentText.length,
-            text_preview: documentText.substring(0, 500) + '...',
-            form_fields_count: ocrFormFields?.length || 0,
-            tables_count: ocrTables?.length || 0,
-            backend: ocrBackend,
-          },
-          metadata: {
-            form_fields: ocrFormFields?.slice(0, 10),  // First 10 for preview
-            tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
-          },
-          // Full text for admin debugging
-          full_output_text: documentText,
-        })
-
-        if (import.meta.env.DEV) {
-          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
-          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
-        }
-      } else {
-        logger?.failStage('OCR failed or produced insufficient text')
-        if (useFallback) {
-          return createFallbackResult(file)
-        }
-        return {
-          success: false,
-          error: {
-            code: mapPdfErrorCode(parseResult.error.code),
-            message: parseResult.error.message,
-            details: parseResult.error.code,
-          },
-          fallbackAvailable: false,
-        }
-      }
-    } else {
-      if (useFallback) {
-        return createFallbackResult(file)
-      }
-      return {
-        success: false,
-        error: {
-          code: mapPdfErrorCode(parseResult.error.code),
-          message: parseResult.error.message,
-          details: parseResult.error.code,
-        },
-        fallbackAvailable: false,
-      }
+    return {
+      success: false,
+      error: {
+        code: 'OCR_ERROR',
+        message: 'Document AI OCR is not configured',
+        details: 'Ensure the backend server is running with GCP credentials configured for Document AI',
+      },
+      fallbackAvailable: true,
     }
-  } else {
-    // PDF extraction succeeded
-    const extractedData = extractionResult.data
-    textQuality = extractedData.quality
-    extractionMethod = extractedData.method
+  }
 
-    logger?.setPageCount(extractedData.pageCount)
-    logger?.completeStage({
-      output: {
-        text_length: extractedData.text.length,
-        text_preview: extractedData.text.substring(0, 500) + '...',
-        page_count: extractedData.pageCount,
-        chars_per_page: Math.round(extractedData.text.length / extractedData.pageCount),
-        // New: quality metrics from server-side extraction
-        extraction_method: extractedData.method,
-        quality_score: extractedData.quality?.qualityScore,
-        quality_ok: extractedData.quality?.qualityOk,
-        quality_issues: extractedData.quality?.issues,
-        ocr_recommended: extractedData.ocrRecommended,
-      },
-      // Full text for admin debugging
-      full_output_text: extractedData.text,
-    })
+  // Extract text using Document AI OCR (always, regardless of native text)
+  const ocrResult = await extractWithDocumentAI(file)
 
-    // ========== OCR CHECK STAGE ==========
-    // Use the new configuration-driven OCR decision engine
-    const ocrDecisionEngine = getOCRDecisionEngine()
-    const ocrDecision = ocrDecisionEngine.analyzeDocument(extractedData.text)
-
-    // Also check server-side quality assessment
-    const serverRecommendsOCR = extractedData.ocrRecommended
-
-    // Log the comprehensive OCR decision analysis
-    logger?.startStage('ocr_check', {
-      text_length: extractedData.text.length,
-      page_count: extractedData.pageCount,
-      chars_per_page: Math.round(extractedData.text.length / extractedData.pageCount),
-      ocr_configured: isOCRConfigured(),
-      // Server-side quality analysis
-      server_quality: {
-        score: textQuality?.qualityScore,
-        issues: textQuality?.issues,
-        ocr_recommended: serverRecommendsOCR,
-      },
-      // OCR decision engine metadata
-      ocr_decision: {
-        action: ocrDecision.action,
-        confidence: ocrDecision.confidence,
-        detected_language: ocrDecision.document_classification.detected_language.locale_code,
-        language_confidence: ocrDecision.document_classification.detected_language.confidence,
-        detected_policy_type: ocrDecision.document_classification.detected_policy_type.policy_type_id,
-        policy_type_confidence: ocrDecision.document_classification.detected_policy_type.confidence,
-        matched_terms: ocrDecision.document_classification.detected_policy_type.matched_terms,
-      },
-    })
-
-    // Derive OCR recommendation from both sources
-    const isScanned = ocrDecision.action !== 'skip_ocr' || serverRecommendsOCR
-
-    // Check if PDF appears to be scanned/poor quality and OCR is available
-    if (useOCR && isOCRConfigured() && isScanned) {
-      logger?.completeStage({ output: { needs_ocr: true, reason: 'low_text_density' } })
-
-      // ========== OCR PROCESSING STAGE ==========
-      logger?.startStage('ocr_processing', { method: useOrchestrator ? 'orchestrator' : 'direct' })
-
-      // Use unified OCR (orchestrator if available, otherwise direct)
-      const ocrResult = useOrchestrator
-        ? await performUnifiedOCR(file, { preferOrchestrator: true })
-        : await performOCR(file)
-
-      if (ocrResult.success && ocrResult.data.text.length > extractedData.text.length) {
-        documentText = ocrResult.data.text
-        usedOCR = true
-        // Store Document AI form fields and tables for later use
-        ocrFormFields = ocrResult.data.formFields
-        ocrTables = ocrResult.data.tables
-        ocrBackend = ocrResult.data.backend
-
-        // Log OCR success with details
-        logger?.setOCRUsed(ocrBackend || 'unknown')
-        logger?.completeStage({
-          output: {
-            text_length: documentText.length,
-            text_preview: documentText.substring(0, 500) + '...',
-            form_fields_count: ocrFormFields?.length || 0,
-            tables_count: ocrTables?.length || 0,
-            backend: ocrBackend,
-          },
-          metadata: {
-            form_fields: ocrFormFields?.slice(0, 10),
-            tables_structure: ocrTables?.map(t => ({ rows: t.rows?.length || 0, cols: t.rows?.[0]?.cells?.length || 0 })),
-          },
-          // Full text for admin debugging
-          full_output_text: documentText,
-        })
-
-        if (import.meta.env.DEV) {
-          const method = 'method' in ocrResult ? ocrResult.method : 'direct'
-          console.log(`[OCR] Method: ${method}, ${ocrFormFields?.length || 0} form fields, ${ocrTables?.length || 0} tables`)
-        }
-      } else {
-        documentText = extractedData.text
-        logger?.completeStage({ output: { ocr_improved: false, using_pdf_text: true } })
-      }
-    } else {
-      documentText = extractedData.text
-
-      // Use comprehensive OCR decision data for detailed context
-      const densityAnalysis = ocrDecision.analysis.density
-      const qualityAnalysis = ocrDecision.analysis.text_quality
-      const fieldAnalysis = ocrDecision.analysis.field_extraction
-      const confidenceBreakdown = ocrDecision.analysis.confidence_breakdown
-
-      // Provide detailed decision context with full OCR decision engine output
-      logger?.skipStage('ocr_processing', {
-        reason: isScanned ? 'OCR not configured' : 'Text density and quality sufficient',
-        decision_context: {
-          assessment_performed: 'Comprehensive document analysis including language detection, policy type classification, text quality, and field extraction testing',
-          threshold: {
-            name: 'overall_confidence',
-            value: 0.85,
-            unit: 'confidence score (0-1)',
-            comparison: 'greater_than',
-          },
-          actual_values: {
-            // Basic density metrics
-            total_characters: densityAnalysis.total_characters,
-            total_pages: densityAnalysis.total_pages,
-            chars_per_page: densityAnalysis.average_chars_per_page,
-            chars_threshold: densityAnalysis.threshold_used,
-            pages_below_threshold: densityAnalysis.pages_below_threshold.length,
-            // Language detection
-            detected_language: ocrDecision.document_classification.detected_language.locale_code,
-            language_confidence: `${(ocrDecision.document_classification.detected_language.confidence * 100).toFixed(0)}%`,
-            // Policy type classification
-            detected_policy_type: ocrDecision.document_classification.detected_policy_type.policy_type_name,
-            policy_confidence: `${(ocrDecision.document_classification.detected_policy_type.confidence * 100).toFixed(0)}%`,
-            matched_terms: ocrDecision.document_classification.detected_policy_type.matched_terms.join(', '),
-            // Text quality
-            text_quality_score: `${(qualityAnalysis.quality_score * 100).toFixed(0)}%`,
-            insurance_terms_found: `${qualityAnalysis.terms_found}/${qualityAnalysis.terms_checked}`,
-            encoding_issues: qualityAnalysis.encoding_issues,
-            // Field extraction
-            required_fields_found: `${fieldAnalysis.required_fields_found}/${fieldAnalysis.required_fields_total}`,
-            extraction_rate: `${(fieldAnalysis.extraction_rate * 100).toFixed(0)}%`,
-            // Overall decision
-            overall_confidence: `${(ocrDecision.confidence * 100).toFixed(0)}%`,
-            ocr_action: ocrDecision.action,
-            ocr_configured: isOCRConfigured(),
-            useOCR_option: useOCR,
-          },
-          decision_logic: ocrDecision.reasoning.join(' '),
-          alternatives: isScanned
-            ? [
-                'Configure Google Document AI or Vision API for OCR processing',
-                'Set GOOGLE_CLOUD_API_KEY and GCP_DOCAI_PROCESSOR_ID environment variables',
-                `Lower the skip_ocr threshold from 0.85 (current confidence: ${(ocrDecision.confidence * 100).toFixed(0)}%)`,
-              ]
-            : [
-                `OCR would be triggered if overall_confidence < 0.60`,
-                `Currently detecting ${ocrDecision.document_classification.detected_language.locale_code.toUpperCase()} ${ocrDecision.document_classification.detected_policy_type.policy_type_name} policy`,
-                'Add more detection terms in config if policy type was misclassified',
-              ],
-        },
-      })
-
-      // Log comprehensive OCR decision output for admin viewing
-      logger?.completeStage({
-        output: {
-          needs_ocr: false,
-          reason: isScanned ? 'ocr_not_configured' : 'sufficient_text_and_quality',
-          ocr_decision_summary: {
-            action: ocrDecision.action,
-            confidence: ocrDecision.confidence,
-            duration_ms: ocrDecision.duration_ms,
-          },
-        },
-        // Full OCR decision metadata for Document Journey viewer
-        metadata: {
-          document_classification: ocrDecision.document_classification,
-          configurations_used: ocrDecision.configurations_used,
-          analysis: {
-            density: {
-              total_pages: densityAnalysis.total_pages,
-              total_characters: densityAnalysis.total_characters,
-              average_chars_per_page: densityAnalysis.average_chars_per_page,
-              threshold_used: densityAnalysis.threshold_used,
-              pages_below_threshold: densityAnalysis.pages_below_threshold,
-              min_chars_page: densityAnalysis.min_chars_page,
-              max_chars_page: densityAnalysis.max_chars_page,
-            },
-            text_quality: {
-              quality_score: qualityAnalysis.quality_score,
-              terms_found: qualityAnalysis.terms_found,
-              terms_checked: qualityAnalysis.terms_checked,
-              found_terms_sample: qualityAnalysis.found_terms_sample,
-              encoding_issues: qualityAnalysis.encoding_issues,
-              locale_used: qualityAnalysis.locale_used,
-            },
-            field_extraction: {
-              fields_checked: fieldAnalysis.fields_checked,
-              fields_found: fieldAnalysis.fields_found,
-              required_fields_found: fieldAnalysis.required_fields_found,
-              required_fields_total: fieldAnalysis.required_fields_total,
-              extraction_rate: fieldAnalysis.extraction_rate,
-              field_results: fieldAnalysis.field_results,
-            },
-            confidence_breakdown: confidenceBreakdown,
-          },
-          reasoning: ocrDecision.reasoning,
-        },
-      })
+  if (!ocrResult.success) {
+    logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`)
+    if (useFallback) {
+      return createFallbackResult(file)
     }
+    return {
+      success: false,
+      error: {
+        code: 'OCR_ERROR',
+        message: ocrResult.error.message,
+        details: ocrResult.error.details,
+      },
+      fallbackAvailable: true,
+    }
+  }
+
+  // OCR succeeded - store results
+  const ocrData = ocrResult.data
+  const documentText = ocrData.text
+  const ocrFormFields = ocrData.formFields
+  const ocrTables = ocrData.tables
+
+  // Always mark as OCR-processed with this approach
+  const usedOCR = true
+
+  // Log OCR success with comprehensive details
+  logger?.setOCRUsed('document-ai')
+  logger?.setPageCount(ocrData.pageCount)
+  logger?.completeStage({
+    output: {
+      text_length: documentText.length,
+      text_preview: documentText.substring(0, 500) + '...',
+      page_count: ocrData.pageCount,
+      confidence: ocrData.confidence,
+      pdf_hash: ocrData.pdfHash,
+      form_fields_count: ocrFormFields.length,
+      tables_count: ocrTables.length,
+      processing_time_ms: ocrData.metadata.processingTimeMs,
+      warnings: ocrData.metadata.warnings,
+    },
+    metadata: {
+      pages: ocrData.pages.map(p => ({
+        page: p.pageNumber,
+        chars: p.text.length,
+        confidence: p.confidence,
+        warnings: p.warnings,
+      })),
+      form_fields: ocrFormFields.slice(0, 10), // First 10 for preview
+      tables_structure: ocrTables.map(t => ({
+        page: t.pageNumber,
+        rows: t.rows?.length || 0,
+        cols: t.rows?.[0]?.cells?.length || 0,
+      })),
+    },
+    full_output_text: documentText,
+  })
+
+  if (import.meta.env.DEV) {
+    console.log(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
+      `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
+      `${ocrFormFields.length} form fields, ` +
+      `${ocrTables.length} tables, ` +
+      `${ocrData.metadata.processingTimeMs}ms`)
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
@@ -805,7 +572,7 @@ export async function extractPolicyFromDocument(
     if (ocrFormFields && ocrFormFields.length > 0) {
       logger?.startStage('form_field_enhancement', {
         form_fields_available: ocrFormFields.length,
-        backend: ocrBackend,
+        backend: 'document-ai',
       })
       const formFieldMap = extractFormFieldMap(ocrFormFields)
 
@@ -902,12 +669,10 @@ export async function extractPolicyFromDocument(
           actual_values: {
             form_fields_count: ocrFormFields?.length || 0,
             ocr_used: usedOCR,
-            ocr_backend: ocrBackend || 'none',
+            ocr_backend: 'document-ai',
             has_form_fields: !!(ocrFormFields && ocrFormFields.length > 0),
           },
-          decision_logic: usedOCR
-            ? `OCR was performed with ${ocrBackend || 'unknown'} backend, but no form fields were detected. Document may not have structured form fields, or OCR backend may not support form field extraction.`
-            : 'OCR was not performed (text PDF with sufficient density), so no Document AI form fields are available. Form field enhancement only works with Document AI OCR output.',
+          decision_logic: 'OCR was performed with Document AI backend, but no form fields were detected. Document may not have structured form fields.',
           alternatives: usedOCR
             ? [
                 'Use Google Document AI which has better form field detection',
@@ -1061,24 +826,15 @@ export async function extractPolicyFromDocument(
           actual_values: {
             tables_count: ocrTables?.length || 0,
             ocr_used: usedOCR,
-            ocr_backend: ocrBackend || 'none',
+            ocr_backend: 'document-ai',
             has_tables: !!(ocrTables && ocrTables.length > 0),
             ai_coverages_count: enhancedExtractedData.coverages?.length || 0,
           },
-          decision_logic: usedOCR
-            ? `OCR was performed with ${ocrBackend || 'unknown'} backend, but no tables were detected in the document. The AI extraction found ${enhancedExtractedData.coverages?.length || 0} coverages from the text.`
-            : 'OCR was not performed (text PDF with sufficient density), so no Document AI tables are available. Table parsing only works with Document AI OCR output that detects structured tables.',
-          alternatives: usedOCR
-            ? [
-                'Use Google Document AI which has better table detection',
-                'Document may not contain structured coverage tables',
-                'Coverage information may be in paragraph form rather than tables',
-              ]
-            : [
-                'Tables are only available when using Document AI OCR',
-                'For native text PDFs, AI extraction parses coverages from the text directly',
-                'Consider if document actually contains tabular coverage data',
-              ],
+          decision_logic: `OCR was performed with Document AI backend, but no tables were detected in the document. The AI extraction found ${enhancedExtractedData.coverages?.length || 0} coverages from the text.`,
+          alternatives: [
+            'Document may not contain structured coverage tables',
+            'Coverage information may be in paragraph form rather than tables',
+          ],
         },
       })
     }
@@ -1144,21 +900,18 @@ export async function extractPolicyFromDocument(
         warnings: patternValidation.warnings,
         enhanced: Object.keys(patternValidation.enhancements),
       } : undefined,
-      // Document AI enhanced data (form fields and tables)
-      documentAI: (ocrFormFields || ocrTables) ? {
+      // Document AI OCR data (always present with OCR-first approach)
+      documentOCR: {
+        pdfHash: ocrData.pdfHash,
+        pages: ocrData.pages,
+        confidence: ocrData.confidence,
         formFields: ocrFormFields,
         tables: ocrTables,
-        backend: ocrBackend || 'vision-api',
         fieldsUsed: formFieldsUsed,
         tableCoveragesUsed,
-      } : undefined,
-      // PDF extraction quality metrics
-      textQuality: textQuality ? {
-        score: textQuality.qualityScore,
-        method: extractionMethod,
-        issues: textQuality.issues,
-        ocrRecommended: !textQuality.qualityOk,
-      } : undefined,
+        processingTimeMs: ocrData.metadata.processingTimeMs,
+        warnings: ocrData.metadata.warnings,
+      },
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'

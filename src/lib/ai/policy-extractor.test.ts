@@ -40,6 +40,20 @@ vi.mock('./ocr', () => ({
       data: { text: 'OCR extracted text', confidence: 0.85, pageCount: 1, isScanned: true },
     })
   ),
+  extractFormFieldMap: vi.fn(() => ({})),
+  findFormField: vi.fn(() => null),
+  TURKISH_FORM_FIELD_PATTERNS: {
+    policyNumber: [],
+    insuredName: [],
+    startDate: [],
+    endDate: [],
+    premium: [],
+  },
+}))
+
+vi.mock('./table-parser', () => ({
+  parseTablesForCoverages: vi.fn(() => ({ coverages: [], confidence: 0.9 })),
+  mergeCoveragesWithTableData: vi.fn((coverages: unknown[]) => coverages),
 }))
 
 vi.mock('./providers/consensus', () => ({
@@ -153,10 +167,114 @@ vi.mock('@/lib/gap-detection', () => ({
   },
 }))
 
+vi.mock('@/lib/extraction', () => ({
+  validateAndEnhanceExtraction: vi.fn(() => ({
+    errors: [],
+    warnings: [],
+    enhancements: {},
+  })),
+  mergeExtractionResults: vi.fn((result: Record<string, unknown>) => result),
+}))
+
+// Mock text-processor module
+vi.mock('./text-processor', () => ({
+  processTextWithAI: vi.fn(() => Promise.resolve({
+    success: true,
+    processedText: 'Processed policy text',
+    corrections: [],
+    confidence: 0.95,
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
+  })),
+  applyBasicOCRCorrections: vi.fn((text: string) => ({ text, corrections: [] })),
+  textNeedsProcessing: vi.fn(() => false),
+  processTextEnhanced: vi.fn(() => Promise.resolve({
+    success: true,
+    processedText: 'Enhanced processed text',
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
+    confidence: 0.95,
+    cleanRoomOutput: undefined,
+  })),
+  applyComprehensivePreprocessing: vi.fn((text: string) => ({
+    text,
+    stats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      totalCharactersRemoved: 0,
+    },
+  })),
+  addSectionMarkers: vi.fn((text: string) => ({ text, sectionsFound: [] })),
+}))
+
+// Mock document-ocr module for OCR-first extraction
+vi.mock('./document-ocr', () => ({
+  isDocumentOCRAvailable: vi.fn(() => true),
+  extractWithDocumentAI: vi.fn(() =>
+    Promise.resolve({
+      success: true,
+      data: {
+        text: 'Sample policy text with coverage details\nSigorta poliçesi\nTeminat: 500.000 TL',
+        pages: [
+          { pageNumber: 1, text: 'Sample policy text with coverage details', confidence: 0.95, warnings: [] },
+        ],
+        pageCount: 1,
+        confidence: 0.95,
+        pdfHash: 'mock-hash-abc123',
+        formFields: [],
+        tables: [],
+        metadata: {
+          backend: 'document-ai',
+          processingTimeMs: 1500,
+          warnings: [],
+        },
+      },
+    })
+  ),
+  computePdfHash: vi.fn(() => Promise.resolve('mock-hash-abc123')),
+  computePdfHashFromFile: vi.fn(() => Promise.resolve('mock-hash-abc123')),
+}))
+
 // Helper to create mock File
 function createMockFile(name: string, type: string, content = 'mock content'): File {
   const blob = new Blob([content], { type })
   return new File([blob], name, { type })
+}
+
+// Helper to reset Document AI OCR mocks after vi.clearAllMocks()
+async function resetDocumentOCRMocks() {
+  const documentOcr = await import('./document-ocr')
+  vi.mocked(documentOcr.isDocumentOCRAvailable).mockReturnValue(true)
+  vi.mocked(documentOcr.extractWithDocumentAI).mockResolvedValue({
+    success: true,
+    data: {
+      text: 'Sample policy text with coverage details\nSigorta poliçesi\nTeminat: 500.000 TL',
+      pages: [
+        { pageNumber: 1, text: 'Sample policy text with coverage details', confidence: 0.95, warnings: [] },
+      ],
+      pageCount: 1,
+      confidence: 0.95,
+      pdfHash: 'mock-hash-abc123',
+      formFields: [],
+      tables: [],
+      metadata: {
+        backend: 'document-ai',
+        processingTimeMs: 1500,
+        warnings: [],
+      },
+    },
+  })
 }
 
 // =============================================================================
@@ -164,10 +282,12 @@ function createMockFile(name: string, type: string, content = 'mock content'): F
 // =============================================================================
 
 describe('extractPolicyFromDocument', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     // Mock URL.createObjectURL
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url')
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   afterEach(() => {
@@ -375,6 +495,9 @@ describe('AI Extraction', () => {
     const config = await import('./config')
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   it('should extract policy with AI when configured', async () => {
@@ -410,7 +533,7 @@ describe('AI Extraction', () => {
 
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.source).toBe('ai')
+      expect(result.source).toBe('ocr')  // OCR-first approach always uses OCR
       expect(result.policy.policyNumber).toBe('POL-123')
       expect(result.policy.provider).toBe('Test Sigorta')
     }
@@ -564,11 +687,12 @@ describe('PDF Parsing', () => {
     }
   })
 
-  it('should return error when PDF parsing fails and fallback disabled', async () => {
-    const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
+  it('should return error when Document AI OCR fails and fallback disabled', async () => {
+    // With OCR-first approach, we go through Document AI OCR, not pdf-parser
+    const documentOcr = await import('./document-ocr')
+    vi.mocked(documentOcr.extractWithDocumentAI).mockResolvedValue({
       success: false,
-      error: { code: 'PARSE_ERROR', message: 'PDF is encrypted' },
+      error: { code: 'OCR_FAILED', message: 'Document AI OCR failed' },
     })
 
     const file = createMockFile('encrypted.pdf', 'application/pdf')
@@ -576,7 +700,7 @@ describe('PDF Parsing', () => {
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.code).toBe('PDF_PARSE_ERROR')
+      expect(result.error.code).toBe('OCR_ERROR')
     }
   })
 })
@@ -594,6 +718,9 @@ describe('OCR Processing', () => {
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.isOCRConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   it('should use OCR for scanned PDFs', async () => {
@@ -637,20 +764,9 @@ describe('OCR Processing', () => {
     }
   })
 
-  it('should use regular text if OCR produces less content', async () => {
-    const pdfParser = await import('./pdf-parser')
-    vi.mocked(pdfParser.extractTextFromPDFWithRetry).mockResolvedValue({
-      success: true,
-      data: { text: 'Long text content from PDF parsing with many words', pageCount: 5, metadata: {} },
-    })
-
-    const ocr = await import('./ocr')
-    vi.mocked(ocr.isLikelyScannedPDF).mockReturnValue(true)
-    vi.mocked(ocr.performOCR).mockResolvedValue({
-      success: true,
-      data: { text: 'Short', confidence: 0.8, pageCount: 5, isScanned: true }, // Less content
-    })
-
+  it('should always use OCR-first approach (source is always ocr)', async () => {
+    // With OCR-first approach, we always use Document AI OCR regardless of text content
+    // This ensures consistent, high-quality text extraction for all documents
     const openai = await import('./providers/openai')
     vi.mocked(openai.extractWithOpenAI).mockResolvedValue({
       policyNumber: 'TEXT-001',
@@ -674,7 +790,7 @@ describe('OCR Processing', () => {
 
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.source).toBe('ai') // Not OCR since regular text was better
+      expect(result.source).toBe('ocr') // Always OCR with OCR-first approach
     }
   })
 })
@@ -691,6 +807,9 @@ describe('Policy Conversion', () => {
     const config = await import('./config')
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   it('should convert extracted data to AnalyzedPolicy format', async () => {
@@ -886,6 +1005,9 @@ describe('Market Comparison', () => {
     const config = await import('./config')
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   it('should include market comparison data', async () => {
@@ -929,6 +1051,9 @@ describe('Risk Assessment Integration', () => {
     const config = await import('./config')
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mocks
+    await resetDocumentOCRMocks()
   })
 
   it('should include risk score in policy', async () => {
@@ -1004,6 +1129,23 @@ describe('Error Tracking Integration', () => {
     const config = await import('./config')
     vi.mocked(config.isAIConfigured).mockReturnValue(true)
     vi.mocked(config.getConfiguredProviders).mockReturnValue(['openai'])
+
+    // Reset Document AI OCR mock to return successful result
+    const documentOcr = await import('./document-ocr')
+    vi.mocked(documentOcr.isDocumentOCRAvailable).mockReturnValue(true)
+    vi.mocked(documentOcr.extractWithDocumentAI).mockResolvedValue({
+      success: true,
+      data: {
+        text: 'Sample policy text with coverage details',
+        pages: [{ pageNumber: 1, text: 'Sample policy text', confidence: 0.95, warnings: [] }],
+        pageCount: 1,
+        confidence: 0.95,
+        pdfHash: 'mock-hash',
+        formFields: [],
+        tables: [],
+        metadata: { backend: 'document-ai', processingTimeMs: 1000, warnings: [] },
+      },
+    })
   })
 
   it('should include stack and type in error response when AI fails', async () => {
