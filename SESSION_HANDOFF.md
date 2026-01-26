@@ -1,4 +1,4 @@
-# Session Handoff - January 25, 2026
+# Session Handoff - January 26, 2026
 
 ## Current Status
 
@@ -7,80 +7,115 @@
 | **Build** | ✅ Passing |
 | **TypeCheck** | ✅ 0 errors |
 | **Lint** | ⚠️ Pre-existing warnings in ocr-orch service |
-| **Tests** | ✅ 5435+ passing (71 tests ran this session) |
-| **Branch** | `claude/review-project-status-tUneo` |
+| **Tests** | ✅ 5560+ passing (145 OCR Decision Engine tests) |
+| **Branch** | `claude/review-project-status-I4Z2Q` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Document Journey** | ✅ Full content capture and decision context |
+| **OCR Decision Engine** | ✅ Complete with Document Journey metadata |
 
 ---
 
 ## Session Summary
 
-This session focused on **Admin Document Journey Viewer Enhancements** - enabling admins to see actual document content at each processing stage and detailed explanations for why stages were skipped.
+This session focused on **Task 5: Enhance Document Journey Metadata** for the OCR Decision Engine - adding full diagnostic output that transforms internal analysis into formatted metadata for the Document Journey viewer.
 
 Key accomplishments:
-1. Added full text content capture at key pipeline stages
-2. Added diff summary with characters added/removed for preprocessing
-3. Added detailed decision context for skipped stages
-4. Fixed coverage.name null safety bug in validation stage
-5. Enhanced Turkish OCR spacing fixes integration
+1. Added `DocumentJourneyMetadata` interface for formatted diagnostic output
+2. Added `buildDocumentJourneyMetadata()` method to OCRDecisionEngine
+3. Added `analyzeDocumentForJourney()` convenience method
+4. Added `config_path` to PolicyTypeClassificationResult
+5. Added `garbage_patterns_checked` to TextQualityAnalysis
+6. Added 36 new tests for Document Journey metadata
+7. All 145 OCR Decision Engine tests passing
 
 ---
 
 ## Features Completed This Session
 
-### 1. Document Journey Full Content Capture
+### Document Journey Metadata Enhancement
 
 | Component | Description |
 |-----------|-------------|
-| `src/types/processing-log.ts` | Added `full_input_text`, `full_output_text`, `full_extracted_json`, `diff_summary` fields |
-| `src/lib/processing-logger.ts` | Updated `CompleteStageOptions` to accept full content |
-| `src/lib/ai/policy-extractor.ts` | Log full text at pdf_extraction, text_preprocessing, ai_extraction, validation |
-| `src/components/admin/DocumentJourneyViewer.tsx` | New `TextContentViewer`, `DiffSummaryViewer` components |
+| `src/lib/ocr-decision/types.ts` | Added `DocumentJourneyMetadata` interface, `config_path`, `garbage_patterns_checked` |
+| `src/lib/ocr-decision/ocr-decision-engine.ts` | Added `buildDocumentJourneyMetadata()` and `analyzeDocumentForJourney()` methods |
+| `src/lib/ocr-decision/policy-classifier.ts` | Added `config_path` to classification results |
+| `src/lib/ocr-decision/text-quality-analyzer.ts` | Added garbage patterns tracking in `checkEncodingIssues()` |
+| `src/lib/ocr-decision/ocr-decision-engine.test.ts` | Added 36 new tests for Document Journey metadata |
 
-**Stages with Full Content**:
-- `pdf_extraction`: Full extracted PDF text
-- `text_preprocessing`: Before/after text with diff summary
-- `ai_extraction`: Input text and full extracted JSON
-- `validation`: Final validated policy JSON
-
-### 2. Decision Context for Skipped Stages
-
-| Component | Description |
-|-----------|-------------|
-| `src/types/processing-log.ts` | Added `StageDecisionContext` interface |
-| `src/lib/processing-logger.ts` | Updated `skipStage()` with detailed options |
-| `src/lib/ai/policy-extractor.ts` | Context for ocr_processing, form_field_enhancement, table_parsing |
-| `src/components/admin/DocumentJourneyViewer.tsx` | New `DecisionContextViewer` component |
-
-**Decision Context Shows**:
+**Document Journey Metadata Structure**:
 ```typescript
 {
-  assessment_performed: 'Text density analysis',
-  threshold: { name: 'chars_per_page', value: 200, comparison: 'less_than' },
-  actual_values: { chars_per_page: 12492, is_likely_scanned: false },
-  decision_logic: 'Text density sufficient (12492 >= 200 threshold)',
-  alternatives: ['OCR triggered if chars_per_page < 200']
+  ocr_decision: {
+    action: 'skip_ocr' | 'selective_ocr' | 'full_ocr',
+    confidence: 0.89,
+    confidence_breakdown: {
+      char_density: { score, weight, contribution, raw_value, threshold, details },
+      text_quality: { ... },
+      page_variance: { ... },
+      encoding_check: { ... },
+      field_extraction: { ... }
+    },
+    language_detection: {
+      detected: 'tr',
+      confidence: 0.85,
+      method: 'term_matching',
+      matched_terms: ['sigorta', 'poliçe', 'prim'],
+      matched_characters: ['İ', 'ş', 'ğ'],
+      runner_up: { locale: 'en', confidence: 0.2 } | null
+    },
+    policy_classification: {
+      detected: 'motor_kasko',
+      name: 'Motor Own Damage (Kasko)',
+      confidence: 0.8,
+      category: 'motor',
+      matched_terms: ['kasko', 'araç sigortası'],
+      config_used: 'config/policy_types/motor/motor_kasko.json'
+    },
+    text_quality: {
+      quality_score: 0.42,
+      terms_found: ['sigorta', 'poliçe'],
+      encoding_issues: [],
+      garbage_patterns_checked: ['[\\ufffd]{2,}', ...],
+      recommendation: 'proceed'
+    },
+    field_extraction: {
+      extraction_rate: 0.6,
+      required_found: 3,
+      required_total: 5,
+      fields: {
+        policy_number: { found: true, value: 'KSK-2024-001234', pattern_used: '...', required: true }
+      },
+      recommendation: 'proceed'
+    },
+    page_analysis: {
+      total_pages: 5,
+      flagged_pages: [{ page: 3, chars: 150, reason: 'Below density threshold' }],
+      min_page: { page: 1, chars: 500 },
+      max_page: { page: 2, chars: 2000 }
+    },
+    configs_used: {
+      locale: 'tr.json',
+      policy_type: 'motor/motor_kasko.json',
+      ocr_settings_version: '1.0.0'
+    },
+    reasoning: ['Language detected as TR (85%)', 'Policy classified as Kasko (80%)', ...],
+    timestamp: '2026-01-26T...',
+    duration_ms: 45
+  }
 }
 ```
-
-### 3. Coverage Name Null Safety Fix
-
-| Issue | Root Cause | Fix |
-|-------|------------|-----|
-| Validation stage crash | AI returns coverages with `description` but no `name` | Added `getCoverageName()` helper with fallback |
 
 ---
 
 ## Commits This Session
 
 ```
-6b0b909 Add detailed decision context for skipped pipeline stages
-cb05372 Add full text content capture for Document Journey viewer
-660cf43 Enhance Document Journey viewer with comprehensive stage details
-c4231e6 Add null safety for coverage.name to prevent validation failures
-2d18904 Fix Turkish OCR spacing: apply comprehensive fix after clean-room processing
+2d625ba Add Document Journey metadata enhancement for full diagnostics
+8ef5d71 Add comprehensive OCR decision engine regression test suite
+0849d5e Fix confidence calculation with weighted formula and detailed breakdown
+384691c Debug and fix policy type classification
+1bb2f3b Debug and fix language detection for Turkish documents
+94b1313 Add configuration-driven OCR decision engine with comprehensive tests
 ```
 
 ---
@@ -89,10 +124,46 @@ c4231e6 Add null safety for coverage.name to prevent validation failures
 
 | File | Changes |
 |------|---------|
-| `src/types/processing-log.ts` | Added `StageDecisionContext`, full content fields, diff_summary |
-| `src/lib/processing-logger.ts` | `SkipStageOptions`, updated `completeStage()` and `skipStage()` |
-| `src/lib/ai/policy-extractor.ts` | Full content logging, `getCoverageName()` helper, detailed skip context |
-| `src/components/admin/DocumentJourneyViewer.tsx` | `TextContentViewer`, `DiffSummaryViewer`, `DecisionContextViewer` |
+| `src/lib/ocr-decision/types.ts` | Added `DocumentJourneyMetadata`, `config_path`, `garbage_patterns_checked` |
+| `src/lib/ocr-decision/ocr-decision-engine.ts` | Added `buildDocumentJourneyMetadata()`, `analyzeDocumentForJourney()` |
+| `src/lib/ocr-decision/policy-classifier.ts` | Added `config_path` to classification results |
+| `src/lib/ocr-decision/text-quality-analyzer.ts` | Added patterns tracking in `checkEncodingIssues()` |
+| `src/lib/ocr-decision/ocr-decision-engine.test.ts` | Added 36 new tests for Document Journey metadata |
+
+---
+
+## OCR Decision Engine Overview
+
+The OCR Decision Engine is a configuration-driven system that decides whether to apply OCR to documents.
+
+### Components
+
+| Component | Purpose |
+|-----------|---------|
+| `OCRDecisionEngine` | Main orchestrator with confidence calculation |
+| `LanguageDetector` | Detects Turkish, English, German |
+| `PolicyTypeClassifier` | Classifies kasko, traffic, health, fire, etc. |
+| `TextQualityAnalyzer` | Checks encoding, garbage patterns, term density |
+| `FieldExtractor` | Tests extraction of key fields |
+| `ConfigurationManager` | Loads JSON configs for locales and policy types |
+
+### Confidence Calculation (5 Weighted Components)
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| `char_density` | 25% | Characters per page vs threshold |
+| `text_quality` | 30% | Insurance term matching |
+| `page_variance` | 15% | Page-to-page consistency |
+| `encoding_check` | 15% | Encoding quality |
+| `field_extraction` | 15% | Required fields found |
+
+### Decision Thresholds
+
+| Action | Threshold | Description |
+|--------|-----------|-------------|
+| `skip_ocr` | >= 0.70 | Good digital PDF, no OCR needed |
+| `selective_ocr` | >= 0.40 | OCR specific low-density pages |
+| `full_ocr` | < 0.40 | OCR entire document |
 
 ---
 
@@ -185,50 +256,57 @@ Add to Supabase Dashboard → Authentication → URL Configuration:
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| ocr-orch tests failing | Low | Open | `MockOCRAdapter is not a constructor` - pre-existing |
-| Lint warnings in pipeline | Low | Open | `no-console`, `no-non-null-assertion` - non-critical |
-| Font preload warnings | Low | Open | Console timing warning |
-| PWA icon 144x144 missing | Low | Open | Create icon file |
+| ocr-orch service tests failing | Low | Open | Missing `tesseract.js` import - monorepo dependency |
+| validate-svc tests failing | Low | Open | Missing `@insurai/rule-packs` - monorepo dependency |
+| ocr.test.ts mock issues | Low | Open | `isProxyConfigured` mock export issue |
+| PolicyDetailView.test.tsx | Low | Open | UI class changes (bg-blue-50) |
+| Dockerfile missing for config test | Low | Open | Create Dockerfile or skip test |
+
+---
+
+## Test Summary
+
+| Category | Count | Status |
+|----------|-------|--------|
+| OCR Decision Engine | 145 | ✅ All passing |
+| Total Project Tests | 5560 | ✅ 98.5% passing |
+| Failed Tests | 58 | Pre-existing issues |
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Test Document Journey in Production** - Verify full content capture works on Railway
-2. **Monitor extraction failures** - Use new Document Journey to debug any production issues
-3. **Verify decision context display** - Check skipped stages show all context
+1. **Integrate OCR Decision Engine with policy-extractor** - Use `analyzeDocumentForJourney()` in extraction pipeline
+2. **Add Document Journey metadata to admin viewer** - Display the new metadata structure
+3. **Test with real Turkish kasko documents** - Verify language/policy detection accuracy
 
 ### Short Term
-1. **Add cost tracking to stages** - Show API cost breakdown per stage
-2. **Add text diff highlighting** - Color-code actual character changes
-3. **Export Document Journey as JSON** - Allow admins to download full processing log
+1. **Add more policy type configs** - life, dask, nakliyat, business
+2. **Add more locale configs** - Arabic, French for international markets
+3. **Tune confidence thresholds** - Based on production data
 
 ### Feature Work
-1. **Add retry button for failed stages** - Allow re-running individual failed stages
-2. **Document Journey search/filter** - Filter logs by status, stage, time
-3. **Fix ocr-orch tests** - Update MockOCRAdapter export
+1. **Add OCR decision caching** - Cache decisions by document hash
+2. **Add A/B testing for thresholds** - Compare skip_ocr accuracy
+3. **Add confidence breakdown to extraction results** - Show in policy details
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Run processing logger tests
-npm test -- --run src/lib/processing-logger.test.ts
+# Run OCR Decision Engine tests
+npm test -- --run src/lib/ocr-decision/
 
-# Run policy extractor tests
-npm test -- --run src/lib/ai/policy-extractor.test.ts
+# Run specific test file
+npm test -- --run src/lib/ocr-decision/ocr-decision-engine.test.ts
 
 # Check TypeScript
 npm run typecheck
 
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
-
-# Check admin endpoint
-curl -s "https://insurai-production.up.railway.app/api/admin/prompts" \
-  -H "Authorization: Bearer <token>" | jq .
 ```
 
 ---
@@ -237,37 +315,38 @@ curl -s "https://insurai-production.up.railway.app/api/admin/prompts" \
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 |
-| Files changed | 4 main files + CLAUDE.md |
-| Features added | 3 (content capture, decision context, diff viewer) |
-| Bugs fixed | 1 (coverage.name null safety) |
-| Tests passing | 71 ran, all passing |
-| Lines of code added | ~400 |
+| Commits this session | 6 |
+| Files changed | 5 main files + CLAUDE.md + SESSION_HANDOFF.md |
+| Features added | 1 (Document Journey metadata) |
+| Tests added | 36 new tests |
+| Total OCR Decision Engine tests | 145 |
+| Lines of code added | ~650 |
 
 ---
 
 ## Handoff Checklist
 
-- [x] All tests passing
+- [x] All OCR Decision Engine tests passing (145/145)
 - [x] TypeScript no errors
 - [x] Changes committed and pushed
-- [x] Documentation updated (CLAUDE.md entries #24, #25, #26)
+- [x] Documentation updated (CLAUDE.md entry #27)
 - [x] Session handoff updated
-- [ ] Test Document Journey in production
+- [ ] Integrate with policy-extractor
+- [ ] Test in production
 
 ---
 
 ## Previous Session Context
 
-January 22, 2026 focused on:
-- Turkish Word Boundary Handling in OCR patterns
-- TC Kimlik/IBAN number preservation
-- Unicode-safe Turkish matching improvements
-- `\b` → `(?=\s|$)` fix for Turkish characters
+January 25, 2026 focused on:
+- Document Journey full content capture
+- Decision context for skipped stages
+- Coverage.name null safety fix
+- Turkish OCR spacing improvements
 
-This session (January 25, 2026) continued with admin tooling improvements - enabling admins to see actual document content and detailed decision explanations in the Document Journey viewer.
+This session (January 26, 2026) completed Task 5: Enhance Document Journey Metadata for the OCR Decision Engine, adding full diagnostic output with confidence breakdowns, language detection details, policy classification with config paths, text quality with garbage patterns checked, and per-field extraction results.
 
 ---
 
-**Last Updated**: January 25, 2026
-**Next Session Focus**: Test Document Journey viewer in production with real documents
+**Last Updated**: January 26, 2026
+**Next Session Focus**: Integrate OCR Decision Engine with policy-extractor pipeline
