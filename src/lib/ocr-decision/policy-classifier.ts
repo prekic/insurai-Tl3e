@@ -153,9 +153,11 @@ export class PolicyTypeClassifier {
     if (validMatches.length > 0) {
       const [bestTypeId, bestScore] = validMatches[0]
       const config = this.configManager.getPolicyConfig(bestTypeId)
+      const configPath = `config/policy_types/${config.category}/${bestTypeId}.json`
 
       debugLog(`=== RESULT: ${bestTypeId} (confidence: ${bestScore.score.toFixed(3)}) ===`)
       debugLog(`  Matched terms: ${JSON.stringify(bestScore.matches)}`)
+      debugLog(`  Config path: ${configPath}`)
 
       return {
         policy_type_id: bestTypeId,
@@ -163,6 +165,7 @@ export class PolicyTypeClassifier {
         category: config.category,
         confidence: bestScore.score,
         matched_terms: bestScore.matches,
+        config_path: configPath,
         all_scores: scores,
       }
     }
@@ -183,6 +186,7 @@ export class PolicyTypeClassifier {
 
     const fallbackId = this.settings.policy_type_detection.fallback_type || '_generic'
     const fallbackConfig = this.configManager.getPolicyConfig(fallbackId)
+    const fallbackConfigPath = `config/policy_types/${fallbackConfig.category}/${fallbackId}.json`
 
     return {
       policy_type_id: fallbackId,
@@ -190,6 +194,7 @@ export class PolicyTypeClassifier {
       category: fallbackConfig.category,
       confidence: 0,
       matched_terms: [],
+      config_path: fallbackConfigPath,
       all_scores: scores,
     }
   }

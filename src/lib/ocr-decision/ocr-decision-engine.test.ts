@@ -927,3 +927,414 @@ describe('Confidence Calculation Verification', () => {
       breakdown.field_extraction.score * breakdown.field_extraction.weight)).toBeLessThan(tolerance)
   })
 })
+
+describe('Document Journey Metadata', () => {
+  let engine: OCRDecisionEngine
+
+  beforeEach(() => {
+    engine = new OCRDecisionEngine()
+  })
+
+  describe('buildDocumentJourneyMetadata', () => {
+    it('transforms OCRDecision into DocumentJourneyMetadata format', () => {
+      const document = `
+        KASKO SİGORTA POLİÇESİ
+        Poliçe No: KSK-2024-001234
+        Sigortalı: AHMET YILMAZ
+        Plaka: 34 ABC 123
+        Prim: 5.000 TL
+        Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları
+        Sigorta poliçe belgesi teminat kapsamı
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      // Verify top-level structure
+      expect(metadata.ocr_decision).toBeDefined()
+      expect(metadata.ocr_decision.action).toBe(decision.action)
+      expect(metadata.ocr_decision.confidence).toBe(decision.confidence)
+    })
+
+    it('includes complete confidence breakdown', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim tutarı '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const breakdown = metadata.ocr_decision.confidence_breakdown
+
+      // Verify all components are present
+      expect(breakdown.char_density).toBeDefined()
+      expect(breakdown.text_quality).toBeDefined()
+      expect(breakdown.page_variance).toBeDefined()
+      expect(breakdown.encoding_check).toBeDefined()
+      expect(breakdown.field_extraction).toBeDefined()
+
+      // Verify structure of each component
+      for (const [key, value] of Object.entries(breakdown)) {
+        expect(value.score).toBeGreaterThanOrEqual(0)
+        expect(value.score).toBeLessThanOrEqual(1)
+        expect(value.weight).toBeGreaterThan(0)
+        expect(value.contribution).toBeDefined()
+        expect(typeof value.details).toBe('string')
+      }
+    })
+
+    it('includes language detection details', () => {
+      const turkishDocument = `
+        BİRLEŞİK KASKO SİGORTA POLİÇESİ
+        Sigortalı: AHMET YILMAZ
+        Poliçe No: KSK-2024-001234
+        Teminat kapsamı sigorta prim tutarı
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(turkishDocument)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const langDetection = metadata.ocr_decision.language_detection
+
+      expect(langDetection.detected).toBe('tr')
+      expect(langDetection.confidence).toBeGreaterThan(0)
+      expect(langDetection.method).toBe('term_matching')
+      expect(Array.isArray(langDetection.matched_terms)).toBe(true)
+      expect(langDetection.matched_terms.length).toBeGreaterThan(0)
+      expect(Array.isArray(langDetection.matched_characters)).toBe(true)
+    })
+
+    it('includes runner_up language when available', () => {
+      // Mixed language document
+      const mixedDocument = `
+        Insurance policy document Versicherung
+        Sigorta poliçe belgesi coverage premium
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(mixedDocument)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const langDetection = metadata.ocr_decision.language_detection
+
+      // For mixed content, there should be a runner-up
+      // (this depends on which language scores highest)
+      expect(langDetection.detected).toBeDefined()
+      // runner_up may be null or an object
+      if (langDetection.runner_up) {
+        expect(langDetection.runner_up.locale).toBeDefined()
+        expect(langDetection.runner_up.confidence).toBeGreaterThan(0)
+      }
+    })
+
+    it('includes policy classification details', () => {
+      // Use enough kasko terms to hit threshold
+      const kaskoDocument = `
+        KASKO SİGORTA POLİÇESİ
+        Kasko sigortası araç sigortası oto sigorta
+        Motorlu kara taşıtları kasko poliçesi
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(kaskoDocument)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const policyClass = metadata.ocr_decision.policy_classification
+
+      expect(policyClass.detected).toBe('motor_kasko')
+      expect(policyClass.name).toBe('Motor Own Damage (Kasko)')
+      expect(policyClass.confidence).toBeGreaterThan(0)
+      expect(policyClass.category).toBe('motor')
+      expect(Array.isArray(policyClass.matched_terms)).toBe(true)
+      expect(policyClass.config_used).toContain('motor_kasko')
+    })
+
+    it('includes text quality analysis', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const textQuality = metadata.ocr_decision.text_quality
+
+      expect(textQuality.quality_score).toBeGreaterThanOrEqual(0)
+      expect(textQuality.quality_score).toBeLessThanOrEqual(1)
+      expect(textQuality.locale_used).toBeDefined()
+      expect(Array.isArray(textQuality.terms_found)).toBe(true)
+      expect(textQuality.terms_checked).toBeGreaterThan(0)
+      expect(Array.isArray(textQuality.encoding_issues)).toBe(true)
+      expect(Array.isArray(textQuality.garbage_patterns_checked)).toBe(true)
+      expect(['proceed', 'consider_ocr', 'require_ocr']).toContain(textQuality.recommendation)
+    })
+
+    it('includes garbage patterns checked in text quality', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const textQuality = metadata.ocr_decision.text_quality
+
+      // Should have garbage patterns from locale config + common patterns
+      expect(textQuality.garbage_patterns_checked.length).toBeGreaterThan(0)
+    })
+
+    it('includes field extraction details', () => {
+      const document = `
+        Poliçe No: KSK-2024-001234
+        Sigortalı: AHMET YILMAZ
+        Plaka: 34 ABC 123
+        Prim Tutarı: 5.000 TL
+        Sigorta poliçe belgesi teminat
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const fieldExtraction = metadata.ocr_decision.field_extraction
+
+      expect(fieldExtraction.extraction_rate).toBeGreaterThanOrEqual(0)
+      expect(fieldExtraction.extraction_rate).toBeLessThanOrEqual(1)
+      expect(fieldExtraction.required_found).toBeGreaterThanOrEqual(0)
+      expect(fieldExtraction.required_total).toBeGreaterThanOrEqual(0)
+      expect(fieldExtraction.fields).toBeDefined()
+      expect(['proceed', 'consider_ocr', 'require_ocr']).toContain(fieldExtraction.recommendation)
+    })
+
+    it('includes per-field extraction results', () => {
+      const document = `
+        Poliçe No: KSK-2024-001234
+        Sigortalı: AHMET YILMAZ
+        Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları
+      `.repeat(10)
+
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const fields = metadata.ocr_decision.field_extraction.fields
+
+      // If there are fields checked, verify structure
+      for (const [fieldName, fieldResult] of Object.entries(fields)) {
+        expect(typeof fieldResult.found).toBe('boolean')
+        expect(fieldResult.value === null || typeof fieldResult.value === 'string').toBe(true)
+        expect(fieldResult.pattern_used === null || typeof fieldResult.pattern_used === 'string').toBe(true)
+        expect(typeof fieldResult.required).toBe('boolean')
+      }
+    })
+
+    it('includes page analysis details', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const pageAnalysis = metadata.ocr_decision.page_analysis
+
+      expect(pageAnalysis.total_pages).toBeGreaterThan(0)
+      expect(pageAnalysis.total_characters).toBeGreaterThan(0)
+      expect(pageAnalysis.avg_chars_per_page).toBeGreaterThan(0)
+      expect(pageAnalysis.density_threshold).toBeGreaterThan(0)
+      expect(pageAnalysis.pages_below_threshold).toBeGreaterThanOrEqual(0)
+      expect(Array.isArray(pageAnalysis.flagged_pages)).toBe(true)
+      expect(pageAnalysis.min_page).toBeDefined()
+      expect(pageAnalysis.min_page.page).toBeGreaterThan(0)
+      expect(pageAnalysis.max_page).toBeDefined()
+      expect(pageAnalysis.max_page.page).toBeGreaterThan(0)
+    })
+
+    it('includes flagged pages with reasons', () => {
+      // Create a document with varying page densities
+      // Simulate pages by form feed separators
+      const page1 = 'Short page content\f'
+      const page2 = 'Sigorta poliçe belgesi teminat prim '.repeat(50) + '\f'
+      const page3 = 'Another short page\f'
+
+      const document = page1 + page2 + page3
+
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const flaggedPages = metadata.ocr_decision.page_analysis.flagged_pages
+
+      // Should have flagged pages for low-density pages
+      for (const flaggedPage of flaggedPages) {
+        expect(flaggedPage.page).toBeGreaterThan(0)
+        expect(flaggedPage.chars).toBeGreaterThanOrEqual(0)
+        expect(flaggedPage.reason).toContain('Below density threshold')
+      }
+    })
+
+    it('includes configs_used details', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      const configsUsed = metadata.ocr_decision.configs_used
+
+      expect(configsUsed.locale).toBeDefined()
+      expect(configsUsed.locale.endsWith('.json')).toBe(true)
+      expect(configsUsed.policy_type).toBeDefined()
+      expect(configsUsed.ocr_settings_version).toBeDefined()
+    })
+
+    it('includes reasoning array', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      expect(Array.isArray(metadata.ocr_decision.reasoning)).toBe(true)
+      expect(metadata.ocr_decision.reasoning.length).toBeGreaterThan(0)
+
+      // Reasoning should include language, policy type, density, etc.
+      const reasoningText = metadata.ocr_decision.reasoning.join(' ')
+      expect(reasoningText.toLowerCase()).toContain('language')
+      expect(reasoningText.toLowerCase()).toContain('policy')
+    })
+
+    it('includes timestamp and duration', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+      const decision = engine.analyzeDocument(document)
+      const metadata = engine.buildDocumentJourneyMetadata(decision)
+
+      expect(metadata.ocr_decision.timestamp).toBeDefined()
+      expect(new Date(metadata.ocr_decision.timestamp).getTime()).toBeGreaterThan(0)
+      expect(metadata.ocr_decision.duration_ms).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  describe('analyzeDocumentForJourney', () => {
+    it('returns DocumentJourneyMetadata directly', () => {
+      const document = `
+        KASKO SİGORTA POLİÇESİ
+        Poliçe No: KSK-2024-001234
+        Sigortalı: AHMET YILMAZ
+        Kasko sigortası araç sigortası oto sigorta motorlu kara taşıtları
+      `.repeat(10)
+
+      const metadata = engine.analyzeDocumentForJourney(document)
+
+      // Should have the full structure
+      expect(metadata.ocr_decision).toBeDefined()
+      expect(metadata.ocr_decision.action).toBeDefined()
+      expect(metadata.ocr_decision.confidence).toBeDefined()
+      expect(metadata.ocr_decision.confidence_breakdown).toBeDefined()
+      expect(metadata.ocr_decision.language_detection).toBeDefined()
+      expect(metadata.ocr_decision.policy_classification).toBeDefined()
+      expect(metadata.ocr_decision.text_quality).toBeDefined()
+      expect(metadata.ocr_decision.field_extraction).toBeDefined()
+      expect(metadata.ocr_decision.page_analysis).toBeDefined()
+    })
+
+    it('supports page-level analysis', () => {
+      const pages = [
+        'Page 1: Sigorta poliçe belgesi',
+        'Page 2: Kasko teminat kapsamı prim tutarı',
+        'Page 3: Araç sigortası detayları',
+      ]
+
+      const metadata = engine.analyzeDocumentForJourney(pages.join('\n'), pages)
+
+      expect(metadata.ocr_decision.page_analysis.total_pages).toBe(3)
+    })
+
+    it('is equivalent to analyzeDocument + buildDocumentJourneyMetadata', () => {
+      const document = 'Sigorta poliçe belgesi teminat prim '.repeat(50)
+
+      // Method 1: Two-step
+      const decision = engine.analyzeDocument(document)
+      const metadata1 = engine.buildDocumentJourneyMetadata(decision)
+
+      // Method 2: Direct
+      const metadata2 = engine.analyzeDocumentForJourney(document)
+
+      // Should be equivalent (except for timing which may differ slightly)
+      expect(metadata1.ocr_decision.action).toBe(metadata2.ocr_decision.action)
+      expect(metadata1.ocr_decision.confidence).toBe(metadata2.ocr_decision.confidence)
+      expect(metadata1.ocr_decision.language_detection.detected).toBe(
+        metadata2.ocr_decision.language_detection.detected
+      )
+      expect(metadata1.ocr_decision.policy_classification.detected).toBe(
+        metadata2.ocr_decision.policy_classification.detected
+      )
+    })
+  })
+
+  describe('real-world scenarios', () => {
+    it('produces complete metadata for Turkish kasko document', () => {
+      const turkishKaskoDoc = `
+        BİRLEŞİK KASKO SİGORTA POLİÇESİ
+        Kasko Sigortası - Oto Sigorta - Araç Sigortası
+
+        Poliçe No: KSK-2024-001234
+        Sigortalı: MEHMET ÖZTÜRK
+        TC Kimlik No: 12345678901
+
+        Motorlu Kara Taşıtları Kasko Poliçesi
+
+        Araç Bilgileri:
+        Plaka: 34 XYZ 789
+        Marka: Toyota
+        Model: Corolla
+
+        Teminatlar:
+        - Araç Bedeli: 500.000 TL
+        - Çarpışma: Dahil
+        - Çalınma: Dahil
+        - Yangın: Dahil
+
+        Prim Bilgileri:
+        Net Prim: 8.500 TL
+        Toplam Prim: 9.350 TL
+
+        Sigorta Dönemi:
+        Başlangıç: 01.01.2024
+        Bitiş: 31.12.2024
+      `.repeat(4)
+
+      const metadata = engine.analyzeDocumentForJourney(turkishKaskoDoc)
+
+      // Verify Turkish detection
+      expect(metadata.ocr_decision.language_detection.detected).toBe('tr')
+      expect(metadata.ocr_decision.language_detection.confidence).toBeGreaterThan(0.5)
+
+      // Verify kasko classification
+      expect(metadata.ocr_decision.policy_classification.detected).toBe('motor_kasko')
+      expect(metadata.ocr_decision.policy_classification.category).toBe('motor')
+
+      // Verify confidence breakdown is complete
+      const breakdown = metadata.ocr_decision.confidence_breakdown
+      expect(Object.keys(breakdown).length).toBe(5)
+
+      // Verify text quality includes Turkish terms
+      expect(metadata.ocr_decision.text_quality.terms_found.length).toBeGreaterThan(0)
+
+      // Verify timestamp format
+      expect(metadata.ocr_decision.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/)
+    })
+
+    it('handles document with encoding issues', () => {
+      const documentWithIssues = `
+        Sigorta poliçe belgesi
+        Garbled text: \ufffd\ufffd\ufffd
+        More text with issues \ufffd\ufffd
+        Normal sigorta terms teminat prim
+      `.repeat(10)
+
+      const metadata = engine.analyzeDocumentForJourney(documentWithIssues)
+
+      // Should detect encoding issues
+      expect(metadata.ocr_decision.text_quality.encoding_issues.length).toBeGreaterThan(0)
+
+      // Encoding check score should be reduced
+      expect(metadata.ocr_decision.confidence_breakdown.encoding_check.score).toBeLessThan(1.0)
+
+      // Should still provide reasoning
+      expect(metadata.ocr_decision.reasoning.length).toBeGreaterThan(0)
+    })
+
+    it('handles very short document', () => {
+      const shortDoc = 'Short text'
+
+      const metadata = engine.analyzeDocumentForJourney(shortDoc)
+
+      // Should still produce valid metadata
+      expect(metadata.ocr_decision.action).toBe('full_ocr')
+      expect(metadata.ocr_decision.confidence).toBeLessThan(0.5)
+
+      // Density should be low
+      expect(metadata.ocr_decision.confidence_breakdown.char_density.score).toBeLessThan(0.5)
+    })
+  })
+})
