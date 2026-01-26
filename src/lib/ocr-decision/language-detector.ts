@@ -12,6 +12,19 @@ import type {
 } from './types'
 import type { ConfigurationManager } from './configuration-manager'
 
+// Debug logging flag - set to true to enable verbose logging
+const DEBUG_LANGUAGE_DETECTION = true
+
+function debugLog(message: string, data?: unknown): void {
+  if (DEBUG_LANGUAGE_DETECTION) {
+    if (data !== undefined) {
+      console.warn(`[LanguageDetector] ${message}`, data)
+    } else {
+      console.warn(`[LanguageDetector] ${message}`)
+    }
+  }
+}
+
 export class LanguageDetector {
   private configManager: ConfigurationManager
   private settings: OCRSettings
@@ -19,15 +32,58 @@ export class LanguageDetector {
   constructor(configManager: ConfigurationManager) {
     this.configManager = configManager
     this.settings = configManager.getOCRSettings()
+
+    // Verify configuration at construction time
+    this.verifyConfiguration()
+  }
+
+  /**
+   * Verify that language detection configuration is properly loaded
+   */
+  private verifyConfiguration(): void {
+    const availableLocales = this.configManager.getAvailableLocales()
+    debugLog(`=== LANGUAGE DETECTOR CONFIGURATION ===`)
+    debugLog(`Available locales: ${availableLocales.join(', ')}`)
+    debugLog(`Min confidence threshold: ${this.settings.language_detection.min_confidence}`)
+    debugLog(`Fallback locale: ${this.settings.language_detection.fallback_locale}`)
+    debugLog(`Sample size: ${this.settings.language_detection.sample_size}`)
+
+    // Check Turkish locale specifically
+    if (!availableLocales.includes('tr')) {
+      console.error('[LanguageDetector] CRITICAL: Turkish locale (tr) not loaded!')
+    } else {
+      const trConfig = this.configManager.getLocale('tr') as LocaleConfig
+      if (trConfig.language_detection) {
+        debugLog(`Turkish sample_terms count: ${trConfig.language_detection.sample_terms?.length || 0}`)
+        debugLog(`Turkish sample_terms: ${JSON.stringify(trConfig.language_detection.sample_terms?.slice(0, 5))}...`)
+        debugLog(`Turkish special_characters count: ${trConfig.language_detection.special_characters?.length || 0}`)
+        debugLog(`Turkish special_characters: ${JSON.stringify(trConfig.language_detection.special_characters)}`)
+      } else {
+        console.error('[LanguageDetector] CRITICAL: Turkish locale missing language_detection config!')
+      }
+    }
+
+    // Check English locale
+    if (!availableLocales.includes('en')) {
+      console.error('[LanguageDetector] WARNING: English locale (en) not loaded!')
+    }
+
+    debugLog(`=== END CONFIGURATION ===`)
   }
 
   /**
    * Detect language from text using configured detection terms
    */
   detect(text: string): LanguageDetectionResult {
+    debugLog(`=== LANGUAGE DETECTION START ===`)
+    debugLog(`Input text length: ${text.length} chars`)
+    debugLog(`Text sample (first 300 chars): "${text.substring(0, 300).replace(/\n/g, ' ')}"`)
+
     const textLower = text.toLowerCase()
     const sampleSize = this.settings.language_detection.sample_size || 2000
     const sampleText = textLower.substring(0, sampleSize)
+
+    debugLog(`Sample size: ${sampleSize}, actual sample length: ${sampleText.length}`)
 
     const scores: Record<string, {
       term_score: number
@@ -35,27 +91,50 @@ export class LanguageDetector {
       combined: number
       term_matches: number
       char_matches: number
+      matched_terms?: string[]
+      matched_chars?: string[]
     }> = {}
 
     const availableLocales = this.configManager.getAvailableLocales()
+    debugLog(`Testing ${availableLocales.length} locales: ${availableLocales.join(', ')}`)
 
     for (const localeCode of availableLocales) {
       const config = this.configManager.getLocale(localeCode)
 
-      if (!('language_detection' in config)) continue
+      if (!('language_detection' in config)) {
+        debugLog(`  Locale '${localeCode}': SKIPPED (no language_detection config)`)
+        continue
+      }
       const localeConfig = config as LocaleConfig
 
       const detectionConfig = localeConfig.language_detection
       const sampleTerms = detectionConfig.sample_terms || []
       const specialChars = detectionConfig.special_characters || []
 
-      // Count term matches
-      const termMatches = sampleTerms.filter(term =>
-        sampleText.includes(term.toLowerCase())
-      ).length
+      debugLog(`  Testing locale '${localeCode}' with ${sampleTerms.length} terms and ${specialChars.length} special chars`)
+
+      // Count term matches - with detailed logging
+      const matchedTerms: string[] = []
+      for (const term of sampleTerms) {
+        const termLower = term.toLowerCase()
+        if (sampleText.includes(termLower)) {
+          matchedTerms.push(term)
+        }
+      }
+      const termMatches = matchedTerms.length
+
+      debugLog(`    Terms matched (${termMatches}/${sampleTerms.length}): ${JSON.stringify(matchedTerms)}`)
 
       // Check for special characters in full text (not just sample)
-      const charMatches = specialChars.filter(char => text.includes(char)).length
+      const matchedChars: string[] = []
+      for (const char of specialChars) {
+        if (text.includes(char)) {
+          matchedChars.push(char)
+        }
+      }
+      const charMatches = matchedChars.length
+
+      debugLog(`    Special chars matched (${charMatches}/${specialChars.length}): ${JSON.stringify(matchedChars)}`)
 
       // Calculate scores
       const termScore = sampleTerms.length > 0 ? termMatches / sampleTerms.length : 0
@@ -64,12 +143,16 @@ export class LanguageDetector {
       // Combined score with term matching weighted more heavily
       const combined = (termScore * 0.7) + (charScore * 0.3)
 
+      debugLog(`    Scores: term=${termScore.toFixed(3)}, char=${charScore.toFixed(3)}, combined=${combined.toFixed(3)}`)
+
       scores[localeCode] = {
         term_score: termScore,
         char_score: charScore,
         combined,
         term_matches: termMatches,
         char_matches: charMatches,
+        matched_terms: matchedTerms,
+        matched_chars: matchedChars,
       }
     }
 
@@ -78,6 +161,12 @@ export class LanguageDetector {
       .sort(([, a], [, b]) => b.combined - a.combined)
 
     const minConfidence = this.settings.language_detection.min_confidence
+
+    debugLog(`Min confidence threshold: ${minConfidence}`)
+    debugLog(`Sorted results:`)
+    for (const [locale, score] of sortedLocales.slice(0, 3)) {
+      debugLog(`  ${locale}: ${score.combined.toFixed(3)} (terms: ${score.term_matches}, chars: ${score.char_matches})`)
+    }
 
     if (sortedLocales.length > 0 && sortedLocales[0][1].combined >= minConfidence) {
       const [bestLocale, bestScore] = sortedLocales[0]
@@ -97,22 +186,36 @@ export class LanguageDetector {
         }
       }
 
+      debugLog(`=== RESULT: ${bestLocale} (confidence: ${bestScore.combined.toFixed(3)}, method: ${method}) ===`)
+      debugLog(`  Matched terms: ${JSON.stringify(bestScore.matched_terms)}`)
+      debugLog(`  Matched chars: ${JSON.stringify(bestScore.matched_chars)}`)
+
       return {
         locale_code: bestLocale,
         confidence: bestScore.combined,
         method,
+        matched_terms: bestScore.matched_terms,
+        matched_chars: bestScore.matched_chars,
         all_scores: scores,
         runner_up: runnerUp,
       }
     }
 
-    // Fallback
+    // Fallback - confidence below threshold
     const fallbackLocale = this.settings.language_detection.fallback_locale || 'en'
+    const bestScore = sortedLocales[0]?.[1]
+
+    debugLog(`=== RESULT: FALLBACK to '${fallbackLocale}' (best score ${bestScore?.combined.toFixed(3) || 0} < threshold ${minConfidence}) ===`)
+    if (bestScore) {
+      debugLog(`  Best was '${sortedLocales[0][0]}' with terms: ${JSON.stringify(bestScore.matched_terms)}`)
+    }
 
     return {
       locale_code: fallbackLocale,
       confidence: 0,
       method: 'fallback',
+      matched_terms: bestScore?.matched_terms,
+      matched_chars: bestScore?.matched_chars,
       all_scores: scores,
     }
   }

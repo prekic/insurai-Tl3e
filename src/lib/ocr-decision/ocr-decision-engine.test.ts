@@ -423,6 +423,87 @@ describe('OCRDecisionEngine', () => {
   })
 })
 
+describe('Language Detection Verification', () => {
+  let detector: LanguageDetector
+
+  beforeEach(() => {
+    const configManager = new ConfigurationManager()
+    detector = new LanguageDetector(configManager)
+
+    // Verify configuration
+    const verification = configManager.verifyConfigurations()
+    expect(verification.success).toBe(true)
+  })
+
+  it('detects Turkish with high confidence when document has insurance terms', () => {
+    // Simulate a real Turkish kasko document
+    const turkishKaskoText = `
+      BİRLEŞİK KASKO SİGORTA POLİÇESİ
+
+      Sigortalı: AHMET YILMAZ
+      Poliçe No: KSK-2024-001234
+
+      Teminat Kapsamı:
+      - Kasko Teminatı
+      - Yangın ve Hırsızlık
+
+      Prim Bilgileri:
+      Toplam Prim: 8.500 TL
+
+      Sigorta Dönemi:
+      Başlangıç: 01.01.2024
+      Bitiş: 31.12.2024
+    `
+
+    const result = detector.detect(turkishKaskoText)
+
+    expect(result.locale_code).toBe('tr')
+    expect(result.confidence).toBeGreaterThan(0.5)
+    expect(result.method).toBe('term_matching')
+    expect(result.matched_terms).toBeDefined()
+    expect(result.matched_terms!.length).toBeGreaterThan(3)
+
+    // Should have matched key Turkish insurance terms
+    const matchedTermsLower = result.matched_terms!.map(t => t.toLowerCase())
+    expect(matchedTermsLower).toContain('sigorta')
+    expect(matchedTermsLower).toContain('poliçe')
+    expect(matchedTermsLower).toContain('prim')
+  })
+
+  it('provides detailed all_scores with matched terms for each locale', () => {
+    const mixedText = 'Sigorta poliçe insurance policy Versicherung'
+    const result = detector.detect(mixedText)
+
+    expect(result.all_scores).toBeDefined()
+    expect(result.all_scores.tr).toBeDefined()
+    expect(result.all_scores.en).toBeDefined()
+    expect(result.all_scores.de).toBeDefined()
+
+    // Turkish should have matched "sigorta" and "poliçe"
+    expect(result.all_scores.tr.matched_terms).toContain('sigorta')
+    expect(result.all_scores.tr.matched_terms).toContain('poliçe')
+
+    // English should have matched "insurance" and "policy"
+    expect(result.all_scores.en.matched_terms).toContain('insurance')
+    expect(result.all_scores.en.matched_terms).toContain('policy')
+  })
+
+  it('detects Turkish from special characters even with no sample terms', () => {
+    // Text with Turkish special characters but no insurance terms
+    const turkishCharsOnly = 'Öğrenci Şükrü Ümit İstanbul Çankaya güneşli'
+    const result = detector.detect(turkishCharsOnly)
+
+    // Should have Turkish special characters matched
+    expect(result.all_scores.tr.char_matches).toBeGreaterThan(0)
+    expect(result.all_scores.tr.matched_chars!.length).toBeGreaterThan(0)
+
+    // Should detect Turkish chars: ö, ğ, ü, ş, ç, İ
+    const matchedChars = result.all_scores.tr.matched_chars || []
+    const hasSpecialChars = matchedChars.some(c => ['ö', 'ğ', 'ü', 'ş', 'ç', 'İ'].includes(c))
+    expect(hasSpecialChars).toBe(true)
+  })
+})
+
 describe('Integration', () => {
   it('full pipeline processes Turkish kasko document', () => {
     const engine = getOCRDecisionEngine()

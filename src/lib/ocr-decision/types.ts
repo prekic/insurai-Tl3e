@@ -218,12 +218,16 @@ export interface LanguageDetectionResult {
   locale_code: string
   confidence: number
   method: 'term_matching' | 'character_detection' | 'fallback'
+  matched_terms?: string[]  // Actual terms that were matched
+  matched_chars?: string[]  // Actual special characters that were matched
   all_scores: Record<string, {
     term_score: number
     char_score: number
     combined: number
     term_matches: number
     char_matches: number
+    matched_terms?: string[]
+    matched_chars?: string[]
   }>
   runner_up?: {
     locale: string
