@@ -7,7 +7,7 @@
 
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
-import pdfParse from 'pdf-parse'
+import { PDFParse } from 'pdf-parse'
 
 const router = Router()
 
@@ -317,89 +317,6 @@ function cleanExtractedText(text: string): NoiseStrippingResult {
 }
 
 // ============================================================================
-// CUSTOM PDF RENDER PAGE
-// ============================================================================
-
-/**
- * Custom page render function for pdf-parse that preserves word boundaries
- * Uses text item positions to detect word/line breaks
- */
-function customRenderPage(pageData: {
-  getTextContent: (options?: { normalizeWhitespace?: boolean }) => Promise<{
-    items: Array<{
-      str: string
-      dir: string
-      width: number
-      height: number
-      transform: number[]
-    }>
-  }>
-}): Promise<string> {
-  return pageData.getTextContent({ normalizeWhitespace: false })
-    .then((textContent) => {
-      const items = textContent.items
-
-      if (items.length === 0) {
-        return ''
-      }
-
-      // Group text items by their Y position (same line)
-      const lines: Map<number, Array<{ x: number, str: string, width: number }>> = new Map()
-
-      for (const item of items) {
-        if (!item.str || item.str.length === 0) continue
-
-        // Transform[4] is X position, Transform[5] is Y position
-        const y = Math.round(item.transform[5])
-        const x = item.transform[4]
-        const width = item.width
-
-        if (!lines.has(y)) {
-          lines.set(y, [])
-        }
-        lines.get(y)!.push({ x, str: item.str, width })
-      }
-
-      // Sort lines by Y position (descending for PDF coordinate system)
-      const sortedYPositions = Array.from(lines.keys()).sort((a, b) => b - a)
-
-      const reconstructedLines: string[] = []
-
-      for (const y of sortedYPositions) {
-        const lineItems = lines.get(y)!
-        // Sort items by X position
-        lineItems.sort((a, b) => a.x - b.x)
-
-        // Reconstruct line with intelligent spacing
-        let lineText = ''
-        let lastX = -Infinity
-        let lastWidth = 0
-
-        for (const item of lineItems) {
-          const gap = item.x - (lastX + lastWidth)
-
-          // If there's a significant gap, add a space
-          // Threshold: if gap > 2 * average character width, add space
-          const avgCharWidth = lastWidth / Math.max(1, lineText.length) || 5
-          if (lineText.length > 0 && gap > avgCharWidth * 0.5) {
-            lineText += ' '
-          }
-
-          lineText += item.str
-          lastX = item.x
-          lastWidth = item.width
-        }
-
-        if (lineText.trim().length > 0) {
-          reconstructedLines.push(lineText.trim())
-        }
-      }
-
-      return reconstructedLines.join('\n')
-    })
-}
-
-// ============================================================================
 // ROUTES
 // ============================================================================
 
@@ -425,12 +342,18 @@ router.post('/extract', upload.single('file'), async (
       return
     }
 
-    // Parse PDF with custom render page for better text reconstruction
-    const pdfData = await pdfParse(file.buffer, {
-      pagerender: customRenderPage,
-    })
+    // Parse PDF using PDFParse class (pdf-parse v2.x API)
+    const parser = new PDFParse({ data: file.buffer })
 
-    const rawText = pdfData.text
+    // Get text extraction result
+    const textResult = await parser.getText()
+    const rawText = textResult.text
+
+    // Get document info
+    const infoResult = await parser.getInfo()
+
+    // Clean up parser
+    await parser.destroy()
 
     // Check if text is too short (likely scanned/image PDF)
     if (rawText.length < 100) {
@@ -455,11 +378,11 @@ router.post('/extract', upload.single('file'), async (
       data: {
         text: rawText,
         cleanedText: cleaning.text,
-        pageCount: pdfData.numpages,
+        pageCount: textResult.total,
         metadata: {
-          title: pdfData.info?.Title,
-          author: pdfData.info?.Author,
-          creationDate: pdfData.info?.CreationDate,
+          title: infoResult.info?.Title as string | undefined,
+          author: infoResult.info?.Author as string | undefined,
+          creationDate: infoResult.info?.CreationDate as string | undefined,
         },
         quality,
         cleaning,
