@@ -691,3 +691,239 @@ describe('Integration', () => {
     expect(decision.action).toBeDefined()
   })
 })
+
+describe('Confidence Calculation Verification', () => {
+  let engine: OCRDecisionEngine
+  let configManager: ConfigurationManager
+
+  beforeEach(() => {
+    configManager = new ConfigurationManager()
+    engine = new OCRDecisionEngine(configManager)
+  })
+
+  it('calculates high confidence for clean digital Turkish kasko document', () => {
+    // Simulate a high-quality digital kasko document with:
+    // - High text density (3900+ chars/page)
+    // - Many Turkish insurance terms
+    // - Extractable fields (policy number, insured, plate, premium)
+    // - No encoding issues
+    const cleanDigitalKaskoDocument = `
+      BİRLEŞİK KASKO SİGORTA POLİÇESİ
+      Kasko Sigortası - Oto Sigorta - Araç Sigortası
+
+      Poliçe No: KSK-2024-001234
+      Sigortalı: MEHMET ÖZTÜRK
+      TC Kimlik No: 12345678901
+
+      Motorlu Kara Taşıtları Kasko Poliçesi
+      Araç sigortası teminat kapsamında sigorta poliçesi
+
+      Araç Bilgileri:
+      Plaka: 34 XYZ 789
+      Marka: Toyota
+      Model: Corolla
+      Model Yılı: 2022
+      Şasi No: ABC123456789XYZ
+
+      Teminatlar ve Kapsam:
+      - Araç Bedeli: 500.000 TL
+      - Çarpışma Teminatı: Dahil
+      - Çalınma Teminatı: Dahil
+      - Yangın Teminatı: Dahil
+      - Doğal Afetler Teminatı: Dahil
+      - Cam Kırılması: 10.000 TL
+      - Ferdi Kaza: 50.000 TL
+      - Hukuki Koruma: 25.000 TL
+
+      Prim Bilgileri:
+      Net Prim: 8.500 TL
+      Vergiler: 850 TL
+      Toplam Prim Tutarı: 9.350 TL
+
+      Sigorta Dönemi:
+      Başlangıç Tarihi: 01.01.2024
+      Bitiş Tarihi: 31.12.2024
+
+      Muafiyet Oranı: %5
+      Hasar ihbar hattı: 0850 222 3344
+
+      Sigortacı: XYZ Sigorta A.Ş.
+      Adres: İstanbul, Türkiye
+    `.repeat(6)  // Repeat to simulate 4000+ chars/page
+
+    const decision = engine.analyzeDocument(cleanDigitalKaskoDocument)
+
+    // Check confidence breakdown is included
+    expect(decision.analysis.confidence_breakdown).toBeDefined()
+    expect(decision.analysis.confidence_breakdown.confidence_breakdown).toBeDefined()
+
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Verify all components are present with expected structure
+    expect(breakdown.char_density).toBeDefined()
+    expect(breakdown.char_density.score).toBeGreaterThanOrEqual(0)
+    expect(breakdown.char_density.score).toBeLessThanOrEqual(1)
+    expect(breakdown.char_density.weight).toBe(0.25)
+    expect(breakdown.char_density.contribution).toBeGreaterThan(0)
+
+    expect(breakdown.text_quality).toBeDefined()
+    expect(breakdown.text_quality.score).toBeGreaterThanOrEqual(0)
+    expect(breakdown.text_quality.weight).toBe(0.30)
+
+    expect(breakdown.page_variance).toBeDefined()
+    expect(breakdown.page_variance.weight).toBe(0.15)
+
+    expect(breakdown.encoding_check).toBeDefined()
+    expect(breakdown.encoding_check.weight).toBe(0.15)
+
+    expect(breakdown.field_extraction).toBeDefined()
+    expect(breakdown.field_extraction.weight).toBe(0.15)
+
+    // For a clean digital document:
+    // - Char density should be high (1.0) since we have lots of text
+    // - Encoding check should be perfect (1.0) - no encoding issues
+    expect(breakdown.char_density.score).toBe(1.0)
+    expect(breakdown.encoding_check.score).toBe(1.0)
+
+    // Weights should sum to 1.0
+    const totalWeight =
+      breakdown.char_density.weight +
+      breakdown.text_quality.weight +
+      breakdown.page_variance.weight +
+      breakdown.encoding_check.weight +
+      breakdown.field_extraction.weight
+    expect(totalWeight).toBe(1.0)
+
+    // Verify contributions sum to overall confidence
+    const totalContrib =
+      breakdown.char_density.contribution +
+      breakdown.text_quality.contribution +
+      breakdown.page_variance.contribution +
+      breakdown.encoding_check.contribution +
+      breakdown.field_extraction.contribution
+
+    expect(Math.abs(totalContrib - decision.confidence)).toBeLessThan(0.01)
+  })
+
+  it('includes detailed component information in breakdown', () => {
+    const document = `
+      KASKO SİGORTA POLİÇESİ
+      Poliçe No: KSK-2024-001234
+      Sigortalı: AHMET YILMAZ
+      Plaka: 34 ABC 123
+      Prim: 5.000 TL
+      Sigorta poliçe belgesi teminat kapsamı
+    `.repeat(10)
+
+    const decision = engine.analyzeDocument(document)
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Each component should have details
+    expect(breakdown.char_density.details).toBeDefined()
+    expect(breakdown.char_density.details).toContain('chars/page')
+
+    expect(breakdown.text_quality.details).toBeDefined()
+    expect(breakdown.text_quality.details).toContain('terms found')
+
+    expect(breakdown.encoding_check.details).toBeDefined()
+
+    expect(breakdown.field_extraction.details).toBeDefined()
+    expect(breakdown.field_extraction.details).toContain('required fields')
+  })
+
+  it('calculates lower confidence for poor quality document', () => {
+    // Document with potential encoding issues (consecutive replacement chars)
+    // and low term coverage
+    const poorQualityDocument = `
+      ####@@@!!!%%%
+      Pol\ufffd\ufffdce No: ???
+      S\ufffd\ufffd\ufffdi\ufffda: ???
+      Random text with garbage characters \ufffd\ufffd\ufffd
+      !!!! #### @@@@ \ufffd\ufffd
+    `.repeat(5)
+
+    const decision = engine.analyzeDocument(poorQualityDocument)
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Encoding score should be lower due to consecutive replacement characters
+    expect(breakdown.encoding_check.score).toBeLessThan(1.0)
+
+    // Text quality should be low due to few terms found
+    expect(breakdown.text_quality.score).toBeLessThan(0.5)
+
+    // Overall confidence should be lower than clean document
+    expect(decision.confidence).toBeLessThan(0.7)
+  })
+
+  it('correctly calculates density score using linear formula', () => {
+    const settings = configManager.getOCRSettings()
+    const threshold = settings.density_analysis.chars_per_page_threshold // 200
+
+    // Create document that would give ~500 chars per page (estimated)
+    // 500 chars / (200 * 4) = 500 / 800 = 0.625
+    const mediumDensityDoc = 'A'.repeat(500)
+    const decision = engine.analyzeDocument(mediumDensityDoc)
+
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // With ~500 chars and single page, density should be around 0.625
+    // Actual calculation: 500 / 800 = 0.625
+    expect(breakdown.char_density.score).toBeGreaterThan(0.5)
+    expect(breakdown.char_density.score).toBeLessThan(0.8)
+    expect(breakdown.char_density.raw_value).toBeGreaterThan(400)
+  })
+
+  it('caps density score at 1.0 for very high density', () => {
+    // Create a very high density document (4000+ chars/page)
+    const highDensityDoc = 'Sigorta poliçe belgesi teminat prim '.repeat(200)
+    const decision = engine.analyzeDocument(highDensityDoc)
+
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Density score should be capped at 1.0
+    expect(breakdown.char_density.score).toBe(1.0)
+  })
+
+  it('uses gradual encoding score instead of binary', () => {
+    // Document with some encoding issues (not too many)
+    const docWithSomeIssues = `
+      Sigorta poliçe belgesi teminat prim
+      Some \ufffd replacement character
+      More normal text sigortalı
+    `.repeat(10)
+
+    const decision = engine.analyzeDocument(docWithSomeIssues)
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Encoding score should be gradual, not binary 0 or 1
+    // With just a few issues, should be between 0.7 and 1.0
+    if (breakdown.encoding_check.raw_value as number > 0) {
+      expect(breakdown.encoding_check.score).toBeLessThan(1.0)
+      expect(breakdown.encoding_check.score).toBeGreaterThan(0)
+    }
+  })
+
+  it('provides correct contribution calculations', () => {
+    const document = 'Sigorta poliçe belgesi teminat prim tutarı muafiyet sigortalı '.repeat(50)
+    const decision = engine.analyzeDocument(document)
+    const breakdown = decision.analysis.confidence_breakdown.confidence_breakdown!
+
+    // Verify contribution = score * weight for each component
+    const tolerance = 0.0001
+
+    expect(Math.abs(breakdown.char_density.contribution -
+      breakdown.char_density.score * breakdown.char_density.weight)).toBeLessThan(tolerance)
+
+    expect(Math.abs(breakdown.text_quality.contribution -
+      breakdown.text_quality.score * breakdown.text_quality.weight)).toBeLessThan(tolerance)
+
+    expect(Math.abs(breakdown.page_variance.contribution -
+      breakdown.page_variance.score * breakdown.page_variance.weight)).toBeLessThan(tolerance)
+
+    expect(Math.abs(breakdown.encoding_check.contribution -
+      breakdown.encoding_check.score * breakdown.encoding_check.weight)).toBeLessThan(tolerance)
+
+    expect(Math.abs(breakdown.field_extraction.contribution -
+      breakdown.field_extraction.score * breakdown.field_extraction.weight)).toBeLessThan(tolerance)
+  })
+})

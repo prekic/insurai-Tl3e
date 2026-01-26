@@ -296,6 +296,14 @@ export interface FieldExtractionAnalysis {
   recommendation: 'proceed' | 'consider_ocr' | 'require_ocr'
 }
 
+export interface ConfidenceComponentBreakdown {
+  score: number
+  weight: number
+  contribution: number
+  raw_value?: number | string  // Original value before score calculation
+  details?: string  // Human-readable explanation
+}
+
 export interface ConfidenceScore {
   overall: number
   component_scores: {
@@ -311,6 +319,14 @@ export interface ConfidenceScore {
     page_variance: number
     encoding_check: number
     field_extraction: number
+  }
+  // Detailed breakdown for Document Journey viewer
+  confidence_breakdown?: {
+    char_density: ConfidenceComponentBreakdown
+    text_quality: ConfidenceComponentBreakdown
+    page_variance: ConfidenceComponentBreakdown
+    encoding_check: ConfidenceComponentBreakdown
+    field_extraction: ConfidenceComponentBreakdown
   }
 }
 
