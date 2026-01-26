@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture
-- **Production Readiness**: ~9.5/10 (4500+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 25, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, **configuration-driven OCR Decision Engine with Document Journey metadata**
+- **Production Readiness**: ~9.5/10 (5600+ tests, 0 lint errors, PWA support, server hardening)
+- **Last Updated**: January 26, 2026
 
 ---
 
@@ -109,6 +109,20 @@ insurai/
 | `src/lib/pipeline/document-chunker.ts` | Document chunking by page markers or size |
 | `src/lib/pipeline/turkish-ocr-normalizer.ts` | Turkish-specific OCR normalization rules |
 | `src/lib/pipeline/pipeline-logger.ts` | Structured logging for pipeline stages |
+
+### OCR Decision Engine (Added Jan 26, 2026)
+| File | Purpose |
+|------|---------|
+| `src/lib/ocr-decision/ocr-decision-engine.ts` | Main orchestrator with `analyzeDocument()` and `buildDocumentJourneyMetadata()` |
+| `src/lib/ocr-decision/types.ts` | TypeScript types including `OCRDecision`, `DocumentJourneyMetadata` |
+| `src/lib/ocr-decision/configuration-manager.ts` | Loads locale and policy configs from JSON files |
+| `src/lib/ocr-decision/language-detector.ts` | Detects document language via term/character matching |
+| `src/lib/ocr-decision/policy-classifier.ts` | Classifies policy type (kasko, traffic, health, etc.) |
+| `src/lib/ocr-decision/text-quality-analyzer.ts` | Analyzes text quality, encoding issues, garbage patterns |
+| `src/lib/ocr-decision/field-extractor.ts` | Tests field extraction patterns (policy number, insured, etc.) |
+| `config/locales/*.json` | Language-specific configs (tr.json, en.json, de.json) |
+| `config/policy_types/**/*.json` | Policy type configs (motor/motor_kasko.json, etc.) |
+| `config/ocr-settings.json` | OCR thresholds, confidence weights, decision thresholds |
 
 ### Components
 | File | Purpose |
@@ -1786,6 +1800,52 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - Updated `convertToAnalyzedPolicy` to fallback name to description
   - Fixed 12+ locations using `.name.toLowerCase()` to use `getCoverageName()`
 - **File**: `src/lib/ai/policy-extractor.ts`
+
+### 27. Configuration-Driven OCR Decision Engine (Added Jan 26, 2026)
+- **Feature**: Full-featured OCR decision system with JSON configuration and Document Journey metadata
+- **Components**:
+  - `OCRDecisionEngine` - Main orchestrator with 5-component weighted confidence calculation
+  - `LanguageDetector` - Detects Turkish, English, German via term + character matching
+  - `PolicyTypeClassifier` - Classifies kasko, traffic, health, fire, life with exclusion terms
+  - `TextQualityAnalyzer` - Checks encoding issues, garbage patterns, insurance term density
+  - `FieldExtractor` - Tests extraction of policy number, insured name, dates, premium
+  - `ConfigurationManager` - Loads JSON configs for locales and policy types
+- **Confidence Calculation** (5 weighted components):
+  ```typescript
+  weights: {
+    char_density: 0.25,      // Character density score
+    text_quality: 0.30,      // Insurance term matching
+    page_variance: 0.15,     // Page-to-page consistency
+    encoding_check: 0.15,    // Encoding quality
+    field_extraction: 0.15   // Required fields found
+  }
+  ```
+- **Decision Thresholds**:
+  - `skip_ocr`: confidence >= 0.70 (good digital PDF)
+  - `selective_ocr`: confidence >= 0.40 (OCR specific pages)
+  - `full_ocr`: confidence < 0.40 (OCR entire document)
+- **Document Journey Metadata**: `buildDocumentJourneyMetadata()` provides full diagnostic output:
+  ```typescript
+  {
+    ocr_decision: {
+      action: 'skip_ocr',
+      confidence: 0.89,
+      confidence_breakdown: { char_density: {...}, text_quality: {...}, ... },
+      language_detection: { detected: 'tr', matched_terms: [...], runner_up: {...} },
+      policy_classification: { detected: 'motor_kasko', matched_terms: [...], config_used: '...' },
+      text_quality: { quality_score: 0.85, garbage_patterns_checked: [...] },
+      field_extraction: { extraction_rate: 0.6, fields: { policy_number: {...} } },
+      page_analysis: { flagged_pages: [...] },
+      reasoning: ['Language detected as TR (85%)', '...']
+    }
+  }
+  ```
+- **Files**:
+  - `src/lib/ocr-decision/*.ts` - All engine components (7 files)
+  - `config/locales/*.json` - Language configs (tr, en, de, _universal)
+  - `config/policy_types/**/*.json` - Policy type configs (motor, property, health, _generic)
+  - `config/ocr-settings.json` - Thresholds and weights
+- **Tests**: 145 tests (81 unit + 64 regression)
 
 ---
 
