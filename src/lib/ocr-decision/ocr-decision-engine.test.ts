@@ -504,6 +504,102 @@ describe('Language Detection Verification', () => {
   })
 })
 
+describe('Policy Classification Verification', () => {
+  let classifier: PolicyTypeClassifier
+  let configManager: ConfigurationManager
+
+  beforeEach(() => {
+    configManager = new ConfigurationManager()
+    classifier = new PolicyTypeClassifier(configManager)
+
+    // Verify configuration
+    const verification = configManager.verifyConfigurations()
+    expect(verification.success).toBe(true)
+  })
+
+  it('classifies Turkish kasko document with high confidence', () => {
+    // Simulate a real Turkish kasko document
+    const turkishKaskoText = `
+      BİRLEŞİK KASKO SİGORTA POLİÇESİ
+
+      Poliçe No: KSK-2024-001234
+      Sigortalı: AHMET YILMAZ
+
+      Bu kasko sigortası poliçesi ile araç sigortası teminatı verilmektedir.
+      Motorlu kara taşıtları için oto sigorta kapsamı geçerlidir.
+
+      Teminat Kapsamı:
+      - Kasko Teminatı
+      - Yangın ve Hırsızlık
+    `
+
+    const result = classifier.classify(turkishKaskoText, 'tr')
+
+    expect(result.policy_type_id).toBe('motor_kasko')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.6)
+    expect(result.matched_terms.length).toBeGreaterThan(0)
+    expect(result.category).toBe('motor')
+
+    // Should have matched key kasko terms
+    const matchedLower = result.matched_terms.map(t => t.toLowerCase())
+    expect(matchedLower).toContain('kasko')
+  })
+
+  it('excludes traffic insurance from kasko classification', () => {
+    // Document with traffic terms - needs 4/6 to reach 0.6 threshold
+    // Detection terms: trafik sigortası, zorunlu mali sorumluluk, zmss, zmms, trafik poliçesi, karayolu motorlu
+    const trafficDocument = `
+      trafik sigortası poliçesi belgesi
+      Zorunlu Mali Sorumluluk Sigortası
+      ZMSS ZMMS kapsamında trafik poliçesi
+    `
+
+    const result = classifier.classify(trafficDocument, 'tr')
+
+    // Should be classified as traffic, not kasko
+    expect(result.policy_type_id).toBe('motor_traffic')
+    expect(result.confidence).toBeGreaterThanOrEqual(0.6)
+
+    // Kasko should be excluded due to exclusion terms (zmss, zorunlu mali sorumluluk)
+    expect(result.all_scores.motor_kasko?.excluded).toBe(true)
+  })
+
+  it('provides detailed all_scores for all policy types', () => {
+    const genericDocument = 'Sigorta poliçesi belgesi'
+    const result = classifier.classify(genericDocument, 'tr')
+
+    expect(result.all_scores).toBeDefined()
+    expect(result.all_scores.motor_kasko).toBeDefined()
+    expect(result.all_scores.motor_traffic).toBeDefined()
+    expect(result.all_scores.property_fire).toBeDefined()
+    expect(result.all_scores.health_individual).toBeDefined()
+  })
+
+  it('uses correct locale fallback for detection terms', () => {
+    // Use English locale for a kasko document
+    const englishKaskoText = 'Comprehensive auto insurance vehicle insurance motor coverage'
+    const result = classifier.classify(englishKaskoText, 'en')
+
+    // Should still detect as motor_kasko using English terms
+    // Note: confidence may be lower due to fewer matching terms
+    expect(result.all_scores.motor_kasko).toBeDefined()
+    expect(result.all_scores.motor_kasko.matches.length).toBeGreaterThan(0)
+  })
+
+  it('correctly applies confidence threshold', () => {
+    // Document with only one kasko term (below 0.6 threshold)
+    const singleTermDoc = 'Bu bir kasko belgesidir'
+    const result = classifier.classify(singleTermDoc, 'tr')
+
+    // Should fall back to _generic because only 1/5 = 0.2 < 0.6 threshold
+    expect(result.policy_type_id).toBe('_generic')
+
+    // But kasko should have some matches
+    expect(result.all_scores.motor_kasko?.matches.length).toBe(1)
+    expect(result.all_scores.motor_kasko?.matches).toContain('kasko')
+  })
+})
+
 describe('Integration', () => {
   it('full pipeline processes Turkish kasko document', () => {
     const engine = getOCRDecisionEngine()
