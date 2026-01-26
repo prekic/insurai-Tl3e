@@ -553,7 +553,6 @@ export class OCRDecisionEngine {
     const confidenceBreakdown = analysis.confidence_breakdown
 
     // Build confidence breakdown with thresholds
-    const thresholds = this.settings.confidence_calculation.thresholds
     const formattedConfidenceBreakdown: DocumentJourneyMetadata['ocr_decision']['confidence_breakdown'] = {}
 
     if (confidenceBreakdown.confidence_breakdown) {
