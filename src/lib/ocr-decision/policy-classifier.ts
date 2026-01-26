@@ -11,6 +11,19 @@ import type {
 } from './types'
 import type { ConfigurationManager } from './configuration-manager'
 
+// Debug logging flag - set to true to enable verbose logging
+const DEBUG_POLICY_CLASSIFICATION = true
+
+function debugLog(message: string, data?: unknown): void {
+  if (DEBUG_POLICY_CLASSIFICATION) {
+    if (data !== undefined) {
+      console.warn(`[PolicyClassifier] ${message}`, data)
+    } else {
+      console.warn(`[PolicyClassifier] ${message}`)
+    }
+  }
+}
+
 export class PolicyTypeClassifier {
   private configManager: ConfigurationManager
   private settings: OCRSettings
@@ -18,12 +31,47 @@ export class PolicyTypeClassifier {
   constructor(configManager: ConfigurationManager) {
     this.configManager = configManager
     this.settings = configManager.getOCRSettings()
+
+    // Verify configuration at construction time
+    this.verifyConfiguration()
+  }
+
+  /**
+   * Verify that policy classification configuration is properly loaded
+   */
+  private verifyConfiguration(): void {
+    const availablePolicyTypes = this.configManager.getAvailablePolicyTypes()
+    debugLog(`=== POLICY CLASSIFIER CONFIGURATION ===`)
+    debugLog(`Available policy types: ${availablePolicyTypes.join(', ')}`)
+    debugLog(`Fallback type: ${this.settings.policy_type_detection.fallback_type}`)
+    debugLog(`Min confidence: ${this.settings.policy_type_detection.min_confidence}`)
+
+    // Check motor_kasko specifically
+    if (!availablePolicyTypes.includes('motor_kasko')) {
+      console.error('[PolicyClassifier] CRITICAL: Kasko policy type (motor_kasko) not loaded!')
+    } else {
+      const kaskoConfig = this.configManager.getPolicyConfig('motor_kasko')
+      if (kaskoConfig.classification) {
+        const trTerms = kaskoConfig.classification.detection_terms?.tr || []
+        debugLog(`Kasko TR detection terms (${trTerms.length}): ${JSON.stringify(trTerms)}`)
+        debugLog(`Kasko confidence threshold: ${kaskoConfig.classification.confidence_threshold}`)
+      } else {
+        console.error('[PolicyClassifier] CRITICAL: Kasko policy missing classification config!')
+      }
+    }
+
+    debugLog(`=== END CONFIGURATION ===`)
   }
 
   /**
    * Classify document into policy type
    */
   classify(text: string, localeCode: string): PolicyTypeClassificationResult {
+    debugLog(`=== POLICY TYPE CLASSIFICATION START ===`)
+    debugLog(`Input text length: ${text.length} chars`)
+    debugLog(`Detected language/locale: ${localeCode}`)
+    debugLog(`Text sample (first 300 chars): "${text.substring(0, 300).replace(/\n/g, ' ')}"`)
+
     const textLower = text.toLowerCase()
     const scores: Record<string, {
       score: number
@@ -33,13 +81,17 @@ export class PolicyTypeClassifier {
     }> = {}
 
     const availablePolicyTypes = this.configManager.getAvailablePolicyTypes()
+    debugLog(`Testing ${availablePolicyTypes.length} policy types: ${availablePolicyTypes.join(', ')}`)
 
     for (const policyId of availablePolicyTypes) {
       const config = this.configManager.getPolicyConfig(policyId)
       const classification = config.classification
 
       // Skip if no classification or if this is a fallback config
-      if (!classification || classification.is_fallback) continue
+      if (!classification || classification.is_fallback) {
+        debugLog(`  Policy '${policyId}': SKIPPED (no classification or is_fallback)`)
+        continue
+      }
 
       const detectionTerms = classification.detection_terms
       const excludeTerms = classification.exclude_if_contains || {}
@@ -49,9 +101,15 @@ export class PolicyTypeClassifier {
       const terms = this.getTermsForLocale(detectionTerms, localeCode)
       const exclude = this.getTermsForLocale(excludeTerms, localeCode)
 
+      debugLog(`  Testing policy '${policyId}' (threshold: ${threshold})`)
+      debugLog(`    Detection terms for '${localeCode}': ${JSON.stringify(terms)}`)
+
       // Check exclusions first
-      const isExcluded = exclude.some(term => textLower.includes(term.toLowerCase()))
+      const excludeMatches = exclude.filter(term => textLower.includes(term.toLowerCase()))
+      const isExcluded = excludeMatches.length > 0
+
       if (isExcluded) {
+        debugLog(`    EXCLUDED by terms: ${JSON.stringify(excludeMatches)}`)
         scores[policyId] = {
           score: 0,
           excluded: true,
@@ -61,9 +119,18 @@ export class PolicyTypeClassifier {
         continue
       }
 
-      // Count matches
-      const matches = terms.filter(term => textLower.includes(term.toLowerCase()))
+      // Count matches - with detailed logging
+      const matches: string[] = []
+      for (const term of terms) {
+        const termLower = term.toLowerCase()
+        if (textLower.includes(termLower)) {
+          matches.push(term)
+        }
+      }
       const score = terms.length > 0 ? matches.length / terms.length : 0
+
+      debugLog(`    Matched (${matches.length}/${terms.length}): ${JSON.stringify(matches)}`)
+      debugLog(`    Score: ${score.toFixed(3)} (threshold: ${threshold})`)
 
       scores[policyId] = {
         score,
@@ -78,9 +145,19 @@ export class PolicyTypeClassifier {
       .filter(([, v]) => !v.excluded && v.score >= (v.threshold || 0.5))
       .sort(([, a], [, b]) => b.score - a.score)
 
+    debugLog(`Valid matches above threshold: ${validMatches.length}`)
+    for (const [policyId, score] of validMatches.slice(0, 3)) {
+      debugLog(`  ${policyId}: ${score.score.toFixed(3)} (matches: ${score.matches.join(', ')})`)
+    }
+
     if (validMatches.length > 0) {
       const [bestTypeId, bestScore] = validMatches[0]
       const config = this.configManager.getPolicyConfig(bestTypeId)
+      const configPath = `config/policy_types/${config.category}/${bestTypeId}.json`
+
+      debugLog(`=== RESULT: ${bestTypeId} (confidence: ${bestScore.score.toFixed(3)}) ===`)
+      debugLog(`  Matched terms: ${JSON.stringify(bestScore.matches)}`)
+      debugLog(`  Config path: ${configPath}`)
 
       return {
         policy_type_id: bestTypeId,
@@ -88,13 +165,28 @@ export class PolicyTypeClassifier {
         category: config.category,
         confidence: bestScore.score,
         matched_terms: bestScore.matches,
+        config_path: configPath,
         all_scores: scores,
       }
     }
 
-    // Fallback to generic
+    // Fallback to generic - find best score for debugging
+    const allScoresSorted = Object.entries(scores)
+      .filter(([, v]) => !v.excluded)
+      .sort(([, a], [, b]) => b.score - a.score)
+
+    debugLog(`=== RESULT: FALLBACK to '_generic' ===`)
+    if (allScoresSorted.length > 0) {
+      const [bestId, bestScore] = allScoresSorted[0]
+      debugLog(`  Best match was '${bestId}' with score ${bestScore.score.toFixed(3)} (below threshold ${bestScore.threshold})`)
+      debugLog(`  Matched terms: ${JSON.stringify(bestScore.matches)}`)
+    } else {
+      debugLog(`  No policy types had any matches`)
+    }
+
     const fallbackId = this.settings.policy_type_detection.fallback_type || '_generic'
     const fallbackConfig = this.configManager.getPolicyConfig(fallbackId)
+    const fallbackConfigPath = `config/policy_types/${fallbackConfig.category}/${fallbackId}.json`
 
     return {
       policy_type_id: fallbackId,
@@ -102,6 +194,7 @@ export class PolicyTypeClassifier {
       category: fallbackConfig.category,
       confidence: 0,
       matched_terms: [],
+      config_path: fallbackConfigPath,
       all_scores: scores,
     }
   }

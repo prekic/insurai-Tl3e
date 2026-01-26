@@ -10,9 +10,26 @@ import type {
   OCRDecision,
   DensityAnalysis,
   ConfidenceScore,
+  ConfidenceComponentBreakdown,
   OCRAction,
   OCRSettings,
+  TextQualityAnalysis,
+  FieldExtractionAnalysis,
+  DocumentJourneyMetadata,
 } from './types'
+
+// Debug logging flag - set to true to enable verbose logging
+const DEBUG_CONFIDENCE_CALCULATION = true
+
+function debugLog(message: string, data?: unknown): void {
+  if (DEBUG_CONFIDENCE_CALCULATION) {
+    if (data !== undefined) {
+      console.warn(`[ConfidenceCalculator] ${message}`, data)
+    } else {
+      console.warn(`[ConfidenceCalculator] ${message}`)
+    }
+  }
+}
 import { ConfigurationManager, getConfigurationManager } from './configuration-manager'
 import { LanguageDetector } from './language-detector'
 import { PolicyTypeClassifier } from './policy-classifier'
@@ -254,70 +271,167 @@ export class OCRDecisionEngine {
    */
   private calculateConfidence(
     density: DensityAnalysis,
-    quality: { quality_score: number; encoding_issues: boolean },
-    fields: { extraction_rate: number }
+    quality: TextQualityAnalysis,
+    fields: FieldExtractionAnalysis
   ): ConfidenceScore {
     const weights = this.settings.confidence_calculation.weights
 
-    // Calculate individual scores
+    debugLog('=== CONFIDENCE CALCULATION START ===')
+
+    // 1. Character Density Score (25%)
     const densityScore = this.calculateDensityScore(density)
+    debugLog(`Char density: ${density.average_chars_per_page} chars/page -> score: ${densityScore.toFixed(2)}`)
+
+    // 2. Text Quality Score (30%)
     const qualityScore = quality.quality_score
+    debugLog(`Text quality score: ${qualityScore.toFixed(2)} (${quality.terms_found}/${quality.terms_checked} terms found)`)
+
+    // 3. Page Variance Score (15%)
     const varianceScore = this.calculateVarianceScore(density)
-    const encodingScore = quality.encoding_issues ? 0 : 1
+    debugLog(`Page variance score: ${varianceScore.toFixed(2)}`)
+
+    // 4. Encoding Check Score (15%) - Gradual, not binary
+    const encodingIssueCount = quality.encoding_issues_found?.length || 0
+    const encodingScore = quality.encoding_issues
+      ? Math.max(0, 1 - (encodingIssueCount * 0.1))
+      : 1.0
+    debugLog(`Encoding score: ${encodingScore.toFixed(2)} (issues: ${encodingIssueCount})`)
+
+    // 5. Field Extraction Score (15%)
     const fieldScore = fields.extraction_rate
+    debugLog(`Field extraction score: ${fieldScore.toFixed(2)} (${fields.required_fields_found}/${fields.required_fields_total} required fields)`)
 
     const scores = {
       char_density: Math.round(densityScore * 100) / 100,
       text_quality: Math.round(qualityScore * 100) / 100,
       page_variance: Math.round(varianceScore * 100) / 100,
-      encoding_check: encodingScore,
+      encoding_check: Math.round(encodingScore * 100) / 100,
       field_extraction: Math.round(fieldScore * 100) / 100,
     }
 
     // Calculate weighted overall score
-    const overall =
-      scores.char_density * weights.char_density +
-      scores.text_quality * weights.text_quality +
-      scores.page_variance * weights.page_variance +
-      scores.encoding_check * weights.encoding_check +
-      scores.field_extraction * weights.field_extraction
+    const charDensityContrib = scores.char_density * weights.char_density
+    const textQualityContrib = scores.text_quality * weights.text_quality
+    const pageVarianceContrib = scores.page_variance * weights.page_variance
+    const encodingCheckContrib = scores.encoding_check * weights.encoding_check
+    const fieldExtractionContrib = scores.field_extraction * weights.field_extraction
+
+    const overall = charDensityContrib + textQualityContrib + pageVarianceContrib +
+      encodingCheckContrib + fieldExtractionContrib
+
+    debugLog(`=== OVERALL CONFIDENCE: ${overall.toFixed(2)} ===`)
+    debugLog('Contributions:', {
+      char_density: charDensityContrib.toFixed(4),
+      text_quality: textQualityContrib.toFixed(4),
+      page_variance: pageVarianceContrib.toFixed(4),
+      encoding_check: encodingCheckContrib.toFixed(4),
+      field_extraction: fieldExtractionContrib.toFixed(4),
+    })
+
+    // Build detailed breakdown for Document Journey
+    const confidence_breakdown: Record<string, ConfidenceComponentBreakdown> = {
+      char_density: {
+        score: scores.char_density,
+        weight: weights.char_density,
+        contribution: Math.round(charDensityContrib * 10000) / 10000,
+        raw_value: density.average_chars_per_page,
+        details: `${density.average_chars_per_page} chars/page (threshold: ${density.threshold_used})`,
+      },
+      text_quality: {
+        score: scores.text_quality,
+        weight: weights.text_quality,
+        contribution: Math.round(textQualityContrib * 10000) / 10000,
+        raw_value: `${quality.terms_found}/${quality.terms_checked}`,
+        details: `${quality.terms_found} of ${quality.terms_checked} terms found`,
+      },
+      page_variance: {
+        score: scores.page_variance,
+        weight: weights.page_variance,
+        contribution: Math.round(pageVarianceContrib * 10000) / 10000,
+        raw_value: density.variance || 0,
+        details: density.total_pages < 2
+          ? 'Single page (variance N/A)'
+          : `Variance: ${density.variance} chars`,
+      },
+      encoding_check: {
+        score: scores.encoding_check,
+        weight: weights.encoding_check,
+        contribution: Math.round(encodingCheckContrib * 10000) / 10000,
+        raw_value: encodingIssueCount,
+        details: encodingIssueCount === 0
+          ? 'No encoding issues detected'
+          : `${encodingIssueCount} encoding issue(s) found`,
+      },
+      field_extraction: {
+        score: scores.field_extraction,
+        weight: weights.field_extraction,
+        contribution: Math.round(fieldExtractionContrib * 10000) / 10000,
+        raw_value: `${fields.required_fields_found}/${fields.required_fields_total}`,
+        details: `${fields.required_fields_found} of ${fields.required_fields_total} required fields found`,
+      },
+    }
 
     return {
       overall: Math.round(overall * 100) / 100,
       component_scores: scores,
       weights_used: weights,
+      confidence_breakdown: confidence_breakdown as ConfidenceScore['confidence_breakdown'],
     }
   }
 
   /**
    * Calculate density score (0-1)
+   *
+   * Uses formula: min(1.0, avg_chars_per_page / (threshold * 4))
+   * This means 4x threshold = max score (1.0)
+   * For threshold 200: 800+ chars/page = 1.0
    */
   private calculateDensityScore(density: DensityAnalysis): number {
     const threshold = density.threshold_used
     const avg = density.average_chars_per_page
 
-    if (avg >= threshold * 10) return 1.0
-    if (avg >= threshold * 5) return 0.9
-    if (avg >= threshold * 2) return 0.8
-    if (avg >= threshold) return 0.7
-    if (avg >= threshold * 0.5) return 0.5
-    if (avg >= threshold * 0.25) return 0.3
-    return 0.1
+    // New formula: linear scaling up to 4x threshold
+    const score = Math.min(1.0, avg / (threshold * 4))
+
+    debugLog(`  Density calculation: ${avg} / (${threshold} * 4) = ${(avg / (threshold * 4)).toFixed(2)} -> capped to ${score.toFixed(2)}`)
+
+    return score
   }
 
   /**
    * Calculate variance score (lower variance = higher score)
+   *
+   * Uses coefficient of variation (CV = stdev / mean)
+   * Lower variance = higher score
    */
   private calculateVarianceScore(density: DensityAnalysis): number {
-    if (!density.variance || density.total_pages < 2) return 1.0
+    if (!density.variance || density.total_pages < 2) {
+      debugLog('  Variance calculation: Single page or no variance -> 1.0')
+      return 1.0
+    }
 
     const varianceThreshold = this.settings.density_analysis.page_variance_threshold
     const normalizedVariance = density.variance / density.average_chars_per_page
 
-    if (normalizedVariance <= varianceThreshold * 0.5) return 1.0
-    if (normalizedVariance <= varianceThreshold) return 0.8
-    if (normalizedVariance <= varianceThreshold * 2) return 0.6
-    return 0.4
+    debugLog(`  Variance calculation: ${density.variance} / ${density.average_chars_per_page} = ${normalizedVariance.toFixed(4)} (threshold: ${varianceThreshold})`)
+
+    // Score based on how close variance is to threshold
+    // Lower variance = higher score
+    let score: number
+    if (normalizedVariance <= varianceThreshold * 0.5) {
+      score = 1.0
+    } else if (normalizedVariance <= varianceThreshold) {
+      score = 0.9
+    } else if (normalizedVariance <= varianceThreshold * 1.5) {
+      score = 0.7
+    } else if (normalizedVariance <= varianceThreshold * 2) {
+      score = 0.5
+    } else {
+      score = 0.3
+    }
+
+    debugLog(`  Variance score: ${score.toFixed(2)}`)
+    return score
   }
 
   /**
@@ -423,6 +537,141 @@ export class OCRDecisionEngine {
   reloadConfigurations(): void {
     this.configManager.reload()
     this.settings = this.configManager.getOCRSettings()
+  }
+
+  /**
+   * Build Document Journey metadata from OCRDecision.
+   * Transforms internal analysis into formatted diagnostic output.
+   */
+  buildDocumentJourneyMetadata(decision: OCRDecision): DocumentJourneyMetadata {
+    const { analysis, document_classification, configurations_used } = decision
+    const langResult = document_classification.detected_language
+    const policyResult = document_classification.detected_policy_type
+    const qualityAnalysis = analysis.text_quality
+    const fieldAnalysis = analysis.field_extraction
+    const densityAnalysis = analysis.density
+    const confidenceBreakdown = analysis.confidence_breakdown
+
+    // Build confidence breakdown with thresholds
+    const thresholds = this.settings.confidence_calculation.thresholds
+    const formattedConfidenceBreakdown: DocumentJourneyMetadata['ocr_decision']['confidence_breakdown'] = {}
+
+    if (confidenceBreakdown.confidence_breakdown) {
+      const breakdown = confidenceBreakdown.confidence_breakdown
+      for (const [key, value] of Object.entries(breakdown)) {
+        formattedConfidenceBreakdown[key] = {
+          score: value.score,
+          weight: value.weight,
+          contribution: value.contribution,
+          raw_value: value.raw_value ?? 0,
+          threshold: key === 'char_density' ? densityAnalysis.threshold_used :
+                     key === 'text_quality' ? qualityAnalysis.min_quality_threshold :
+                     key === 'field_extraction' ? (fieldAnalysis.min_rate_threshold || 0.5) :
+                     undefined,
+          details: value.details || '',
+        }
+      }
+    }
+
+    // Build field extraction details
+    const fieldDetails: DocumentJourneyMetadata['ocr_decision']['field_extraction']['fields'] = {}
+    for (const [fieldName, fieldResult] of Object.entries(fieldAnalysis.field_results)) {
+      fieldDetails[fieldName] = {
+        found: fieldResult.found,
+        value: fieldResult.value,
+        pattern_used: fieldResult.matched_pattern || null,
+        required: fieldResult.required,
+      }
+    }
+
+    // Build flagged pages list
+    const flaggedPages: Array<{ page: number; chars: number; reason: string }> = []
+    for (const pageDetail of densityAnalysis.page_details) {
+      if (pageDetail.needs_ocr) {
+        flaggedPages.push({
+          page: pageDetail.page,
+          chars: pageDetail.chars,
+          reason: `Below density threshold (${pageDetail.chars} < ${densityAnalysis.threshold_used})`,
+        })
+      }
+    }
+
+    return {
+      ocr_decision: {
+        action: decision.action,
+        confidence: decision.confidence,
+        confidence_breakdown: formattedConfidenceBreakdown,
+
+        language_detection: {
+          detected: langResult.locale_code,
+          confidence: langResult.confidence,
+          method: langResult.method,
+          matched_terms: langResult.matched_terms || [],
+          matched_characters: langResult.matched_chars || [],
+          runner_up: langResult.runner_up || null,
+        },
+
+        policy_classification: {
+          detected: policyResult.policy_type_id,
+          name: policyResult.policy_type_name,
+          confidence: policyResult.confidence,
+          category: policyResult.category,
+          matched_terms: policyResult.matched_terms,
+          config_used: policyResult.config_path,
+        },
+
+        text_quality: {
+          quality_score: qualityAnalysis.quality_score,
+          locale_used: qualityAnalysis.locale_used,
+          terms_found: qualityAnalysis.found_terms_sample,
+          terms_checked: qualityAnalysis.terms_checked,
+          encoding_issues: qualityAnalysis.encoding_issues_found || [],
+          garbage_patterns_checked: qualityAnalysis.garbage_patterns_checked || [],
+          recommendation: qualityAnalysis.recommendation,
+        },
+
+        field_extraction: {
+          extraction_rate: fieldAnalysis.extraction_rate,
+          required_found: fieldAnalysis.required_fields_found,
+          required_total: fieldAnalysis.required_fields_total,
+          fields: fieldDetails,
+          recommendation: fieldAnalysis.recommendation,
+        },
+
+        page_analysis: {
+          total_pages: densityAnalysis.total_pages,
+          total_characters: densityAnalysis.total_characters,
+          avg_chars_per_page: densityAnalysis.average_chars_per_page,
+          density_threshold: densityAnalysis.threshold_used,
+          pages_below_threshold: densityAnalysis.pages_below_threshold.length,
+          flagged_pages: flaggedPages,
+          min_page: densityAnalysis.min_chars_page,
+          max_page: densityAnalysis.max_chars_page,
+        },
+
+        configs_used: {
+          locale: configurations_used.locale_config,
+          policy_type: configurations_used.policy_config,
+          ocr_settings_version: configurations_used.ocr_settings_version,
+        },
+
+        reasoning: decision.reasoning,
+        timestamp: decision.timestamp,
+        duration_ms: decision.duration_ms,
+      },
+    }
+  }
+
+  /**
+   * Analyze document and return Document Journey metadata directly.
+   * Convenience method that combines analyzeDocument + buildDocumentJourneyMetadata.
+   */
+  analyzeDocumentForJourney(
+    extractedText: string,
+    pageTexts?: string[]
+  ): DocumentJourneyMetadata {
+    const decision = this.analyzeDocument(extractedText, pageTexts)
+    return this.buildDocumentJourneyMetadata(decision)
   }
 }
 

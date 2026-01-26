@@ -33,8 +33,8 @@ export class TextQualityAnalyzer {
     // Get insurance terminology for this locale
     const allTerms = this.configManager.getInsuranceTerminology(localeCode)
 
-    // Check for encoding issues
-    const { hasIssues: encodingIssues, issues: encodingIssuesFound } =
+    // Check for encoding issues - also get the patterns that were checked
+    const { hasIssues: encodingIssues, issues: encodingIssuesFound, patternsChecked } =
       this.checkEncodingIssues(text, localeConfig)
 
     // Term matching
@@ -65,6 +65,7 @@ export class TextQualityAnalyzer {
       found_terms_sample: foundTerms.slice(0, 10),
       encoding_issues: encodingIssues,
       encoding_issues_found: encodingIssuesFound,
+      garbage_patterns_checked: patternsChecked,
       locale_used: localeCode,
       min_quality_threshold: minQuality,
       recommendation,
@@ -77,13 +78,15 @@ export class TextQualityAnalyzer {
   private checkEncodingIssues(
     text: string,
     localeConfig: LocaleConfig | { locale_code: string }
-  ): { hasIssues: boolean; issues: string[] } {
+  ): { hasIssues: boolean; issues: string[]; patternsChecked: string[] } {
     const issues: string[] = []
+    const patternsChecked: string[] = []
 
     if ('encoding_validation' in localeConfig) {
       const garbagePatterns = localeConfig.encoding_validation.garbage_patterns || []
 
       for (const pattern of garbagePatterns) {
+        patternsChecked.push(pattern)
         try {
           const regex = new RegExp(pattern, 'gi')
           const matches = text.match(regex)
@@ -98,11 +101,12 @@ export class TextQualityAnalyzer {
 
     // Check for common encoding issues
     const commonIssues = [
-      { pattern: /\ufffd{2,}/g, name: 'Unicode replacement characters' },
-      { pattern: /[\x00-\x08\x0b\x0c\x0e-\x1f]{3,}/g, name: 'Control characters' },
+      { pattern: /\ufffd{2,}/g, patternStr: '[\\ufffd]{2,}', name: 'Unicode replacement characters' },
+      { pattern: /[\x00-\x08\x0b\x0c\x0e-\x1f]{3,}/g, patternStr: '[\\x00-\\x1f]{3,}', name: 'Control characters' },
     ]
 
-    for (const { pattern, name } of commonIssues) {
+    for (const { pattern, patternStr, name } of commonIssues) {
+      patternsChecked.push(patternStr)
       const matches = text.match(pattern)
       if (matches && matches.length > 0) {
         issues.push(`Found ${matches.length} occurrences of ${name}`)
@@ -112,6 +116,7 @@ export class TextQualityAnalyzer {
     return {
       hasIssues: issues.length > 0,
       issues,
+      patternsChecked,
     }
   }
 

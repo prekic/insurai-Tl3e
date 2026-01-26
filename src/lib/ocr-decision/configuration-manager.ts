@@ -348,6 +348,106 @@ export class ConfigurationManager {
   }
 
   /**
+   * Verify all configurations are properly loaded
+   * Returns diagnostic information for debugging
+   */
+  verifyConfigurations(): {
+    success: boolean
+    issues: string[]
+    diagnostics: {
+      locales: { code: string; sample_terms_count: number; special_chars_count: number }[]
+      policy_types: { id: string; has_classification: boolean; detection_terms_locales: string[] }[]
+      ocr_settings: { min_confidence: number; fallback_locale: string }
+    }
+  } {
+    const issues: string[] = []
+    const diagnostics = {
+      locales: [] as { code: string; sample_terms_count: number; special_chars_count: number }[],
+      policy_types: [] as { id: string; has_classification: boolean; detection_terms_locales: string[] }[],
+      ocr_settings: {
+        min_confidence: this.ocrSettings.language_detection.min_confidence,
+        fallback_locale: this.ocrSettings.language_detection.fallback_locale,
+      },
+    }
+
+    // Check locales
+    const availableLocales = this.getAvailableLocales()
+    if (!availableLocales.includes('tr')) {
+      issues.push('CRITICAL: Turkish locale (tr) not loaded')
+    }
+    if (!availableLocales.includes('en')) {
+      issues.push('CRITICAL: English locale (en) not loaded')
+    }
+
+    for (const localeCode of availableLocales) {
+      const config = this.getLocale(localeCode) as LocaleConfig
+      const sampleTermsCount = config.language_detection?.sample_terms?.length || 0
+      const specialCharsCount = config.language_detection?.special_characters?.length || 0
+
+      diagnostics.locales.push({
+        code: localeCode,
+        sample_terms_count: sampleTermsCount,
+        special_chars_count: specialCharsCount,
+      })
+
+      if (sampleTermsCount === 0) {
+        issues.push(`WARNING: Locale '${localeCode}' has no sample_terms for language detection`)
+      }
+    }
+
+    // Check policy types
+    const availablePolicyTypes = this.getAvailablePolicyTypes()
+    if (!availablePolicyTypes.includes('motor_kasko')) {
+      issues.push('CRITICAL: Kasko policy type (motor_kasko) not loaded')
+    }
+    if (!availablePolicyTypes.includes('motor_traffic')) {
+      issues.push('WARNING: Traffic policy type (motor_traffic) not loaded')
+    }
+
+    for (const policyId of availablePolicyTypes) {
+      const config = this.getPolicyConfig(policyId)
+      const hasClassification = !!config.classification
+      const detectionTermsLocales = hasClassification
+        ? Object.keys(config.classification?.detection_terms || {})
+        : []
+
+      diagnostics.policy_types.push({
+        id: policyId,
+        has_classification: hasClassification,
+        detection_terms_locales: detectionTermsLocales,
+      })
+
+      if (!hasClassification) {
+        issues.push(`WARNING: Policy type '${policyId}' has no classification config`)
+      } else if (!detectionTermsLocales.includes('tr')) {
+        issues.push(`WARNING: Policy type '${policyId}' has no Turkish detection terms`)
+      }
+    }
+
+    // Log diagnostics
+    console.warn('[ConfigurationManager] === CONFIGURATION VERIFICATION ===')
+    console.warn(`[ConfigurationManager] Locales: ${diagnostics.locales.map(l => `${l.code}(${l.sample_terms_count} terms)`).join(', ')}`)
+    console.warn(`[ConfigurationManager] Policy types: ${diagnostics.policy_types.map(p => p.id).join(', ')}`)
+    console.warn(`[ConfigurationManager] Min confidence: ${diagnostics.ocr_settings.min_confidence}`)
+    console.warn(`[ConfigurationManager] Fallback locale: ${diagnostics.ocr_settings.fallback_locale}`)
+    if (issues.length > 0) {
+      console.warn(`[ConfigurationManager] Issues found: ${issues.length}`)
+      for (const issue of issues) {
+        console.warn(`[ConfigurationManager]   - ${issue}`)
+      }
+    } else {
+      console.warn('[ConfigurationManager] All configurations verified successfully')
+    }
+    console.warn('[ConfigurationManager] === END VERIFICATION ===')
+
+    return {
+      success: issues.filter(i => i.startsWith('CRITICAL')).length === 0,
+      issues,
+      diagnostics,
+    }
+  }
+
+  /**
    * Reload all configurations (for hot-reload support)
    */
   reload(): void {

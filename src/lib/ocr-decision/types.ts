@@ -218,12 +218,16 @@ export interface LanguageDetectionResult {
   locale_code: string
   confidence: number
   method: 'term_matching' | 'character_detection' | 'fallback'
+  matched_terms?: string[]  // Actual terms that were matched
+  matched_chars?: string[]  // Actual special characters that were matched
   all_scores: Record<string, {
     term_score: number
     char_score: number
     combined: number
     term_matches: number
     char_matches: number
+    matched_terms?: string[]
+    matched_chars?: string[]
   }>
   runner_up?: {
     locale: string
@@ -237,6 +241,7 @@ export interface PolicyTypeClassificationResult {
   category: string
   confidence: number
   matched_terms: string[]
+  config_path: string  // Path to the config file used
   all_scores: Record<string, {
     score: number
     excluded: boolean
@@ -268,6 +273,7 @@ export interface TextQualityAnalysis {
   found_terms_sample: string[]
   encoding_issues: boolean
   encoding_issues_found?: string[]
+  garbage_patterns_checked?: string[]  // Patterns used for encoding validation
   locale_used: string
   min_quality_threshold: number
   recommendation: 'proceed' | 'consider_ocr' | 'require_ocr'
@@ -292,6 +298,14 @@ export interface FieldExtractionAnalysis {
   recommendation: 'proceed' | 'consider_ocr' | 'require_ocr'
 }
 
+export interface ConfidenceComponentBreakdown {
+  score: number
+  weight: number
+  contribution: number
+  raw_value?: number | string  // Original value before score calculation
+  details?: string  // Human-readable explanation
+}
+
 export interface ConfidenceScore {
   overall: number
   component_scores: {
@@ -307,6 +321,14 @@ export interface ConfidenceScore {
     page_variance: number
     encoding_check: number
     field_extraction: number
+  }
+  // Detailed breakdown for Document Journey viewer
+  confidence_breakdown?: {
+    char_density: ConfidenceComponentBreakdown
+    text_quality: ConfidenceComponentBreakdown
+    page_variance: ConfidenceComponentBreakdown
+    encoding_check: ConfidenceComponentBreakdown
+    field_extraction: ConfidenceComponentBreakdown
   }
 }
 
@@ -349,4 +371,80 @@ export interface ConfigurationLoadResult {
   policy_types: Record<string, PolicyTypeConfig>
   ocr_settings: OCRSettings
   errors?: string[]
+}
+
+// ============ DOCUMENT JOURNEY METADATA TYPES ============
+
+/**
+ * Enhanced metadata format for Document Journey viewer.
+ * Provides all diagnostic information in a structured format.
+ */
+export interface DocumentJourneyMetadata {
+  ocr_decision: {
+    action: OCRAction
+    confidence: number
+    confidence_breakdown: Record<string, {
+      score: number
+      weight: number
+      contribution: number
+      raw_value: number | string
+      threshold?: number
+      details: string
+    }>
+    language_detection: {
+      detected: string
+      confidence: number
+      method: 'term_matching' | 'character_detection' | 'fallback'
+      matched_terms: string[]
+      matched_characters: string[]
+      runner_up: { locale: string; confidence: number } | null
+    }
+    policy_classification: {
+      detected: string
+      name: string
+      confidence: number
+      category: string
+      matched_terms: string[]
+      config_used: string
+    }
+    text_quality: {
+      quality_score: number
+      locale_used: string
+      terms_found: string[]
+      terms_checked: number
+      encoding_issues: string[]
+      garbage_patterns_checked: string[]
+      recommendation: 'proceed' | 'consider_ocr' | 'require_ocr'
+    }
+    field_extraction: {
+      extraction_rate: number
+      required_found: number
+      required_total: number
+      fields: Record<string, {
+        found: boolean
+        value: string | null
+        pattern_used: string | null
+        required: boolean
+      }>
+      recommendation: 'proceed' | 'consider_ocr' | 'require_ocr'
+    }
+    page_analysis: {
+      total_pages: number
+      total_characters: number
+      avg_chars_per_page: number
+      density_threshold: number
+      pages_below_threshold: number
+      flagged_pages: Array<{ page: number; chars: number; reason: string }>
+      min_page: { page: number; chars: number }
+      max_page: { page: number; chars: number }
+    }
+    configs_used: {
+      locale: string
+      policy_type: string
+      ocr_settings_version: string
+    }
+    reasoning: string[]
+    timestamp: string
+    duration_ms: number
+  }
 }

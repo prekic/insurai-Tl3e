@@ -5,7 +5,8 @@
     "sample_terms": ["sigorta", "poliçe", "teminat", "prim", "ve", "için", "ile", "sigortacı", "sigortalı"],
     "min_matches_for_detection": 3,
     "character_sets": ["latin", "turkish_special"],
-    "special_characters": ["ğ", "ü", "ş", "ı", "ö", "ç", "İ", "Ğ", "Ü", "Ş", "Ö", "Ç"]
+    "special_characters": ["ğ", "ü", "ş", "ı", "ö", "ç", "İ", "Ğ", "Ü", "Ş", "Ö", "Ç"],
+    "_comment": "Keep sample_terms small (9 highly common terms) for accurate percentage matching. Extended terms are in insurance_terminology."
   },
   "encoding_validation": {
     "expected_characters": "a-zA-ZğüşıöçĞÜŞİÖÇ0-9",

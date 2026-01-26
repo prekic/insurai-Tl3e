@@ -52,11 +52,12 @@
 
   "language_detection": {
     "enabled": true,
-    "min_confidence": 0.70,
+    "min_confidence": 0.40,
     "fallback_locale": "en",
     "supported_locales": ["tr", "en", "de", "fr", "es", "ar", "it", "nl", "pt"],
     "multi_language_support": true,
-    "sample_size": 2000
+    "sample_size": 2000,
+    "_comment": "Lowered min_confidence from 0.70 to 0.40 for better detection of documents with OCR errors or limited sample terms"
   },
 
   "policy_type_detection": {
