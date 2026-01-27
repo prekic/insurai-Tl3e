@@ -13,7 +13,7 @@ import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-pa
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
-import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing, processTextEnhanced, cleanTurkishTextWithAI, type CleanRoomResult } from './text-processor'
+import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing, processTextEnhanced, type CleanRoomResult } from './text-processor'
 import {
   ExtractedPolicyData,
   ExtractedCoverage,
@@ -94,8 +94,6 @@ export interface ExtractionOptions {
   useOCR?: boolean  // Legacy option, OCR-first is now always used
   useConsensus?: boolean
   useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
-  /** Use AI-powered OCR cleanup for Turkish text (costs ~$0.001/doc, much better quality) */
-  useAIOCRCleanup?: boolean  // Default: true - uses GPT-4o-mini/Claude Haiku for Turkish correction
   primaryProvider?: AIProvider
   providers?: AIProvider[]
   /** Optional logger for tracking processing stages with actual data */
@@ -229,7 +227,6 @@ export async function extractPolicyFromDocument(
     // useOCR is a legacy option, OCR-first is now always used
     useConsensus = true,
     useCleanRoom = true,  // Default to clean-room processing
-    useAIOCRCleanup = true,  // Default: use AI for Turkish OCR cleanup (~$0.001/doc)
     primaryProvider,
     providers,
     logger,  // Optional processing logger for tracking stages
@@ -476,44 +473,7 @@ export async function extractPolicyFromDocument(
         processedText = basicResult.text
       }
     }
-  }
-
-  // AI-powered Turkish OCR cleanup (costs ~$0.001/doc with GPT-4o-mini)
-  // This fixes Turkish character spacing issues that deterministic rules miss:
-  // - Müş teri → Müşteri
-  // - SİGORTAŞİRKETİ → SİGORTA ŞİRKETİ
-  // - SANAYİVE → SANAYİ VE
-  // Also removes garbage data: B^^^B, a!!!!!a, etc.
-  if (useAIOCRCleanup) {
-    try {
-      console.log('[PolicyExtractor] Starting AI-powered Turkish OCR cleanup...')
-      const aiCleanupResult = await cleanTurkishTextWithAI(processedText, {
-        provider: primaryProvider || 'openai',
-        useOfflineFallback: true,  // Fall back to deterministic if AI fails
-      })
-
-      const beforeLength = processedText.length
-      processedText = aiCleanupResult.text
-
-      console.log(`[PolicyExtractor] AI OCR cleanup complete: ` +
-        `${aiCleanupResult.aiCleanupStats.provider} provider, ` +
-        `${beforeLength - processedText.length} chars changed, ` +
-        `${aiCleanupResult.totalProcessingTimeMs}ms`)
-
-      // Debug stats
-      if (import.meta.env.DEV) {
-        console.warn(`[DEBUG] AI OCR cleanup: ` +
-          `${aiCleanupResult.corrections.length} corrections, ` +
-          `${aiCleanupResult.preCleanStats?.noiseLinesRemoved || 0} garbage lines removed, ` +
-          `${aiCleanupResult.preCleanStats?.barcodeArtifactsRemoved || 0} barcode artifacts removed, ` +
-          `provider: ${aiCleanupResult.aiCleanupStats.provider}, ` +
-          `fallback: ${aiCleanupResult.aiCleanupStats.fallbackUsed}`)
-      }
-    } catch (error) {
-      console.warn('[PolicyExtractor] AI OCR cleanup failed, continuing with current text:', error)
-      // Continue with the text we have - AI cleanup is an enhancement, not required
-    }
-  } else if (!useCleanRoom && textNeedsProcessing(documentText)) {
+  } else if (textNeedsProcessing(documentText)) {
     // Legacy AI-assisted processing
     try {
       const processingResult = await processTextWithAI(documentText, {
