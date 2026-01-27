@@ -1,6 +1,6 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isProxyConfigured, type AIProvider } from './config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
-import { isPDFFile } from './pdf-parser'
+import { isPDFFile, extractTextFromPDFWithRetry } from './pdf-parser'
 import {
   extractWithDocumentAI,
   isDocumentOCRAvailable,
@@ -263,19 +263,158 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // ========== DOCUMENT AI OCR EXTRACTION STAGE ==========
-  // OCR-first approach: ALWAYS use Document AI OCR for text extraction
-  // This ensures consistent, high-quality text for all PDFs (native or scanned)
+  // ========== TEXT EXTRACTION STAGE ==========
+  // Try Document AI OCR first, fall back to pdf.js if unavailable
   logger?.startStage('ocr_processing', {
     filename: file.name,
     file_size: file.size,
-    strategy: 'ocr-first',
+    strategy: 'document-ai-first-with-pdfjs-fallback',
     backend: 'document-ai',
   })
 
-  // Check if Document AI OCR is available
-  if (!isDocumentOCRAvailable()) {
-    logger?.failStage('Document AI OCR not configured')
+  // Variables to hold extraction results (from either Document AI or pdf.js)
+  let documentText: string = ''
+  let ocrFormFields: FormField[] = []
+  let ocrTables: Table[] = []
+  let usedOCR = false
+  let extractionMethod: 'document-ai' | 'pdf.js' | 'none' = 'none'
+  let pageCount = 0
+  // Store full Document AI data for result object (when available)
+  let documentAIOcrData: {
+    pdfHash: string
+    pages: PageText[]
+    confidence: number
+    metadata: { processingTimeMs: number; warnings: string[] }
+  } | null = null
+
+  // Try Document AI OCR first (if available)
+  const documentAIAvailable = isDocumentOCRAvailable()
+
+  if (documentAIAvailable) {
+    const ocrResult = await extractWithDocumentAI(file)
+
+    if (ocrResult.success) {
+      // Document AI succeeded - use its results
+      const ocrData = ocrResult.data
+      documentText = ocrData.text
+      ocrFormFields = ocrData.formFields
+      ocrTables = ocrData.tables
+      usedOCR = true
+      extractionMethod = 'document-ai'
+      pageCount = ocrData.pageCount
+      // Store full data for result object
+      documentAIOcrData = {
+        pdfHash: ocrData.pdfHash,
+        pages: ocrData.pages,
+        confidence: ocrData.confidence,
+        metadata: ocrData.metadata,
+      }
+
+      // Log Document AI success
+      logger?.setOCRUsed('document-ai')
+      logger?.setPageCount(ocrData.pageCount)
+      logger?.completeStage({
+        output: {
+          text_length: documentText.length,
+          text_preview: documentText.substring(0, 500) + '...',
+          page_count: ocrData.pageCount,
+          confidence: ocrData.confidence,
+          pdf_hash: ocrData.pdfHash,
+          form_fields_count: ocrFormFields.length,
+          tables_count: ocrTables.length,
+          processing_time_ms: ocrData.metadata.processingTimeMs,
+          warnings: ocrData.metadata.warnings,
+        },
+        metadata: {
+          pages: ocrData.pages.map(p => ({
+            page: p.pageNumber,
+            chars: p.text.length,
+            confidence: p.confidence,
+            warnings: p.warnings,
+          })),
+          form_fields: ocrFormFields.slice(0, 10),
+          tables_structure: ocrTables.map(t => ({
+            page: t.pageNumber,
+            rows: t.rows?.length || 0,
+            cols: t.rows?.[0]?.cells?.length || 0,
+          })),
+        },
+        full_output_text: documentText,
+      })
+
+      if (import.meta.env.DEV) {
+        console.log(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
+          `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
+          `${ocrFormFields.length} form fields, ` +
+          `${ocrTables.length} tables, ` +
+          `${ocrData.metadata.processingTimeMs}ms`)
+      }
+    } else {
+      // Document AI failed - log and try pdf.js fallback
+      console.warn(`[Extraction] Document AI failed: ${ocrResult.error.message}, trying pdf.js fallback`)
+    }
+  } else {
+    console.warn('[Extraction] Document AI not available, trying pdf.js fallback')
+  }
+
+  // If Document AI didn't work (not available or failed), try pdf.js
+  if (extractionMethod === 'none') {
+    logger?.startStage('pdf_extraction', {
+      filename: file.name,
+      file_size: file.size,
+      fallback_reason: documentAIAvailable ? 'document-ai-failed' : 'document-ai-not-configured',
+    })
+
+    const pdfResult = await extractTextFromPDFWithRetry(file)
+
+    if (pdfResult.success) {
+      // pdf.js succeeded
+      documentText = pdfResult.data.text
+      pageCount = pdfResult.data.pageCount
+      extractionMethod = 'pdf.js'
+      usedOCR = false // pdf.js extracts native text, not OCR
+
+      logger?.setOCRUsed('pdf.js')
+      logger?.setPageCount(pageCount)
+      logger?.completeStage({
+        output: {
+          text_length: documentText.length,
+          text_preview: documentText.substring(0, 500) + '...',
+          page_count: pageCount,
+          metadata: pdfResult.data.metadata,
+        },
+        full_output_text: documentText,
+      })
+
+      if (import.meta.env.DEV) {
+        console.log(`[pdf.js fallback] ${pageCount} pages, ${documentText.length} chars extracted`)
+      }
+    } else {
+      // Both Document AI and pdf.js failed
+      logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
+
+      if (useFallback) {
+        console.warn('[Extraction] Both Document AI and pdf.js failed, using sample data fallback')
+        return createFallbackResult(file)
+      }
+
+      return {
+        success: false,
+        error: {
+          code: 'OCR_ERROR',
+          message: documentAIAvailable
+            ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
+            : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
+          details: 'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
+        },
+        fallbackAvailable: true,
+      }
+    }
+  }
+
+  // At this point, we have extracted text from either Document AI or pdf.js
+  if (!documentText || documentText.trim().length === 0) {
+    logger?.failStage('No text could be extracted from the document')
     if (useFallback) {
       return createFallbackResult(file)
     }
@@ -283,79 +422,11 @@ export async function extractPolicyFromDocument(
       success: false,
       error: {
         code: 'OCR_ERROR',
-        message: 'Document AI OCR is not configured',
-        details: 'Ensure the backend server is running with GCP credentials configured for Document AI',
+        message: 'No text could be extracted from the document',
+        details: 'The PDF appears to be empty or contains only images without OCR text',
       },
       fallbackAvailable: true,
     }
-  }
-
-  // Extract text using Document AI OCR (always, regardless of native text)
-  const ocrResult = await extractWithDocumentAI(file)
-
-  if (!ocrResult.success) {
-    logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`)
-    if (useFallback) {
-      return createFallbackResult(file)
-    }
-    return {
-      success: false,
-      error: {
-        code: 'OCR_ERROR',
-        message: ocrResult.error.message,
-        details: ocrResult.error.details,
-      },
-      fallbackAvailable: true,
-    }
-  }
-
-  // OCR succeeded - store results
-  const ocrData = ocrResult.data
-  const documentText = ocrData.text
-  const ocrFormFields = ocrData.formFields
-  const ocrTables = ocrData.tables
-
-  // Always mark as OCR-processed with this approach
-  const usedOCR = true
-
-  // Log OCR success with comprehensive details
-  logger?.setOCRUsed('document-ai')
-  logger?.setPageCount(ocrData.pageCount)
-  logger?.completeStage({
-    output: {
-      text_length: documentText.length,
-      text_preview: documentText.substring(0, 500) + '...',
-      page_count: ocrData.pageCount,
-      confidence: ocrData.confidence,
-      pdf_hash: ocrData.pdfHash,
-      form_fields_count: ocrFormFields.length,
-      tables_count: ocrTables.length,
-      processing_time_ms: ocrData.metadata.processingTimeMs,
-      warnings: ocrData.metadata.warnings,
-    },
-    metadata: {
-      pages: ocrData.pages.map(p => ({
-        page: p.pageNumber,
-        chars: p.text.length,
-        confidence: p.confidence,
-        warnings: p.warnings,
-      })),
-      form_fields: ocrFormFields.slice(0, 10), // First 10 for preview
-      tables_structure: ocrTables.map(t => ({
-        page: t.pageNumber,
-        rows: t.rows?.length || 0,
-        cols: t.rows?.[0]?.cells?.length || 0,
-      })),
-    },
-    full_output_text: documentText,
-  })
-
-  if (import.meta.env.DEV) {
-    console.log(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
-      `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
-      `${ocrFormFields.length} form fields, ` +
-      `${ocrTables.length} tables, ` +
-      `${ocrData.metadata.processingTimeMs}ms`)
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
@@ -900,17 +971,28 @@ export async function extractPolicyFromDocument(
         warnings: patternValidation.warnings,
         enhanced: Object.keys(patternValidation.enhancements),
       } : undefined,
-      // Document AI OCR data (always present with OCR-first approach)
-      documentOCR: {
-        pdfHash: ocrData.pdfHash,
-        pages: ocrData.pages,
-        confidence: ocrData.confidence,
+      // Document AI OCR data (when available) or pdf.js extraction info
+      documentOCR: documentAIOcrData ? {
+        pdfHash: documentAIOcrData.pdfHash,
+        pages: documentAIOcrData.pages,
+        confidence: documentAIOcrData.confidence,
         formFields: ocrFormFields,
         tables: ocrTables,
         fieldsUsed: formFieldsUsed,
         tableCoveragesUsed,
-        processingTimeMs: ocrData.metadata.processingTimeMs,
-        warnings: ocrData.metadata.warnings,
+        processingTimeMs: documentAIOcrData.metadata.processingTimeMs,
+        warnings: documentAIOcrData.metadata.warnings,
+      } : {
+        // pdf.js fallback - minimal data
+        pdfHash: '',
+        pages: [] as PageText[],
+        confidence: 0.9, // Assumed good quality for native text
+        formFields: [] as FormField[],
+        tables: [] as Table[],
+        fieldsUsed: 0, // No form fields used in pdf.js extraction
+        tableCoveragesUsed: 0,
+        processingTimeMs: 0,
+        warnings: ['Extracted with pdf.js (Document AI unavailable)'],
       },
     }
   } catch (error) {
