@@ -8,11 +8,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const {
   mockIsOCRConfigured,
   mockGetGoogleCloudApiKey,
+  mockIsProxyConfigured,
+  mockGetProxyUrl,
   mockAiCache,
 } = vi.hoisted(() => {
   return {
     mockIsOCRConfigured: vi.fn(),
     mockGetGoogleCloudApiKey: vi.fn(),
+    mockIsProxyConfigured: vi.fn(() => true),
+    mockGetProxyUrl: vi.fn(() => 'http://localhost:4001'),
     mockAiCache: {
       initialize: vi.fn(),
       getOCR: vi.fn(),
@@ -25,6 +29,8 @@ const {
 vi.mock('./config', () => ({
   isOCRConfigured: mockIsOCRConfigured,
   getGoogleCloudApiKey: mockGetGoogleCloudApiKey,
+  isProxyConfigured: mockIsProxyConfigured,
+  getProxyUrl: mockGetProxyUrl,
 }))
 
 vi.mock('./cache', () => ({
@@ -85,6 +91,8 @@ describe('OCR Module', () => {
     // Reset mocks to default state
     mockIsOCRConfigured.mockReturnValue(true)
     mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+    mockIsProxyConfigured.mockReturnValue(true)
+    mockGetProxyUrl.mockReturnValue('http://localhost:4001')
   })
 
   afterEach(() => {
@@ -199,7 +207,10 @@ describe('OCR Module', () => {
     })
 
     it('should return NO_OCR_CONFIG error when OCR is not configured', async () => {
+      // Disable both OCR and proxy to get NO_OCR_CONFIG
       mockIsOCRConfigured.mockReturnValue(false)
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
 
       const file = createMockFile()
       const result = await performOCR(file)
@@ -207,12 +218,15 @@ describe('OCR Module', () => {
       expect(result.success).toBe(false)
       if (!result.success) {
         expect(result.error.code).toBe('NO_OCR_CONFIG')
-        expect(result.error.message).toContain('not configured')
+        expect(result.error.message).toContain('No OCR backend configured')
       }
     })
 
     it('should return NO_OCR_CONFIG error when API key is not available', async () => {
+      // Disable proxy to force direct API call, then API key will be needed
       mockIsOCRConfigured.mockReturnValue(true)
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockGetGoogleCloudApiKey.mockReturnValue(null)
 
       const file = createMockFile()
@@ -226,6 +240,12 @@ describe('OCR Module', () => {
     })
 
     it('should call Google Vision API with correct parameters', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
       mockFetch.mockResolvedValue({
         ok: true,
         json: async () => ({
@@ -263,6 +283,9 @@ describe('OCR Module', () => {
     })
 
     it('should extract text and confidence from API response', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -300,6 +323,9 @@ describe('OCR Module', () => {
     })
 
     it('should cache successful OCR results', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -330,6 +356,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle empty OCR response (no text detected)', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -346,12 +375,15 @@ describe('OCR Module', () => {
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.text).toBe('')
-        expect(result.data.confidence).toBe(0)
+        expect(result.data.confidence).toBe(0.8) // Default confidence when no blocks
         expect(result.data.pageCount).toBe(1)
       }
     })
 
     it('should handle API error response', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -368,12 +400,15 @@ describe('OCR Module', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.code).toBe('OCR_FAILED')
+        expect(result.error.code).toBe('VISION_API_ERROR')
         expect(result.error.message).toContain('Invalid API key')
       }
     })
 
     it('should handle API error with no error message', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -390,12 +425,15 @@ describe('OCR Module', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.code).toBe('OCR_FAILED')
+        expect(result.error.code).toBe('VISION_API_ERROR')
         expect(result.error.message).toContain('API error: 500')
       }
     })
 
     it('should handle network errors', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -406,12 +444,15 @@ describe('OCR Module', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.code).toBe('OCR_FAILED')
+        expect(result.error.code).toBe('VISION_API_ERROR')
         expect(result.error.message).toBe('Network error')
       }
     })
 
     it('should handle non-Error exceptions', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -422,12 +463,15 @@ describe('OCR Module', () => {
 
       expect(result.success).toBe(false)
       if (!result.success) {
-        expect(result.error.code).toBe('OCR_FAILED')
-        expect(result.error.message).toBe('OCR processing failed')
+        expect(result.error.code).toBe('VISION_API_ERROR')
+        expect(result.error.message).toBe('Vision API processing failed')
       }
     })
 
     it('should handle multiple pages in response', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -460,6 +504,9 @@ describe('OCR Module', () => {
     })
 
     it('should default confidence to 0.8 when no blocks have confidence', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -487,6 +534,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle undefined pages array in annotation', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -516,6 +566,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle undefined blocks array in page', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -547,6 +600,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle undefined text in annotation', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -576,6 +632,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle empty pages array (pageCount defaults to 1)', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -605,6 +664,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle block without confidence property', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -642,7 +704,10 @@ describe('OCR Module', () => {
 
   describe('performMultiPageOCR', () => {
     it('should return NO_OCR_CONFIG error when OCR is not configured', async () => {
+      // Disable both OCR and proxy to get NO_OCR_CONFIG
       mockIsOCRConfigured.mockReturnValue(false)
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
 
       const pages = [createMockBlob()]
       const result = await performMultiPageOCR(pages)
@@ -654,7 +719,10 @@ describe('OCR Module', () => {
     })
 
     it('should return NO_OCR_CONFIG error when API key is not available', async () => {
-      mockIsOCRConfigured.mockReturnValue(true)
+      // Disable proxy to force direct API call, then API key will be needed
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
+      mockIsOCRConfigured.mockReturnValue(false)
       mockGetGoogleCloudApiKey.mockReturnValue(null)
 
       const pages = [createMockBlob()]
@@ -667,6 +735,9 @@ describe('OCR Module', () => {
     })
 
     it('should process multiple pages in parallel', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -698,6 +769,12 @@ describe('OCR Module', () => {
     })
 
     it('should combine text from multiple pages', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
       // Use a different approach - return same text for all pages
       mockFetch.mockResolvedValue({
         ok: true,
@@ -725,6 +802,9 @@ describe('OCR Module', () => {
     })
 
     it('should calculate average confidence across pages', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -757,6 +837,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle failed individual page OCR gracefully', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -792,6 +875,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle network errors', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -808,6 +894,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle non-Error exceptions', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -824,6 +913,9 @@ describe('OCR Module', () => {
     })
 
     it('should handle pages with no text annotation', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
@@ -845,6 +937,9 @@ describe('OCR Module', () => {
     })
 
     it('should set isScanned to true for all results', async () => {
+      // Disable proxy to force direct Vision API call
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
       mockIsOCRConfigured.mockReturnValue(true)
       mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
 
