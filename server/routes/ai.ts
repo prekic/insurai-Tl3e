@@ -72,10 +72,39 @@ const GCP_CONFIG = {
 /**
  * Get the path to GCP service account credentials
  */
+// Cache for credentials file path (written once from env var)
+let _cachedCredentialsPath: string | null = null
+
 function getGCPCredentialsPath(): string | null {
-  // Check environment variable first
+  // Return cached path if already resolved
+  if (_cachedCredentialsPath) {
+    return _cachedCredentialsPath
+  }
+
+  // Check environment variable for file path first
   if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    return process.env.GOOGLE_APPLICATION_CREDENTIALS
+    _cachedCredentialsPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+    return _cachedCredentialsPath
+  }
+
+  // Check for base64-encoded credentials (for Railway/Heroku/etc.)
+  // This allows passing service account JSON as an environment variable
+  // Supports both GCP_SERVICE_ACCOUNT_BASE64 (user's existing var) and GCP_CREDENTIALS_BASE64
+  const base64Credentials = process.env.GCP_SERVICE_ACCOUNT_BASE64 || process.env.GCP_CREDENTIALS_BASE64
+  if (base64Credentials) {
+    try {
+      const credentialsJson = Buffer.from(base64Credentials, 'base64').toString('utf-8')
+      // Validate it's proper JSON
+      JSON.parse(credentialsJson)
+      // Write to temp file
+      const tempPath = path.join(process.cwd(), '.gcp-credentials-temp.json')
+      fs.writeFileSync(tempPath, credentialsJson, { mode: 0o600 })
+      console.log('[Document AI] Credentials loaded from base64 environment variable')
+      _cachedCredentialsPath = tempPath
+      return _cachedCredentialsPath
+    } catch (error) {
+      console.error('[Document AI] Failed to decode base64 credentials:', error)
+    }
   }
 
   // Check common locations
@@ -87,7 +116,8 @@ function getGCPCredentialsPath(): string | null {
 
   for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
-      return p
+      _cachedCredentialsPath = p
+      return _cachedCredentialsPath
     }
   }
 
