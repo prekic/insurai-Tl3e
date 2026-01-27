@@ -289,9 +289,12 @@ export async function extractPolicyFromDocument(
 
   // Try Document AI OCR first (if available)
   const documentAIAvailable = isDocumentOCRAvailable()
+  console.log('[PolicyExtractor] Document AI available:', documentAIAvailable)
 
   if (documentAIAvailable) {
+    console.log('[PolicyExtractor] Attempting Document AI extraction...')
     const ocrResult = await extractWithDocumentAI(file)
+    console.log('[PolicyExtractor] Document AI result success:', ocrResult.success)
 
     if (ocrResult.success) {
       // Document AI succeeded - use its results
@@ -351,14 +354,17 @@ export async function extractPolicyFromDocument(
       }
     } else {
       // Document AI failed - log and try pdf.js fallback
-      console.warn(`[Extraction] Document AI failed: ${ocrResult.error.message}, trying pdf.js fallback`)
+      console.warn('[PolicyExtractor] Document AI FAILED:', ocrResult.error.message)
+      console.log('[PolicyExtractor] Will try pdf.js fallback...')
     }
   } else {
-    console.warn('[Extraction] Document AI not available, trying pdf.js fallback')
+    console.warn('[PolicyExtractor] Document AI not available, will try pdf.js fallback')
   }
 
   // If Document AI didn't work (not available or failed), try pdf.js
+  console.log('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
   if (extractionMethod === 'none') {
+    console.log('[PolicyExtractor] Starting pdf.js fallback extraction...')
     logger?.startStage('pdf_extraction', {
       filename: file.name,
       file_size: file.size,
@@ -366,6 +372,7 @@ export async function extractPolicyFromDocument(
     })
 
     const pdfResult = await extractTextFromPDFWithRetry(file)
+    console.log('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
 
     if (pdfResult.success) {
       // pdf.js succeeded
@@ -373,6 +380,7 @@ export async function extractPolicyFromDocument(
       pageCount = pdfResult.data.pageCount
       extractionMethod = 'pdf.js'
       usedOCR = false // pdf.js extracts native text, not OCR
+      console.log(`[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`)
 
       logger?.setOCRUsed('pdf.js')
       logger?.setPageCount(pageCount)
@@ -385,11 +393,8 @@ export async function extractPolicyFromDocument(
         },
         full_output_text: documentText,
       })
-
-      if (import.meta.env.DEV) {
-        console.log(`[pdf.js fallback] ${pageCount} pages, ${documentText.length} chars extracted`)
-      }
     } else {
+      console.error('[PolicyExtractor] pdf.js ALSO FAILED:', pdfResult.error.message)
       // Both Document AI and pdf.js failed
       logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
