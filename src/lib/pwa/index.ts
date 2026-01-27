@@ -562,9 +562,9 @@ export function initializePWA(config: Partial<PWAConfig> = {}): void {
   // Listen for controller change (new service worker activated)
   if (isServiceWorkerSupported()) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] New service worker activated')
-      // Optionally reload the page
-      // window.location.reload()
+      console.log('[PWA] New service worker activated, reloading page to get fresh assets')
+      // Reload to ensure new bundles are loaded
+      window.location.reload()
     })
 
     // Listen for messages from service worker
