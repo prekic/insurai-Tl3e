@@ -136,22 +136,29 @@ function isDocumentAIConfigured(): boolean {
  * Get access token for Document AI
  */
 async function getDocumentAIAccessToken(): Promise<string | null> {
+  console.log('[Document AI] getDocumentAIAccessToken() called')
   const credentialsPath = getGCPCredentialsPath()
+  console.log('[Document AI] Credentials path:', credentialsPath)
   if (!credentialsPath) {
     console.error('[Document AI] No credentials file found')
     return null
   }
 
   try {
+    console.log('[Document AI] Creating GoogleAuth instance...')
     const auth = new GoogleAuth({
       keyFile: credentialsPath,
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     })
+    console.log('[Document AI] GoogleAuth created, getting access token...')
     const token = await auth.getAccessToken()
-    console.log('[Document AI] Access token obtained successfully')
+    console.log('[Document AI] Access token obtained successfully, length:', token ? String(token).length : 0)
     return token as string
   } catch (error) {
-    console.error('[Document AI] Failed to get access token:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : ''
+    console.error('[Document AI] Failed to get access token:', errorMessage)
+    console.error('[Document AI] Error stack:', errorStack)
     return null
   }
 }
@@ -900,12 +907,16 @@ router.post(
   ocrLimiter,
   validateDocumentAI,
   async (req: Request, res: Response) => {
+    // Version marker for debugging deployments (v2 = Jan 27 2026)
+    console.log('[Document AI] OCR route v2 invoked')
     const IS_PRODUCTION = process.env.NODE_ENV === 'production'
     const startTime = Date.now()
 
     try {
       // Check if Document AI is configured
+      console.log('[Document AI] Checking configuration...')
       if (!isDocumentAIConfigured()) {
+        console.log('[Document AI] NOT configured, returning 503')
         return res.status(503).json({
           error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI not configured',
           code: 'PROVIDER_NOT_CONFIGURED',
@@ -913,13 +924,16 @@ router.post(
       }
 
       // Get access token
+      console.log('[Document AI] Getting access token...')
       const accessToken = await getDocumentAIAccessToken()
       if (!accessToken) {
+        console.error('[Document AI] Access token is null/empty, returning 503')
         return res.status(503).json({
           error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Failed to get Document AI access token',
           code: 'AUTH_FAILED',
         })
       }
+      console.log('[Document AI] Access token received')
 
       const { documentBase64, mimeType, languageHints } = req.body as DocumentAIInput
 
