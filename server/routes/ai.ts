@@ -148,6 +148,7 @@ async function getDocumentAIAccessToken(): Promise<string | null> {
       scopes: ['https://www.googleapis.com/auth/cloud-platform'],
     })
     const token = await auth.getAccessToken()
+    console.log('[Document AI] Access token obtained successfully')
     return token as string
   } catch (error) {
     console.error('[Document AI] Failed to get access token:', error)
@@ -925,6 +926,8 @@ router.post(
       // Build Document AI endpoint
       const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
 
+      console.log(`[Document AI] Calling API: ${GCP_CONFIG.location}-documentai.googleapis.com, project=${GCP_CONFIG.projectId}, processor=${GCP_CONFIG.processorId}`)
+
       // Call Document AI
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -1112,9 +1115,8 @@ router.post(
         processingTimeMs: Date.now() - startTime,
       }
 
-      if (!IS_PRODUCTION) {
-        console.error('[Document AI Error]', JSON.stringify(errorDetails, null, 2))
-      }
+      // ALWAYS log Document AI errors (needed to debug production issues)
+      console.error('[Document AI Error]', JSON.stringify(errorDetails, null, 2))
 
       let code = 'DOCUMENT_AI_FAILED'
       let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Document AI processing failed'
