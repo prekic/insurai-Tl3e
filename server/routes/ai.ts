@@ -89,19 +89,21 @@ function getGCPCredentialsPath(): string | null {
 
   // Check for base64-encoded credentials (for Railway/Heroku/etc.)
   // This allows passing service account JSON as an environment variable
-  if (process.env.GCP_CREDENTIALS_BASE64) {
+  // Supports both GCP_SERVICE_ACCOUNT_BASE64 (user's existing var) and GCP_CREDENTIALS_BASE64
+  const base64Credentials = process.env.GCP_SERVICE_ACCOUNT_BASE64 || process.env.GCP_CREDENTIALS_BASE64
+  if (base64Credentials) {
     try {
-      const credentialsJson = Buffer.from(process.env.GCP_CREDENTIALS_BASE64, 'base64').toString('utf-8')
+      const credentialsJson = Buffer.from(base64Credentials, 'base64').toString('utf-8')
       // Validate it's proper JSON
       JSON.parse(credentialsJson)
       // Write to temp file
       const tempPath = path.join(process.cwd(), '.gcp-credentials-temp.json')
       fs.writeFileSync(tempPath, credentialsJson, { mode: 0o600 })
-      console.log('[Document AI] Credentials loaded from GCP_CREDENTIALS_BASE64 environment variable')
+      console.log('[Document AI] Credentials loaded from base64 environment variable')
       _cachedCredentialsPath = tempPath
       return _cachedCredentialsPath
     } catch (error) {
-      console.error('[Document AI] Failed to decode GCP_CREDENTIALS_BASE64:', error)
+      console.error('[Document AI] Failed to decode base64 credentials:', error)
     }
   }
 
