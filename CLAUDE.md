@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, **configuration-driven OCR Decision Engine with Document Journey metadata**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, **Document AI 30-page support with imageless mode**
 - **Production Readiness**: ~9.5/10 (5600+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 26, 2026
+- **Last Updated**: January 28, 2026
 
 ---
 
@@ -1847,6 +1847,72 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `config/ocr-settings.json` - Thresholds and weights
 - **Tests**: 145 tests (81 unit + 64 regression)
 
+### 28. Document AI 30-Page Support with Imageless Mode (Fixed Jan 28, 2026)
+- **Problem**: Document AI failing with "Document pages in non-imageless mode exceed the limit: 15 got 16"
+- **Root Cause**: Default Document AI mode only supports 15 pages per document
+- **Solution**: Enable imageless mode which supports up to 30 pages
+- **Key Parameter**: `processOptions.ocrConfig.enableImagelessMode: true`
+- **Important**: `skipHumanReview: true` alone does NOT enable imageless mode
+- **Files Changed**: `server/routes/ai.ts`
+- **Configuration**:
+  ```typescript
+  // Correct configuration for 30-page support:
+  processOptions: {
+    ocrConfig: {
+      enableImagelessMode: true,  // THIS enables 30-page limit
+      enableNativePdfParsing: true,
+      hints: {
+        languageHints: ['tr', 'en'],
+      },
+    },
+  }
+  ```
+- **Version Markers in Logs**:
+  - `v2`: Basic logging
+  - `v3`: Added `skipHumanReview` (didn't fix the issue)
+  - `v4`: Added `enableImagelessMode: true` (correct fix)
+- **Related Fixes in This Session**:
+  - Added verbose logging for Document AI authentication debugging
+  - Added support for `GCP_SERVICE_ACCOUNT_BASE64` environment variable
+  - Service worker cache busting (v7 → v8) to ensure new code loads
+
+### 29. Service Worker Cache Busting for New Deployments (Fixed Jan 27, 2026)
+- **Problem**: Browser loading old JavaScript bundles after Railway deployment
+- **Root Cause**: Service worker cache-first strategy serving stale assets
+- **Solution**:
+  - Bumped service worker cache version to v8
+  - Enabled automatic page reload on `controllerchange` event
+- **Files Changed**:
+  - `public/sw.js` - Cache version `v8`
+  - `src/lib/pwa/index.ts` - Added `window.location.reload()` on controller change
+- **Pattern**:
+  ```typescript
+  // In src/lib/pwa/index.ts
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    console.log('[PWA] New service worker activated, reloading page')
+    window.location.reload()
+  })
+  ```
+
+### 30. GCP Service Account Credentials via Base64 Environment Variable (Added Jan 27, 2026)
+- **Problem**: Railway doesn't support file mounts for GCP service account JSON
+- **Solution**: Support base64-encoded credentials via environment variable
+- **Environment Variables Supported**:
+  - `GCP_SERVICE_ACCOUNT_BASE64` (preferred)
+  - `GCP_CREDENTIALS_BASE64` (fallback)
+  - `GOOGLE_APPLICATION_CREDENTIALS` (file path, for local dev)
+- **File Changed**: `server/routes/ai.ts`
+- **How It Works**:
+  1. Server decodes base64 credentials on startup
+  2. Writes to temporary file `.gcp-credentials-temp.json`
+  3. Uses file path for GoogleAuth initialization
+- **To Set Up**:
+  ```bash
+  # Encode your service account JSON file:
+  base64 -w 0 service-account.json
+  # Set the output as GCP_SERVICE_ACCOUNT_BASE64 in Railway
+  ```
+
 ---
 
 ## Turkish Market Considerations
@@ -2140,6 +2206,19 @@ connectSrc: [
 - Prompt endpoints are at `/api/admin/prompts` (not `/api/admin/prompts/templates`)
 - Express route ordering matters: specific routes like `/prompts/templates` must come before `/prompts/:id`
 
+**Document AI Configuration:**
+- `enableImagelessMode: true` must be in `processOptions.ocrConfig` (NOT at root level)
+- `skipHumanReview: true` alone does NOT enable imageless mode
+- Default page limit is 15; imageless mode increases to 30
+- Check logs for version marker: `[Document AI] OCR route v4 invoked (enableImagelessMode: true)`
+- GCP credentials can be passed via `GCP_SERVICE_ACCOUNT_BASE64` (base64-encoded JSON)
+
+**Service Worker Cache Issues:**
+- After deployment, browser may load old bundles due to service worker cache
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v8)
+- Users may need to hard refresh (Ctrl+Shift+R) or clear site data
+- Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
+
 ---
 
 ## CI/CD
@@ -2187,5 +2266,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 4500+ tests, all passing
-**Last Updated**: January 25, 2026
+**Tests**: 5600+ tests, all passing
+**Last Updated**: January 28, 2026
