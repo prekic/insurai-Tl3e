@@ -9,8 +9,12 @@
  * - Parallel page processing
  * - Image format optimization (PNG for quality, JPEG for speed)
  * - Caching to avoid re-rendering
+ *
+ * Uses pdf2pic for PDF→image conversion and sharp for image processing.
  */
 
+import { fromBuffer, type Options as Pdf2PicOptions } from 'pdf2pic'
+import sharp from 'sharp'
 import type { BoundingBox } from '@insurai/types'
 
 // ============================================================================
@@ -241,119 +245,124 @@ export class PDFRenderer {
     pageNo: number,
     dpi: number
   ): Promise<Buffer> {
-    // In production, use one of:
-    // - pdf-poppler
-    // - pdf2pic
-    // - pdfjs-dist with canvas
-    // - ghostscript via child_process
+    console.log(`[Render] Rendering page ${pageNo} at ${dpi} DPI using pdf2pic`)
 
-    // This is a placeholder implementation
-    // In production, you'd do something like:
-    //
-    // import { fromBuffer } from 'pdf2pic'
-    // const converter = fromBuffer(pdfBuffer, {
-    //   density: dpi,
-    //   format: 'png',
-    //   width: Math.round(8.5 * dpi), // Assume letter size
-    //   height: Math.round(11 * dpi),
-    // })
-    // const result = await converter(pageNo)
-    // return result.buffer
+    // Configure pdf2pic for high-quality rendering
+    const options: Pdf2PicOptions = {
+      density: dpi,
+      format: 'png',
+      width: Math.round(8.5 * dpi),  // Letter width in pixels
+      height: Math.round(11 * dpi),  // Letter height in pixels
+      saveFilename: `page-${pageNo}`,
+      savePath: '/tmp/render-svc',
+    }
 
-    console.log(`[Render] Rendering page ${pageNo} at ${dpi} DPI`)
+    try {
+      // Convert PDF page to image using pdf2pic (uses GraphicsMagick/ImageMagick under the hood)
+      const converter = fromBuffer(pdfBuffer, options)
+      const result = await converter(pageNo, { responseType: 'buffer' })
 
-    // Return placeholder buffer (in production, this would be actual image data)
-    // For now, we'll use a simple approach that works with the architecture
+      if (!result.buffer) {
+        throw new Error(`Failed to render page ${pageNo}: no buffer returned`)
+      }
 
-    // Simulate rendering time based on DPI
-    const renderTimeMs = dpi === 300 ? 500 : dpi === 600 ? 1000 : 2000
-    await new Promise(resolve => setTimeout(resolve, renderTimeMs / 10)) // 10x faster for demo
-
-    // Create a simple placeholder PNG
-    // In production, this would be the actual rendered PDF page
-    return this.createPlaceholderPNG(pageNo, dpi)
+      console.log(`[Render] Successfully rendered page ${pageNo} (${result.buffer.length} bytes)`)
+      return result.buffer
+    } catch (error) {
+      // If pdf2pic fails (e.g., GraphicsMagick not installed), fall back to placeholder
+      console.warn(`[Render] pdf2pic failed, using fallback: ${(error as Error).message}`)
+      return this.createFallbackPNG(pageNo, dpi)
+    }
   }
 
-  private createPlaceholderPNG(pageNo: number, dpi: number): Buffer {
-    // Create a minimal valid PNG file (1x1 white pixel)
-    // In production, this would be actual PDF rendering output
+  /**
+   * Create a fallback PNG when pdf2pic is unavailable.
+   * This creates a valid PNG with text indicating the page number.
+   */
+  private async createFallbackPNG(pageNo: number, dpi: number): Promise<Buffer> {
+    const width = Math.round(8.5 * dpi)
+    const height = Math.round(11 * dpi)
 
-    const width = Math.round(8.5 * dpi / 10) // Scaled down for demo
-    const height = Math.round(11 * dpi / 10)
+    // Use sharp to create a placeholder image with text
+    const svgText = `
+      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="#f8f9fa"/>
+        <text x="50%" y="50%" font-family="Arial" font-size="${dpi / 3}"
+              fill="#6c757d" text-anchor="middle" dominant-baseline="middle">
+          Page ${pageNo} (${dpi} DPI)
+        </text>
+        <text x="50%" y="55%" font-family="Arial" font-size="${dpi / 6}"
+              fill="#adb5bd" text-anchor="middle" dominant-baseline="middle">
+          Install GraphicsMagick for actual PDF rendering
+        </text>
+      </svg>
+    `
 
-    // PNG file header and minimal structure
-    const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+    const pngBuffer = await sharp(Buffer.from(svgText))
+      .png()
+      .toBuffer()
 
-    // IHDR chunk
-    const ihdrData = Buffer.alloc(13)
-    ihdrData.writeUInt32BE(width, 0)
-    ihdrData.writeUInt32BE(height, 4)
-    ihdrData.writeUInt8(8, 8)  // bit depth
-    ihdrData.writeUInt8(2, 9)  // color type (RGB)
-    ihdrData.writeUInt8(0, 10) // compression
-    ihdrData.writeUInt8(0, 11) // filter
-    ihdrData.writeUInt8(0, 12) // interlace
-
-    const ihdrChunk = this.createPNGChunk('IHDR', ihdrData)
-
-    // Minimal IDAT chunk (just for structure)
-    const idatData = Buffer.from([0x78, 0x9C, 0x63, 0xF8, 0x0F, 0x00, 0x00, 0x01, 0x01, 0x00, 0x05])
-    const idatChunk = this.createPNGChunk('IDAT', idatData)
-
-    // IEND chunk
-    const iendChunk = this.createPNGChunk('IEND', Buffer.alloc(0))
-
-    // Add page info as metadata (in production, this would be in tEXt chunk)
-    console.log(`[Render] Created placeholder for page ${pageNo} at ${dpi} DPI`)
-
-    return Buffer.concat([pngSignature, ihdrChunk, idatChunk, iendChunk])
-  }
-
-  private createPNGChunk(type: string, data: Buffer): Buffer {
-    const length = Buffer.alloc(4)
-    length.writeUInt32BE(data.length)
-
-    const typeBuffer = Buffer.from(type, 'ascii')
-    const payload = Buffer.concat([typeBuffer, data])
-
-    // CRC32 calculation (simplified - in production use proper CRC32)
-    const crc = Buffer.alloc(4)
-    crc.writeUInt32BE(0) // Placeholder CRC
-
-    return Buffer.concat([length, payload, crc])
+    console.log(`[Render] Created fallback PNG for page ${pageNo} (${pngBuffer.length} bytes)`)
+    return pngBuffer
   }
 
   private async cropImage(
     imageBuffer: Buffer,
     bbox: BoundingBox,
-    _dpi: number
+    dpi: number
   ): Promise<Buffer> {
-    // In production, use sharp or jimp for cropping:
-    //
-    // import sharp from 'sharp'
-    // const cropped = await sharp(imageBuffer)
-    //   .extract({
-    //     left: Math.round(bbox.x * dpi / 72),
-    //     top: Math.round(bbox.y * dpi / 72),
-    //     width: Math.round(bbox.width * dpi / 72),
-    //     height: Math.round(bbox.height * dpi / 72),
-    //   })
-    //   .toBuffer()
-    // return cropped
+    // Convert PDF coordinates (72 DPI) to pixel coordinates at render DPI
+    const left = Math.round(bbox.x * dpi / 72)
+    const top = Math.round(bbox.y * dpi / 72)
+    const width = Math.round(bbox.width * dpi / 72)
+    const height = Math.round(bbox.height * dpi / 72)
 
-    console.log(`[Render] Cropping to ${bbox.x},${bbox.y} ${bbox.width}x${bbox.height}`)
+    console.log(`[Render] Cropping to ${left},${top} ${width}x${height} (from bbox ${bbox.x},${bbox.y} ${bbox.width}x${bbox.height})`)
 
-    // For now, return original (in production, would crop)
-    return imageBuffer
+    try {
+      // Get image metadata to ensure crop region is valid
+      const metadata = await sharp(imageBuffer).metadata()
+
+      // Clamp crop region to image bounds
+      const safeLeft = Math.max(0, Math.min(left, (metadata.width || 0) - 1))
+      const safeTop = Math.max(0, Math.min(top, (metadata.height || 0) - 1))
+      const safeWidth = Math.min(width, (metadata.width || width) - safeLeft)
+      const safeHeight = Math.min(height, (metadata.height || height) - safeTop)
+
+      if (safeWidth <= 0 || safeHeight <= 0) {
+        console.warn(`[Render] Invalid crop region after clamping, returning original`)
+        return imageBuffer
+      }
+
+      const cropped = await sharp(imageBuffer)
+        .extract({
+          left: safeLeft,
+          top: safeTop,
+          width: safeWidth,
+          height: safeHeight,
+        })
+        .toBuffer()
+
+      console.log(`[Render] Cropped image: ${cropped.length} bytes`)
+      return cropped
+    } catch (error) {
+      console.error(`[Render] Crop failed: ${(error as Error).message}`)
+      return imageBuffer // Return original on error
+    }
   }
 
   private async convertToJpeg(pngBuffer: Buffer): Promise<Buffer> {
-    // In production:
-    // import sharp from 'sharp'
-    // return sharp(pngBuffer).jpeg({ quality: config.rendering.jpegQuality }).toBuffer()
+    try {
+      const jpegBuffer = await sharp(pngBuffer)
+        .jpeg({ quality: config.rendering.jpegQuality })
+        .toBuffer()
 
-    // For now, return as-is
-    return pngBuffer
+      console.log(`[Render] Converted to JPEG: ${jpegBuffer.length} bytes (quality: ${config.rendering.jpegQuality})`)
+      return jpegBuffer
+    } catch (error) {
+      console.error(`[Render] JPEG conversion failed: ${(error as Error).message}`)
+      return pngBuffer // Return original PNG on error
+    }
   }
 
   private async uploadImage(key: string, buffer: Buffer): Promise<void> {
