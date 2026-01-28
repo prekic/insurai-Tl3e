@@ -200,6 +200,7 @@ interface DocumentAIResponse {
   error?: {
     code: number
     message: string
+    status?: string  // GCP error status like "INVALID_ARGUMENT", "PERMISSION_DENIED"
   }
 }
 
