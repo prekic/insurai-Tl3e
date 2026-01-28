@@ -75,6 +75,7 @@ New specific error codes:
 ## Commits This Session
 
 ```
+941472d Update documentation with session changes (CLAUDE.md, SESSION_HANDOFF.md)
 9784992 Add admin diagnostics endpoint and improve login error handling
 8118591 Fix 46 test failures across 6 test files
 ```
@@ -92,7 +93,8 @@ New specific error codes:
 | `src/components/PolicyChat.test.tsx` | Fixed quick question test (sends message directly) |
 | `src/components/GlobalNavigation.test.tsx` | Check both link and button roles |
 | `src/__tests__/integration/config-validation.test.ts` | Skip Dockerfile test if not present |
-| `CLAUDE.md` | Added issue #31, updated test count |
+| `CLAUDE.md` | Added issue #31, updated test count, added ADMIN_JWT_SECRET to gotchas |
+| `SESSION_HANDOFF.md` | Complete rewrite with session details |
 
 ---
 
@@ -206,9 +208,9 @@ git log --oneline -5
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 2 |
+| Commits this session | 3 |
 | Test failures fixed | 46 |
-| Files changed | 8 |
+| Files changed | 10 |
 | New endpoints | 1 (`/api/admin/diagnostics`) |
 
 ---
