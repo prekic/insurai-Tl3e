@@ -909,7 +909,8 @@ router.post(
   validateDocumentAI,
   async (req: Request, res: Response) => {
     // Version marker for debugging deployments (v4 = Jan 28 2026, enableImagelessMode fix)
-    console.log('[Document AI] OCR route v4 invoked (enableImagelessMode: true)')
+    // Version marker: v5 = removed unsupported enableImagelessMode (standard OCR processor, 15-page limit)
+    console.log('[Document AI] OCR route v5 invoked (standard processor, 15-page limit)')
     const IS_PRODUCTION = process.env.NODE_ENV === 'production'
     const startTime = Date.now()
 
@@ -956,12 +957,11 @@ router.post(
             mimeType,
           },
           skipHumanReview: true,
-          // Language hints and imageless mode for higher page limit (30 vs 15)
+          // Note: enableImagelessMode is only available on Enterprise Document OCR processors
+          // Standard OCR processors have a 15-page limit
+          // For documents >15 pages, the fallback to pdf.js will be used
           processOptions: {
             ocrConfig: {
-              // Enable imageless mode - increases page limit from 15 to 30
-              enableImagelessMode: true,
-              enableNativePdfParsing: true,
               hints: {
                 languageHints: languageHints || ['tr', 'en'],
               },
