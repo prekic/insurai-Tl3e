@@ -48,7 +48,27 @@ export interface AuthenticatedRequest extends Request {
 // CONFIGURATION
 // ============================================================================
 
-const JWT_SECRET = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'insurai-admin-secret-change-in-production'
+function getJWTSecret(): string {
+  const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
+  if (!secret) {
+    const msg = 'ADMIN_JWT_SECRET is not configured. Set ADMIN_JWT_SECRET environment variable. Refusing to start with no secret.'
+    console.error('[Admin Auth] FATAL:', msg)
+    throw new Error(msg)
+  }
+  if (secret.length < 32) {
+    console.warn('[Admin Auth] WARNING: ADMIN_JWT_SECRET is shorter than 32 characters. Use a stronger secret in production.')
+  }
+  return secret
+}
+
+// Lazily resolved so the server can still start if admin routes are never used
+let _jwtSecret: string | null = null
+function getJWTSecretCached(): string {
+  if (!_jwtSecret) {
+    _jwtSecret = getJWTSecret()
+  }
+  return _jwtSecret
+}
 const JWT_EXPIRES_IN = process.env.ADMIN_JWT_EXPIRES_IN || '30m'
 const REFRESH_TOKEN_EXPIRES_IN = process.env.ADMIN_REFRESH_EXPIRES_IN || '7d'
 const BCRYPT_ROUNDS = 12
@@ -119,7 +139,7 @@ export function generateAdminToken(user: AdminUser, sessionId: string): string {
     sessionId,
   }
 
-  return jwt.sign(payload, JWT_SECRET, {
+  return jwt.sign(payload, getJWTSecretCached(), {
     expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
     issuer: 'insurai-admin',
     audience: 'insurai-admin-api',
@@ -132,7 +152,7 @@ export function generateAdminToken(user: AdminUser, sessionId: string): string {
 export function generateRefreshToken(user: AdminUser, sessionId: string): string {
   return jwt.sign(
     { sub: user.id, sessionId, type: 'refresh' },
-    JWT_SECRET,
+    getJWTSecretCached(),
     { expiresIn: REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] } as jwt.SignOptions
   )
 }
@@ -142,7 +162,7 @@ export function generateRefreshToken(user: AdminUser, sessionId: string): string
  */
 export function verifyAdminToken(token: string): AdminTokenPayload | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET, {
+    const decoded = jwt.verify(token, getJWTSecretCached(), {
       issuer: 'insurai-admin',
       audience: 'insurai-admin-api',
     }) as AdminTokenPayload
@@ -382,32 +402,6 @@ export async function updateAdminLogin(adminId: string, ipAddress: string): Prom
 export function authenticateAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   // Check for Authorization header
   const authHeader = req.headers.authorization
-  const legacyToken = req.headers['x-admin-token'] as string | undefined
-
-  // Development mode bypass (only if explicitly enabled)
-  if (process.env.NODE_ENV === 'development' && process.env.ADMIN_DEV_BYPASS === 'true') {
-    req.adminUser = {
-      id: 'dev-admin',
-      email: 'dev@insurai.com',
-      role: 'super_admin',
-      status: 'active',
-      permissions: ['*'],
-    }
-    return next()
-  }
-
-  // Check legacy token (for backward compatibility)
-  if (!authHeader && legacyToken && legacyToken === process.env.ADMIN_SECRET) {
-    req.adminUser = {
-      id: 'legacy-admin',
-      email: 'admin@insurai.com',
-      role: 'admin',
-      status: 'active',
-      permissions: [],
-    }
-    console.warn('Using legacy admin token authentication - please migrate to JWT')
-    return next()
-  }
 
   // No auth provided
   if (!authHeader) {

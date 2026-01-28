@@ -70,6 +70,27 @@ const GCP_CONFIG = {
 }
 
 /**
+ * Cleanup temp GCP credentials file on process exit.
+ * The file is written from base64 env var and should not persist on disk.
+ */
+function cleanupTempCredentials(): void {
+  const tempPath = path.join(process.cwd(), '.gcp-credentials-temp.json')
+  try {
+    if (fs.existsSync(tempPath)) {
+      fs.unlinkSync(tempPath)
+      console.log('[Document AI] Cleaned up temp credentials file')
+    }
+  } catch {
+    // Best-effort cleanup - don't crash on exit
+  }
+}
+
+// Register cleanup handlers (runs on normal exit and signals)
+process.on('exit', cleanupTempCredentials)
+process.on('SIGINT', () => { cleanupTempCredentials(); process.exit(0) })
+process.on('SIGTERM', () => { cleanupTempCredentials(); process.exit(0) })
+
+/**
  * Get the path to GCP service account credentials
  */
 // Cache for credentials file path (written once from env var)
@@ -786,10 +807,13 @@ router.post(
       const { imageBase64 } = req.body as OCRInput
 
       const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+        'https://vision.googleapis.com/v1/images:annotate',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': apiKey,
+          },
           body: JSON.stringify({
             requests: [
               {
@@ -1159,14 +1183,14 @@ router.post(
         code = 'RATE_LIMIT_EXCEEDED'
         userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Document AI rate limit exceeded'
       } else if (message.includes('exceed the limit') || message.includes('exceed limit')) {
-        // Page limit error - this shouldn't happen with enableImagelessMode=true (30 page limit)
-        // If it does, it means either imageless mode isn't enabled or document exceeds 30 pages
+        // Standard OCR processor has a 15-page limit per request.
+        // Documents >15 pages should be split client-side via pdf-splitter.ts.
         code = 'PAGE_LIMIT_EXCEEDED'
-        console.error('[Document AI] PAGE LIMIT ERROR - This should not happen with enableImagelessMode=true!')
+        console.error('[Document AI] PAGE LIMIT ERROR - document should have been split before sending')
         console.error('[Document AI] Error message:', message)
         userMessage = IS_PRODUCTION
-          ? 'Document exceeds page limit. Please upload a document with 30 or fewer pages.'
-          : `Document AI page limit exceeded: ${message}. Check that enableImagelessMode is set in processOptions.ocrConfig.`
+          ? 'Document exceeds page limit. Please upload a document with 15 or fewer pages per chunk.'
+          : `Document AI page limit exceeded: ${message}. Documents >15 pages must be split via pdf-splitter.ts.`
       } else if (message.includes('INVALID_ARGUMENT')) {
         code = 'INVALID_DOCUMENT'
         userMessage = IS_PRODUCTION ? 'Unable to process this document format' : 'Invalid document format for Document AI'
@@ -1552,7 +1576,8 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
   }
 
   // Test Google Cloud Vision (OCR)
-  if (process.env.GOOGLE_CLOUD_API_KEY) {
+  const googleApiKey = process.env.GOOGLE_CLOUD_API_KEY
+  if (googleApiKey) {
     diagnostics.google.configured = true
     const startTime = Date.now()
     try {
@@ -1560,10 +1585,13 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
       // Using a tiny 1x1 white PNG to minimize cost
       const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
       const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${process.env.GOOGLE_CLOUD_API_KEY}`,
+        'https://vision.googleapis.com/v1/images:annotate',
         {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': googleApiKey,
+          },
           body: JSON.stringify({
             requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
           }),
