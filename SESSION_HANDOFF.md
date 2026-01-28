@@ -8,69 +8,74 @@
 | **TypeCheck** | ✅ 0 errors |
 | **Lint** | ⚠️ Pre-existing warnings in ocr-orch service |
 | **Tests** | ✅ 5600+ passing |
-| **Branch** | `claude/review-project-status-bQd62` |
+| **Branch** | `claude/review-project-status-nZqul` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Document AI** | ✅ 30-page support with imageless mode |
+| **Document AI** | ✅ PDF splitting for >15 pages |
 
 ---
 
 ## Session Summary
 
-This session focused on **debugging and fixing Document AI OCR** which was failing with a 15-page limit error for Turkish insurance PDFs.
+This session focused on **fixing Document AI OCR failures** and implementing **PDF splitting** for documents exceeding the 15-page limit.
 
 Key accomplishments:
-1. Diagnosed Document AI 500 error via verbose logging
-2. Fixed imageless mode configuration (use `enableImagelessMode` not just `skipHumanReview`)
-3. Added support for `GCP_SERVICE_ACCOUNT_BASE64` environment variable
-4. Fixed service worker cache issues preventing new code from loading
-5. Added comprehensive logging for Document AI authentication debugging
+1. Fixed "Stage interrupted by new stage" error in OCR processing
+2. Discovered `enableImagelessMode` is NOT supported on standard Document AI processors
+3. Implemented PDF splitting for documents >15 pages using pdf-lib
+4. Added enhanced error logging for Document AI debugging
+5. Configured Railway to auto-deploy from feature branch
 
 ---
 
 ## Features Completed This Session
 
-### Document AI 30-Page Support
+### PDF Splitting for Document AI Page Limit
 
 | Issue | Solution |
 |-------|----------|
-| Document AI failing with "exceed limit: 15 got 16" | Enable imageless mode with `processOptions.ocrConfig.enableImagelessMode: true` |
-| GCP credentials not loading on Railway | Support `GCP_SERVICE_ACCOUNT_BASE64` environment variable |
-| New code not loading in browser | Fixed service worker cache busting (v7→v8) and auto-reload on `controllerchange` |
-| Error details hidden in production | Added verbose logging for Document AI authentication flow |
+| Document AI failing with "Unknown name enableImagelessMode" | Removed unsupported option from config |
+| Standard OCR processor has 15-page limit | Implemented PDF splitting (chunks of 15 pages) |
+| "Stage interrupted by new stage" error | Fixed stage lifecycle in policy-extractor.ts |
+| Unclear Document AI errors | Added detailed error logging with status codes |
 
-**Correct Document AI Configuration**:
-```typescript
-// In server/routes/ai.ts
-body: JSON.stringify({
-  rawDocument: { content: documentBase64, mimeType },
-  skipHumanReview: true,
-  processOptions: {
-    ocrConfig: {
-      enableImagelessMode: true,  // THIS is the key parameter for 30-page support
-      enableNativePdfParsing: true,
-      hints: {
-        languageHints: ['tr', 'en'],
-      },
-    },
-  },
-})
+**How PDF Splitting Works**:
 ```
+16-page PDF uploaded
+        ↓
+Check page count (16 > 15 limit)
+        ↓
+Split into chunks:
+  - Chunk 1: pages 1-15
+  - Chunk 2: page 16
+        ↓
+Process each chunk with Document AI
+        ↓
+Combine results with correct page numbers
+        ↓
+Return unified result
+```
+
+**New Files**:
+- `src/lib/ai/pdf-splitter.ts` - PDF splitting utility using pdf-lib
+
+**Key Functions**:
+- `splitPdf()` - Splits PDF into chunks of max 15 pages
+- `getPdfPageCount()` - Quick page count check before processing
+- `extractWithDocumentAIChunked()` - Orchestrates chunk processing
+- `combineChunkResults()` - Merges results from all chunks
 
 ---
 
 ## Commits This Session
 
 ```
-ba8fba8 Fix Document AI imageless mode - use enableImagelessMode in ocrConfig
-b9f7014 Enable imageless mode for Document AI to support 30-page documents
-695d83a Add verbose logging to debug Document AI authentication flow
-8355eeb Add production logging for Document AI errors
-000a902 Support GCP_SERVICE_ACCOUNT_BASE64 environment variable
-babed7f Add support for base64-encoded GCP credentials
-f249594 Revert "Add AI-powered Turkish OCR cleanup to extraction pipeline"
-dc6c32e Enable page reload on service worker controller change
-0c75568 Bump service worker cache version to v8
+ef366bf Update documentation for PDF splitting and Document AI fixes
+6a55c62 Add PDF splitting for documents exceeding 15-page Document AI limit
+6780b68 Fix Document AI: remove unsupported enableImagelessMode option
+c7d85a2 Bump service worker cache to v9 - test Railway branch deploy
+dc0721b Add enhanced error logging for Document AI failures
+20aca95 Fix 'Stage interrupted by new stage' error in OCR processing
 ```
 
 ---
@@ -79,26 +84,40 @@ dc6c32e Enable page reload on service worker controller change
 
 | File | Changes |
 |------|---------|
-| `server/routes/ai.ts` | Added `enableImagelessMode: true`, GCP base64 credentials support, verbose logging |
-| `public/sw.js` | Bumped cache version to v8 |
-| `src/lib/pwa/index.ts` | Added auto-reload on service worker controller change |
+| `src/lib/ai/pdf-splitter.ts` | **NEW** PDF splitting utility using pdf-lib |
+| `src/lib/ai/document-ocr.ts` | Added chunked extraction support, page offset handling |
+| `src/lib/ai/policy-extractor.ts` | Fixed stage lifecycle - properly close stages before starting new ones |
+| `server/routes/ai.ts` | Removed unsupported `enableImagelessMode`, added error logging (v5) |
+| `public/sw.js` | Bumped cache version to v9 |
+| `package.json` | Added pdf-lib dependency |
 
 ---
 
-## Document AI vs pdf.js Output Comparison
+## Important Discovery: enableImagelessMode Not Supported
 
-| Source | Output Quality | Example |
-|--------|---------------|---------|
-| **pdf.js** (fallback) | Spaced Turkish chars | `B İ RLE Şİ K KASKO S İ GORTA POL İÇ ES İ` |
-| **Document AI** | Merged Turkish chars | `BİRLEŞİK KASKO SİGORTA POLİÇESİ` |
+**What we learned this session:**
 
-Document AI produces significantly better Turkish OCR. The session fixed it to handle documents up to 30 pages (was failing at 16 pages).
+The `enableImagelessMode` option does NOT exist on standard Document AI OCR processors. It's only available on Enterprise Document OCR processors.
+
+| Processor Type | Page Limit | enableImagelessMode |
+|----------------|------------|---------------------|
+| Standard OCR (current) | 15 pages | ❌ Not supported |
+| Enterprise OCR | 30 pages | ✅ Supported |
+
+**Previous documentation was incorrect** - the "30-page support with imageless mode" approach doesn't work with the current processor.
+
+**Solution implemented**: Split PDFs that exceed 15 pages on the client side before sending to Document AI.
 
 ---
 
 ## Railway Deployment Status
 
 **Current**: Deployed and running at https://insurai-production.up.railway.app
+
+**Branch Configuration**:
+- Branch: `claude/review-project-status-nZqul`
+- Root Directory: (empty - use repo root)
+- Auto-deploys on push to this branch
 
 ### Required Environment Variables
 
@@ -110,7 +129,7 @@ Document AI produces significantly better Turkish OCR. The session fixed it to h
 | `OPENAI_API_KEY` | AI extraction | Runtime |
 | `ANTHROPIC_API_KEY` | AI fallback (currently has billing issue) | Runtime |
 | `GOOGLE_CLOUD_API_KEY` | Google Cloud general | Runtime |
-| `GCP_SERVICE_ACCOUNT_BASE64` | **NEW** Document AI credentials (base64-encoded JSON) | Runtime |
+| `GCP_SERVICE_ACCOUNT_BASE64` | Document AI credentials (base64-encoded JSON) | Runtime |
 | `VITE_SUPABASE_URL` | Frontend Supabase client | Build-time |
 | `VITE_SUPABASE_ANON_KEY` | Frontend Supabase client | Build-time |
 
@@ -179,10 +198,10 @@ Add to Supabase Dashboard → Authentication → URL Configuration:
 | `crypto` not defined | Import explicitly: `import crypto from 'crypto'` |
 | React hooks error #310 | All hooks must be BEFORE conditional returns |
 | Admin API 401 errors | Use `adminFetch()` not raw `fetch()` |
-| Document AI 15-page limit | Use `enableImagelessMode: true` in `ocrConfig` |
-| `skipHumanReview` not enabling imageless | Must ALSO set `enableImagelessMode: true` |
-| Service worker serving old JS | Bump `CACHE_VERSION` in `public/sw.js` |
-| Browser loading old bundles | Hard refresh (Ctrl+Shift+R) or clear site data |
+| Document AI 15-page limit | PDFs are auto-split into chunks (no config needed) |
+| `enableImagelessMode` error | NOT supported on standard OCR - use PDF splitting instead |
+| Service worker serving old JS | Bump `CACHE_VERSION` in `public/sw.js` (currently v9) |
+| "Stage interrupted by new stage" | Fixed - stages now properly closed before starting new ones |
 
 ---
 
@@ -204,17 +223,16 @@ Check Railway logs to verify deployed version:
 
 | Version | Log Message | Status |
 |---------|-------------|--------|
-| v2 | `[Document AI] OCR route v2 invoked` | Added logging |
-| v3 | `[Document AI] OCR route v3 invoked (imageless mode enabled)` | Added skipHumanReview (didn't fix) |
-| v4 | `[Document AI] OCR route v4 invoked (enableImagelessMode: true)` | **CORRECT FIX** |
+| v4 | `[Document AI] OCR route v4 invoked (enableImagelessMode: true)` | FAILED - option not supported |
+| v5 | `[Document AI] OCR route v5 invoked (standard processor, 15-page limit)` | **CURRENT** |
 
 ---
 
 ## Next Steps (Priority Order)
 
-### Immediate (Pending Merge)
-1. **Merge PR to main** - Branch `claude/review-project-status-bQd62` has the fix
-2. **Verify Document AI works** - Check logs for `v4` marker and successful 16-page processing
+### Immediate
+1. **Test PDF splitting** - Upload 16+ page PDF and verify chunked processing works
+2. **Verify Document AI logs** - Check for `v5` marker in Railway logs
 3. **Top up Anthropic credits** - Currently falling back to OpenAI due to billing issue
 
 ### Short Term
@@ -227,13 +245,19 @@ Check Railway logs to verify deployed version:
 2. **Add Document Journey metadata to admin viewer** - Display diagnostic output
 3. **Add OCR decision caching** - Cache decisions by document hash
 
+### Optional: Enterprise Document AI
+If higher page limits needed without splitting:
+1. Create Enterprise Document OCR processor in GCP console
+2. Update `GCP_DOCAI_PROCESSOR_ID` in Railway env vars
+3. `enableImagelessMode` will work with Enterprise processor (30-page limit)
+
 ---
 
 ## Verification Commands
 
 ```bash
 # Check Railway logs for Document AI version
-# Should see: [Document AI] OCR route v4 invoked (enableImagelessMode: true)
+# Should see: [Document AI] OCR route v5 invoked (standard processor, 15-page limit)
 
 # Run tests locally
 npm test -- --run server/__tests__/
@@ -244,10 +268,8 @@ npm run typecheck
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
-# Test Document AI endpoint (requires auth)
-curl -X POST "https://insurai-production.up.railway.app/api/ai/document-ai" \
-  -H "Content-Type: application/json" \
-  -d '{"documentBase64": "...", "mimeType": "application/pdf"}'
+# Check what's deployed
+git log --oneline -5
 ```
 
 ---
@@ -256,40 +278,46 @@ curl -X POST "https://insurai-production.up.railway.app/api/ai/document-ai" \
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 9 |
-| Files changed | 3 main files + CLAUDE.md + SESSION_HANDOFF.md |
-| Bug fixes | 3 (imageless mode, GCP creds, service worker) |
-| PRs created/merged | 4 (#160, #161, #162, #163, #164) |
-| Pending PR | 1 (with imageless mode fix) |
+| Commits this session | 6 |
+| Files changed | 8 (including new pdf-splitter.ts, CLAUDE.md, SESSION_HANDOFF.md) |
+| Bug fixes | 2 (stage interruption, unsupported option) |
+| New features | 1 (PDF splitting) |
+| Dependencies added | 1 (pdf-lib) |
 
 ---
 
 ## Handoff Checklist
 
-- [x] Document AI imageless mode fix implemented
-- [x] GCP base64 credentials support added
-- [x] Service worker cache busting fixed
-- [x] Verbose logging added for debugging
-- [x] Changes committed and pushed to branch
-- [x] CLAUDE.md updated (entries #28, #29, #30)
+- [x] "Stage interrupted by new stage" error fixed
+- [x] Discovered `enableImagelessMode` not supported on standard processor
+- [x] Removed unsupported Document AI options
+- [x] Implemented PDF splitting for >15 page documents
+- [x] Added enhanced error logging
+- [x] Bumped service worker cache to v9
+- [x] CLAUDE.md updated (entries #28, #29, #30 corrected)
 - [x] SESSION_HANDOFF.md updated
-- [ ] **Merge PR to main** - Branch `claude/review-project-status-bQd62`
-- [ ] **Verify v4 in production logs**
-- [ ] **Test 16-page PDF upload**
+- [x] Documentation commit ef366bf pushed
+- [x] Changes pushed to `claude/review-project-status-nZqul`
+- [x] Railway configured to auto-deploy from this branch
+- [ ] **Test 16-page PDF upload** - Verify PDF splitting works in production
 
 ---
 
 ## Previous Session Context
 
-January 26, 2026 focused on:
+Earlier January 28, 2026:
+- Attempted to fix Document AI with `enableImagelessMode: true`
+- That approach failed because the option doesn't exist on standard OCR processor
+- This session discovered the root cause and implemented PDF splitting solution
+
+January 26, 2026:
 - OCR Decision Engine Document Journey metadata enhancement
 - Configuration-driven OCR decision system
 - Full diagnostic output with confidence breakdowns
 
-This session (January 27-28, 2026) fixed Document AI to support 30-page documents using imageless mode, added GCP credentials support via base64 environment variable, and fixed service worker cache issues.
-
 ---
 
 **Last Updated**: January 28, 2026
-**Pending Action**: Merge PR `claude/review-project-status-bQd62` → `main` to deploy Document AI fix
-**Next Session Focus**: Verify Document AI in production, integrate OCR Decision Engine with extraction pipeline
+**Pending Action**: Test 16-page PDF upload to verify PDF splitting works
+**Branch**: `claude/review-project-status-nZqul` (Railway auto-deploys from this branch)
+**Next Session Focus**: Verify PDF splitting in production, integrate OCR Decision Engine
