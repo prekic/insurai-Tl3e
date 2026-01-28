@@ -70,6 +70,7 @@ Return unified result
 ## Commits This Session
 
 ```
+ef366bf Update documentation for PDF splitting and Document AI fixes
 6a55c62 Add PDF splitting for documents exceeding 15-page Document AI limit
 6780b68 Fix Document AI: remove unsupported enableImagelessMode option
 c7d85a2 Bump service worker cache to v9 - test Railway branch deploy
@@ -277,8 +278,8 @@ git log --oneline -5
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 |
-| Files changed | 6 (including new pdf-splitter.ts) |
+| Commits this session | 6 |
+| Files changed | 8 (including new pdf-splitter.ts, CLAUDE.md, SESSION_HANDOFF.md) |
 | Bug fixes | 2 (stage interruption, unsupported option) |
 | New features | 1 (PDF splitting) |
 | Dependencies added | 1 (pdf-lib) |
@@ -293,8 +294,9 @@ git log --oneline -5
 - [x] Implemented PDF splitting for >15 page documents
 - [x] Added enhanced error logging
 - [x] Bumped service worker cache to v9
-- [x] CLAUDE.md updated (entries #28, #29 corrected)
+- [x] CLAUDE.md updated (entries #28, #29, #30 corrected)
 - [x] SESSION_HANDOFF.md updated
+- [x] Documentation commit ef366bf pushed
 - [x] Changes pushed to `claude/review-project-status-nZqul`
 - [x] Railway configured to auto-deploy from this branch
 - [ ] **Test 16-page PDF upload** - Verify PDF splitting works in production
