@@ -30,6 +30,7 @@ import {
   getSupabaseWithError,
   AuthenticatedRequest,
 } from '../middleware/admin-auth.js'
+import { authLimiter } from '../middleware/rate-limit.js'
 import * as adminDb from '../services/admin-db.js'
 import * as costControl from '../middleware/cost-control.js'
 import * as promptVersioning from '../middleware/prompt-versioning.js'
@@ -136,7 +137,7 @@ function getClientIp(req: Request): string {
  * Admin login endpoint
  * POST /api/admin/auth/login
  */
-router.post('/auth/login', async (req: Request, res: Response) => {
+router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
   console.log('[Admin Login] Request received')
   try {
     const { email, password } = req.body
@@ -355,7 +356,7 @@ router.post('/auth/logout', authenticateAdmin, async (req: AuthenticatedRequest,
  * Refresh token endpoint
  * POST /api/admin/auth/refresh
  */
-router.post('/auth/refresh', async (req: Request, res: Response) => {
+router.post('/auth/refresh', authLimiter, async (req: Request, res: Response) => {
   try {
     const { refreshToken } = req.body
 
