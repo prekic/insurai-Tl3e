@@ -10,7 +10,7 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, **PDF splitting for Document AI 15-page limit**
-- **Production Readiness**: ~9.5/10 (5600+ tests, 0 lint errors, PWA support, server hardening)
+- **Production Readiness**: ~9.5/10 (5787+ tests, 0 lint errors, PWA support, server hardening)
 - **Last Updated**: January 28, 2026
 
 ---
@@ -1922,6 +1922,31 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   # Set the output as GCP_SERVICE_ACCOUNT_BASE64 in Railway
   ```
 
+### 31. Admin Diagnostics Endpoint and Improved Error Handling (Added Jan 28, 2026)
+- **Problem**: Admin login returned 500 error with no clear indication of what's misconfigured
+- **Solution**: Added diagnostic endpoint and improved error handling
+- **New Endpoint**: `GET /api/admin/diagnostics` - Returns configuration status without exposing secrets
+  ```json
+  {
+    "success": false,
+    "status": "misconfigured",
+    "config": {
+      "hasJwtSecret": false,
+      "jwtSecretLength": "not set",
+      "hasSupabaseUrl": true,
+      "hasServiceKey": true,
+      "supabaseClientInitialized": true
+    },
+    "issues": ["ADMIN_JWT_SECRET not configured"]
+  }
+  ```
+- **Improved Login Errors**:
+  - `JWT_NOT_CONFIGURED` (503) - ADMIN_JWT_SECRET missing
+  - `DB_NOT_CONFIGURED` (503) - SUPABASE_URL or SERVICE_ROLE_KEY missing
+  - `TOKEN_GENERATION_ERROR` (500) - Token creation failed with details
+- **File Changed**: `server/routes/admin.ts`
+- **Usage**: Visit `https://insurai-production.up.railway.app/api/admin/diagnostics` to debug deployment issues
+
 ---
 
 ## Turkish Market Considerations
@@ -2149,6 +2174,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 | Env vars with quotes | Railway UI adds quotes | Don't add manual quotes |
 | Build not using env vars | VITE_* need rebuild | Trigger new deploy, not just restart |
 | Admin login 500 error | SUPABASE_URL not set | Add SUPABASE_URL (not VITE_SUPABASE_URL) |
+| Admin login 500 error | ADMIN_JWT_SECRET not set | Visit `/api/admin/diagnostics` to check config |
 | crypto not defined | Missing import in ESM | Fixed in server/routes/admin.ts |
 
 ### Other Production Options
@@ -2166,7 +2192,9 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 - API keys must NOT have `VITE_` prefix - they stay server-side only
 - Railway env vars shouldn't have manual quotes (Railway adds them automatically)
 - **Server needs `SUPABASE_URL`** (not `VITE_SUPABASE_URL`) for runtime database access
+- **Admin auth needs `ADMIN_JWT_SECRET`** - generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
 - Always import `crypto` explicitly in server code (don't rely on global or `require()`)
+- Use `/api/admin/diagnostics` endpoint to check which env vars are configured
 
 **API Proxy Auto-Detection (`src/lib/env.ts`):**
 ```typescript
@@ -2276,5 +2304,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 5600+ tests, all passing
+**Tests**: 5787+ tests, all passing (163 test files)
 **Last Updated**: January 28, 2026
