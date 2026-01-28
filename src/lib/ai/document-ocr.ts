@@ -9,11 +9,13 @@
  * - Avoids silent corruption from pdf.js glyph-splitting
  * - Per-page text with confidence scores
  * - Form field and table detection included
+ * - Automatic PDF splitting for documents >15 pages
  *
  * Cost: ~$0.001-0.01 per page (cheaper than engineering time debugging bad extraction)
  */
 
 import { isProxyConfigured, getProxyUrl } from './config'
+import { splitPdf, chunkToFile, getPdfPageCount, DOCUMENT_AI_PAGE_LIMIT } from './pdf-splitter'
 
 // ============================================================================
 // TYPES
@@ -122,6 +124,9 @@ export async function computePdfHashFromFile(file: File): Promise<string> {
  *
  * This is the PRIMARY extraction method - used for ALL PDFs regardless of
  * whether they have native text or are scanned images.
+ *
+ * For PDFs with more than 15 pages, automatically splits into chunks
+ * and processes each chunk separately, then combines results.
  */
 export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResponse> {
   const startTime = performance.now()
@@ -137,6 +142,39 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
     }
   }
 
+  try {
+    // Check page count first to determine if splitting is needed
+    const pageCount = await getPdfPageCount(file)
+    console.log(`[Document AI] PDF has ${pageCount} pages (limit: ${DOCUMENT_AI_PAGE_LIMIT})`)
+
+    if (pageCount > DOCUMENT_AI_PAGE_LIMIT) {
+      // Split and process in chunks
+      console.log(`[Document AI] PDF exceeds ${DOCUMENT_AI_PAGE_LIMIT}-page limit, splitting into chunks...`)
+      return await extractWithDocumentAIChunked(file, startTime)
+    }
+
+    // Process single PDF (within page limit)
+    return await extractSinglePdfWithDocumentAI(file, startTime)
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return {
+      success: false,
+      error: {
+        code: 'NETWORK_ERROR',
+        message: `Failed to process PDF: ${errorMessage}`,
+      },
+    }
+  }
+}
+
+/**
+ * Process a single PDF file (must be within 15-page limit)
+ */
+async function extractSinglePdfWithDocumentAI(
+  file: File,
+  startTime: number,
+  pageOffset: number = 0
+): Promise<DocumentOCRResponse> {
   try {
     // Compute PDF hash for deduplication/caching
     const pdfHash = await computePdfHashFromFile(file)
@@ -203,6 +241,8 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
       // Use page-by-page data from Document AI
       for (const page of ocrData.pages) {
         const pageWarnings: string[] = []
+        // Apply page offset for chunked processing
+        const actualPageNumber = page.pageNumber + pageOffset
 
         // Check for low confidence
         if (page.confidence < 0.7) {
@@ -215,14 +255,14 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
         }
 
         pages.push({
-          pageNumber: page.pageNumber,
+          pageNumber: actualPageNumber,
           text: page.text,
           confidence: page.confidence,
           warnings: pageWarnings,
         })
 
         if (pageWarnings.length > 0) {
-          warnings.push(`Page ${page.pageNumber}: ${pageWarnings.join(', ')}`)
+          warnings.push(`Page ${actualPageNumber}: ${pageWarnings.join(', ')}`)
         }
       }
     } else {
@@ -232,7 +272,7 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
 
       for (let i = 0; i < pageTexts.length; i++) {
         pages.push({
-          pageNumber: i + 1,
+          pageNumber: i + 1 + pageOffset, // Apply page offset
           text: pageTexts[i],
           confidence: ocrData.confidence,
           warnings: [],
@@ -240,20 +280,20 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
       }
     }
 
-    // Transform form fields
+    // Transform form fields (with page offset)
     const formFields: FormField[] = (ocrData.formFields || []).map(f => ({
       name: f.name,
       value: f.value,
       confidence: f.confidence,
-      pageNumber: f.page || 1,
+      pageNumber: (f.page || 1) + pageOffset,
     }))
 
-    // Transform tables
+    // Transform tables (with page offset)
     const tables: Table[] = (ocrData.tables || []).map(t => ({
       rows: t.rows,
       headerRows: t.headerRows || 0,
       confidence: t.confidence || ocrData.confidence,
-      pageNumber: t.page || 1,
+      pageNumber: (t.page || 1) + pageOffset,
     }))
 
     // Calculate overall confidence
@@ -287,6 +327,153 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
         message: `Failed to connect to Document AI: ${errorMessage}`,
       },
     }
+  }
+}
+
+// ============================================================================
+// CHUNKED EXTRACTION FOR LARGE PDFS
+// ============================================================================
+
+/**
+ * Extract text from a large PDF by splitting into chunks
+ *
+ * Document AI has a 15-page limit per request. This function:
+ * 1. Splits the PDF into chunks of 15 pages each
+ * 2. Processes each chunk with Document AI
+ * 3. Combines the results into a single response
+ */
+async function extractWithDocumentAIChunked(
+  file: File,
+  startTime: number
+): Promise<DocumentOCRResponse> {
+  try {
+    // Split the PDF into chunks
+    const splitResult = await splitPdf(file, DOCUMENT_AI_PAGE_LIMIT)
+    console.log(`[Document AI] Split into ${splitResult.chunks.length} chunks`)
+
+    // Compute hash of original file
+    const pdfHash = await computePdfHashFromFile(file)
+
+    // Process each chunk
+    const chunkResults: DocumentOCRResult[] = []
+    const errors: string[] = []
+
+    for (let i = 0; i < splitResult.chunks.length; i++) {
+      const chunk = splitResult.chunks[i]
+      const pageRange = splitResult.pageRanges[i]
+      const pageOffset = pageRange[0] - 1 // Convert to 0-indexed offset
+
+      console.log(`[Document AI] Processing chunk ${i + 1}/${splitResult.chunks.length} (pages ${pageRange[0]}-${pageRange[1]})`)
+
+      // Convert chunk to File
+      const chunkFile = chunkToFile(chunk, file.name, i, pageRange)
+
+      // Process this chunk
+      const chunkStartTime = performance.now()
+      const result = await extractSinglePdfWithDocumentAI(chunkFile, chunkStartTime, pageOffset)
+
+      if (result.success) {
+        chunkResults.push(result.data)
+        console.log(`[Document AI] Chunk ${i + 1} completed: ${result.data.pages.length} pages, ${result.data.text.length} chars`)
+      } else {
+        errors.push(`Chunk ${i + 1} (pages ${pageRange[0]}-${pageRange[1]}): ${result.error.message}`)
+        console.error(`[Document AI] Chunk ${i + 1} failed:`, result.error.message)
+      }
+    }
+
+    // If all chunks failed, return error
+    if (chunkResults.length === 0) {
+      return {
+        success: false,
+        error: {
+          code: 'OCR_FAILED',
+          message: `All ${splitResult.chunks.length} chunks failed to process`,
+          details: errors.join('; '),
+        },
+      }
+    }
+
+    // Combine results from all chunks
+    const combinedResult = combineChunkResults(chunkResults, pdfHash, splitResult.totalPages, startTime)
+
+    // Add warning if some chunks failed
+    if (errors.length > 0) {
+      combinedResult.metadata.warnings.push(
+        `${errors.length} of ${splitResult.chunks.length} chunks failed: ${errors.join('; ')}`
+      )
+    }
+
+    console.log(`[Document AI] Combined ${chunkResults.length} chunks: ${combinedResult.pageCount} pages, ${combinedResult.text.length} chars`)
+
+    return {
+      success: true,
+      data: combinedResult,
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    return {
+      success: false,
+      error: {
+        code: 'OCR_FAILED',
+        message: `Failed to process chunked PDF: ${errorMessage}`,
+      },
+    }
+  }
+}
+
+/**
+ * Combine results from multiple chunk extractions
+ */
+function combineChunkResults(
+  chunks: DocumentOCRResult[],
+  pdfHash: string,
+  totalPages: number,
+  startTime: number
+): DocumentOCRResult {
+  // Combine all pages (already have correct page numbers due to pageOffset)
+  const allPages: PageText[] = []
+  const allFormFields: FormField[] = []
+  const allTables: Table[] = []
+  const allWarnings: string[] = []
+  let totalConfidence = 0
+
+  for (const chunk of chunks) {
+    allPages.push(...chunk.pages)
+    allFormFields.push(...chunk.formFields)
+    allTables.push(...chunk.tables)
+    allWarnings.push(...chunk.metadata.warnings)
+    totalConfidence += chunk.confidence * chunk.pages.length
+  }
+
+  // Sort pages by page number
+  allPages.sort((a, b) => a.pageNumber - b.pageNumber)
+
+  // Combine text in page order
+  const combinedText = allPages.map(p => p.text).join('\n\n')
+
+  // Calculate average confidence
+  const avgConfidence = allPages.length > 0
+    ? totalConfidence / allPages.length
+    : 0
+
+  const processingTimeMs = Math.round(performance.now() - startTime)
+
+  return {
+    text: combinedText,
+    pages: allPages,
+    pageCount: totalPages,
+    confidence: avgConfidence,
+    pdfHash,
+    formFields: allFormFields,
+    tables: allTables,
+    metadata: {
+      backend: 'document-ai',
+      processingTimeMs,
+      warnings: [
+        `Processed as ${chunks.length} chunks (15 pages each) due to Document AI page limit`,
+        ...allWarnings,
+      ],
+    },
   }
 }
 
