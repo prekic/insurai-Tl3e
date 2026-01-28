@@ -130,6 +130,51 @@ function getClientIp(req: Request): string {
 }
 
 // ============================================================================
+// DIAGNOSTIC ENDPOINTS (Public - for debugging deployment issues)
+// ============================================================================
+
+/**
+ * Admin configuration diagnostic endpoint
+ * GET /api/admin/diagnostics
+ * Returns configuration status without exposing secrets
+ * Use this to debug deployment issues (e.g., missing env vars)
+ */
+router.get('/diagnostics', (_req: Request, res: Response) => {
+  const hasJwtSecret = !!(process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET)
+  const jwtSecretLength = (process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || '').length
+  const hasSupabaseUrl = !!process.env.SUPABASE_URL
+  const hasViteSupabaseUrl = !!process.env.VITE_SUPABASE_URL
+  const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  // Check Supabase client initialization
+  const { client, error: supabaseError } = getSupabaseWithError()
+
+  const issues: string[] = []
+  if (!hasJwtSecret) issues.push('ADMIN_JWT_SECRET not configured')
+  if (jwtSecretLength > 0 && jwtSecretLength < 32) issues.push('ADMIN_JWT_SECRET too short (< 32 chars)')
+  if (!hasSupabaseUrl && !hasViteSupabaseUrl) issues.push('SUPABASE_URL not configured')
+  if (!hasServiceKey) issues.push('SUPABASE_SERVICE_ROLE_KEY not configured')
+  if (!client && supabaseError) issues.push(`Supabase init failed: ${supabaseError}`)
+
+  res.json({
+    success: issues.length === 0,
+    status: issues.length === 0 ? 'healthy' : 'misconfigured',
+    timestamp: new Date().toISOString(),
+    config: {
+      hasJwtSecret,
+      jwtSecretLength: jwtSecretLength > 0 ? `${jwtSecretLength} chars` : 'not set',
+      hasSupabaseUrl,
+      hasViteSupabaseUrl,
+      hasServiceKey,
+      supabaseClientInitialized: !!client,
+      supabaseError: supabaseError || null,
+    },
+    issues: issues.length > 0 ? issues : undefined,
+    nodeEnv: process.env.NODE_ENV,
+  })
+})
+
+// ============================================================================
 // AUTHENTICATION ENDPOINTS
 // ============================================================================
 
@@ -259,12 +304,38 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
       return
     }
 
+    // Check JWT secret is configured before generating tokens
+    const jwtSecret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
+    if (!jwtSecret) {
+      console.error('[Admin Login] ADMIN_JWT_SECRET not configured')
+      res.status(503).json({
+        success: false,
+        error: 'Server configuration error',
+        code: 'JWT_NOT_CONFIGURED',
+        message: 'ADMIN_JWT_SECRET environment variable is not set',
+      })
+      return
+    }
+
     // Generate tokens
     console.log('[Admin Login] Generating tokens...')
     const sessionId = crypto.randomUUID()
-    const token = generateAdminToken(adminUser, sessionId)
-    const refreshToken = generateRefreshToken(adminUser, sessionId)
-    console.log('[Admin Login] Tokens generated successfully')
+    let token: string
+    let refreshToken: string
+    try {
+      token = generateAdminToken(adminUser, sessionId)
+      refreshToken = generateRefreshToken(adminUser, sessionId)
+      console.log('[Admin Login] Tokens generated successfully')
+    } catch (tokenError) {
+      console.error('[Admin Login] Token generation failed:', tokenError)
+      res.status(500).json({
+        success: false,
+        error: 'Token generation failed',
+        code: 'TOKEN_GENERATION_ERROR',
+        debug: tokenError instanceof Error ? tokenError.message : String(tokenError),
+      })
+      return
+    }
 
     // Create session in database (non-blocking - don't fail login if this fails)
     try {
