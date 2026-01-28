@@ -200,6 +200,7 @@ interface DocumentAIResponse {
   error?: {
     code: number
     message: string
+    status?: string  // GCP error status like "INVALID_ARGUMENT", "PERMISSION_DENIED"
   }
 }
 
@@ -971,6 +972,15 @@ router.post(
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}` } })) as DocumentAIResponse
+        // Enhanced error logging for debugging
+        console.error('[Document AI] API call failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorMessage: errorData.error?.message,
+          errorCode: errorData.error?.code,
+          errorStatus: errorData.error?.status,
+          processingTimeMs: Date.now() - startTime,
+        })
         throw new Error(errorData.error?.message || `Document AI error: ${response.status}`)
       }
 
@@ -1148,6 +1158,15 @@ router.post(
       } else if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429')) {
         code = 'RATE_LIMIT_EXCEEDED'
         userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Document AI rate limit exceeded'
+      } else if (message.includes('exceed the limit') || message.includes('exceed limit')) {
+        // Page limit error - this shouldn't happen with enableImagelessMode=true (30 page limit)
+        // If it does, it means either imageless mode isn't enabled or document exceeds 30 pages
+        code = 'PAGE_LIMIT_EXCEEDED'
+        console.error('[Document AI] PAGE LIMIT ERROR - This should not happen with enableImagelessMode=true!')
+        console.error('[Document AI] Error message:', message)
+        userMessage = IS_PRODUCTION
+          ? 'Document exceeds page limit. Please upload a document with 30 or fewer pages.'
+          : `Document AI page limit exceeded: ${message}. Check that enableImagelessMode is set in processOptions.ocrConfig.`
       } else if (message.includes('INVALID_ARGUMENT')) {
         code = 'INVALID_DOCUMENT'
         userMessage = IS_PRODUCTION ? 'Unable to process this document format' : 'Invalid document format for Document AI'
