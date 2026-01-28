@@ -907,8 +907,8 @@ router.post(
   ocrLimiter,
   validateDocumentAI,
   async (req: Request, res: Response) => {
-    // Version marker for debugging deployments (v3 = Jan 27 2026, imageless mode)
-    console.log('[Document AI] OCR route v3 invoked (imageless mode enabled)')
+    // Version marker for debugging deployments (v4 = Jan 28 2026, enableImagelessMode fix)
+    console.log('[Document AI] OCR route v4 invoked (enableImagelessMode: true)')
     const IS_PRODUCTION = process.env.NODE_ENV === 'production'
     const startTime = Date.now()
 
@@ -954,13 +954,12 @@ router.post(
             content: documentBase64,
             mimeType,
           },
-          // Enable imageless mode for higher page limit (30 vs 15)
-          // skipHumanReview: true enables imageless mode
           skipHumanReview: true,
-          // Language hints for better Turkish recognition
+          // Language hints and imageless mode for higher page limit (30 vs 15)
           processOptions: {
             ocrConfig: {
-              // Enable advanced OCR options
+              // Enable imageless mode - increases page limit from 15 to 30
+              enableImagelessMode: true,
               enableNativePdfParsing: true,
               hints: {
                 languageHints: languageHints || ['tr', 'en'],
