@@ -353,12 +353,35 @@ export async function extractPolicyFromDocument(
           `${ocrData.metadata.processingTimeMs}ms`)
       }
     } else {
-      // Document AI failed - log and try pdf.js fallback
+      // Document AI failed - properly close the stage and log error details
       console.warn('[PolicyExtractor] Document AI FAILED:', ocrResult.error.message)
+      console.warn('[PolicyExtractor] Document AI error code:', ocrResult.error.code)
+      console.warn('[PolicyExtractor] Document AI error details:', ocrResult.error.details)
       console.log('[PolicyExtractor] Will try pdf.js fallback...')
+
+      // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
+      // This prevents "Stage interrupted by new stage" error
+      logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`, {
+        error_code: ocrResult.error.code,
+        error_details: ocrResult.error.details,
+        will_try_fallback: true,
+        fallback_method: 'pdf.js',
+      })
     }
   } else {
+    // Document AI not available - fail the already-started ocr_processing stage
     console.warn('[PolicyExtractor] Document AI not available, will try pdf.js fallback')
+
+    // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
+    // The stage was already started at line 268, so we must fail it (not skip)
+    // This prevents "Stage interrupted by new stage" error
+    logger?.failStage('Document AI not configured', {
+      reason: 'not_configured',
+      proxy_url_set: !!import.meta.env.VITE_API_PROXY_URL,
+      will_try_fallback: true,
+      fallback_method: 'pdf.js',
+      note: 'Configure GCP_SERVICE_ACCOUNT_BASE64 environment variable for Document AI',
+    })
   }
 
   // If Document AI didn't work (not available or failed), try pdf.js
