@@ -72,8 +72,11 @@ export interface CleanupStats {
 const _TURKISH_SPECIAL_CHARS = 'ÇçĞğİıÖöŞşÜü'
 const _ALL_TURKISH_UPPER = 'A-ZÇĞİÖŞÜ'
 const _ALL_TURKISH_LOWER = 'a-zçğıöşü'
- 
-void (_TURKISH_SPECIAL_CHARS, _ALL_TURKISH_UPPER, _ALL_TURKISH_LOWER) // Suppress unused warnings
+
+// Suppress unused warnings - these constants are for documentation
+void _TURKISH_SPECIAL_CHARS
+void _ALL_TURKISH_UPPER
+void _ALL_TURKISH_LOWER
 
 /**
  * Fix spaced Turkish characters (B İ RLE Şİ K → BİRLEŞİK)

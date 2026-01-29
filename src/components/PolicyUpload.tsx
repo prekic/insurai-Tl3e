@@ -100,6 +100,8 @@ export function PolicyUpload() {
   const { health, checkHealth, runDiagnostics } = useBackendHealth()
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
   const filesReceivedRef = useRef(false)
+  // Ref to hold the latest addFiles function to avoid stale closures in useEffect
+  const addFilesRef = useRef<(files: File[]) => Promise<void>>()
 
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
@@ -138,7 +140,6 @@ export function PolicyUpload() {
   }, [isAutoOpen, autoOpenTriggered, searchParams, navigate])
 
   // Listen for files passed from GlobalNavigation
-   
   useEffect(() => {
     // Check if files were passed via navigation state
     const state = location.state as { filesReady?: boolean } | null
@@ -149,7 +150,8 @@ export function PolicyUpload() {
       const handleFilesSelected = (e: CustomEvent<File[]>) => {
         const selectedFiles = e.detail
         if (selectedFiles && selectedFiles.length > 0) {
-          addFiles(selectedFiles)
+          // Use ref to call the latest version of addFiles
+          addFilesRef.current?.(selectedFiles)
         }
         // Clean up session storage
         sessionStorage.removeItem('pendingUploadFiles')
@@ -246,6 +248,10 @@ export function PolicyUpload() {
       await processFileAsync(uploadedFile.id, uploadedFile.file)
     }
   }
+
+  // Keep the ref updated with the latest addFiles function
+  // This allows useEffect to always call the current version without re-running
+  addFilesRef.current = addFiles
 
   const processFileAsync = async (fileId: string, file: File) => {
     // Create processing logger for tracking the document journey

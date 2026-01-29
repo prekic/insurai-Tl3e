@@ -4,7 +4,7 @@
  */
 
 import { adminFetch } from '@/lib/admin/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -43,12 +43,8 @@ export function AuditTab() {
   const [actionFilter, setActionFilter] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
 
-   
-  useEffect(() => {
-    fetchLogs()
-  }, [actionFilter, resourceFilter])
-
-  const fetchLogs = async () => {
+  // Wrap fetchLogs in useCallback to satisfy exhaustive-deps rule
+  const fetchLogs = useCallback(async () => {
     setIsLoading(true)
     try {
       const params = new URLSearchParams()
@@ -67,7 +63,11 @@ export function AuditTab() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [actionFilter, resourceFilter])
+
+  useEffect(() => {
+    fetchLogs()
+  }, [fetchLogs])
 
   const exportLogs = async () => {
     try {
