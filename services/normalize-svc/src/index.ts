@@ -114,11 +114,11 @@ export class Normalizer {
     const evidenceIndex = this.buildEvidenceIndex(text, current)
 
     if (this.debug) {
-      console.log(`[Normalizer] ${this.docId}:`)
-      console.log(`  - Input length: ${text.length}`)
-      console.log(`  - Output length: ${current.length}`)
-      console.log(`  - Rules applied: ${appliedRulesMap.size}`)
-      console.log(`  - Duration: ${Date.now() - startTime}ms`)
+      console.warn(`[Normalizer] ${this.docId}:`)
+      console.warn(`  - Input length: ${text.length}`)
+      console.warn(`  - Output length: ${current.length}`)
+      console.warn(`  - Rules applied: ${appliedRulesMap.size}`)
+      console.warn(`  - Duration: ${Date.now() - startTime}ms`)
     }
 
     return {

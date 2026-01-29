@@ -96,12 +96,12 @@ export class Validator {
     const passed = critical.length === 0
 
     if (this.options.debug) {
-      console.log(`[Validator] ${this.options.docId}:`)
-      console.log(`  - Critical: ${critical.length}`)
-      console.log(`  - Errors: ${errors.length}`)
-      console.log(`  - Warnings: ${warnings.length}`)
-      console.log(`  - Passed: ${passed}`)
-      console.log(`  - Confidence: ${(overallConfidence * 100).toFixed(1)}%`)
+      console.warn(`[Validator] ${this.options.docId}:`)
+      console.warn(`  - Critical: ${critical.length}`)
+      console.warn(`  - Errors: ${errors.length}`)
+      console.warn(`  - Warnings: ${warnings.length}`)
+      console.warn(`  - Passed: ${passed}`)
+      console.warn(`  - Confidence: ${(overallConfidence * 100).toFixed(1)}%`)
     }
 
     return {
@@ -227,7 +227,7 @@ export class Validator {
 
     // Just informational - phone found or not
     if (matches.length > 0 && this.options.debug) {
-      console.log(`  - Found ${matches.length} phone numbers matching: ${description}`)
+      console.warn(`  - Found ${matches.length} phone numbers matching: ${description}`)
     }
   }
 

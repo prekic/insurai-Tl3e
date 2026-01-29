@@ -138,6 +138,7 @@ export function PolicyUpload() {
   }, [isAutoOpen, autoOpenTriggered, searchParams, navigate])
 
   // Listen for files passed from GlobalNavigation
+   
   useEffect(() => {
     // Check if files were passed via navigation state
     const state = location.state as { filesReady?: boolean } | null
@@ -264,16 +265,16 @@ export function PolicyUpload() {
       try {
         if (!createPromise) {
           // First call - create a promise for the create operation
-          console.log('[ProcessingLog] Creating new log for document:', log.document_id)
+          console.warn('[ProcessingLog] Creating new log for document:', log.document_id)
           createPromise = (async () => {
             const result = await createProcessingLog(log)
-            console.log('[ProcessingLog] Create result:', result ? 'success' : 'failed')
+            console.warn('[ProcessingLog] Create result:', result ? 'success' : 'failed')
             return !!result
           })()
           await createPromise
         } else {
           // Wait for create to finish, then update
-          console.log('[ProcessingLog] Updating log for document:', log.document_id, 'stages:', log.stages.length)
+          console.warn('[ProcessingLog] Updating log for document:', log.document_id, 'stages:', log.stages.length)
           await createPromise
           await updateProcessingLog(log.document_id, log)
         }

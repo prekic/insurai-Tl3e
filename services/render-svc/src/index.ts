@@ -220,7 +220,7 @@ export class PDFRenderer {
     if (config.cache.enabled) {
       const exists = await this.checkImageExists(key)
       if (exists) {
-        console.log(`[Render] Cache hit: ${key}`)
+        console.warn(`[Render] Cache hit: ${key}`)
         return key
       }
     }
@@ -236,7 +236,7 @@ export class PDFRenderer {
     // Upload to storage
     await this.uploadImage(key, outputBuffer)
 
-    console.log(`[Render] Rendered: ${key}`)
+    console.warn(`[Render] Rendered: ${key}`)
     return key
   }
 
@@ -245,7 +245,7 @@ export class PDFRenderer {
     pageNo: number,
     dpi: number
   ): Promise<Buffer> {
-    console.log(`[Render] Rendering page ${pageNo} at ${dpi} DPI using pdf2pic`)
+    console.warn(`[Render] Rendering page ${pageNo} at ${dpi} DPI using pdf2pic`)
 
     // Configure pdf2pic for high-quality rendering
     const options: Pdf2PicOptions = {
@@ -266,7 +266,7 @@ export class PDFRenderer {
         throw new Error(`Failed to render page ${pageNo}: no buffer returned`)
       }
 
-      console.log(`[Render] Successfully rendered page ${pageNo} (${result.buffer.length} bytes)`)
+      console.warn(`[Render] Successfully rendered page ${pageNo} (${result.buffer.length} bytes)`)
       return result.buffer
     } catch (error) {
       // If pdf2pic fails (e.g., GraphicsMagick not installed), fall back to placeholder
@@ -302,7 +302,7 @@ export class PDFRenderer {
       .png()
       .toBuffer()
 
-    console.log(`[Render] Created fallback PNG for page ${pageNo} (${pngBuffer.length} bytes)`)
+    console.warn(`[Render] Created fallback PNG for page ${pageNo} (${pngBuffer.length} bytes)`)
     return pngBuffer
   }
 
@@ -317,7 +317,7 @@ export class PDFRenderer {
     const width = Math.round(bbox.width * dpi / 72)
     const height = Math.round(bbox.height * dpi / 72)
 
-    console.log(`[Render] Cropping to ${left},${top} ${width}x${height} (from bbox ${bbox.x},${bbox.y} ${bbox.width}x${bbox.height})`)
+    console.warn(`[Render] Cropping to ${left},${top} ${width}x${height} (from bbox ${bbox.x},${bbox.y} ${bbox.width}x${bbox.height})`)
 
     try {
       // Get image metadata to ensure crop region is valid
@@ -343,7 +343,7 @@ export class PDFRenderer {
         })
         .toBuffer()
 
-      console.log(`[Render] Cropped image: ${cropped.length} bytes`)
+      console.warn(`[Render] Cropped image: ${cropped.length} bytes`)
       return cropped
     } catch (error) {
       console.error(`[Render] Crop failed: ${(error as Error).message}`)
@@ -357,7 +357,7 @@ export class PDFRenderer {
         .jpeg({ quality: config.rendering.jpegQuality })
         .toBuffer()
 
-      console.log(`[Render] Converted to JPEG: ${jpegBuffer.length} bytes (quality: ${config.rendering.jpegQuality})`)
+      console.warn(`[Render] Converted to JPEG: ${jpegBuffer.length} bytes (quality: ${config.rendering.jpegQuality})`)
       return jpegBuffer
     } catch (error) {
       console.error(`[Render] JPEG conversion failed: ${(error as Error).message}`)
@@ -478,7 +478,7 @@ app.post('/render-region', async (req, res) => {
 const PORT = process.env.PORT || 4003
 
 app.listen(PORT, () => {
-  console.log(`[Render Service] Listening on port ${PORT}`)
+  console.warn(`[Render Service] Listening on port ${PORT}`)
 })
 
 export { PDFRenderer }

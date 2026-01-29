@@ -63,7 +63,7 @@ export async function splitPdf(
   const chunks: Uint8Array[] = []
   const pageRanges: Array<[number, number]> = []
 
-  console.log(`[PDF Splitter] Splitting ${totalPages} pages into ${numChunks} chunks of max ${maxPagesPerChunk} pages`)
+  console.warn(`[PDF Splitter] Splitting ${totalPages} pages into ${numChunks} chunks of max ${maxPagesPerChunk} pages`)
 
   for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
     const startPage = chunkIndex * maxPagesPerChunk
@@ -88,7 +88,7 @@ export async function splitPdf(
     chunks.push(chunkBytes)
     pageRanges.push([startPage + 1, endPage]) // 1-indexed
 
-    console.log(`[PDF Splitter] Created chunk ${chunkIndex + 1}/${numChunks}: pages ${startPage + 1}-${endPage}`)
+    console.warn(`[PDF Splitter] Created chunk ${chunkIndex + 1}/${numChunks}: pages ${startPage + 1}-${endPage}`)
   }
 
   return {

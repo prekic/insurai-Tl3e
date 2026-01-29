@@ -69,10 +69,10 @@ async function testWorkerUrl(url: string, timeout: number = 5000): Promise<boole
 async function findWorkingWorkerUrl(version: string): Promise<string | null> {
   for (const cdnFn of WORKER_CDN_SOURCES) {
     const url = cdnFn(version)
-    console.log(`[PDF.js] Testing worker URL: ${url}`)
+    console.warn(`[PDF.js] Testing worker URL: ${url}`)
 
     if (await testWorkerUrl(url)) {
-      console.log(`[PDF.js] Found working worker: ${url}`)
+      console.warn(`[PDF.js] Found working worker: ${url}`)
       return url
     }
   }
@@ -468,7 +468,7 @@ export async function extractTextFromPDFWithRetry(
     if (result.success) {
       // Log success after retry
       if (attempt > 1) {
-        console.log(`[PDF.js] Successfully parsed PDF on attempt ${attempt}`)
+        console.warn(`[PDF.js] Successfully parsed PDF on attempt ${attempt}`)
       }
       return result
     }
@@ -478,7 +478,7 @@ export async function extractTextFromPDFWithRetry(
     // Check if this error type should be retried
     if (!isRetryableErrorCode(result.error.code)) {
       // Non-retryable error (e.g., INVALID_PDF, EMPTY_PDF, PASSWORD_PROTECTED)
-      console.log(`[PDF.js] Non-retryable error: ${result.error.code}`)
+      console.warn(`[PDF.js] Non-retryable error: ${result.error.code}`)
       return result
     }
 
@@ -507,7 +507,7 @@ export async function extractTextFromPDFWithRetry(
     if (attempt < maxRetries) {
       // Exponential backoff: 1s, 2s, 4s
       const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000)
-      console.log(`[PDF.js] Waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`)
+      console.warn(`[PDF.js] Waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`)
       await new Promise(resolve => setTimeout(resolve, delayMs))
     }
   }

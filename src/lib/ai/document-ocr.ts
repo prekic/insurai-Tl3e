@@ -145,11 +145,11 @@ export async function extractWithDocumentAI(file: File): Promise<DocumentOCRResp
   try {
     // Check page count first to determine if splitting is needed
     const pageCount = await getPdfPageCount(file)
-    console.log(`[Document AI] PDF has ${pageCount} pages (limit: ${DOCUMENT_AI_PAGE_LIMIT})`)
+    console.warn(`[Document AI] PDF has ${pageCount} pages (limit: ${DOCUMENT_AI_PAGE_LIMIT})`)
 
     if (pageCount > DOCUMENT_AI_PAGE_LIMIT) {
       // Split and process in chunks
-      console.log(`[Document AI] PDF exceeds ${DOCUMENT_AI_PAGE_LIMIT}-page limit, splitting into chunks...`)
+      console.warn(`[Document AI] PDF exceeds ${DOCUMENT_AI_PAGE_LIMIT}-page limit, splitting into chunks...`)
       return await extractWithDocumentAIChunked(file, startTime)
     }
 
@@ -349,7 +349,7 @@ async function extractWithDocumentAIChunked(
   try {
     // Split the PDF into chunks
     const splitResult = await splitPdf(file, DOCUMENT_AI_PAGE_LIMIT)
-    console.log(`[Document AI] Split into ${splitResult.chunks.length} chunks`)
+    console.warn(`[Document AI] Split into ${splitResult.chunks.length} chunks`)
 
     // Compute hash of original file
     const pdfHash = await computePdfHashFromFile(file)
@@ -363,7 +363,7 @@ async function extractWithDocumentAIChunked(
       const pageRange = splitResult.pageRanges[i]
       const pageOffset = pageRange[0] - 1 // Convert to 0-indexed offset
 
-      console.log(`[Document AI] Processing chunk ${i + 1}/${splitResult.chunks.length} (pages ${pageRange[0]}-${pageRange[1]})`)
+      console.warn(`[Document AI] Processing chunk ${i + 1}/${splitResult.chunks.length} (pages ${pageRange[0]}-${pageRange[1]})`)
 
       // Convert chunk to File
       const chunkFile = chunkToFile(chunk, file.name, i, pageRange)
@@ -374,7 +374,7 @@ async function extractWithDocumentAIChunked(
 
       if (result.success) {
         chunkResults.push(result.data)
-        console.log(`[Document AI] Chunk ${i + 1} completed: ${result.data.pages.length} pages, ${result.data.text.length} chars`)
+        console.warn(`[Document AI] Chunk ${i + 1} completed: ${result.data.pages.length} pages, ${result.data.text.length} chars`)
       } else {
         errors.push(`Chunk ${i + 1} (pages ${pageRange[0]}-${pageRange[1]}): ${result.error.message}`)
         console.error(`[Document AI] Chunk ${i + 1} failed:`, result.error.message)
@@ -403,7 +403,7 @@ async function extractWithDocumentAIChunked(
       )
     }
 
-    console.log(`[Document AI] Combined ${chunkResults.length} chunks: ${combinedResult.pageCount} pages, ${combinedResult.text.length} chars`)
+    console.warn(`[Document AI] Combined ${chunkResults.length} chunks: ${combinedResult.pageCount} pages, ${combinedResult.text.length} chars`)
 
     return {
       success: true,

@@ -162,12 +162,12 @@ export class Reconciler {
       : []
 
     if (this.options.debug) {
-      console.log(`[Reconciler] ${this.options.docId}:`)
-      console.log(`  - Engines: ${results.map(r => r.engine).join(', ')}`)
-      console.log(`  - Total groups: ${totalGroups}`)
-      console.log(`  - Disputed: ${disputedCount}`)
-      console.log(`  - Agreement ratio: ${(agreementRatio * 100).toFixed(1)}%`)
-      console.log(`  - Needs targeted re-OCR: ${needsTargetedReOCR}`)
+      console.warn(`[Reconciler] ${this.options.docId}:`)
+      console.warn(`  - Engines: ${results.map(r => r.engine).join(', ')}`)
+      console.warn(`  - Total groups: ${totalGroups}`)
+      console.warn(`  - Disputed: ${disputedCount}`)
+      console.warn(`  - Agreement ratio: ${(agreementRatio * 100).toFixed(1)}%`)
+      console.warn(`  - Needs targeted re-OCR: ${needsTargetedReOCR}`)
     }
 
     return {

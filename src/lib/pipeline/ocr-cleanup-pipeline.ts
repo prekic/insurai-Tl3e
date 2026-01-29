@@ -246,7 +246,7 @@ export async function runOCRCleanupPipeline(
       })
 
       if (opts.debug && preCleanResult.stats.turkishWordsDespaced > 0) {
-        console.log(`[PreClean] Fixed ${preCleanResult.stats.turkishWordsDespaced} Turkish word spacing issues`)
+        console.warn(`[PreClean] Fixed ${preCleanResult.stats.turkishWordsDespaced} Turkish word spacing issues`)
       }
     } else {
       logger.logStageComplete('preclean', 0, { skipped: true })
@@ -373,7 +373,7 @@ export async function runOCRCleanupPipeline(
       })
 
       if (opts.debug && result.hasQAFailures) {
-        console.log('\n' + getQASummary(qaResult.documentReport))
+        console.warn('\n' + getQASummary(qaResult.documentReport))
       }
     }
 

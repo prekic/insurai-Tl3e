@@ -9,7 +9,6 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase generic type
 type AnyDatabase = any
 
 // ============================================================================
@@ -384,7 +383,6 @@ export async function updateAdminLogin(adminId: string, ipAddress: string): Prom
 
   // Then increment login count using RPC if available
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Supabase RPC call
     await (db as any).rpc('increment_login_count', { row_id: adminId })
   } catch {
     // RPC might not exist, that's okay

@@ -116,7 +116,7 @@ class AICacheManager {
 
       if (entry) {
         if (this.debug) {
-          console.log(`[AICache] Hit for extraction (${provider}, ${versionSuffix})`)
+          console.warn(`[AICache] Hit for extraction (${provider}, ${versionSuffix})`)
         }
         return entry.data
       }
@@ -166,7 +166,7 @@ class AICacheManager {
       })
 
       if (this.debug) {
-        console.log(`[AICache] Stored extraction (${provider}, ${versionSuffix})`)
+        console.warn(`[AICache] Stored extraction (${provider}, ${versionSuffix})`)
       }
     } catch {
       // Cache write failures are non-critical
@@ -243,7 +243,7 @@ class AICacheManager {
 
       if (entry) {
         if (this.debug) {
-          console.log(`[AICache] Hit for consensus (${providerKey}, ${versionSuffix})`)
+          console.warn(`[AICache] Hit for consensus (${providerKey}, ${versionSuffix})`)
         }
         return entry.data
       }
@@ -290,7 +290,7 @@ class AICacheManager {
       })
 
       if (this.debug) {
-        console.log(`[AICache] Stored consensus (${providerKey}, ${versionSuffix})`)
+        console.warn(`[AICache] Stored consensus (${providerKey}, ${versionSuffix})`)
       }
     } catch {
       // Cache write failures are non-critical

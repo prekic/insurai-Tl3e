@@ -268,7 +268,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'anthropic', result)
 
     // Log successful extraction with cost info
-    console.log('[Claude Extract] Extraction complete, logging audit...')
+    console.warn('[Claude Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'anthropic',
       confidence: result.confidence?.overall ?? 0.7,

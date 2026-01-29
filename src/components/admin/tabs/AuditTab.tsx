@@ -43,6 +43,7 @@ export function AuditTab() {
   const [actionFilter, setActionFilter] = useState('')
   const [resourceFilter, setResourceFilter] = useState('')
 
+   
   useEffect(() => {
     fetchLogs()
   }, [actionFilter, resourceFilter])

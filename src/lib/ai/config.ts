@@ -230,7 +230,7 @@ export async function extractViaProxy(
   }
 
   try {
-    console.log('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`)
+    console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`)
 
     // Use unified endpoint with automatic fallback
     const response = await fetch(`${proxyUrl}/api/ai/extract`, {
@@ -242,11 +242,11 @@ export async function extractViaProxy(
       }),
     })
 
-    console.log('[extractViaProxy] Response status:', response.status, response.statusText)
+    console.warn('[extractViaProxy] Response status:', response.status, response.statusText)
 
     const result = await response.json()
 
-    console.log('[extractViaProxy] Parsed response:', {
+    console.warn('[extractViaProxy] Parsed response:', {
       success: result.success,
       hasData: !!result.data,
       dataType: result.data ? typeof result.data : 'undefined',
@@ -274,7 +274,7 @@ export async function extractViaProxy(
       }
     }
 
-    console.log('[extractViaProxy] Returning successful result with data')
+    console.warn('[extractViaProxy] Returning successful result with data')
     return {
       success: true,
       data: result.data,

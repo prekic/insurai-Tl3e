@@ -289,12 +289,12 @@ export async function extractPolicyFromDocument(
 
   // Try Document AI OCR first (if available)
   const documentAIAvailable = isDocumentOCRAvailable()
-  console.log('[PolicyExtractor] Document AI available:', documentAIAvailable)
+  console.warn('[PolicyExtractor] Document AI available:', documentAIAvailable)
 
   if (documentAIAvailable) {
-    console.log('[PolicyExtractor] Attempting Document AI extraction...')
+    console.warn('[PolicyExtractor] Attempting Document AI extraction...')
     const ocrResult = await extractWithDocumentAI(file)
-    console.log('[PolicyExtractor] Document AI result success:', ocrResult.success)
+    console.warn('[PolicyExtractor] Document AI result success:', ocrResult.success)
 
     if (ocrResult.success) {
       // Document AI succeeded - use its results
@@ -346,7 +346,7 @@ export async function extractPolicyFromDocument(
       })
 
       if (import.meta.env.DEV) {
-        console.log(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
+        console.warn(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
           `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
           `${ocrFormFields.length} form fields, ` +
           `${ocrTables.length} tables, ` +
@@ -357,7 +357,7 @@ export async function extractPolicyFromDocument(
       console.warn('[PolicyExtractor] Document AI FAILED:', ocrResult.error.message)
       console.warn('[PolicyExtractor] Document AI error code:', ocrResult.error.code)
       console.warn('[PolicyExtractor] Document AI error details:', ocrResult.error.details)
-      console.log('[PolicyExtractor] Will try pdf.js fallback...')
+      console.warn('[PolicyExtractor] Will try pdf.js fallback...')
 
       // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
       // This prevents "Stage interrupted by new stage" error
@@ -385,9 +385,9 @@ export async function extractPolicyFromDocument(
   }
 
   // If Document AI didn't work (not available or failed), try pdf.js
-  console.log('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
+  console.warn('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
   if (extractionMethod === 'none') {
-    console.log('[PolicyExtractor] Starting pdf.js fallback extraction...')
+    console.warn('[PolicyExtractor] Starting pdf.js fallback extraction...')
     logger?.startStage('pdf_extraction', {
       filename: file.name,
       file_size: file.size,
@@ -395,7 +395,7 @@ export async function extractPolicyFromDocument(
     })
 
     const pdfResult = await extractTextFromPDFWithRetry(file)
-    console.log('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
+    console.warn('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
 
     if (pdfResult.success) {
       // pdf.js succeeded
@@ -403,7 +403,7 @@ export async function extractPolicyFromDocument(
       pageCount = pdfResult.data.pageCount
       extractionMethod = 'pdf.js'
       usedOCR = false // pdf.js extracts native text, not OCR
-      console.log(`[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`)
+      console.warn(`[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`)
 
       logger?.setOCRUsed('pdf.js')
       logger?.setPageCount(pageCount)
@@ -604,9 +604,9 @@ export async function extractPolicyFromDocument(
       }
     } else {
       // Use single provider (use processed text for better extraction)
-      console.log('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
+      console.warn('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
       extractedData = await extractWithProvider(provider, processedText)
-      console.log('[PolicyExtractor] extractWithProvider returned:', {
+      console.warn('[PolicyExtractor] extractWithProvider returned:', {
         hasData: !!extractedData,
         policyNumber: extractedData?.policyNumber,
         provider: extractedData?.provider,
@@ -617,7 +617,7 @@ export async function extractPolicyFromDocument(
 
     // Log AI extraction success
     const confidenceOverall = extractedData.confidence?.overall ?? 0.7
-    console.log('[PolicyExtractor] Confidence overall:', confidenceOverall)
+    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall)
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {
@@ -676,7 +676,7 @@ export async function extractPolicyFromDocument(
       const formFieldMap = extractFormFieldMap(ocrFormFields)
 
       if (import.meta.env.DEV) {
-        console.log('[Document AI] Form field map:', formFieldMap)
+        console.warn('[Document AI] Form field map:', formFieldMap)
       }
 
       // Helper to find and use high-confidence form field value
@@ -698,7 +698,7 @@ export async function extractPolicyFromDocument(
       if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
         enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
         if (import.meta.env.DEV) {
-          console.log(`[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`)
+          console.warn(`[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`)
         }
       }
 
@@ -707,7 +707,7 @@ export async function extractPolicyFromDocument(
       if (formInsuredName && formInsuredName !== extractedData.insuredName) {
         enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
         if (import.meta.env.DEV) {
-          console.log(`[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`)
+          console.warn(`[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`)
         }
       }
 
@@ -741,13 +741,13 @@ export async function extractPolicyFromDocument(
         if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
           enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
           if (import.meta.env.DEV) {
-            console.log(`[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`)
+            console.warn(`[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`)
           }
         }
       }
 
       if (import.meta.env.DEV && formFieldsUsed > 0) {
-        console.log(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
+        console.warn(`[Document AI] Enhanced extraction with ${formFieldsUsed} form fields`)
       }
 
       // Log form field enhancement completion
@@ -869,7 +869,7 @@ export async function extractPolicyFromDocument(
 
         if (tableData.coverages.length > 0) {
           if (import.meta.env.DEV) {
-            console.log(`[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`)
+            console.warn(`[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`)
           }
 
           // Merge table coverages with AI-extracted coverages
@@ -904,7 +904,7 @@ export async function extractPolicyFromDocument(
           })
 
           if (import.meta.env.DEV && tableCoveragesUsed > 0) {
-            console.log(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
+            console.warn(`[Table Parser] Added ${tableCoveragesUsed} new coverages from tables`)
           }
         } else {
           logger?.completeStage({
@@ -1093,7 +1093,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
   const now = new Date()
 
   // Debug logging for production troubleshooting
-  console.log('[convertToAnalyzedPolicy] Input data:', {
+  console.warn('[convertToAnalyzedPolicy] Input data:', {
     hasCoverages: !!data.coverages,
     coveragesIsArray: Array.isArray(data.coverages),
     coveragesLength: Array.isArray(data.coverages) ? data.coverages.length : 'N/A',
@@ -1173,7 +1173,7 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     premiumValue = data.premium
   } else if (data.premium && typeof data.premium === 'object' && 'amount' in data.premium) {
     premiumValue = (data.premium as { amount: number }).amount
-    console.log('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
+    console.warn('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
   }
 
   // Handle policyNumber - AI might return camelCase or snake_case
