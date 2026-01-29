@@ -107,6 +107,7 @@ if (!hasError) {
 ## Commits This Session
 
 ```
+6cf40eb Update documentation with ESLint cleanup session changes
 2e582d7 Fix catch block variable names in admin routes
 d92d145 Fix react-hooks/exhaustive-deps warnings properly
 3ef35f7 Reduce ESLint warnings from 161 to 48 (70% reduction)
@@ -224,7 +225,7 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 | Metric | Value |
 |--------|-------|
-| Commits this session | 5 |
+| Commits this session | 6 |
 | ESLint errors fixed | 153 → 0 |
 | ESLint warnings reduced | 161 → 48 (70%) |
 | React hooks warnings fixed | 4 |
