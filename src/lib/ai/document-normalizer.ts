@@ -385,6 +385,7 @@ export class DocumentNormalizer {
     const originalLength = result.length
 
     // Remove control characters (except newlines and tabs)
+    // eslint-disable-next-line no-control-regex -- Intentional control character matching
     result = result.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
 
     // Remove obvious binary/encoded data blocks
@@ -393,7 +394,7 @@ export class DocumentNormalizer {
 
     for (const line of lines) {
       // Skip lines that are mostly special characters
-      const specialRatio = (line.match(/[<>\[\]{}|\\^~`@#$%&*+=]/g) || []).length / Math.max(1, line.length)
+      const specialRatio = (line.match(/[<>[\]{}|\\^~`@#$%&*+=]/g) || []).length / Math.max(1, line.length)
       if (specialRatio > 0.3 && line.length > 10) {
         this.stats.artifactsRemoved++
         continue

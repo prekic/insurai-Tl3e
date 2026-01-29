@@ -2,7 +2,7 @@
  * Config Manager Tests
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   getConfig,
   getConfigObject,
@@ -216,7 +216,7 @@ describe('Config Manager', () => {
     })
 
     it('should update provider config', () => {
-      const original = getProviderConfig('openai')
+      const _original = getProviderConfig('openai')
 
       const success = updateProviderConfig(
         'openai',

@@ -857,7 +857,7 @@ describe('Confidence Calculation Verification', () => {
 
   it('correctly calculates density score using linear formula', () => {
     const settings = configManager.getOCRSettings()
-    const threshold = settings.density_analysis.chars_per_page_threshold // 200
+    const _threshold = settings.density_analysis.chars_per_page_threshold // 200
 
     // Create document that would give ~500 chars per page (estimated)
     // 500 chars / (200 * 4) = 500 / 800 = 0.625
@@ -971,7 +971,7 @@ describe('Document Journey Metadata', () => {
       expect(breakdown.field_extraction).toBeDefined()
 
       // Verify structure of each component
-      for (const [key, value] of Object.entries(breakdown)) {
+      for (const [_key, value] of Object.entries(breakdown)) {
         expect(value.score).toBeGreaterThanOrEqual(0)
         expect(value.score).toBeLessThanOrEqual(1)
         expect(value.weight).toBeGreaterThan(0)
@@ -1107,7 +1107,7 @@ describe('Document Journey Metadata', () => {
       const fields = metadata.ocr_decision.field_extraction.fields
 
       // If there are fields checked, verify structure
-      for (const [fieldName, fieldResult] of Object.entries(fields)) {
+      for (const [_fieldName, fieldResult] of Object.entries(fields)) {
         expect(typeof fieldResult.found).toBe('boolean')
         expect(fieldResult.value === null || typeof fieldResult.value === 'string').toBe(true)
         expect(fieldResult.pattern_used === null || typeof fieldResult.pattern_used === 'string').toBe(true)

@@ -680,7 +680,7 @@ export async function extractPolicyFromDocument(
       }
 
       // Helper to find and use high-confidence form field value
-      const useFormField = (
+      const getFormFieldValue = (
         patterns: readonly (string | RegExp)[],
         currentValue: string | number | null | undefined,
         minConfidence = 0.7
@@ -694,7 +694,7 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for policy number (high priority - very reliable from Document AI)
-      const formPolicyNumber = useFormField(TURKISH_FORM_FIELD_PATTERNS.policyNumber, extractedData.policyNumber, 0.6)
+      const formPolicyNumber = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.policyNumber, extractedData.policyNumber, 0.6)
       if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
         enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
         if (import.meta.env.DEV) {
@@ -703,7 +703,7 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for insured name
-      const formInsuredName = useFormField(TURKISH_FORM_FIELD_PATTERNS.insuredName, extractedData.insuredName)
+      const formInsuredName = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.insuredName, extractedData.insuredName)
       if (formInsuredName && formInsuredName !== extractedData.insuredName) {
         enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
         if (import.meta.env.DEV) {
@@ -712,7 +712,7 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for dates
-      const formStartDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.startDate, extractedData.startDate)
+      const formStartDate = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.startDate, extractedData.startDate)
       if (formStartDate && formStartDate !== extractedData.startDate) {
         // Normalize date format if needed (DD.MM.YYYY → YYYY-MM-DD)
         const normalizedDate = formStartDate.includes('.')
@@ -721,7 +721,7 @@ export async function extractPolicyFromDocument(
         enhancedExtractedData = { ...enhancedExtractedData, startDate: normalizedDate }
       }
 
-      const formEndDate = useFormField(TURKISH_FORM_FIELD_PATTERNS.endDate, extractedData.endDate)
+      const formEndDate = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.endDate, extractedData.endDate)
       if (formEndDate && formEndDate !== extractedData.endDate) {
         const normalizedDate = formEndDate.includes('.')
           ? formEndDate.split('.').reverse().join('-')
@@ -730,7 +730,7 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for premium (parse Turkish number format)
-      const formPremium = useFormField(TURKISH_FORM_FIELD_PATTERNS.premium, extractedData.premium?.toString())
+      const formPremium = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.premium, extractedData.premium?.toString())
       if (formPremium) {
         // Parse Turkish currency format: "₺5.000,50" or "5.000,50 TL"
         const cleanPremium = formPremium

@@ -55,7 +55,7 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
     }
 
     // Skip lines that are mostly special characters
-    if (/^[!@#$%^&*()_+=\[\]{}|\\:;"'<>,.?\/~`\s]+$/.test(trimmedLine)) {
+    if (/^[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`\s]+$/.test(trimmedLine)) {
       noiseTypes.add('special-chars-only')
       continue
     }
@@ -83,6 +83,7 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
     let cleanedLine = trimmedLine
 
     // Remove control characters (but keep Turkish chars)
+    // eslint-disable-next-line no-control-regex
     cleanedLine = cleanedLine.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
 
     // Remove isolated caret sequences
@@ -115,9 +116,11 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
 export function stripControlCharacters(text: string): string {
   // Remove C0 control chars except tab, newline, carriage return
   // Remove C1 control chars entirely
+  /* eslint-disable no-control-regex */
   return text
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // C0 except \t \n \r
     .replace(/[\x7F-\x9F]/g, '') // C1 control chars
+  /* eslint-enable no-control-regex */
 }
 
 /**

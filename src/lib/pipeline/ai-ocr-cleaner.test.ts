@@ -331,7 +331,7 @@ describe('AI OCR Cleaner', () => {
     })
 
     it('should call multiple providers in parallel', async () => {
-      let callUrls: string[] = []
+      const callUrls: string[] = []
       global.fetch = vi.fn().mockImplementation((url: string) => {
         callUrls.push(url)
         if (url.includes('openai')) {

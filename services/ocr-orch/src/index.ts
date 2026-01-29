@@ -852,6 +852,7 @@ class TesseractAdapter implements OCRAdapter {
 }
 
 // Tesseract.js type declarations (subset)
+// eslint-disable-next-line @typescript-eslint/no-namespace
 declare namespace Tesseract {
   interface Page {
     confidence: number

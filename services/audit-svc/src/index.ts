@@ -13,10 +13,10 @@
 
 import crypto from 'crypto'
 import type {
-  ExtractionResult,
-  ReconcileResult,
-  NormalizeResult,
-  ValidationGateResult,
+  ExtractionResult as _ExtractionResult,
+  ReconcileResult as _ReconcileResult,
+  NormalizeResult as _NormalizeResult,
+  ValidationGateResult as _ValidationGateResult,
 } from '@insurai/types'
 
 // ============================================================================
@@ -178,7 +178,7 @@ export class AuditBundleGenerator {
    */
   private async collectArtifacts(docId: string): Promise<AuditArtifact[]> {
     const artifacts: AuditArtifact[] = []
-    const now = new Date()
+    const _now = new Date()
 
     // Original PDF
     const pdfKey = `${docId}/original.pdf`
@@ -406,7 +406,7 @@ export class AuditBundleGenerator {
    */
   private async getComplianceMetadata(
     docId: string,
-    tenantId: string
+    _tenantId: string
   ): Promise<ComplianceMetadata> {
     // In production, fetch from compliance database
     const now = new Date()
@@ -629,6 +629,7 @@ app.get('/bundle/:tenantId/:docId/:bundleId', async (req, res) => {
 const PORT = process.env.PORT || 4011
 
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`[Audit Service] Listening on port ${PORT}`)
 })
 

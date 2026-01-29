@@ -100,8 +100,10 @@ export class TextQualityAnalyzer {
     }
 
     // Check for common encoding issues
+     
     const commonIssues = [
       { pattern: /\ufffd{2,}/g, patternStr: '[\\ufffd]{2,}', name: 'Unicode replacement characters' },
+      // eslint-disable-next-line no-control-regex
       { pattern: /[\x00-\x08\x0b\x0c\x0e-\x1f]{3,}/g, patternStr: '[\\x00-\\x1f]{3,}', name: 'Control characters' },
     ]
 
@@ -140,6 +142,7 @@ export class TextQualityAnalyzer {
       : 0
 
     // Garbage character ratio (non-printable, weird symbols)
+    // eslint-disable-next-line no-control-regex
     const garbageChars = (text.match(/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd�]/g) || []).length
     const garbageRatio = text.length > 0 ? garbageChars / text.length : 0
 
@@ -201,8 +204,9 @@ export class TextQualityAnalyzer {
     // Quality metrics
     const alphanumeric = (text.match(/[a-zA-Z0-9\u00C0-\u024F\u0400-\u04FF]/g) || []).length
     const whitespace = (text.match(/\s/g) || []).length
-    const punctuation = (text.match(/[.,;:!?'"()\[\]{}]/g) || []).length
+    const punctuation = (text.match(/[.,;:!?'"()[\]{}]/g) || []).length
     const special = (text.match(/[^a-zA-Z0-9\s\u00C0-\u024F]/g) || []).length
+    // eslint-disable-next-line no-control-regex
     const garbage = (text.match(/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/g) || []).length
 
     const total = text.length || 1
@@ -263,6 +267,7 @@ export class TextQualityAnalyzer {
     }
 
     // Check garbage ratio
+    // eslint-disable-next-line no-control-regex
     const garbage = (text.match(/[\x00-\x08\x0b\x0c\x0e-\x1f\ufffd]/g) || []).length
     const garbageRatio = garbage / Math.max(text.length, 1)
     if (garbageRatio > 0.05) {

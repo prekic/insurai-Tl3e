@@ -225,7 +225,7 @@ export class Normalizer {
     }
 
     let result = text
-    let totalMatches = 0
+    let _totalMatches = 0
 
     for (const pattern of slm.patterns) {
       try {
@@ -255,7 +255,7 @@ export class Normalizer {
 
         if (before !== result) {
           const matchCount = (before.match(regex) || []).length
-          totalMatches += matchCount
+          _totalMatches += matchCount
           this.recordRule(rules, `slm-${pattern.action}`, `Split-letter merge: ${pattern.action}`, before, result, matchCount)
         }
       } catch (e) {
@@ -316,7 +316,7 @@ export class Normalizer {
   // STAGE 5: NUMBER CANONICALIZATION
   // ============================================================================
 
-  private applyNumberCanonicalization(text: string, rules: Map<string, AppliedRule>): string {
+  private applyNumberCanonicalization(text: string, _rules: Map<string, AppliedRule>): string {
     const nc = this.localePack.normalization.numberCanonicalization
     if (!nc) {
       return text
@@ -404,7 +404,7 @@ export class Normalizer {
     }
 
     // Numbered items
-    if (/^\d+[.)\-]/.test(trimmed) || /^[a-z][.)\-]/i.test(trimmed)) {
+    if (/^\d+[.)-]/.test(trimmed) || /^[a-z][.)-]/i.test(trimmed)) {
       return 'list_item'
     }
 

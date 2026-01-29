@@ -6,11 +6,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  ProcessingLogger,
   createProcessingLogger,
   serializeProcessingLog,
   deserializeProcessingLog,
+  type ProcessingLogger,
 } from './processing-logger'
+
+// Type alias to satisfy eslint - ProcessingLogger is used for type checking
+type _Logger = ProcessingLogger
 
 describe('ProcessingLogger', () => {
   beforeEach(() => {

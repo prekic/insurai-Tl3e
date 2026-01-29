@@ -12,14 +12,7 @@
  * - Overridden at runtime
  */
 
-import type {
-  LocaleRulePack,
-  PolicyRulePack,
-  RulePack,
-  RulePackType,
-  SupportedLocale,
-  SupportedPolicyType,
-} from '@insurai/types'
+import type { LocaleRulePack, PolicyRulePack } from '@insurai/types'
 
 // ============================================================================
 // RULE PACK REGISTRY
@@ -84,7 +77,7 @@ export class RulePackRegistry {
     const seen = new Set<string>()
     const packs: LocaleRulePack[] = []
 
-    for (const [key, pack] of this.localePacks) {
+    for (const [_key, pack] of this.localePacks) {
       if (!seen.has(pack.id)) {
         seen.add(pack.id)
         packs.push(pack)
@@ -101,7 +94,7 @@ export class RulePackRegistry {
     const seen = new Set<string>()
     const packs: PolicyRulePack[] = []
 
-    for (const [key, pack] of this.policyPacks) {
+    for (const [_key, pack] of this.policyPacks) {
       if (!seen.has(pack.id)) {
         seen.add(pack.id)
         packs.push(pack)
@@ -435,4 +428,11 @@ export { propertyFireTRPack } from './packs/policies/property-fire-tr'
 export { daskTRPack } from './packs/policies/dask-tr'
 export { fallbackPolicyPack } from './packs/policies/fallback'
 
-export type { LocaleRulePack, PolicyRulePack, RulePack } from '@insurai/types'
+export type {
+  LocaleRulePack,
+  PolicyRulePack,
+  RulePack,
+  RulePackType,
+  SupportedLocale,
+  SupportedPolicyType,
+} from '@insurai/types'

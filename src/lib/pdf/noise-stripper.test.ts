@@ -95,6 +95,7 @@ Normal again
       const result = stripControlCharacters(text)
 
       expect(result).toBe('HelloWorldEnd')
+      // eslint-disable-next-line no-control-regex
       expect(result).not.toMatch(/[\x00-\x08\x0B\x0C\x0E-\x1F]/)
     })
 
@@ -103,6 +104,7 @@ Normal again
       const result = stripControlCharacters(text)
 
       expect(result).toBe('HelloWorld')
+       
       expect(result).not.toMatch(/[\x7F-\x9F]/)
     })
 
@@ -208,6 +210,7 @@ Extra spacing   between    words`
       expect(result.text).not.toContain('█▀▄')
 
       // Should remove control characters
+      // eslint-disable-next-line no-control-regex
       expect(result.text).not.toMatch(/[\x00-\x08]/)
 
       // Should normalize whitespace

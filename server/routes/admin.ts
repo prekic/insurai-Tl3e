@@ -114,7 +114,7 @@ const securityLogs: SecurityLog[] = []
 const auditLogs: AuditLog[] = []
 const blockedIPs: Map<string, { reason: string; blockedAt: string; expiresAt?: string }> = new Map()
 
-let requestCounters = {
+const requestCounters: { aiRequestId: number; policyOpId: number; securityLogId: number; auditLogId: number } = {
   aiRequestId: 0,
   policyOpId: 0,
   securityLogId: 0,
@@ -381,7 +381,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
         },
       },
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('[Admin Login] Unexpected error:', error)
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorStack = error instanceof Error ? error.stack : undefined
@@ -417,7 +417,7 @@ router.post('/auth/logout', authenticateAdmin, async (req: AuthenticatedRequest,
     })
 
     res.json({ success: true, message: 'Logged out successfully' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Logout error:', error)
     res.status(500).json({ success: false, error: 'Logout failed' })
   }
@@ -487,7 +487,7 @@ router.post('/auth/refresh', authLimiter, async (req: Request, res: Response) =>
         expiresIn: process.env.ADMIN_JWT_EXPIRES_IN || '30m',
       },
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Token refresh error:', error)
     res.status(500).json({ success: false, error: 'Token refresh failed' })
   }
@@ -526,7 +526,7 @@ router.get('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, r
     await logAdminAction(req, 'view', 'admin_users')
 
     res.json({ success: true, data: users })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to list admin users:', error)
     res.status(500).json({ success: false, error: 'Failed to list admin users' })
   }
@@ -581,7 +581,7 @@ router.post('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, 
       success: true,
       data: newUser,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to create admin user:', error)
     res.status(500).json({ success: false, error: 'Failed to create admin user' })
   }
@@ -614,7 +614,7 @@ router.put('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedReques
     await logAdminAction(req, 'update', 'admin_user', id, undefined, updates)
 
     res.json({ success: true, data: updated })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to update admin user:', error)
     res.status(500).json({ success: false, error: 'Failed to update admin user' })
   }
@@ -649,7 +649,7 @@ router.delete('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedReq
     await logAdminAction(req, 'delete', 'admin_user', id)
 
     res.json({ success: true, message: 'User deleted' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to delete admin user:', error)
     res.status(500).json({ success: false, error: 'Failed to delete admin user' })
   }
@@ -696,7 +696,7 @@ router.get('/health', async (_req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: health })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get health status' })
   }
 })
@@ -748,7 +748,7 @@ router.get('/metrics', authenticateAdmin, async (_req: AuthenticatedRequest, res
     }
 
     res.json({ success: true, data: metrics })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get metrics' })
   }
 })
@@ -786,7 +786,7 @@ router.get('/ai/requests', authenticateAdmin, (req: AuthenticatedRequest, res: R
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: aiRequests.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get AI requests' })
   }
 })
@@ -919,7 +919,7 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
     }
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get AI stats' })
   }
 })
@@ -954,7 +954,7 @@ router.get('/policies/operations', authenticateAdmin, (req: AuthenticatedRequest
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: policyOperations.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get policy operations' })
   }
 })
@@ -1004,7 +1004,7 @@ router.get('/policies/stats', authenticateAdmin, (req: AuthenticatedRequest, res
     stats.ocrUsageRate = stats.total > 0 ? ocrCount / stats.total : 0
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get policy stats' })
   }
 })
@@ -1039,7 +1039,7 @@ router.get('/security/logs', authenticateAdmin, (req: AuthenticatedRequest, res:
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: securityLogs.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get security logs' })
   }
 })
@@ -1142,7 +1142,7 @@ router.get('/audit/logs', authenticateAdmin, (req: AuthenticatedRequest, res: Re
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: auditLogs.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get audit logs' })
   }
 })
@@ -1317,7 +1317,7 @@ router.get('/prompts', authenticateAdmin, async (req: AuthenticatedRequest, res:
     }
 
     res.json({ success: true, data: templates })
-  } catch (error) {
+  } catch (_error) {
     console.error('[Admin] Error fetching prompts:', error)
     res.status(500).json({ success: false, error: 'Failed to fetch prompts' })
   }
@@ -1333,7 +1333,7 @@ router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
     }
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('[Admin] Error fetching prompt:', error)
     res.status(500).json({ success: false, error: 'Failed to fetch prompt' })
   }
@@ -1381,7 +1381,7 @@ router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'
     logAdminAction(req, 'update', 'prompt_template', id, previousTemplate, updatedTemplate)
 
     res.json({ success: true, data: updatedTemplate })
-  } catch (error) {
+  } catch (_error) {
     console.error('[Admin] Error updating prompt:', error)
     res.status(500).json({ success: false, error: 'Failed to update prompt' })
   }
@@ -1430,7 +1430,7 @@ router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), 
     logAdminAction(req, 'create', 'prompt_template', template.id, undefined, template)
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('[Admin] Error creating prompt:', error)
     res.status(500).json({ success: false, error: 'Failed to create prompt' })
   }
@@ -1559,7 +1559,7 @@ router.get('/budgets', authenticateAdmin, async (req: AuthenticatedRequest, res:
     await logAdminAction(req, 'view', 'budgets')
 
     res.json({ success: true, data: budgets })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to list budgets:', error)
     res.status(500).json({ success: false, error: 'Failed to list budgets' })
   }
@@ -1579,7 +1579,7 @@ router.get('/budgets/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
     }
 
     res.json({ success: true, data: budget })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get budget:', error)
     res.status(500).json({ success: false, error: 'Failed to get budget' })
   }
@@ -1622,7 +1622,7 @@ router.post('/budgets', ...requireSuperAdmin(), async (req: AuthenticatedRequest
     await logAdminAction(req, 'create', 'budget', budget?.id, undefined, { name, limitAmount })
 
     res.json({ success: true, data: budget })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to create budget:', error)
     res.status(500).json({ success: false, error: 'Failed to create budget' })
   }
@@ -1654,7 +1654,7 @@ router.put('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequ
     await logAdminAction(req, 'update', 'budget', id, existing, updates)
 
     res.json({ success: true, data: budget })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to update budget:', error)
     res.status(500).json({ success: false, error: 'Failed to update budget' })
   }
@@ -1685,7 +1685,7 @@ router.delete('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
     await logAdminAction(req, 'delete', 'budget', id)
 
     res.json({ success: true, message: 'Budget deactivated' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to delete budget:', error)
     res.status(500).json({ success: false, error: 'Failed to delete budget' })
   }
@@ -1710,7 +1710,7 @@ router.post('/budgets/:id/reset', ...requireSuperAdmin(), async (req: Authentica
     await logAdminAction(req, 'reset', 'budget', id)
 
     res.json({ success: true, message: 'Budget usage reset' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to reset budget:', error)
     res.status(500).json({ success: false, error: 'Failed to reset budget' })
   }
@@ -1730,7 +1730,7 @@ router.get('/cost/alerts', authenticateAdmin, async (req: AuthenticatedRequest, 
     const alerts = await costControl.getRecentAlerts(limit)
 
     res.json({ success: true, data: alerts })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get alerts:', error)
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
@@ -1755,7 +1755,7 @@ router.post('/cost/alerts/:id/acknowledge', authenticateAdmin, async (req: Authe
     await logAdminAction(req, 'acknowledge', 'cost_alert', id)
 
     res.json({ success: true, message: 'Alert acknowledged' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to acknowledge alert:', error)
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
@@ -1780,7 +1780,7 @@ router.get('/cost/usage', authenticateAdmin, async (req: AuthenticatedRequest, r
     const stats = await costControl.getUsageStats(start, end)
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get usage stats:', error)
     res.status(500).json({ success: false, error: 'Failed to get usage stats' })
   }
@@ -1850,7 +1850,7 @@ router.get('/cost/summary', authenticateAdmin, async (_req: AuthenticatedRequest
     }
 
     res.json({ success: true, data: summary })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get cost summary:', error)
     res.status(500).json({ success: false, error: 'Failed to get cost summary' })
   }
@@ -1890,7 +1890,7 @@ router.get('/prompts/templates', authenticateAdmin, async (req: AuthenticatedReq
     const templates = await promptVersioning.getTemplates(category)
 
     res.json({ success: true, data: templates })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to list templates:', error)
     res.status(500).json({ success: false, error: 'Failed to list templates' })
   }
@@ -1913,7 +1913,7 @@ router.get('/prompts/templates/:id', authenticateAdmin, async (req: Authenticate
     const versions = await promptVersioning.getVersions(req.params.id)
 
     res.json({ success: true, data: { ...template, versions } })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get template:', error)
     res.status(500).json({ success: false, error: 'Failed to get template' })
   }
@@ -1950,7 +1950,7 @@ router.post('/prompts/templates', ...requireSuperAdmin(), async (req: Authentica
     await logAdminAction(req, 'create', 'prompt_template', template.id, undefined, { name, category })
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to create template:', error)
     res.status(500).json({ success: false, error: 'Failed to create template' })
   }
@@ -1981,7 +1981,7 @@ router.put('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Authent
     await logAdminAction(req, 'update', 'prompt_template', id)
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to update template:', error)
     res.status(500).json({ success: false, error: 'Failed to update template' })
   }
@@ -2006,7 +2006,7 @@ router.delete('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Auth
     await logAdminAction(req, 'delete', 'prompt_template', id)
 
     res.json({ success: true, message: 'Template deleted' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to delete template:', error)
     res.status(500).json({ success: false, error: 'Failed to delete template' })
   }
@@ -2021,7 +2021,7 @@ router.get('/prompts/templates/:id/stats', authenticateAdmin, async (req: Authen
     const stats = await promptVersioning.getTemplateStats(req.params.id)
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get template stats:', error)
     res.status(500).json({ success: false, error: 'Failed to get template stats' })
   }
@@ -2040,7 +2040,7 @@ router.get('/prompts/templates/:templateId/versions', authenticateAdmin, async (
     const versions = await promptVersioning.getVersions(req.params.templateId)
 
     res.json({ success: true, data: versions })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get versions:', error)
     res.status(500).json({ success: false, error: 'Failed to get versions' })
   }
@@ -2060,7 +2060,7 @@ router.get('/prompts/versions/:id', authenticateAdmin, async (req: Authenticated
     }
 
     res.json({ success: true, data: version })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get version:', error)
     res.status(500).json({ success: false, error: 'Failed to get version' })
   }
@@ -2085,7 +2085,7 @@ router.post('/prompts/templates/:templateId/rollback/:versionId', ...requireSupe
     await logAdminAction(req, 'rollback', 'prompt_template', templateId, undefined, { versionId })
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to rollback:', error)
     res.status(500).json({ success: false, error: 'Failed to rollback' })
   }
@@ -2126,7 +2126,7 @@ router.get('/prompts/versions/compare', authenticateAdmin, async (req: Authentic
         },
       },
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to compare versions:', error)
     res.status(500).json({ success: false, error: 'Failed to compare versions' })
   }
@@ -2146,7 +2146,7 @@ router.get('/prompts/ab-tests', authenticateAdmin, async (req: AuthenticatedRequ
     const tests = await promptVersioning.getABTests(status)
 
     res.json({ success: true, data: tests })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to list A/B tests:', error)
     res.status(500).json({ success: false, error: 'Failed to list A/B tests' })
   }
@@ -2179,7 +2179,7 @@ router.get('/prompts/ab-tests/:id', authenticateAdmin, async (req: Authenticated
         treatmentVersions: treatmentVersions.filter(Boolean),
       },
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get A/B test:', error)
     res.status(500).json({ success: false, error: 'Failed to get A/B test' })
   }
@@ -2237,7 +2237,7 @@ router.post('/prompts/ab-tests', ...requireSuperAdmin(), async (req: Authenticat
     await logAdminAction(req, 'create', 'ab_test', test.id, undefined, { name, templateId })
 
     res.json({ success: true, data: test })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to create A/B test:', error)
     res.status(500).json({ success: false, error: 'Failed to create A/B test' })
   }
@@ -2271,7 +2271,7 @@ router.put('/prompts/ab-tests/:id/status', ...requireSuperAdmin(), async (req: A
     await logAdminAction(req, 'update_status', 'ab_test', id, undefined, { status })
 
     res.json({ success: true, data: test })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to update A/B test status:', error)
     res.status(500).json({ success: false, error: 'Failed to update A/B test status' })
   }
@@ -2291,7 +2291,7 @@ router.get('/prompts/ab-tests/:id/results', authenticateAdmin, async (req: Authe
     }
 
     res.json({ success: true, data: results })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get A/B test results:', error)
     res.status(500).json({ success: false, error: 'Failed to get A/B test results' })
   }
@@ -2342,7 +2342,7 @@ router.post('/prompts/ab-tests/:id/apply-winner', ...requireSuperAdmin(), async 
     await logAdminAction(req, 'apply_winner', 'ab_test', id, undefined, { winnerId: test.results.winner })
 
     res.json({ success: true, data: template })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to apply winner:', error)
     res.status(500).json({ success: false, error: 'Failed to apply winner' })
   }
@@ -2386,7 +2386,7 @@ router.post('/prompts/preview', authenticateAdmin, async (req: AuthenticatedRequ
     }
 
     res.json({ success: true, data: rendered })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to preview prompt:', error)
     res.status(500).json({ success: false, error: 'Failed to preview prompt' })
   }
@@ -2408,7 +2408,7 @@ router.post('/prompts/extract-variables', authenticateAdmin, (req: Authenticated
     const variables = promptVersioning.extractVariables(template)
 
     res.json({ success: true, data: { variables } })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to extract variables:', error)
     res.status(500).json({ success: false, error: 'Failed to extract variables' })
   }
@@ -2426,7 +2426,7 @@ router.get('/monitoring/metrics', authenticateAdmin, (_req: AuthenticatedRequest
   try {
     const metrics = monitoring.getSystemMetrics()
     res.json({ success: true, data: metrics })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get metrics:', error)
     res.status(500).json({ success: false, error: 'Failed to get metrics' })
   }
@@ -2440,7 +2440,7 @@ router.get('/monitoring/health', async (_req: Request, res: Response) => {
   try {
     const health = await monitoring.runHealthChecks()
     res.json({ success: true, data: health })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to run health checks:', error)
     res.status(500).json({ success: false, error: 'Failed to run health checks' })
   }
@@ -2454,7 +2454,7 @@ router.get('/monitoring/dashboard', authenticateAdmin, async (_req: Authenticate
   try {
     const summary = await monitoring.getDashboardSummary()
     res.json({ success: true, data: summary })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get dashboard summary:', error)
     res.status(500).json({ success: false, error: 'Failed to get dashboard summary' })
   }
@@ -2468,7 +2468,7 @@ router.get('/monitoring/endpoints', authenticateAdmin, (_req: AuthenticatedReque
   try {
     const stats = monitoring.getEndpointStats()
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get endpoint stats:', error)
     res.status(500).json({ success: false, error: 'Failed to get endpoint stats' })
   }
@@ -2484,7 +2484,7 @@ router.get('/monitoring/trends', authenticateAdmin, (req: AuthenticatedRequest, 
     const intervalMinutes = parseInt(req.query.interval as string) || 5
     const trends = monitoring.getTrends(periodMinutes, intervalMinutes)
     res.json({ success: true, data: trends })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get trends:', error)
     res.status(500).json({ success: false, error: 'Failed to get trends' })
   }
@@ -2499,7 +2499,7 @@ router.get('/monitoring/activity', authenticateAdmin, (req: AuthenticatedRequest
     const limit = parseInt(req.query.limit as string) || 50
     const activity = monitoring.getRecentActivity(limit)
     res.json({ success: true, data: activity })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get recent activity:', error)
     res.status(500).json({ success: false, error: 'Failed to get recent activity' })
   }
@@ -2517,7 +2517,7 @@ router.get('/monitoring/alert-rules', authenticateAdmin, (_req: AuthenticatedReq
   try {
     const rules = monitoring.getAlertRules()
     res.json({ success: true, data: rules })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get alert rules:', error)
     res.status(500).json({ success: false, error: 'Failed to get alert rules' })
   }
@@ -2537,7 +2537,7 @@ router.get('/monitoring/alert-rules/:id', authenticateAdmin, (req: Authenticated
     }
 
     res.json({ success: true, data: rule })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get alert rule:', error)
     res.status(500).json({ success: false, error: 'Failed to get alert rule' })
   }
@@ -2575,7 +2575,7 @@ router.post('/monitoring/alert-rules', ...requireSuperAdmin(), async (req: Authe
     await logAdminAction(req, 'create', 'alert_rule', rule.id, undefined, { name, metric })
 
     res.json({ success: true, data: rule })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to create alert rule:', error)
     res.status(500).json({ success: false, error: 'Failed to create alert rule' })
   }
@@ -2601,7 +2601,7 @@ router.put('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req: Au
     await logAdminAction(req, 'update', 'alert_rule', id, undefined, updates)
 
     res.json({ success: true, data: rule })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to update alert rule:', error)
     res.status(500).json({ success: false, error: 'Failed to update alert rule' })
   }
@@ -2626,7 +2626,7 @@ router.delete('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req:
     await logAdminAction(req, 'delete', 'alert_rule', id)
 
     res.json({ success: true, message: 'Alert rule deleted' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to delete alert rule:', error)
     res.status(500).json({ success: false, error: 'Failed to delete alert rule' })
   }
@@ -2644,7 +2644,7 @@ router.get('/monitoring/alerts', authenticateAdmin, (_req: AuthenticatedRequest,
   try {
     const alerts = monitoring.getActiveAlerts()
     res.json({ success: true, data: alerts })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get alerts:', error)
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
@@ -2659,7 +2659,7 @@ router.get('/monitoring/alerts/history', authenticateAdmin, (req: AuthenticatedR
     const limit = parseInt(req.query.limit as string) || 100
     const history = monitoring.getAlertHistory(limit)
     res.json({ success: true, data: history })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get alert history:', error)
     res.status(500).json({ success: false, error: 'Failed to get alert history' })
   }
@@ -2684,7 +2684,7 @@ router.post('/monitoring/alerts/:id/acknowledge', authenticateAdmin, async (req:
     await logAdminAction(req, 'acknowledge', 'monitoring_alert', id)
 
     res.json({ success: true, data: alert })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to acknowledge alert:', error)
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
@@ -2709,7 +2709,7 @@ router.post('/monitoring/alerts/:id/resolve', authenticateAdmin, async (req: Aut
     await logAdminAction(req, 'resolve', 'monitoring_alert', id)
 
     res.json({ success: true, data: alert })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to resolve alert:', error)
     res.status(500).json({ success: false, error: 'Failed to resolve alert' })
   }
@@ -2758,7 +2758,7 @@ router.get('/processing-logs', authenticateAdmin, async (req: AuthenticatedReque
       limit: filters.limit,
       offset: filters.offset,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to list processing logs:', error)
     res.status(500).json({ success: false, error: 'Failed to list processing logs' })
   }
@@ -2777,7 +2777,7 @@ router.get('/processing-logs/stats', authenticateAdmin, async (req: Authenticate
       success: true,
       data: stats,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get processing stats:', error)
     res.status(500).json({ success: false, error: 'Failed to get processing stats' })
   }
@@ -2801,7 +2801,7 @@ router.get('/processing-logs/:documentId', authenticateAdmin, async (req: Authen
       success: true,
       data: log,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get processing log:', error)
     res.status(500).json({ success: false, error: 'Failed to get processing log' })
   }
@@ -2825,7 +2825,7 @@ router.get('/processing-logs/by-policy/:policyId', authenticateAdmin, async (req
       success: true,
       data: log,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get processing log by policy:', error)
     res.status(500).json({ success: false, error: 'Failed to get processing log' })
   }
@@ -2848,7 +2848,7 @@ router.post('/processing-logs/cleanup', authenticateAdmin, requireSuperAdmin, as
       message: `Deleted ${deletedCount} logs older than ${daysOld} days`,
       deletedCount,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to cleanup processing logs:', error)
     res.status(500).json({ success: false, error: 'Failed to cleanup processing logs' })
   }
@@ -2872,7 +2872,7 @@ router.get('/notifications/unacknowledged', authenticateAdmin, async (_req: Auth
       data: notifications,
       count: notifications.length,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get unacknowledged notifications:', error)
     res.status(500).json({ success: false, error: 'Failed to get notifications' })
   }
@@ -2896,7 +2896,7 @@ router.get('/notifications', authenticateAdmin, async (req: AuthenticatedRequest
       limit,
       offset,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to get notifications:', error)
     res.status(500).json({ success: false, error: 'Failed to get notifications' })
   }
@@ -2922,7 +2922,7 @@ router.post('/notifications/:id/acknowledge', authenticateAdmin, async (req: Aut
     await logAdminAction(req, 'acknowledge', 'notification', id)
 
     res.json({ success: true, message: 'Notification acknowledged' })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to acknowledge notification:', error)
     res.status(500).json({ success: false, error: 'Failed to acknowledge notification' })
   }
@@ -2953,7 +2953,7 @@ router.post('/notifications/acknowledge-all', authenticateAdmin, async (req: Aut
       message: `Acknowledged ${acknowledgedCount} notifications`,
       acknowledgedCount,
     })
-  } catch (error) {
+  } catch (_error) {
     console.error('Failed to acknowledge all notifications:', error)
     res.status(500).json({ success: false, error: 'Failed to acknowledge notifications' })
   }

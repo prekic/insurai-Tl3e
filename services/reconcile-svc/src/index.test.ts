@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { Reconciler, type ReconcileOptions } from './index'
+import { Reconciler } from './index'
 
 // Helper to create mock OCR tokens
 function createToken(

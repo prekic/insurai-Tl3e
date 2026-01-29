@@ -8,7 +8,6 @@ import {
   normalizeDocument,
   getCleanCopy,
   getRedactedCopy,
-  type PIICategory,
 } from './document-normalizer'
 
 describe('DocumentNormalizer', () => {
