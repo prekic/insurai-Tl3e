@@ -9,7 +9,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest'
-import { Normalizer, type NormalizeOptions } from './index'
+import { Normalizer } from './index'
 
 // Mock locale rule pack for Turkish (matches LocaleRulePack type)
 const turkishLocalePack = {

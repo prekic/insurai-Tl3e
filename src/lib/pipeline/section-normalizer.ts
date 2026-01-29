@@ -141,7 +141,8 @@ const PAGE_BREAK_PATTERNS = [
  * OCR artifact patterns to clean
  */
 const GARBAGE_PATTERNS = [
-  // Binary data
+  // Binary data - intentionally matching control characters
+  // eslint-disable-next-line no-control-regex
   /[\x00-\x08\x0B\x0C\x0E-\x1F]/g,
   // Long sequences of special characters
   /[^\S\n]{20,}/g,
@@ -363,7 +364,7 @@ function detectWarnings(
 
   // Check for garbled text (high ratio of special characters)
   const specialCharRatio =
-    (normalizedText.match(/[^\w\s.,;:'"()\-\/\\çğıöşüÇĞİÖŞÜ]/g)?.length || 0) /
+    (normalizedText.match(/[^\w\s.,;:'"()\-/\\çğıöşüÇĞİÖŞÜ]/g)?.length || 0) /
     normalizedText.length
   if (specialCharRatio > 0.1) {
     warnings.push({

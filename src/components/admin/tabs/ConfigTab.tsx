@@ -4,7 +4,7 @@
  */
 
 import { adminFetch } from '@/lib/admin/api'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -47,13 +47,12 @@ export function ConfigTab() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const fetchData = async () => {
+  // Wrap fetchData in useCallback to satisfy exhaustive-deps rule
+  // Note: Uses local variable to track errors within the function scope
+  const fetchData = useCallback(async () => {
     setIsLoading(true)
     setError(null)
+    let hasError = false
     try {
       const [configsRes, flagsRes] = await Promise.all([
         adminFetch('/api/admin/config'),
@@ -67,19 +66,24 @@ export function ConfigTab() {
         setConfigs(configsData.data)
       } else {
         setError(configsData.error || 'Failed to fetch configuration')
+        hasError = true
       }
       if (flagsData.success) {
         setFeatureFlags(flagsData.data)
-      } else if (!error) {
+      } else if (!hasError) {
         setError(flagsData.error || 'Failed to fetch feature flags')
       }
-    } catch (error) {
-      console.error('Failed to fetch config:', error)
-      setError(error instanceof Error ? error.message : 'Failed to fetch configuration')
+    } catch (err) {
+      console.error('Failed to fetch config:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch configuration')
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
 
   const saveConfig = async (id: string, value: unknown) => {
     try {

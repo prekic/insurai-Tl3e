@@ -112,10 +112,10 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
   try {
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
-      console.log('[OpenAI Extract] Using proxy, calling extractViaProxy...')
+      console.warn('[OpenAI Extract] Using proxy, calling extractViaProxy...')
       const proxyResult = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT)
 
-      console.log('[OpenAI Extract] Proxy response received:', {
+      console.warn('[OpenAI Extract] Proxy response received:', {
         success: proxyResult.success,
         hasData: !!proxyResult.data,
         error: proxyResult.error,
@@ -133,7 +133,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
 
       result = proxyResult.data as unknown as ExtractedPolicyData
 
-      console.log('[OpenAI Extract] Parsed result:', {
+      console.warn('[OpenAI Extract] Parsed result:', {
         hasConfidence: !!result.confidence,
         confidenceOverall: result.confidence?.overall,
         hasCoverages: !!result.coverages,
@@ -148,7 +148,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       // Ensure required fields exist (server may not enforce schema)
       // Add defaults for any missing required fields
       if (!result.confidence) {
-        console.log('[OpenAI Extract] Adding default confidence scores')
+        console.warn('[OpenAI Extract] Adding default confidence scores')
         result.confidence = {
           overall: 0.7,
           policyNumber: 0.7,
@@ -159,7 +159,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
         }
       }
       if (!result.coverages || !Array.isArray(result.coverages)) {
-        console.log('[OpenAI Extract] Adding default coverages array')
+        console.warn('[OpenAI Extract] Adding default coverages array')
         result.coverages = []
       }
       if (!result.specialConditions || !Array.isArray(result.specialConditions)) {
@@ -169,7 +169,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
         result.exclusions = []
       }
       if (!result.amendmentInfo) {
-        console.log('[OpenAI Extract] Adding default amendmentInfo')
+        console.warn('[OpenAI Extract] Adding default amendmentInfo')
         result.amendmentInfo = {
           isAmendment: false,
           amendmentNumber: null,
@@ -180,7 +180,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
         }
       }
 
-      console.log('[OpenAI Extract] After applying defaults - returning result')
+      console.warn('[OpenAI Extract] After applying defaults - returning result')
 
       // Estimate output tokens from response
       actualOutputTokens = estimateTokens(JSON.stringify(result))
@@ -223,7 +223,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       // Ensure required fields exist (direct API may also have missing fields)
       // This matches the proxy path defaults for consistency
       if (!result.confidence) {
-        console.log('[OpenAI Extract] Direct API: Adding default confidence scores')
+        console.warn('[OpenAI Extract] Direct API: Adding default confidence scores')
         result.confidence = {
           overall: 0.7,
           policyNumber: 0.7,
@@ -282,7 +282,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     await aiCache.setExtraction(truncatedText, 'openai', result)
 
     // Log successful extraction with cost info
-    console.log('[OpenAI Extract] Extraction complete, logging audit...')
+    console.warn('[OpenAI Extract] Extraction complete, logging audit...')
     await timedAudit.complete({
       provider: 'openai',
       confidence: result.confidence?.overall ?? 0.7,

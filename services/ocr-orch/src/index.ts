@@ -748,14 +748,14 @@ class TesseractAdapter implements OCRAdapter {
   private async initWorker(): Promise<Worker> {
     // Initialize worker with Turkish, English, and German support
     const langString = config.tesseract.languages.join('+')
-    console.log(`[Tesseract] Initializing worker with languages: ${langString}`)
+    console.warn(`[Tesseract] Initializing worker with languages: ${langString}`)
 
     const worker = await createWorker(langString, 1, {
       logger: (m: { status: string; progress: number }) => {
         if (m.status === 'recognizing text') {
           // Only log progress at 25% intervals
           if (Math.floor(m.progress * 4) !== Math.floor((m.progress - 0.01) * 4)) {
-            console.log(`[Tesseract] Progress: ${Math.round(m.progress * 100)}%`)
+            console.warn(`[Tesseract] Progress: ${Math.round(m.progress * 100)}%`)
           }
         }
       },
@@ -769,7 +769,7 @@ class TesseractAdapter implements OCRAdapter {
     })
 
     this.worker = worker
-    console.log('[Tesseract] Worker initialized successfully')
+    console.warn('[Tesseract] Worker initialized successfully')
     return worker
   }
 
@@ -846,12 +846,13 @@ class TesseractAdapter implements OCRAdapter {
       await this.worker.terminate()
       this.worker = null
       this.initPromise = null
-      console.log('[Tesseract] Worker terminated')
+      console.warn('[Tesseract] Worker terminated')
     }
   }
 }
 
 // Tesseract.js type declarations (subset)
+// eslint-disable-next-line @typescript-eslint/no-namespace
 declare namespace Tesseract {
   interface Page {
     confidence: number
@@ -950,7 +951,7 @@ export class OCROrchestrator {
     for (const adapter of adapters) {
       if (adapter.isAvailable()) {
         this.adapters.set(adapter.name, adapter)
-        console.log(`[OCR] Registered adapter: ${adapter.name}`)
+        console.warn(`[OCR] Registered adapter: ${adapter.name}`)
       }
     }
 
@@ -1175,7 +1176,7 @@ export class OCROrchestrator {
       } catch (error) {
         lastError = error as Error
         const delay = Math.pow(2, attempt) * 1000 // Exponential backoff
-        console.log(`[OCR] Retry ${attempt + 1}/${maxRetries} for ${adapter.name} in ${delay}ms`)
+        console.warn(`[OCR] Retry ${attempt + 1}/${maxRetries} for ${adapter.name} in ${delay}ms`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
@@ -1393,8 +1394,8 @@ app.get('/health/:engine', (req, res) => {
 const PORT = process.env.PORT || 4006
 
 app.listen(PORT, () => {
-  console.log(`[OCR Orchestrator] Listening on port ${PORT}`)
-  console.log(`[OCR Orchestrator] Available engines: ${orchestrator.getAvailableEngines().join(', ')}`)
+  console.warn(`[OCR Orchestrator] Listening on port ${PORT}`)
+  console.warn(`[OCR Orchestrator] Available engines: ${orchestrator.getAvailableEngines().join(', ')}`)
 })
 
 export {

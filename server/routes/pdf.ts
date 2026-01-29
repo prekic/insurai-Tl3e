@@ -93,6 +93,7 @@ const TURKISH_INSURANCE_TERMS = [
 const BARCODE_PATTERNS = [
   /\^{3,}/g,
   /[!@#$%^&*]{4,}/g,
+  // eslint-disable-next-line no-control-regex
   /[\x00-\x1F\x7F-\x9F]{2,}/g,
   /(.)\1{5,}/g,
   /[B♠♣♦♥█▀▄░▒▓]{3,}/gi,
@@ -125,6 +126,7 @@ function analyzeTextQuality(text: string): TextQualityMetrics {
   }
 
   // Calculate control character ratio
+  // eslint-disable-next-line no-control-regex
   const controlChars = text.match(/[\x00-\x1F\x7F-\x9F]/g) || []
   const controlCharRatio = controlChars.length / text.length
 
@@ -237,7 +239,7 @@ function stripBarcodeNoise(text: string): NoiseStrippingResult {
       continue
     }
 
-    if (/^[!@#$%^&*()_+=\[\]{}|\\:;"'<>,.?\/~`\s]+$/.test(trimmedLine)) {
+    if (/^[!@#$%^&*()_+=[\]{}|\\:;"'<>,.?/~`\s]+$/.test(trimmedLine)) {
       noiseTypes.add('special-chars-only')
       continue
     }
@@ -253,6 +255,7 @@ function stripBarcodeNoise(text: string): NoiseStrippingResult {
     }
 
     let cleanedLine = trimmedLine
+    // eslint-disable-next-line no-control-regex
     cleanedLine = cleanedLine.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
     cleanedLine = cleanedLine.replace(/\^+/g, '')
     cleanedLine = cleanedLine.replace(/\s{3,}/g, '  ')
@@ -299,6 +302,7 @@ function fixGlyphSplitTurkish(text: string): string {
 function cleanExtractedText(text: string): NoiseStrippingResult {
   const barcodeResult = stripBarcodeNoise(text)
   let cleanedText = barcodeResult.text
+    // eslint-disable-next-line no-control-regex
     .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
     .replace(/[\x7F-\x9F]/g, '')
 

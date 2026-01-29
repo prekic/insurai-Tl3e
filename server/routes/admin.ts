@@ -114,7 +114,7 @@ const securityLogs: SecurityLog[] = []
 const auditLogs: AuditLog[] = []
 const blockedIPs: Map<string, { reason: string; blockedAt: string; expiresAt?: string }> = new Map()
 
-let requestCounters = {
+const requestCounters: { aiRequestId: number; policyOpId: number; securityLogId: number; auditLogId: number } = {
   aiRequestId: 0,
   policyOpId: 0,
   securityLogId: 0,

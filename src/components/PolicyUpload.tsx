@@ -100,6 +100,8 @@ export function PolicyUpload() {
   const { health, checkHealth, runDiagnostics } = useBackendHealth()
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
   const filesReceivedRef = useRef(false)
+  // Ref to hold the latest addFiles function to avoid stale closures in useEffect
+  const addFilesRef = useRef<(files: File[]) => Promise<void>>()
 
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
@@ -148,7 +150,8 @@ export function PolicyUpload() {
       const handleFilesSelected = (e: CustomEvent<File[]>) => {
         const selectedFiles = e.detail
         if (selectedFiles && selectedFiles.length > 0) {
-          addFiles(selectedFiles)
+          // Use ref to call the latest version of addFiles
+          addFilesRef.current?.(selectedFiles)
         }
         // Clean up session storage
         sessionStorage.removeItem('pendingUploadFiles')
@@ -246,6 +249,10 @@ export function PolicyUpload() {
     }
   }
 
+  // Keep the ref updated with the latest addFiles function
+  // This allows useEffect to always call the current version without re-running
+  addFilesRef.current = addFiles
+
   const processFileAsync = async (fileId: string, file: File) => {
     // Create processing logger for tracking the document journey
     const logger = createProcessingLogger({
@@ -264,16 +271,16 @@ export function PolicyUpload() {
       try {
         if (!createPromise) {
           // First call - create a promise for the create operation
-          console.log('[ProcessingLog] Creating new log for document:', log.document_id)
+          console.warn('[ProcessingLog] Creating new log for document:', log.document_id)
           createPromise = (async () => {
             const result = await createProcessingLog(log)
-            console.log('[ProcessingLog] Create result:', result ? 'success' : 'failed')
+            console.warn('[ProcessingLog] Create result:', result ? 'success' : 'failed')
             return !!result
           })()
           await createPromise
         } else {
           // Wait for create to finish, then update
-          console.log('[ProcessingLog] Updating log for document:', log.document_id, 'stages:', log.stages.length)
+          console.warn('[ProcessingLog] Updating log for document:', log.document_id, 'stages:', log.stages.length)
           await createPromise
           await updateProcessingLog(log.document_id, log)
         }

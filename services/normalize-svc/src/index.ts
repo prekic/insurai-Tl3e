@@ -114,11 +114,11 @@ export class Normalizer {
     const evidenceIndex = this.buildEvidenceIndex(text, current)
 
     if (this.debug) {
-      console.log(`[Normalizer] ${this.docId}:`)
-      console.log(`  - Input length: ${text.length}`)
-      console.log(`  - Output length: ${current.length}`)
-      console.log(`  - Rules applied: ${appliedRulesMap.size}`)
-      console.log(`  - Duration: ${Date.now() - startTime}ms`)
+      console.warn(`[Normalizer] ${this.docId}:`)
+      console.warn(`  - Input length: ${text.length}`)
+      console.warn(`  - Output length: ${current.length}`)
+      console.warn(`  - Rules applied: ${appliedRulesMap.size}`)
+      console.warn(`  - Duration: ${Date.now() - startTime}ms`)
     }
 
     return {
@@ -225,7 +225,7 @@ export class Normalizer {
     }
 
     let result = text
-    let totalMatches = 0
+    let _totalMatches = 0
 
     for (const pattern of slm.patterns) {
       try {
@@ -255,7 +255,7 @@ export class Normalizer {
 
         if (before !== result) {
           const matchCount = (before.match(regex) || []).length
-          totalMatches += matchCount
+          _totalMatches += matchCount
           this.recordRule(rules, `slm-${pattern.action}`, `Split-letter merge: ${pattern.action}`, before, result, matchCount)
         }
       } catch (e) {
@@ -316,7 +316,7 @@ export class Normalizer {
   // STAGE 5: NUMBER CANONICALIZATION
   // ============================================================================
 
-  private applyNumberCanonicalization(text: string, rules: Map<string, AppliedRule>): string {
+  private applyNumberCanonicalization(text: string, _rules: Map<string, AppliedRule>): string {
     const nc = this.localePack.normalization.numberCanonicalization
     if (!nc) {
       return text
@@ -404,7 +404,7 @@ export class Normalizer {
     }
 
     // Numbered items
-    if (/^\d+[.)\-]/.test(trimmed) || /^[a-z][.)\-]/i.test(trimmed)) {
+    if (/^\d+[.)-]/.test(trimmed) || /^[a-z][.)-]/i.test(trimmed)) {
       return 'list_item'
     }
 

@@ -3,9 +3,13 @@
  *
  * Provides tiered rate limiting for different API endpoints.
  * AI endpoints have stricter limits due to cost and resource usage.
+ *
+ * Security: Uses req.ip (set by Express trust proxy) and hashed auth tokens.
+ * Does NOT trust user-supplied headers like x-forwarded-for or x-user-id.
  */
 
 import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit'
+import crypto from 'crypto'
 import type { Request, Response } from 'express'
 
 // Rate limit configuration from environment or defaults
@@ -38,20 +42,56 @@ const config = {
 }
 
 /**
- * Custom key generator that uses IP + optional user ID
- * This allows per-user rate limiting when authenticated
+ * Extract a secure user identifier from the Authorization header.
+ *
+ * Uses a truncated hash of the Bearer token to identify unique sessions.
+ * This ensures:
+ * - Same token always maps to the same rate limit bucket
+ * - Different tokens get different buckets (even if forged)
+ * - Token content is not exposed in logs or rate limit keys
+ *
+ * @param authHeader - The Authorization header value
+ * @returns A short hash of the token, or empty string if no valid token
+ */
+function extractSecureUserId(authHeader: string | undefined): string {
+  if (!authHeader) return ''
+
+  // Extract Bearer token
+  const parts = authHeader.split(' ')
+  if (parts.length !== 2 || parts[0] !== 'Bearer') return ''
+
+  const token = parts[1]
+  if (!token || token.length < 10) return ''
+
+  // Create a short hash of the token for rate limiting purposes
+  // Using first 16 chars of SHA-256 hash (64 bits) - sufficient for rate limit keys
+  const hash = crypto.createHash('sha256').update(token).digest('hex').substring(0, 16)
+  return `user:${hash}`
+}
+
+/**
+ * Custom key generator that uses IP + optional authenticated user hash
+ *
+ * Security considerations:
+ * - Uses req.ip which respects Express "trust proxy" setting
+ * - Does NOT trust x-forwarded-for directly (Express handles this)
+ * - Does NOT trust x-user-id header (was vulnerable to spoofing)
+ * - Uses hashed auth token for per-user rate limiting
+ *
+ * @param req - Express request object
+ * @returns Rate limit key combining IP and optional user hash
  */
 function keyGenerator(req: Request): string {
-  // Get IP address (handle proxies)
-  const ip =
-    (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-    req.ip ||
-    req.socket.remoteAddress ||
-    'unknown'
+  // Use req.ip - Express sets this correctly based on "trust proxy" setting
+  // Falls back to socket address if req.ip is not set
+  const ip = req.ip || req.socket.remoteAddress || 'unknown'
 
-  // If authenticated, include user ID for per-user limits
-  const userId = (req.headers['x-user-id'] as string) || ''
+  // Extract user identifier from Authorization header (secure)
+  const userId = extractSecureUserId(req.headers.authorization)
 
+  // Combine IP and user ID for rate limit key
+  // If authenticated: "192.168.1.1:user:abc123def456"
+  // If not authenticated: "192.168.1.1"
   return userId ? `${ip}:${userId}` : ip
 }
 

@@ -189,14 +189,14 @@ export class ImagePreprocessor {
    * Converts image to grayscale and applies threshold for OCR optimization
    */
   private async binarize(imageBuffer: Buffer, stats: ImageStats): Promise<Buffer> {
-    console.log(`[Preprocess] Binarizing (brightness: ${stats.meanBrightness.toFixed(2)})`)
+    console.warn(`[Preprocess] Binarizing (brightness: ${stats.meanBrightness.toFixed(2)})`)
 
     try {
       // Calculate adaptive threshold based on image brightness
       // Lower threshold for darker images, higher for brighter
       const threshold = Math.round(255 * (stats.meanBrightness < 0.5 ? 0.4 : 0.5))
 
-      console.log(`[Preprocess] Using threshold: ${threshold}`)
+      console.warn(`[Preprocess] Using threshold: ${threshold}`)
 
       const binarized = await sharp(imageBuffer)
         .grayscale()
@@ -204,7 +204,7 @@ export class ImagePreprocessor {
         .png()
         .toBuffer()
 
-      console.log(`[Preprocess] Binarized: ${binarized.length} bytes`)
+      console.warn(`[Preprocess] Binarized: ${binarized.length} bytes`)
       return binarized
     } catch (error) {
       console.error(`[Preprocess] Binarization failed: ${(error as Error).message}`)
@@ -216,10 +216,10 @@ export class ImagePreprocessor {
    * Deskewing by rotating image to correct detected skew
    */
   private async deskew(imageBuffer: Buffer, stats: ImageStats): Promise<Buffer> {
-    console.log(`[Preprocess] Deskewing (detected angle: ${stats.skewAngle.toFixed(2)}°)`)
+    console.warn(`[Preprocess] Deskewing (detected angle: ${stats.skewAngle.toFixed(2)}°)`)
 
     if (Math.abs(stats.skewAngle) < 0.5) {
-      console.log(`[Preprocess] Skew angle too small, skipping deskew`)
+      console.warn(`[Preprocess] Skew angle too small, skipping deskew`)
       return imageBuffer
     }
 
@@ -235,7 +235,7 @@ export class ImagePreprocessor {
         .png()
         .toBuffer()
 
-      console.log(`[Preprocess] Deskewed by ${correctionAngle.toFixed(2)}°: ${deskewed.length} bytes`)
+      console.warn(`[Preprocess] Deskewed by ${correctionAngle.toFixed(2)}°: ${deskewed.length} bytes`)
       return deskewed
     } catch (error) {
       console.error(`[Preprocess] Deskew failed: ${(error as Error).message}`)
@@ -247,7 +247,7 @@ export class ImagePreprocessor {
    * Contrast enhancement using normalization and gamma correction
    */
   private async enhance(imageBuffer: Buffer, stats: ImageStats): Promise<Buffer> {
-    console.log(`[Preprocess] Enhancing contrast (current: ${stats.contrast.toFixed(2)})`)
+    console.warn(`[Preprocess] Enhancing contrast (current: ${stats.contrast.toFixed(2)})`)
 
     try {
       // Determine enhancement strength based on current contrast
@@ -270,7 +270,7 @@ export class ImagePreprocessor {
 
       const enhanced = await pipeline.png().toBuffer()
 
-      console.log(`[Preprocess] Enhanced (gamma: ${gamma}, sharpen: ${sharpenSigma}): ${enhanced.length} bytes`)
+      console.warn(`[Preprocess] Enhanced (gamma: ${gamma}, sharpen: ${sharpenSigma}): ${enhanced.length} bytes`)
       return enhanced
     } catch (error) {
       console.error(`[Preprocess] Enhancement failed: ${(error as Error).message}`)
@@ -282,10 +282,10 @@ export class ImagePreprocessor {
    * Denoising using median blur and light sharpening
    */
   private async denoise(imageBuffer: Buffer, stats: ImageStats): Promise<Buffer> {
-    console.log(`[Preprocess] Denoising (noise level: ${stats.noiseLevel.toFixed(2)})`)
+    console.warn(`[Preprocess] Denoising (noise level: ${stats.noiseLevel.toFixed(2)})`)
 
     if (stats.noiseLevel < 0.1) {
-      console.log(`[Preprocess] Low noise, applying light cleanup only`)
+      console.warn(`[Preprocess] Low noise, applying light cleanup only`)
     }
 
     try {
@@ -300,7 +300,7 @@ export class ImagePreprocessor {
         .png()
         .toBuffer()
 
-      console.log(`[Preprocess] Denoised (blur: ${blurSigma}): ${denoised.length} bytes`)
+      console.warn(`[Preprocess] Denoised (blur: ${blurSigma}): ${denoised.length} bytes`)
       return denoised
     } catch (error) {
       console.error(`[Preprocess] Denoise failed: ${(error as Error).message}`)
@@ -345,7 +345,7 @@ export class ImagePreprocessor {
         skewAngle,
       }
 
-      console.log(`[Preprocess] Image stats: ${JSON.stringify(stats)}`)
+      console.warn(`[Preprocess] Image stats: ${JSON.stringify(stats)}`)
       return stats
     } catch (error) {
       console.error(`[Preprocess] Analysis failed: ${(error as Error).message}`)
@@ -479,6 +479,7 @@ app.post('/analyze', async (req, res) => {
       { headers: { Authorization: `Basic ${Buffer.from(`${config.storage.accessKey}:${config.storage.secretKey}`).toString('base64')}` } }
     ).then(r => r.arrayBuffer()).then(Buffer.from)
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- analyzeImage not in public type
     const stats = await (preprocessor as any).analyzeImage(imageBuffer)
     const optimalVariants = preprocessor.selectOptimalVariants(stats)
 
@@ -495,8 +496,8 @@ app.post('/analyze', async (req, res) => {
 const PORT = process.env.PORT || 4004
 
 app.listen(PORT, () => {
-  console.log(`[Preprocess Service] Listening on port ${PORT}`)
-  console.log(`[Preprocess Service] Available variants: ${config.processing.variants.join(', ')}`)
+  console.warn(`[Preprocess Service] Listening on port ${PORT}`)
+  console.warn(`[Preprocess Service] Available variants: ${config.processing.variants.join(', ')}`)
 })
 
 export { ImagePreprocessor }

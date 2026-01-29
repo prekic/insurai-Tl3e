@@ -42,6 +42,7 @@ const TURKISH_INSURANCE_TERMS = [
 ]
 
 // Patterns indicating barcode/QR noise
+/* eslint-disable no-control-regex */
 const BARCODE_PATTERNS = [
   /\^{3,}/g,                    // ^^^ sequences
   /[!@#$%^&*]{4,}/g,           // Repeated special chars
@@ -49,6 +50,7 @@ const BARCODE_PATTERNS = [
   /(.)\1{5,}/g,                 // Same char repeated 6+ times (but not spaces/newlines)
   /[B♠♣♦♥█▀▄░▒▓]{3,}/gi,       // Card suits and block chars (common barcode artifacts)
 ]
+/* eslint-enable no-control-regex */
 
 /**
  * Analyze text quality to detect extraction issues
@@ -80,6 +82,7 @@ export function analyzeTextQuality(text: string): TextQualityMetrics {
   }
 
   // Calculate control character ratio
+  // eslint-disable-next-line no-control-regex
   const controlChars = text.match(/[\x00-\x1F\x7F-\x9F]/g) || []
   const controlCharRatio = controlChars.length / text.length
 

@@ -694,7 +694,7 @@ export interface KnowledgeUpdate {
 export async function recordLearningFeedback(feedback: LearningFeedback): Promise<void> {
   // Store feedback for analysis and model improvement
   // This would be sent to a learning pipeline in production
-  console.log('Learning feedback recorded:', feedback)
+  console.warn('Learning feedback recorded:', feedback)
 }
 
 /**
@@ -703,7 +703,7 @@ export async function recordLearningFeedback(feedback: LearningFeedback): Promis
  */
 export async function updateKnowledgeBase(update: KnowledgeUpdate): Promise<void> {
   // Add to knowledge base for future extractions
-  console.log('Knowledge base updated:', update)
+  console.warn('Knowledge base updated:', update)
 }
 
 /**

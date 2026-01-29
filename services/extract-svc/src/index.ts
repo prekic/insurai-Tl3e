@@ -94,10 +94,11 @@ export function validateVIN(vin: string): boolean {
  * Normalize Turkish date format to ISO
  */
 export function normalizeTurkishDate(date: string): string {
-  const parts = date.split(/[\.\/\-]/)
+  const parts = date.split(/[./-]/)
   if (parts.length !== 3) return date
 
-  let [day, month, year] = parts
+  const [day, month] = parts
+  let year = parts[2]
   if (year.length === 2) {
     year = parseInt(year) > 50 ? `19${year}` : `20${year}`
   }
@@ -133,7 +134,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'policy_number',
     name: 'Policy Number',
     nameTr: 'Poliçe No',
-    pattern: /(?:poli[çc]e\s*(?:no|numaras[ıi])\s*[:\s]*)([A-Z0-9\-\/]+)/i,
+    pattern: /(?:poli[çc]e\s*(?:no|numaras[ıi])\s*[:\s]*)([A-Z0-9/-]+)/i,
     extract: m => m[1].trim(),
     validate: v => v.length >= 5,
     confidence: 0.95,
@@ -172,8 +173,8 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'phone',
     name: 'Phone',
     nameTr: 'Telefon',
-    pattern: /(?:Tel(?:efon)?|GSM|Cep)\s*[:\s]*([0-9\s\-\(\)]{10,15})/i,
-    extract: m => m[1].replace(/[\s\-\(\)]/g, ''),
+    pattern: /(?:Tel(?:efon)?|GSM|Cep)\s*[:\s]*([0-9\s\-()]{10,15})/i,
+    extract: m => m[1].replace(/[\s\-()]/g, ''),
     validate: v => /^0?[235][0-9]{9}$/.test(v),
     confidence: 0.9,
   },
@@ -182,7 +183,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'start_date',
     name: 'Start Date',
     nameTr: 'Başlangıç Tarihi',
-    pattern: /(?:ba[şs]lang[ıi][çc]\s*tarihi|poli[çc]e\s*ba[şs]lang[ıi][çc]|yürürlük\s*tarihi)\s*[:\s]*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})/i,
+    pattern: /(?:ba[şs]lang[ıi][çc]\s*tarihi|poli[çc]e\s*ba[şs]lang[ıi][çc]|yürürlük\s*tarihi)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
     extract: m => m[1],
     normalize: v => normalizeTurkishDate(v),
     validate: v => isValidDate(v),
@@ -193,7 +194,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'end_date',
     name: 'End Date',
     nameTr: 'Bitiş Tarihi',
-    pattern: /(?:biti[şs]\s*tarihi|poli[çc]e\s*biti[şs]i|son\s*tarih|vade\s*sonu)\s*[:\s]*(\d{1,2}[\.\/\-]\d{1,2}[\.\/\-]\d{2,4})/i,
+    pattern: /(?:biti[şs]\s*tarihi|poli[çc]e\s*biti[şs]i|son\s*tarih|vade\s*sonu)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i,
     extract: m => m[1],
     normalize: v => normalizeTurkishDate(v),
     validate: v => isValidDate(v),
@@ -204,7 +205,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'premium',
     name: 'Premium',
     nameTr: 'Prim',
-    pattern: /(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*(?:₺|TL|TRY)?\s*([0-9][0-9\.\,]*)\s*(?:TL|₺|TRY)?/i,
+    pattern: /(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*(?:₺|TL|TRY)?\s*([0-9][0-9.,]*)\s*(?:TL|₺|TRY)?/i,
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.9,
@@ -214,7 +215,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'coverage',
     name: 'Coverage',
     nameTr: 'Teminat',
-    pattern: /(?:teminat\s*(?:tutar[ıi])?|sigorta\s*bedeli)\s*[:\s]*([0-9\.\,]+)\s*(?:TL|₺|TRY)?/i,
+    pattern: /(?:teminat\s*(?:tutar[ıi])?|sigorta\s*bedeli)\s*[:\s]*([0-9.,]+)\s*(?:TL|₺|TRY)?/i,
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.85,
@@ -224,7 +225,7 @@ export const turkishPatterns: FieldPattern[] = [
     id: 'deductible',
     name: 'Deductible',
     nameTr: 'Muafiyet',
-    pattern: /(?:muafiyet|öz\s*risk)\s*[:\s]*([0-9\.\,]+\s*(?:TL|₺|TRY|%)?)/i,
+    pattern: /(?:muafiyet|öz\s*risk)\s*[:\s]*([0-9.,]+\s*(?:TL|₺|TRY|%)?)/i,
     extract: m => m[1].trim(),
     confidence: 0.85,
   },
@@ -302,7 +303,7 @@ const motorKaskoPatterns: FieldPattern[] = [
     id: 'vehicle_value',
     name: 'Vehicle Value',
     nameTr: 'Araç Değeri',
-    pattern: /(?:ara[çc]\s*de[ğg]eri|sigorta\s*de[ğg]eri|rayiç\s*de[ğg]er)\s*[:\s]*([0-9\.\,]+)\s*(?:TL|₺)?/i,
+    pattern: /(?:ara[çc]\s*de[ğg]eri|sigorta\s*de[ğg]eri|rayiç\s*de[ğg]er)\s*[:\s]*([0-9.,]+)\s*(?:TL|₺)?/i,
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.85,
@@ -331,7 +332,7 @@ const propertyPatterns: FieldPattern[] = [
     id: 'floor_area',
     name: 'Floor Area',
     nameTr: 'Alan',
-    pattern: /(?:alan|brüt\s*alan)\s*[:\s]*([0-9\.\,]+)\s*(?:m²|m2|metrekare)?/i,
+    pattern: /(?:alan|brüt\s*alan)\s*[:\s]*([0-9.,]+)\s*(?:m²|m2|metrekare)?/i,
     extract: m => m[1],
     normalize: v => normalizeCurrency(v),
     confidence: 0.85,
@@ -367,6 +368,7 @@ export class FieldExtractor {
     const targets: ExtractionTarget[] = []
 
     // Get patterns for policy type
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const patterns = this.patterns.get(policyType || 'default') || this.patterns.get('default')!
 
     // Build extraction targets from patterns
@@ -481,6 +483,7 @@ export class FieldExtractor {
    * Get extraction targets for a policy type
    */
   getTargets(policyType: string | null): ExtractionTarget[] {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const patterns = this.patterns.get(policyType || 'default') || this.patterns.get('default')!
 
     return patterns.map(p => ({
@@ -549,5 +552,6 @@ async function fetchNormalizedText(docId: string): Promise<string> {
 const PORT = process.env.PORT || 4010
 
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`[Extract Service] Listening on port ${PORT}`)
 })

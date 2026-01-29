@@ -10,8 +10,8 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, **PDF splitting for Document AI 15-page limit**
-- **Production Readiness**: ~9.5/10 (5787+ tests, 0 lint errors, PWA support, server hardening)
-- **Last Updated**: January 28, 2026
+- **Production Readiness**: ~9.5/10 (5787+ tests, 0 lint errors, 48 warnings, PWA support, server hardening)
+- **Last Updated**: January 29, 2026
 
 ---
 
@@ -1947,6 +1947,74 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File Changed**: `server/routes/admin.ts`
 - **Usage**: Visit `https://insurai-production.up.railway.app/api/admin/diagnostics` to debug deployment issues
 
+### 32. ESLint Cleanup and React Hooks Exhaustive-Deps Fixes (Fixed Jan 29, 2026)
+- **Problem**: Multiple code quality issues:
+  - 153 ESLint errors (reduced to 0)
+  - 161 ESLint warnings (reduced to 48)
+  - 4 `react-hooks/exhaustive-deps` warnings with potential stale closure bugs
+  - Railway build failure from linter auto-renaming catch block variables
+- **Root Causes**:
+  - Unused variables, imports, and eslint-disable directives
+  - `console.log` usage where `console.warn` expected
+  - useEffect dependencies missing complex callback functions
+  - Linter renamed `error` to `_error` in catch blocks but code still referenced `error`
+- **Solutions**:
+  1. **ESLint Errors (153 → 0)**:
+     - Removed unused imports/variables or prefixed with `_`
+     - Added eslint-disable for intentional patterns (control regex)
+     - Fixed useless escapes in character classes
+  2. **ESLint Warnings (161 → 48)**:
+     - Changed `console.log` to `console.warn` across many files
+     - Removed unused eslint-disable directives
+     - Remaining 45 are `no-non-null-assertion` (deferred - requires refactoring)
+  3. **React Hooks Exhaustive-Deps**:
+     - `PolicyUpload.tsx`: Used ref pattern for complex callback chain
+     - `AuditTab.tsx`: Used useCallback for fetchLogs
+     - `ConfigTab.tsx`: Used useCallback + fixed stale closure bug
+  4. **Catch Block Variables**:
+     - Changed all 71 `} catch (_error) {` back to `} catch (error) {`
+- **Files Changed**:
+  - `src/components/PolicyUpload.tsx` - Ref pattern for addFiles
+  - `src/components/admin/tabs/AuditTab.tsx` - useCallback for fetchLogs
+  - `src/components/admin/tabs/ConfigTab.tsx` - useCallback + stale closure fix
+  - `server/routes/admin.ts` - 71 catch block fixes
+  - Multiple files in `src/lib/ai/` and `services/` for console.warn changes
+- **Patterns for useEffect Dependencies**:
+  ```tsx
+  // Pattern 1: Ref pattern for complex callback chains
+  const addFilesRef = useRef<(files: File[]) => Promise<void>>()
+  addFilesRef.current = addFiles  // Keep ref updated
+  useEffect(() => {
+    addFilesRef.current?.(selectedFiles)
+  }, [location, navigate])  // Only stable dependencies
+
+  // Pattern 2: useCallback for simple dependencies
+  const fetchData = useCallback(async () => {
+    // ... fetch logic
+  }, [filter1, filter2])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+  ```
+- **Stale Closure Bug Fixed**:
+  ```tsx
+  // BEFORE (bug): error state was stale
+  const fetchData = async () => {
+    if (!error) {  // Always reads initial error value!
+      setError(msg)
+    }
+  }
+
+  // AFTER (fixed): use local variable
+  const fetchData = useCallback(async () => {
+    let hasError = false
+    // ... fetch and set hasError = true on error
+    if (!hasError) {
+      setError(msg)
+    }
+  }, [])
+  ```
+
 ---
 
 ## Turkish Market Considerations
@@ -2237,6 +2305,12 @@ connectSrc: [
 - Wrong: `if (loading) return <Spinner />` then `const x = useCallback(...)`
 - Right: `const x = useCallback(...)` then `if (loading) return <Spinner />`
 
+**React Hooks Exhaustive-Deps Patterns:**
+- **Simple case**: Use `useCallback` and include callback in useEffect deps
+- **Complex case**: Use ref pattern when callback has deep dependency chains
+- **Stale closure gotcha**: Don't check state variables inside async callbacks - use local variables instead
+- See Known Issue #32 for detailed patterns and examples
+
 **Admin API Authentication:**
 - All admin tab components MUST use `adminFetch()` from `@/lib/admin/api`, not raw `fetch()`
 - `adminFetch()` automatically adds `Authorization: Bearer <token>` header
@@ -2305,4 +2379,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 5787+ tests, all passing (163 test files)
-**Last Updated**: January 28, 2026
+**Last Updated**: January 29, 2026

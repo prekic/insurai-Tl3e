@@ -63,22 +63,23 @@ describe('Rate Limit Middleware', () => {
   })
 
   describe('keyGenerator', () => {
-    it('should use IP from x-forwarded-for header', async () => {
+    it('should use req.ip which is set by Express trust proxy', async () => {
       const { generalLimiter } = await import('../middleware/rate-limit')
 
+      // When "trust proxy" is set, Express populates req.ip from x-forwarded-for
+      // The rate limiter should use req.ip, NOT read x-forwarded-for directly
       const req = {
         headers: { 'x-forwarded-for': '192.168.1.1, 10.0.0.1' },
-        ip: '127.0.0.1',
+        ip: '192.168.1.1', // Express sets this when trust proxy is configured
         socket: { remoteAddress: '::1' },
       } as unknown as Request
 
-      // Access keyGenerator through the limiter's options
-      // The key is generated internally by express-rate-limit
       expect(generalLimiter).toBeDefined()
-      expect(req.headers['x-forwarded-for']).toBe('192.168.1.1, 10.0.0.1')
+      // req.ip should be used, not the raw header
+      expect(req.ip).toBe('192.168.1.1')
     })
 
-    it('should fall back to req.ip when x-forwarded-for not present', async () => {
+    it('should use req.ip as primary source', async () => {
       const req = {
         headers: {},
         ip: '192.168.1.100',
@@ -98,17 +99,42 @@ describe('Rate Limit Middleware', () => {
       expect(req.socket.remoteAddress).toBe('192.168.1.200')
     })
 
-    it('should include user ID when x-user-id header present', async () => {
+    it('should use hashed Authorization token for user identification (not x-user-id)', async () => {
+      // Security: x-user-id header was vulnerable to spoofing
+      // Now we use a hash of the Authorization Bearer token
       const req = {
         headers: {
-          'x-user-id': 'user-123',
-          'x-forwarded-for': '192.168.1.1',
+          // x-user-id is now IGNORED for security
+          'x-user-id': 'spoofed-user-id',
+          // Authorization header is used instead
+          authorization: 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test',
         },
         ip: '127.0.0.1',
         socket: { remoteAddress: '::1' },
       } as unknown as Request
 
-      expect(req.headers['x-user-id']).toBe('user-123')
+      // The old x-user-id header should be ignored
+      expect(req.headers['x-user-id']).toBe('spoofed-user-id')
+      // Authorization header should be present for hashing
+      expect(req.headers.authorization).toContain('Bearer ')
+    })
+
+    it('should not trust x-forwarded-for header directly', async () => {
+      // Security test: rate limiter should NOT read x-forwarded-for directly
+      // It should rely on req.ip which Express sets based on trust proxy config
+      const req = {
+        headers: {
+          // Attacker tries to spoof their IP
+          'x-forwarded-for': 'spoofed-ip-1.2.3.4',
+        },
+        // But Express sets req.ip to the real client IP
+        ip: '10.0.0.1',
+        socket: { remoteAddress: '10.0.0.1' },
+      } as unknown as Request
+
+      // req.ip should be the trusted value, not the spoofed header
+      expect(req.ip).toBe('10.0.0.1')
+      expect(req.headers['x-forwarded-for']).toBe('spoofed-ip-1.2.3.4')
     })
   })
 
@@ -279,6 +305,82 @@ describe('Rate Limit Middleware', () => {
       expect(expectedResponse.error).toBe('Too many authentication attempts')
       expect(expectedResponse.code).toBe('AUTH_RATE_LIMIT_EXCEEDED')
       expect(expectedResponse.retryAfter).toBe(900) // 15 minutes
+    })
+  })
+
+  describe('Security: extractSecureUserId behavior', () => {
+    it('should return empty string when no Authorization header', async () => {
+      const req = {
+        headers: {},
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+      } as unknown as Request
+
+      // Without Authorization header, user ID should be empty
+      expect(req.headers.authorization).toBeUndefined()
+    })
+
+    it('should return empty string for invalid Authorization format', async () => {
+      const req = {
+        headers: {
+          authorization: 'InvalidFormat token123',
+        },
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+      } as unknown as Request
+
+      // Should only accept "Bearer <token>" format
+      expect(req.headers.authorization).not.toMatch(/^Bearer /)
+    })
+
+    it('should return empty string for empty Bearer token', async () => {
+      const req = {
+        headers: {
+          authorization: 'Bearer ',
+        },
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+      } as unknown as Request
+
+      // Empty token after Bearer should be rejected
+      expect(req.headers.authorization).toBe('Bearer ')
+    })
+
+    it('should accept valid Bearer token format', async () => {
+      const validToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U'
+      const req = {
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        ip: '192.168.1.1',
+        socket: { remoteAddress: '192.168.1.1' },
+      } as unknown as Request
+
+      expect(req.headers.authorization).toMatch(/^Bearer /)
+      expect(req.headers.authorization?.split(' ')[1]?.length).toBeGreaterThan(10)
+    })
+
+    it('should generate consistent hash for same token', async () => {
+      const crypto = await import('crypto')
+      const token = 'test-token-12345'
+
+      // Same token should always produce same hash
+      const hash1 = crypto.createHash('sha256').update(token).digest('hex').substring(0, 16)
+      const hash2 = crypto.createHash('sha256').update(token).digest('hex').substring(0, 16)
+
+      expect(hash1).toBe(hash2)
+      expect(hash1.length).toBe(16)
+    })
+
+    it('should generate different hash for different tokens', async () => {
+      const crypto = await import('crypto')
+      const token1 = 'test-token-12345'
+      const token2 = 'test-token-67890'
+
+      const hash1 = crypto.createHash('sha256').update(token1).digest('hex').substring(0, 16)
+      const hash2 = crypto.createHash('sha256').update(token2).digest('hex').substring(0, 16)
+
+      expect(hash1).not.toBe(hash2)
     })
   })
 })

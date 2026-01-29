@@ -109,7 +109,7 @@ export function log(
 
   // Also output to console in development
   if (process.env.NODE_ENV !== 'production' || level === 'error') {
-    const logFn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log
+    const logFn = level === 'error' ? console.error : console.warn
     logFn(`[Pipeline:${stage}] ${message}`, options.metrics || '')
   }
 }

@@ -86,8 +86,8 @@ const DEFAULT_OPTIONS: Required<ChunkingOptions> = {
 const PARAGRAPH_BREAK_PATTERNS = [
   /\n\n+/, // Double newline
   /\n(?=[A-ZÇĞİÖŞÜ])/, // Newline followed by uppercase
-  /\n(?=\d+[.)\-])/, // Newline followed by numbered list
-  /\n(?=[\-•●○])/, // Newline followed by bullet
+  /\n(?=\d+[.)])/, // Newline followed by numbered list
+  /\n(?=[•●○-])/, // Newline followed by bullet
   /(?<=[.!?])\s+(?=[A-ZÇĞİÖŞÜ])/, // Sentence end followed by capital
 ]
 

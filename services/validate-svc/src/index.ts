@@ -96,12 +96,12 @@ export class Validator {
     const passed = critical.length === 0
 
     if (this.options.debug) {
-      console.log(`[Validator] ${this.options.docId}:`)
-      console.log(`  - Critical: ${critical.length}`)
-      console.log(`  - Errors: ${errors.length}`)
-      console.log(`  - Warnings: ${warnings.length}`)
-      console.log(`  - Passed: ${passed}`)
-      console.log(`  - Confidence: ${(overallConfidence * 100).toFixed(1)}%`)
+      console.warn(`[Validator] ${this.options.docId}:`)
+      console.warn(`  - Critical: ${critical.length}`)
+      console.warn(`  - Errors: ${errors.length}`)
+      console.warn(`  - Warnings: ${warnings.length}`)
+      console.warn(`  - Passed: ${passed}`)
+      console.warn(`  - Confidence: ${(overallConfidence * 100).toFixed(1)}%`)
     }
 
     return {
@@ -227,11 +227,11 @@ export class Validator {
 
     // Just informational - phone found or not
     if (matches.length > 0 && this.options.debug) {
-      console.log(`  - Found ${matches.length} phone numbers matching: ${description}`)
+      console.warn(`  - Found ${matches.length} phone numbers matching: ${description}`)
     }
   }
 
-  private validateNationalId(pattern: string, checksum: string | undefined, description: string): void {
+  private validateNationalId(pattern: string, checksum: string | undefined, _description: string): void {
     const regex = new RegExp(pattern, 'g')
     const matches = this.options.text.match(regex) || []
 
@@ -354,23 +354,26 @@ export class Validator {
   private parseValue(value: string, type: 'money' | 'date' | 'number' | 'percent'): { value?: number; error?: string } {
     try {
       switch (type) {
-        case 'money':
+        case 'money': {
           // Handle Turkish format: 1.234,56 or 1234.56
           const moneyStr = value
             .replace(/[₺TL\s]/g, '')
             .replace(/\./g, '')
             .replace(',', '.')
           return { value: parseFloat(moneyStr) }
+        }
 
-        case 'number':
+        case 'number': {
           const numStr = value.replace(/\./g, '').replace(',', '.')
           return { value: parseFloat(numStr) }
+        }
 
-        case 'percent':
+        case 'percent': {
           const percentStr = value.replace('%', '').trim()
           return { value: parseFloat(percentStr) }
+        }
 
-        case 'date':
+        case 'date': {
           // Return timestamp for comparison
           const parts = value.split(/[./-]/)
           if (parts.length === 3) {
@@ -381,6 +384,7 @@ export class Validator {
             return { value: new Date(year, month, day).getTime() }
           }
           return { error: 'Invalid date format' }
+        }
 
         default:
           return { error: 'Unknown parse type' }
@@ -438,7 +442,7 @@ export class Validator {
         this.validatePageSequence(severity, message)
         break
 
-      case 'mustBe0to100':
+      case 'mustBe0to100': {
         const percentValue = parseFloat(field.valueNormalized.replace('%', ''))
         if (percentValue < 0 || percentValue > 100) {
           this.addResult({
@@ -454,6 +458,7 @@ export class Validator {
           })
         }
         break
+      }
 
       default:
         console.warn(`[Validator] Unknown custom rule: ${rule}`)

@@ -11,13 +11,10 @@ import {
   defineSignal,
   defineQuery,
   setHandler,
-  condition,
-  sleep,
   ApplicationFailure,
 } from '@temporalio/workflow'
 
 import type {
-  Document,
   DocumentStatus,
   DocumentStage,
   DocumentHints,
@@ -282,10 +279,10 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 8: NORMALIZE
     // =========================================================================
-    let normalizeResult: NormalizeResult
+    let _normalizeResult: NormalizeResult
 
     await runStage(state, 'normalize', 'NORMALIZING', async () => {
-      normalizeResult = await normalizeText({
+      _normalizeResult = await normalizeText({
         docId: input.docId,
         locale: detectionResult!.locale,
         policyType: detectionResult!.policyType,

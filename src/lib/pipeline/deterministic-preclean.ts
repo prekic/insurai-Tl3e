@@ -185,7 +185,8 @@ function isNoiseLine(line: string): { isNoise: boolean; reason: string } {
 
   // B3: Check for extended ASCII heavy lines
   if (trimmed.length >= 20) {
-    // Characters outside normal Turkish text range
+    // Characters outside normal Turkish text range (tab, newline, CR are allowed)
+    // eslint-disable-next-line no-control-regex
     const weirdChars = trimmed.match(/[^\x09\x0A\x0D\x20-\x7EÇĞİÖŞÜçğıöşüÂÎÛâîû]/g) || []
     if (weirdChars.length >= 5 && weirdChars.length / trimmed.length >= 0.10) {
       return { isNoise: true, reason: 'extended_ascii_heavy' }

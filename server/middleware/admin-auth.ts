@@ -9,7 +9,6 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyDatabase = any
 
 // ============================================================================
@@ -167,7 +166,7 @@ export function verifyAdminToken(token: string): AdminTokenPayload | null {
       audience: 'insurai-admin-api',
     }) as AdminTokenPayload
     return decoded
-  } catch (error) {
+  } catch {
     return null
   }
 }
@@ -384,7 +383,6 @@ export async function updateAdminLogin(adminId: string, ipAddress: string): Prom
 
   // Then increment login count using RPC if available
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (db as any).rpc('increment_login_count', { row_id: adminId })
   } catch {
     // RPC might not exist, that's okay

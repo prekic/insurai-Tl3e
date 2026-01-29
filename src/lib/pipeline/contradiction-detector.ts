@@ -28,9 +28,9 @@ import type {
  */
 const POLICY_NUMBER_PATTERNS = [
   // Standard numeric (10+ digits)
-  /(?:POLİÇE\s*(?:NO|NUMARASI?)?\s*[:\-]?\s*)(\d{8,15})/gi,
+  /(?:POLİÇE\s*(?:NO|NUMARASI?)?\s*[:-]?\s*)(\d{8,15})/gi,
   // With prefix
-  /(?:POL|KSK|TRF|KONUT)[\/\-]?\d{4}[\/\-]?\d{4,10}/gi,
+  /(?:POL|KSK|TRF|KONUT)[/-]?\d{4}[/-]?\d{4,10}/gi,
   // Generic capture near "poliçe" keyword
   /POLİÇE[^0-9]{0,20}(\d{7,15})/gi,
 ]
@@ -41,7 +41,7 @@ const POLICY_NUMBER_PATTERNS = [
  */
 const DATE_PATTERNS = [
   // DD.MM.YYYY or DD/MM/YYYY
-  /(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/g,
+  /(\d{1,2})[./](\d{1,2})[./](\d{4})/g,
   // YYYY-MM-DD
   /(\d{4})-(\d{2})-(\d{2})/g,
   // Written format: "15 Ocak 2026"
@@ -64,7 +64,7 @@ const PLATE_PATTERNS = [
  */
 const VIN_PATTERNS = [
   /\b([A-HJ-NPR-Z0-9]{17})\b/gi,
-  /ŞASİ\s*(?:NO|NUMARASI?)?\s*[:\-]?\s*([A-HJ-NPR-Z0-9]{17})/gi,
+  /ŞASİ\s*(?:NO|NUMARASI?)?\s*[:-]?\s*([A-HJ-NPR-Z0-9]{17})/gi,
 ]
 
 /**
@@ -103,7 +103,7 @@ function normalizeVIN(vin: string | null | undefined): string {
  */
 function normalizeDate(dateStr: string): string | null {
   // Try DD.MM.YYYY or DD/MM/YYYY
-  const ddmmyyyy = dateStr.match(/(\d{1,2})[\.\/](\d{1,2})[\.\/](\d{4})/)
+  const ddmmyyyy = dateStr.match(/(\d{1,2})[./](\d{1,2})[./](\d{4})/)
   if (ddmmyyyy) {
     const [, day, month, year] = ddmmyyyy
     return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`

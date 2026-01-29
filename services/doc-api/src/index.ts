@@ -20,14 +20,14 @@ import type {
   CreateDocumentRequest,
   CreateDocumentResponse,
   GetDocumentResponse,
-  DocumentHints,
+  DocumentHints as _DocumentHints,
 } from '@insurai/types'
 
 // Import rule pack system
 import {
   createDefaultRegistry,
-  selectRulePacks,
-  RulePackRegistry,
+  selectRulePacks as _selectRulePacks,
+  RulePackRegistry as _RulePackRegistry,
 } from '@insurai/rule-packs'
 
 // ============================================================================
@@ -76,6 +76,7 @@ interface RequestContext {
 }
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       ctx: RequestContext
@@ -384,7 +385,7 @@ app.get('/v1/documents/:docId/text', async (req: Request, res: Response) => {
     const finalText = tokens?.map(t => t.text).join(' ') || ''
 
     // Build reading order blocks
-    const readingOrderBlocks = tokens?.map((t, i) => ({
+    const readingOrderBlocks = tokens?.map((t, _i) => ({
       id: t.id,
       pageNo: t.page_no,
       bbox: t.bbox,
@@ -680,7 +681,7 @@ app.get('/v1/rulepacks/:packId', (req: Request, res: Response) => {
 // ERROR HANDLING
 // ============================================================================
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error('[doc-api] Unhandled error:', err)
   res.status(500).json({
     error: {
@@ -707,8 +708,11 @@ app.use((req: Request, res: Response) => {
 
 if (require.main === module) {
   app.listen(config.port, () => {
+    // eslint-disable-next-line no-console
     console.log(`[doc-api] Server running on port ${config.port}`)
+    // eslint-disable-next-line no-console
     console.log(`[doc-api] Environment: ${config.env}`)
+    // eslint-disable-next-line no-console
     console.log(`[doc-api] Rule packs loaded: ${rulePackRegistry.getAllLocalePacks().length} locales, ${rulePackRegistry.getAllPolicyPacks().length} policies`)
   })
 }

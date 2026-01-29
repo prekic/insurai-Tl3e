@@ -8,7 +8,6 @@ import {
   processDocumentCombined,
   processDocumentQuick,
   cleanTurkishTextWithAI,
-  type CombinedProcessingResult,
 } from './text-processor'
 
 describe('Text Processor', () => {
@@ -128,6 +127,7 @@ describe('Text Processor', () => {
       it('should remove control characters', () => {
         const input = 'Text with\x00\x01\x02control chars'
         const result = applyComprehensivePreprocessing(input)
+        // eslint-disable-next-line no-control-regex
         expect(result.text).not.toMatch(/[\x00-\x1F]/)
       })
 
@@ -494,7 +494,7 @@ Normal text continues`
       it('should remove complex barcode-like garbage', () => {
         const input = 'j54<O[ MtWfE<q&v\nPOLİÇE NO: 12345'
         const result = applyComprehensivePreprocessing(input)
-        expect(result.text).not.toMatch(/[<>\[\]{}]+/)
+        expect(result.text).not.toMatch(/[<>[\]{}]+/)
         expect(result.text).toContain('POLİÇE NO')
       })
     })

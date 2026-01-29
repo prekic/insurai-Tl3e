@@ -72,7 +72,11 @@ export interface CleanupStats {
 const _TURKISH_SPECIAL_CHARS = 'ÇçĞğİıÖöŞşÜü'
 const _ALL_TURKISH_UPPER = 'A-ZÇĞİÖŞÜ'
 const _ALL_TURKISH_LOWER = 'a-zçğıöşü'
-void _TURKISH_SPECIAL_CHARS, _ALL_TURKISH_UPPER, _ALL_TURKISH_LOWER // Suppress unused warnings
+
+// Suppress unused warnings - these constants are for documentation
+void _TURKISH_SPECIAL_CHARS
+void _ALL_TURKISH_UPPER
+void _ALL_TURKISH_LOWER
 
 /**
  * Fix spaced Turkish characters (B İ RLE Şİ K → BİRLEŞİK)
@@ -381,11 +385,12 @@ function cleanupURLsAndEmails(text: string): { text: string; cleanupCount: numbe
 /**
  * Patterns that indicate garbage/binary data
  */
+/* eslint-disable no-control-regex */
 const GARBAGE_PATTERNS = [
   // Encrypted/binary data blocks (lots of special chars, random sequences)
   /[\x00-\x1F\x7F-\x9F]+/g,  // Control characters
-  /[B-Zb-z]{1,2}[\^<>\[\]{}|\\]{2,}[A-Za-z0-9]{2,}/g,  // Encoded data like "B^^^Bj54<O[..."
-  /(?:^|\n)[^\n]*[<>\[\]{}|\\^~`]{5,}[^\n]*(?:\n|$)/gm,  // Lines with lots of special chars
+  /[B-Zb-z]{1,2}[\^<>[\]{}|\\]{2,}[A-Za-z0-9]{2,}/g,  // Encoded data like "B^^^Bj54<O[..."
+  /(?:^|\n)[^\n]*[<>[\]{}|\\^~`]{5,}[^\n]*(?:\n|$)/gm,  // Lines with lots of special chars
   /(?:[A-Za-z0-9+/]{4}){10,}={0,2}/g,  // Base64-like long sequences
   /(?:\d[A-Za-z]){10,}/g,  // Alternating digit-letter patterns (binary artifacts)
   /[^\x20-\x7E\xA0-\xFF\u0100-\u017F]+/g,  // Non-printable except common Unicode
@@ -407,15 +412,15 @@ const QR_BARCODE_PATTERNS = [
 
   // Pattern 1: B^^^B style (most common in Turkish insurance PDFs)
   // Matches: B^^^Bj54<O[dR^B, B^B^B, B^^^Bk7j etc.
-  /(?:B\s*\^+\s*B[A-Za-z0-9<>\[\]]*\s*)+/g,
+  /(?:B\s*\^+\s*B[A-Za-z0-9<>[\]]*\s*)+/g,
   /(?:B\s*[\^<>]+\s*B\s*)+/gi,
 
   // Pattern 2: Generic caret sequences with letters
   /(?:[A-Z]\s*[\^<>]+\s*[A-Z][A-Za-z0-9]*\s*)+/g,
-  /(?:[A-Z][\^]+[A-Z])+[A-Za-z0-9<>\[\]]+/g,
+  /(?:[A-Z][\^]+[A-Z])+[A-Za-z0-9<>[\]]+/g,
 
   // Pattern 3: Encoded blocks with special char clusters
-  /[A-Za-z0-9]*[\^<>\[\]{}|\\]{3,}[A-Za-z0-9]+/g,
+  /[A-Za-z0-9]*[\^<>[\]{}|\\]{3,}[A-Za-z0-9]+/g,
 
   // =========================================================================
   // BARCODE PATTERNS (Linear barcodes)
@@ -425,7 +430,7 @@ const QR_BARCODE_PATTERNS = [
   /[|l1I]{15,}/g,
 
   // Horizontal line patterns
-  /[=_\-]{15,}/g,
+  /[=_-]{15,}/g,
 
   // Mixed bar patterns
   /(?:[|lI1]+[.\s]*){10,}/g,
@@ -490,7 +495,7 @@ const ESIGORTA_ARTIFACT_PATTERNS = [
   /DOĞRULAMA\s*KODU\s*:\s*[A-Za-z0-9]+/gi,
 
   // QR verification URLs that got corrupted
-  /https?:\/\/[^\s]*[\^<>\[\]{}|\\]+[^\s]*/gi,
+  /https?:\/\/[^\s]*[\^<>[\]{}|\\]+[^\s]*/gi,
 
   // Digital certificate fragments
   /CN=[^\n,]+,\s*OU=[^\n,]+/gi,
@@ -509,13 +514,14 @@ function isGarbageLine(line: string): boolean {
   const trimmed = line.trim()
 
   // Check ratio of special characters to total
-  const specialChars = (trimmed.match(/[<>\[\]{}|\\^~`@#$%&*+=]/g) || []).length
+  const specialChars = (trimmed.match(/[<>[\]{}|\\^~`@#$%&*+=]/g) || []).length
   const specialRatio = specialChars / trimmed.length
 
   // If more than 20% special chars, likely garbage
   if (specialRatio > 0.2) return true
 
   // Check for control characters
+   
   if (/[\x00-\x1F\x7F]/.test(trimmed)) return true
 
   // Check for binary-like patterns
@@ -1546,8 +1552,9 @@ export function textNeedsProcessing(text: string): boolean {
     /\.\s*com\s*\.\s*tr/i,
 
     // Garbage characters
+     
     /[\x00-\x1F\x7F]/,
-    /[<>\[\]{}|\\^]{3,}/,
+    /[<>[\]{}|\\^]{3,}/,
 
     // Missing Turkish characters
     /ISTANBUL|TURKIYE|SIGORTA|POLICE/,
@@ -1567,7 +1574,7 @@ export function textNeedsProcessing(text: string): boolean {
   }
 
   // Check character distribution for garbage
-  const specialChars = (text.match(/[<>\[\]{}|\\^~`@#$%&*+=]/g) || []).length
+  const specialChars = (text.match(/[<>[\]{}|\\^~`@#$%&*+=]/g) || []).length
   const totalChars = text.length
   if (totalChars > 100 && specialChars / totalChars > 0.1) {
     return true
@@ -1591,7 +1598,7 @@ export function estimateTextQuality(text: string): number {
   score -= spacedCount * 5
 
   // Penalize for garbage characters
-  const garbageCount = (text.match(/[<>\[\]{}|\\^]{2,}/g) || []).length
+  const garbageCount = (text.match(/[<>[\]{}|\\^]{2,}/g) || []).length
   score -= garbageCount * 10
 
   // Penalize for excessive spacing

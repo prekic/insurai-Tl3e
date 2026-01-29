@@ -45,6 +45,7 @@ const PRESERVE_PATTERNS = {
 const GARBAGE_PATTERNS = [
   /B\^{2,}B/i, // B^^^B type artifacts
   /[█▀▄▌▐░▒▓■□▪▫●○◆◇]{3,}/, // Block characters
+  // eslint-disable-next-line no-control-regex -- intentionally matching control chars for OCR cleanup
   /[\x00-\x08\x0B\x0C\x0E-\x1F]{3,}/, // Control characters
 ]
 

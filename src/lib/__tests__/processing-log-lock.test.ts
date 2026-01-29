@@ -2,7 +2,7 @@
  * Test the Promise-based lock for processing log persistence
  * This simulates the race condition that was causing duplicate key errors
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 
 describe('Processing Log Lock', () => {
   let createCount = 0
@@ -10,7 +10,7 @@ describe('Processing Log Lock', () => {
   let createPromise: Promise<boolean> | null = null
 
   // Mock the persist callback logic
-  const mockPersistCallback = async (log: { document_id: string; stages: number }) => {
+  const mockPersistCallback = async (_log: { document_id: string; stages: number }) => {
     if (!createPromise) {
       // First call - create a promise for the create operation
       createPromise = (async () => {

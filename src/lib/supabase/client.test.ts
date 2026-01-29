@@ -1,6 +1,6 @@
 /**
  * Tests for Supabase Client
- * Tests isSupabaseConfigured function
+ * Tests isSupabaseConfigured function and secure client behavior
  */
 
 import { describe, it, expect } from 'vitest'
@@ -32,96 +32,165 @@ describe('Supabase Client', () => {
     expect(supabase).toBeDefined()
   })
 
-  it('should have auth property', () => {
+  it('should be an object (real client or proxy)', () => {
+    expect(typeof supabase).toBe('object')
+  })
+})
+
+// =============================================================================
+// Unconfigured Client Security Tests
+// =============================================================================
+
+describe('Unconfigured Client Security', () => {
+  // These tests verify the security behavior when Supabase is NOT configured
+  // The client should throw helpful errors instead of using placeholder URLs
+
+  it('should throw descriptive error when accessing auth if not configured', () => {
+    if (!isSupabaseConfigured()) {
+      expect(() => supabase.auth).toThrow('Supabase is not configured')
+    } else {
+      // If configured, auth should be accessible
+      expect(supabase.auth).toBeDefined()
+    }
+  })
+
+  it('should throw descriptive error when calling from() if not configured', () => {
+    if (!isSupabaseConfigured()) {
+      expect(() => supabase.from('policies')).toThrow('Supabase is not configured')
+    } else {
+      // If configured, from() should work
+      const query = supabase.from('policies')
+      expect(query).toBeDefined()
+    }
+  })
+
+  it('should throw descriptive error when accessing storage if not configured', () => {
+    if (!isSupabaseConfigured()) {
+      expect(() => supabase.storage).toThrow('Supabase is not configured')
+    } else {
+      expect(supabase.storage).toBeDefined()
+    }
+  })
+
+  it('should include configuration instructions in error message', () => {
+    if (!isSupabaseConfigured()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+        supabase.auth
+        expect.fail('Should have thrown an error')
+      } catch (error) {
+        expect((error as Error).message).toContain('VITE_SUPABASE_URL')
+        expect((error as Error).message).toContain('VITE_SUPABASE_ANON_KEY')
+        expect((error as Error).message).toContain('local-only mode')
+      }
+    }
+  })
+})
+
+// =============================================================================
+// Configured Client Tests (only run if configured)
+// =============================================================================
+
+describe('Configured Client', () => {
+  // Skip these tests if Supabase is not configured
+  const runIfConfigured = isSupabaseConfigured() ? it : it.skip
+
+  runIfConfigured('should have auth property', () => {
     expect(supabase.auth).toBeDefined()
   })
 
-  it('should have from method', () => {
+  runIfConfigured('should have from method', () => {
     expect(typeof supabase.from).toBe('function')
   })
 
-  it('should have storage property', () => {
+  runIfConfigured('should have storage property', () => {
     expect(supabase.storage).toBeDefined()
   })
 
-  it('should have functions property', () => {
+  runIfConfigured('should have functions property', () => {
     expect(supabase.functions).toBeDefined()
   })
 })
 
 // =============================================================================
-// Auth Configuration Tests
+// Auth Configuration Tests (only run if configured)
 // =============================================================================
 
 describe('Auth Configuration', () => {
-  it('should have auth object on client', () => {
+  const runIfConfigured = isSupabaseConfigured() ? it : it.skip
+
+  runIfConfigured('should have auth object on client', () => {
     expect(supabase.auth).toBeDefined()
     expect(typeof supabase.auth).toBe('object')
   })
 
-  it('should have getSession method', () => {
+  runIfConfigured('should have getSession method', () => {
     expect(typeof supabase.auth.getSession).toBe('function')
   })
 
-  it('should have getUser method', () => {
+  runIfConfigured('should have getUser method', () => {
     expect(typeof supabase.auth.getUser).toBe('function')
   })
 
-  it('should have signIn methods', () => {
+  runIfConfigured('should have signIn methods', () => {
     expect(typeof supabase.auth.signInWithPassword).toBe('function')
     expect(typeof supabase.auth.signInWithOAuth).toBe('function')
   })
 
-  it('should have signOut method', () => {
+  runIfConfigured('should have signOut method', () => {
     expect(typeof supabase.auth.signOut).toBe('function')
   })
 
-  it('should have onAuthStateChange method', () => {
+  runIfConfigured('should have onAuthStateChange method', () => {
     expect(typeof supabase.auth.onAuthStateChange).toBe('function')
   })
 })
 
 // =============================================================================
-// Storage Tests
+// Storage Tests (only run if configured)
 // =============================================================================
 
 describe('Storage', () => {
-  it('should have storage from method', () => {
+  const runIfConfigured = isSupabaseConfigured() ? it : it.skip
+
+  runIfConfigured('should have storage from method', () => {
     expect(typeof supabase.storage.from).toBe('function')
   })
 })
 
 // =============================================================================
-// Database Query Tests
+// Database Query Tests (only run if configured)
 // =============================================================================
 
 describe('Database Queries', () => {
-  it('should create query builder with from()', () => {
+  const runIfConfigured = isSupabaseConfigured() ? it : it.skip
+
+  runIfConfigured('should create query builder with from()', () => {
     const query = supabase.from('policies')
     expect(query).toBeDefined()
   })
 
-  it('should have select method on query builder', () => {
+  runIfConfigured('should have select method on query builder', () => {
     const query = supabase.from('policies')
     expect(typeof query.select).toBe('function')
   })
 
-  it('should have insert method on query builder', () => {
+  runIfConfigured('should have insert method on query builder', () => {
     const query = supabase.from('policies')
     expect(typeof query.insert).toBe('function')
   })
 
-  it('should have update method on query builder', () => {
+  runIfConfigured('should have update method on query builder', () => {
     const query = supabase.from('policies')
     expect(typeof query.update).toBe('function')
   })
 
-  it('should have delete method on query builder', () => {
+  runIfConfigured('should have delete method on query builder', () => {
     const query = supabase.from('policies')
     expect(typeof query.delete).toBe('function')
   })
 
-  it('should allow chaining select with eq', () => {
+  runIfConfigured('should allow chaining select with eq', () => {
     const query = supabase.from('policies').select('*')
     expect(typeof query.eq).toBe('function')
   })

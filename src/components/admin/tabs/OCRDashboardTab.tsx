@@ -207,7 +207,8 @@ export function OCRDashboardTab() {
     } finally {
       setIsLoading(false)
     }
-  }, [period])
+    // Note: Add `period` to deps when API is implemented (line 201)
+  }, [])
 
   useEffect(() => {
     fetchData()

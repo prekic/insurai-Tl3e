@@ -177,6 +177,7 @@ export class LayoutAnalyzer {
       const binaryBuffer = await this.binarizeImage(imageBuffer)
       const projections = await this.calculateProjections(binaryBuffer, stats.width, stats.height)
 
+      // eslint-disable-next-line no-console
       console.log(`[Layout] Page ${pageNo}: ${stats.width}x${stats.height}, brightness: ${stats.meanBrightness.toFixed(2)}`)
 
       // Step 1: Detect text blocks using projection profiles
@@ -213,6 +214,7 @@ export class LayoutAnalyzer {
       // Step 6: Establish reading order
       this.assignReadingOrder(regions)
 
+      // eslint-disable-next-line no-console
       console.log(`[Layout] Page ${pageNo}: Found ${regions.length} regions`)
 
     } catch (error) {
@@ -850,6 +852,7 @@ export class LayoutAnalyzer {
     // Assign child reading order within tables
     for (const region of regions) {
       if (region.children) {
+        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         const children = regions.filter(r => region.children!.includes(r.id))
         children.sort((a, b) => {
           const yDiff = a.bbox.y - b.bbox.y
@@ -945,7 +948,9 @@ app.post('/analyze', async (req, res) => {
 const PORT = process.env.PORT || 4005
 
 app.listen(PORT, () => {
+  // eslint-disable-next-line no-console
   console.log(`[Layout Service] Listening on port ${PORT}`)
+  // eslint-disable-next-line no-console
   console.log(`[Layout Service] Using sharp-based region detection`)
 })
 
