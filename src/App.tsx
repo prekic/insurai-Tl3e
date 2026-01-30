@@ -49,6 +49,9 @@ const NotFound = lazy(() =>
 const AuthPage = lazy(() =>
   import('./components/AuthPage').then((m) => ({ default: m.AuthPage }))
 )
+const TryAnalysis = lazy(() =>
+  import('./components/TryAnalysis').then((m) => ({ default: m.TryAnalysis }))
+)
 const AdminDashboard = lazy(() =>
   import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 )
@@ -60,6 +63,7 @@ const AdminLogin = lazy(() =>
 const ROUTES = {
   home: '/',
   auth: '/auth',
+  try: '/try',  // Free trial analysis (no auth required)
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
@@ -152,6 +156,14 @@ function AppContent() {
                 element={
                   <PageTransition>
                     <AuthPage />
+                  </PageTransition>
+                }
+              />
+              <Route
+                path="/try"
+                element={
+                  <PageTransition>
+                    <TryAnalysis />
                   </PageTransition>
                 }
               />

@@ -16,6 +16,9 @@ export function Hero() {
   const { user, signOut } = useAuth()
   const policyCount = policies.length
 
+  // Route to /try for anonymous users, /upload for logged-in users
+  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
@@ -293,7 +296,7 @@ export function Hero() {
                   loadingText="Analyzing..."
                 />
                 <AnimatedButton
-                  onClick={() => navigate('/upload?autoOpen=true')}
+                  onClick={() => navigate(uploadPath)}
                   className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-semibold"
                 >
                   <span>See Demo Report</span>

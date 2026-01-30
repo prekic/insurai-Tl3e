@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
+import { useAuth } from '@/lib/supabase/auth-context'
 
 interface UploadWidgetProps {
   compact?: boolean
@@ -16,9 +17,13 @@ export function UploadWidget({
   loadingText = 'Uploading...'
 }: UploadWidgetProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Route to /try for anonymous users, /upload for logged-in users
+  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -73,8 +78,8 @@ export function UploadWidget({
       toast.success('Files uploaded successfully', {
         description: `${valid.length} policy document(s) are being analyzed.`,
       })
-      // Navigate to upload page for full analysis
-      navigate('/upload?autoOpen=true')
+      // Navigate to appropriate page based on auth state
+      navigate(uploadPath)
     } catch (err) {
       setIsUploading(false)
       const message = err instanceof Error ? err.message : 'Upload failed'

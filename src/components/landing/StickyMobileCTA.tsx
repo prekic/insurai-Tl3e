@@ -1,6 +1,7 @@
 import { Upload } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '@/lib/supabase/auth-context'
 
 /**
  * StickyMobileCTA - A floating CTA button that appears on mobile
@@ -10,7 +11,11 @@ import { useNavigate } from 'react-router-dom'
  */
 export function StickyMobileCTA() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [isVisible, setIsVisible] = useState(false)
+
+  // Route to /try for anonymous users, /upload for logged-in users
+  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
 
   useEffect(() => {
     // Show the sticky CTA after scrolling 600px (approximately past the hero)
@@ -32,7 +37,7 @@ export function StickyMobileCTA() {
   }, [])
 
   const handleClick = () => {
-    navigate('/upload?autoOpen=true')
+    navigate(uploadPath)
   }
 
   // Only render on mobile (md breakpoint hides it via CSS)
