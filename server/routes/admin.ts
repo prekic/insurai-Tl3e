@@ -696,7 +696,7 @@ router.get('/health', async (_req: Request, res: Response) => {
     }
 
     res.json({ success: true, data: health })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get health status' })
   }
 })
@@ -748,7 +748,7 @@ router.get('/metrics', authenticateAdmin, async (_req: AuthenticatedRequest, res
     }
 
     res.json({ success: true, data: metrics })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get metrics' })
   }
 })
@@ -786,7 +786,7 @@ router.get('/ai/requests', authenticateAdmin, (req: AuthenticatedRequest, res: R
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: aiRequests.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get AI requests' })
   }
 })
@@ -919,7 +919,7 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
     }
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get AI stats' })
   }
 })
@@ -954,7 +954,7 @@ router.get('/policies/operations', authenticateAdmin, (req: AuthenticatedRequest
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: policyOperations.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get policy operations' })
   }
 })
@@ -1004,7 +1004,7 @@ router.get('/policies/stats', authenticateAdmin, (req: AuthenticatedRequest, res
     stats.ocrUsageRate = stats.total > 0 ? ocrCount / stats.total : 0
 
     res.json({ success: true, data: stats })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get policy stats' })
   }
 })
@@ -1039,7 +1039,7 @@ router.get('/security/logs', authenticateAdmin, (req: AuthenticatedRequest, res:
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: securityLogs.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get security logs' })
   }
 })
@@ -1142,7 +1142,7 @@ router.get('/audit/logs', authenticateAdmin, (req: AuthenticatedRequest, res: Re
     results = results.slice(0, Number(limit))
 
     res.json({ success: true, data: results, total: auditLogs.length })
-  } catch (error) {
+  } catch (_error) {
     res.status(500).json({ success: false, error: 'Failed to get audit logs' })
   }
 })
