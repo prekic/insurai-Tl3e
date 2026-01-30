@@ -6,6 +6,7 @@
 
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
+import crypto from 'crypto'
 import {
   isEmailConfigured,
   getEmailPreferences,
@@ -14,6 +15,42 @@ import {
   sendTrialReminderEmail,
   EmailPreferences,
 } from '../services/email-service.js'
+
+// =============================================================================
+// TOKEN UTILITIES
+// =============================================================================
+
+const UNSUBSCRIBE_SECRET = process.env.UNSUBSCRIBE_SECRET || process.env.ADMIN_JWT_SECRET || 'default-unsubscribe-secret'
+
+/**
+ * Generate an unsubscribe token for an email address
+ * Token is a HMAC-SHA256 hash of email + secret, truncated to 32 chars
+ */
+export function generateUnsubscribeToken(email: string): string {
+  const normalizedEmail = email.toLowerCase().trim()
+  return crypto
+    .createHmac('sha256', UNSUBSCRIBE_SECRET)
+    .update(normalizedEmail)
+    .digest('hex')
+    .substring(0, 32)
+}
+
+/**
+ * Verify an unsubscribe token for an email address
+ */
+export function verifyUnsubscribeToken(email: string, token: string): boolean {
+  const expectedToken = generateUnsubscribeToken(email)
+  // Use timing-safe comparison to prevent timing attacks
+  try {
+    return crypto.timingSafeEqual(
+      Buffer.from(token),
+      Buffer.from(expectedToken)
+    )
+  } catch {
+    // Buffers of different lengths will throw
+    return false
+  }
+}
 
 const router = Router()
 
@@ -95,7 +132,7 @@ router.put('/preferences', async (req: Request, res: Response) => {
     if (!parseResult.success) {
       return res.status(400).json({
         error: 'Invalid preferences',
-        details: parseResult.error.errors,
+        details: parseResult.error.issues,
       })
     }
 
@@ -121,7 +158,7 @@ router.post('/capture', async (req: Request, res: Response) => {
     if (!parseResult.success) {
       return res.status(400).json({
         error: 'Invalid email',
-        details: parseResult.error.errors,
+        details: parseResult.error.issues,
       })
     }
 
@@ -160,7 +197,7 @@ router.post('/test', async (req: Request, res: Response) => {
     if (!parseResult.success) {
       return res.status(400).json({
         error: 'Invalid request',
-        details: parseResult.error.errors,
+        details: parseResult.error.issues,
       })
     }
 
@@ -202,25 +239,32 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Email is required' })
     }
 
-    // Validate unsubscribe token if provided
-    // Token should be a hash of email + secret to prevent unauthorized unsubscribes
-    if (token) {
-      // TODO: In production, verify token matches expected hash
-      // const expectedToken = crypto.createHash('sha256')
-      //   .update(email + process.env.UNSUBSCRIBE_SECRET)
-      //   .digest('hex')
-      // if (token !== expectedToken) {
-      //   return res.status(401).json({ error: 'Invalid unsubscribe token' })
-      // }
-      console.log(`[EmailRoutes] Unsubscribe with token for: ${email}`)
-    } else {
-      // Without token, log as potential abuse but still process
-      // In production, you might want to require the token
-      console.warn(`[EmailRoutes] Unsubscribe without token for: ${email}`)
+    // Normalize email for comparison
+    const normalizedEmail = email.toLowerCase().trim()
+
+    // Validate unsubscribe token - required for security
+    if (!token || typeof token !== 'string') {
+      console.warn(`[EmailRoutes] Unsubscribe attempt without token for: ${normalizedEmail}`)
+      return res.status(401).json({
+        error: 'Invalid unsubscribe link',
+        message: 'Please use the unsubscribe link from your email'
+      })
     }
 
+    // Verify token matches expected hash
+    if (!verifyUnsubscribeToken(normalizedEmail, token)) {
+      console.warn(`[EmailRoutes] Invalid unsubscribe token for: ${normalizedEmail}`)
+      return res.status(401).json({
+        error: 'Invalid unsubscribe token',
+        message: 'This unsubscribe link is invalid or expired. Please use the link from your most recent email.'
+      })
+    }
+
+    console.log(`[EmailRoutes] Valid unsubscribe request for: ${normalizedEmail}`)
+
     // Update preferences to opt out of marketing
-    // This would need the user ID from the token in production
+    // Note: For captured emails (no user account), we would store this in captured_emails table
+    // For registered users, we would update user_email_preferences
 
     return res.json({
       success: true,
@@ -230,6 +274,31 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
     console.error('[EmailRoutes] Failed to unsubscribe:', error)
     return res.status(500).json({ error: 'Failed to unsubscribe' })
   }
+})
+
+/**
+ * GET /api/email/unsubscribe-token
+ * Generate an unsubscribe token for testing (admin only in production)
+ */
+router.get('/unsubscribe-token', (req: Request, res: Response) => {
+  const email = req.query.email as string
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email query parameter required' })
+  }
+
+  // In production, this should be admin-only
+  const adminToken = req.headers['x-admin-token']
+  if (process.env.NODE_ENV === 'production' && !adminToken) {
+    return res.status(401).json({ error: 'Admin authentication required' })
+  }
+
+  const token = generateUnsubscribeToken(email)
+  return res.json({
+    email: email.toLowerCase().trim(),
+    token,
+    unsubscribeUrl: `${process.env.FRONTEND_URL || 'http://localhost:5173'}/unsubscribe?email=${encodeURIComponent(email)}&token=${token}`
+  })
 })
 
 export default router

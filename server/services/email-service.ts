@@ -6,6 +6,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 // Email provider configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY
@@ -99,7 +100,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
       }
     }
 
-    const data = await response.json()
+    const data = await response.json() as { id: string }
     console.log('[EmailService] Email sent successfully:', data.id)
 
     // Log email to database
@@ -147,6 +148,29 @@ function stripHtml(html: string): string {
     .trim()
 }
 
+/**
+ * Generate an unsubscribe token for an email address
+ * Uses HMAC-SHA256 with a secret key
+ */
+const UNSUBSCRIBE_SECRET = process.env.UNSUBSCRIBE_SECRET || process.env.ADMIN_JWT_SECRET || 'default-unsubscribe-secret'
+
+function generateUnsubscribeToken(email: string): string {
+  const normalizedEmail = email.toLowerCase().trim()
+  return crypto
+    .createHmac('sha256', UNSUBSCRIBE_SECRET)
+    .update(normalizedEmail)
+    .digest('hex')
+    .substring(0, 32)
+}
+
+/**
+ * Generate an unsubscribe URL for an email address
+ */
+function getUnsubscribeUrl(email: string): string {
+  const token = generateUnsubscribeToken(email)
+  return `${APP_URL}/unsubscribe?email=${encodeURIComponent(email.toLowerCase().trim())}&token=${token}`
+}
+
 // =============================================================================
 // EMAIL TEMPLATES
 // =============================================================================
@@ -175,7 +199,11 @@ const baseStyles = `
   .divider { height: 1px; background-color: #e5e7eb; margin: 24px 0; }
 `
 
-function wrapTemplate(content: string): string {
+function wrapTemplate(content: string, recipientEmail?: string): string {
+  const unsubscribeLink = recipientEmail
+    ? `<a href="${getUnsubscribeUrl(recipientEmail)}">Abonelikten Çık</a> ·`
+    : ''
+
   return `
 <!DOCTYPE html>
 <html lang="tr">
@@ -196,6 +224,7 @@ function wrapTemplate(content: string): string {
       <p style="margin-top: 8px;">
         <a href="${APP_URL}/help">Yardım</a> ·
         <a href="${APP_URL}/settings">Email Tercihler</a> ·
+        ${unsubscribeLink}
         <a href="${APP_URL}">Ana Sayfa</a>
       </p>
     </div>
@@ -249,7 +278,7 @@ export async function sendWelcomeEmail(
   return sendEmail({
     to: email,
     subject: 'InsurAI\'a Hoş Geldiniz! 🎉',
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'welcome' }],
   })
 }
@@ -317,7 +346,7 @@ export async function sendPolicyUploadedEmail(
   return sendEmail({
     to: email,
     subject: `Poliçe Analiz Tamamlandı: ${policyData.policyNumber}`,
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'policy_uploaded' }],
   })
 }
@@ -378,7 +407,7 @@ export async function sendPolicyExpiringEmail(
   return sendEmail({
     to: email,
     subject: `⚠️ Poliçe Süresi Doluyor: ${policyData.policyNumber} (${policyData.daysRemaining} gün)`,
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'policy_expiring' }],
   })
 }
@@ -433,7 +462,7 @@ export async function sendPolicyExpiredEmail(
   return sendEmail({
     to: email,
     subject: `🚨 Poliçe Süresi Doldu: ${policyData.policyNumber}`,
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'policy_expired' }],
   })
 }
@@ -481,7 +510,7 @@ export async function sendTrialReminderEmail(
   return sendEmail({
     to: email,
     subject: 'InsurAI Denemeniz - Tüm Özelliklere Erişin! 🚀',
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'trial_reminder' }],
   })
 }
@@ -527,7 +556,7 @@ export async function sendAdminAlertEmail(
   return sendEmail({
     to: email,
     subject: `[InsurAI Admin] ${emoji} ${alert.title}`,
-    html: wrapTemplate(content),
+    html: wrapTemplate(content, email),
     tags: [{ name: 'type', value: 'admin_alert' }],
   })
 }
