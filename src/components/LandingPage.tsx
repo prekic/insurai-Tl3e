@@ -1,6 +1,8 @@
 import { lazy, Suspense, memo } from 'react'
 import { Hero } from './landing/Hero'
 import { Stats } from './landing/Stats'
+import { TrustedProviders } from './landing/TrustedProviders'
+import { StickyMobileCTA } from './landing/StickyMobileCTA'
 import { LazySection } from '@/hooks/useLazySection'
 
 // Lazy load below-the-fold sections for better FCP/LCP
@@ -34,6 +36,7 @@ export const LandingPage = memo(function LandingPage() {
       {/* Above-the-fold content - loads immediately */}
       <Hero />
       <Stats />
+      <TrustedProviders />
 
       {/* Below-the-fold content - lazy loaded when scrolled into view */}
       <Suspense fallback={<SectionSkeleton />}>
@@ -89,6 +92,9 @@ export const LandingPage = memo(function LandingPage() {
           <Footer />
         </LazySection>
       </Suspense>
+
+      {/* Sticky mobile CTA - appears after scrolling past hero */}
+      <StickyMobileCTA />
     </div>
   )
 })

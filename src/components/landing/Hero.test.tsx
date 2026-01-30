@@ -163,10 +163,10 @@ describe('Hero', () => {
       expect(screen.getByTestId('upload-widget')).toBeInTheDocument()
     })
 
-    it('should have sample policies button', () => {
+    it('should have demo report button', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('Try with sample policies')).toBeInTheDocument()
+      expect(screen.getByText('See Demo Report')).toBeInTheDocument()
     })
 
     it('should display trust stats', () => {

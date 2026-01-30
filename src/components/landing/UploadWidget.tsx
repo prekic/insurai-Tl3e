@@ -6,9 +6,15 @@ import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
 interface UploadWidgetProps {
   compact?: boolean
+  buttonText?: string
+  loadingText?: string
 }
 
-export function UploadWidget({ compact = false }: UploadWidgetProps) {
+export function UploadWidget({
+  compact = false,
+  buttonText = 'Upload your policy',
+  loadingText = 'Uploading...'
+}: UploadWidgetProps) {
   const navigate = useNavigate()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -94,16 +100,16 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
 
   if (compact) {
     return (
-      <label className="group inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all cursor-pointer font-medium">
+      <label className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all cursor-pointer font-semibold text-lg">
         {isUploading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>Uploading...</span>
+            <span>{loadingText}</span>
           </>
         ) : (
           <>
-            <Upload size={18} />
-            <span>Upload your policy</span>
+            <Upload size={20} />
+            <span>{buttonText}</span>
           </>
         )}
         <input
