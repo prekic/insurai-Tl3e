@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Upload,
   FileText,
@@ -53,11 +53,17 @@ interface AnalysisResult {
   confidence?: number
 }
 
+interface LocationState {
+  file?: File
+}
+
 export function TryAnalysis() {
   const navigate = useNavigate()
+  const location = useLocation()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { health } = useBackendHealth()
+  const processedFromStateRef = useRef(false)
 
   const [state, setState] = useState<AnalysisState>('idle')
   const [progress, setProgress] = useState(0)
@@ -108,6 +114,118 @@ export function TryAnalysis() {
   }, [user, navigate])
 
   const backendReady = health.status === 'healthy'
+
+  // Separate function for processing file from state to avoid circular deps
+  const processFileFromState = useCallback(async (file: File) => {
+    // Check trial eligibility first
+    const trialCheck = canPerformFreeTrial()
+    if (!trialCheck.canTry) {
+      toast.error('Free trial already used', {
+        description: trialCheck.reason,
+      })
+      setState('trial-used')
+      return
+    }
+
+    // Validate file
+    const { valid, errors } = validateFiles([file])
+    if (errors.length > 0 || valid.length === 0) {
+      const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
+      toast.error(errorInfo.title, { description: errorInfo.description })
+      return
+    }
+
+    // Check backend availability
+    if (!isAIConfigured()) {
+      toast.error('Analysis service unavailable', {
+        description: 'Please try again in a moment.',
+      })
+      return
+    }
+
+    // Track upload started
+    trackTrialUploadStarted(file.type, file.size)
+
+    // Start analysis
+    setSelectedFile(file)
+    setState('uploading')
+    setProgress(10)
+    setProgressMessage('Preparing document...')
+    setError(null)
+
+    try {
+      setProgress(20)
+      setProgressMessage('Uploading document...')
+      await new Promise((r) => setTimeout(r, 300))
+
+      setState('analyzing')
+      setProgress(40)
+      setProgressMessage('Extracting text from PDF...')
+
+      trackTrialAnalysisStarted()
+
+      const extractionResult = await extractPolicyFromDocument(file)
+
+      if (!extractionResult.success) {
+        throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
+      }
+
+      setProgress(95)
+      setProgressMessage('Finalizing analysis...')
+
+      const policy = extractionResult.policy!
+      const fileName = sanitizeFileName(file.name)
+
+      saveTrialResult(policy, fileName)
+
+      setResult({
+        policy,
+        fileName,
+        confidence: policy.aiConfidence,
+      })
+
+      setProgress(100)
+      setProgressMessage('Analysis complete!')
+      setState('complete')
+
+      trackTrialAnalysisCompleted(
+        policy.type,
+        policy.aiConfidence,
+        policy.coverages?.length || 0
+      )
+
+      toast.success('Analysis complete!', {
+        description: 'Your policy has been analyzed successfully.',
+      })
+    } catch (err) {
+      console.error('[TryAnalysis] Error:', err)
+      const message = err instanceof Error ? err.message : 'Analysis failed'
+      setError(message)
+      setState('error')
+      trackTrialAnalysisFailed(message)
+      toast.error('Analysis failed', { description: message })
+    }
+  }, [])
+
+  // Process file passed from landing page UploadWidget via router state
+  useEffect(() => {
+    const locationState = location.state as LocationState | null
+    const fileFromState = locationState?.file
+
+    // Only process once, when we have a file and backend is ready
+    if (
+      fileFromState &&
+      !processedFromStateRef.current &&
+      backendReady &&
+      state === 'idle'
+    ) {
+      processedFromStateRef.current = true
+      // Clear location state to prevent reprocessing on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+      // Start processing the file
+      processFileFromState(fileFromState)
+    }
+  }, [location, backendReady, state, navigate, processFileFromState])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])

@@ -22,9 +22,6 @@ export function UploadWidget({
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Route to /try for anonymous users, /upload for logged-in users
-  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
-
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
     setIsDragging(false)
@@ -75,11 +72,15 @@ export function UploadWidget({
       })
 
       setIsUploading(false)
-      toast.success('Files uploaded successfully', {
-        description: `${valid.length} policy document(s) are being analyzed.`,
-      })
-      // Navigate to appropriate page based on auth state
-      navigate(uploadPath)
+      // Navigate to appropriate page with file data
+      // For anonymous users, pass file via router state to TryAnalysis
+      // For logged-in users, pass to PolicyUpload
+      if (user) {
+        navigate('/upload?autoOpen=true', { state: { files: valid } })
+      } else {
+        // Pass file to TryAnalysis - it will handle the analysis
+        navigate('/try', { state: { file: valid[0] } })
+      }
     } catch (err) {
       setIsUploading(false)
       const message = err instanceof Error ? err.message : 'Upload failed'
