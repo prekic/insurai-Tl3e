@@ -2086,6 +2086,73 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/App.tsx` - Added `/try` route
 - **Commits**: `051db44`, `a434068`, `71df32e`, `6d7923b`
 
+### 35. Simulated Network Error Removed from UploadWidget (Fixed Jan 30, 2026)
+- **Problem**: 5% of uploads randomly failed with "Network error" - development code left in production
+- **Root Cause**: `UploadWidget.tsx` had `if (Math.random() < 0.05) reject(new Error('Network error'))`
+- **Solution**: Removed simulated error, replaced with simple 500ms delay for UX
+- **File Changed**: `src/components/landing/UploadWidget.tsx`
+- **Commit**: `9887e8d`
+
+### 36. Secure Email Unsubscribe Tokens (Added Jan 30, 2026)
+- **Feature**: All marketing emails now include secure unsubscribe links with HMAC-SHA256 tokens
+- **Implementation**:
+  - `server/routes/email.ts` - Added `generateUnsubscribeToken()` and `verifyUnsubscribeToken()`
+  - `server/services/email-service.ts` - Updated `wrapTemplate()` to include unsubscribe links
+  - Token is HMAC-SHA256 of email + secret, truncated to 32 chars
+  - Timing-safe comparison prevents timing attacks
+- **Endpoints**:
+  - `POST /api/email/unsubscribe` - Requires valid token
+  - `GET /api/email/unsubscribe-token` - Admin endpoint for testing
+- **Environment Variable**: `UNSUBSCRIBE_SECRET` (falls back to `ADMIN_JWT_SECRET`)
+- **Commits**: `60bd2ba`
+
+### 37. ESLint Warnings Reduced to 45 (Jan 30, 2026)
+- **Status**: All 45 remaining warnings are `@typescript-eslint/no-non-null-assertion`
+- **Fixed This Session**:
+  - Unescaped entities in `TryAnalysis.tsx` (2 occurrences)
+  - Unescaped entity in `Hero.tsx` (1 occurrence)
+  - `ZodError.errors` → `ZodError.issues` in email routes
+- **Remaining Warnings by File**:
+  - `services/workflow/.../ocr-pipeline.ts` (18)
+  - `src/lib/admin/operations-logger.ts` (10)
+  - `services/validate-svc/src/index.ts` (6)
+  - Others (11 across 10 files)
+- **Note**: These non-null assertions are intentional in guarded code paths
+- **Commits**: `858b0cd`, `60bd2ba`
+
+### 38. Migration Files Renamed with Sequential Suffixes (Jan 30, 2026)
+- **Problem**: Multiple migration files had same number prefix causing conflicts
+- **Solution**: Renamed to use a, b, c suffixes for ordering:
+  - `005_admin_schema.sql` → `005a_admin_schema.sql`
+  - `005_admin_tables.sql` → `005b_admin_tables.sql`
+  - `007_document_processing_logs.sql` → `007a_document_processing_logs.sql`
+  - `007_extraction_pipeline.sql` → `007b_extraction_pipeline.sql`
+  - `007_email_system.sql` → `007c_email_system.sql`
+  - `008_admin_notifications.sql` → `008a_admin_notifications.sql`
+  - `008_seed_kasko_benchmark.sql` → `008b_seed_kasko_benchmark.sql`
+- **Commit**: `6b72aed`
+
+### 39. Debug Flags Disabled in OCR Decision Engine (Jan 30, 2026)
+- **Files Changed**:
+  - `src/lib/ocr-decision/language-detector.ts`: `DEBUG_LANGUAGE_DETECTION = false`
+  - `src/lib/ocr-decision/policy-classifier.ts`: `DEBUG_POLICY_CLASSIFICATION = false`
+  - `src/lib/ocr-decision/ocr-decision-engine.ts`: `DEBUG_CONFIDENCE_CALCULATION = false`
+- **Commit**: `6b72aed`
+
+### 40. Google Vision OCR Service Error (Informational - Jan 30, 2026)
+- **Status**: Informational, not blocking
+- **Symptom**: `/api/ai/diagnose` returns `"google": {"valid": false, "error": "Service error"}`
+- **Impact**:
+  - ❌ Google Vision OCR not working
+  - ✅ Document AI OCR may still work (uses different credentials)
+  - ✅ pdf.js text extraction works (for digital PDFs)
+  - ✅ OpenAI/Anthropic extraction working
+- **Possible Causes**:
+  - Cloud Vision API not enabled on Google Cloud project
+  - `GOOGLE_CLOUD_API_KEY` doesn't have Vision API permissions
+  - Billing not enabled on project
+- **Fallback Flow**: Digital PDF → pdf.js → OpenAI/Anthropic → Success ✅
+
 ---
 
 ## Turkish Market Considerations

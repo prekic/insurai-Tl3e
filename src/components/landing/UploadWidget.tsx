@@ -59,17 +59,8 @@ export function UploadWidget({
     setIsUploading(true)
 
     try {
-      // Simulate processing with potential failure
-      await new Promise((resolve, reject) => {
-        setTimeout(() => {
-          // 5% chance of simulated network error for demo
-          if (Math.random() < 0.05) {
-            reject(new Error('Network error'))
-          } else {
-            resolve(true)
-          }
-        }, 1500)
-      })
+      // Brief delay for UX feedback
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
       setIsUploading(false)
       // Navigate to appropriate page with file data

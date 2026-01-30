@@ -18,8 +18,8 @@ import type {
   DocumentJourneyMetadata,
 } from './types'
 
-// Debug logging flag - set to true to enable verbose logging
-const DEBUG_CONFIDENCE_CALCULATION = true
+// Debug logging flag - set to false in production
+const DEBUG_CONFIDENCE_CALCULATION = false
 
 function debugLog(message: string, data?: unknown): void {
   if (DEBUG_CONFIDENCE_CALCULATION) {

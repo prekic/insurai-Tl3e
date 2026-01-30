@@ -339,7 +339,7 @@ export function Hero() {
               </div>,
 
               <div key="sample-report" className="mt-4">
-                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you'll get:</p>
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
                 <SampleReportPreviewCompact />
               </div>,
 

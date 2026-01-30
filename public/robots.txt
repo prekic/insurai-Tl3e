@@ -1,0 +1,29 @@
+# InsurAI - robots.txt
+# https://insurai-production.up.railway.app
+
+User-agent: *
+Allow: /
+Allow: /try
+Allow: /help
+Allow: /auth
+
+# Disallow authenticated/private areas
+Disallow: /dashboard
+Disallow: /upload
+Disallow: /policy/
+Disallow: /chat
+Disallow: /account
+Disallow: /settings
+Disallow: /compare
+Disallow: /admin
+Disallow: /admin/
+Disallow: /api/
+
+# Disallow shared results (temporary/private)
+Disallow: /share/
+
+# Allow crawlers to find sitemap
+Sitemap: https://insurai-production.up.railway.app/sitemap.xml
+
+# Crawl-delay for rate limiting (optional, not all bots respect this)
+Crawl-delay: 1

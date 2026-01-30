@@ -500,7 +500,7 @@ export function TryAnalysis() {
               Free Trial Already Used
             </h1>
             <p className="text-gray-600 mb-6">
-              You've already analyzed a policy with your free trial.
+              You&apos;ve already analyzed a policy with your free trial.
               {timeRemaining > 0 && (
                 <span className="block mt-2 text-sm text-gray-500">
                   Try again in {formatTimeRemaining(timeRemaining)}
@@ -785,7 +785,7 @@ export function TryAnalysis() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">Get a copy via email</h4>
-                    <p className="text-sm text-gray-500">We'll send you this analysis report</p>
+                    <p className="text-sm text-gray-500">We&apos;ll send you this analysis report</p>
                   </div>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">

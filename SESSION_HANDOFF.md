@@ -1,4 +1,4 @@
-# Session Handoff - January 30, 2026
+# Session Handoff - January 30, 2026 (Afternoon)
 
 ## Current Status
 
@@ -7,9 +7,9 @@
 | **Build** | ✅ Passing |
 | **TypeCheck** | ✅ 0 errors |
 | **ESLint Errors** | ✅ 0 errors |
-| **ESLint Warnings** | ⚠️ 48 warnings (no-non-null-assertion) |
+| **ESLint Warnings** | ⚠️ 45 warnings (all no-non-null-assertion) |
 | **Tests** | ✅ 5800+ passing (165 test files) |
-| **Branch** | `claude/review-project-status-oHQXg` |
+| **Branch** | `claude/review-handoff-xynEP` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Railway deployed, working |
@@ -18,87 +18,102 @@
 
 ## Session Summary
 
-This session focused on **free trial upload flow fixes** and **extraction timeout handling**.
+This session focused on **production hardening** and **email security**:
 
-Key accomplishments:
-1. Fixed file handoff bug from landing page to TryAnalysis
-2. Added 90-second timeout with Promise.race for stuck extractions
-3. Added progress updates every 10 seconds during extraction
-4. Created 32 new tests (19 for TryAnalysis, 13 for UploadWidget)
-5. Identified Anthropic billing issue causing fallback to OpenAI
+1. Removed 5% simulated network error from UploadWidget
+2. Implemented secure email unsubscribe tokens (HMAC-SHA256)
+3. Fixed ESLint warnings (unescaped entities, ZodError.issues)
+4. Renamed migration files with sequential a,b,c suffixes
+5. Disabled debug flags in OCR decision engine
+6. Updated README.md to reflect full-stack state
+7. Investigated Google Vision OCR "Service error"
+8. Updated CLAUDE.md and SESSION_HANDOFF.md with session changes
 
 ---
 
 ## Features Completed This Session
 
-### 1. File Handoff Fix (commit 6d7923b)
+### 1. Simulated Network Error Removed (commit 9887e8d)
 
-**Problem**: Anonymous users uploaded files on landing page but were returned to upload page instead of seeing analysis results.
+**Problem**: 5% of anonymous uploads randomly failed with "Network error" - development code accidentally left in production.
 
-**Root Cause**: `UploadWidget.tsx` navigated to `/try` but didn't pass the file.
-
-**Solution**: Pass file via React Router state:
+**Root Cause**: `UploadWidget.tsx` lines 62-72 contained:
 ```tsx
-// UploadWidget.tsx
-navigate('/try', { state: { file: valid[0] } })
-
-// TryAnalysis.tsx
-const location = useLocation()
-const state = location.state as LocationState | null
-if (state?.file) {
-  processFileFromState(state.file)
+if (Math.random() < 0.05) {
+  reject(new Error('Network error'))
 }
 ```
 
-### 2. Extraction Timeout (commit 58345b4)
+**Solution**: Removed simulated error, replaced with 500ms delay for UX feedback.
 
-**Problem**: Analysis got stuck at 40% "Extracting text from PDF..." with no way out.
+### 2. Secure Email Unsubscribe Tokens (commit 60bd2ba)
 
-**Solution**: Added 60-second timeout (later increased to 90s) using Promise.race:
-```tsx
-const EXTRACTION_TIMEOUT_MS = 90000
-const timeoutPromise = new Promise<never>((_, reject) => {
-  setTimeout(() => reject(new Error('Analysis timed out...')), EXTRACTION_TIMEOUT_MS)
-})
-const result = await Promise.race([extractionPromise, timeoutPromise])
+**Feature**: All marketing emails now include cryptographically secure unsubscribe links.
+
+**Implementation**:
+- `server/routes/email.ts`:
+  - `generateUnsubscribeToken(email)` - HMAC-SHA256, truncated to 32 chars
+  - `verifyUnsubscribeToken(email, token)` - Timing-safe comparison
+- `server/services/email-service.ts`:
+  - `wrapTemplate()` now accepts `recipientEmail` parameter
+  - Footer includes personalized unsubscribe URL
+
+**Endpoints**:
+- `POST /api/email/unsubscribe` - Requires valid token (401 without)
+- `GET /api/email/unsubscribe-token?email=...` - Admin testing endpoint
+
+**Environment Variable**: `UNSUBSCRIBE_SECRET` (falls back to `ADMIN_JWT_SECRET`)
+
+### 3. ESLint Warnings Fixed (commits 858b0cd, 60bd2ba)
+
+| Fix | Location |
+|-----|----------|
+| `You've` → `You&apos;ve` | TryAnalysis.tsx:503 |
+| `We'll` → `We&apos;ll` | TryAnalysis.tsx:788 |
+| `you'll` → `you&apos;ll` | Hero.tsx:342 |
+| `ZodError.errors` → `.issues` | email.ts (3 occurrences) |
+| Type assertion for Resend | email-service.ts:103 |
+
+**Result**: Reduced from 51 to 45 warnings.
+
+### 4. Migration Files Renamed (commit 6b72aed)
+
+Resolved naming conflicts by adding sequential suffixes:
+```
+005_admin_schema.sql    → 005a_admin_schema.sql
+005_admin_tables.sql    → 005b_admin_tables.sql
+007_document_*.sql      → 007a_, 007b_, 007c_
+008_admin_*.sql         → 008a_, 008b_
 ```
 
-### 3. Progress Updates (commit 2b2682b)
+### 5. Debug Flags Disabled (commit 6b72aed)
 
-**Problem**: Users saw no feedback during long extractions.
+| File | Flag |
+|------|------|
+| `language-detector.ts` | `DEBUG_LANGUAGE_DETECTION = false` |
+| `policy-classifier.ts` | `DEBUG_POLICY_CLASSIFICATION = false` |
+| `ocr-decision-engine.ts` | `DEBUG_CONFIDENCE_CALCULATION = false` |
 
-**Solution**: Progress interval updates every 10 seconds:
-```tsx
-progressInterval = setInterval(() => {
-  setProgress((prev) => prev < 85 ? prev + 5 : prev)
-  setProgressMessage((prev) => {
-    const messages = ['Extracting text...', 'Analyzing structure...', 'Processing with AI...', 'Almost there...']
-    const currentIndex = messages.indexOf(prev)
-    return currentIndex < messages.length - 1 ? messages[currentIndex + 1] : prev
-  })
-}, 10000)
-```
+### 6. README.md Updated (commit 36097dc)
 
-### 4. Test Coverage
-
-| Test File | Tests | Coverage |
-|-----------|-------|----------|
-| `TryAnalysis.test.tsx` | 19 | File handoff, timeout, progress, errors |
-| `UploadWidget.test.tsx` | 13 | Anonymous/logged-in flows, drag-drop |
+Changed from "Phase 1: Frontend-only" to accurate full-stack documentation including:
+- Express backend, Supabase, AI integration
+- 5800+ tests, PWA support, email notifications
+- Railway deployment instructions
+- Complete environment variable documentation
 
 ---
 
 ## Commits This Session
 
 ```
-2b2682b Increase timeout to 90s and add progress updates during extraction
-58345b4 Add timeout and error handling for stuck analysis states
-6d7923b Fix file handoff from landing page to trial analysis
-71df32e Add trial data transfer, analytics, email capture, and share links
-a434068 Show full analysis for anonymous users
-051db44 Add session-based free trial for anonymous users
-c0a0888 Improve mobile landing page conversion and trust signals
-6fbf519 Revert OCR Decision Engine integration - always use Document AI
+92a6b0c Add final commit to SESSION_HANDOFF.md documentation
+33b52fe Update documentation for session handoff
+9887e8d Remove simulated network error from UploadWidget
+858b0cd Fix remaining unescaped entity in TryAnalysis.tsx
+60bd2ba Implement secure email unsubscribe tokens and fix ESLint warnings
+36097dc Update README.md to reflect current full-stack state
+6b72aed Rename migrations and disable debug flags for production
 ```
 
 ---
@@ -107,11 +122,16 @@ c0a0888 Improve mobile landing page conversion and trust signals
 
 | File | Changes |
 |------|---------|
-| `src/components/TryAnalysis.tsx` | Added file from router state, 90s timeout, progress updates |
-| `src/components/landing/UploadWidget.tsx` | Pass file via router state for anonymous users |
-| `src/components/TryAnalysis.test.tsx` | **NEW** 19 tests |
-| `src/components/landing/UploadWidget.test.tsx` | **NEW** 13 tests |
-| `src/App.tsx` | Added `/try` route |
+| `src/components/landing/UploadWidget.tsx` | Removed 5% simulated error |
+| `src/components/TryAnalysis.tsx` | Fixed unescaped entities |
+| `src/components/landing/Hero.tsx` | Fixed unescaped entity |
+| `server/routes/email.ts` | Added token generation/verification |
+| `server/services/email-service.ts` | Added crypto import, unsubscribe URLs in emails |
+| `README.md` | Complete rewrite for current state |
+| `supabase/migrations/*.sql` | Renamed with a,b,c suffixes |
+| `src/lib/ocr-decision/*.ts` | Debug flags set to false |
+| `CLAUDE.md` | Added known issues #35-40 |
+| `SESSION_HANDOFF.md` | Complete rewrite for session handoff |
 
 ---
 
@@ -119,32 +139,73 @@ c0a0888 Improve mobile landing page conversion and trust signals
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Anthropic billing issue | Medium | Open | "Your credit balance is too low" - auto-falls back to OpenAI |
-| Extraction latency | Low | Mitigated | 90s timeout accommodates Document AI + fallback |
-| 45 no-non-null-assertion warnings | Low | Deferred | Would require refactoring |
+| Google Vision "Service error" | Low | Open | Falls back to pdf.js + OpenAI |
+| Anthropic billing issue | Medium | Open | Falls back to OpenAI |
+| 45 no-non-null-assertion warnings | Low | Deferred | Intentional in guarded paths |
+
+### Google Vision OCR Status
+
+From `/api/ai/diagnose`:
+```json
+{
+  "google": {
+    "configured": true,
+    "valid": false,
+    "error": "Service error"
+  }
+}
+```
+
+**Impact**: Not blocking - system uses pdf.js → OpenAI/Anthropic fallback.
+
+**Possible causes**:
+- Cloud Vision API not enabled on GCP project
+- `GOOGLE_CLOUD_API_KEY` lacks Vision permissions
+- Billing not enabled
 
 ---
 
-## Railway Deployment Notes
+## Production Health Check
 
-**Last Deployment**: January 30, 2026
+```bash
+# Health endpoint
+curl -s "https://insurai-production.up.railway.app/api/health"
+# {"status":"ok","timestamp":"...","providers":{"openai":true,"anthropic":true,"google":true}}
 
-**Logs Revealed**:
-1. Document AI OCR working (~50 seconds for processing)
-2. Anthropic API failed: "Your credit balance is too low to access the Anthropic API"
-3. System correctly fell back to OpenAI
-4. Admin notification created for billing issue
+# Admin diagnostics
+curl -s "https://insurai-production.up.railway.app/api/admin/diagnostics"
+# {"success":true,"status":"healthy","config":{"hasJwtSecret":true,...}}
 
-**Environment Variables Required**:
-- `OPENAI_API_KEY` - Required, used as fallback
-- `ANTHROPIC_API_KEY` - Optional, preferred provider
-- `GOOGLE_CLOUD_API_KEY` - Required for Document AI OCR
-- `GCP_SERVICE_ACCOUNT_BASE64` - GCP credentials (base64-encoded)
-- `SUPABASE_URL` - Required for database
-- `SUPABASE_SERVICE_ROLE_KEY` - Required for admin operations
-- `ADMIN_JWT_SECRET` - Required for admin authentication
-- `VITE_SUPABASE_URL` - Build-time (baked into bundle)
-- `VITE_SUPABASE_ANON_KEY` - Build-time (baked into bundle)
+# AI diagnostics
+curl -s "https://insurai-production.up.railway.app/api/ai/diagnose"
+# Shows provider validity and latency
+```
+
+---
+
+## Railway Environment Variables
+
+### Required
+```bash
+OPENAI_API_KEY=sk-proj-xxx          # Required, used as fallback
+ANTHROPIC_API_KEY=sk-ant-xxx        # Optional, preferred provider
+GOOGLE_CLOUD_API_KEY=xxx            # For Vision OCR (currently failing)
+GCP_SERVICE_ACCOUNT_BASE64=...      # For Document AI (base64-encoded JSON)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+ADMIN_JWT_SECRET=xxx                # 128 chars recommended
+NODE_ENV=production
+
+# Build-time (baked into JS bundle)
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+```
+
+### Optional
+```bash
+UNSUBSCRIBE_SECRET=xxx              # Falls back to ADMIN_JWT_SECRET
+RESEND_API_KEY=re_xxx               # For email notifications
+```
 
 **Note**: `VITE_API_PROXY_URL` is auto-detected in production via `window.location.origin`
 
@@ -153,33 +214,32 @@ c0a0888 Improve mobile landing page conversion and trust signals
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Top up Anthropic credits** - Restore faster extraction without fallback
-2. **Monitor extraction success rate** - Check if 90s timeout is sufficient
+1. **Test anonymous upload flow** - Verify simulated error fix works
+2. **Check Google Cloud Console** - Enable Vision API or fix credentials
 
 ### Short Term
-1. **Consider caching extraction results** - Reduce repeated API calls
-2. **Add retry logic for transient failures** - Network issues, rate limits
-3. **Implement extraction queue** - Handle multiple concurrent uploads
+1. **Top up Anthropic credits** - Restore faster extraction
+2. **Test email unsubscribe flow** - Verify tokens work end-to-end
+3. **Run full E2E test** - See `docs/LAUNCH_CHECKLIST.md`
 
 ### Feature Work
-1. **Integrate OCR Decision Engine with policy-extractor** - (Reverted, needs refinement)
-2. **Add Document Journey metadata to admin viewer**
+1. **Add unsubscribe page** - Frontend for `/unsubscribe?email=&token=`
+2. **Email preference management** - Let users toggle notification types
 3. **Multi-policy free trial** - Allow 3 policies per session
 
 ---
 
-## Common Gotchas (Quick Reference)
+## Common Gotchas
 
 | Gotcha | Solution |
 |--------|----------|
-| Files not passed to TryAnalysis | Use `navigate('/try', { state: { file } })` |
-| Extraction stuck/timeout | 90s timeout with Promise.race |
-| No progress feedback | setInterval updates every 10s |
-| Anthropic billing | System auto-falls back to OpenAI |
+| 5% random upload failure | Fixed - removed simulated error |
+| Email unsubscribe without token | Now returns 401 with helpful message |
+| Migration file conflicts | Use a,b,c suffixes (005a, 005b, etc.) |
+| Debug logs in production | Set DEBUG_* flags to false |
 | `VITE_*` vars not updating | Need rebuild, not restart |
-| Admin login 500 | Check `/api/admin/diagnostics` |
-| PDF.js worker blocked | CSP must allow unpkg.com |
-| useRef for duplicate prevention | Prevent re-processing on re-renders |
+| Google Vision not working | Check Vision API enabled, key permissions |
+| ZodError.errors undefined | Use `.issues` instead |
 
 ---
 
@@ -187,10 +247,10 @@ c0a0888 Improve mobile landing page conversion and trust signals
 
 ```bash
 # Check ESLint status
-npm run lint
+npm run lint  # Should show 0 errors, 45 warnings
 
 # Check TypeScript
-npm run typecheck
+npm run typecheck  # Should pass
 
 # Run all tests
 npm test -- --run
@@ -198,31 +258,31 @@ npm test -- --run
 # Full validation
 npm run validate
 
-# Health check
+# Check production health
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
-
-# Admin diagnostics
-curl -s "https://insurai-production.up.railway.app/api/admin/diagnostics" | jq .
 ```
 
 ---
 
 ## Previous Session Context
 
-January 29, 2026:
-- Fixed all 153 ESLint errors (reduced to 0)
-- Reduced ESLint warnings from 161 to 48 (70% reduction)
-- Fixed 4 react-hooks/exhaustive-deps warnings
-- Fixed Railway build failure from catch block variable renaming
+**Earlier Today (Jan 30, Morning)**:
+- Fixed file handoff from landing page to TryAnalysis
+- Added 90-second timeout for stuck extractions
+- Added progress updates every 10 seconds
+- Created 32 new tests
 
-January 28, 2026:
+**January 29, 2026**:
+- Fixed all 153 ESLint errors (reduced to 0)
+- Reduced ESLint warnings from 161 to 48
+
+**January 28, 2026**:
 - Implemented PDF splitting for Document AI 15-page limit
 - Added `/api/admin/diagnostics` endpoint
-- Configured `ADMIN_JWT_SECRET` on Railway
 
 ---
 
-**Last Updated**: January 30, 2026
-**Branch**: `claude/review-project-status-oHQXg`
-**ESLint Status**: 0 errors, 48 warnings
-**Next Session Focus**: Top up Anthropic credits, monitor extraction success
+**Last Updated**: January 30, 2026 (17:55 UTC)
+**Branch**: `claude/review-handoff-xynEP`
+**ESLint Status**: 0 errors, 45 warnings
+**Next Session Focus**: Test anonymous upload, fix Google Vision, test email flow

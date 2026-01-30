@@ -23,6 +23,7 @@ dotenv.config()
 import aiRoutes from './routes/ai.js'
 import adminRoutes from './routes/admin.js'
 import pdfRoutes from './routes/pdf.js'
+import emailRoutes from './routes/email.js'
 import {
   generalLimiter,
   healthLimiter,
@@ -277,6 +278,9 @@ app.use('/api/admin', adminRoutes)
 
 // PDF extraction routes (with longer timeout for large files)
 app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)
+
+// Email notification routes
+app.use('/api/email', emailRoutes)
 
 // 404 handler for API routes only
 app.use('/api', (_req, res) => {
