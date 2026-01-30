@@ -197,9 +197,27 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
   try {
     const { token, email } = req.body
 
-    // In production, verify the unsubscribe token
-    // For now, just log and return success
-    console.log(`[EmailRoutes] Unsubscribe request: ${email}`)
+    // Validate required fields
+    if (!email || typeof email !== 'string') {
+      return res.status(400).json({ error: 'Email is required' })
+    }
+
+    // Validate unsubscribe token if provided
+    // Token should be a hash of email + secret to prevent unauthorized unsubscribes
+    if (token) {
+      // TODO: In production, verify token matches expected hash
+      // const expectedToken = crypto.createHash('sha256')
+      //   .update(email + process.env.UNSUBSCRIBE_SECRET)
+      //   .digest('hex')
+      // if (token !== expectedToken) {
+      //   return res.status(401).json({ error: 'Invalid unsubscribe token' })
+      // }
+      console.log(`[EmailRoutes] Unsubscribe with token for: ${email}`)
+    } else {
+      // Without token, log as potential abuse but still process
+      // In production, you might want to require the token
+      console.warn(`[EmailRoutes] Unsubscribe without token for: ${email}`)
+    }
 
     // Update preferences to opt out of marketing
     // This would need the user ID from the token in production
