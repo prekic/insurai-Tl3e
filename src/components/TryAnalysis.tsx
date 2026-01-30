@@ -231,6 +231,7 @@ export function TryAnalysis() {
   }
 
   if (state === 'complete' && result) {
+    const policy = result.policy
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-8 px-4">
         <div className="max-w-4xl mx-auto">
@@ -248,6 +249,13 @@ export function TryAnalysis() {
                   {result.fileName} • Confidence: {Math.round((result.confidence || 0.85) * 100)}%
                 </p>
               </div>
+              <Button
+                onClick={handleSignUp}
+                size="sm"
+                className="bg-gradient-to-r from-blue-600 to-indigo-600"
+              >
+                Save to Dashboard
+              </Button>
             </div>
           </div>
 
@@ -256,99 +264,195 @@ export function TryAnalysis() {
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6">
               <h2 className="text-white font-semibold text-lg">Policy Summary</h2>
               <p className="text-slate-300 text-sm">
-                {result.policy.typeTr || result.policy.type} • {result.policy.provider}
+                {policy.typeTr || policy.type} • {policy.provider}
               </p>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-6">
               {/* Key Details */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <div className="text-sm text-gray-500">Policy Number</div>
-                  <div className="font-semibold text-gray-900">{result.policy.policyNumber}</div>
+                  <div className="font-semibold text-gray-900">{policy.policyNumber}</div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <div className="text-sm text-gray-500">Insured</div>
-                  <div className="font-semibold text-gray-900">{result.policy.insuredPerson || 'N/A'}</div>
+                  <div className="font-semibold text-gray-900">{policy.insuredPerson || 'N/A'}</div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <div className="text-sm text-gray-500">Premium</div>
                   <div className="font-semibold text-gray-900">
-                    ₺{result.policy.premium?.toLocaleString('tr-TR') || 'N/A'}
+                    ₺{policy.premium?.toLocaleString('tr-TR') || 'N/A'}
                   </div>
                 </div>
                 <div className="p-4 bg-gray-50 rounded-xl">
                   <div className="text-sm text-gray-500">Coverage</div>
                   <div className="font-semibold text-gray-900">
-                    ₺{result.policy.coverage?.toLocaleString('tr-TR') || 'N/A'}
+                    {policy.coverages?.some(c => c.isMarketValue)
+                      ? 'Rayiç Değer'
+                      : `₺${policy.coverage?.toLocaleString('tr-TR') || 'N/A'}`}
                   </div>
                 </div>
               </div>
 
-              {/* Coverage Preview */}
-              {result.policy.coverages && result.policy.coverages.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="font-semibold text-gray-900 mb-3">Coverages ({result.policy.coverages.length})</h3>
+              {/* Dates */}
+              {(policy.startDate || policy.expiryDate) && (
+                <div className="grid grid-cols-2 gap-4">
+                  {policy.startDate && (
+                    <div className="p-4 bg-gray-50 rounded-xl">
+                      <div className="text-sm text-gray-500">Start Date</div>
+                      <div className="font-semibold text-gray-900">
+                        {new Date(policy.startDate).toLocaleDateString('tr-TR')}
+                      </div>
+                    </div>
+                  )}
+                  {policy.expiryDate && (
+                    <div className="p-4 bg-gray-50 rounded-xl">
+                      <div className="text-sm text-gray-500">Expiry Date</div>
+                      <div className="font-semibold text-gray-900">
+                        {new Date(policy.expiryDate).toLocaleDateString('tr-TR')}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* All Coverages */}
+              {policy.coverages && policy.coverages.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">
+                    Coverages ({policy.coverages.length})
+                  </h3>
                   <div className="space-y-2">
-                    {result.policy.coverages.slice(0, 3).map((cov, i) => (
+                    {policy.coverages.map((cov, i) => (
                       <div key={i} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
                         <span className="text-sm text-emerald-800">{cov.nameTr || cov.name}</span>
                         <span className="text-sm font-medium text-emerald-700">
-                          {cov.included ? '✓ Included' : `₺${cov.limit?.toLocaleString('tr-TR')}`}
+                          {cov.isUnlimited
+                            ? 'Sınırsız'
+                            : cov.isMarketValue
+                              ? 'Rayiç Değer'
+                              : cov.included && (!cov.limit || cov.limit === 0)
+                                ? '✓ Dahil'
+                                : `₺${cov.limit?.toLocaleString('tr-TR')}`}
                         </span>
                       </div>
                     ))}
-                    {result.policy.coverages.length > 3 && (
-                      <p className="text-sm text-gray-500 text-center pt-2">
-                        +{result.policy.coverages.length - 3} more coverages
-                      </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Exclusions */}
+              {policy.exclusions && policy.exclusions.length > 0 && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">
+                    Exclusions ({policy.exclusions.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {policy.exclusions.map((exc, i) => (
+                      <div key={i} className="flex items-start gap-2 p-3 bg-red-50 rounded-lg">
+                        <XCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-red-800">{exc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* All AI Insights */}
+              {policy.aiInsights && policy.aiInsights.length > 0 && (
+                <div className="p-4 bg-blue-50 rounded-xl">
+                  <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                    <Sparkles size={16} />
+                    AI Insights ({policy.aiInsights.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {policy.aiInsights.map((insight, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <CheckCircle2 size={14} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-blue-800">{insight.replace(/^[✓✔]\s*/, '')}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Risk Actions */}
+              {policy.riskActions && policy.riskActions.length > 0 && (
+                <div className="p-4 bg-amber-50 rounded-xl">
+                  <h3 className="font-semibold text-amber-900 mb-3 flex items-center gap-2">
+                    <AlertTriangle size={16} />
+                    Recommended Actions ({policy.riskActions.length})
+                  </h3>
+                  <div className="space-y-2">
+                    {policy.riskActions.map((action, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <ArrowRight size={14} className={`mt-0.5 flex-shrink-0 ${
+                          action.priority === 'critical' ? 'text-red-600' :
+                          action.priority === 'high' ? 'text-orange-600' :
+                          'text-amber-600'
+                        }`} />
+                        <p className="text-sm text-amber-800">{action.action}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Vehicle Info (for Kasko) */}
+              {policy.vehicleInfo && (
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3">Vehicle Information</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {policy.vehicleInfo.plate && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500">Plate</div>
+                        <div className="font-medium text-gray-900">{policy.vehicleInfo.plate}</div>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.make && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500">Make</div>
+                        <div className="font-medium text-gray-900">{policy.vehicleInfo.make}</div>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.model && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500">Model</div>
+                        <div className="font-medium text-gray-900">{policy.vehicleInfo.model}</div>
+                      </div>
+                    )}
+                    {policy.vehicleInfo.year && (
+                      <div className="p-3 bg-gray-50 rounded-lg">
+                        <div className="text-xs text-gray-500">Year</div>
+                        <div className="font-medium text-gray-900">{policy.vehicleInfo.year}</div>
+                      </div>
                     )}
                   </div>
                 </div>
               )}
-
-              {/* AI Insights Preview */}
-              {result.policy.aiInsights && result.policy.aiInsights.length > 0 && (
-                <div className="mt-4 p-4 bg-blue-50 rounded-xl">
-                  <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                    <Sparkles size={16} />
-                    AI Insight
-                  </h3>
-                  <p className="text-sm text-blue-800">{result.policy.aiInsights[0]}</p>
-                </div>
-              )}
             </div>
+          </div>
 
-            {/* Blurred Preview / Signup CTA */}
-            <div className="relative">
-              {/* Blurred content hint */}
-              <div className="p-6 bg-gradient-to-b from-transparent to-gray-100 blur-sm opacity-50">
-                <div className="h-20 bg-gray-200 rounded-lg mb-3"></div>
-                <div className="h-16 bg-gray-200 rounded-lg"></div>
+          {/* Sign Up CTA Banner */}
+          <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-6">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h3 className="text-white font-bold text-lg mb-1">
+                  Save this analysis to your dashboard
+                </h3>
+                <p className="text-blue-100 text-sm">
+                  Create a free account to track policies, compare providers, and get market insights.
+                </p>
               </div>
-
-              {/* Overlay CTA */}
-              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-b from-white/80 to-white">
-                <div className="text-center p-6">
-                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Lock className="text-blue-600" size={24} />
-                  </div>
-                  <h3 className="font-bold text-gray-900 mb-2">
-                    Sign up to unlock full analysis
-                  </h3>
-                  <p className="text-sm text-gray-600 mb-4 max-w-sm">
-                    Get detailed gap analysis, market comparisons, AI recommendations, and save to your dashboard.
-                  </p>
-                  <Button
-                    onClick={handleSignUp}
-                    className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg"
-                  >
-                    <Sparkles size={18} className="mr-2" />
-                    Sign Up Free
-                    <ArrowRight size={18} className="ml-2" />
-                  </Button>
-                </div>
-              </div>
+              <Button
+                onClick={handleSignUp}
+                className="bg-white text-blue-600 hover:bg-blue-50 whitespace-nowrap"
+              >
+                <Sparkles size={18} className="mr-2" />
+                Sign Up Free
+                <ArrowRight size={18} className="ml-2" />
+              </Button>
             </div>
           </div>
 
