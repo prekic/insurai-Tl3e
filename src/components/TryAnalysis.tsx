@@ -785,7 +785,7 @@ export function TryAnalysis() {
                   </div>
                   <div>
                     <h4 className="font-semibold text-gray-900">Get a copy via email</h4>
-                    <p className="text-sm text-gray-500">We'll send you this analysis report</p>
+                    <p className="text-sm text-gray-500">We&apos;ll send you this analysis report</p>
                   </div>
                 </div>
                 <div className="flex gap-2 w-full md:w-auto">
