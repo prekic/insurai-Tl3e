@@ -12,6 +12,8 @@ const STORAGE_KEYS = {
   TRIAL_RESULT: 'insurai_trial_result',
   TRIAL_TIMESTAMP: 'insurai_trial_timestamp',
   TRIAL_FILE_NAME: 'insurai_trial_filename',
+  TRIAL_EMAIL: 'insurai_trial_email',
+  TRIAL_SHARE_ID: 'insurai_trial_share_id',
 } as const
 
 // Trial expires after 24 hours (encourages signup)
@@ -22,6 +24,13 @@ export interface TrialResult {
   fileName: string
   analyzedAt: string
   expiresAt: string
+  email?: string
+  shareId?: string
+}
+
+export interface TrialEmail {
+  email: string
+  capturedAt: string
 }
 
 /**
@@ -80,6 +89,8 @@ export function getTrialResult(): TrialResult | null {
     const resultStr = localStorage.getItem(STORAGE_KEYS.TRIAL_RESULT)
     const timestamp = localStorage.getItem(STORAGE_KEYS.TRIAL_TIMESTAMP)
     const fileName = localStorage.getItem(STORAGE_KEYS.TRIAL_FILE_NAME)
+    const email = localStorage.getItem(STORAGE_KEYS.TRIAL_EMAIL)
+    const shareId = localStorage.getItem(STORAGE_KEYS.TRIAL_SHARE_ID)
 
     if (!resultStr || !timestamp) {
       return null
@@ -101,10 +112,24 @@ export function getTrialResult(): TrialResult | null {
       fileName: fileName || 'policy.pdf',
       analyzedAt: new Date(trialTime).toISOString(),
       expiresAt: new Date(trialTime + TRIAL_EXPIRY_MS).toISOString(),
+      email: email || undefined,
+      shareId: shareId || undefined,
     }
   } catch {
     return null
   }
+}
+
+/**
+ * Generate a short unique share ID
+ */
+function generateShareId(): string {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  let result = ''
+  for (let i = 0; i < 12; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  }
+  return result
 }
 
 /**
@@ -113,10 +138,12 @@ export function getTrialResult(): TrialResult | null {
 export function saveTrialResult(policy: AnalyzedPolicy, fileName: string): void {
   try {
     const now = Date.now()
+    const shareId = generateShareId()
     localStorage.setItem(STORAGE_KEYS.TRIAL_USED, 'true')
     localStorage.setItem(STORAGE_KEYS.TRIAL_RESULT, JSON.stringify(policy))
     localStorage.setItem(STORAGE_KEYS.TRIAL_TIMESTAMP, now.toString())
     localStorage.setItem(STORAGE_KEYS.TRIAL_FILE_NAME, fileName)
+    localStorage.setItem(STORAGE_KEYS.TRIAL_SHARE_ID, shareId)
   } catch (error) {
     console.warn('[FreeTrial] Failed to save trial result:', error)
   }
@@ -143,6 +170,8 @@ export function clearTrialData(): void {
     localStorage.removeItem(STORAGE_KEYS.TRIAL_RESULT)
     localStorage.removeItem(STORAGE_KEYS.TRIAL_TIMESTAMP)
     localStorage.removeItem(STORAGE_KEYS.TRIAL_FILE_NAME)
+    localStorage.removeItem(STORAGE_KEYS.TRIAL_EMAIL)
+    localStorage.removeItem(STORAGE_KEYS.TRIAL_SHARE_ID)
   } catch {
     // Ignore storage errors
   }
@@ -196,4 +225,99 @@ export function canPerformFreeTrial(): { canTry: boolean; reason?: string } {
     }
   }
   return { canTry: true }
+}
+
+// ============================================================================
+// Email Capture
+// ============================================================================
+
+/**
+ * Save user's email for follow-up (optional, before analysis)
+ */
+export function saveTrialEmail(email: string): void {
+  try {
+    localStorage.setItem(STORAGE_KEYS.TRIAL_EMAIL, email)
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Get stored trial email
+ */
+export function getTrialEmail(): string | null {
+  try {
+    return localStorage.getItem(STORAGE_KEYS.TRIAL_EMAIL)
+  } catch {
+    return null
+  }
+}
+
+// ============================================================================
+// Shareable Results
+// ============================================================================
+
+/**
+ * Get the share URL for the current trial result
+ */
+export function getShareUrl(): string | null {
+  try {
+    const shareId = localStorage.getItem(STORAGE_KEYS.TRIAL_SHARE_ID)
+    if (!shareId) return null
+
+    // Check if trial is still valid
+    if (!hasValidTrialResult()) return null
+
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${baseUrl}/share/${shareId}`
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Get share ID for the current trial
+ */
+export function getShareId(): string | null {
+  try {
+    const shareId = localStorage.getItem(STORAGE_KEYS.TRIAL_SHARE_ID)
+    if (!shareId) return null
+
+    // Check if trial is still valid
+    if (!hasValidTrialResult()) return null
+
+    return shareId
+  } catch {
+    return null
+  }
+}
+
+// ============================================================================
+// Trial Data Transfer (for signup flow)
+// ============================================================================
+
+/**
+ * Get trial data for transfer to user account after signup.
+ * This includes all data needed to create a policy in the user's account.
+ */
+export function getTrialDataForTransfer(): {
+  policy: AnalyzedPolicy
+  fileName: string
+  email?: string
+} | null {
+  const result = getTrialResult()
+  if (!result) return null
+
+  return {
+    policy: result.policy,
+    fileName: result.fileName,
+    email: result.email,
+  }
+}
+
+/**
+ * Check if there's trial data that should be transferred after signup
+ */
+export function hasPendingTrialTransfer(): boolean {
+  return hasValidTrialResult()
 }

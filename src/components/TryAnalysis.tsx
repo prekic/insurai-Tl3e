@@ -11,6 +11,9 @@ import {
   XCircle,
   Lock,
   Shield,
+  Share2,
+  Check,
+  Mail,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
@@ -27,7 +30,20 @@ import {
   getTrialResult,
   getTrialTimeRemaining,
   formatTimeRemaining,
+  saveTrialEmail,
+  getTrialEmail,
+  getShareUrl,
 } from '@/lib/free-trial'
+import {
+  trackTrialPageView,
+  trackTrialUploadStarted,
+  trackTrialAnalysisStarted,
+  trackTrialAnalysisCompleted,
+  trackTrialAnalysisFailed,
+  trackTrialEmailCaptured,
+  trackTrialShareCopied,
+  trackTrialSignupClicked,
+} from '@/lib/analytics'
 
 type AnalysisState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error' | 'trial-used'
 
@@ -50,6 +66,14 @@ export function TryAnalysis() {
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [email, setEmail] = useState('')
+  const [emailSubmitted, setEmailSubmitted] = useState(false)
+  const [shareCopied, setShareCopied] = useState(false)
+
+  // Track page view on mount
+  useEffect(() => {
+    trackTrialPageView()
+  }, [])
 
   // Check for existing trial result on mount
   useEffect(() => {
@@ -60,6 +84,12 @@ export function TryAnalysis() {
         fileName: existingResult.fileName,
       })
       setState('complete')
+      // Restore email if saved
+      const savedEmail = getTrialEmail()
+      if (savedEmail) {
+        setEmail(savedEmail)
+        setEmailSubmitted(true)
+      }
     } else if (hasUsedFreeTrial()) {
       setState('trial-used')
     }
@@ -123,6 +153,9 @@ export function TryAnalysis() {
       return
     }
 
+    // Track upload started
+    trackTrialUploadStarted(file.type, file.size)
+
     // Start analysis
     setSelectedFile(file)
     setState('uploading')
@@ -140,6 +173,9 @@ export function TryAnalysis() {
       setProgress(40)
       setProgressMessage('Extracting text from PDF...')
 
+      // Track analysis started
+      trackTrialAnalysisStarted()
+
       // Run extraction
       const extractionResult = await extractPolicyFromDocument(file)
 
@@ -156,6 +192,13 @@ export function TryAnalysis() {
       // Save to localStorage
       saveTrialResult(policy, fileName)
 
+      // Save email if provided
+      if (email && !emailSubmitted) {
+        saveTrialEmail(email)
+        setEmailSubmitted(true)
+        trackTrialEmailCaptured()
+      }
+
       setResult({
         policy,
         fileName,
@@ -166,6 +209,13 @@ export function TryAnalysis() {
       setProgressMessage('Analysis complete!')
       setState('complete')
 
+      // Track completion
+      trackTrialAnalysisCompleted(
+        policy.type,
+        policy.aiConfidence,
+        policy.coverages?.length || 0
+      )
+
       toast.success('Analysis complete!', {
         description: 'Your policy has been analyzed successfully.',
       })
@@ -174,11 +224,13 @@ export function TryAnalysis() {
       const message = err instanceof Error ? err.message : 'Analysis failed'
       setError(message)
       setState('error')
+      trackTrialAnalysisFailed(message)
       toast.error('Analysis failed', { description: message })
     }
   }
 
-  const handleSignUp = () => {
+  const handleSignUp = (source: 'header' | 'banner' | 'trial_used' = 'banner') => {
+    trackTrialSignupClicked(source)
     // Navigate to auth with return URL
     navigate('/auth?returnTo=/dashboard&fromTrial=true')
   }
@@ -188,6 +240,36 @@ export function TryAnalysis() {
     setError(null)
     setSelectedFile(null)
     setProgress(0)
+  }
+
+  const handleShareCopy = async () => {
+    const shareUrl = getShareUrl()
+    if (!shareUrl) return
+
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      setShareCopied(true)
+      trackTrialShareCopied()
+      toast.success('Link copied!', {
+        description: 'Share this link with your colleagues.',
+      })
+      setTimeout(() => setShareCopied(false), 3000)
+    } catch {
+      toast.error('Failed to copy link')
+    }
+  }
+
+  const handleEmailSubmit = () => {
+    if (!email || !email.includes('@')) {
+      toast.error('Please enter a valid email')
+      return
+    }
+    saveTrialEmail(email)
+    setEmailSubmitted(true)
+    trackTrialEmailCaptured()
+    toast.success('Email saved!', {
+      description: "We'll send you the analysis report.",
+    })
   }
 
   // Render based on state
@@ -214,7 +296,7 @@ export function TryAnalysis() {
 
             <div className="space-y-3">
               <Button
-                onClick={handleSignUp}
+                onClick={() => handleSignUp('trial_used')}
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg"
               >
                 <Sparkles size={18} className="mr-2" />
@@ -232,6 +314,7 @@ export function TryAnalysis() {
 
   if (state === 'complete' && result) {
     const policy = result.policy
+    const shareUrl = getShareUrl()
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-8 px-4">
         <div className="max-w-4xl mx-auto">
@@ -249,13 +332,35 @@ export function TryAnalysis() {
                   {result.fileName} • Confidence: {Math.round((result.confidence || 0.85) * 100)}%
                 </p>
               </div>
-              <Button
-                onClick={handleSignUp}
-                size="sm"
-                className="bg-gradient-to-r from-blue-600 to-indigo-600"
-              >
-                Save to Dashboard
-              </Button>
+              <div className="flex items-center gap-2">
+                {shareUrl && (
+                  <Button
+                    onClick={handleShareCopy}
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                  >
+                    {shareCopied ? (
+                      <>
+                        <Check size={16} className="text-emerald-600" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Share2 size={16} />
+                        Share
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Button
+                  onClick={() => handleSignUp('header')}
+                  size="sm"
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600"
+                >
+                  Save to Dashboard
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -446,7 +551,7 @@ export function TryAnalysis() {
                 </p>
               </div>
               <Button
-                onClick={handleSignUp}
+                onClick={() => handleSignUp('banner')}
                 className="bg-white text-blue-600 hover:bg-blue-50 whitespace-nowrap"
               >
                 <Sparkles size={18} className="mr-2" />
@@ -455,6 +560,35 @@ export function TryAnalysis() {
               </Button>
             </div>
           </div>
+
+          {/* Email Capture (if not submitted) */}
+          {!emailSubmitted && (
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 mb-6">
+              <div className="flex flex-col md:flex-row items-center gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <Mail className="text-blue-600" size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Get a copy via email</h4>
+                    <p className="text-sm text-gray-500">We'll send you this analysis report</p>
+                  </div>
+                </div>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="flex-1 md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                  <Button onClick={handleEmailSubmit} variant="outline">
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Trust badges */}
           <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
@@ -598,6 +732,27 @@ export function TryAnalysis() {
                   </div>
                 </div>
                 <span className="text-gray-400">1 free analysis</span>
+              </div>
+            </div>
+          )}
+
+          {/* Optional Email Input (before analysis) */}
+          {state === 'idle' && (
+            <div className="px-8 py-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <Mail size={16} className="text-gray-400" />
+                  <span>Send me the report (optional)</span>
+                </div>
+                <div className="flex-1 flex gap-2 w-full sm:w-auto">
+                  <input
+                    type="email"
+                    placeholder="your@email.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="flex-1 px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  />
+                </div>
               </div>
             </div>
           )}

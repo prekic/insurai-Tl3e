@@ -52,6 +52,9 @@ const AuthPage = lazy(() =>
 const TryAnalysis = lazy(() =>
   import('./components/TryAnalysis').then((m) => ({ default: m.TryAnalysis }))
 )
+const SharedResult = lazy(() =>
+  import('./components/SharedResult').then((m) => ({ default: m.SharedResult }))
+)
 const AdminDashboard = lazy(() =>
   import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 )
@@ -64,6 +67,7 @@ const ROUTES = {
   home: '/',
   auth: '/auth',
   try: '/try',  // Free trial analysis (no auth required)
+  share: '/share/:shareId',  // Shared trial result (no auth required)
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
@@ -164,6 +168,14 @@ function AppContent() {
                 element={
                   <PageTransition>
                     <TryAnalysis />
+                  </PageTransition>
+                }
+              />
+              <Route
+                path="/share/:shareId"
+                element={
+                  <PageTransition>
+                    <SharedResult />
                   </PageTransition>
                 }
               />
