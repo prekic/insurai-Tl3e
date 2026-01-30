@@ -27,6 +27,7 @@ This session focused on **production hardening** and **email security**:
 5. Disabled debug flags in OCR decision engine
 6. Updated README.md to reflect full-stack state
 7. Investigated Google Vision OCR "Service error"
+8. Updated CLAUDE.md and SESSION_HANDOFF.md with session changes
 
 ---
 
@@ -106,6 +107,7 @@ Changed from "Phase 1: Frontend-only" to accurate full-stack documentation inclu
 ## Commits This Session
 
 ```
+33b52fe Update documentation for session handoff
 9887e8d Remove simulated network error from UploadWidget
 858b0cd Fix remaining unescaped entity in TryAnalysis.tsx
 60bd2ba Implement secure email unsubscribe tokens and fix ESLint warnings
@@ -127,6 +129,8 @@ Changed from "Phase 1: Frontend-only" to accurate full-stack documentation inclu
 | `README.md` | Complete rewrite for current state |
 | `supabase/migrations/*.sql` | Renamed with a,b,c suffixes |
 | `src/lib/ocr-decision/*.ts` | Debug flags set to false |
+| `CLAUDE.md` | Added known issues #35-40 |
+| `SESSION_HANDOFF.md` | Complete rewrite for session handoff |
 
 ---
 
