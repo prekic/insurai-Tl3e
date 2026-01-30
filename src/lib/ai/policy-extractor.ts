@@ -8,8 +8,6 @@ import {
   type FormField,
   type Table,
 } from './document-ocr'
-import { getOCRDecisionEngine } from '@/lib/ocr-decision/ocr-decision-engine'
-import type { OCRDecision, OCRAction } from '@/lib/ocr-decision/types'
 import { extractFormFieldMap, findFormField, TURKISH_FORM_FIELD_PATTERNS } from './ocr'
 import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
@@ -52,14 +50,6 @@ export interface ExtractionResult {
     errors: string[]
     warnings: string[]
     enhanced: string[]
-  }
-  // OCR Decision Engine result (when used)
-  ocrDecision?: {
-    action: OCRAction
-    confidence: number
-    detectedLanguage: string
-    detectedPolicyType: string
-    reasoning: string[]
   }
   // Document AI OCR data (always present with OCR-first approach)
   documentOCR?: {
@@ -274,17 +264,21 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT EXTRACTION STAGE ==========
-  // Smart extraction: Try pdf.js first, then use OCR Decision Engine to determine if Document AI OCR is needed
-  // This optimizes for speed (pdf.js is fast) while ensuring quality (OCR for scanned docs)
+  // Try Document AI OCR first, fall back to pdf.js if unavailable
+  logger?.startStage('ocr_processing', {
+    filename: file.name,
+    file_size: file.size,
+    strategy: 'document-ai-first-with-pdfjs-fallback',
+    backend: 'document-ai',
+  })
 
-  // Variables to hold extraction results
+  // Variables to hold extraction results (from either Document AI or pdf.js)
   let documentText: string = ''
   let ocrFormFields: FormField[] = []
   let ocrTables: Table[] = []
   let usedOCR = false
   let extractionMethod: 'document-ai' | 'pdf.js' | 'none' = 'none'
   let pageCount = 0
-  let ocrDecisionResult: OCRDecision | null = null
   // Store full Document AI data for result object (when available)
   let documentAIOcrData: {
     pdfHash: string
@@ -293,163 +287,17 @@ export async function extractPolicyFromDocument(
     metadata: { processingTimeMs: number; warnings: string[] }
   } | null = null
 
-  // Step 1: Try pdf.js first (fast, handles native text PDFs)
-  logger?.startStage('pdf_extraction', {
-    filename: file.name,
-    file_size: file.size,
-    strategy: 'pdfjs-first-with-smart-ocr-decision',
-  })
-
-  const pdfResult = await extractTextFromPDFWithRetry(file)
-  console.warn('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
-
-  let pdfJsText: string = ''
-  let pdfJsPageCount = 0
-
-  if (pdfResult.success) {
-    pdfJsText = pdfResult.data.text
-    pdfJsPageCount = pdfResult.data.pageCount
-    console.warn(`[PolicyExtractor] pdf.js SUCCESS: ${pdfJsPageCount} pages, ${pdfJsText.length} chars`)
-
-    logger?.setPageCount(pdfJsPageCount)
-    logger?.completeStage({
-      output: {
-        text_length: pdfJsText.length,
-        text_preview: pdfJsText.substring(0, 500) + '...',
-        page_count: pdfJsPageCount,
-        metadata: pdfResult.data.metadata,
-      },
-      full_output_text: pdfJsText,
-    })
-  } else {
-    console.warn('[PolicyExtractor] pdf.js failed:', pdfResult.error.message)
-    logger?.failStage(`pdf.js extraction failed: ${pdfResult.error.message}`, {
-      error_code: pdfResult.error.code,
-      will_try_document_ai: true,
-    })
-  }
-
-  // Step 2: Run OCR Decision Engine to analyze text quality (if we have any text)
+  // Try Document AI OCR first (if available)
   const documentAIAvailable = isDocumentOCRAvailable()
-  let ocrAction: OCRAction = 'full_ocr' // Default to full OCR if no text
+  console.warn('[PolicyExtractor] Document AI available:', documentAIAvailable)
 
-  if (pdfJsText.length > 0) {
-    logger?.startStage('ocr_decision', {
-      text_length: pdfJsText.length,
-      page_count: pdfJsPageCount,
-      document_ai_available: documentAIAvailable,
-    })
-
-    try {
-      const ocrEngine = getOCRDecisionEngine()
-      ocrDecisionResult = ocrEngine.analyzeDocument(pdfJsText)
-      ocrAction = ocrDecisionResult.action
-
-      // Build Document Journey metadata for rich logging
-      const journeyMetadata = ocrEngine.buildDocumentJourneyMetadata(ocrDecisionResult)
-
-      console.warn(`[PolicyExtractor] OCR Decision: ${ocrAction} (confidence: ${(ocrDecisionResult.confidence * 100).toFixed(1)}%)`)
-      console.warn(`[PolicyExtractor] Detected language: ${ocrDecisionResult.document_classification.detected_language.locale_code}`)
-      console.warn(`[PolicyExtractor] Detected policy type: ${ocrDecisionResult.document_classification.detected_policy_type.policy_type_name}`)
-
-      logger?.completeStage({
-        output: {
-          action: ocrAction,
-          confidence: ocrDecisionResult.confidence,
-          detected_language: ocrDecisionResult.document_classification.detected_language.locale_code,
-          detected_policy_type: ocrDecisionResult.document_classification.detected_policy_type.policy_type_id,
-          text_quality_score: ocrDecisionResult.analysis.text_quality.quality_score,
-          field_extraction_rate: ocrDecisionResult.analysis.field_extraction.extraction_rate,
-          pages_needing_ocr: ocrDecisionResult.pages_to_ocr.length,
-        },
-        metadata: {
-          // Include full OCR decision metadata for Document Journey viewer
-          ocr_decision: journeyMetadata.ocr_decision,
-          reasoning: ocrDecisionResult.reasoning,
-          confidence_breakdown: ocrDecisionResult.analysis.confidence_breakdown.component_scores,
-        },
-      })
-    } catch (error) {
-      // OCR Decision Engine failed - default to full OCR if Document AI available
-      console.warn('[PolicyExtractor] OCR Decision Engine failed:', error)
-      ocrAction = documentAIAvailable ? 'full_ocr' : 'skip_ocr'
-      logger?.failStage('OCR Decision Engine failed', {
-        error: error instanceof Error ? error.message : 'Unknown error',
-        fallback_action: ocrAction,
-      })
-    }
-  } else {
-    // No text from pdf.js - skip OCR decision, go straight to Document AI
-    logger?.skipStage('ocr_decision', {
-      reason: 'No text extracted from pdf.js',
-      decision_context: {
-        assessment_performed: 'Check pdf.js extraction result',
-        actual_values: {
-          pdfjs_text_length: 0,
-          pdfjs_success: pdfResult.success,
-        },
-        decision_logic: 'Cannot analyze text quality without text. Will attempt Document AI OCR.',
-        alternatives: ['pdf.js extraction needs to succeed for OCR decision analysis'],
-      },
-    })
-    ocrAction = 'full_ocr'
-  }
-
-  // Step 3: Based on OCR decision, either use pdf.js text or invoke Document AI
-  if (ocrAction === 'skip_ocr' && pdfJsText.length > 0) {
-    // Text quality is good enough - use pdf.js text directly
-    console.warn('[PolicyExtractor] Using pdf.js text (OCR not needed)')
-    documentText = pdfJsText
-    pageCount = pdfJsPageCount
-    extractionMethod = 'pdf.js'
-    usedOCR = false
-
-    // Skip OCR processing stage
-    logger?.skipStage('ocr_processing', {
-      reason: `OCR Decision Engine determined text quality is sufficient (confidence: ${ocrDecisionResult ? (ocrDecisionResult.confidence * 100).toFixed(1) : 'N/A'}%)`,
-      decision_context: {
-        assessment_performed: 'OCR Decision Engine analysis',
-        threshold: {
-          name: 'confidence_threshold',
-          value: 0.70,
-          unit: 'ratio',
-          comparison: 'greater_than',
-        },
-        actual_values: {
-          overall_confidence: ocrDecisionResult?.confidence || 0,
-          text_quality_score: ocrDecisionResult?.analysis.text_quality.quality_score || 0,
-          field_extraction_rate: ocrDecisionResult?.analysis.field_extraction.extraction_rate || 0,
-          detected_language: ocrDecisionResult?.document_classification.detected_language.locale_code || 'unknown',
-          detected_policy_type: ocrDecisionResult?.document_classification.detected_policy_type.policy_type_id || 'unknown',
-        },
-        decision_logic: ocrDecisionResult?.reasoning.join(' | ') || 'Text quality sufficient',
-        alternatives: [
-          'OCR would be triggered if confidence < 70%',
-          'OCR would be triggered if field extraction rate is low',
-          'OCR would be triggered for scanned documents with low character density',
-        ],
-      },
-    })
-  } else if (documentAIAvailable) {
-    // Need OCR (selective or full) - use Document AI
-    const ocrPages = ocrAction === 'selective_ocr' && ocrDecisionResult
-      ? ocrDecisionResult.pages_to_ocr
-      : undefined // undefined means all pages
-
-    logger?.startStage('ocr_processing', {
-      filename: file.name,
-      file_size: file.size,
-      ocr_action: ocrAction,
-      pages_to_ocr: ocrPages || 'all',
-      reason: ocrDecisionResult
-        ? ocrDecisionResult.reasoning.slice(-1)[0]
-        : 'No pdf.js text available',
-    })
-
-    console.warn(`[PolicyExtractor] Running Document AI OCR (action: ${ocrAction})...`)
+  if (documentAIAvailable) {
+    console.warn('[PolicyExtractor] Attempting Document AI extraction...')
     const ocrResult = await extractWithDocumentAI(file)
+    console.warn('[PolicyExtractor] Document AI result success:', ocrResult.success)
 
     if (ocrResult.success) {
+      // Document AI succeeded - use its results
       const ocrData = ocrResult.data
       documentText = ocrData.text
       ocrFormFields = ocrData.formFields
@@ -457,7 +305,7 @@ export async function extractPolicyFromDocument(
       usedOCR = true
       extractionMethod = 'document-ai'
       pageCount = ocrData.pageCount
-
+      // Store full data for result object
       documentAIOcrData = {
         pdfHash: ocrData.pdfHash,
         pages: ocrData.pages,
@@ -465,6 +313,7 @@ export async function extractPolicyFromDocument(
         metadata: ocrData.metadata,
       }
 
+      // Log Document AI success
       logger?.setOCRUsed('document-ai')
       logger?.setPageCount(ocrData.pageCount)
       logger?.completeStage({
@@ -478,7 +327,6 @@ export async function extractPolicyFromDocument(
           tables_count: ocrTables.length,
           processing_time_ms: ocrData.metadata.processingTimeMs,
           warnings: ocrData.metadata.warnings,
-          ocr_decision_action: ocrAction,
         },
         metadata: {
           pages: ocrData.pages.map(p => ({
@@ -505,79 +353,76 @@ export async function extractPolicyFromDocument(
           `${ocrData.metadata.processingTimeMs}ms`)
       }
     } else {
-      // Document AI failed - fall back to pdf.js text if available
+      // Document AI failed - properly close the stage and log error details
       console.warn('[PolicyExtractor] Document AI FAILED:', ocrResult.error.message)
+      console.warn('[PolicyExtractor] Document AI error code:', ocrResult.error.code)
+      console.warn('[PolicyExtractor] Document AI error details:', ocrResult.error.details)
+      console.warn('[PolicyExtractor] Will try pdf.js fallback...')
 
-      if (pdfJsText.length > 0) {
-        // Use pdf.js text as fallback
-        console.warn('[PolicyExtractor] Falling back to pdf.js text')
-        documentText = pdfJsText
-        pageCount = pdfJsPageCount
-        extractionMethod = 'pdf.js'
-        usedOCR = false
-
-        logger?.failStage(`Document AI OCR failed, using pdf.js fallback: ${ocrResult.error.message}`, {
-          error_code: ocrResult.error.code,
-          error_details: ocrResult.error.details,
-          fallback_used: true,
-          fallback_text_length: pdfJsText.length,
-        })
-      } else {
-        // No fallback available
-        logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`, {
-          error_code: ocrResult.error.code,
-          error_details: ocrResult.error.details,
-        })
-
-        if (useFallback) {
-          console.warn('[Extraction] Both extraction methods failed, using sample data fallback')
-          return createFallbackResult(file)
-        }
-
-        return {
-          success: false,
-          error: {
-            code: 'OCR_ERROR',
-            message: `Document AI failed and no pdf.js text available: ${ocrResult.error.message}`,
-            details: ocrResult.error.details,
-          },
-          fallbackAvailable: true,
-        }
-      }
+      // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
+      // This prevents "Stage interrupted by new stage" error
+      logger?.failStage(`Document AI OCR failed: ${ocrResult.error.message}`, {
+        error_code: ocrResult.error.code,
+        error_details: ocrResult.error.details,
+        will_try_fallback: true,
+        fallback_method: 'pdf.js',
+      })
     }
   } else {
-    // Document AI not available
-    if (pdfJsText.length > 0) {
-      // Use pdf.js text even if OCR decision recommended OCR
-      console.warn('[PolicyExtractor] Document AI not available, using pdf.js text')
-      documentText = pdfJsText
-      pageCount = pdfJsPageCount
-      extractionMethod = 'pdf.js'
-      usedOCR = false
+    // Document AI not available - fail the already-started ocr_processing stage
+    console.warn('[PolicyExtractor] Document AI not available, will try pdf.js fallback')
 
-      logger?.skipStage('ocr_processing', {
-        reason: 'Document AI not configured',
-        decision_context: {
-          assessment_performed: 'Check Document AI availability',
-          actual_values: {
-            document_ai_available: false,
-            pdfjs_text_available: true,
-            pdfjs_text_length: pdfJsText.length,
-            ocr_decision_action: ocrAction,
-          },
-          decision_logic: 'Document AI is not configured. Using pdf.js extracted text.',
-          alternatives: [
-            'Configure GCP_SERVICE_ACCOUNT_BASE64 environment variable for Document AI',
-            'Set GOOGLE_CLOUD_API_KEY for Document AI access',
-          ],
+    // IMPORTANT: Fail the ocr_processing stage BEFORE starting pdf_extraction
+    // The stage was already started at line 268, so we must fail it (not skip)
+    // This prevents "Stage interrupted by new stage" error
+    logger?.failStage('Document AI not configured', {
+      reason: 'not_configured',
+      proxy_url_set: !!import.meta.env.VITE_API_PROXY_URL,
+      will_try_fallback: true,
+      fallback_method: 'pdf.js',
+      note: 'Configure GCP_SERVICE_ACCOUNT_BASE64 environment variable for Document AI',
+    })
+  }
+
+  // If Document AI didn't work (not available or failed), try pdf.js
+  console.warn('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
+  if (extractionMethod === 'none') {
+    console.warn('[PolicyExtractor] Starting pdf.js fallback extraction...')
+    logger?.startStage('pdf_extraction', {
+      filename: file.name,
+      file_size: file.size,
+      fallback_reason: documentAIAvailable ? 'document-ai-failed' : 'document-ai-not-configured',
+    })
+
+    const pdfResult = await extractTextFromPDFWithRetry(file)
+    console.warn('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
+
+    if (pdfResult.success) {
+      // pdf.js succeeded
+      documentText = pdfResult.data.text
+      pageCount = pdfResult.data.pageCount
+      extractionMethod = 'pdf.js'
+      usedOCR = false // pdf.js extracts native text, not OCR
+      console.warn(`[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`)
+
+      logger?.setOCRUsed('pdf.js')
+      logger?.setPageCount(pageCount)
+      logger?.completeStage({
+        output: {
+          text_length: documentText.length,
+          text_preview: documentText.substring(0, 500) + '...',
+          page_count: pageCount,
+          metadata: pdfResult.data.metadata,
         },
+        full_output_text: documentText,
       })
     } else {
-      // No text and no OCR available
-      logger?.fail('No text extraction method available')
+      console.error('[PolicyExtractor] pdf.js ALSO FAILED:', pdfResult.error.message)
+      // Both Document AI and pdf.js failed
+      logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
       if (useFallback) {
-        console.warn('[Extraction] No text extraction available, using sample data fallback')
+        console.warn('[Extraction] Both Document AI and pdf.js failed, using sample data fallback')
         return createFallbackResult(file)
       }
 
@@ -585,16 +430,15 @@ export async function extractPolicyFromDocument(
         success: false,
         error: {
           code: 'OCR_ERROR',
-          message: 'No text could be extracted and Document AI is not configured',
-          details: 'Configure GCP_SERVICE_ACCOUNT_BASE64 environment variable for Document AI OCR support',
+          message: documentAIAvailable
+            ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
+            : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
+          details: 'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
         },
         fallbackAvailable: true,
       }
     }
   }
-
-  // At this point, we have extracted text from either Document AI or pdf.js
-  console.warn(`[PolicyExtractor] Final extraction state: method=${extractionMethod}, pages=${pageCount}, chars=${documentText.length}, usedOCR=${usedOCR}`)
 
   if (!documentText || documentText.trim().length === 0) {
     logger?.failStage('No text could be extracted from the document')
@@ -1153,14 +997,6 @@ export async function extractPolicyFromDocument(
         errors: patternValidation.errors,
         warnings: patternValidation.warnings,
         enhanced: Object.keys(patternValidation.enhancements),
-      } : undefined,
-      // OCR Decision Engine result (when used)
-      ocrDecision: ocrDecisionResult ? {
-        action: ocrDecisionResult.action,
-        confidence: ocrDecisionResult.confidence,
-        detectedLanguage: ocrDecisionResult.document_classification.detected_language.locale_code,
-        detectedPolicyType: ocrDecisionResult.document_classification.detected_policy_type.policy_type_id,
-        reasoning: ocrDecisionResult.reasoning,
       } : undefined,
       // Document AI OCR data (when available) or pdf.js extraction info
       documentOCR: documentAIOcrData ? {
