@@ -153,6 +153,9 @@ export function TryAnalysis() {
     setProgressMessage('Preparing document...')
     setError(null)
 
+    // Declare progressInterval outside try block so it's accessible in catch
+    let progressInterval: ReturnType<typeof setInterval> | null = null
+
     try {
       setProgress(20)
       setProgressMessage('Uploading document...')
@@ -164,18 +167,41 @@ export function TryAnalysis() {
 
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (60 seconds)
-      const EXTRACTION_TIMEOUT_MS = 60000
+      // Add timeout to prevent stuck state (90 seconds for larger documents)
+      const EXTRACTION_TIMEOUT_MS = 90000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Analysis timed out. Please try again with a smaller document.'))
+          reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
         }, EXTRACTION_TIMEOUT_MS)
       })
+
+      // Update progress during extraction
+      progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev < 85) return prev + 5
+          return prev
+        })
+        setProgressMessage((prev) => {
+          const messages = [
+            'Extracting text from PDF...',
+            'Analyzing document structure...',
+            'Processing with AI...',
+            'Almost there...',
+          ]
+          const currentIndex = messages.indexOf(prev)
+          if (currentIndex < messages.length - 1) {
+            return messages[currentIndex + 1]
+          }
+          return prev
+        })
+      }, 10000) // Update every 10 seconds
 
       const extractionResult = await Promise.race([
         extractPolicyFromDocument(file),
         timeoutPromise,
       ])
+
+      if (progressInterval) clearInterval(progressInterval)
 
       // Handle null/undefined result
       if (!extractionResult) {
@@ -219,6 +245,7 @@ export function TryAnalysis() {
         description: 'Your policy has been analyzed successfully.',
       })
     } catch (err) {
+      if (progressInterval) clearInterval(progressInterval)
       console.error('[TryAnalysis] Error:', err)
       const message = err instanceof Error ? err.message : 'Analysis failed'
       setError(message)
@@ -302,6 +329,9 @@ export function TryAnalysis() {
     setProgressMessage('Preparing document...')
     setError(null)
 
+    // Declare progressInterval outside try block so it's accessible in catch
+    let progressInterval: ReturnType<typeof setInterval> | null = null
+
     try {
       // Simulate upload progress
       setProgress(20)
@@ -315,19 +345,42 @@ export function TryAnalysis() {
       // Track analysis started
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (60 seconds)
-      const EXTRACTION_TIMEOUT_MS = 60000
+      // Add timeout to prevent stuck state (90 seconds for larger documents)
+      const EXTRACTION_TIMEOUT_MS = 90000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Analysis timed out. Please try again with a smaller document.'))
+          reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
         }, EXTRACTION_TIMEOUT_MS)
       })
+
+      // Update progress during extraction
+      progressInterval = setInterval(() => {
+        setProgress((prev) => {
+          if (prev < 85) return prev + 5
+          return prev
+        })
+        setProgressMessage((prev) => {
+          const messages = [
+            'Extracting text from PDF...',
+            'Analyzing document structure...',
+            'Processing with AI...',
+            'Almost there...',
+          ]
+          const currentIndex = messages.indexOf(prev)
+          if (currentIndex < messages.length - 1) {
+            return messages[currentIndex + 1]
+          }
+          return prev
+        })
+      }, 10000) // Update every 10 seconds
 
       // Run extraction with timeout
       const extractionResult = await Promise.race([
         extractPolicyFromDocument(file),
         timeoutPromise,
       ])
+
+      if (progressInterval) clearInterval(progressInterval)
 
       // Handle null/undefined result
       if (!extractionResult) {
@@ -380,6 +433,7 @@ export function TryAnalysis() {
         description: 'Your policy has been analyzed successfully.',
       })
     } catch (err) {
+      if (progressInterval) clearInterval(progressInterval)
       console.error('[TryAnalysis] Error:', err)
       const message = err instanceof Error ? err.message : 'Analysis failed'
       setError(message)
