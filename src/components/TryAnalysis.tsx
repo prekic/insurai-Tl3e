@@ -164,16 +164,37 @@ export function TryAnalysis() {
 
       trackTrialAnalysisStarted()
 
-      const extractionResult = await extractPolicyFromDocument(file)
+      // Add timeout to prevent stuck state (60 seconds)
+      const EXTRACTION_TIMEOUT_MS = 60000
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Analysis timed out. Please try again with a smaller document.'))
+        }, EXTRACTION_TIMEOUT_MS)
+      })
+
+      const extractionResult = await Promise.race([
+        extractPolicyFromDocument(file),
+        timeoutPromise,
+      ])
+
+      // Handle null/undefined result
+      if (!extractionResult) {
+        throw new Error('Failed to analyze policy - no response received')
+      }
 
       if (!extractionResult.success) {
         throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
       }
 
+      // Validate policy exists
+      if (!extractionResult.policy) {
+        throw new Error('Analysis completed but no policy data was extracted')
+      }
+
       setProgress(95)
       setProgressMessage('Finalizing analysis...')
 
-      const policy = extractionResult.policy!
+      const policy = extractionResult.policy
       const fileName = sanitizeFileName(file.name)
 
       saveTrialResult(policy, fileName)
@@ -294,17 +315,38 @@ export function TryAnalysis() {
       // Track analysis started
       trackTrialAnalysisStarted()
 
-      // Run extraction
-      const extractionResult = await extractPolicyFromDocument(file)
+      // Add timeout to prevent stuck state (60 seconds)
+      const EXTRACTION_TIMEOUT_MS = 60000
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Analysis timed out. Please try again with a smaller document.'))
+        }, EXTRACTION_TIMEOUT_MS)
+      })
+
+      // Run extraction with timeout
+      const extractionResult = await Promise.race([
+        extractPolicyFromDocument(file),
+        timeoutPromise,
+      ])
+
+      // Handle null/undefined result
+      if (!extractionResult) {
+        throw new Error('Failed to analyze policy - no response received')
+      }
 
       if (!extractionResult.success) {
         throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
       }
 
+      // Validate policy exists
+      if (!extractionResult.policy) {
+        throw new Error('Analysis completed but no policy data was extracted')
+      }
+
       setProgress(95)
       setProgressMessage('Finalizing analysis...')
 
-      const policy = extractionResult.policy!
+      const policy = extractionResult.policy
       const fileName = sanitizeFileName(file.name)
 
       // Save to localStorage

@@ -472,4 +472,144 @@ describe('TryAnalysis', () => {
       expect(screen.getByText(/Service temporarily unavailable/)).toBeInTheDocument()
     })
   })
+
+  describe('Timeout and Stuck State Handling', () => {
+    it('shows timeout error when extraction takes too long', async () => {
+      // Simulate a promise that never resolves (stuck extraction)
+      mockExtractPolicy.mockImplementation(
+        () => new Promise((resolve) => {
+          // This promise will be aborted by the timeout
+          setTimeout(() => resolve({ success: true, policy: createMockPolicy() }), 120000)
+        })
+      )
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      // Should show analyzing state initially
+      await waitFor(() => {
+        expect(screen.getByText(/Extracting text|analyzing/i)).toBeInTheDocument()
+      })
+
+      // After timeout (mocked to be fast in tests), should show error
+      await waitFor(
+        () => {
+          expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        },
+        { timeout: 65000 } // Wait for timeout + buffer
+      )
+
+      expect(screen.getByText(/timed out|too long/i)).toBeInTheDocument()
+    }, 70000) // Increase test timeout
+
+    it('handles extraction that returns neither success nor error', async () => {
+      // Edge case: extraction returns undefined/null
+      mockExtractPolicy.mockResolvedValue(null)
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+      })
+    })
+
+    it('handles extraction returning success false without error message', async () => {
+      mockExtractPolicy.mockResolvedValue({
+        success: false,
+        // No error message provided
+      })
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+      })
+
+      // Should show a default error message
+      expect(screen.getByText(/Failed to analyze policy/i)).toBeInTheDocument()
+    })
+
+    it('handles extraction returning success true but no policy', async () => {
+      mockExtractPolicy.mockResolvedValue({
+        success: true,
+        policy: null, // No policy returned
+      })
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+      })
+    })
+
+    it('shows progress indicators during each stage', async () => {
+      // Use a delayed mock that resolves after a short delay
+      mockExtractPolicy.mockImplementation(
+        () => new Promise((resolve) => {
+          setTimeout(() => {
+            resolve({
+              success: true,
+              policy: createMockPolicy(),
+            })
+          }, 100) // Short delay to allow checking progress
+        })
+      )
+
+      renderWithRouter()
+
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const mockFile = createMockFile()
+
+      await act(async () => {
+        await userEvent.upload(input, mockFile)
+      })
+
+      // Should show some processing state (uploading or analyzing)
+      await waitFor(() => {
+        const hasProcessingText =
+          screen.queryByText(/Preparing document/i) ||
+          screen.queryByText(/Uploading/i) ||
+          screen.queryByText(/Extracting/i) ||
+          screen.queryByText(/analyzing/i)
+        expect(hasProcessingText).toBeInTheDocument()
+      })
+
+      // Progress should be visible
+      await waitFor(() => {
+        expect(screen.getByText(/\d+% complete/)).toBeInTheDocument()
+      })
+
+      // Wait for completion
+      await waitFor(() => {
+        expect(screen.getByText('Analysis Complete!')).toBeInTheDocument()
+      })
+    })
+  })
 })
