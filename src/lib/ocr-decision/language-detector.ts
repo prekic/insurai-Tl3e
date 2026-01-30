@@ -12,8 +12,8 @@ import type {
 } from './types'
 import type { ConfigurationManager } from './configuration-manager'
 
-// Debug logging flag - set to true to enable verbose logging
-const DEBUG_LANGUAGE_DETECTION = true
+// Debug logging flag - set to false in production
+const DEBUG_LANGUAGE_DETECTION = false
 
 function debugLog(message: string, data?: unknown): void {
   if (DEBUG_LANGUAGE_DETECTION) {
