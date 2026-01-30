@@ -33,6 +33,7 @@ import { usePolicies } from '@/lib/policy-context'
 import { exportToCSV, exportPoliciesToPDF } from '@/lib/export'
 import { isSupabaseConfigured } from '@/lib/supabase'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { EmailPreferences } from './EmailPreferences'
 
 // Local storage keys
 const STORAGE_KEYS = {
@@ -657,6 +658,9 @@ export function Settings() {
               ))}
             </CardContent>
           </Card>
+
+          {/* Email Notifications (Server-side) */}
+          <EmailPreferences />
 
           {/* Language Selection */}
           <Card>
