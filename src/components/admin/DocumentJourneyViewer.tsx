@@ -24,6 +24,7 @@ import {
   ScanLine,
   Wand2,
   Brain,
+  BrainCog,
   FormInput,
   Table,
   CheckCircle2,
@@ -66,6 +67,7 @@ interface DocumentJourneyViewerProps {
 const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
   upload: Upload,
   pdf_extraction: FileText,
+  ocr_decision: BrainCog,
   ocr_check: Search,
   ocr_processing: ScanLine,
   text_preprocessing: Wand2,
@@ -82,6 +84,7 @@ const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
 const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; description: string }> = {
   upload: { en: 'Upload', tr: 'Yükleme', description: 'File received and validated in browser' },
   pdf_extraction: { en: 'PDF Extraction', tr: 'PDF Metin Çıkarma', description: 'Text extracted from PDF using pdf.js' },
+  ocr_decision: { en: 'OCR Decision', tr: 'OCR Karar Motoru', description: 'Analyzing document quality to determine if OCR is needed (language, policy type, text quality)' },
   ocr_check: { en: 'OCR Check', tr: 'OCR Kontrolü', description: 'Checking text density to determine if OCR is needed' },
   ocr_processing: { en: 'OCR Processing', tr: 'OCR İşleme', description: 'Optical character recognition for scanned documents' },
   text_preprocessing: { en: 'Text Preprocessing', tr: 'Metin Ön İşleme', description: 'Text normalization, Turkish OCR cleanup, spacing fixes' },

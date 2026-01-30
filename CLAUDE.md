@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, **PDF splitting for Document AI 15-page limit**
-- **Production Readiness**: ~9.5/10 (5787+ tests, 0 lint errors, 48 warnings, PWA support, server hardening)
-- **Last Updated**: January 29, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, **session-based free trial for anonymous users with 90s extraction timeout**
+- **Production Readiness**: ~9.5/10 (5800+ tests, 0 lint errors, 48 warnings, PWA support, server hardening)
+- **Last Updated**: January 30, 2026
 
 ---
 
@@ -133,10 +133,12 @@ insurai/
 | `src/components/PolicyChat.tsx` | Multi-turn AI chat for policy questions |
 | `src/components/PolicyDashboard.tsx` | Main dashboard with policy cards |
 | `src/components/PolicyDetailView.tsx` | Detailed policy view with share/download |
-| `src/components/PolicyDiffViewer.tsx` | **NEW** Visual diff for policy changes |
-| `src/components/ConflictResolutionDialog.tsx` | **NEW** Duplicate/amendment resolution UI |
+| `src/components/PolicyDiffViewer.tsx` | Visual diff for policy changes |
+| `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | Main nav with auth state |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
+| `src/components/TryAnalysis.tsx` | **NEW** Anonymous free trial analysis (Jan 30, 2026) |
+| `src/components/landing/UploadWidget.tsx` | **UPDATED** Landing page upload with file handoff |
 
 ### Admin Components (Updated Jan 25, 2026)
 | File | Purpose |
@@ -2015,6 +2017,75 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   }, [])
   ```
 
+### 33. Free Trial Upload Flow and Extraction Timeout Fixes (Fixed Jan 30, 2026)
+- **Problem**: Multiple issues with anonymous user free trial flow:
+  - Files uploaded on landing page returned users to upload page instead of showing results
+  - Analysis got stuck at 40% "Extracting text from PDF..." with no timeout
+  - No progress feedback during long extractions (Document AI + AI provider can take 60+ seconds)
+- **Root Causes**:
+  - `UploadWidget.tsx` navigated to `/try` but didn't pass the file to `TryAnalysis.tsx`
+  - No timeout mechanism for extraction promises
+  - No progress updates during the extraction process
+- **Solutions**:
+  1. **File Handoff via Router State**:
+     ```tsx
+     // UploadWidget.tsx - Pass file via state
+     navigate('/try', { state: { file: valid[0] } })
+
+     // TryAnalysis.tsx - Receive file from state
+     const location = useLocation()
+     const state = location.state as LocationState | null
+     if (state?.file) {
+       processFileFromState(state.file)
+     }
+     ```
+  2. **90-Second Timeout with Promise.race**:
+     ```tsx
+     const EXTRACTION_TIMEOUT_MS = 90000
+     const timeoutPromise = new Promise<never>((_, reject) => {
+       setTimeout(() => reject(new Error('Analysis timed out...')), EXTRACTION_TIMEOUT_MS)
+     })
+     const result = await Promise.race([extractionPromise, timeoutPromise])
+     ```
+  3. **Progress Updates Every 10 Seconds**:
+     ```tsx
+     progressInterval = setInterval(() => {
+       setProgress((prev) => prev < 85 ? prev + 5 : prev)
+       setProgressMessage((prev) => {
+         const messages = ['Extracting text...', 'Analyzing structure...', 'Processing with AI...', 'Almost there...']
+         const currentIndex = messages.indexOf(prev)
+         return currentIndex < messages.length - 1 ? messages[currentIndex + 1] : prev
+       })
+     }, 10000)
+     ```
+- **Files Changed**:
+  - `src/components/landing/UploadWidget.tsx` - Pass file via router state
+  - `src/components/TryAnalysis.tsx` - Accept file from state, add timeout, progress updates
+  - `src/components/TryAnalysis.test.tsx` - **NEW** 19 tests for timeout and file handling
+  - `src/components/landing/UploadWidget.test.tsx` - **NEW** 13 tests for file handoff
+- **Note**: Railway logs revealed Anthropic API billing issue causing fallback to OpenAI, adding latency. The 90-second timeout accommodates Document AI OCR (~50s) + AI extraction with fallback.
+
+### 34. Session-Based Free Trial for Anonymous Users (Added Jan 30, 2026)
+- **Feature**: Anonymous users can now analyze one policy per session without signup
+- **Implementation**:
+  - `TryAnalysis.tsx` - New component for anonymous trial analysis
+  - Session storage tracks trial usage (`insurai_trial_used`)
+  - Full analysis results shown (not truncated)
+  - Email capture modal after viewing results
+  - Share link generation for analysis results
+- **User Flow**:
+  1. User uploads PDF on landing page (UploadWidget)
+  2. File passed via router state to `/try` route
+  3. TryAnalysis extracts and analyzes the policy
+  4. Full results displayed with score, coverages, gaps
+  5. Email capture prompt with "Continue without email" option
+  6. Share link available for results
+- **Files**:
+  - `src/components/TryAnalysis.tsx` - Main trial analysis component
+  - `src/components/landing/UploadWidget.tsx` - Updated for anonymous flow
+  - `src/App.tsx` - Added `/try` route
+- **Commits**: `051db44`, `a434068`, `71df32e`, `6d7923b`
+
 ---
 
 ## Turkish Market Considerations
@@ -2331,6 +2402,19 @@ connectSrc: [
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
+**AI Provider Fallback and Billing:**
+- If Anthropic API billing issue occurs ("credit balance too low"), system auto-falls back to OpenAI
+- Fallback adds latency (extra API round-trip after failure)
+- Admin notifications created for billing issues
+- Check Railway logs for `[AI] Anthropic failed, falling back to OpenAI`
+- 90-second timeout in TryAnalysis.tsx accommodates Document AI OCR (~50s) + AI fallback
+
+**Free Trial File Handoff:**
+- Files uploaded on landing page must be passed via React Router state
+- Pattern: `navigate('/try', { state: { file: valid[0] } })`
+- TryAnalysis reads from `location.state` and auto-processes
+- Use `useRef` to prevent duplicate processing on re-renders
+
 ---
 
 ## CI/CD
@@ -2378,5 +2462,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 5787+ tests, all passing (163 test files)
-**Last Updated**: January 29, 2026
+**Tests**: 5800+ tests, all passing (165 test files)
+**Last Updated**: January 30, 2026

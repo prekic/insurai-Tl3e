@@ -440,7 +440,6 @@ export async function extractPolicyFromDocument(
     }
   }
 
-  // At this point, we have extracted text from either Document AI or pdf.js
   if (!documentText || documentText.trim().length === 0) {
     logger?.failStage('No text could be extracted from the document')
     if (useFallback) {

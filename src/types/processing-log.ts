@@ -10,7 +10,8 @@
 export type ProcessingStage =
   | 'upload'              // File received in browser
   | 'pdf_extraction'      // Text extraction via pdf.js
-  | 'ocr_check'           // Density check to determine if OCR needed
+  | 'ocr_decision'        // OCR Decision Engine analysis (language, policy type, quality)
+  | 'ocr_check'           // Legacy: Density check to determine if OCR needed
   | 'ocr_processing'      // OCR via Document AI/Vision/Tesseract
   | 'text_preprocessing'  // Text normalization, OCR cleanup
   | 'ai_extraction'       // GPT-4o/Claude structured extraction
@@ -194,6 +195,15 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     icon: 'FileText',
     color: 'indigo',
   },
+  ocr_decision: {
+    name: 'ocr_decision',
+    label: 'OCR Decision',
+    labelTr: 'OCR Karar Motoru',
+    description: 'Analyzing document quality to determine OCR requirements',
+    descriptionTr: 'OCR gereksinimini belirlemek için belge kalitesi analiz ediliyor',
+    icon: 'BrainCircuit',
+    color: 'purple',
+  },
   ocr_check: {
     name: 'ocr_check',
     label: 'OCR Check',
@@ -292,7 +302,8 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
 export const PIPELINE_STAGES: ProcessingStage[] = [
   'upload',
   'pdf_extraction',
-  'ocr_check',
+  'ocr_decision',
+  'ocr_check',  // Legacy - kept for backwards compatibility
   'ocr_processing',
   'text_preprocessing',
   'ai_extraction',

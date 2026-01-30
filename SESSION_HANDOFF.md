@@ -1,4 +1,4 @@
-# Session Handoff - January 29, 2026
+# Session Handoff - January 30, 2026
 
 ## Current Status
 
@@ -6,113 +6,99 @@
 |--------|--------|
 | **Build** | ✅ Passing |
 | **TypeCheck** | ✅ 0 errors |
-| **ESLint Errors** | ✅ 0 errors (fixed 153 → 0 this session) |
-| **ESLint Warnings** | ⚠️ 48 warnings (reduced from 161 - 70% reduction) |
-| **Tests** | ✅ 5787+ passing (163 test files) |
-| **Branch** | `claude/review-project-status-GZE7q` |
+| **ESLint Errors** | ✅ 0 errors |
+| **ESLint Warnings** | ⚠️ 48 warnings (no-non-null-assertion) |
+| **Tests** | ✅ 5800+ passing (165 test files) |
+| **Branch** | `claude/review-project-status-oHQXg` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Admin Login** | ✅ Working (ADMIN_JWT_SECRET configured) |
+| **Deployment** | ✅ Railway deployed, working |
 
 ---
 
 ## Session Summary
 
-This session focused on **ESLint cleanup** and **React hooks exhaustive-deps fixes**.
+This session focused on **free trial upload flow fixes** and **extraction timeout handling**.
 
 Key accomplishments:
-1. Fixed all 153 ESLint errors (reduced to 0)
-2. Reduced ESLint warnings from 161 to 48 (70% reduction)
-3. Fixed 4 react-hooks/exhaustive-deps warnings with proper patterns
-4. Fixed Railway build failure from catch block variable renaming
-5. Fixed a stale closure bug in ConfigTab.tsx
-6. Updated CLAUDE.md with Known Issue #32 and gotchas
+1. Fixed file handoff bug from landing page to TryAnalysis
+2. Added 90-second timeout with Promise.race for stuck extractions
+3. Added progress updates every 10 seconds during extraction
+4. Created 32 new tests (19 for TryAnalysis, 13 for UploadWidget)
+5. Identified Anthropic billing issue causing fallback to OpenAI
 
 ---
 
 ## Features Completed This Session
 
-### 1. ESLint Error Fixes (153 → 0)
+### 1. File Handoff Fix (commit 6d7923b)
 
-| Issue Type | Examples | Fix |
-|------------|----------|-----|
-| Unused variables | `beforeEach`, `PIICategory` | Removed imports or prefixed with `_` |
-| Unused eslint-disable | `admin-auth.ts` | Removed directives |
-| Useless escapes | `\[` in char class | Changed to `[` |
-| Control char regex | `document-normalizer.ts` | Added eslint-disable comment |
+**Problem**: Anonymous users uploaded files on landing page but were returned to upload page instead of seeing analysis results.
 
-### 2. ESLint Warning Fixes (161 → 48)
+**Root Cause**: `UploadWidget.tsx` navigated to `/try` but didn't pass the file.
 
-| Warning Type | Count | Action |
-|--------------|-------|--------|
-| `no-console` | 109 | Changed `console.log` to `console.warn` |
-| `no-non-null-assertion` | 45 | Deferred (requires refactoring) |
-| `react-hooks/exhaustive-deps` | 4 | Fixed with patterns below |
-| Unused eslint-disable | 2 | Removed |
-| `no-explicit-any` | 1 | Added eslint-disable |
-
-### 3. React Hooks Exhaustive-Deps Fixes
-
-| File | Pattern Used | Why |
-|------|--------------|-----|
-| `PolicyUpload.tsx` | Ref pattern | Complex callback chain (addFiles→processFileAsync→user) |
-| `AuditTab.tsx` | useCallback | Simple dependencies (actionFilter, resourceFilter) |
-| `ConfigTab.tsx` | useCallback | Simple case + **fixed stale closure bug** |
-
-**Ref Pattern (for complex cases):**
+**Solution**: Pass file via React Router state:
 ```tsx
-const addFilesRef = useRef<(files: File[]) => Promise<void>>()
-addFilesRef.current = addFiles  // Keep ref updated
-useEffect(() => {
-  addFilesRef.current?.(selectedFiles)
-}, [location, navigate])  // Only stable dependencies
-```
+// UploadWidget.tsx
+navigate('/try', { state: { file: valid[0] } })
 
-**useCallback Pattern (for simple cases):**
-```tsx
-const fetchData = useCallback(async () => {
-  // fetch logic
-}, [filter1, filter2])
-useEffect(() => {
-  fetchData()
-}, [fetchData])
-```
-
-### 4. Stale Closure Bug Fix (ConfigTab.tsx)
-
-```tsx
-// BEFORE (bug): error state was stale
-if (!error) {  // Always reads initial null value!
-  setError(msg)
-}
-
-// AFTER (fixed): use local variable
-let hasError = false
-// ... set hasError = true on first error
-if (!hasError) {
-  setError(msg)
+// TryAnalysis.tsx
+const location = useLocation()
+const state = location.state as LocationState | null
+if (state?.file) {
+  processFileFromState(state.file)
 }
 ```
 
-### 5. Railway Build Fix
+### 2. Extraction Timeout (commit 58345b4)
 
-**Problem**: Linter auto-renamed `error` to `_error` in 71 catch blocks, but code inside still referenced `error`
+**Problem**: Analysis got stuck at 40% "Extracting text from PDF..." with no way out.
 
-**Error**: `Cannot find name 'error'. Did you mean '_error'?` (71 occurrences)
+**Solution**: Added 60-second timeout (later increased to 90s) using Promise.race:
+```tsx
+const EXTRACTION_TIMEOUT_MS = 90000
+const timeoutPromise = new Promise<never>((_, reject) => {
+  setTimeout(() => reject(new Error('Analysis timed out...')), EXTRACTION_TIMEOUT_MS)
+})
+const result = await Promise.race([extractionPromise, timeoutPromise])
+```
 
-**Fix**: Changed all `} catch (_error) {` back to `} catch (error) {`
+### 3. Progress Updates (commit 2b2682b)
+
+**Problem**: Users saw no feedback during long extractions.
+
+**Solution**: Progress interval updates every 10 seconds:
+```tsx
+progressInterval = setInterval(() => {
+  setProgress((prev) => prev < 85 ? prev + 5 : prev)
+  setProgressMessage((prev) => {
+    const messages = ['Extracting text...', 'Analyzing structure...', 'Processing with AI...', 'Almost there...']
+    const currentIndex = messages.indexOf(prev)
+    return currentIndex < messages.length - 1 ? messages[currentIndex + 1] : prev
+  })
+}, 10000)
+```
+
+### 4. Test Coverage
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `TryAnalysis.test.tsx` | 19 | File handoff, timeout, progress, errors |
+| `UploadWidget.test.tsx` | 13 | Anonymous/logged-in flows, drag-drop |
 
 ---
 
 ## Commits This Session
 
 ```
-6cf40eb Update documentation with ESLint cleanup session changes
-2e582d7 Fix catch block variable names in admin routes
-d92d145 Fix react-hooks/exhaustive-deps warnings properly
-3ef35f7 Reduce ESLint warnings from 161 to 48 (70% reduction)
-d378d7f Fix all ESLint errors (153 → 0)
-c954173 Remove placeholder credentials vulnerability in Supabase client
+2b2682b Increase timeout to 90s and add progress updates during extraction
+58345b4 Add timeout and error handling for stuck analysis states
+6d7923b Fix file handoff from landing page to trial analysis
+71df32e Add trial data transfer, analytics, email capture, and share links
+a434068 Show full analysis for anonymous users
+051db44 Add session-based free trial for anonymous users
+c0a0888 Improve mobile landing page conversion and trust signals
+6fbf519 Revert OCR Decision Engine integration - always use Document AI
 ```
 
 ---
@@ -121,50 +107,11 @@ c954173 Remove placeholder credentials vulnerability in Supabase client
 
 | File | Changes |
 |------|---------|
-| `src/components/PolicyUpload.tsx` | Ref pattern for addFiles callback |
-| `src/components/admin/tabs/AuditTab.tsx` | useCallback for fetchLogs |
-| `src/components/admin/tabs/ConfigTab.tsx` | useCallback + stale closure fix |
-| `server/routes/admin.ts` | 71 catch block variable fixes |
-| `src/lib/ai/text-processor.ts` | Fixed void expression |
-| `src/lib/admin/config-manager.test.ts` | Removed unused imports |
-| `src/lib/ai/document-normalizer.ts` | Fixed useless escapes, eslint-disable |
-| `src/lib/ai/document-normalizer.test.ts` | Removed unused import |
-| `server/middleware/admin-auth.ts` | Removed unused eslint-disable |
-| `services/preproc-svc/src/index.ts` | Added eslint-disable for any |
-| Multiple files in `src/lib/ai/` | Changed console.log to console.warn |
-| `CLAUDE.md` | Added issue #32, updated gotchas |
-
----
-
-## Remaining ESLint Warnings (48)
-
-| Type | Count | Notes |
-|------|-------|-------|
-| `no-non-null-assertion` | 45 | Would require adding null checks throughout code |
-| `react-hooks/exhaustive-deps` | 3 | In services (monorepo dependencies) |
-
-The 45 `no-non-null-assertion` warnings are low priority and would require significant refactoring to fix properly (adding null checks and handling null cases).
-
----
-
-## Common Gotchas (Quick Reference)
-
-| Gotcha | Solution |
-|--------|----------|
-| Admin login 500 error | Visit `/api/admin/diagnostics` to check config |
-| `ADMIN_JWT_SECRET` missing | Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
-| `VITE_*` vars not updating | Need rebuild (redeploy), not just restart |
-| Railway env vars with quotes | Don't add quotes manually - Railway adds them |
-| PDF.js worker blocked | CSP must allow unpkg.com, cdn.jsdelivr.net |
-| Supabase auth failing | Add Railway URL to Supabase redirect allowlist |
-| Server can't access DB | Use `SUPABASE_URL` not `VITE_SUPABASE_URL` |
-| `crypto` not defined | Import explicitly: `import crypto from 'crypto'` |
-| React hooks error #310 | All hooks must be BEFORE conditional returns |
-| Admin API 401 errors | Use `adminFetch()` not raw `fetch()` |
-| Document AI 15-page limit | PDFs are auto-split into chunks (no config needed) |
-| **Catch block renaming** | **Don't let linter rename `error` to `_error` if still used** |
-| **Stale closures** | **Use local variables in async callbacks, not state** |
-| **exhaustive-deps complex** | **Use ref pattern for complex callback chains** |
+| `src/components/TryAnalysis.tsx` | Added file from router state, 90s timeout, progress updates |
+| `src/components/landing/UploadWidget.tsx` | Pass file via router state for anonymous users |
+| `src/components/TryAnalysis.test.tsx` | **NEW** 19 tests |
+| `src/components/landing/UploadWidget.test.tsx` | **NEW** 13 tests |
+| `src/App.tsx` | Added `/try` route |
 
 ---
 
@@ -172,28 +119,67 @@ The 45 `no-non-null-assertion` warnings are low priority and would require signi
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Anthropic billing issue | Medium | Open | "Your credit balance is too low" - falls back to OpenAI |
-| ocr-orch service tests failing | Low | Open | Missing `tesseract.js` import - monorepo dependency |
-| validate-svc tests failing | Low | Open | Missing `@insurai/rule-packs` - monorepo dependency |
-| 45 no-non-null-assertion warnings | Low | Deferred | Would require refactoring to add null checks |
+| Anthropic billing issue | Medium | Open | "Your credit balance is too low" - auto-falls back to OpenAI |
+| Extraction latency | Low | Mitigated | 90s timeout accommodates Document AI + fallback |
+| 45 no-non-null-assertion warnings | Low | Deferred | Would require refactoring |
+
+---
+
+## Railway Deployment Notes
+
+**Last Deployment**: January 30, 2026
+
+**Logs Revealed**:
+1. Document AI OCR working (~50 seconds for processing)
+2. Anthropic API failed: "Your credit balance is too low to access the Anthropic API"
+3. System correctly fell back to OpenAI
+4. Admin notification created for billing issue
+
+**Environment Variables Required**:
+- `OPENAI_API_KEY` - Required, used as fallback
+- `ANTHROPIC_API_KEY` - Optional, preferred provider
+- `GOOGLE_CLOUD_API_KEY` - Required for Document AI OCR
+- `GCP_SERVICE_ACCOUNT_BASE64` - GCP credentials (base64-encoded)
+- `SUPABASE_URL` - Required for database
+- `SUPABASE_SERVICE_ROLE_KEY` - Required for admin operations
+- `ADMIN_JWT_SECRET` - Required for admin authentication
+- `VITE_SUPABASE_URL` - Build-time (baked into bundle)
+- `VITE_SUPABASE_ANON_KEY` - Build-time (baked into bundle)
+
+**Note**: `VITE_API_PROXY_URL` is auto-detected in production via `window.location.origin`
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Verify deployment** - Ensure Railway deployed latest changes
-2. **Test admin login** - Verify it still works after ESLint changes
+1. **Top up Anthropic credits** - Restore faster extraction without fallback
+2. **Monitor extraction success rate** - Check if 90s timeout is sufficient
 
 ### Short Term
-1. **Consider fixing non-null assertions** - 45 warnings could be addressed
-2. **Monitor Document AI quality** - Compare Turkish OCR output quality
-3. **Add deterministic post-processing** - Fix remaining OCR issues
+1. **Consider caching extraction results** - Reduce repeated API calls
+2. **Add retry logic for transient failures** - Network issues, rate limits
+3. **Implement extraction queue** - Handle multiple concurrent uploads
 
 ### Feature Work
-1. **Integrate OCR Decision Engine with policy-extractor**
+1. **Integrate OCR Decision Engine with policy-extractor** - (Reverted, needs refinement)
 2. **Add Document Journey metadata to admin viewer**
-3. **Add OCR decision caching**
+3. **Multi-policy free trial** - Allow 3 policies per session
+
+---
+
+## Common Gotchas (Quick Reference)
+
+| Gotcha | Solution |
+|--------|----------|
+| Files not passed to TryAnalysis | Use `navigate('/try', { state: { file } })` |
+| Extraction stuck/timeout | 90s timeout with Promise.race |
+| No progress feedback | setInterval updates every 10s |
+| Anthropic billing | System auto-falls back to OpenAI |
+| `VITE_*` vars not updating | Need rebuild, not restart |
+| Admin login 500 | Check `/api/admin/diagnostics` |
+| PDF.js worker blocked | CSP must allow unpkg.com |
+| useRef for duplicate prevention | Prevent re-processing on re-renders |
 
 ---
 
@@ -209,62 +195,34 @@ npm run typecheck
 # Run all tests
 npm test -- --run
 
-# Full validation (typecheck + lint + test)
+# Full validation
 npm run validate
-
-# Check admin configuration status
-curl -s "https://insurai-production.up.railway.app/api/admin/diagnostics" | jq .
 
 # Health check
 curl -s "https://insurai-production.up.railway.app/api/health" | jq .
+
+# Admin diagnostics
+curl -s "https://insurai-production.up.railway.app/api/admin/diagnostics" | jq .
 ```
-
----
-
-## Session Statistics
-
-| Metric | Value |
-|--------|-------|
-| Commits this session | 6 |
-| ESLint errors fixed | 153 → 0 |
-| ESLint warnings reduced | 161 → 48 (70%) |
-| React hooks warnings fixed | 4 |
-| Catch blocks fixed | 71 |
-| Files changed | 15+ |
-
----
-
-## Handoff Checklist
-
-- [x] ESLint errors reduced from 153 to 0
-- [x] ESLint warnings reduced from 161 to 48
-- [x] React hooks exhaustive-deps fixed (4 warnings)
-- [x] Railway build failure fixed (catch block variables)
-- [x] Stale closure bug fixed in ConfigTab.tsx
-- [x] CLAUDE.md updated (issue #32, gotchas)
-- [x] SESSION_HANDOFF.md updated
-- [x] Changes pushed to `claude/review-project-status-GZE7q`
 
 ---
 
 ## Previous Session Context
 
-January 28, 2026 (Evening):
-- Fixed 46 test failures across 6 test files
+January 29, 2026:
+- Fixed all 153 ESLint errors (reduced to 0)
+- Reduced ESLint warnings from 161 to 48 (70% reduction)
+- Fixed 4 react-hooks/exhaustive-deps warnings
+- Fixed Railway build failure from catch block variable renaming
+
+January 28, 2026:
+- Implemented PDF splitting for Document AI 15-page limit
 - Added `/api/admin/diagnostics` endpoint
 - Configured `ADMIN_JWT_SECRET` on Railway
 
-January 28, 2026 (Earlier):
-- Implemented PDF splitting for Document AI 15-page limit
-- Fixed "Stage interrupted by new stage" error
-
-January 26, 2026:
-- OCR Decision Engine Document Journey metadata enhancement
-- Configuration-driven OCR decision system
-
 ---
 
-**Last Updated**: January 29, 2026
-**Branch**: `claude/review-project-status-GZE7q`
+**Last Updated**: January 30, 2026
+**Branch**: `claude/review-project-status-oHQXg`
 **ESLint Status**: 0 errors, 48 warnings
-**Next Session Focus**: Consider fixing non-null assertions, continue feature work
+**Next Session Focus**: Top up Anthropic credits, monitor extraction success

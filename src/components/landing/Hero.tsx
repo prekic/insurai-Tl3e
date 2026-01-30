@@ -1,8 +1,9 @@
-import { Shield, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
+import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { UploadWidget } from './UploadWidget'
+import { SampleReportPreviewCompact } from './SampleReportPreview'
 import { StaggeredList, AnimatedButton, NumberCounter, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
 import { LanguageToggle } from './LanguageToggle'
@@ -14,6 +15,9 @@ export function Hero() {
   const { policies } = usePolicies()
   const { user, signOut } = useAuth()
   const policyCount = policies.length
+
+  // Route to /try for anonymous users, /upload for logged-in users
+  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
@@ -286,14 +290,33 @@ export function Hero() {
               </div>,
 
               <div key="ctas" className="flex flex-col sm:flex-row gap-4 pt-4">
-                <UploadWidget compact={true} />
+                <UploadWidget
+                  compact={true}
+                  buttonText="Analyze Your Policy Free"
+                  loadingText="Analyzing..."
+                />
                 <AnimatedButton
-                  onClick={() => navigate('/upload?autoOpen=true')}
-                  className="group inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-medium"
+                  onClick={() => navigate(uploadPath)}
+                  className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-semibold"
                 >
-                  <span>Try with sample policies</span>
+                  <span>See Demo Report</span>
                   <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                 </AnimatedButton>
+              </div>,
+
+              <div key="security-badges" className="flex flex-wrap items-center gap-4 pt-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700">KVKK Uyumlu</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                  <Lock size={14} className="text-blue-600" />
+                  <span className="text-xs font-medium text-blue-700">256-bit SSL</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-full">
+                  <Shield size={14} className="text-purple-600" />
+                  <span className="text-xs font-medium text-purple-700">Verileriniz Korunur</span>
+                </div>
               </div>,
 
               <div key="samples-cta" className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
@@ -315,7 +338,12 @@ export function Hero() {
                 </div>
               </div>,
 
-              <div key="trust" className="pt-8 flex items-center gap-8 text-sm text-gray-500">
+              <div key="sample-report" className="mt-4">
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you'll get:</p>
+                <SampleReportPreviewCompact />
+              </div>,
+
+              <div key="trust" className="pt-6 flex items-center gap-8 text-sm text-gray-500">
                 <div>
                   <NumberCounter value={4.9} decimals={1} suffix="★" className="text-2xl font-semibold text-gray-900" />
                   <div>15K+ reviews</div>

@@ -3,13 +3,21 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
+import { useAuth } from '@/lib/supabase/auth-context'
 
 interface UploadWidgetProps {
   compact?: boolean
+  buttonText?: string
+  loadingText?: string
 }
 
-export function UploadWidget({ compact = false }: UploadWidgetProps) {
+export function UploadWidget({
+  compact = false,
+  buttonText = 'Upload your policy',
+  loadingText = 'Uploading...'
+}: UploadWidgetProps) {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -64,11 +72,15 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
       })
 
       setIsUploading(false)
-      toast.success('Files uploaded successfully', {
-        description: `${valid.length} policy document(s) are being analyzed.`,
-      })
-      // Navigate to upload page for full analysis
-      navigate('/upload?autoOpen=true')
+      // Navigate to appropriate page with file data
+      // For anonymous users, pass file via router state to TryAnalysis
+      // For logged-in users, pass to PolicyUpload
+      if (user) {
+        navigate('/upload?autoOpen=true', { state: { files: valid } })
+      } else {
+        // Pass file to TryAnalysis - it will handle the analysis
+        navigate('/try', { state: { file: valid[0] } })
+      }
     } catch (err) {
       setIsUploading(false)
       const message = err instanceof Error ? err.message : 'Upload failed'
@@ -94,16 +106,16 @@ export function UploadWidget({ compact = false }: UploadWidgetProps) {
 
   if (compact) {
     return (
-      <label className="group inline-flex items-center justify-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all cursor-pointer font-medium">
+      <label className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all cursor-pointer font-semibold text-lg">
         {isUploading ? (
           <>
             <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            <span>Uploading...</span>
+            <span>{loadingText}</span>
           </>
         ) : (
           <>
-            <Upload size={18} />
-            <span>Upload your policy</span>
+            <Upload size={20} />
+            <span>{buttonText}</span>
           </>
         )}
         <input

@@ -10,6 +10,7 @@ import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
 import { PolicyCardGrid } from './PolicyCard'
 import { useCompareSelection } from '@/hooks/usePolicyComparison'
 import { getShortCompanyName, getCoverageType, getMainCoverageValue, getSubjectDisplay } from '@/lib/insurance-display'
+import { useTrialTransfer } from '@/hooks/useTrialTransfer'
 import type { DuplicatePolicy } from '@/types/policy'
 
 // Sorting configuration
@@ -28,8 +29,17 @@ export function PolicyDashboard() {
     duplicates,
     dismissDuplicate,
     mergeDuplicates,
+    refreshPolicies,
   } = usePolicies()
   const uploadedPolicies = useDashboardPolicies()
+
+  // Auto-transfer trial data when user signs up from trial flow
+  useTrialTransfer({
+    onTransferComplete: () => {
+      // Refresh policies to show the newly transferred policy
+      refreshPolicies?.()
+    },
+  })
 
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
