@@ -55,6 +55,9 @@ const TryAnalysis = lazy(() =>
 const SharedResult = lazy(() =>
   import('./components/SharedResult').then((m) => ({ default: m.SharedResult }))
 )
+const UnsubscribePage = lazy(() =>
+  import('./components/UnsubscribePage').then((m) => ({ default: m.UnsubscribePage }))
+)
 const AdminDashboard = lazy(() =>
   import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
 )
@@ -68,6 +71,7 @@ const ROUTES = {
   auth: '/auth',
   try: '/try',  // Free trial analysis (no auth required)
   share: '/share/:shareId',  // Shared trial result (no auth required)
+  unsubscribe: '/unsubscribe',  // Email unsubscribe (no auth required)
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
@@ -103,7 +107,8 @@ function AppContent() {
   const isLandingPage = location.pathname === '/'
   const isAuthPage = location.pathname === '/auth'
   const isAdminPage = location.pathname.startsWith('/admin')
-  const hideNavigation = isLandingPage || isAuthPage || isAdminPage
+  const isUnsubscribePage = location.pathname === '/unsubscribe'
+  const hideNavigation = isLandingPage || isAuthPage || isAdminPage || isUnsubscribePage
 
   // Get page title for screen readers
   const getPageTitle = (): string => {
@@ -176,6 +181,14 @@ function AppContent() {
                 element={
                   <PageTransition>
                     <SharedResult />
+                  </PageTransition>
+                }
+              />
+              <Route
+                path="/unsubscribe"
+                element={
+                  <PageTransition>
+                    <UnsubscribePage />
                   </PageTransition>
                 }
               />

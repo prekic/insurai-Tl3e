@@ -93,8 +93,6 @@ describe('UploadWidget', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUser.mockReturnValue(null)
-    // Reset random to avoid flaky 5% error simulation
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
   })
 
   describe('Rendering', () => {
@@ -268,55 +266,9 @@ describe('UploadWidget', () => {
     })
   })
 
-  describe('Error Handling', () => {
-    it('shows error state when upload fails', async () => {
-      // Make random return < 0.05 to trigger error
-      vi.spyOn(Math, 'random').mockReturnValue(0.01)
-
-      renderWithRouter()
-
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement
-      const mockFile = createMockFile()
-
-      await act(async () => {
-        await userEvent.upload(input, mockFile)
-      })
-
-      await waitFor(
-        () => {
-          expect(screen.getByText('Upload failed')).toBeInTheDocument()
-        },
-        { timeout: 3000 }
-      )
-
-      expect(mockToast.error).toHaveBeenCalledWith(
-        'Upload failed',
-        expect.objectContaining({
-          description: expect.any(String),
-        })
-      )
-    })
-
-    it('shows inline error message on failure', async () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.01)
-
-      renderWithRouter()
-
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement
-      const mockFile = createMockFile()
-
-      await act(async () => {
-        await userEvent.upload(input, mockFile)
-      })
-
-      await waitFor(
-        () => {
-          expect(screen.getByText('Upload failed')).toBeInTheDocument()
-        },
-        { timeout: 3000 }
-      )
-    })
-  })
+  // Note: Error handling tests for simulated network errors were removed
+  // because the simulated 5% random network error was removed in commit 9887e8d.
+  // Error handling is now tested through file validation tests below.
 
   describe('File Validation', () => {
     it('shows error for invalid files', async () => {
@@ -346,7 +298,6 @@ describe('UploadWidget Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockUser.mockReturnValue(null)
-    vi.spyOn(Math, 'random').mockReturnValue(0.5)
   })
 
   it('maintains file reference through navigation', async () => {
