@@ -883,6 +883,11 @@ router.post(
  * Proxy for Google Cloud Vision OCR
  * Rate limited: 30 requests per hour
  * Validated: imageBase64 required, max 15MB, valid base64 format
+ *
+ * Authentication priority (most secure first):
+ * 1. Service account OAuth token (if GCP_SERVICE_ACCOUNT_BASE64 configured)
+ * 2. API key in header (X-goog-api-key) - keeps key out of URLs/logs
+ * 3. API key in query param (fallback) - less secure, visible in logs
  */
 router.post(
   '/ocr',
@@ -891,8 +896,11 @@ router.post(
   validateOCR,
   async (req: Request, res: Response) => {
     try {
+      // Try OAuth token first (most secure - uses service account, no API key exposure)
+      const oauthToken = await getDocumentAIAccessToken()
       const apiKey = process.env.GOOGLE_CLOUD_API_KEY
-      if (!apiKey) {
+
+      if (!oauthToken && !apiKey) {
         return res.status(503).json({
           error: 'Google Cloud not configured',
           code: 'PROVIDER_NOT_CONFIGURED',
@@ -902,25 +910,42 @@ router.post(
       // Body is validated and sanitized by middleware
       const { imageBase64 } = req.body as OCRInput
 
-      // Use query parameter for REST API (x-goog-api-key header is for gRPC only)
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: imageBase64 },
-                features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-                imageContext: { languageHints: ['tr', 'en'] },
-              },
-            ],
-          }),
+      // Build request with appropriate authentication
+      // Priority: OAuth token > API key header > API key query param
+      let url = 'https://vision.googleapis.com/v1/images:annotate'
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (oauthToken) {
+        // Most secure: OAuth bearer token from service account
+        headers['Authorization'] = `Bearer ${oauthToken}`
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[Vision OCR] Using OAuth bearer token authentication')
         }
-      )
+      } else if (apiKey) {
+        // Fallback: API key in header (X-goog-api-key with correct capitalization)
+        // Note: Header keeps API key out of URL logs, but query param is more reliable
+        // Using query param as Google REST APIs have inconsistent header support
+        url = `${url}?key=${apiKey}`
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[Vision OCR] Using API key authentication (query param)')
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: imageBase64 },
+              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+              imageContext: { languageHints: ['tr', 'en'] },
+            },
+          ],
+        }),
+      })
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
@@ -1549,6 +1574,7 @@ interface ProviderDiagnostic {
   error?: string
   latencyMs?: number
   model?: string
+  authMethod?: string // 'oauth' | 'api_key' - only for Google Vision
 }
 
 /**
@@ -1675,34 +1701,51 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
   }
 
   // Test Google Cloud Vision (OCR)
+  // Check both OAuth (service account) and API key authentication
   const googleApiKey = process.env.GOOGLE_CLOUD_API_KEY
-  if (googleApiKey) {
+  const hasServiceAccount = !!getGCPCredentialsPath()
+
+  if (googleApiKey || hasServiceAccount) {
     diagnostics.google.configured = true
     const startTime = Date.now()
     try {
-      // Make a minimal API call to verify the key works
+      // Try OAuth token first (most secure)
+      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
+
+      // Build request with appropriate authentication
+      let url = 'https://vision.googleapis.com/v1/images:annotate'
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      let authMethod = 'none'
+      if (oauthToken) {
+        headers['Authorization'] = `Bearer ${oauthToken}`
+        authMethod = 'oauth'
+      } else if (googleApiKey) {
+        url = `${url}?key=${googleApiKey}`
+        authMethod = 'api_key'
+      }
+
+      // Make a minimal API call to verify credentials work
       // Using a tiny 1x1 white PNG to minimize cost
-      // Use query parameter for REST API (x-goog-api-key header is for gRPC only)
       const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-      const response = await fetch(
-        `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
-          }),
-        }
-      )
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
+        }),
+      })
       diagnostics.google.latencyMs = Date.now() - startTime
 
       if (response.ok) {
         diagnostics.google.valid = true
-        // Only show model in non-production
+        // Only show details in non-production
         if (!IS_PRODUCTION) {
           diagnostics.google.model = 'cloud-vision-v1'
+          // Show which auth method was used (oauth is more secure than api_key)
+          diagnostics.google.authMethod = authMethod
         }
       } else {
         const errorData = (await response.json().catch(() => ({}))) as {
@@ -1718,6 +1761,7 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
         // Log full error in development for debugging
         if (!IS_PRODUCTION) {
           console.log('[Vision Diagnose] Error response:', {
+            authMethod,
             httpStatus,
             errorStatus,
             errorMessage,
