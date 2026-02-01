@@ -1559,17 +1559,20 @@ function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
   if (!isProduction) return error
 
   // Map technical errors to user-friendly messages for SaaS
-  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect')) {
+  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect') || error.includes('Authentication failed')) {
     return 'Service configuration error'
   }
-  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota')) {
+  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota') || error.includes('try again later')) {
     return 'Service temporarily busy'
   }
-  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING')) {
+  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing')) {
     return 'Service temporarily unavailable'
   }
-  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled')) {
+  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled') || error.includes('Permission denied')) {
     return 'Service not available'
+  }
+  if (error.includes('NOT_FOUND') || error.includes('not found') || error.includes('404')) {
+    return 'Service not configured'
   }
   return 'Service error'
 }
@@ -1702,16 +1705,44 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
           diagnostics.google.model = 'cloud-vision-v1'
         }
       } else {
-        const errorData = (await response.json().catch(() => ({}))) as { error?: { message?: string; status?: string } }
+        const errorData = (await response.json().catch(() => ({}))) as {
+          error?: { message?: string; status?: string; code?: number }
+        }
         diagnostics.google.valid = false
-        let errorMsg = errorData.error?.message || `HTTP ${response.status}`
-        // Provide specific guidance
-        if (errorMsg.includes('API key not valid') || response.status === 400) {
+
+        // Check both message and status fields from Google Cloud API response
+        const errorMessage = errorData.error?.message || ''
+        const errorStatus = errorData.error?.status || ''
+        const httpStatus = response.status
+
+        // Log full error in development for debugging
+        if (!IS_PRODUCTION) {
+          console.log('[Vision Diagnose] Error response:', {
+            httpStatus,
+            errorStatus,
+            errorMessage,
+            fullError: errorData.error
+          })
+        }
+
+        let errorMsg = errorMessage || `HTTP ${httpStatus}`
+
+        // Map Google Cloud error statuses to actionable messages
+        if (errorMsg.includes('API key not valid') || httpStatus === 400) {
           errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
-        } else if (errorMsg.includes('PERMISSION_DENIED')) {
+        } else if (errorStatus === 'PERMISSION_DENIED' || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('has not been used')) {
           errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
-        } else if (errorMsg.includes('BILLING')) {
+        } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
+          errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
+        } else if (errorStatus === 'FAILED_PRECONDITION' || errorMsg.includes('Billing') || errorMsg.includes('BILLING')) {
           errorMsg = 'Billing not enabled on Google Cloud project'
+        } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
+          errorMsg = 'Rate limit exceeded - try again later'
+        } else if (errorStatus === 'NOT_FOUND' || httpStatus === 404) {
+          errorMsg = 'Vision API endpoint not found - check API configuration'
+        } else if (httpStatus === 403) {
+          // Catch-all for 403 errors with unrecognized status
+          errorMsg = `Permission denied (${errorStatus || 'unknown'}) - check API key permissions`
         }
         diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
       }
