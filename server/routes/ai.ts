@@ -902,13 +902,13 @@ router.post(
       // Body is validated and sanitized by middleware
       const { imageBase64 } = req.body as OCRInput
 
+      // Use query parameter for REST API (x-goog-api-key header is for gRPC only)
       const response = await fetch(
-        'https://vision.googleapis.com/v1/images:annotate',
+        `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
           },
           body: JSON.stringify({
             requests: [
@@ -1682,14 +1682,14 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
     try {
       // Make a minimal API call to verify the key works
       // Using a tiny 1x1 white PNG to minimize cost
+      // Use query parameter for REST API (x-goog-api-key header is for gRPC only)
       const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
       const response = await fetch(
-        'https://vision.googleapis.com/v1/images:annotate',
+        `https://vision.googleapis.com/v1/images:annotate?key=${googleApiKey}`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-goog-api-key': googleApiKey,
           },
           body: JSON.stringify({
             requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
