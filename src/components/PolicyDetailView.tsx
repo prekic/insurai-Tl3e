@@ -19,6 +19,7 @@ import {
   type GroupedCoverage,
   type AnalyzedExclusion,
 } from '@/lib/knowledge/kasko-knowledge'
+import { getShortCompanyName } from '@/lib/insurance-display'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -91,6 +92,45 @@ function getCategoryInfo(category: CoverageCategory) {
 }
 
 /**
+ * Get additional info text for a coverage item
+ */
+function getCoverageInfoText(coverage: Coverage, locale: string): string | null {
+  const parts: string[] = []
+
+  // Add deductible info if applicable
+  if (coverage.deductible && coverage.deductible > 0) {
+    parts.push(locale === 'tr'
+      ? `Muafiyet: ${formatCurrency(coverage.deductible)}`
+      : `Deductible: ${formatCurrency(coverage.deductible)}`)
+  }
+
+  // Add description if available
+  if (coverage.description && coverage.description.trim()) {
+    parts.push(coverage.description.trim())
+  }
+
+  // Add importance info
+  if (coverage.importance === 'critical') {
+    parts.push(locale === 'tr' ? '⚠️ Kritik teminat' : '⚠️ Critical coverage')
+  }
+
+  // Add info about special values
+  if (coverage.isMarketValue) {
+    parts.push(locale === 'tr'
+      ? 'Hasar anındaki piyasa değeri üzerinden ödenir'
+      : 'Paid based on market value at time of loss')
+  }
+
+  if (coverage.isUnlimited) {
+    parts.push(locale === 'tr'
+      ? 'Limit üst sınırı yoktur'
+      : 'No upper limit')
+  }
+
+  return parts.length > 0 ? parts.join(' • ') : null
+}
+
+/**
  * Collapsible coverage category for mobile-friendly display
  */
 function CollapsibleCoverageCategory({
@@ -109,10 +149,15 @@ function CollapsibleCoverageCategory({
   defaultExpanded?: boolean
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+  const [expandedCoverageIndex, setExpandedCoverageIndex] = useState<number | null>(null)
   const PREVIEW_COUNT = 2
 
   const hasMore = coverages.length > PREVIEW_COUNT
   const displayedCoverages = isExpanded ? coverages : coverages.slice(0, PREVIEW_COUNT)
+
+  const toggleCoverageInfo = (index: number) => {
+    setExpandedCoverageIndex(expandedCoverageIndex === index ? null : index)
+  }
 
   return (
     <div className="border border-gray-200 rounded-xl overflow-hidden">
@@ -161,29 +206,52 @@ function CollapsibleCoverageCategory({
             )
           }
 
-          // Regular coverage
+          // Regular coverage - with click-to-expand info
           const coverage = groupedCoverage as unknown as Coverage
           const limitDisplay = formatCoverageLimit(coverage)
           const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
             limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
+          const infoText = getCoverageInfoText(coverage, locale)
+          const isCoverageExpanded = expandedCoverageIndex === i
+          const hasInfo = !!infoText
 
           return (
-            <div key={i} className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                {coverage.included !== false ? (
-                  <div className="w-6 h-6 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
-                    <Check className="text-green-600" size={12} />
+            <div key={i} className="rounded-lg bg-gray-50 overflow-hidden">
+              <button
+                onClick={() => hasInfo && toggleCoverageInfo(i)}
+                className={`flex items-center justify-between gap-2 p-2.5 w-full text-left transition-colors ${hasInfo ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
+                disabled={!hasInfo}
+              >
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  {coverage.included !== false ? (
+                    <div className="w-6 h-6 bg-green-100 rounded-md flex items-center justify-center flex-shrink-0">
+                      <Check className="text-green-600" size={12} />
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
+                      <X className="text-gray-400" size={12} />
+                    </div>
+                  )}
+                  <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
+                  {hasInfo && (
+                    <Info size={12} className={`text-gray-400 flex-shrink-0 transition-colors ${isCoverageExpanded ? 'text-blue-500' : ''}`} />
+                  )}
+                </div>
+                <p className={`font-semibold text-sm flex-shrink-0 ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                  {limitDisplay}
+                </p>
+              </button>
+
+              {/* Expanded info section */}
+              {isCoverageExpanded && infoText && (
+                <div className="px-2.5 pb-2.5">
+                  <div className="p-2 bg-blue-50 rounded-md border border-blue-100 ml-8">
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {infoText}
+                    </p>
                   </div>
-                ) : (
-                  <div className="w-6 h-6 bg-gray-200 rounded-md flex items-center justify-center flex-shrink-0">
-                    <X className="text-gray-400" size={12} />
-                  </div>
-                )}
-                <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
-              </div>
-              <p className={`font-semibold text-sm flex-shrink-0 ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
-                {limitDisplay}
-              </p>
+                </div>
+              )}
             </div>
           )
         })}
@@ -770,7 +838,7 @@ export function PolicyDetailView() {
                   {policy.typeTr}
                 </h1>
                 <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis" title={policy.provider}>
-                  {policy.provider}
+                  {getShortCompanyName(policy.provider)}
                 </p>
                 {/* Show plate for vehicle policies */}
                 {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo?.plate && (
@@ -789,7 +857,7 @@ export function PolicyDetailView() {
                     const shareUrl = `${window.location.origin}/policy/${policy.id}`
                     if (navigator.share) {
                       await navigator.share({
-                        title: `${policy.provider} - ${policy.typeTr}`,
+                        title: `${getShortCompanyName(policy.provider)} - ${policy.typeTr}`,
                         text: `${locale === 'tr' ? 'Poliçe' : 'Policy'} ${policy.policyNumber}`,
                         url: shareUrl,
                       })
@@ -812,7 +880,7 @@ export function PolicyDetailView() {
                 onClick={() => {
                   const summary = [
                     `${locale === 'tr' ? 'Poliçe' : 'Policy'}: ${policy.policyNumber}`,
-                    `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${policy.provider}`,
+                    `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${getShortCompanyName(policy.provider)}`,
                     `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
                     `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
                     `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,

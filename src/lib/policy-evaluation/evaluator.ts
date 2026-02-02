@@ -390,12 +390,61 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
   const issuesTR: string[] = []
   let score = 80
 
-  // Check main deductible
+  // Handle market value policies where coverage field is 0
+  // In this case, we can only evaluate the absolute deductible amount
+  const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+
+  if (policy.deductible === 0) {
+    // No deductible is excellent
+    score = 95
+    return {
+      category: 'Deductible',
+      categoryTR: 'Muafiyet',
+      score,
+      weight: config.weights.deductible,
+      details: 'No deductible - full coverage from first TL',
+      detailsTR: 'Muafiyet yok - ilk TL\'den itibaren tam teminat',
+      issues: [],
+      issuesTR: [],
+    }
+  }
+
+  // For market value policies, evaluate deductible as absolute amount
+  if (hasMarketValueCoverage) {
+    if (policy.deductible < 5000) {
+      score = 90
+    } else if (policy.deductible < 10000) {
+      score = 80
+    } else if (policy.deductible < 25000) {
+      score = 65
+      issues.push('Deductible is moderately high')
+      issuesTR.push('Muafiyet orta düzeyde yüksek')
+    } else if (policy.deductible < 50000) {
+      score = 50
+      issues.push('Deductible is high')
+      issuesTR.push('Muafiyet yüksek')
+    } else {
+      score = 30
+      issues.push('Deductible is very high')
+      issuesTR.push('Muafiyet çok yüksek')
+    }
+
+    return {
+      category: 'Deductible',
+      categoryTR: 'Muafiyet',
+      score,
+      weight: config.weights.deductible,
+      details: `Deductible of ${policy.deductible.toLocaleString('tr-TR')} TL`,
+      detailsTR: `${policy.deductible.toLocaleString('tr-TR')} TL muafiyet`,
+      issues,
+      issuesTR,
+    }
+  }
+
+  // Standard evaluation: Check deductible as percentage of coverage
   const deductibleRatio = policy.deductible / policy.coverage
 
-  if (deductibleRatio === 0) {
-    score = 95 // No deductible is great
-  } else if (deductibleRatio < 0.01) {
+  if (deductibleRatio < 0.01) {
     score = 90 // Less than 1%
   } else if (deductibleRatio < 0.02) {
     score = 80 // 1-2% is standard
@@ -415,7 +464,7 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
 
   // Check individual coverage deductibles
   const highDeductibleCoverages = policy.coverages.filter(c =>
-    c.included && c.deductible > 0 && (c.deductible / c.limit) > 0.1
+    c.included && c.deductible > 0 && c.limit > 0 && (c.deductible / c.limit) > 0.1
   )
 
   if (highDeductibleCoverages.length > 0) {
@@ -571,11 +620,51 @@ function evaluateValue(
   const issues: string[] = []
   const issuesTR: string[] = []
 
-  // Value is a combination of coverage quality vs premium paid
-  const coverageToPremiumRatio = policy.coverage / policy.premium
+  // Handle market value policies where coverage is 0
+  const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
 
   // Calculate base value score
   let score = (premiumScore * 0.4 + coverageScore * 0.6)
+
+  // For market value policies, evaluate based on coverage quality and features
+  if (hasMarketValueCoverage) {
+    // Check for value-added coverages
+    const valueCoverages = ['roadside assistance', 'yol yardım', 'anadolu hizmet', 'replacement vehicle', 'ikame araç', 'legal protection', 'hukuki koruma', 'mini onarım', 'cam', 'glass']
+    const valueAddedCount = policy.coverages.filter(c =>
+      c.included && valueCoverages.some(vc => c.name.toLowerCase().includes(vc))
+    ).length
+
+    if (valueAddedCount >= 3) {
+      score += 15 // Excellent value-added features
+    } else if (valueAddedCount >= 2) {
+      score += 10
+    } else if (valueAddedCount >= 1) {
+      score += 5
+    }
+
+    // Check number of exclusions
+    if (policy.exclusions.length > 10) {
+      score -= 10
+      issues.push('High number of exclusions reduces coverage value')
+      issuesTR.push('Yüksek istisna sayısı teminat değerini düşürür')
+    }
+
+    score = Math.max(0, Math.min(100, score))
+
+    return {
+      category: 'Value',
+      categoryTR: 'Değer',
+      score,
+      weight: config.weights.value,
+      details: `Market value coverage with ${valueAddedCount} value-added features`,
+      detailsTR: `Rayiç değer teminatı, ${valueAddedCount} katma değerli özellik ile`,
+      issues,
+      issuesTR,
+    }
+  }
+
+  // Standard evaluation: Value is a combination of coverage quality vs premium paid
+  const coverageToPremiumRatio = policy.coverage / policy.premium
 
   // Adjust for coverage to premium ratio
   if (coverageToPremiumRatio > 50) {
@@ -741,18 +830,26 @@ function generateRecommendations(
     })
   }
 
-  // Deductible optimization - with specific amounts
-  if (scores.deductible.score < 60) {
+  // Deductible optimization - only if deductible is actually high (not 0)
+  // Note: When deductible is 0, the score should be 95 (handled in evaluateDeductible)
+  if (scores.deductible.score < 60 && policy.deductible > 0) {
     const deductibleAmount = policy.deductible.toLocaleString('tr-TR')
-    const deductiblePercent = ((policy.deductible / policy.coverage) * 100).toFixed(1)
+    // Handle market value policies where coverage is 0
+    const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+    const deductibleDesc = hasMarketValueCoverage
+      ? `Your deductible of ₺${deductibleAmount} is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it.`
+      : `Your deductible of ₺${deductibleAmount} (${((policy.deductible / policy.coverage) * 100).toFixed(1)}% of coverage) is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it by 50%.`
+    const deductibleDescTR = hasMarketValueCoverage
+      ? `₺${deductibleAmount} muafiyetiniz yüksek. Bir hasarda bu tutarı cebinizden ödemeniz gerekir. Temsilcinizden azaltma konusunda bilgi alın.`
+      : `₺${deductibleAmount} muafiyetiniz (teminatın %${((policy.deductible / policy.coverage) * 100).toFixed(1)}'i) yüksek. Bir hasarda bu tutarı cebinizden ödemeniz gerekir. Temsilcinizden %50 azaltma konusunda bilgi alın.`
 
     recommendations.push({
       priority: 'medium',
       type: 'reduce_deductible',
       title: `Negotiate Lower Deductible (Currently ₺${deductibleAmount})`,
       titleTR: `Daha Düşük Muafiyet Pazarlığı Yapın (Mevcut: ₺${deductibleAmount})`,
-      description: `Your deductible of ₺${deductibleAmount} (${deductiblePercent}% of coverage) is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it by 50%.`,
-      descriptionTR: `₺${deductibleAmount} muafiyetiniz (teminatın %${deductiblePercent}'i) yüksek. Bir hasarda bu tutarı cebinizden ödemeniz gerekir. Temsilcinizden %50 azaltma konusunda bilgi alın.`,
+      description: deductibleDesc,
+      descriptionTR: deductibleDescTR,
       estimatedImpact: {
         premiumChange: 10,
         riskReduction: 25,
@@ -760,22 +857,28 @@ function generateRecommendations(
     })
   }
 
-  // Premium optimization - actionable advice
-  if (scores.premium.score < 60) {
+  // Premium optimization - only show if there are actual issues identified
+  // Don't show generic "Compare Alternative Quotes" for well-covered policies
+  const hasPremiumIssues = scores.premium.issues.length > 0
+  const isComprehensivePolicy = scores.coverage.score >= 80 || policy.coverages.length >= 8
+
+  if (scores.premium.score < 60 && hasPremiumIssues && !isComprehensivePolicy) {
     const premiumAmount = policy.premium.toLocaleString('tr-TR')
 
     recommendations.push({
       priority: 'medium',
       type: 'review_premium',
-      title: 'Compare Alternative Quotes',
-      titleTR: 'Alternatif Teklifleri Karşılaştırın',
-      description: `Your premium of ₺${premiumAmount} is above market average. Get 3-5 competitive quotes from different insurers. Use comparison sites like sigorta.com or ask an independent broker.`,
-      descriptionTR: `₺${premiumAmount} priminiz piyasa ortalamasının üzerinde. Farklı sigortacılardan 3-5 rekabetçi teklif alın. sigorta.com gibi karşılaştırma sitelerini kullanın veya bağımsız bir acenta ile görüşün.`,
+      title: 'Review Premium at Renewal',
+      titleTR: 'Yenileme Zamanı Primi Gözden Geçirin',
+      description: `Your premium of ₺${premiumAmount} may be above market average. At renewal time, get 2-3 competitive quotes to compare.`,
+      descriptionTR: `₺${premiumAmount} priminiz piyasa ortalamasının üzerinde olabilir. Yenileme zamanında karşılaştırma için 2-3 rekabetçi teklif alın.`,
     })
   }
 
   // Value optimization - specific suggestions
-  if (scores.value.score < 60) {
+  // Skip for market value policies where coverage is 0 (ratio would be 0/premium = 0)
+  const hasMarketValuePolicyValue = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+  if (scores.value.score < 60 && !hasMarketValuePolicyValue) {
     const coverageToPremium = (policy.coverage / policy.premium).toFixed(1)
 
     recommendations.push({
