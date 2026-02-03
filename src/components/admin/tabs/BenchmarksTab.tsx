@@ -230,7 +230,7 @@ export function BenchmarksTab() {
       return
     }
 
-    if (!confirm(`Tüm ${bulkUpdateData.insurance_type || 'sigorta'} benchmark\'larını ${bulkUpdateData.multiplier}x çarpanı ile güncellemek istediğinizden emin misiniz?`)) {
+    if (!confirm(`Tüm ${bulkUpdateData.insurance_type || 'sigorta'} benchmark'larını ${bulkUpdateData.multiplier}x çarpanı ile güncellemek istediğinizden emin misiniz?`)) {
       return
     }
 
