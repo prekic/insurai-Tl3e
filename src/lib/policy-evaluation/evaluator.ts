@@ -22,12 +22,18 @@ import {
 // Import knowledge database
 import {
   getBranchStatistics,
-  getPremiumBenchmark,
   getCurrentTrafficLimits,
   getCurrentDaskLimits,
   MARKET_DATA_2024,
   DASK_PREMIUM_RATES_2026,
 } from '@/data'
+
+// Import benchmark service for database-driven benchmarks
+import {
+  getPremiumBenchmarkWithFallback,
+  isValueBasedBenchmark,
+  evaluateValueBasedPremium,
+} from './benchmark-service'
 
 // =============================================================================
 // POLICY TYPE TO BRANCH CODE MAPPING
@@ -140,49 +146,72 @@ export function evaluatePolicy(
 
 function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdown {
   const insuranceType = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
-  const benchmark = getPremiumBenchmark(insuranceType)
+  const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
   const issues: string[] = []
   const issuesTR: string[] = []
 
   let score = 70 // Default score
+  let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market average`
+  let detailsTR = `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa ortalaması ile karşılaştırıldı`
 
   if (benchmark) {
-    const { minPremium, avgPremium, maxPremium } = benchmark
+    // Check if this benchmark uses value-based comparison (% of insured value)
+    // This is typical for kasko, where premium depends on vehicle value
+    if (isValueBasedBenchmark(benchmark) && policy.coverage > 0) {
+      // Use value-based evaluation
+      const valueEval = evaluateValueBasedPremium(policy.premium, policy.coverage, benchmark)
+      score = valueEval.score
+      details = valueEval.details
+      detailsTR = valueEval.detailsTR
 
-    if (policy.premium < minPremium) {
-      // Suspiciously low - might be missing coverage
-      score = 60
-      issues.push('Premium is below market minimum - verify coverage is adequate')
-      issuesTR.push('Prim piyasa minimumunun altında - teminatın yeterli olduğunu doğrulayın')
-    } else if (policy.premium <= avgPremium) {
-      // Great - at or below average
-      score = 90 + Math.round((avgPremium - policy.premium) / avgPremium * 10)
-      score = Math.min(100, score)
-    } else if (policy.premium <= maxPremium) {
-      // Above average but within range
-      const aboveAvgRatio = (policy.premium - avgPremium) / (maxPremium - avgPremium)
-      score = 90 - Math.round(aboveAvgRatio * 30)
-      if (aboveAvgRatio > 0.5) {
-        issues.push('Premium is significantly above market average')
-        issuesTR.push('Prim piyasa ortalamasının önemli ölçüde üzerinde')
+      if (valueEval.position === 'high') {
+        issues.push('Premium rate is above market average for this value')
+        issuesTR.push('Prim oranı bu değer için piyasa ortalamasının üzerinde')
+      } else if (valueEval.position === 'very_high') {
+        issues.push('Premium rate significantly exceeds typical market range')
+        issuesTR.push('Prim oranı tipik piyasa aralığını önemli ölçüde aşıyor')
       }
     } else {
-      // Above maximum
-      score = 40
-      issues.push('Premium exceeds typical market range')
-      issuesTR.push('Prim tipik piyasa aralığını aşıyor')
+      // Direct premium comparison
+      const { minPremium, avgPremium, maxPremium } = benchmark
+
+      if (policy.premium < minPremium) {
+        // Suspiciously low - might be missing coverage
+        score = 60
+        issues.push('Premium is below market minimum - verify coverage is adequate')
+        issuesTR.push('Prim piyasa minimumunun altında - teminatın yeterli olduğunu doğrulayın')
+      } else if (policy.premium <= avgPremium) {
+        // Great - at or below average
+        score = 90 + Math.round((avgPremium - policy.premium) / avgPremium * 10)
+        score = Math.min(100, score)
+      } else if (policy.premium <= maxPremium) {
+        // Above average but within range
+        const aboveAvgRatio = (policy.premium - avgPremium) / (maxPremium - avgPremium)
+        score = 90 - Math.round(aboveAvgRatio * 30)
+        if (aboveAvgRatio > 0.5) {
+          issues.push('Premium is significantly above market average')
+          issuesTR.push('Prim piyasa ortalamasının önemli ölçüde üzerinde')
+        }
+      } else {
+        // Above maximum
+        score = 40
+        issues.push('Premium exceeds typical market range')
+        issuesTR.push('Prim tipik piyasa aralığını aşıyor')
+      }
     }
   }
 
-  // Check premium relative to coverage
-  const premiumToCoverageRatio = policy.premium / policy.coverage
-  const avgRatio = MARKET_DATA_2024.averagePremiums[insuranceType as keyof typeof MARKET_DATA_2024.averagePremiums] || 5000
-  const expectedRatio = avgRatio / 100000 // Rough expected ratio
+  // Check premium relative to coverage (skip for market value policies where coverage is 0)
+  if (policy.coverage > 0) {
+    const premiumToCoverageRatio = policy.premium / policy.coverage
+    const avgRatio = MARKET_DATA_2024.averagePremiums[insuranceType as keyof typeof MARKET_DATA_2024.averagePremiums] || 5000
+    const expectedRatio = avgRatio / 100000 // Rough expected ratio
 
-  if (premiumToCoverageRatio > expectedRatio * 2) {
-    score = Math.max(score - 10, 0)
-    issues.push('Premium to coverage ratio is high')
-    issuesTR.push('Prim/teminat oranı yüksek')
+    if (premiumToCoverageRatio > expectedRatio * 2) {
+      score = Math.max(score - 10, 0)
+      issues.push('Premium to coverage ratio is high')
+      issuesTR.push('Prim/teminat oranı yüksek')
+    }
   }
 
   return {
@@ -190,8 +219,8 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
     categoryTR: 'Prim',
     score,
     weight: config.weights.premium,
-    details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market average`,
-    detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa ortalaması ile karşılaştırıldı`,
+    details,
+    detailsTR,
     issues,
     issuesTR,
   }
@@ -735,23 +764,41 @@ function generateMarketComparison(
   _branchStats: ReturnType<typeof getBranchStatistics>
 ): PolicyEvaluation['marketComparison'] {
   const insuranceType = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
-  const benchmark = getPremiumBenchmark(insuranceType)
+  const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
 
   let premiumPercentile = 50
   let coveragePercentile = 50
 
   if (benchmark) {
-    // Calculate premium percentile
-    const premiumRange = benchmark.maxPremium - benchmark.minPremium
-    if (premiumRange > 0) {
-      premiumPercentile = Math.max(0, Math.min(100,
-        100 - ((policy.premium - benchmark.minPremium) / premiumRange * 100)
-      ))
-    }
+    // Check if value-based comparison is appropriate
+    if (isValueBasedBenchmark(benchmark) && policy.coverage > 0) {
+      // For value-based benchmarks (like kasko), compare rate instead of absolute premium
+      const actualRate = policy.premium / policy.coverage
+      const rateRange = (benchmark.valueMaxRate || 0) - (benchmark.valueMinRate || 0)
 
-    // Estimate coverage percentile based on premium
-    const expectedCoverage = policy.premium * 20 // Rough estimate
-    coveragePercentile = Math.min(100, (policy.coverage / expectedCoverage) * 50)
+      if (rateRange > 0 && benchmark.valueMinRate) {
+        premiumPercentile = Math.max(0, Math.min(100,
+          100 - ((actualRate - benchmark.valueMinRate) / rateRange * 100)
+        ))
+      }
+
+      // Coverage percentile is less meaningful for value-based, use 70 as neutral
+      coveragePercentile = 70
+    } else {
+      // Direct premium comparison
+      const premiumRange = benchmark.maxPremium - benchmark.minPremium
+      if (premiumRange > 0) {
+        premiumPercentile = Math.max(0, Math.min(100,
+          100 - ((policy.premium - benchmark.minPremium) / premiumRange * 100)
+        ))
+      }
+
+      // Estimate coverage percentile based on premium
+      const expectedCoverage = policy.premium * 20 // Rough estimate
+      coveragePercentile = policy.coverage > 0
+        ? Math.min(100, (policy.coverage / expectedCoverage) * 50)
+        : 50
+    }
   }
 
   const avgPercentile = (premiumPercentile + coveragePercentile) / 2
