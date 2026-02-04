@@ -56,6 +56,7 @@ import type {
   ProcessingStageRecord,
   ProcessingStage,
   ProcessingStageStatus,
+  StageDecisionContext,
 } from '@/types/processing-log'
 
 interface DocumentJourneyViewerProps {
@@ -641,27 +642,139 @@ function DiffSummaryViewer({
   )
 }
 
-/* TODO: Re-enable DecisionContextViewer once TypeScript inference issue is resolved
- * This component was causing a mysterious "Type 'unknown' is not assignable to type 'ReactNode'"
- * error that moved around the file regardless of changes. Investigation needed.
- *
-// Decision Context Viewer - explains WHY a stage was skipped
-function DecisionContextViewer({
-  context,
-  stageName: _stageName,
-}: {
-  context: StageDecisionContext
-  stageName: string
-}) {
+/**
+ * Helper to safely format values for display
+ * Ensures all values are strings to avoid TypeScript ReactNode inference issues
+ */
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) return 'N/A'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number') return String(value)
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
+}
+
+/**
+ * Decision Context Viewer - explains WHY a stage was skipped
+ * Shows the assessment performed, thresholds, actual values, and decision logic
+ */
+function DecisionContextViewer({ context }: { context: StageDecisionContext }) {
   const [expanded, setExpanded] = useState(true)
 
+  // Format threshold comparison for display
+  const getComparisonSymbol = (comparison: string): string => {
+    switch (comparison) {
+      case 'less_than': return '<'
+      case 'greater_than': return '>'
+      case 'equals': return '='
+      case 'not_equals': return '≠'
+      default: return comparison
+    }
+  }
+
   return (
-    <div className="border border-purple-200 rounded-lg overflow-hidden bg-purple-50/30">
-      // ... component implementation ...
+    <div className="border border-purple-200 rounded-lg overflow-hidden bg-purple-50/30 mt-3">
+      {/* Header */}
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-purple-100 border-b border-purple-200 cursor-pointer hover:bg-purple-150"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center gap-2 text-sm font-semibold text-purple-800">
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+          <Info size={16} />
+          Decision Context
+        </div>
+        <span className="text-xs text-purple-600 bg-purple-200 px-2 py-1 rounded">
+          Why this stage was skipped
+        </span>
+      </div>
+
+      {expanded && (
+        <div className="p-4 space-y-4 text-sm">
+          {/* Assessment Performed */}
+          <div>
+            <div className="font-medium text-purple-700 mb-1 flex items-center gap-2">
+              <Target size={14} />
+              Assessment Performed
+            </div>
+            <div className="text-gray-700 bg-white rounded px-3 py-2 border border-purple-100">
+              {formatValue(context.assessment_performed)}
+            </div>
+          </div>
+
+          {/* Threshold */}
+          {context.threshold && (
+            <div>
+              <div className="font-medium text-purple-700 mb-1 flex items-center gap-2">
+                <Hash size={14} />
+                Decision Threshold
+              </div>
+              <div className="bg-white rounded px-3 py-2 border border-purple-100 font-mono text-sm">
+                {formatValue(context.threshold.name)} {getComparisonSymbol(context.threshold.comparison)} {formatValue(context.threshold.value)}
+                {context.threshold.unit && (
+                  <span className="text-gray-500 ml-1">({formatValue(context.threshold.unit)})</span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Actual Values */}
+          {context.actual_values && Object.keys(context.actual_values).length > 0 && (
+            <div>
+              <div className="font-medium text-purple-700 mb-1 flex items-center gap-2">
+                <Zap size={14} />
+                Actual Measured Values
+              </div>
+              <div className="bg-white rounded border border-purple-100 overflow-hidden">
+                <table className="w-full text-sm">
+                  <tbody>
+                    {Object.entries(context.actual_values).map(([key, value], idx) => (
+                      <tr key={key} className={idx % 2 === 0 ? 'bg-gray-50' : ''}>
+                        <td className="px-3 py-1.5 font-medium text-gray-600 border-r border-purple-100">
+                          {formatValue(key.replace(/_/g, ' '))}
+                        </td>
+                        <td className="px-3 py-1.5 text-gray-800 font-mono">
+                          {formatValue(value)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Decision Logic */}
+          <div>
+            <div className="font-medium text-purple-700 mb-1 flex items-center gap-2">
+              <Lightbulb size={14} />
+              Decision Logic
+            </div>
+            <div className="text-gray-700 bg-white rounded px-3 py-2 border border-purple-100">
+              {formatValue(context.decision_logic)}
+            </div>
+          </div>
+
+          {/* Alternatives */}
+          {context.alternatives && context.alternatives.length > 0 && (
+            <div>
+              <div className="font-medium text-purple-700 mb-1 flex items-center gap-2">
+                <ArrowRight size={14} />
+                What Would Trigger This Stage
+              </div>
+              <ul className="list-disc list-inside text-gray-700 bg-white rounded px-3 py-2 border border-purple-100 space-y-1">
+                {context.alternatives.map((alt, idx) => (
+                  <li key={idx}>{formatValue(alt)}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
-*/
 
 // OCR Decision Viewer - displays comprehensive OCR decision analysis
 function OCRDecisionViewer({
@@ -1332,7 +1445,7 @@ function StageCard({
   const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage, description: '' }
   const metrics = calculateMetrics(stage)
 
-  const hasDetails = stage.input || stage.output || stage.metadata || stage.error
+  const hasDetails = stage.input || stage.output || stage.metadata || stage.error || stage.decision_context
 
   // Calculate quick summary metrics for collapsed view
   const quickMetrics = useMemo(() => {
@@ -1534,6 +1647,11 @@ function StageCard({
                   {JSON.stringify(stage.metadata, null, 2)}
                 </pre>
               </div>
+            )}
+
+            {/* Decision Context - explains WHY a stage was skipped */}
+            {stage.status === 'skipped' && stage.decision_context && (
+              <DecisionContextViewer context={stage.decision_context} />
             )}
 
             {/* Full details button */}

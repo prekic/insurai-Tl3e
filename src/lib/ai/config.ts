@@ -1,6 +1,8 @@
-import OpenAI from 'openai'
-import Anthropic from '@anthropic-ai/sdk'
 import env from '@/lib/env'
+
+// Lazy-loaded SDK instances (only imported when needed)
+let cachedOpenAI: InstanceType<typeof import('openai').default> | null = null
+let cachedAnthropic: InstanceType<typeof import('@anthropic-ai/sdk').default> | null = null
 
 // Environment variables for AI providers
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
@@ -148,8 +150,9 @@ export function getConfiguredProviders(): ('openai' | 'anthropic')[] {
 /**
  * Get OpenAI client instance (for direct API access in development)
  * In production, use extractViaProxy() instead
+ * @returns Promise that resolves to OpenAI client or null
  */
-export function getOpenAIClient(): OpenAI | null {
+export async function getOpenAIClient(): Promise<InstanceType<typeof import('openai').default> | null> {
   // Don't return client if proxy is configured - use proxy instead
   if (isProxyConfigured()) {
     console.warn('OpenAI client requested but proxy is configured. Use extractViaProxy() instead.')
@@ -161,17 +164,26 @@ export function getOpenAIClient(): OpenAI | null {
     return null
   }
 
-  return new OpenAI({
+  // Return cached instance if available
+  if (cachedOpenAI) {
+    return cachedOpenAI
+  }
+
+  // Dynamic import to avoid bundling when not needed
+  const { default: OpenAI } = await import('openai')
+  cachedOpenAI = new OpenAI({
     apiKey,
     dangerouslyAllowBrowser: true, // For demo only - use backend proxy in production
   })
+  return cachedOpenAI
 }
 
 /**
  * Get Anthropic client instance (for direct API access in development)
  * In production, use extractViaProxy() instead
+ * @returns Promise that resolves to Anthropic client or null
  */
-export function getAnthropicClient(): Anthropic | null {
+export async function getAnthropicClient(): Promise<InstanceType<typeof import('@anthropic-ai/sdk').default> | null> {
   // Don't return client if proxy is configured - use proxy instead
   if (isProxyConfigured()) {
     console.warn(
@@ -185,9 +197,17 @@ export function getAnthropicClient(): Anthropic | null {
     return null
   }
 
-  return new Anthropic({
+  // Return cached instance if available
+  if (cachedAnthropic) {
+    return cachedAnthropic
+  }
+
+  // Dynamic import to avoid bundling when not needed
+  const { default: Anthropic } = await import('@anthropic-ai/sdk')
+  cachedAnthropic = new Anthropic({
     apiKey,
   })
+  return cachedAnthropic
 }
 
 /**

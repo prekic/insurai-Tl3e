@@ -285,6 +285,94 @@ export interface TranslationDictionary {
     welcomeBack: string
     createYourAccount: string
   }
+
+  // AI Insights
+  insights: {
+    title: string
+    aiInsights: string
+    showMore: string
+    showLess: string
+    moreInsights: string
+    noInsights: string
+    loading: string
+  }
+
+  // Policy Evaluation
+  evaluation: {
+    title: string
+    overallScore: string
+    grade: string
+    coverage: string
+    premium: string
+    deductible: string
+    compliance: string
+    value: string
+    excellent: string
+    good: string
+    fair: string
+    poor: string
+    critical: string
+    recommendations: string
+    showAllRecommendations: string
+    noRecommendations: string
+  }
+
+  // Policy Comparison
+  comparison: {
+    title: string
+    compareWith: string
+    selectPolicies: string
+    differences: string
+    similarities: string
+    coverageComparison: string
+    premiumComparison: string
+    noPoliciesSelected: string
+    addPolicy: string
+    removePolicy: string
+    betterValue: string
+    worseValue: string
+    sameValue: string
+  }
+
+  // Insurance Terms
+  insurance: {
+    kasko: string
+    traffic: string
+    home: string
+    health: string
+    life: string
+    dask: string
+    business: string
+    nakliyat: string
+    fire: string
+    earthquake: string
+    flood: string
+    theft: string
+    collision: string
+    naturalDisasters: string
+    personalAccident: string
+    legalProtection: string
+    roadAssistance: string
+    glassBreakage: string
+    marketValue: string
+    unlimited: string
+    included: string
+    excluded: string
+    optional: string
+  }
+
+  // Coverage Categories
+  coverageCategories: {
+    main: string
+    liability: string
+    supplementary: string
+    assistance: string
+    legal: string
+    other: string
+    critical: string
+    standard: string
+    minor: string
+  }
 }
 
 // Base English translations
@@ -535,6 +623,89 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     welcomeBack: 'Welcome back',
     createYourAccount: 'Create your account',
   },
+
+  insights: {
+    title: 'AI Insights',
+    aiInsights: 'AI Insights',
+    showMore: 'Show more',
+    showLess: 'Show less',
+    moreInsights: 'more insights',
+    noInsights: 'No insights available',
+    loading: 'Analyzing policy...',
+  },
+
+  evaluation: {
+    title: 'Policy Evaluation',
+    overallScore: 'Overall Score',
+    grade: 'Grade',
+    coverage: 'Coverage',
+    premium: 'Premium',
+    deductible: 'Deductible',
+    compliance: 'Compliance',
+    value: 'Value',
+    excellent: 'Excellent',
+    good: 'Good',
+    fair: 'Fair',
+    poor: 'Poor',
+    critical: 'Critical',
+    recommendations: 'Recommendations',
+    showAllRecommendations: 'Show all recommendations',
+    noRecommendations: 'No recommendations at this time',
+  },
+
+  comparison: {
+    title: 'Policy Comparison',
+    compareWith: 'Compare with',
+    selectPolicies: 'Select policies to compare',
+    differences: 'Differences',
+    similarities: 'Similarities',
+    coverageComparison: 'Coverage Comparison',
+    premiumComparison: 'Premium Comparison',
+    noPoliciesSelected: 'No policies selected',
+    addPolicy: 'Add policy',
+    removePolicy: 'Remove policy',
+    betterValue: 'Better value',
+    worseValue: 'Lower value',
+    sameValue: 'Same value',
+  },
+
+  insurance: {
+    kasko: 'Comprehensive Auto',
+    traffic: 'Traffic Insurance',
+    home: 'Home Insurance',
+    health: 'Health Insurance',
+    life: 'Life Insurance',
+    dask: 'Earthquake Insurance',
+    business: 'Business Insurance',
+    nakliyat: 'Cargo Insurance',
+    fire: 'Fire',
+    earthquake: 'Earthquake',
+    flood: 'Flood',
+    theft: 'Theft',
+    collision: 'Collision',
+    naturalDisasters: 'Natural Disasters',
+    personalAccident: 'Personal Accident',
+    legalProtection: 'Legal Protection',
+    roadAssistance: 'Road Assistance',
+    glassBreakage: 'Glass Breakage',
+    marketValue: 'Market Value',
+    unlimited: 'Unlimited',
+    included: 'Included',
+    excluded: 'Excluded',
+    optional: 'Optional',
+  },
+
+  coverageCategories: {
+    main: 'Main Coverages',
+    liability: 'Liability',
+    supplementary: 'Supplementary',
+    assistance: 'Assistance',
+    legal: 'Legal',
+    other: 'Other',
+    critical: 'Critical',
+    standard: 'Standard',
+    minor: 'Minor',
+  },
 }
 
 // Turkish translations (pre-loaded for the Turkish market focus)
@@ -784,6 +955,89 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     checkEmail: 'Hesabınızı onaylamak için e-postanızı kontrol edin.',
     welcomeBack: 'Tekrar hoş geldiniz',
     createYourAccount: 'Hesabınızı oluşturun',
+  },
+
+  insights: {
+    title: 'AI İçgörüleri',
+    aiInsights: 'AI İçgörüleri',
+    showMore: 'Daha fazla göster',
+    showLess: 'Daha az göster',
+    moreInsights: 'daha fazla içgörü',
+    noInsights: 'Henüz içgörü yok',
+    loading: 'Poliçe analiz ediliyor...',
+  },
+
+  evaluation: {
+    title: 'Poliçe Değerlendirmesi',
+    overallScore: 'Genel Puan',
+    grade: 'Not',
+    coverage: 'Teminat',
+    premium: 'Prim',
+    deductible: 'Muafiyet',
+    compliance: 'Uyumluluk',
+    value: 'Değer',
+    excellent: 'Mükemmel',
+    good: 'İyi',
+    fair: 'Orta',
+    poor: 'Zayıf',
+    critical: 'Kritik',
+    recommendations: 'Öneriler',
+    showAllRecommendations: 'Tüm önerileri göster',
+    noRecommendations: 'Şu anda öneri yok',
+  },
+
+  comparison: {
+    title: 'Poliçe Karşılaştırması',
+    compareWith: 'Şununla karşılaştır',
+    selectPolicies: 'Karşılaştırmak için poliçe seçin',
+    differences: 'Farklılıklar',
+    similarities: 'Benzerlikler',
+    coverageComparison: 'Teminat Karşılaştırması',
+    premiumComparison: 'Prim Karşılaştırması',
+    noPoliciesSelected: 'Poliçe seçilmedi',
+    addPolicy: 'Poliçe ekle',
+    removePolicy: 'Poliçeyi kaldır',
+    betterValue: 'Daha iyi değer',
+    worseValue: 'Daha düşük değer',
+    sameValue: 'Aynı değer',
+  },
+
+  insurance: {
+    kasko: 'Kasko',
+    traffic: 'Trafik Sigortası',
+    home: 'Konut Sigortası',
+    health: 'Sağlık Sigortası',
+    life: 'Hayat Sigortası',
+    dask: 'DASK',
+    business: 'İşyeri Sigortası',
+    nakliyat: 'Nakliyat Sigortası',
+    fire: 'Yangın',
+    earthquake: 'Deprem',
+    flood: 'Sel/Su Baskını',
+    theft: 'Hırsızlık',
+    collision: 'Çarpma/Çarpışma',
+    naturalDisasters: 'Doğal Afetler',
+    personalAccident: 'Ferdi Kaza',
+    legalProtection: 'Hukuksal Koruma',
+    roadAssistance: 'Yol Yardım',
+    glassBreakage: 'Cam Kırılması',
+    marketValue: 'Rayiç Değer',
+    unlimited: 'Sınırsız',
+    included: 'Dahil',
+    excluded: 'Hariç',
+    optional: 'İsteğe Bağlı',
+  },
+
+  coverageCategories: {
+    main: 'Ana Teminatlar',
+    liability: 'Sorumluluk',
+    supplementary: 'Ek Teminatlar',
+    assistance: 'Yardım Hizmetleri',
+    legal: 'Hukuki',
+    other: 'Diğer',
+    critical: 'Kritik',
+    standard: 'Standart',
+    minor: 'Küçük',
   },
 }
 

@@ -2,9 +2,26 @@
  * Analytics Service
  *
  * Tracks user events for conversion optimization.
- * Events are logged to console in development and can be extended
- * to send to analytics providers (e.g., Mixpanel, Amplitude, GA4).
+ * Supports Google Analytics 4 (GA4) integration.
+ *
+ * Environment Variables:
+ * - VITE_GA_MEASUREMENT_ID: Google Analytics 4 Measurement ID (e.g., G-XXXXXXXXXX)
+ * - VITE_ANALYTICS_ENABLED: Set to 'true' to enable analytics in production
+ *
+ * The service:
+ * - Logs events to console in development
+ * - Stores events in sessionStorage for debugging
+ * - Sends events to GA4 when configured
+ * - Respects user consent settings (KVKK/GDPR)
  */
+
+// Declare gtag on window for TypeScript
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void
+    dataLayer?: unknown[]
+  }
+}
 
 export type TrialFunnelEvent =
   | 'trial_page_view'
@@ -37,11 +54,93 @@ export interface EventProperties {
 interface AnalyticsConfig {
   enabled: boolean
   debug: boolean
+  gaMeasurementId: string | null
+  consentGiven: boolean
+}
+
+// Check if user has given analytics consent (stored in localStorage)
+function hasAnalyticsConsent(): boolean {
+  try {
+    const consent = localStorage.getItem('insurai_analytics_consent')
+    return consent === 'true'
+  } catch {
+    return false
+  }
 }
 
 const config: AnalyticsConfig = {
   enabled: true,
   debug: import.meta.env.DEV,
+  gaMeasurementId: import.meta.env.VITE_GA_MEASUREMENT_ID || null,
+  consentGiven: hasAnalyticsConsent(),
+}
+
+// ============================================================================
+// GA4 Initialization & Consent Management
+// ============================================================================
+
+/**
+ * Initialize Google Analytics 4
+ * Call this after user gives consent or on page load if consent already given
+ */
+function initGA4(): void {
+  if (!config.gaMeasurementId || typeof window === 'undefined') return
+  if (window.gtag) return // Already initialized
+
+  // Load gtag.js script
+  const script = document.createElement('script')
+  script.async = true
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${config.gaMeasurementId}`
+  document.head.appendChild(script)
+
+  // Initialize dataLayer and gtag
+  window.dataLayer = window.dataLayer || []
+  window.gtag = function gtag(...args: unknown[]) {
+    window.dataLayer?.push(args)
+  }
+  window.gtag('js', new Date())
+  window.gtag('config', config.gaMeasurementId, {
+    // Respect consent mode
+    anonymize_ip: true,
+    send_page_view: false, // We'll send page views manually
+  })
+
+  if (config.debug) {
+    console.warn('[Analytics] GA4 initialized with ID:', config.gaMeasurementId)
+  }
+}
+
+/**
+ * Set analytics consent and initialize GA4 if consent given
+ * Call this when user accepts analytics in cookie/privacy banner
+ */
+export function setAnalyticsConsent(consent: boolean): void {
+  try {
+    localStorage.setItem('insurai_analytics_consent', consent ? 'true' : 'false')
+    config.consentGiven = consent
+
+    if (consent) {
+      initGA4()
+    }
+
+    if (config.debug) {
+      console.warn('[Analytics] Consent set to:', consent)
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Check if user has given analytics consent
+ */
+export function hasGivenAnalyticsConsent(): boolean {
+  return config.consentGiven
+}
+
+// Initialize GA4 on load if consent already given
+if (typeof window !== 'undefined' && config.consentGiven && config.gaMeasurementId) {
+  initGA4()
 }
 
 /**
@@ -74,11 +173,19 @@ export function trackEvent(event: AnalyticsEvent, properties?: EventProperties):
     // Ignore storage errors
   }
 
-  // TODO: Send to analytics provider
-  // Examples:
-  // - mixpanel.track(event, properties)
-  // - amplitude.logEvent(event, properties)
-  // - gtag('event', event, properties)
+  // Send to Google Analytics 4 if configured and consent given
+  if (window.gtag && config.gaMeasurementId && config.consentGiven) {
+    // Convert event name to GA4 format (snake_case)
+    const ga4EventName = event.replace(/-/g, '_')
+
+    // Send event with properties
+    window.gtag('event', ga4EventName, {
+      ...properties,
+      // Add common parameters
+      event_category: event.startsWith('trial_') ? 'trial_funnel' : 'general',
+      event_timestamp: timestamp,
+    })
+  }
 }
 
 /**
@@ -232,5 +339,31 @@ export function getTrialFunnelMetrics(): {
     analysesCompleted,
     signupClicks,
     conversionRate,
+  }
+}
+
+// ============================================================================
+// Analytics Status & Configuration
+// ============================================================================
+
+/**
+ * Get current analytics configuration status
+ * Useful for debugging and admin panel
+ */
+export function getAnalyticsStatus(): {
+  enabled: boolean
+  debug: boolean
+  ga4Configured: boolean
+  ga4MeasurementId: string | null
+  consentGiven: boolean
+  totalEventsTracked: number
+} {
+  return {
+    enabled: config.enabled,
+    debug: config.debug,
+    ga4Configured: !!config.gaMeasurementId,
+    ga4MeasurementId: config.gaMeasurementId,
+    consentGiven: config.consentGiven,
+    totalEventsTracked: getTrackedEvents().length,
   }
 }

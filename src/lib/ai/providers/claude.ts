@@ -191,7 +191,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
       actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
       // Fall back to direct API (development)
-      const client = getAnthropicClient()
+      const client = await getAnthropicClient()
 
       if (!client) {
         throw new Error('Anthropic client not available')

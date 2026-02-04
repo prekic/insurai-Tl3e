@@ -5,6 +5,9 @@ dist-server/
 *.local
 .turbo
 
+# Bundle analysis
+stats.html
+
 # TypeScript
 *.tsbuildinfo
 
