@@ -2524,6 +2524,7 @@ Railway hosts both frontend and backend as a single service. The Express server 
 {
   "build": {
     "builder": "NIXPACKS",
+    "installCommand": "npm ci",
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
@@ -2538,6 +2539,7 @@ Railway hosts both frontend and backend as a single service. The Express server 
 OPENAI_API_KEY=sk-proj-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=xxx
+GCP_SERVICE_ACCOUNT_BASE64=...   # Base64-encoded service account JSON for Document AI
 NODE_ENV=production
 
 # Server-side Supabase (REQUIRED for admin auth)
@@ -2550,6 +2552,7 @@ ADMIN_JWT_SECRET=your-random-secret
 # Build-time (embedded in JS bundle)
 VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 
 # NOT needed - auto-detected from window.location.origin
 # VITE_API_PROXY_URL is automatically set in production
@@ -2667,7 +2670,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v9)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v11)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 

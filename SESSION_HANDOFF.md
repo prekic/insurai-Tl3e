@@ -156,6 +156,7 @@ export async function getOpenAIClient() {
 ## Commits This Session
 
 ```
+3c68743 Update project documentation for session handoff
 f20abb7 Re-implement lost changes from archived session
 ```
 
