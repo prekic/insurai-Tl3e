@@ -2343,9 +2343,9 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Note**: `npm ci` ensures clean install from package-lock.json
 
-### 49. Service Worker Cache Version v11 (Added Feb 4, 2026)
-- **Change**: Bumped service worker cache version from v9 to v11
-- **Purpose**: Force cache invalidation after new deployment
+### 49. Service Worker Cache Version v12 (Updated Feb 4, 2026)
+- **Change**: Bumped service worker cache version from v11 to v12
+- **Purpose**: Force cache invalidation after new deployment with bundle changes
 - **File Changed**: `public/sw.js`
 - **Note**: Users may need hard refresh (Ctrl+Shift+R) or clear site data if seeing stale content
 
@@ -2354,6 +2354,77 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Purpose**: Prevent bundle analysis report from being committed
 - **File Changed**: `.gitignore`
 - **Usage**: Run `npm run build:analyze` to generate stats.html for bundle inspection
+
+### 51. Bundle Chunking Optimization Attempt (Feb 4, 2026)
+- **Problem**: `useBackendHealth` chunk was 676KB due to AI SDK imports
+- **Initial Attempt**: Aggressive manual chunking with separate vendor chunks for React, Supabase, OpenAI, Anthropic, etc.
+- **Result**: Reduced chunk sizes but caused circular dependency issues
+- **Error**: `Cannot access 'na' before initialization` in `vendor-common` chunk
+- **Root Cause**: Separating modules that have initialization order dependencies
+- **Learning**: Aggressive `manualChunks` can break module initialization order in Rollup/Vite
+- **Commits**: `b5f525a` (optimization), `05627d4` (fix)
+
+### 52. Circular Dependency Fix in Bundle Chunking (Fixed Feb 4, 2026)
+- **Problem**: Page wouldn't load after deployment - JavaScript initialization error
+- **Error**: `Uncaught ReferenceError: Cannot access 'na' before initialization` at `vendor-common-H-RuQgAK.js`
+- **Root Cause**: Aggressive `manualChunks` in `vite.config.ts` created circular dependencies
+- **Solution**: Simplified chunking to only split truly independent large libraries (pdfjs, pdf-lib)
+- **File Changed**: `vite.config.ts`
+- **Before**:
+  ```typescript
+  manualChunks(id) {
+    if (id.includes('react')) return 'vendor-react'
+    if (id.includes('@supabase')) return 'vendor-supabase'
+    if (id.includes('openai')) return 'vendor-openai'
+    if (id.includes('@anthropic-ai')) return 'vendor-anthropic'
+    if (id.includes('node_modules')) return 'vendor-common'  // PROBLEMATIC
+  }
+  ```
+- **After**:
+  ```typescript
+  manualChunks(id) {
+    // Only split large, truly independent libraries
+    if (id.includes('pdfjs-dist')) return 'vendor-pdfjs'
+    if (id.includes('pdf-lib')) return 'vendor-pdflib'
+    // Let Vite handle the rest to avoid initialization errors
+  }
+  ```
+- **Key Insight**: The catch-all `vendor-common` chunk combined modules with hidden interdependencies
+- **Commit**: `05627d4`
+
+### 53. File Upload Flow Fix for Logged-In Users (Fixed Feb 4, 2026)
+- **Problem**: When logged-in users clicked "Analyze Your Policy Free" on landing page, selected a file, they were redirected to `/upload` but the file was lost
+- **Root Cause**: `TryAnalysis.tsx` detected logged-in user and redirected to `/upload` without passing the file
+- **Solution**: Pass file via React Router state when redirecting
+- **Files Changed**:
+  - `src/components/TryAnalysis.tsx` - Pass file in redirect: `navigate('/upload', { state: { files: [file], autoProcess: true } })`
+  - `src/components/PolicyUpload.tsx` - Handle files from location state
+- **Pattern Used**:
+  ```typescript
+  // TryAnalysis.tsx - Pass file when redirecting logged-in user
+  useEffect(() => {
+    if (user) {
+      const locationState = location.state as { file?: File } | null
+      const fileFromState = locationState?.file
+      if (fileFromState) {
+        navigate('/upload', { state: { files: [fileFromState], autoProcess: true }, replace: true })
+      } else {
+        navigate('/upload', { replace: true })
+      }
+    }
+  }, [user, navigate, location.state])
+
+  // PolicyUpload.tsx - Receive and process file from state
+  useEffect(() => {
+    const state = location.state as { files?: File[]; autoProcess?: boolean } | null
+    if (state?.files && state.files.length > 0 && !filesReceivedRef.current) {
+      filesReceivedRef.current = true
+      addFilesRef.current?.(state.files)
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location, navigate])
+  ```
+- **Commit**: `37ef119`
 
 ---
 
@@ -2670,9 +2741,16 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v11)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v12)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
+
+**Vite Bundle Chunking (manualChunks):**
+- **DO NOT** use aggressive catch-all chunking like `if (id.includes('node_modules')) return 'vendor-common'`
+- This creates circular dependency errors: `Cannot access 'X' before initialization`
+- Only split truly **independent** large libraries (pdfjs-dist, pdf-lib)
+- Let Vite/Rollup handle interdependent modules automatically
+- See Known Issue #51-52 for details on the failed optimization attempt
 
 **AI Provider Fallback and Billing:**
 - If Anthropic API billing issue occurs ("credit balance too low"), system auto-falls back to OpenAI
@@ -2735,4 +2813,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 5800+ tests, all passing (165 test files)
-**Last Updated**: January 30, 2026
+**Last Updated**: February 4, 2026

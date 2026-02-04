@@ -1,8 +1,10 @@
 import env from '@/lib/env'
 
 // Lazy-loaded SDK instances (only imported when needed)
-let cachedOpenAI: InstanceType<typeof import('openai').default> | null = null
-let cachedAnthropic: InstanceType<typeof import('@anthropic-ai/sdk').default> | null = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedOpenAI: any = null
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let cachedAnthropic: any = null
 
 // Environment variables for AI providers
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY
@@ -152,7 +154,8 @@ export function getConfiguredProviders(): ('openai' | 'anthropic')[] {
  * In production, use extractViaProxy() instead
  * @returns Promise that resolves to OpenAI client or null
  */
-export async function getOpenAIClient(): Promise<InstanceType<typeof import('openai').default> | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getOpenAIClient(): Promise<any> {
   // Don't return client if proxy is configured - use proxy instead
   if (isProxyConfigured()) {
     console.warn('OpenAI client requested but proxy is configured. Use extractViaProxy() instead.')
@@ -183,7 +186,8 @@ export async function getOpenAIClient(): Promise<InstanceType<typeof import('ope
  * In production, use extractViaProxy() instead
  * @returns Promise that resolves to Anthropic client or null
  */
-export async function getAnthropicClient(): Promise<InstanceType<typeof import('@anthropic-ai/sdk').default> | null> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getAnthropicClient(): Promise<any> {
   // Don't return client if proxy is configured - use proxy instead
   if (isProxyConfigured()) {
     console.warn(

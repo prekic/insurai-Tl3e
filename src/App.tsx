@@ -70,6 +70,7 @@ const ROUTES = {
   home: '/',
   auth: '/auth',
   try: '/try',  // Free trial analysis (no auth required)
+  trialPolicy: '/policy/trial',  // Trial analysis result view (no auth required)
   share: '/share/:shareId',  // Shared trial result (no auth required)
   unsubscribe: '/unsubscribe',  // Email unsubscribe (no auth required)
   upload: '/upload',
@@ -173,6 +174,14 @@ function AppContent() {
                 element={
                   <PageTransition>
                     <TryAnalysis />
+                  </PageTransition>
+                }
+              />
+              <Route
+                path="/policy/trial"
+                element={
+                  <PageTransition>
+                    <PolicyDetailView />
                   </PageTransition>
                 }
               />

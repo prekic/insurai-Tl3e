@@ -46,29 +46,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          // React core
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-
-          // Animation library
-          'vendor-animation': ['framer-motion'],
-
-          // PDF parsing (large dependency)
-          'vendor-pdf': ['pdfjs-dist'],
-
-          // AI SDKs
-          'vendor-ai': ['openai', '@anthropic-ai/sdk'],
-
-          // UI utilities
-          'vendor-ui': ['sonner', 'lucide-react', 'clsx', 'tailwind-merge'],
-
-          // Supabase
-          'vendor-supabase': ['@supabase/supabase-js'],
+        manualChunks(id: string) {
+          // Only split out large, independent libraries to avoid circular deps
+          // PDF.js for parsing (large, independent)
+          if (id.includes('node_modules/pdfjs-dist')) {
+            return 'vendor-pdfjs'
+          }
+          // PDF-lib for splitting (large, independent)
+          if (id.includes('node_modules/pdf-lib')) {
+            return 'vendor-pdflib'
+          }
+          // Let Vite handle the rest automatically to avoid initialization errors
         },
       },
     },
-    // Increase warning limit slightly since we're now properly chunking
-    chunkSizeWarningLimit: 600,
+    // Increase warning limit for larger chunks
+    chunkSizeWarningLimit: 800,
   },
   test: {
     globals: true,

@@ -2997,7 +2997,12 @@ interface PremiumBenchmark {
 router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { insurance_type, is_active } = req.query
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     let query = supabase
       .from('premium_benchmarks')
@@ -3035,7 +3040,12 @@ router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, r
 router.get('/benchmarks/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     const { data, error } = await supabase
       .from('premium_benchmarks')
@@ -3089,7 +3099,12 @@ router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequ
       return
     }
 
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     const { data, error } = await supabase
       .from('premium_benchmarks')
@@ -3142,7 +3157,12 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
     const { id } = req.params
     const updates = req.body
 
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     // Get existing for audit log
     const { data: existing } = await supabase
@@ -3212,7 +3232,12 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
 router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     // Soft delete
     const { error } = await supabase
@@ -3242,7 +3267,12 @@ router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: Authenticat
  */
 router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: AuthenticatedRequest, res: Response) => {
   try {
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     const { data, error } = await supabase
       .from('premium_benchmarks')
@@ -3256,7 +3286,7 @@ router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: Authen
     }
 
     // Get unique types
-    const types = [...new Map(data.map(item => [item.insurance_type, item])).values()]
+    const types = [...new Map(data.map((item: { insurance_type: string; insurance_type_tr: string }) => [item.insurance_type, item])).values()]
 
     res.json({ success: true, data: types })
   } catch (error) {
@@ -3281,7 +3311,12 @@ router.put('/benchmarks/bulk-update', ...requireSuperAdmin(), async (req: Authen
       return
     }
 
-    const supabase = getSupabaseWithError()
+    const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+    if (!supabase) {
+      res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+      return
+    }
 
     // Get all active benchmarks for the type (or all if not specified)
     let query = supabase

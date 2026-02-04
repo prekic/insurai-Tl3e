@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck, FileText, ChevronDown, ChevronUp, Copy, CheckCircle, Code } from 'lucide-react'
 import { Button } from './ui/button'
@@ -745,17 +745,28 @@ import { ScoreBreakdown } from './evaluation/ScoreBreakdown'
 import { RecommendationCard } from './evaluation/RecommendationCard'
 import type { AnalyzedPolicy } from '@/types/policy'
 
+interface LocationState {
+  policy?: AnalyzedPolicy
+  isTrialResult?: boolean
+}
+
 export function PolicyDetailView() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const { getPolicyById, fetchPolicyById } = usePolicies()
   const { locale } = useI18n()
 
+  // Check for policy passed via location state (for trial results)
+  const locationState = location.state as LocationState | null
+  const trialPolicy = locationState?.policy
+  const isTrialResult = locationState?.isTrialResult ?? false
+
   // Try local cache first, then fetch from Supabase if not found
   const [policy, setPolicy] = useState<AnalyzedPolicy | undefined>(() =>
-    id ? getPolicyById(id) : undefined
+    trialPolicy ?? (id ? getPolicyById(id) : undefined)
   )
-  const [isLoadingPolicy, setIsLoadingPolicy] = useState(!policy && !!id)
+  const [isLoadingPolicy, setIsLoadingPolicy] = useState(!policy && !!id && !trialPolicy)
 
   useEffect(() => {
     // If policy is already in local cache, no need to fetch
@@ -814,12 +825,34 @@ export function PolicyDetailView() {
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden">
       {/* Mobile-first header - ultra compact */}
+      {/* Trial result banner */}
+      {isTrialResult && (
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={18} />
+              <span className="text-sm font-medium">
+                {locale === 'tr' ? 'Ücretsiz Analiz Sonucu' : 'Free Trial Result'}
+              </span>
+            </div>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="bg-white text-blue-600 hover:bg-blue-50"
+              onClick={() => navigate('/auth?mode=signup')}
+            >
+              {locale === 'tr' ? 'Kayıt Ol ve Kaydet' : 'Sign Up & Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm w-full">
         <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 w-full overflow-hidden">
           <div className="flex items-center gap-2 w-full">
             {/* Back button - minimal padding */}
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => isTrialResult ? navigate('/') : navigate(-1)}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
               aria-label={locale === 'tr' ? 'Geri' : 'Go back'}
             >

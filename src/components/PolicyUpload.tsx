@@ -168,6 +168,18 @@ export function PolicyUpload() {
     }
   }, [location, navigate])
 
+  // Handle files passed directly via navigation state (e.g., from TryAnalysis redirect)
+  useEffect(() => {
+    const state = location.state as { files?: File[]; autoProcess?: boolean } | null
+    if (state?.files && state.files.length > 0 && !filesReceivedRef.current) {
+      filesReceivedRef.current = true
+      // Add files and start processing
+      addFilesRef.current?.(state.files)
+      // Clear the navigation state to prevent re-processing
+      navigate(location.pathname, { replace: true, state: null })
+    }
+  }, [location, navigate])
+
   const handleRunDiagnostics = async () => {
     setIsRunningDiagnostics(true)
     toast.info('Running diagnostics...', {
