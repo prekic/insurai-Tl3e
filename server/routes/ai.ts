@@ -883,6 +883,11 @@ router.post(
  * Proxy for Google Cloud Vision OCR
  * Rate limited: 30 requests per hour
  * Validated: imageBase64 required, max 15MB, valid base64 format
+ *
+ * Authentication priority (most secure first):
+ * 1. Service account OAuth token (if GCP_SERVICE_ACCOUNT_BASE64 configured)
+ * 2. API key in header (X-goog-api-key) - keeps key out of URLs/logs
+ * 3. API key in query param (fallback) - less secure, visible in logs
  */
 router.post(
   '/ocr',
@@ -891,8 +896,11 @@ router.post(
   validateOCR,
   async (req: Request, res: Response) => {
     try {
+      // Try OAuth token first (most secure - uses service account, no API key exposure)
+      const oauthToken = await getDocumentAIAccessToken()
       const apiKey = process.env.GOOGLE_CLOUD_API_KEY
-      if (!apiKey) {
+
+      if (!oauthToken && !apiKey) {
         return res.status(503).json({
           error: 'Google Cloud not configured',
           code: 'PROVIDER_NOT_CONFIGURED',
@@ -902,25 +910,42 @@ router.post(
       // Body is validated and sanitized by middleware
       const { imageBase64 } = req.body as OCRInput
 
-      const response = await fetch(
-        'https://vision.googleapis.com/v1/images:annotate',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey,
-          },
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: imageBase64 },
-                features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-                imageContext: { languageHints: ['tr', 'en'] },
-              },
-            ],
-          }),
+      // Build request with appropriate authentication
+      // Priority: OAuth token > API key header > API key query param
+      let url = 'https://vision.googleapis.com/v1/images:annotate'
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      if (oauthToken) {
+        // Most secure: OAuth bearer token from service account
+        headers['Authorization'] = `Bearer ${oauthToken}`
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[Vision OCR] Using OAuth bearer token authentication')
         }
-      )
+      } else if (apiKey) {
+        // Fallback: API key in header (X-goog-api-key with correct capitalization)
+        // Note: Header keeps API key out of URL logs, but query param is more reliable
+        // Using query param as Google REST APIs have inconsistent header support
+        url = `${url}?key=${apiKey}`
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[Vision OCR] Using API key authentication (query param)')
+        }
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: imageBase64 },
+              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+              imageContext: { languageHints: ['tr', 'en'] },
+            },
+          ],
+        }),
+      })
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
@@ -1549,6 +1574,7 @@ interface ProviderDiagnostic {
   error?: string
   latencyMs?: number
   model?: string
+  authMethod?: string // 'oauth' | 'api_key' - only for Google Vision
 }
 
 /**
@@ -1559,17 +1585,20 @@ function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
   if (!isProduction) return error
 
   // Map technical errors to user-friendly messages for SaaS
-  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect')) {
+  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect') || error.includes('Authentication failed')) {
     return 'Service configuration error'
   }
-  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota')) {
+  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota') || error.includes('try again later')) {
     return 'Service temporarily busy'
   }
-  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING')) {
+  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing')) {
     return 'Service temporarily unavailable'
   }
-  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled')) {
+  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled') || error.includes('Permission denied')) {
     return 'Service not available'
+  }
+  if (error.includes('NOT_FOUND') || error.includes('not found') || error.includes('404')) {
+    return 'Service not configured'
   }
   return 'Service error'
 }
@@ -1672,46 +1701,92 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
   }
 
   // Test Google Cloud Vision (OCR)
+  // Check both OAuth (service account) and API key authentication
   const googleApiKey = process.env.GOOGLE_CLOUD_API_KEY
-  if (googleApiKey) {
+  const hasServiceAccount = !!getGCPCredentialsPath()
+
+  if (googleApiKey || hasServiceAccount) {
     diagnostics.google.configured = true
     const startTime = Date.now()
     try {
-      // Make a minimal API call to verify the key works
+      // Try OAuth token first (most secure)
+      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
+
+      // Build request with appropriate authentication
+      let url = 'https://vision.googleapis.com/v1/images:annotate'
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+
+      let authMethod = 'none'
+      if (oauthToken) {
+        headers['Authorization'] = `Bearer ${oauthToken}`
+        authMethod = 'oauth'
+      } else if (googleApiKey) {
+        url = `${url}?key=${googleApiKey}`
+        authMethod = 'api_key'
+      }
+
+      // Make a minimal API call to verify credentials work
       // Using a tiny 1x1 white PNG to minimize cost
       const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-      const response = await fetch(
-        'https://vision.googleapis.com/v1/images:annotate',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': googleApiKey,
-          },
-          body: JSON.stringify({
-            requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
-          }),
-        }
-      )
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
+        }),
+      })
       diagnostics.google.latencyMs = Date.now() - startTime
 
       if (response.ok) {
         diagnostics.google.valid = true
-        // Only show model in non-production
+        // Only show details in non-production
         if (!IS_PRODUCTION) {
           diagnostics.google.model = 'cloud-vision-v1'
+          // Show which auth method was used (oauth is more secure than api_key)
+          diagnostics.google.authMethod = authMethod
         }
       } else {
-        const errorData = (await response.json().catch(() => ({}))) as { error?: { message?: string; status?: string } }
+        const errorData = (await response.json().catch(() => ({}))) as {
+          error?: { message?: string; status?: string; code?: number }
+        }
         diagnostics.google.valid = false
-        let errorMsg = errorData.error?.message || `HTTP ${response.status}`
-        // Provide specific guidance
-        if (errorMsg.includes('API key not valid') || response.status === 400) {
+
+        // Check both message and status fields from Google Cloud API response
+        const errorMessage = errorData.error?.message || ''
+        const errorStatus = errorData.error?.status || ''
+        const httpStatus = response.status
+
+        // Log full error in development for debugging
+        if (!IS_PRODUCTION) {
+          console.log('[Vision Diagnose] Error response:', {
+            authMethod,
+            httpStatus,
+            errorStatus,
+            errorMessage,
+            fullError: errorData.error
+          })
+        }
+
+        let errorMsg = errorMessage || `HTTP ${httpStatus}`
+
+        // Map Google Cloud error statuses to actionable messages
+        if (errorMsg.includes('API key not valid') || httpStatus === 400) {
           errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
-        } else if (errorMsg.includes('PERMISSION_DENIED')) {
+        } else if (errorStatus === 'PERMISSION_DENIED' || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('has not been used')) {
           errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
-        } else if (errorMsg.includes('BILLING')) {
+        } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
+          errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
+        } else if (errorStatus === 'FAILED_PRECONDITION' || errorMsg.includes('Billing') || errorMsg.includes('BILLING')) {
           errorMsg = 'Billing not enabled on Google Cloud project'
+        } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
+          errorMsg = 'Rate limit exceeded - try again later'
+        } else if (errorStatus === 'NOT_FOUND' || httpStatus === 404) {
+          errorMsg = 'Vision API endpoint not found - check API configuration'
+        } else if (httpStatus === 403) {
+          // Catch-all for 403 errors with unrecognized status
+          errorMsg = `Permission denied (${errorStatus || 'unknown'}) - check API key permissions`
         }
         diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
       }

@@ -33,6 +33,18 @@
 export { evaluatePolicy } from './evaluator'
 export { comparePolicies, quickCompare, compareCoverage } from './comparator'
 
+// Benchmark service for database-driven premium benchmarks
+export {
+  initializeBenchmarks,
+  refreshBenchmarks,
+  getPremiumBenchmarkWithFallback,
+  getAllBenchmarksForType,
+  isValueBasedBenchmark,
+  evaluateValueBasedPremium,
+  type PremiumBenchmark,
+  type LegacyPremiumRange,
+} from './benchmark-service'
+
 // Types
 export type {
   // Evaluation types

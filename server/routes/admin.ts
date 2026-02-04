@@ -2959,4 +2959,386 @@ router.post('/notifications/acknowledge-all', authenticateAdmin, async (req: Aut
   }
 })
 
+// ============================================================================
+// PREMIUM BENCHMARKS MANAGEMENT
+// ============================================================================
+
+/**
+ * Premium Benchmark interface for admin management
+ */
+interface PremiumBenchmark {
+  id: string
+  insurance_type: string
+  insurance_type_tr: string
+  sub_type: string | null
+  sub_type_tr: string | null
+  min_premium: number
+  avg_premium: number
+  max_premium: number
+  comparison_method: 'direct_premium' | 'value_based'
+  value_min_rate: number | null
+  value_avg_rate: number | null
+  value_max_rate: number | null
+  currency: string
+  year: number
+  source: string | null
+  source_tr: string | null
+  notes: string | null
+  notes_tr: string | null
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+/**
+ * Get all premium benchmarks
+ * GET /api/admin/benchmarks
+ */
+router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { insurance_type, is_active } = req.query
+    const supabase = getSupabaseWithError()
+
+    let query = supabase
+      .from('premium_benchmarks')
+      .select('*')
+      .order('insurance_type', { ascending: true })
+      .order('sub_type', { ascending: true })
+
+    if (insurance_type) {
+      query = query.eq('insurance_type', insurance_type)
+    }
+
+    if (is_active !== undefined) {
+      query = query.eq('is_active', is_active === 'true')
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Failed to fetch benchmarks:', error)
+      res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
+      return
+    }
+
+    res.json({ success: true, data: data as PremiumBenchmark[] })
+  } catch (error) {
+    console.error('Failed to fetch benchmarks:', error)
+    res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
+  }
+})
+
+/**
+ * Get a specific benchmark
+ * GET /api/admin/benchmarks/:id
+ */
+router.get('/benchmarks/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const supabase = getSupabaseWithError()
+
+    const { data, error } = await supabase
+      .from('premium_benchmarks')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (error || !data) {
+      res.status(404).json({ success: false, error: 'Benchmark not found' })
+      return
+    }
+
+    res.json({ success: true, data: data as PremiumBenchmark })
+  } catch (error) {
+    console.error('Failed to fetch benchmark:', error)
+    res.status(500).json({ success: false, error: 'Failed to fetch benchmark' })
+  }
+})
+
+/**
+ * Create a new benchmark
+ * POST /api/admin/benchmarks
+ */
+router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const {
+      insurance_type,
+      insurance_type_tr,
+      sub_type,
+      sub_type_tr,
+      min_premium,
+      avg_premium,
+      max_premium,
+      comparison_method,
+      value_min_rate,
+      value_avg_rate,
+      value_max_rate,
+      currency,
+      year,
+      source,
+      source_tr,
+      notes,
+      notes_tr,
+    } = req.body
+
+    if (!insurance_type || !insurance_type_tr || min_premium === undefined || avg_premium === undefined || max_premium === undefined) {
+      res.status(400).json({
+        success: false,
+        error: 'insurance_type, insurance_type_tr, min_premium, avg_premium, and max_premium are required',
+      })
+      return
+    }
+
+    const supabase = getSupabaseWithError()
+
+    const { data, error } = await supabase
+      .from('premium_benchmarks')
+      .insert({
+        insurance_type,
+        insurance_type_tr,
+        sub_type: sub_type || null,
+        sub_type_tr: sub_type_tr || null,
+        min_premium: parseFloat(min_premium),
+        avg_premium: parseFloat(avg_premium),
+        max_premium: parseFloat(max_premium),
+        comparison_method: comparison_method || 'direct_premium',
+        value_min_rate: value_min_rate ? parseFloat(value_min_rate) : null,
+        value_avg_rate: value_avg_rate ? parseFloat(value_avg_rate) : null,
+        value_max_rate: value_max_rate ? parseFloat(value_max_rate) : null,
+        currency: currency || 'TRY',
+        year: year || new Date().getFullYear(),
+        source: source || null,
+        source_tr: source_tr || null,
+        notes: notes || null,
+        notes_tr: notes_tr || null,
+        is_active: true,
+        created_by: req.adminUser?.id || null,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to create benchmark:', error)
+      res.status(500).json({ success: false, error: 'Failed to create benchmark' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'create', 'premium_benchmark', data.id, undefined, { insurance_type, sub_type })
+
+    res.json({ success: true, data: data as PremiumBenchmark })
+  } catch (error) {
+    console.error('Failed to create benchmark:', error)
+    res.status(500).json({ success: false, error: 'Failed to create benchmark' })
+  }
+})
+
+/**
+ * Update a benchmark
+ * PUT /api/admin/benchmarks/:id
+ */
+router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const updates = req.body
+
+    const supabase = getSupabaseWithError()
+
+    // Get existing for audit log
+    const { data: existing } = await supabase
+      .from('premium_benchmarks')
+      .select('*')
+      .eq('id', id)
+      .single()
+
+    if (!existing) {
+      res.status(404).json({ success: false, error: 'Benchmark not found' })
+      return
+    }
+
+    // Prepare update object
+    const updateData: Record<string, unknown> = {
+      updated_by: req.adminUser?.id || null,
+    }
+
+    // Only include fields that are explicitly provided
+    const allowedFields = [
+      'insurance_type', 'insurance_type_tr', 'sub_type', 'sub_type_tr',
+      'min_premium', 'avg_premium', 'max_premium',
+      'comparison_method', 'value_min_rate', 'value_avg_rate', 'value_max_rate',
+      'currency', 'year', 'source', 'source_tr', 'notes', 'notes_tr', 'is_active',
+    ]
+
+    for (const field of allowedFields) {
+      if (updates[field] !== undefined) {
+        // Parse numeric fields
+        if (['min_premium', 'avg_premium', 'max_premium', 'value_min_rate', 'value_avg_rate', 'value_max_rate'].includes(field)) {
+          updateData[field] = updates[field] !== null ? parseFloat(updates[field]) : null
+        } else if (field === 'year') {
+          updateData[field] = parseInt(updates[field])
+        } else {
+          updateData[field] = updates[field]
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('premium_benchmarks')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Failed to update benchmark:', error)
+      res.status(500).json({ success: false, error: 'Failed to update benchmark' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'update', 'premium_benchmark', id, existing, updates)
+
+    res.json({ success: true, data: data as PremiumBenchmark })
+  } catch (error) {
+    console.error('Failed to update benchmark:', error)
+    res.status(500).json({ success: false, error: 'Failed to update benchmark' })
+  }
+})
+
+/**
+ * Delete a benchmark (soft delete by setting is_active = false)
+ * DELETE /api/admin/benchmarks/:id
+ */
+router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { id } = req.params
+    const supabase = getSupabaseWithError()
+
+    // Soft delete
+    const { error } = await supabase
+      .from('premium_benchmarks')
+      .update({ is_active: false, updated_by: req.adminUser?.id || null })
+      .eq('id', id)
+
+    if (error) {
+      console.error('Failed to delete benchmark:', error)
+      res.status(500).json({ success: false, error: 'Failed to delete benchmark' })
+      return
+    }
+
+    // Log action
+    await logAdminAction(req, 'delete', 'premium_benchmark', id)
+
+    res.json({ success: true, message: 'Benchmark deactivated' })
+  } catch (error) {
+    console.error('Failed to delete benchmark:', error)
+    res.status(500).json({ success: false, error: 'Failed to delete benchmark' })
+  }
+})
+
+/**
+ * Get available insurance types for dropdown
+ * GET /api/admin/benchmarks/types
+ */
+router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const supabase = getSupabaseWithError()
+
+    const { data, error } = await supabase
+      .from('premium_benchmarks')
+      .select('insurance_type, insurance_type_tr')
+      .eq('is_active', true)
+
+    if (error) {
+      console.error('Failed to fetch insurance types:', error)
+      res.status(500).json({ success: false, error: 'Failed to fetch insurance types' })
+      return
+    }
+
+    // Get unique types
+    const types = [...new Map(data.map(item => [item.insurance_type, item])).values()]
+
+    res.json({ success: true, data: types })
+  } catch (error) {
+    console.error('Failed to fetch insurance types:', error)
+    res.status(500).json({ success: false, error: 'Failed to fetch insurance types' })
+  }
+})
+
+/**
+ * Bulk update benchmarks for a specific year
+ * PUT /api/admin/benchmarks/bulk-update
+ */
+router.put('/benchmarks/bulk-update', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { year, multiplier, insurance_type } = req.body
+
+    if (!year || !multiplier) {
+      res.status(400).json({
+        success: false,
+        error: 'year and multiplier are required',
+      })
+      return
+    }
+
+    const supabase = getSupabaseWithError()
+
+    // Get all active benchmarks for the type (or all if not specified)
+    let query = supabase
+      .from('premium_benchmarks')
+      .select('*')
+      .eq('is_active', true)
+
+    if (insurance_type) {
+      query = query.eq('insurance_type', insurance_type)
+    }
+
+    const { data: benchmarks, error: fetchError } = await query
+
+    if (fetchError) {
+      console.error('Failed to fetch benchmarks for bulk update:', fetchError)
+      res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
+      return
+    }
+
+    // Update each benchmark
+    const mult = parseFloat(multiplier)
+    let updatedCount = 0
+
+    for (const benchmark of benchmarks || []) {
+      const { error: updateError } = await supabase
+        .from('premium_benchmarks')
+        .update({
+          min_premium: Math.round(benchmark.min_premium * mult),
+          avg_premium: Math.round(benchmark.avg_premium * mult),
+          max_premium: Math.round(benchmark.max_premium * mult),
+          year: parseInt(year),
+          updated_by: req.adminUser?.id || null,
+        })
+        .eq('id', benchmark.id)
+
+      if (!updateError) {
+        updatedCount++
+      }
+    }
+
+    // Log action
+    await logAdminAction(req, 'bulk_update', 'premium_benchmarks', undefined, undefined, {
+      year,
+      multiplier,
+      insurance_type: insurance_type || 'all',
+      updatedCount,
+    })
+
+    res.json({
+      success: true,
+      message: `Updated ${updatedCount} benchmarks`,
+      updatedCount,
+    })
+  } catch (error) {
+    console.error('Failed to bulk update benchmarks:', error)
+    res.status(500).json({ success: false, error: 'Failed to bulk update benchmarks' })
+  }
+})
+
 export default router
