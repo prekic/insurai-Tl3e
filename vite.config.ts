@@ -46,24 +46,52 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks(id: string) {
           // React core
-          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-
+          if (id.includes('node_modules/react') ||
+              id.includes('node_modules/react-dom') ||
+              id.includes('node_modules/react-router')) {
+            return 'vendor-react'
+          }
           // Animation library
-          'vendor-animation': ['framer-motion'],
-
-          // PDF parsing (large dependency)
-          'vendor-pdf': ['pdfjs-dist'],
-
-          // AI SDKs
-          'vendor-ai': ['openai', '@anthropic-ai/sdk'],
-
+          if (id.includes('node_modules/framer-motion')) {
+            return 'vendor-animation'
+          }
+          // PDF.js for parsing (large dependency)
+          if (id.includes('node_modules/pdfjs-dist')) {
+            return 'vendor-pdfjs'
+          }
+          // PDF-lib for splitting (separate chunk)
+          if (id.includes('node_modules/pdf-lib')) {
+            return 'vendor-pdflib'
+          }
+          // OpenAI SDK - separate from Anthropic
+          if (id.includes('node_modules/openai')) {
+            return 'vendor-openai'
+          }
+          // Anthropic SDK - separate chunk
+          if (id.includes('node_modules/@anthropic-ai')) {
+            return 'vendor-anthropic'
+          }
           // UI utilities
-          'vendor-ui': ['sonner', 'lucide-react', 'clsx', 'tailwind-merge'],
-
+          if (id.includes('node_modules/sonner') ||
+              id.includes('node_modules/lucide-react') ||
+              id.includes('node_modules/clsx') ||
+              id.includes('node_modules/tailwind-merge')) {
+            return 'vendor-ui'
+          }
           // Supabase
-          'vendor-supabase': ['@supabase/supabase-js'],
+          if (id.includes('node_modules/@supabase')) {
+            return 'vendor-supabase'
+          }
+          // Sentry
+          if (id.includes('node_modules/@sentry')) {
+            return 'vendor-sentry'
+          }
+          // Other large node_modules go to common vendor
+          if (id.includes('node_modules')) {
+            return 'vendor-common'
+          }
         },
       },
     },
