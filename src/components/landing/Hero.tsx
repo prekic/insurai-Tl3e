@@ -142,7 +142,7 @@ export function Hero() {
                 <Bell size={20} />
               </button>
               <Link
-                to="/upload?autoOpen=true"
+                to={uploadPath}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
               >
                 <Upload size={18} />
@@ -244,7 +244,7 @@ export function Hero() {
                 Compare
               </button>
               <button
-                onClick={() => handleMenuClick('/upload?autoOpen=true')}
+                onClick={() => handleMenuClick(uploadPath)}
                 className="block w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-center"
               >
                 Upload Policy

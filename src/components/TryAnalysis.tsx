@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Upload,
@@ -14,10 +14,16 @@ import {
   Share2,
   Check,
   Mail,
+  TrendingUp,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
-import { AnalyzedPolicy } from '@/types/policy'
+import { AnalyzedPolicy, Policy } from '@/types/policy'
+import { evaluatePolicy } from '@/lib/policy-evaluation'
+import { GradeBadge } from './evaluation/GradeBadge'
+import { ScoreBreakdown } from './evaluation/ScoreBreakdown'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { sanitizeFileName } from '@/lib/sanitize'
 import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
@@ -75,6 +81,44 @@ export function TryAnalysis() {
   const [email, setEmail] = useState('')
   const [emailSubmitted, setEmailSubmitted] = useState(false)
   const [shareCopied, setShareCopied] = useState(false)
+  const [scoreBreakdownExpanded, setScoreBreakdownExpanded] = useState(false)
+
+  // Calculate policy evaluation when result is available
+  const evaluation = useMemo(() => {
+    if (!result?.policy) return null
+
+    // Convert AnalyzedPolicy to Policy format for evaluation
+    const policyForEval: Policy = {
+      id: 'trial-policy',
+      policyNumber: result.policy.policyNumber || 'N/A',
+      provider: result.policy.provider || 'Unknown',
+      logo: '',
+      type: result.policy.type || 'kasko',
+      typeTr: result.policy.typeTr || result.policy.type || 'Kasko',
+      coverage: result.policy.coverage || 0,
+      premium: result.policy.premium || 0,
+      monthlyPremium: (result.policy.premium || 0) / 12,
+      deductible: result.policy.deductible || 0,
+      startDate: result.policy.startDate || new Date().toISOString(),
+      expiryDate: result.policy.expiryDate || new Date().toISOString(),
+      status: 'active',
+      uploadDate: new Date().toISOString(),
+      fileName: result.fileName,
+      documentType: 'policy',
+      insuredPerson: result.policy.insuredPerson || 'N/A',
+      coverages: result.policy.coverages || [],
+      exclusions: result.policy.exclusions || [],
+      specialConditions: [],
+      insuranceLine: result.policy.type || 'kasko',
+    }
+
+    try {
+      return evaluatePolicy(policyForEval)
+    } catch (err) {
+      console.error('[TryAnalysis] Evaluation error:', err)
+      return null
+    }
+  }, [result])
 
   // Track page view on mount
   useEffect(() => {
@@ -577,6 +621,72 @@ export function TryAnalysis() {
               </div>
             </div>
           </div>
+
+          {/* Policy Evaluation Card */}
+          {evaluation && (
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-6">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="text-blue-600" size={20} />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-gray-900">Policy Evaluation</h2>
+                      <p className="text-sm text-gray-500">AI-powered analysis against market benchmarks</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-gray-900">{evaluation.overallScore}</div>
+                      <div className="text-xs text-gray-500">Overall Score</div>
+                    </div>
+                    <GradeBadge grade={evaluation.grade} size="md" />
+                  </div>
+                </div>
+
+                {/* Score Breakdown Toggle */}
+                <button
+                  onClick={() => setScoreBreakdownExpanded(!scoreBreakdownExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+                >
+                  <span className="text-sm font-medium text-gray-700">View Score Breakdown</span>
+                  {scoreBreakdownExpanded ? (
+                    <ChevronUp size={18} className="text-gray-500" />
+                  ) : (
+                    <ChevronDown size={18} className="text-gray-500" />
+                  )}
+                </button>
+
+                {/* Expanded Score Breakdown */}
+                {scoreBreakdownExpanded && (
+                  <div className="mt-4">
+                    <ScoreBreakdown
+                      breakdown={evaluation.scoreBreakdown}
+                      variant="full"
+                    />
+                  </div>
+                )}
+
+                {/* Recommendations Preview */}
+                {evaluation.recommendations && evaluation.recommendations.length > 0 && (
+                  <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+                    <h3 className="font-medium text-amber-800 mb-2">
+                      Key Recommendation
+                    </h3>
+                    <p className="text-sm text-amber-700">
+                      {evaluation.recommendations[0].descriptionTR || evaluation.recommendations[0].description}
+                    </p>
+                    {evaluation.recommendations.length > 1 && (
+                      <p className="text-xs text-amber-600 mt-2">
+                        +{evaluation.recommendations.length - 1} more recommendations available with full account
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Policy Summary Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-6">
