@@ -114,6 +114,7 @@ useEffect(() => {
 ## Commits This Session
 
 ```
+66dd2dd Update documentation with session changes
 05627d4 Fix circular dependency in bundle chunking causing initialization error
 323422a Bump service worker cache version to v12 for fresh content
 37ef119 Fix file upload flow from landing page for logged-in users
@@ -204,6 +205,15 @@ RESEND_API_KEY=re_xxx               # For email notifications
 ```
 
 **Note**: `VITE_API_PROXY_URL` is auto-detected in production via `window.location.origin`
+
+### API Proxy Auto-Detection (`src/lib/env.ts`)
+```typescript
+// In production, if VITE_API_PROXY_URL not set, auto-detect:
+if (import.meta.env.PROD && typeof window !== 'undefined') {
+  return window.location.origin  // Same origin when co-hosted on Railway
+}
+```
+This means you do NOT need to set `VITE_API_PROXY_URL` for Railway deployments.
 
 ---
 
