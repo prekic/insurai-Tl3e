@@ -1,14 +1,21 @@
 // AI extraction service for InsurAI
 // Provides PDF parsing, multi-model AI extraction, OCR, and policy comparison
 
-// Configuration
+// Configuration - lightweight utilities from proxy-utils (no SDK imports)
 export {
   isAIConfigured,
-  isProviderConfigured,
   isOCRConfigured,
+  isProxyConfigured,
+  getProxyUrl,
+  checkProxyProviders,
+  type AIProvider,
+} from './proxy-utils'
+
+// Configuration - heavy utilities that need SDK imports
+export {
+  isProviderConfigured,
   getConfiguredProviders,
   AI_CONFIG,
-  type AIProvider,
 } from './config'
 
 // PDF parsing (with lazy loading and retry logic)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getProxyUrl } from '@/lib/ai/config'
+import { getProxyUrl } from '@/lib/ai/proxy-utils'
 
 export interface ProviderDiagnostic {
   configured: boolean

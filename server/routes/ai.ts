@@ -39,6 +39,95 @@ import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 
 const router = Router()
 
+/**
+ * ANTHROPIC_SCHEMA_PROMPT
+ * Claude doesn't support OpenAI's response_format parameter, so the JSON schema
+ * must be included in the prompt text itself to ensure structured output.
+ * This is critical for reliable extraction with Claude models.
+ */
+const ANTHROPIC_SCHEMA_PROMPT = `
+You are an expert insurance policy analyzer. Extract all policy information and return it as valid JSON.
+
+## CRITICAL: Output Format
+
+You MUST respond with ONLY valid JSON matching this exact schema. Do not include any text before or after the JSON.
+
+{
+  "policyNumber": string | null,
+  "provider": string | null,
+  "policyType": "kasko" | "traffic" | "home" | "health" | "life" | "dask" | "business" | "nakliyat" | null,
+  "policyTypeTr": string | null,
+  "insuredName": string | null,
+  "insuredAddress": string | null,
+  "startDate": string | null,
+  "endDate": string | null,
+  "premium": number | null,
+  "currency": string | null,
+  "paymentFrequency": "annual" | "semi-annual" | "quarterly" | "monthly" | null,
+  "vehicleInfo": {
+    "plate": string | null,
+    "make": string | null,
+    "model": string | null,
+    "year": number | null,
+    "chassisNumber": string | null,
+    "engineNumber": string | null,
+    "color": string | null,
+    "usageType": string | null,
+    "marketValue": number | null
+  } | null,
+  "propertyInfo": {
+    "address": string | null,
+    "buildingType": string | null,
+    "constructionYear": number | null,
+    "squareMeters": number | null,
+    "numberOfFloors": number | null,
+    "floor": number | null,
+    "heatingType": string | null,
+    "securityFeatures": string[] | null
+  } | null,
+  "coverages": [
+    {
+      "name": string,
+      "nameTr": string | null,
+      "limit": number | null,
+      "deductible": number | null,
+      "description": string | null,
+      "isUnlimited": boolean | null,
+      "isMarketValue": boolean | null,
+      "category": "main" | "liability" | "supplementary" | "assistance" | "legal" | "other" | null
+    }
+  ],
+  "specialConditions": string[],
+  "exclusions": string[],
+  "confidence": {
+    "overall": number,
+    "policyNumber": number,
+    "provider": number,
+    "dates": number,
+    "premium": number,
+    "coverages": number
+  },
+  "amendmentInfo": {
+    "isAmendment": boolean,
+    "amendmentNumber": string | null,
+    "amendmentDate": string | null,
+    "basePolicyNumber": string | null,
+    "amendmentReason": string | null,
+    "premiumDifference": number | null
+  }
+}
+
+## Important Notes:
+- Dates must be in YYYY-MM-DD format
+- Confidence scores must be between 0 and 1
+- For Turkish policies, include both English (name) and Turkish (nameTr) coverage names
+- Set isUnlimited: true for "Sınırsız" coverages
+- Set isMarketValue: true for "Rayiç Değer" coverages
+- Extract all coverages found in the document
+
+Now analyze the following policy document:
+`
+
 // Initialize clients (lazy - only when keys are available)
 let openaiClient: OpenAI | null = null
 let anthropicClient: Anthropic | null = null
@@ -425,18 +514,21 @@ router.post(
 
       if (clientPrompt) {
         // Use client-provided prompt (backward compatibility)
-        finalSystemPrompt = clientPrompt
+        // Still prepend schema for reliable JSON output
+        finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
+        finalUserPrompt = clientPrompt + '\n\n' + documentText
       } else {
-        // Use admin-managed prompt
+        // Use admin-managed prompt with schema
         const renderedPrompt = await getExtractionPrompt(documentText, policyType)
         if (renderedPrompt) {
-          finalSystemPrompt = renderedPrompt.systemPrompt
+          // Prepend schema to admin prompt for reliable JSON output
+          finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
           finalUserPrompt = renderedPrompt.userPrompt
           promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
-          console.log(`[Extraction/Anthropic] Using prompt template: ${promptTemplateUsed}`)
+          console.log(`[Extraction/Anthropic] Using prompt template: ${promptTemplateUsed} (with schema)`)
         } else {
-          finalSystemPrompt = 'Extract policy information as JSON.'
-          console.log('[Extraction/Anthropic] Using fallback prompt (admin prompt unavailable)')
+          finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
+          console.log('[Extraction/Anthropic] Using ANTHROPIC_SCHEMA_PROMPT fallback')
         }
       }
 
@@ -583,19 +675,23 @@ router.post(
     const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
 
     // Get extraction prompt (shared between providers)
-    let finalSystemPrompt: string
+    // For Anthropic, we use ANTHROPIC_SCHEMA_PROMPT to ensure structured JSON output
+    // For OpenAI, we use response_format: json_schema
+    const anthropicSystemPrompt: string = ANTHROPIC_SCHEMA_PROMPT
+    let openaiSystemPrompt: string
     let finalUserPrompt = documentText
 
     if (clientPrompt) {
-      finalSystemPrompt = clientPrompt
+      openaiSystemPrompt = clientPrompt
+      finalUserPrompt = documentText
     } else {
       const renderedPrompt = await getExtractionPrompt(documentText, policyType)
       if (renderedPrompt) {
-        finalSystemPrompt = renderedPrompt.systemPrompt
+        openaiSystemPrompt = renderedPrompt.systemPrompt
         finalUserPrompt = renderedPrompt.userPrompt
         console.log(`[${requestId}] Using prompt template: ${renderedPrompt.templateName} v${renderedPrompt.version}`)
       } else {
-        finalSystemPrompt = 'Extract policy information as JSON.'
+        openaiSystemPrompt = 'Extract policy information as JSON.'
         console.log(`[${requestId}] Using fallback prompt`)
       }
     }
@@ -605,12 +701,12 @@ router.post(
     const openaiClient = getOpenAIClient()
 
     if (anthropicClient) {
-      console.log(`[${requestId}] Trying Anthropic first...`)
+      console.log(`[${requestId}] Trying Anthropic first (with ANTHROPIC_SCHEMA_PROMPT)...`)
       try {
         const response = await anthropicClient.messages.create({
           model: model || 'claude-sonnet-4-20250514',
           max_tokens: 4096,
-          system: finalSystemPrompt,
+          system: anthropicSystemPrompt,
           messages: [{ role: 'user', content: finalUserPrompt }],
         })
 
@@ -698,9 +794,9 @@ router.post(
       try {
         // Ensure "json" is in the prompt for OpenAI
         const jsonReminder = '\n\nRespond with valid JSON only.'
-        const systemPromptWithJson = finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
-          ? finalSystemPrompt
-          : finalSystemPrompt + jsonReminder
+        const systemPromptWithJson = openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
+          ? openaiSystemPrompt
+          : openaiSystemPrompt + jsonReminder
         const userPromptWithJson = finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON') || systemPromptWithJson.includes('json')
           ? finalUserPrompt
           : finalUserPrompt + jsonReminder

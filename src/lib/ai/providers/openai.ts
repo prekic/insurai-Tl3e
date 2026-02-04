@@ -186,7 +186,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
       actualOutputTokens = estimateTokens(JSON.stringify(result))
     } else {
       // Fall back to direct API (development)
-      const client = getOpenAIClient()
+      const client = await getOpenAIClient()
 
       if (!client) {
         throw new Error('OpenAI client not available')

@@ -980,26 +980,31 @@ export const SERVICE_COVERAGE_CLARIFICATIONS: Record<string, {
   question: string
   questionEn: string
   details: string[]
+  detailsEn: string[]
 }> = {
   'ikame araç': {
     question: 'İkame araç kaç gün ve hangi şartlarda sağlanıyor?',
     questionEn: 'How many days and under what conditions is replacement vehicle provided?',
     details: ['Gün limiti (genellikle 15-30 gün)', 'Araç sınıfı', 'Minimum hasar tutarı şartı'],
+    detailsEn: ['Day limit (usually 15-30 days)', 'Vehicle class', 'Minimum damage amount requirement'],
   },
   'çekici': {
     question: 'Çekici hizmeti limitsiz mi yoksa km sınırı var mı?',
     questionEn: 'Is towing unlimited or is there a distance limit?',
     details: ['Mesafe limiti (km)', 'Yıllık kullanım sayısı'],
+    detailsEn: ['Distance limit (km)', 'Annual usage limit'],
   },
   'asistans': {
     question: 'Asistans hizmetlerinin kapsamı ve limitleri nedir?',
     questionEn: 'What is the scope and limits of assistance services?',
     details: ['7/24 erişim', 'Yol yardımı kapsamı', 'Konaklama desteği'],
+    detailsEn: ['24/7 access', 'Roadside assistance scope', 'Accommodation support'],
   },
   'cam': {
     question: 'Cam hasarında muafiyet var mı?',
     questionEn: 'Is there a deductible for glass damage?',
     details: ['Ön cam muafiyeti', 'Yan cam muafiyeti', 'Onarım vs değişim'],
+    detailsEn: ['Windshield deductible', 'Side window deductible', 'Repair vs replacement'],
   },
 }
 
@@ -1010,6 +1015,7 @@ export function getCoverageClarifications(coverageName: string): {
   question: string
   questionEn: string
   details: string[]
+  detailsEn: string[]
 } | null {
   const nameLower = coverageName.toLowerCase()
   for (const [key, value] of Object.entries(SERVICE_COVERAGE_CLARIFICATIONS)) {
@@ -1458,19 +1464,31 @@ export function analyzeExclusionsComprehensive(
 
     // Check if this exclusion is unclear and needs clarification
     const unclearPatterns = [
-      { pattern: 'yetkisiz', question: 'Yetkisiz sürücü tam olarak nasıl tanımlanıyor?' },
-      { pattern: 'belirli sürücü', question: 'Hangi sürücüler bu poliçe kapsamında?' },
-      { pattern: 'ruhsata', question: 'Ruhsat bilgilerinin güncel olduğundan emin misiniz?' },
+      {
+        pattern: 'yetkisiz',
+        question: 'Yetkisiz sürücü tam olarak nasıl tanımlanıyor?',
+        questionEn: 'How exactly is an unauthorized driver defined?',
+      },
+      {
+        pattern: 'belirli sürücü',
+        question: 'Hangi sürücüler bu poliçe kapsamında?',
+        questionEn: 'Which drivers are covered under this policy?',
+      },
+      {
+        pattern: 'ruhsata',
+        question: 'Ruhsat bilgilerinin güncel olduğundan emin misiniz?',
+        questionEn: 'Are you sure the registration information is up to date?',
+      },
     ]
 
-    for (const { pattern, question } of unclearPatterns) {
+    for (const { pattern, question, questionEn } of unclearPatterns) {
       if (exclusionLower.includes(pattern)) {
         analyzed.needsClarification = true
         analyzed.clarificationQuestion = question
         result.clarificationNeeded.push({
           item: exclusion,
           question,
-          questionEn: question, // TODO: translate
+          questionEn,
         })
         break
       }

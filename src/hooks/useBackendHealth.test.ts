@@ -2,12 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useBackendHealth, type DiagnosticResult } from './useBackendHealth'
 
-// Mock the config module
-vi.mock('@/lib/ai/config', () => ({
+// Mock the proxy-utils module
+vi.mock('@/lib/ai/proxy-utils', () => ({
   getProxyUrl: vi.fn(),
 }))
 
-import { getProxyUrl } from '@/lib/ai/config'
+import { getProxyUrl } from '@/lib/ai/proxy-utils'
 
 const mockGetProxyUrl = vi.mocked(getProxyUrl)
 
