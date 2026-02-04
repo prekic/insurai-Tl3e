@@ -688,6 +688,93 @@ export function TryAnalysis() {
             </div>
           )}
 
+          {/* AI Insights Card */}
+          {policy.aiInsights && policy.aiInsights.length > 0 && (
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-2xl shadow-xl border border-purple-200 overflow-hidden mb-6">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                      <Sparkles className="text-purple-600" size={20} />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-purple-900">AI Insights</h2>
+                      <p className="text-sm text-purple-600">Key findings from your policy</p>
+                    </div>
+                  </div>
+                  {policy.aiConfidence !== undefined && (
+                    <div className="px-3 py-1 bg-purple-100 rounded-full text-sm font-medium text-purple-700">
+                      {Math.round(policy.aiConfidence * 100)}% confidence
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {policy.aiInsights.slice(0, 5).map((insight, i) => {
+                    const cleanInsight = insight.replace(/^[✓✔☑]\s*/g, '').trim()
+                    return (
+                      <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700 flex items-start gap-2">
+                        <CheckCircle2 className="text-purple-500 flex-shrink-0 mt-0.5" size={16} />
+                        <span>{cleanInsight}</span>
+                      </div>
+                    )
+                  })}
+                  {policy.aiInsights.length > 5 && (
+                    <p className="text-xs text-purple-600 text-center pt-2">
+                      +{policy.aiInsights.length - 5} more insights available with full account
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Risk Assessment Card (if available) */}
+          {policy.riskScore && (
+            <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-6">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      policy.riskScore.level === 'very_low' || policy.riskScore.level === 'low'
+                        ? 'bg-green-100'
+                        : policy.riskScore.level === 'moderate'
+                        ? 'bg-yellow-100'
+                        : 'bg-red-100'
+                    }`}>
+                      <Shield className={`${
+                        policy.riskScore.level === 'very_low' || policy.riskScore.level === 'low'
+                          ? 'text-green-600'
+                          : policy.riskScore.level === 'moderate'
+                          ? 'text-yellow-600'
+                          : 'text-red-600'
+                      }`} size={20} />
+                    </div>
+                    <div>
+                      <h2 className="font-semibold text-gray-900">Risk Assessment</h2>
+                      <p className="text-sm text-gray-500">ML-powered risk analysis</p>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                    policy.riskScore.level === 'very_low' || policy.riskScore.level === 'low'
+                      ? 'bg-green-100 text-green-700'
+                      : policy.riskScore.level === 'moderate'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    {policy.riskScore.level.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())} Risk
+                  </div>
+                </div>
+                {policy.riskScore.topIssue && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                    <p className="text-sm text-amber-800">
+                      <strong>Top Issue:</strong> {policy.riskScore.topIssue}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Policy Summary Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-6">
             <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6">
