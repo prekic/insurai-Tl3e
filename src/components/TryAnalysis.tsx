@@ -81,12 +81,24 @@ export function TryAnalysis() {
     preloadPdfJs()
   }, [])
 
-  // If user is logged in, redirect to full upload
+  // If user is logged in, redirect to full upload (with any file that was passed)
   useEffect(() => {
     if (user) {
-      navigate('/upload', { replace: true })
+      // Get file from location state if present
+      const locationState = location.state as LocationState | null
+      const fileFromState = locationState?.file
+
+      if (fileFromState) {
+        // Pass file along to upload page
+        navigate('/upload', {
+          replace: true,
+          state: { files: [fileFromState], autoProcess: true }
+        })
+      } else {
+        navigate('/upload', { replace: true })
+      }
     }
-  }, [user, navigate])
+  }, [user, navigate, location.state])
 
   const backendReady = health.status === 'healthy'
 
