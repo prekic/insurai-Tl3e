@@ -9,7 +9,7 @@
  * - HTML pages: Stale-while-revalidate
  */
 
-const CACHE_VERSION = 'v11'
+const CACHE_VERSION = 'v12'
 const STATIC_CACHE = `insurai-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `insurai-dynamic-${CACHE_VERSION}`
 const API_CACHE = `insurai-api-${CACHE_VERSION}`
