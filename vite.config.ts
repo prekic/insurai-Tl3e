@@ -47,56 +47,21 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id: string) {
-          // React core
-          if (id.includes('node_modules/react') ||
-              id.includes('node_modules/react-dom') ||
-              id.includes('node_modules/react-router')) {
-            return 'vendor-react'
-          }
-          // Animation library
-          if (id.includes('node_modules/framer-motion')) {
-            return 'vendor-animation'
-          }
-          // PDF.js for parsing (large dependency)
+          // Only split out large, independent libraries to avoid circular deps
+          // PDF.js for parsing (large, independent)
           if (id.includes('node_modules/pdfjs-dist')) {
             return 'vendor-pdfjs'
           }
-          // PDF-lib for splitting (separate chunk)
+          // PDF-lib for splitting (large, independent)
           if (id.includes('node_modules/pdf-lib')) {
             return 'vendor-pdflib'
           }
-          // OpenAI SDK - separate from Anthropic
-          if (id.includes('node_modules/openai')) {
-            return 'vendor-openai'
-          }
-          // Anthropic SDK - separate chunk
-          if (id.includes('node_modules/@anthropic-ai')) {
-            return 'vendor-anthropic'
-          }
-          // UI utilities
-          if (id.includes('node_modules/sonner') ||
-              id.includes('node_modules/lucide-react') ||
-              id.includes('node_modules/clsx') ||
-              id.includes('node_modules/tailwind-merge')) {
-            return 'vendor-ui'
-          }
-          // Supabase
-          if (id.includes('node_modules/@supabase')) {
-            return 'vendor-supabase'
-          }
-          // Sentry
-          if (id.includes('node_modules/@sentry')) {
-            return 'vendor-sentry'
-          }
-          // Other large node_modules go to common vendor
-          if (id.includes('node_modules')) {
-            return 'vendor-common'
-          }
+          // Let Vite handle the rest automatically to avoid initialization errors
         },
       },
     },
-    // Increase warning limit slightly since we're now properly chunking
-    chunkSizeWarningLimit: 600,
+    // Increase warning limit for larger chunks
+    chunkSizeWarningLimit: 800,
   },
   test: {
     globals: true,
