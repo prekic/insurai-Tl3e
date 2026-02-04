@@ -1,4 +1,4 @@
-# Session Handoff - January 30, 2026 (Afternoon)
+# Session Handoff - February 4, 2026
 
 ## Current Status
 
@@ -9,7 +9,7 @@
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 45 warnings (all no-non-null-assertion) |
 | **Tests** | ✅ 5800+ passing (165 test files) |
-| **Branch** | `claude/review-handoff-xynEP` |
+| **Branch** | `claude/verify-todo-merge-8qpiq` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Railway deployed, working |
@@ -18,102 +18,145 @@
 
 ## Session Summary
 
-This session focused on **production hardening** and **email security**:
+This session focused on **re-implementing lost changes** from an archived Claude session and **bundle optimization**:
 
-1. Removed 5% simulated network error from UploadWidget
-2. Implemented secure email unsubscribe tokens (HMAC-SHA256)
-3. Fixed ESLint warnings (unescaped entities, ZodError.issues)
-4. Renamed migration files with sequential a,b,c suffixes
-5. Disabled debug flags in OCR decision engine
-6. Updated README.md to reflect full-stack state
-7. Investigated Google Vision OCR "Service error"
-8. Updated CLAUDE.md and SESSION_HANDOFF.md with session changes
+1. Re-implemented all lost changes from archived session `claude/review-handoff-Qptp9`
+2. Added ANTHROPIC_SCHEMA_PROMPT for reliable Claude JSON extraction
+3. Created proxy-utils.ts to reduce bundle size by splitting lightweight utilities
+4. Implemented dynamic SDK imports in config.ts for lazy loading
+5. Added GA4 analytics with KVKK consent management
+6. Extended i18n translations (insights, evaluation, comparison, insurance, coverageCategories)
+7. Enabled DecisionContextViewer in Document Journey admin viewer
+8. Added English translations to kasko-knowledge.ts
+9. Fixed Railway build configuration with installCommand
+10. Bumped service worker cache to v11
+11. Added stats.html to .gitignore
 
 ---
 
 ## Features Completed This Session
 
-### 1. Simulated Network Error Removed (commit 9887e8d)
+### 1. ANTHROPIC_SCHEMA_PROMPT for Claude JSON Extraction (commit f20abb7)
 
-**Problem**: 5% of anonymous uploads randomly failed with "Network error" - development code accidentally left in production.
+**Problem**: Claude doesn't support OpenAI's `response_format: { type: 'json_object' }` parameter, causing unreliable JSON output.
 
-**Root Cause**: `UploadWidget.tsx` lines 62-72 contained:
-```tsx
-if (Math.random() < 0.05) {
-  reject(new Error('Network error'))
+**Solution**: Added `ANTHROPIC_SCHEMA_PROMPT` constant that includes the full JSON schema directly in the prompt text.
+
+**File Changed**: `server/routes/ai.ts`
+
+```typescript
+const ANTHROPIC_SCHEMA_PROMPT = `
+You are an expert insurance policy analyzer. Extract all policy information and return it as valid JSON.
+
+## CRITICAL: Output Format
+You MUST respond with ONLY valid JSON matching this exact schema...
+`
+```
+
+### 2. proxy-utils.ts for Bundle Optimization (commit f20abb7)
+
+**Problem**: Components only needing proxy URL checks were importing the full AI SDK (~400KB).
+
+**Solution**: Created `src/lib/ai/proxy-utils.ts` with lightweight utilities that don't import AI SDKs.
+
+**New File**: `src/lib/ai/proxy-utils.ts` (89 lines)
+- `isProxyConfigured()` - Check if proxy is available
+- `getProxyUrl()` - Get proxy URL
+- `isAIConfigured()` - Check if AI is available (via proxy or localStorage)
+- `isOCRConfigured()` - Check if OCR is available
+- `checkProxyProviders()` - Query available providers
+
+**Updated**: `src/lib/ai/index.ts` - Split exports between proxy-utils (lightweight) and config (heavy)
+
+### 3. Dynamic SDK Imports in config.ts (commit f20abb7)
+
+**Problem**: AI SDKs imported at module load time increased initial bundle size.
+
+**Solution**: Changed to dynamic imports with caching:
+
+```typescript
+let cachedOpenAI: InstanceType<typeof import('openai').default> | null = null
+
+export async function getOpenAIClient() {
+  if (cachedOpenAI) return cachedOpenAI
+  const { default: OpenAI } = await import('openai')
+  cachedOpenAI = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+  return cachedOpenAI
 }
 ```
 
-**Solution**: Removed simulated error, replaced with 500ms delay for UX feedback.
+**File Changed**: `src/lib/ai/config.ts`
 
-### 2. Secure Email Unsubscribe Tokens (commit 60bd2ba)
+### 4. GA4 Analytics with KVKK Consent (commit f20abb7)
 
-**Feature**: All marketing emails now include cryptographically secure unsubscribe links.
+**Feature**: Google Analytics 4 integration respecting Turkish KVKK privacy requirements.
 
-**Implementation**:
-- `server/routes/email.ts`:
-  - `generateUnsubscribeToken(email)` - HMAC-SHA256, truncated to 32 chars
-  - `verifyUnsubscribeToken(email, token)` - Timing-safe comparison
-- `server/services/email-service.ts`:
-  - `wrapTemplate()` now accepts `recipientEmail` parameter
-  - Footer includes personalized unsubscribe URL
+**Implementation** (`src/lib/analytics.ts`):
+- Analytics only initializes after user consent
+- `setAnalyticsConsent(consent)` - Enable/disable tracking
+- `hasGivenAnalyticsConsent()` - Check consent status
+- Consent stored in localStorage
 
-**Endpoints**:
-- `POST /api/email/unsubscribe` - Requires valid token (401 without)
-- `GET /api/email/unsubscribe-token?email=...` - Admin testing endpoint
+**Environment Variable**: `VITE_GA_MEASUREMENT_ID` (optional)
 
-**Environment Variable**: `UNSUBSCRIBE_SECRET` (falls back to `ADMIN_JWT_SECRET`)
+### 5. i18n Translation Extensions (commit f20abb7)
 
-### 3. ESLint Warnings Fixed (commits 858b0cd, 60bd2ba)
+**Feature**: Added new translation sections for policy UI.
 
-| Fix | Location |
-|-----|----------|
-| `You've` → `You&apos;ve` | TryAnalysis.tsx:503 |
-| `We'll` → `We&apos;ll` | TryAnalysis.tsx:788 |
-| `you'll` → `you&apos;ll` | Hero.tsx:342 |
-| `ZodError.errors` → `.issues` | email.ts (3 occurrences) |
-| Type assertion for Resend | email-service.ts:103 |
+**New Sections**:
+- `insights` - AI insights display
+- `evaluation` - Policy evaluation scores
+- `comparison` - Policy comparison UI
+- `insurance` - Insurance type names
+- `coverageCategories` - Coverage category labels
 
-**Result**: Reduced from 51 to 45 warnings.
+**File Changed**: `src/lib/i18n/translations.ts`
 
-### 4. Migration Files Renamed (commit 6b72aed)
+### 6. DecisionContextViewer Enabled (commit f20abb7)
 
-Resolved naming conflicts by adding sequential suffixes:
-```
-005_admin_schema.sql    → 005a_admin_schema.sql
-005_admin_tables.sql    → 005b_admin_tables.sql
-007_document_*.sql      → 007a_, 007b_, 007c_
-008_admin_*.sql         → 008a_, 008b_
-```
+**Feature**: Admin Document Journey viewer now shows detailed decision context for skipped stages.
 
-### 5. Debug Flags Disabled (commit 6b72aed)
+**Information Displayed**:
+- Assessment performed
+- Decision threshold
+- Actual measured values
+- Decision logic explanation
+- What would trigger the stage
 
-| File | Flag |
-|------|------|
-| `language-detector.ts` | `DEBUG_LANGUAGE_DETECTION = false` |
-| `policy-classifier.ts` | `DEBUG_POLICY_CLASSIFICATION = false` |
-| `ocr-decision-engine.ts` | `DEBUG_CONFIDENCE_CALCULATION = false` |
+**File Changed**: `src/components/admin/DocumentJourneyViewer.tsx`
 
-### 6. README.md Updated (commit 36097dc)
+### 7. English Translations for Kasko Knowledge (commit f20abb7)
 
-Changed from "Phase 1: Frontend-only" to accurate full-stack documentation including:
-- Express backend, Supabase, AI integration
-- 5800+ tests, PWA support, email notifications
-- Railway deployment instructions
-- Complete environment variable documentation
+**Feature**: Added `questionEn` and `detailsEn` fields to Turkish kasko knowledge patterns.
+
+**Purpose**: Support bilingual UI and English-language policy analysis.
+
+**File Changed**: `src/lib/knowledge/kasko-knowledge.ts`
+
+### 8. Railway Build Configuration (commit f20abb7)
+
+**Change**: Added explicit `installCommand: "npm ci"` to railway.json.
+
+**File Changed**: `railway.json`
+
+### 9. Service Worker Cache v11 (commit f20abb7)
+
+**Change**: Bumped cache version from v9 to v11.
+
+**File Changed**: `public/sw.js`
+
+### 10. Bundle Analysis Ignored (commit f20abb7)
+
+**Change**: Added `stats.html` to .gitignore.
+
+**File Changed**: `.gitignore`
 
 ---
 
 ## Commits This Session
 
 ```
-92a6b0c Add final commit to SESSION_HANDOFF.md documentation
-33b52fe Update documentation for session handoff
-9887e8d Remove simulated network error from UploadWidget
-858b0cd Fix remaining unescaped entity in TryAnalysis.tsx
-60bd2ba Implement secure email unsubscribe tokens and fix ESLint warnings
-36097dc Update README.md to reflect current full-stack state
-6b72aed Rename migrations and disable debug flags for production
+f20abb7 Re-implement lost changes from archived session
 ```
 
 ---
@@ -122,16 +165,19 @@ Changed from "Phase 1: Frontend-only" to accurate full-stack documentation inclu
 
 | File | Changes |
 |------|---------|
-| `src/components/landing/UploadWidget.tsx` | Removed 5% simulated error |
-| `src/components/TryAnalysis.tsx` | Fixed unescaped entities |
-| `src/components/landing/Hero.tsx` | Fixed unescaped entity |
-| `server/routes/email.ts` | Added token generation/verification |
-| `server/services/email-service.ts` | Added crypto import, unsubscribe URLs in emails |
-| `README.md` | Complete rewrite for current state |
-| `supabase/migrations/*.sql` | Renamed with a,b,c suffixes |
-| `src/lib/ocr-decision/*.ts` | Debug flags set to false |
-| `CLAUDE.md` | Added known issues #35-40 |
-| `SESSION_HANDOFF.md` | Complete rewrite for session handoff |
+| `src/lib/ai/proxy-utils.ts` | **NEW** - Lightweight proxy utilities |
+| `src/lib/ai/config.ts` | Dynamic SDK imports with caching |
+| `src/lib/ai/index.ts` | Split exports between proxy-utils and config |
+| `src/lib/analytics.ts` | GA4 integration with KVKK consent |
+| `src/lib/i18n/translations.ts` | New translation sections |
+| `src/lib/knowledge/kasko-knowledge.ts` | English translations |
+| `src/components/admin/DocumentJourneyViewer.tsx` | DecisionContextViewer enabled |
+| `src/hooks/useBackendHealth.ts` | Import from proxy-utils |
+| `server/routes/ai.ts` | ANTHROPIC_SCHEMA_PROMPT constant |
+| `railway.json` | Added installCommand |
+| `public/sw.js` | Cache version v11 |
+| `.gitignore` | Added stats.html |
+| `CLAUDE.md` | Added Known Issues #41-50 |
 
 ---
 
@@ -142,26 +188,6 @@ Changed from "Phase 1: Frontend-only" to accurate full-stack documentation inclu
 | Google Vision "Service error" | Low | Open | Falls back to pdf.js + OpenAI |
 | Anthropic billing issue | Medium | Open | Falls back to OpenAI |
 | 45 no-non-null-assertion warnings | Low | Deferred | Intentional in guarded paths |
-
-### Google Vision OCR Status
-
-From `/api/ai/diagnose`:
-```json
-{
-  "google": {
-    "configured": true,
-    "valid": false,
-    "error": "Service error"
-  }
-}
-```
-
-**Impact**: Not blocking - system uses pdf.js → OpenAI/Anthropic fallback.
-
-**Possible causes**:
-- Cloud Vision API not enabled on GCP project
-- `GOOGLE_CLOUD_API_KEY` lacks Vision permissions
-- Billing not enabled
 
 ---
 
@@ -203,6 +229,7 @@ VITE_SUPABASE_ANON_KEY=eyJ...
 
 ### Optional
 ```bash
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX # For GA4 analytics
 UNSUBSCRIBE_SECRET=xxx              # Falls back to ADMIN_JWT_SECRET
 RESEND_API_KEY=re_xxx               # For email notifications
 ```
@@ -214,17 +241,17 @@ RESEND_API_KEY=re_xxx               # For email notifications
 ## Next Steps (Priority Order)
 
 ### Immediate
-1. **Test anonymous upload flow** - Verify simulated error fix works
-2. **Check Google Cloud Console** - Enable Vision API or fix credentials
+1. **Deploy to Railway** - Push changes and verify deployment
+2. **Test bundle size** - Run `npm run build:analyze` to verify improvements
 
 ### Short Term
 1. **Top up Anthropic credits** - Restore faster extraction
-2. **Test email unsubscribe flow** - Verify tokens work end-to-end
-3. **Run full E2E test** - See `docs/LAUNCH_CHECKLIST.md`
+2. **Test GA4 analytics** - Verify consent flow works
+3. **Check DecisionContextViewer** - Test with real document processing
 
 ### Feature Work
-1. **Add unsubscribe page** - Frontend for `/unsubscribe?email=&token=`
-2. **Email preference management** - Let users toggle notification types
+1. **Consent banner UI** - Create user-facing analytics consent dialog
+2. **i18n integration** - Wire up new translation sections to components
 3. **Multi-policy free trial** - Allow 3 policies per session
 
 ---
@@ -233,13 +260,11 @@ RESEND_API_KEY=re_xxx               # For email notifications
 
 | Gotcha | Solution |
 |--------|----------|
-| 5% random upload failure | Fixed - removed simulated error |
-| Email unsubscribe without token | Now returns 401 with helpful message |
-| Migration file conflicts | Use a,b,c suffixes (005a, 005b, etc.) |
-| Debug logs in production | Set DEBUG_* flags to false |
-| `VITE_*` vars not updating | Need rebuild, not restart |
-| Google Vision not working | Check Vision API enabled, key permissions |
-| ZodError.errors undefined | Use `.issues` instead |
+| Claude returns text instead of JSON | Use ANTHROPIC_SCHEMA_PROMPT with full schema in prompt |
+| Large initial bundle | Import from proxy-utils instead of config for lightweight checks |
+| SDK import errors | Use dynamic imports: `await import('openai')` |
+| Stale bundle after deploy | Bump sw.js cache version |
+| Analytics not tracking | Check KVKK consent given via `hasGivenAnalyticsConsent()` |
 
 ---
 
@@ -252,25 +277,27 @@ npm run lint  # Should show 0 errors, 45 warnings
 # Check TypeScript
 npm run typecheck  # Should pass
 
-# Run all tests
-npm test -- --run
+# Run specific tests
+npm test -- --run src/lib/ai/proxy-utils.test.ts
+npm test -- --run src/hooks/useBackendHealth.test.ts
 
 # Full validation
 npm run validate
 
-# Check production health
-curl -s "https://insurai-production.up.railway.app/api/health" | jq .
+# Bundle analysis
+npm run build:analyze
 ```
 
 ---
 
 ## Previous Session Context
 
-**Earlier Today (Jan 30, Morning)**:
-- Fixed file handoff from landing page to TryAnalysis
-- Added 90-second timeout for stuck extractions
-- Added progress updates every 10 seconds
-- Created 32 new tests
+**January 30, 2026**:
+- Session-based free trial for anonymous users
+- 90-second extraction timeout
+- Secure email unsubscribe tokens
+- Migration files renamed with sequential suffixes
+- Debug flags disabled in OCR decision engine
 
 **January 29, 2026**:
 - Fixed all 153 ESLint errors (reduced to 0)
@@ -282,7 +309,7 @@ curl -s "https://insurai-production.up.railway.app/api/health" | jq .
 
 ---
 
-**Last Updated**: January 30, 2026 (17:55 UTC)
-**Branch**: `claude/review-handoff-xynEP`
+**Last Updated**: February 4, 2026
+**Branch**: `claude/verify-todo-merge-8qpiq`
 **ESLint Status**: 0 errors, 45 warnings
-**Next Session Focus**: Test anonymous upload, fix Google Vision, test email flow
+**Next Session Focus**: Deploy, test bundle size, verify GA4 consent flow

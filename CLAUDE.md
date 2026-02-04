@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, **session-based free trial for anonymous users with 90s extraction timeout**
-- **Production Readiness**: ~9.5/10 (5800+ tests, 0 lint errors, 48 warnings, PWA support, server hardening)
-- **Last Updated**: January 30, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, **bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent**
+- **Production Readiness**: ~9.5/10 (5800+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
+- **Last Updated**: February 4, 2026
 
 ---
 
@@ -93,14 +93,15 @@ insurai/
 | File | Purpose |
 |------|---------|
 | `src/lib/ai/policy-extractor.ts` | Main AI extraction orchestrator |
-| `src/lib/ai/config.ts` | AI provider configuration & proxy settings |
+| `src/lib/ai/config.ts` | AI provider configuration with dynamic SDK imports |
+| `src/lib/ai/proxy-utils.ts` | **NEW** Lightweight proxy utilities (no SDK imports) |
 | `src/lib/ai/pdf-parser.ts` | PDF text extraction with pdf.js |
 | `src/lib/ai/prompts.ts` | AI prompts for extraction and OCR correction |
 | `src/lib/ai/text-processor.ts` | Combined document processing pipeline |
 | `src/lib/ai/document-normalizer.ts` | Clean-room deterministic document normalizer |
 | `src/lib/ai/document-ocr.ts` | Document AI OCR with chunked extraction |
-| `src/lib/ai/pdf-splitter.ts` | **NEW** PDF splitting for >15 page documents |
-| `server/routes/ai.ts` | AI proxy routes (extraction, chat, OCR) |
+| `src/lib/ai/pdf-splitter.ts` | PDF splitting for >15 page documents |
+| `server/routes/ai.ts` | AI proxy routes with ANTHROPIC_SCHEMA_PROMPT |
 
 ### OCR Cleanup Pipeline (Added Jan 2026)
 | File | Purpose |
@@ -2152,6 +2153,207 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `GOOGLE_CLOUD_API_KEY` doesn't have Vision API permissions
   - Billing not enabled on project
 - **Fallback Flow**: Digital PDF → pdf.js → OpenAI/Anthropic → Success ✅
+
+### 41. ANTHROPIC_SCHEMA_PROMPT for Reliable Claude JSON Extraction (Added Feb 4, 2026)
+- **Problem**: Claude doesn't support OpenAI's `response_format: { type: 'json_object' }` parameter
+- **Root Cause**: Anthropic API has no equivalent structured output mode
+- **Solution**: Added `ANTHROPIC_SCHEMA_PROMPT` constant in `server/routes/ai.ts` that includes full JSON schema in prompt text
+- **Implementation**:
+  ```typescript
+  const ANTHROPIC_SCHEMA_PROMPT = `
+  You are an expert insurance policy analyzer. Extract all policy information and return it as valid JSON.
+
+  ## CRITICAL: Output Format
+  You MUST respond with ONLY valid JSON matching this exact schema. Do not include any text before or after the JSON.
+
+  {
+    "policyNumber": string | null,
+    "provider": string | null,
+    "policyType": "kasko" | "traffic" | "home" | "health" | "life" | "dask" | "business" | "nakliyat" | null,
+    // ... full schema
+    "confidence": { "overall": number, ... }
+  }
+
+  ## Important Notes:
+  - Dates must be in YYYY-MM-DD format
+  - Confidence scores must be between 0 and 1
+  - For Turkish policies, include both English (name) and Turkish (nameTr) coverage names
+
+  Now analyze the following policy document:
+  `
+  ```
+- **Endpoints Updated**: `/api/ai/extract/anthropic`, `/api/ai/extract` (unified endpoint)
+- **File Changed**: `server/routes/ai.ts`
+
+### 42. proxy-utils.ts for Bundle Optimization (Added Feb 4, 2026)
+- **Problem**: Components that only needed proxy URL/status checks were importing the full AI SDK (~400KB)
+- **Root Cause**: `isAIConfigured()` and `getProxyUrl()` lived in `config.ts` which imports OpenAI and Anthropic SDKs
+- **Solution**: Created `src/lib/ai/proxy-utils.ts` with lightweight versions of these utilities
+- **New File** (`src/lib/ai/proxy-utils.ts`):
+  ```typescript
+  export type AIProvider = 'openai' | 'anthropic'
+  export function isProxyConfigured(): boolean { return env.hasProxy }
+  export function getProxyUrl(): string | null { return env.proxyUrl }
+  export function isAIConfigured(): boolean { /* checks proxy or localStorage keys */ }
+  export function isOCRConfigured(): boolean { return isProxyConfigured() }
+  export async function checkProxyProviders(): Promise<{openai: boolean; anthropic: boolean; google: boolean}>
+  ```
+- **Updated Exports** (`src/lib/ai/index.ts`):
+  ```typescript
+  // Lightweight utilities from proxy-utils (no SDK imports)
+  export { isAIConfigured, isOCRConfigured, isProxyConfigured, getProxyUrl, checkProxyProviders, type AIProvider } from './proxy-utils'
+  // Heavy utilities that need SDK imports
+  export { isProviderConfigured, getConfiguredProviders, AI_CONFIG } from './config'
+  ```
+- **Files Changed**:
+  - `src/lib/ai/proxy-utils.ts` - **NEW** (89 lines)
+  - `src/lib/ai/index.ts` - Split exports
+  - `src/hooks/useBackendHealth.ts` - Import from proxy-utils
+
+### 43. Dynamic SDK Imports in config.ts (Added Feb 4, 2026)
+- **Problem**: AI SDKs were imported at module load time, increasing initial bundle size
+- **Solution**: Changed to dynamic imports with caching for lazy loading
+- **Implementation**:
+  ```typescript
+  // Lazy-loaded SDK instances (only imported when needed)
+  let cachedOpenAI: InstanceType<typeof import('openai').default> | null = null
+  let cachedAnthropic: InstanceType<typeof import('@anthropic-ai/sdk').default> | null = null
+
+  export async function getOpenAIClient(): Promise<...> {
+    if (cachedOpenAI) return cachedOpenAI
+    // Dynamic import to avoid bundling when not needed
+    const { default: OpenAI } = await import('openai')
+    cachedOpenAI = new OpenAI({ apiKey, dangerouslyAllowBrowser: true })
+    return cachedOpenAI
+  }
+
+  export async function getAnthropicClient(): Promise<...> {
+    // Similar pattern with dynamic import
+  }
+  ```
+- **Benefits**:
+  - SDKs only loaded when AI extraction actually needed
+  - Reduced initial bundle size
+  - Cached instances prevent repeated imports
+- **File Changed**: `src/lib/ai/config.ts`
+
+### 44. GA4 Analytics with KVKK Consent Management (Added Feb 4, 2026)
+- **Feature**: Google Analytics 4 integration with Turkish KVKK/GDPR consent compliance
+- **Implementation** (`src/lib/analytics.ts`):
+  ```typescript
+  declare global {
+    interface Window {
+      gtag?: (...args: unknown[]) => void
+      dataLayer?: unknown[]
+    }
+  }
+
+  interface AnalyticsConfig {
+    enabled: boolean
+    debug: boolean
+    gaMeasurementId: string | null
+    consentGiven: boolean
+  }
+
+  function initGA4(): void {
+    if (!config.gaMeasurementId || typeof window === 'undefined') return
+    if (window.gtag) return // Already initialized
+    // Load gtag.js script and initialize
+  }
+
+  export function setAnalyticsConsent(consent: boolean): void {
+    config.consentGiven = consent
+    if (consent) initGA4()
+  }
+
+  export function hasGivenAnalyticsConsent(): boolean { return config.consentGiven }
+  ```
+- **Consent Flow**:
+  1. User sees consent banner on first visit
+  2. User accepts/rejects analytics
+  3. If accepted, GA4 script loads and tracking begins
+  4. Consent stored in localStorage for persistence
+- **Environment Variable**: `VITE_GA_MEASUREMENT_ID` (optional)
+- **File Changed**: `src/lib/analytics.ts`
+
+### 45. i18n Translation Extensions for Policy UI (Added Feb 4, 2026)
+- **Feature**: Added comprehensive translation sections for policy analysis UI
+- **New Sections** in `TranslationDictionary`:
+  ```typescript
+  insights: { title: string; aiInsights: string; showMore: string; showLess: string; noInsights: string }
+  evaluation: { title: string; overallScore: string; grade: string; premium: string; coverage: string; ... }
+  comparison: { title: string; compareWith: string; differences: string; noPolicies: string; ... }
+  insurance: { kasko: string; traffic: string; home: string; health: string; life: string; dask: string; ... }
+  coverageCategories: { main: string; liability: string; supplementary: string; assistance: string; legal: string; other: string }
+  ```
+- **Languages**: Both Turkish (tr) and English (en) translations provided
+- **File Changed**: `src/lib/i18n/translations.ts`
+
+### 46. DecisionContextViewer Enabled in Document Journey (Added Feb 4, 2026)
+- **Feature**: Admin Document Journey viewer now shows detailed decision context for skipped pipeline stages
+- **Problem**: DecisionContextViewer component was implemented but commented out
+- **Solution**: Enabled the component and added `formatValue()` helper for proper value display
+- **Implementation**:
+  ```typescript
+  function formatValue(value: unknown): string {
+    if (value === null || value === undefined) return 'N/A'
+    if (typeof value === 'string') return value
+    if (typeof value === 'number') return String(value)
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    if (typeof value === 'object') return JSON.stringify(value)
+    return String(value)
+  }
+  ```
+- **Information Displayed**:
+  - Assessment performed (what was checked)
+  - Decision threshold (e.g., `chars_per_page < 200`)
+  - Actual measured values (formatted table)
+  - Decision logic explanation
+  - What would trigger the stage
+- **File Changed**: `src/components/admin/DocumentJourneyViewer.tsx`
+
+### 47. English Translations for Kasko Knowledge Base (Added Feb 4, 2026)
+- **Feature**: Added `questionEn` and `detailsEn` fields to Turkish kasko knowledge patterns
+- **Purpose**: Support bilingual UI and future English-language policy analysis
+- **File Changed**: `src/lib/knowledge/kasko-knowledge.ts`
+- **Pattern**:
+  ```typescript
+  {
+    id: 'deprem_teminati',
+    question: 'Deprem hasarları teminat kapsamında mı?',
+    questionEn: 'Is earthquake damage covered?',
+    details: '...',
+    detailsEn: '...',
+    category: 'coverage'
+  }
+  ```
+
+### 48. Railway Build Configuration Update (Added Feb 4, 2026)
+- **Change**: Added explicit `installCommand` to Railway configuration
+- **Purpose**: Ensure consistent dependency installation on Railway deployments
+- **File Changed**: `railway.json`
+  ```json
+  {
+    "build": {
+      "builder": "NIXPACKS",
+      "installCommand": "npm ci",
+      "buildCommand": "npm run build && npm run build:server"
+    }
+  }
+  ```
+- **Note**: `npm ci` ensures clean install from package-lock.json
+
+### 49. Service Worker Cache Version v11 (Added Feb 4, 2026)
+- **Change**: Bumped service worker cache version from v9 to v11
+- **Purpose**: Force cache invalidation after new deployment
+- **File Changed**: `public/sw.js`
+- **Note**: Users may need hard refresh (Ctrl+Shift+R) or clear site data if seeing stale content
+
+### 50. Bundle Analysis Output Ignored (Added Feb 4, 2026)
+- **Change**: Added `stats.html` to `.gitignore`
+- **Purpose**: Prevent bundle analysis report from being committed
+- **File Changed**: `.gitignore`
+- **Usage**: Run `npm run build:analyze` to generate stats.html for bundle inspection
 
 ---
 
