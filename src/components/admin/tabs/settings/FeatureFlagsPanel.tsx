@@ -9,6 +9,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { FeatureFlagSkeleton } from '@/components/ui/loading'
 import {
   Sliders,
   Save,
@@ -20,6 +21,7 @@ import {
   AlertCircle,
   Info,
   Percent,
+  Flag,
 } from 'lucide-react'
 
 interface FeatureFlag {
@@ -150,22 +152,36 @@ export function FeatureFlagsPanel() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading feature flags...</div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold flex items-center gap-2">
+              <Sliders className="h-5 w-5" />
+              Feature Flags
+            </h2>
+            <p className="text-sm text-gray-500">
+              Control feature availability and manage gradual rollouts
+            </p>
+          </div>
+        </div>
+        <FeatureFlagSkeleton count={3} />
+      </div>
     )
   }
 
   if (error && flags.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-red-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>{error}</p>
-            <Button onClick={fetchFlags} className="mt-2">
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+              <AlertCircle className="h-8 w-8 text-red-500" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">Failed to Load Feature Flags</h3>
+              <p className="text-gray-500 text-sm max-w-sm">{error}</p>
+            </div>
+            <Button onClick={fetchFlags}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Retry
             </Button>
@@ -247,16 +263,19 @@ export function FeatureFlagsPanel() {
                 <button
                   onClick={() => toggleFlag(flag)}
                   disabled={isSaving}
-                  className={`p-2 rounded-lg transition-colors ${
+                  className={`p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
                     flag.enabled
                       ? 'text-green-600 hover:bg-green-50'
                       : 'text-gray-400 hover:bg-gray-50'
                   }`}
+                  role="switch"
+                  aria-checked={flag.enabled}
+                  aria-label={`Toggle ${flag.key.replace(/_/g, ' ')}: ${flag.enabled ? 'Enabled' : 'Disabled'}`}
                 >
                   {flag.enabled ? (
-                    <ToggleRight className="h-10 w-10" />
+                    <ToggleRight className="h-8 w-8" />
                   ) : (
-                    <ToggleLeft className="h-10 w-10" />
+                    <ToggleLeft className="h-8 w-8" />
                   )}
                 </button>
               </div>
@@ -307,7 +326,12 @@ export function FeatureFlagsPanel() {
                         step="5"
                         value={editRollout}
                         onChange={(e) => setEditRollout(Number(e.target.value))}
-                        className="flex-1"
+                        className="flex-1 accent-blue-600"
+                        aria-label={`Rollout percentage for ${flag.key.replace(/_/g, ' ')}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={editRollout}
+                        aria-valuetext={`${editRollout}%`}
                       />
                       <Input
                         type="number"
@@ -316,6 +340,7 @@ export function FeatureFlagsPanel() {
                         value={editRollout}
                         onChange={(e) => setEditRollout(Number(e.target.value))}
                         className="w-20"
+                        aria-label={`Rollout percentage input`}
                       />
                       <span className="text-sm text-gray-500">%</span>
                     </div>
@@ -350,11 +375,20 @@ export function FeatureFlagsPanel() {
       {/* No flags message */}
       {flags.length === 0 && (
         <Card>
-          <CardContent className="py-8">
-            <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-              <Sliders className="h-8 w-8" />
-              <p>No feature flags configured yet.</p>
-              <p className="text-sm">Run the database migration to add default feature flags.</p>
+          <CardContent className="py-12">
+            <div className="text-center flex flex-col items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+                <Flag className="h-8 w-8 text-gray-400" />
+              </div>
+              <div className="space-y-2">
+                <h3 className="font-semibold text-gray-900">No Feature Flags Configured</h3>
+                <p className="text-gray-500 text-sm max-w-sm">
+                  Run the database migration to add default feature flags for gradual rollouts.
+                </p>
+              </div>
+              <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+                npx supabase migration up
+              </code>
             </div>
           </CardContent>
         </Card>

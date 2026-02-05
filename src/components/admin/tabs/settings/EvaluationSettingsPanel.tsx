@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { SettingsSkeleton } from '@/components/ui/loading'
 import {
   Save,
   Scale,
@@ -15,6 +16,7 @@ import {
   Target,
   AlertCircle,
   Info,
+  BarChart3,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -148,22 +150,26 @@ export function EvaluationSettingsPanel({
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading evaluation settings...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SettingsSkeleton groups={3} itemsPerGroup={4} />
   }
 
   if (settings.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>No evaluation settings found. Run the database migration to seed default values.</p>
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <BarChart3 className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">No Evaluation Settings Found</h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                Run the database migration to seed default scoring weights and grade thresholds.
+              </p>
+            </div>
+            <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+              npx supabase migration up
+            </code>
           </div>
         </CardContent>
       </Card>
@@ -249,7 +255,12 @@ export function EvaluationSettingsPanel({
                         max="100"
                         value={weight}
                         onChange={(e) => handleWeightChange(key, Number(e.target.value))}
-                        className="flex-1"
+                        className="flex-1 accent-blue-600"
+                        aria-label={`${getWeightLabel(key)} weight slider`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={weight}
+                        aria-valuetext={`${weight}%`}
                       />
                       <Input
                         type="number"
@@ -258,6 +269,7 @@ export function EvaluationSettingsPanel({
                         value={weight}
                         onChange={(e) => handleWeightChange(key, Number(e.target.value))}
                         className="w-20"
+                        aria-label={`${getWeightLabel(key)} weight input`}
                       />
                     </>
                   ) : (

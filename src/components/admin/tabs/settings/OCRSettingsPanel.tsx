@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SettingsSkeleton } from '@/components/ui/loading'
 import {
   Eye,
   Save,
@@ -15,8 +16,8 @@ import {
   CheckCircle,
   AlertTriangle,
   XCircle,
-  AlertCircle,
   Info,
+  ScanText,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -126,6 +127,7 @@ export function OCRSettingsPanel({
     const isEditing = editingKey === setting.key
     const value = isEditing ? Number(editValue) : Number(setting.value)
     const indicator = getConfidenceIndicator(value)
+    const keyLabel = setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
     if (isEditing) {
       return (
@@ -138,7 +140,12 @@ export function OCRSettingsPanel({
               step="0.05"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="flex-1"
+              className="flex-1 accent-blue-600"
+              aria-label={`${keyLabel} slider`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(Number(editValue) * 100)}
+              aria-valuetext={`${(Number(editValue) * 100).toFixed(0)}%`}
             />
             <span className="font-mono text-sm w-16 text-right">
               {(Number(editValue) * 100).toFixed(0)}%
@@ -253,22 +260,26 @@ export function OCRSettingsPanel({
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading OCR settings...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SettingsSkeleton groups={5} itemsPerGroup={3} />
   }
 
   if (settings.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>No OCR settings found. Run the database migration to seed default values.</p>
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <ScanText className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">No OCR Settings Found</h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                Run the database migration to seed default OCR configuration values.
+              </p>
+            </div>
+            <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+              npx supabase migration up
+            </code>
           </div>
         </CardContent>
       </Card>

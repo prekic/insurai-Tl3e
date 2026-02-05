@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { SettingsSkeleton } from '@/components/ui/loading'
 import {
   Save,
   Sparkles,
@@ -16,7 +17,7 @@ import {
   Zap,
   ToggleLeft,
   ToggleRight,
-  AlertCircle,
+  FileQuestion,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -103,18 +104,22 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
 
     // Boolean toggle
     if (setting.valueType === 'boolean') {
+      const keyLabel = setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
       return (
         <button
           onClick={() => handleToggle(setting)}
           disabled={isSaving}
-          className={`p-1 rounded transition-colors ${
+          className={`p-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
             setting.value ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'
           }`}
+          role="switch"
+          aria-checked={setting.value as boolean}
+          aria-label={`${keyLabel}: ${setting.value ? 'Enabled' : 'Disabled'}`}
         >
           {setting.value ? (
-            <ToggleRight className="h-8 w-8" />
+            <ToggleRight className="h-7 w-7" />
           ) : (
-            <ToggleLeft className="h-8 w-8" />
+            <ToggleLeft className="h-7 w-7" />
           )}
         </button>
       )
@@ -282,22 +287,26 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading AI settings...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SettingsSkeleton groups={4} itemsPerGroup={3} />
   }
 
   if (settings.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>No AI settings found. Run the database migration to seed default values.</p>
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <FileQuestion className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">No AI Settings Found</h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                Run the database migration to seed default AI configuration values.
+              </p>
+            </div>
+            <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+              npx supabase migration up
+            </code>
           </div>
         </CardContent>
       </Card>
