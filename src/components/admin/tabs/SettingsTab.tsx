@@ -16,6 +16,7 @@ import {
   X,
   AlertCircle,
   Sliders,
+  History,
 } from 'lucide-react'
 
 // Sub-panels
@@ -24,8 +25,9 @@ import { EvaluationSettingsPanel } from './settings/EvaluationSettingsPanel'
 import { RateLimitsPanel } from './settings/RateLimitsPanel'
 import { OCRSettingsPanel } from './settings/OCRSettingsPanel'
 import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
+import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -64,6 +66,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Feature Flags',
     description: 'Enable or disable features and manage rollouts',
     icon: <Sliders className="h-5 w-5" />,
+  },
+  {
+    id: 'history',
+    label: 'History',
+    description: 'View audit log of all settings changes',
+    icon: <History className="h-5 w-5" />,
   },
 ]
 
@@ -197,6 +205,8 @@ export function SettingsTab() {
         )
       case 'feature_flags':
         return <FeatureFlagsPanel />
+      case 'history':
+        return <SettingsHistoryPanel />
       default:
         return null
     }

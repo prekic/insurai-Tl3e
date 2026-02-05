@@ -2,7 +2,7 @@
  * Tests for OCRDecisionEngine initialization with database config
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import {
   OCRDecisionEngine,
   getOCRDecisionEngine,

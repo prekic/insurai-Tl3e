@@ -472,6 +472,105 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
 })
 
 /**
+ * GET /api/admin/settings/history
+ * Get audit history for all settings (paginated)
+ */
+router.get('/history', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+  const offset = parseInt(req.query.offset as string) || 0
+  const category = req.query.category as string | undefined
+
+  try {
+    let query = supabase
+      .from('settings_audit_log')
+      .select(
+        `
+        id,
+        setting_id,
+        category,
+        key,
+        previous_value,
+        new_value,
+        changed_by,
+        changed_at,
+        reason,
+        ip_address,
+        user_agent
+      `,
+        { count: 'exact' }
+      )
+      .order('changed_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (category) {
+      query = query.eq('category', category)
+    }
+
+    const { data, error, count } = await query
+
+    if (error) {
+      console.error('[Settings API] Error fetching history:', error)
+      return res.status(500).json({ success: false, error: 'Failed to fetch history' })
+    }
+
+    // Try to get admin user emails for the changed_by UUIDs
+    const changedByIds = [...new Set((data || []).map((entry) => entry.changed_by).filter(Boolean))]
+    let adminUsers: Record<string, string> = {}
+
+    if (changedByIds.length > 0) {
+      const { data: users } = await supabase
+        .from('admin_users')
+        .select('id, email')
+        .in('id', changedByIds)
+
+      if (users) {
+        adminUsers = users.reduce(
+          (acc, user) => {
+            acc[user.id] = user.email
+            return acc
+          },
+          {} as Record<string, string>
+        )
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        history: (data || []).map((entry) => ({
+          id: entry.id,
+          settingId: entry.setting_id,
+          category: entry.category,
+          key: entry.key,
+          previousValue: entry.previous_value,
+          newValue: entry.new_value,
+          changedBy: entry.changed_by,
+          changedByEmail: adminUsers[entry.changed_by] || 'Unknown',
+          changedAt: entry.changed_at,
+          reason: entry.reason,
+          ipAddress: entry.ip_address,
+          userAgent: entry.user_agent,
+        })),
+        pagination: {
+          total: count || 0,
+          limit,
+          offset,
+          hasMore: (count || 0) > offset + limit,
+        },
+      },
+    })
+  } catch (error) {
+    console.error('[Settings API] Exception:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
  * GET /api/admin/settings/:category/:key/history
  * Get audit history for a specific setting
  */

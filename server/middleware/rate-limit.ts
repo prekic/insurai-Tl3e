@@ -396,7 +396,7 @@ export async function refreshRateLimitConfig(): Promise<void> {
     cachedConfig = await getRateLimitsConfig()
     lastConfigFetch = Date.now()
     console.log('[Rate Limit] Configuration refreshed from database')
-  } catch (error) {
+  } catch (_error) {
     console.warn('[Rate Limit] Failed to refresh config from database, using cached/defaults')
   }
 }

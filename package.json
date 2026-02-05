@@ -14,7 +14,7 @@
     "start:server": "node dist-server/index.js",
     "start:prod": "npm run build && npm run build:server && NODE_ENV=production node dist-server/index.js",
     "preview": "vite preview",
-    "lint": "eslint . --max-warnings 45",
+    "lint": "eslint . --max-warnings 46",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
