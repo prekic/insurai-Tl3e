@@ -106,6 +106,7 @@ Added 49 new tests for database config integration:
 ## Commits This Session
 
 ```
+7a2c98d Update project documentation for database config integration
 0cc16f4 Add comprehensive tests for database config integration
 e7acaf7 Connect admin settings to application functionality
 ```
@@ -122,7 +123,8 @@ e7acaf7 Connect admin settings to application functionality
 | `src/lib/admin/config-manager.ts` | Enabled use_db_config flag |
 | `server/routes/ai.ts` | Fixed unused AIConfig import |
 | `supabase/migrations/013_seed_configuration_defaults.sql` | Set use_db_config enabled |
-| `CLAUDE.md` | Added Known Issues entry #56 |
+| `CLAUDE.md` | Added Known Issues entry #56, updated test count to 6085+ |
+| `SESSION_HANDOFF.md` | Updated with current session status and next steps |
 
 ---
 
@@ -235,6 +237,30 @@ RESEND_API_KEY=re_xxx               # For email notifications
 ```
 
 **Note**: `VITE_API_PROXY_URL` is auto-detected in production via `window.location.origin`
+
+### API Proxy Auto-Detection (`src/lib/env.ts`)
+```typescript
+// In production, if VITE_API_PROXY_URL not set, auto-detect:
+if (import.meta.env.PROD && typeof window !== 'undefined') {
+  return window.location.origin  // Same origin when co-hosted on Railway
+}
+```
+This means you do NOT need to set `VITE_API_PROXY_URL` for Railway deployments.
+
+### CSP Configuration for PDF.js Worker
+The server (`server/index.ts`) must allow these CDN domains:
+```typescript
+scriptSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com']
+workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://unpkg.com', ...]
+```
+
+### Supabase Auth Configuration
+Go to Supabase Dashboard → Authentication → URL Configuration and add:
+```
+https://insurai-production.up.railway.app/**
+```
+Required for OAuth and magic link flows.
 
 ---
 
