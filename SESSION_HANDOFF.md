@@ -94,6 +94,7 @@ This session completed the **Admin Dashboard Settings UI** work:
 ## Commits This Session
 
 ```
+3e37c5c Update project documentation for Settings History feature
 dee49a9 Add comprehensive tests for Settings History feature
 a9547f0 Add Settings History UI to Admin Dashboard
 b2a5c0a Add client-side validation for admin settings panels
@@ -240,6 +241,7 @@ The server must allow these CDN domains for PDF.js worker:
 ```typescript
 scriptSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com']
 workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
 ```
 
 ---
