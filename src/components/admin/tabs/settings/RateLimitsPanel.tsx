@@ -3,12 +3,17 @@
  * Configure API rate limiting and quota management
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
+import {
+  validateSetting,
+  getValidationDescription,
+  type ValidationResult,
+} from '@/lib/admin/settings-validation'
 import {
   Timer,
   Save,
@@ -19,6 +24,7 @@ import {
   Activity,
   Info,
   Gauge,
+  AlertCircle,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -66,6 +72,7 @@ export function RateLimitsPanel({
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editReason, setEditReason] = useState('')
+  const [validationError, setValidationError] = useState<ValidationResult | null>(null)
 
   const getSettingByKey = (key: string): SettingValue | undefined => {
     return settings.find((s) => s.key === key)
@@ -75,13 +82,33 @@ export function RateLimitsPanel({
     setEditingKey(setting.key)
     setEditValue(String(setting.value))
     setEditReason('')
+    setValidationError(null)
   }
+
+  // Validate on value change
+  useEffect(() => {
+    if (editingKey && editValue !== '') {
+      const result = validateSetting(editingKey, Number(editValue))
+      setValidationError(result.valid ? null : result)
+    }
+  }, [editingKey, editValue])
 
   const handleSave = async (setting: SettingValue) => {
     const value = Number(editValue)
+
+    // Final validation before save
+    const result = validateSetting(setting.key, value)
+    if (!result.valid) {
+      setValidationError(result)
+      return
+    }
+
     await onUpdate(setting.key, value, editReason || undefined)
     setEditingKey(null)
+    setValidationError(null)
   }
+
+  const canSave = !validationError && editValue !== ''
 
   const formatValue = (key: string, value: number) => {
     if (key.includes('window_ms')) {
@@ -103,6 +130,7 @@ export function RateLimitsPanel({
 
   const renderSettingInput = (setting: SettingValue) => {
     const isEditing = editingKey === setting.key
+    const validationHint = getValidationDescription(setting.key)
 
     if (isEditing) {
       return (
@@ -113,12 +141,22 @@ export function RateLimitsPanel({
               min="0"
               value={editValue}
               onChange={(e) => setEditValue(e.target.value)}
-              className="w-32"
+              className={`w-32 ${validationError ? 'border-red-300 focus:ring-red-500' : ''}`}
+              aria-invalid={!!validationError}
             />
             <span className="text-sm text-gray-500">
               {setting.key.includes('window_ms') ? 'ms' : 'requests'}
             </span>
           </div>
+          {validationError && (
+            <div className="flex items-center gap-1 text-red-600 text-xs">
+              <AlertCircle className="h-3 w-3" />
+              <span>{validationError.error}</span>
+            </div>
+          )}
+          {validationHint && !validationError && (
+            <div className="text-xs text-gray-500">{validationHint}</div>
+          )}
           <Input
             placeholder="Reason for change"
             value={editReason}
@@ -126,7 +164,7 @@ export function RateLimitsPanel({
             className="text-sm"
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving}>
+            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving || !canSave}>
               <Save className="h-4 w-4 mr-1" />
               Save
             </Button>

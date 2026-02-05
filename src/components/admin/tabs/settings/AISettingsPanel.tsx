@@ -3,12 +3,17 @@
  * Configure AI providers, models, temperatures, and extraction settings
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
+import {
+  validateSetting,
+  getValidationDescription,
+  type ValidationResult,
+} from '@/lib/admin/settings-validation'
 import {
   Save,
   Sparkles,
@@ -18,6 +23,7 @@ import {
   ToggleLeft,
   ToggleRight,
   FileQuestion,
+  AlertCircle,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -76,6 +82,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editReason, setEditReason] = useState<string>('')
+  const [validationError, setValidationError] = useState<ValidationResult | null>(null)
 
   const getSettingByKey = (key: string): SettingValue | undefined => {
     return settings.find((s) => s.key === key)
@@ -85,19 +92,43 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
     setEditingKey(setting.key)
     setEditValue(String(setting.value))
     setEditReason('')
+    setValidationError(null)
   }
 
+  // Validate on value change
+  useEffect(() => {
+    if (editingKey && editValue !== '') {
+      const setting = getSettingByKey(editingKey)
+      if (setting) {
+        const valueToValidate = setting.valueType === 'number' ? Number(editValue) : editValue
+        const result = validateSetting(editingKey, valueToValidate)
+        setValidationError(result.valid ? null : result)
+      }
+    }
+  }, [editingKey, editValue])
+
   const handleSave = async (setting: SettingValue) => {
+    // Final validation before save
     let value: unknown = editValue
     if (setting.valueType === 'number') value = Number(editValue)
     if (setting.valueType === 'boolean') value = editValue === 'true'
+
+    const result = validateSetting(setting.key, value)
+    if (!result.valid) {
+      setValidationError(result)
+      return
+    }
+
     await onUpdate(setting.key, value, editReason || undefined)
     setEditingKey(null)
+    setValidationError(null)
   }
 
   const handleToggle = async (setting: SettingValue) => {
     await onUpdate(setting.key, !setting.value, 'Toggled via admin panel')
   }
+
+  const canSave = !validationError && editValue !== ''
 
   const renderSettingInput = (setting: SettingValue) => {
     const isEditing = editingKey === setting.key
@@ -177,6 +208,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
 
     // Number input with slider for temperatures
     if (setting.key.includes('temperature')) {
+      const validationHint = getValidationDescription(setting.key)
       if (isEditing) {
         return (
           <div className="flex flex-col gap-2 w-64">
@@ -188,10 +220,23 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
                 step="0.1"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1"
+                className={`flex-1 accent-blue-600 ${validationError ? 'accent-red-500' : ''}`}
+                aria-label={`${setting.key} slider`}
+                aria-invalid={!!validationError}
               />
-              <span className="font-mono text-sm w-12">{editValue}</span>
+              <span className={`font-mono text-sm w-12 ${validationError ? 'text-red-600' : ''}`}>
+                {editValue}
+              </span>
             </div>
+            {validationError && (
+              <div className="flex items-center gap-1 text-red-600 text-xs">
+                <AlertCircle className="h-3 w-3" />
+                <span>{validationError.error}</span>
+              </div>
+            )}
+            {validationHint && !validationError && (
+              <div className="text-xs text-gray-500">{validationHint}</div>
+            )}
             <Input
               placeholder="Reason for change"
               value={editReason}
@@ -199,7 +244,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
               className="text-sm"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving}>
+              <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving || !canSave}>
                 <Save className="h-4 w-4 mr-1" />
                 Save
               </Button>
@@ -228,14 +273,25 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
 
     // Generic number/string input
     if (isEditing) {
+      const validationHint = getValidationDescription(setting.key)
       return (
         <div className="flex flex-col gap-2">
           <Input
             type={setting.valueType === 'number' ? 'number' : 'text'}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="w-40"
+            className={`w-40 ${validationError ? 'border-red-300 focus:ring-red-500' : ''}`}
+            aria-invalid={!!validationError}
           />
+          {validationError && (
+            <div className="flex items-center gap-1 text-red-600 text-xs">
+              <AlertCircle className="h-3 w-3" />
+              <span>{validationError.error}</span>
+            </div>
+          )}
+          {validationHint && !validationError && (
+            <div className="text-xs text-gray-500">{validationHint}</div>
+          )}
           <Input
             placeholder="Reason for change"
             value={editReason}
@@ -243,7 +299,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
             className="text-sm"
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving}>
+            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving || !canSave}>
               <Save className="h-4 w-4 mr-1" />
               Save
             </Button>

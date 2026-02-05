@@ -10,6 +10,10 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
 import {
+  validateGradeThresholds,
+  type ValidationResult,
+} from '@/lib/admin/settings-validation'
+import {
   Save,
   Scale,
   Trophy,
@@ -78,6 +82,19 @@ export function EvaluationSettingsPanel({
     const weights = editingWeights ? tempWeights : currentWeights
     return Object.values(weights).reduce((sum, w) => sum + w, 0)
   }, [editingWeights, tempWeights, currentWeights])
+
+  // Validate grade thresholds are in descending order
+  const gradeValidation = useMemo((): ValidationResult | null => {
+    if (!editingGrades) return null
+    return validateGradeThresholds({
+      grade_a_threshold: tempGrades.grade_a_threshold ?? 0,
+      grade_b_threshold: tempGrades.grade_b_threshold ?? 0,
+      grade_c_threshold: tempGrades.grade_c_threshold ?? 0,
+      grade_d_threshold: tempGrades.grade_d_threshold ?? 0,
+    })
+  }, [editingGrades, tempGrades])
+
+  const canSaveGrades = !gradeValidation || gradeValidation.valid
 
   const startEditingWeights = () => {
     setTempWeights({ ...currentWeights })
@@ -326,7 +343,7 @@ export function EvaluationSettingsPanel({
               <Button onClick={startEditingGrades}>Edit Thresholds</Button>
             ) : (
               <div className="flex gap-2">
-                <Button onClick={saveGrades} disabled={isSaving}>
+                <Button onClick={saveGrades} disabled={isSaving || !canSaveGrades}>
                   <Save className="h-4 w-4 mr-1" />
                   Save
                 </Button>
@@ -417,12 +434,22 @@ export function EvaluationSettingsPanel({
             </div>
           )}
 
+          {/* Validation error for grade thresholds */}
+          {editingGrades && gradeValidation && !gradeValidation.valid && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              <span>{gradeValidation.error}</span>
+            </div>
+          )}
+
           {/* Info box */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2 text-blue-700">
             <Info className="h-4 w-4 mt-0.5" />
             <div className="text-sm">
               <strong>How grades work:</strong> A policy with a score of 85 would receive grade B
               (if B threshold is 80 and A threshold is 90). Score below D threshold gets grade F.
+              <br />
+              <strong>Note:</strong> Thresholds must be in descending order (A {">"} B {">"} C {">"} D).
             </div>
           </div>
         </CardContent>
