@@ -101,7 +101,11 @@ export function SettingsTab() {
       const data: SettingsData = {}
       for (let i = 0; i < categories.length; i++) {
         const json = await responses[i].json()
-        if (json.success) {
+        if (json.success && json.data?.settings) {
+          // API returns { data: { category, settings: [...] } }
+          data[categories[i]] = json.data.settings
+        } else if (json.success && Array.isArray(json.data)) {
+          // Fallback if API returns array directly
           data[categories[i]] = json.data
         }
       }
