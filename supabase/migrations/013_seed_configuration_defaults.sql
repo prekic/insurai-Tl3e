@@ -266,7 +266,7 @@ ON CONFLICT (category, key) DO NOTHING;
 -- ===========================================
 
 INSERT INTO public.feature_flags (key, name, description, enabled, rollout_percentage) VALUES
-('use_db_config', 'Database Configuration', 'Use database for configuration instead of hardcoded values', false, 0),
+('use_db_config', 'Database Configuration', 'Use database for configuration instead of hardcoded values', true, 100),
 ('new_evaluation_algorithm', 'New Evaluation Algorithm', 'Enable improved policy evaluation algorithm', false, 0),
 ('ai_consensus_mode', 'AI Consensus Mode', 'Use multiple AI models for consensus extraction', false, 0),
 ('advanced_gap_analysis', 'Advanced Gap Analysis', 'Enable advanced gap analysis features', false, 0),

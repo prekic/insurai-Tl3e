@@ -447,6 +447,12 @@ function initializeDefaultFeatureFlags(): void {
       enabled: false,
       enabledForRoles: ['premium', 'admin', 'super_admin'],
     },
+    {
+      id: 'use_db_config',
+      name: 'Database Configuration',
+      description: 'Load configuration settings from database instead of defaults',
+      enabled: true,
+    },
   ]
 
   const now = new Date().toISOString()

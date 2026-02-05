@@ -54,6 +54,22 @@ export class OCRDecisionEngine {
   }
 
   /**
+   * Refresh settings from the configuration manager.
+   * Call this after updating the ConfigurationManager with database config.
+   */
+  refreshSettings(): void {
+    this.settings = this.configManager.getOCRSettings()
+  }
+
+  /**
+   * Get the underlying configuration manager
+   * (useful for updating database config)
+   */
+  getConfigurationManager(): ConfigurationManager {
+    return this.configManager
+  }
+
+  /**
    * Main entry point for OCR decision making.
    * Returns decision with full analysis context.
    */
@@ -685,4 +701,28 @@ export function getOCRDecisionEngine(): OCRDecisionEngine {
     engineInstance = new OCRDecisionEngine()
   }
   return engineInstance
+}
+
+/**
+ * Initialize OCR Decision Engine with database configuration.
+ * Call this once at application startup when database config is available.
+ *
+ * @param dbConfig - OCR configuration from the database
+ * @returns The configured OCRDecisionEngine instance
+ */
+export function initializeOCREngineWithConfig(dbConfig: import('@/lib/config/types').OCRConfig): OCRDecisionEngine {
+  const engine = getOCRDecisionEngine()
+  engine.getConfigurationManager().updateFromDatabaseConfig(dbConfig)
+  engine.refreshSettings()
+  return engine
+}
+
+/**
+ * Reset the OCR Decision Engine singleton (useful for testing)
+ */
+export function resetOCRDecisionEngine(): void {
+  if (engineInstance) {
+    engineInstance.getConfigurationManager().resetToBaseSettings()
+  }
+  engineInstance = null
 }

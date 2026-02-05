@@ -237,6 +237,88 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
   useRegionalBenchmarks: true,
 }
 
+/**
+ * Grade thresholds - can be overridden by database config
+ */
+export interface GradeThresholds {
+  gradeAThreshold: number
+  gradeBThreshold: number
+  gradeCThreshold: number
+  gradeDThreshold: number
+}
+
+export const DEFAULT_GRADE_THRESHOLDS: GradeThresholds = {
+  gradeAThreshold: 90,
+  gradeBThreshold: 80,
+  gradeCThreshold: 70,
+  gradeDThreshold: 60,
+}
+
+/**
+ * Status thresholds - can be overridden by database config
+ */
+export interface StatusThresholds {
+  statusExcellentThreshold: number
+  statusGoodThreshold: number
+  statusFairThreshold: number
+  statusPoorThreshold: number
+}
+
+export const DEFAULT_STATUS_THRESHOLDS: StatusThresholds = {
+  statusExcellentThreshold: 90,
+  statusGoodThreshold: 75,
+  statusFairThreshold: 60,
+  statusPoorThreshold: 40,
+}
+
+/**
+ * Convert flat database config to evaluator's EvaluationConfig format
+ */
+export function convertDatabaseConfigToEvaluatorConfig(
+  dbConfig: {
+    weightPremium?: number
+    weightCoverage?: number
+    weightDeductible?: number
+    weightCompliance?: number
+    weightValue?: number
+    strictCompliance?: boolean
+    includeOptionalCoverages?: boolean
+    useRegionalBenchmarks?: boolean
+  }
+): Partial<EvaluationConfig> {
+  const config: Partial<EvaluationConfig> = {}
+
+  // Convert flat weights to nested structure
+  if (
+    dbConfig.weightPremium !== undefined ||
+    dbConfig.weightCoverage !== undefined ||
+    dbConfig.weightDeductible !== undefined ||
+    dbConfig.weightCompliance !== undefined ||
+    dbConfig.weightValue !== undefined
+  ) {
+    config.weights = {
+      premium: dbConfig.weightPremium ?? DEFAULT_EVALUATION_CONFIG.weights.premium,
+      coverage: dbConfig.weightCoverage ?? DEFAULT_EVALUATION_CONFIG.weights.coverage,
+      deductible: dbConfig.weightDeductible ?? DEFAULT_EVALUATION_CONFIG.weights.deductible,
+      compliance: dbConfig.weightCompliance ?? DEFAULT_EVALUATION_CONFIG.weights.compliance,
+      value: dbConfig.weightValue ?? DEFAULT_EVALUATION_CONFIG.weights.value,
+    }
+  }
+
+  // Copy boolean options
+  if (dbConfig.strictCompliance !== undefined) {
+    config.strictCompliance = dbConfig.strictCompliance
+  }
+  if (dbConfig.includeOptionalCoverages !== undefined) {
+    config.includeOptionalCoverages = dbConfig.includeOptionalCoverages
+  }
+  if (dbConfig.useRegionalBenchmarks !== undefined) {
+    config.useRegionalBenchmarks = dbConfig.useRegionalBenchmarks
+  }
+
+  return config
+}
+
 // =============================================================================
 // HELPER TYPE GUARDS
 // =============================================================================
@@ -261,18 +343,24 @@ export function isCritical(score: number): boolean {
   return score < 40
 }
 
-export function getGradeFromScore(score: number): EvaluationGrade {
-  if (score >= 90) return 'A'
-  if (score >= 80) return 'B'
-  if (score >= 70) return 'C'
-  if (score >= 60) return 'D'
+export function getGradeFromScore(
+  score: number,
+  thresholds: GradeThresholds = DEFAULT_GRADE_THRESHOLDS
+): EvaluationGrade {
+  if (score >= thresholds.gradeAThreshold) return 'A'
+  if (score >= thresholds.gradeBThreshold) return 'B'
+  if (score >= thresholds.gradeCThreshold) return 'C'
+  if (score >= thresholds.gradeDThreshold) return 'D'
   return 'F'
 }
 
-export function getStatusFromScore(score: number): EvaluationStatus {
-  if (score >= 90) return 'excellent'
-  if (score >= 75) return 'good'
-  if (score >= 60) return 'fair'
-  if (score >= 40) return 'poor'
+export function getStatusFromScore(
+  score: number,
+  thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS
+): EvaluationStatus {
+  if (score >= thresholds.statusExcellentThreshold) return 'excellent'
+  if (score >= thresholds.statusGoodThreshold) return 'good'
+  if (score >= thresholds.statusFairThreshold) return 'fair'
+  if (score >= thresholds.statusPoorThreshold) return 'poor'
   return 'critical'
 }
