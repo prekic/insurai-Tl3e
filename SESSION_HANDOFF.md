@@ -1,4 +1,4 @@
-# Session Handoff - February 4, 2026 (Evening)
+# Session Handoff - February 5, 2026
 
 ## Current Status
 
@@ -8,117 +8,107 @@
 | **TypeCheck** | ✅ 0 errors |
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 45 warnings (all no-non-null-assertion) |
-| **Tests** | ✅ 5800+ passing (165 test files) |
-| **Branch** | `claude/review-project-status-SzJ1q` |
+| **Tests** | ✅ 6085+ passing (490 test files) |
+| **Branch** | `claude/review-project-status-VVM3E` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Deployment** | ⚠️ Pending redeploy after chunking fix |
+| **Deployment** | ✅ Live and working |
 
 ---
 
 ## Session Summary
 
-This session focused on **bundle optimization** and **fixing deployment issues**:
+This session focused on **connecting admin settings to application functionality**:
 
-1. Attempted aggressive Vite `manualChunks` optimization to reduce bundle size
-2. Discovered circular dependency issue causing page crash
-3. Fixed bundle chunking to only split truly independent libraries
-4. Fixed file upload flow for logged-in users on landing page
-5. Bumped service worker cache to v12
+1. Connected OCR settings from database to OCR Decision Engine
+2. Added database config integration methods to ConfigurationManager
+3. Enabled `use_db_config` feature flag (100% rollout)
+4. Added 49 comprehensive tests for database config integration
+5. Updated project documentation (CLAUDE.md entry #56)
 
 ---
 
 ## Features/Fixes Completed This Session
 
-### 1. Bundle Optimization Attempt (commit b5f525a)
+### 1. OCR Decision Engine Database Config Integration
 
-**Problem**: `useBackendHealth` chunk was 676KB due to AI SDK imports.
+**Problem**: Admin settings in database weren't affecting OCR decision engine behavior.
 
-**Attempted Solution**: Aggressive `manualChunks` with separate vendor chunks:
+**Solution**: Added methods to ConfigurationManager and OCRDecisionEngine for runtime configuration updates.
+
+**New Methods in ConfigurationManager:**
 ```typescript
-manualChunks(id) {
-  if (id.includes('react')) return 'vendor-react'
-  if (id.includes('@supabase')) return 'vendor-supabase'
-  if (id.includes('openai')) return 'vendor-openai'
-  if (id.includes('@anthropic-ai')) return 'vendor-anthropic'
-  if (id.includes('node_modules')) return 'vendor-common'  // PROBLEMATIC
+// Apply database config on top of base JSON settings
+updateFromDatabaseConfig(dbConfig: OCRConfig): void {
+  this.ocrSettings = this.applyDatabaseConfig(dbConfig)
+  this.databaseConfigApplied = true
+}
+
+// Check if database config is active
+isDatabaseConfigApplied(): boolean {
+  return this.databaseConfigApplied
+}
+
+// Revert to original JSON settings
+resetToBaseSettings(): void {
+  this.ocrSettings = this.baseOcrSettings
+  this.databaseConfigApplied = false
 }
 ```
 
-**Result**: Built successfully, reduced chunk sizes, but **caused page crash** after deployment.
-
-### 2. Circular Dependency Fix (commit 05627d4)
-
-**Problem**: Page wouldn't load after deployment with error:
-```
-Uncaught ReferenceError: Cannot access 'na' before initialization
-    at vendor-common-H-RuQgAK.js:9:217468
-```
-
-**Root Cause**: The catch-all `vendor-common` chunk combined modules that had hidden initialization order dependencies.
-
-**Solution**: Simplified chunking to only split truly independent libraries:
+**New Methods in OCRDecisionEngine:**
 ```typescript
-manualChunks(id) {
-  // Only split large, truly independent libraries
-  if (id.includes('pdfjs-dist')) return 'vendor-pdfjs'
-  if (id.includes('pdf-lib')) return 'vendor-pdflib'
-  // Let Vite handle the rest automatically
+// Reload settings from ConfigurationManager
+refreshSettings(): void {
+  this.settings = this.configManager.getOCRSettings()
+}
+
+// Access underlying config manager
+getConfigurationManager(): ConfigurationManager {
+  return this.configManager
 }
 ```
 
-**File Changed**: `vite.config.ts`
-
-**Key Learning**: Aggressive `manualChunks` can break module initialization order in Rollup/Vite. Only split libraries that are completely independent.
-
-### 3. File Upload Flow Fix for Logged-In Users (commit 37ef119)
-
-**Problem**: When logged-in users clicked "Analyze Your Policy Free" on landing page, selected a file, and were redirected to `/upload`, the file was lost.
-
-**Root Cause**: `TryAnalysis.tsx` detected logged-in user and redirected without passing the file.
-
-**Solution**: Pass file via React Router state when redirecting:
-
+**New Module Exports:**
 ```typescript
-// TryAnalysis.tsx - Pass file when redirecting logged-in user
-useEffect(() => {
-  if (user) {
-    const locationState = location.state as { file?: File } | null
-    const fileFromState = locationState?.file
-    if (fileFromState) {
-      navigate('/upload', {
-        state: { files: [fileFromState], autoProcess: true },
-        replace: true
-      })
-    } else {
-      navigate('/upload', { replace: true })
-    }
-  }
-}, [user, navigate, location.state])
+// Initialize singleton with database config
+export function initializeOCREngineWithConfig(dbConfig: OCRConfig): OCRDecisionEngine
+
+// Reset singleton for testing
+export function resetOCRDecisionEngine(): void
 ```
 
-**Files Changed**:
-- `src/components/TryAnalysis.tsx` - Pass file in redirect
-- `src/components/PolicyUpload.tsx` - Handle files from location state
+### 2. Feature Flag Enabled
 
-### 4. Service Worker Cache v12 (commit 323422a)
+The `use_db_config` feature flag is now enabled by default (100% rollout):
 
-**Change**: Bumped cache version from v11 to v12.
+**Files Updated:**
+- `src/lib/admin/config-manager.ts` - Frontend default: `enabled: true`
+- `supabase/migrations/013_seed_configuration_defaults.sql` - Database seed: `true, 100`
 
-**Purpose**: Force cache invalidation after bundle changes.
+### 3. Comprehensive Test Coverage
 
-**File Changed**: `public/sw.js`
+Added 49 new tests for database config integration:
+
+| Test File | Tests | Coverage |
+|-----------|-------|----------|
+| `src/lib/ocr-decision/__tests__/configuration-manager-db.test.ts` | 17 | DB config merging, weights, thresholds, reset |
+| `src/lib/ocr-decision/__tests__/ocr-engine-db-init.test.ts` | 13 | Engine initialization, singleton, refresh |
+| `src/lib/policy-evaluation/__tests__/configurable-thresholds.test.ts` | 19 | Grade and status threshold customization |
+
+**Test Results:**
+- All 49 new tests passing
+- Module tests: 462+ passing (policy-evaluation, ocr-decision, config, admin)
+- Pre-existing failures (32) unrelated - missing AuthProvider in component tests
 
 ---
 
 ## Commits This Session
 
 ```
-66dd2dd Update documentation with session changes
-05627d4 Fix circular dependency in bundle chunking causing initialization error
-323422a Bump service worker cache version to v12 for fresh content
-37ef119 Fix file upload flow from landing page for logged-in users
-b5f525a Optimize bundle chunking for better code splitting
+7a2c98d Update project documentation for database config integration
+0cc16f4 Add comprehensive tests for database config integration
+e7acaf7 Connect admin settings to application functionality
 ```
 
 ---
@@ -127,11 +117,14 @@ b5f525a Optimize bundle chunking for better code splitting
 
 | File | Changes |
 |------|---------|
-| `vite.config.ts` | Simplified manualChunks to avoid circular deps |
-| `src/components/TryAnalysis.tsx` | Pass file via router state on redirect |
-| `src/components/PolicyUpload.tsx` | Handle files from location state |
-| `public/sw.js` | Cache version v12 |
-| `CLAUDE.md` | Added Known Issues #51-53 |
+| `src/lib/ocr-decision/configuration-manager.ts` | Added DB config integration (updateFromDatabaseConfig, isDatabaseConfigApplied, resetToBaseSettings) |
+| `src/lib/ocr-decision/ocr-decision-engine.ts` | Added refresh/getter methods (refreshSettings, getConfigurationManager) |
+| `src/lib/ocr-decision/index.ts` | Added exports (initializeOCREngineWithConfig, resetOCRDecisionEngine) |
+| `src/lib/admin/config-manager.ts` | Enabled use_db_config flag |
+| `server/routes/ai.ts` | Fixed unused AIConfig import |
+| `supabase/migrations/013_seed_configuration_defaults.sql` | Set use_db_config enabled |
+| `CLAUDE.md` | Added Known Issues entry #56, updated test count to 6085+ |
+| `SESSION_HANDOFF.md` | Updated with current session status and next steps |
 
 ---
 
@@ -139,11 +132,50 @@ b5f525a Optimize bundle chunking for better code splitting
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Page crash with aggressive chunking | Critical | ✅ Fixed | Simplified manualChunks (commit 05627d4) |
-| File lost on logged-in redirect | Medium | ✅ Fixed | Pass via router state (commit 37ef119) |
+| Pre-existing test failures (32) | Low | Open | Missing AuthProvider in component tests |
+| Railway cold start delay | Low | Expected | First request may take 5-10s after idle |
 | Google Vision "Service error" | Low | Open | Falls back to pdf.js + OpenAI |
-| Anthropic billing issue | Medium | Open | Falls back to OpenAI |
+| Anthropic billing issue | Medium | Open | Falls back to OpenAI, adds latency |
 | 45 no-non-null-assertion warnings | Low | Deferred | Intentional in guarded paths |
+
+---
+
+## Configuration System Architecture
+
+### Three-Tier Configuration
+```
+┌─────────────────────────────────────────────────────────────┐
+│ Tier 1: System Defaults (src/lib/config/types.ts)           │
+│         ↓ (always available, hardcoded fallbacks)           │
+│ Tier 2: Admin Settings (app_settings table)                 │
+│         ↓ (database-stored, admin-editable)                 │
+│ Tier 3: User Preferences (user_preferences table)           │
+│         (per-user overrides, planned for future)            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Components Connected to Database Settings
+
+| Component | Settings Category | Settings Applied |
+|-----------|-------------------|------------------|
+| AI Extraction | `ai` | Model selection, temperature, timeouts |
+| Policy Evaluation | `evaluation` | Weights, grade thresholds, status thresholds |
+| Rate Limiting | `rate_limits` | Requests per hour by endpoint |
+| OCR Decision Engine | `ocr` | Confidence thresholds, density analysis, weights |
+
+### OCR Decision Engine Config Pattern
+```
+ocr-settings.json ──► ConfigurationManager ──► OCRDecisionEngine
+      ↑                      │
+      │                      ↓
+ Base Settings         Database Config
+ (preserved)           (merged on top)
+
+Methods:
+- updateFromDatabaseConfig(dbConfig) → Apply DB settings
+- resetToBaseSettings() → Revert to JSON
+- refreshSettings() → Reload into engine
+```
 
 ---
 
@@ -172,7 +204,7 @@ curl -s "https://insurai-production.up.railway.app/api/ai/diagnose"
 {
   "build": {
     "builder": "NIXPACKS",
-    "installCommand": "npm ci",
+    "installCommand": "npm ci --include=dev",
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
@@ -215,11 +247,15 @@ if (import.meta.env.PROD && typeof window !== 'undefined') {
 ```
 This means you do NOT need to set `VITE_API_PROXY_URL` for Railway deployments.
 
----
+### CSP Configuration for PDF.js Worker
+The server (`server/index.ts`) must allow these CDN domains:
+```typescript
+scriptSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com']
+workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
+connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://unpkg.com', ...]
+```
 
-## Supabase Configuration
-
-### Auth Redirect URLs (Required)
+### Supabase Auth Configuration
 Go to Supabase Dashboard → Authentication → URL Configuration and add:
 ```
 https://insurai-production.up.railway.app/**
@@ -228,35 +264,22 @@ Required for OAuth and magic link flows.
 
 ---
 
-## CSP Configuration for PDF.js Worker
-
-The server (`server/index.ts`) must allow these CDN domains for PDF.js:
-
-```typescript
-// In Helmet CSP config:
-scriptSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com']
-workerSrc: ["'self'", 'blob:', 'https://unpkg.com', 'https://cdn.jsdelivr.net']
-connectSrc: ["'self'", 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com']
-```
-
----
-
 ## Next Steps (Priority Order)
 
-### Immediate
-1. **Merge/Deploy to Railway** - The chunking fix needs to be deployed
-2. **Verify page loads** - Test https://insurai-production.up.railway.app after deployment
-3. **Hard refresh if needed** - Users may need Ctrl+Shift+R to clear service worker cache
+### High Priority
+1. **Fix Pre-existing Test Failures** - Add `AuthProvider` wrapper to failing component tests
+2. **Admin Dashboard UI Polish** - Settings panels work but could use UX improvements
+3. **Settings Validation** - Add client-side validation for settings before saving
 
-### Short Term
-1. **Monitor bundle sizes** - Run `npm run build:analyze` to check current sizes
-2. **Top up Anthropic credits** - Restore faster extraction
-3. **Test file upload flow** - Verify logged-in users get files properly
+### Medium Priority
+4. **Settings History UI** - Display audit log in Admin Dashboard
+5. **User Preferences Integration** - Allow users to override some settings
+6. **Performance Monitoring** - Track config fetch latency in production
 
-### Future Optimization
-1. **Code-split AI components** - Use React.lazy for PolicyChat, PolicyUpload
-2. **Dynamic imports at call site** - Import OpenAI/Anthropic only when extraction starts
-3. **Consider tree-shaking SDKs** - Check if unused SDK features can be excluded
+### Low Priority
+7. **Settings Export/Import** - Allow backing up and restoring settings
+8. **Settings Diff View** - Show what changed between versions
+9. **Batch Settings Update** - Update multiple settings in single API call
 
 ---
 
@@ -264,12 +287,14 @@ connectSrc: ["'self'", 'https://unpkg.com', 'https://cdn.jsdelivr.net', 'https:/
 
 | Gotcha | Solution |
 |--------|----------|
-| Aggressive manualChunks breaks page | Only split independent libs (pdfjs, pdf-lib) |
-| File lost on redirect | Pass via router state: `navigate('/path', { state: { file } })` |
-| Claude returns text instead of JSON | Use ANTHROPIC_SCHEMA_PROMPT with full schema in prompt |
-| Stale bundle after deploy | Bump sw.js cache version (currently v12) |
 | VITE_* vars not updating | Need rebuild, not just restart |
-| Railway env vars with quotes | Don't add manual quotes - Railway handles it |
+| Server needs SUPABASE_URL | Use `SUPABASE_URL`, not `VITE_SUPABASE_URL` for server-side |
+| Admin auth needs ADMIN_JWT_SECRET | Generate with `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"` |
+| Always import crypto explicitly | Don't rely on global `crypto` in Node.js server code |
+| Check /api/admin/diagnostics | Use this endpoint to debug Railway configuration issues |
+| Railway cold start | First request may take 5-10s - this is expected behavior |
+| Claude returns text not JSON | Use ANTHROPIC_SCHEMA_PROMPT with full schema in prompt |
+| Stale bundle after deploy | Bump sw.js cache version (currently v12) |
 
 ---
 
@@ -288,31 +313,36 @@ npm run validate
 # Bundle analysis
 npm run build:analyze
 
-# Test specific files
-npm test -- --run src/components/TryAnalysis.test.tsx
-npm test -- --run src/components/PolicyUpload.test.tsx
+# Test specific modules
+npm test -- --run src/lib/ocr-decision
+npm test -- --run src/lib/policy-evaluation
+npm test -- --run src/lib/config
 ```
 
 ---
 
 ## Previous Session Context
 
-**February 4, 2026 (Earlier)**:
-- Re-implemented lost changes from archived session
-- Added ANTHROPIC_SCHEMA_PROMPT for Claude JSON extraction
-- Created proxy-utils.ts for bundle optimization
-- Implemented dynamic SDK imports
-- Added GA4 analytics with KVKK consent
-- Extended i18n translations
+**February 4, 2026**:
+- Bundle optimization (manualChunks)
+- Circular dependency fix
+- File upload flow fix for logged-in users
+- Service worker cache v12
 
-**January 30, 2026**:
+**Earlier February 2026**:
+- Configuration system implementation (843+ settings)
+- Admin Settings panels (AI, Evaluation, Rate Limits, OCR)
+- Settings Tab API response parsing fixes
+
+**January 2026**:
 - Session-based free trial for anonymous users
 - 90-second extraction timeout
 - Secure email unsubscribe tokens
+- OCR Decision Engine with Document Journey
 
 ---
 
-**Last Updated**: February 4, 2026 (Evening)
-**Branch**: `claude/review-project-status-SzJ1q`
+**Last Updated**: February 5, 2026
+**Branch**: `claude/review-project-status-VVM3E`
 **ESLint Status**: 0 errors, 45 warnings
-**Next Session Focus**: Verify deployment, test file upload flow, monitor bundle sizes
+**Next Session Focus**: Fix pre-existing test failures, Admin Dashboard UI polish

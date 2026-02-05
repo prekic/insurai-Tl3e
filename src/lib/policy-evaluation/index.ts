@@ -30,7 +30,7 @@
  */
 
 // Main functions
-export { evaluatePolicy } from './evaluator'
+export { evaluatePolicy, type EvaluatePolicyOptions } from './evaluator'
 export { comparePolicies, quickCompare, compareCoverage } from './comparator'
 
 // Benchmark service for database-driven premium benchmarks
@@ -65,10 +65,14 @@ export type {
 
   // Configuration
   EvaluationConfig,
+  GradeThresholds,
+  StatusThresholds,
 } from './types'
 
 export {
   DEFAULT_EVALUATION_CONFIG,
+  DEFAULT_GRADE_THRESHOLDS,
+  DEFAULT_STATUS_THRESHOLDS,
   getGradeFromScore,
   getStatusFromScore,
   isExcellent,
@@ -76,6 +80,7 @@ export {
   isFair,
   isPoor,
   isCritical,
+  convertDatabaseConfigToEvaluatorConfig,
 } from './types'
 
 // =============================================================================

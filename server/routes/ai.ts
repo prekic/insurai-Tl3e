@@ -33,6 +33,7 @@ import { fileURLToPath } from 'url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
+import { getAIConfig } from '../services/config-service.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
@@ -371,6 +372,10 @@ router.post(
       console.log(`[${requestId}] 📝 System prompt: ${finalSystemPrompt.substring(0, 100)}...`)
       console.log(`[${requestId}] 📝 User prompt length: ${finalUserPrompt.length} chars`)
 
+      // Get AI config from database (falls back to defaults if unavailable)
+      const aiConfig = await getAIConfig()
+      console.log(`[${requestId}] 🔧 Using config: model=${model || aiConfig.openaiExtractionModel}, temp=${aiConfig.temperature}, tokens=${aiConfig.maxTokens}`)
+
       // Ensure "json" is in the prompt (required by OpenAI when using response_format: json_object)
       const jsonReminder = '\n\nRespond with valid JSON only.'
       const systemPromptWithJson = finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
@@ -381,7 +386,7 @@ router.post(
         : finalUserPrompt + jsonReminder
 
       const response = await client.chat.completions.create({
-        model: model || 'gpt-4o',
+        model: model || aiConfig.openaiExtractionModel,
         messages: [
           { role: 'system', content: systemPromptWithJson },
           { role: 'user', content: userPromptWithJson },
@@ -390,8 +395,8 @@ router.post(
           type: 'json_schema',
           json_schema: EXTRACTION_JSON_SCHEMA,
         },
-        max_tokens: 4096,
-        temperature: 0.1,
+        max_tokens: aiConfig.maxTokens,
+        temperature: aiConfig.temperature,
       })
       console.log(`[${requestId}] ✅ OpenAI responded`)
 
@@ -532,9 +537,12 @@ router.post(
         }
       }
 
+      // Get AI config from database (falls back to defaults if unavailable)
+      const aiConfig = await getAIConfig()
+
       const response = await client.messages.create({
-        model: model || 'claude-sonnet-4-20250514',
-        max_tokens: 4096,
+        model: model || aiConfig.anthropicExtractionModel,
+        max_tokens: aiConfig.maxTokens,
         system: finalSystemPrompt,
         messages: [{ role: 'user', content: finalUserPrompt }],
       })
@@ -555,7 +563,7 @@ router.post(
       }
 
       // Track cost usage
-      const usedModel = response.model || model || 'claude-sonnet-4-20250514'
+      const usedModel = response.model || model || aiConfig.anthropicExtractionModel
       const inputTokens = response.usage.input_tokens
       const outputTokens = response.usage.output_tokens
       const cost = calculateCost(usedModel, inputTokens, outputTokens)
@@ -696,6 +704,10 @@ router.post(
       }
     }
 
+    // Get AI config from database (falls back to defaults if unavailable)
+    const aiConfig = await getAIConfig()
+    console.log(`[${requestId}] 🔧 Using config: anthropic=${aiConfig.anthropicExtractionModel}, openai=${aiConfig.openaiExtractionModel}`)
+
     // Try Anthropic first if available
     const anthropicClient = getAnthropicClient()
     const openaiClient = getOpenAIClient()
@@ -704,8 +716,8 @@ router.post(
       console.log(`[${requestId}] Trying Anthropic first (with ANTHROPIC_SCHEMA_PROMPT)...`)
       try {
         const response = await anthropicClient.messages.create({
-          model: model || 'claude-sonnet-4-20250514',
-          max_tokens: 4096,
+          model: model || aiConfig.anthropicExtractionModel,
+          max_tokens: aiConfig.maxTokens,
           system: anthropicSystemPrompt,
           messages: [{ role: 'user', content: finalUserPrompt }],
         })
@@ -723,7 +735,7 @@ router.post(
         }
 
         // Track cost
-        const usedModel = response.model || model || 'claude-sonnet-4-20250514'
+        const usedModel = response.model || model || aiConfig.anthropicExtractionModel
         const inputTokens = response.usage.input_tokens
         const outputTokens = response.usage.output_tokens
         const cost = calculateCost(usedModel, inputTokens, outputTokens)
@@ -802,7 +814,7 @@ router.post(
           : finalUserPrompt + jsonReminder
 
         const response = await openaiClient.chat.completions.create({
-          model: 'gpt-4o',
+          model: aiConfig.openaiExtractionModel,
           messages: [
             { role: 'system', content: systemPromptWithJson },
             { role: 'user', content: userPromptWithJson },
@@ -811,8 +823,8 @@ router.post(
             type: 'json_schema',
             json_schema: EXTRACTION_JSON_SCHEMA,
           },
-          max_tokens: 4096,
-          temperature: 0.1,
+          max_tokens: aiConfig.maxTokens,
+          temperature: aiConfig.temperature,
         })
 
         const content = response.choices[0]?.message?.content
@@ -821,7 +833,7 @@ router.post(
         }
 
         // Track cost
-        const usedModel = response.model || 'gpt-4o'
+        const usedModel = response.model || aiConfig.openaiExtractionModel
         const inputTokens = response.usage?.prompt_tokens || 0
         const outputTokens = response.usage?.completion_tokens || 0
         const cost = calculateCost(usedModel, inputTokens, outputTokens)
@@ -1384,6 +1396,9 @@ router.post(
         console.log('[Chat] Using fallback prompt (admin prompt unavailable)')
       }
 
+      // Get AI config for chat settings
+      const aiConfig = await getAIConfig()
+
       if (useProvider === 'openai') {
         const client = getOpenAIClient()
         if (!client) {
@@ -1404,10 +1419,10 @@ router.post(
         ]
 
         const response = await client.chat.completions.create({
-          model: 'gpt-4o-mini',
+          model: aiConfig.openaiBackupModel, // Use backup/fast model for chat
           messages,
           max_tokens: 1024,
-          temperature: 0.7,
+          temperature: aiConfig.chatTemperature,
         })
 
         const content = response.choices[0]?.message?.content
@@ -1419,7 +1434,7 @@ router.post(
         }
 
         // Track cost usage for chat
-        const chatModel = response.model || 'gpt-4o-mini'
+        const chatModel = response.model || aiConfig.openaiBackupModel
         const inputTokens = response.usage?.prompt_tokens || 0
         const outputTokens = response.usage?.completion_tokens || 0
         const cost = calculateCost(chatModel, inputTokens, outputTokens)
@@ -1467,7 +1482,7 @@ router.post(
         ]
 
         const response = await client.messages.create({
-          model: 'claude-3-5-haiku-20241022',
+          model: aiConfig.anthropicBackupModel, // Use backup/fast model for chat
           max_tokens: 1024,
           system: systemPrompt,
           messages,
@@ -1482,7 +1497,7 @@ router.post(
         }
 
         // Track cost usage for chat
-        const chatModel = response.model || 'claude-3-5-haiku-20241022'
+        const chatModel = response.model || aiConfig.anthropicBackupModel
         const inputTokens = response.usage.input_tokens
         const outputTokens = response.usage.output_tokens
         const cost = calculateCost(chatModel, inputTokens, outputTokens)

@@ -21,7 +21,7 @@ import { PoliciesTab } from './tabs/PoliciesTab'
 import { PipelineTab } from './tabs/PipelineTab'
 import { OCRDashboardTab } from './tabs/OCRDashboardTab'
 import { SecurityTab } from './tabs/SecurityTab'
-import { ConfigTab } from './tabs/ConfigTab'
+import { SettingsTab } from './tabs/SettingsTab'
 import { AnalyticsTab } from './tabs/AnalyticsTab'
 import { AuditTab } from './tabs/AuditTab'
 import { AlertsTab } from './tabs/AlertsTab'
@@ -196,7 +196,7 @@ export function AdminDashboard() {
       case 'security':
         return <SecurityTab />
       case 'config':
-        return <ConfigTab />
+        return <SettingsTab />
       case 'benchmarks':
         return <BenchmarksTab />
       case 'analytics':

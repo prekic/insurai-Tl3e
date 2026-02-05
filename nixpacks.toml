@@ -1,0 +1,11 @@
+# Nixpacks configuration for Railway deployment
+# See: https://nixpacks.com/docs/configuration/file
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = ["npm run build && npm run build:server"]
+
+[start]
+cmd = "NODE_ENV=production node dist-server/index.js"

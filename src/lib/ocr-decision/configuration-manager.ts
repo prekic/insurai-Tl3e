@@ -13,6 +13,7 @@ import type {
   FieldPattern,
   ConfigurationLoadResult,
 } from './types'
+import type { OCRConfig } from '@/lib/config/types'
 
 // Import configuration files statically (for browser compatibility)
 import trLocale from '../../../config/locales/tr.json'
@@ -64,12 +65,139 @@ export class ConfigurationManager {
   private locales: Map<string, LocaleConfig | UniversalConfig> = new Map()
   private policyTypes: Map<string, PolicyTypeConfig> = new Map()
   private ocrSettings: OCRSettings
+  private baseOcrSettings: OCRSettings // Keep original JSON settings for merging
   private loadErrors: string[] = []
   private lastLoadTime: Date = new Date()
+  private databaseConfigApplied: boolean = false
 
   constructor() {
-    this.ocrSettings = ocrSettings as OCRSettings
+    this.baseOcrSettings = ocrSettings as OCRSettings
+    this.ocrSettings = this.baseOcrSettings
     this.loadAllConfigurations()
+  }
+
+  /**
+   * Convert flat database OCRConfig to nested OCRSettings format.
+   * Merges database values with the base JSON settings.
+   */
+  private applyDatabaseConfig(dbConfig: OCRConfig): OCRSettings {
+    // Start with a deep copy of the base settings
+    const settings: OCRSettings = JSON.parse(JSON.stringify(this.baseOcrSettings))
+
+    // Apply density analysis settings
+    if (dbConfig.charsPerPageThreshold !== undefined) {
+      settings.density_analysis.chars_per_page_threshold = dbConfig.charsPerPageThreshold
+    }
+    if (dbConfig.minPagesForAverage !== undefined) {
+      settings.density_analysis.min_pages_for_average_calculation = dbConfig.minPagesForAverage
+    }
+    if (dbConfig.pageVarianceThreshold !== undefined) {
+      settings.density_analysis.page_variance_threshold = dbConfig.pageVarianceThreshold
+    }
+    if (dbConfig.minCharsForValidPage !== undefined) {
+      settings.density_analysis.min_chars_for_valid_page = dbConfig.minCharsForValidPage
+    }
+
+    // Apply confidence thresholds
+    if (dbConfig.skipOcrThreshold !== undefined) {
+      settings.confidence_calculation.thresholds.skip_ocr = dbConfig.skipOcrThreshold
+    }
+    if (dbConfig.selectiveOcrThreshold !== undefined) {
+      settings.confidence_calculation.thresholds.selective_ocr = dbConfig.selectiveOcrThreshold
+    }
+
+    // Apply confidence weights
+    if (dbConfig.weightCharDensity !== undefined) {
+      settings.confidence_calculation.weights.char_density = dbConfig.weightCharDensity
+    }
+    if (dbConfig.weightTextQuality !== undefined) {
+      settings.confidence_calculation.weights.text_quality = dbConfig.weightTextQuality
+    }
+    if (dbConfig.weightPageVariance !== undefined) {
+      settings.confidence_calculation.weights.page_variance = dbConfig.weightPageVariance
+    }
+    if (dbConfig.weightEncodingCheck !== undefined) {
+      settings.confidence_calculation.weights.encoding_check = dbConfig.weightEncodingCheck
+    }
+    if (dbConfig.weightFieldExtraction !== undefined) {
+      settings.confidence_calculation.weights.field_extraction = dbConfig.weightFieldExtraction
+    }
+
+    // Apply provider confidence thresholds
+    if (dbConfig.googleVisionConfidence !== undefined && settings.ocr_providers.available.google_vision) {
+      settings.ocr_providers.available.google_vision.confidence_threshold = dbConfig.googleVisionConfidence
+    }
+    if (dbConfig.documentAiConfidence !== undefined && settings.ocr_providers.available.google_document_ai) {
+      settings.ocr_providers.available.google_document_ai.confidence_threshold = dbConfig.documentAiConfidence
+    }
+    if (dbConfig.tesseractConfidence !== undefined && settings.ocr_providers.available.tesseract) {
+      settings.ocr_providers.available.tesseract.confidence_threshold = dbConfig.tesseractConfidence
+    }
+
+    // Apply language detection settings
+    if (dbConfig.languageMinConfidence !== undefined) {
+      settings.language_detection.min_confidence = dbConfig.languageMinConfidence
+    }
+    if (dbConfig.languageSampleSize !== undefined) {
+      settings.language_detection.sample_size = dbConfig.languageSampleSize
+    }
+
+    // Apply policy type detection settings
+    if (dbConfig.policyTypeMinConfidence !== undefined) {
+      settings.policy_type_detection.min_confidence = dbConfig.policyTypeMinConfidence
+    }
+
+    // Apply quality check settings
+    if (settings.quality_checks) {
+      if (dbConfig.minWordLengthAverage !== undefined) {
+        settings.quality_checks.min_word_length_average = dbConfig.minWordLengthAverage
+      }
+      if (dbConfig.maxGarbageCharRatio !== undefined) {
+        settings.quality_checks.max_garbage_char_ratio = dbConfig.maxGarbageCharRatio
+      }
+      if (dbConfig.minAlphanumericRatio !== undefined) {
+        settings.quality_checks.min_alphanumeric_ratio = dbConfig.minAlphanumericRatio
+      }
+    }
+
+    // Apply performance settings
+    if (dbConfig.maxPagesQuickAnalysis !== undefined) {
+      settings.performance.max_pages_for_quick_analysis = dbConfig.maxPagesQuickAnalysis
+    }
+    if (dbConfig.timeoutSeconds !== undefined) {
+      settings.performance.timeout_seconds = dbConfig.timeoutSeconds
+    }
+    if (dbConfig.maxTextLength !== undefined) {
+      settings.performance.max_text_length = dbConfig.maxTextLength
+    }
+
+    return settings
+  }
+
+  /**
+   * Update OCR settings from database configuration.
+   * Call this to apply admin-configured settings from the database.
+   */
+  updateFromDatabaseConfig(dbConfig: OCRConfig): void {
+    this.ocrSettings = this.applyDatabaseConfig(dbConfig)
+    this.databaseConfigApplied = true
+    console.warn('[ConfigurationManager] OCR settings updated from database config')
+  }
+
+  /**
+   * Check if database configuration has been applied
+   */
+  isDatabaseConfigApplied(): boolean {
+    return this.databaseConfigApplied
+  }
+
+  /**
+   * Reset to base JSON settings (useful for testing or when database is unavailable)
+   */
+  resetToBaseSettings(): void {
+    this.ocrSettings = this.baseOcrSettings
+    this.databaseConfigApplied = false
+    console.warn('[ConfigurationManager] OCR settings reset to base JSON configuration')
   }
 
   /**

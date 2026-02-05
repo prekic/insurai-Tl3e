@@ -12,9 +12,13 @@ import type {
   ComplianceIssue,
   Recommendation,
   EvaluationConfig,
+  GradeThresholds,
+  StatusThresholds,
 } from './types'
 import {
   DEFAULT_EVALUATION_CONFIG,
+  DEFAULT_GRADE_THRESHOLDS,
+  DEFAULT_STATUS_THRESHOLDS,
   getGradeFromScore,
   getStatusFromScore,
 } from './types'
@@ -65,10 +69,34 @@ const POLICY_TYPE_TO_INSURANCE_TYPE: Record<PolicyType, string> = {
 // MAIN EVALUATION FUNCTION
 // =============================================================================
 
+export interface EvaluatePolicyOptions {
+  config?: Partial<EvaluationConfig>
+  gradeThresholds?: Partial<GradeThresholds>
+  statusThresholds?: Partial<StatusThresholds>
+}
+
 export function evaluatePolicy(
   policy: Policy,
-  config: Partial<EvaluationConfig> = {}
+  configOrOptions: Partial<EvaluationConfig> | EvaluatePolicyOptions = {}
 ): PolicyEvaluation {
+  // Handle both old signature (config only) and new signature (options object)
+  let config: Partial<EvaluationConfig>
+  let gradeThresholds: GradeThresholds
+  let statusThresholds: StatusThresholds
+
+  if ('config' in configOrOptions || 'gradeThresholds' in configOrOptions || 'statusThresholds' in configOrOptions) {
+    // New signature with options object
+    const options = configOrOptions as EvaluatePolicyOptions
+    config = options.config || {}
+    gradeThresholds = { ...DEFAULT_GRADE_THRESHOLDS, ...options.gradeThresholds }
+    statusThresholds = { ...DEFAULT_STATUS_THRESHOLDS, ...options.statusThresholds }
+  } else {
+    // Old signature - just config
+    config = configOrOptions as Partial<EvaluationConfig>
+    gradeThresholds = DEFAULT_GRADE_THRESHOLDS
+    statusThresholds = DEFAULT_STATUS_THRESHOLDS
+  }
+
   const fullConfig = { ...DEFAULT_EVALUATION_CONFIG, ...config }
   const branchCode = POLICY_TYPE_TO_BRANCH[policy.type]
   const branchStats = getBranchStatistics(branchCode)
@@ -115,8 +143,8 @@ export function evaluatePolicy(
     evaluatedAt: new Date().toISOString(),
 
     overallScore,
-    grade: getGradeFromScore(overallScore),
-    status: getStatusFromScore(overallScore),
+    grade: getGradeFromScore(overallScore, gradeThresholds),
+    status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {
       premium: premiumScore,

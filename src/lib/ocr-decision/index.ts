@@ -46,4 +46,6 @@ export { FieldExtractor } from './field-extractor'
 export {
   OCRDecisionEngine,
   getOCRDecisionEngine,
+  initializeOCREngineWithConfig,
+  resetOCRDecisionEngine,
 } from './ocr-decision-engine'

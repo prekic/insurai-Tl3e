@@ -4,6 +4,8 @@
  * Provides tiered rate limiting for different API endpoints.
  * AI endpoints have stricter limits due to cost and resource usage.
  *
+ * Configuration is loaded from database via config-service with fallback to defaults.
+ *
  * Security: Uses req.ip (set by Express trust proxy) and hashed auth tokens.
  * Does NOT trust user-supplied headers like x-forwarded-for or x-user-id.
  */
@@ -11,9 +13,24 @@
 import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit'
 import crypto from 'crypto'
 import type { Request, Response } from 'express'
+import { getRateLimitsConfig, type RateLimitsConfig } from '../services/config-service.js'
 
-// Rate limit configuration from environment or defaults
-const config = {
+// =============================================================================
+// CONFIGURATION CACHE
+// =============================================================================
+
+/**
+ * Cached rate limit configuration
+ * Updated periodically from database
+ */
+let cachedConfig: RateLimitsConfig | null = null
+let lastConfigFetch = 0
+const CONFIG_CACHE_TTL_MS = 60000 // 1 minute cache
+
+/**
+ * Default rate limit configuration (used as fallback)
+ */
+const defaultConfig = {
   // General API limits
   general: {
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10), // 15 minutes
@@ -39,7 +56,90 @@ const config = {
     windowMs: 60000, // 1 minute
     max: 60, // 1 per second
   },
+  // Auth limits
+  auth: {
+    windowMs: 900000, // 15 minutes
+    max: 10, // 10 attempts
+  },
 }
+
+/**
+ * Get current rate limit configuration with caching
+ * Falls back to defaults if database unavailable
+ */
+async function getConfig(): Promise<RateLimitsConfig> {
+  const now = Date.now()
+
+  // Return cached config if still valid
+  if (cachedConfig && now - lastConfigFetch < CONFIG_CACHE_TTL_MS) {
+    return cachedConfig
+  }
+
+  try {
+    cachedConfig = await getRateLimitsConfig()
+    lastConfigFetch = now
+    return cachedConfig
+  } catch {
+    // Fall back to defaults on error
+    return {
+      generalWindowMs: defaultConfig.general.windowMs,
+      generalMaxRequests: defaultConfig.general.max,
+      aiExtractionWindowMs: defaultConfig.ai.windowMs,
+      aiExtractionMaxRequests: defaultConfig.ai.max,
+      ocrWindowMs: defaultConfig.ocr.windowMs,
+      ocrMaxRequests: defaultConfig.ocr.max,
+      chatWindowMs: defaultConfig.chat.windowMs,
+      chatMaxRequests: defaultConfig.chat.max,
+      healthWindowMs: defaultConfig.health.windowMs,
+      healthMaxRequests: defaultConfig.health.max,
+      authWindowMs: defaultConfig.auth.windowMs,
+      authMaxAttempts: defaultConfig.auth.max,
+    }
+  }
+}
+
+/**
+ * Get current config synchronously (uses cached value or defaults)
+ */
+function getConfigSync(): typeof defaultConfig {
+  if (cachedConfig) {
+    return {
+      general: {
+        windowMs: cachedConfig.generalWindowMs,
+        max: cachedConfig.generalMaxRequests,
+      },
+      ai: {
+        windowMs: cachedConfig.aiExtractionWindowMs,
+        max: cachedConfig.aiExtractionMaxRequests,
+      },
+      ocr: {
+        windowMs: cachedConfig.ocrWindowMs,
+        max: cachedConfig.ocrMaxRequests,
+      },
+      chat: {
+        windowMs: cachedConfig.chatWindowMs,
+        max: cachedConfig.chatMaxRequests,
+      },
+      health: {
+        windowMs: cachedConfig.healthWindowMs,
+        max: cachedConfig.healthMaxRequests,
+      },
+      auth: {
+        windowMs: cachedConfig.authWindowMs,
+        max: cachedConfig.authMaxAttempts,
+      },
+    }
+  }
+  return defaultConfig
+}
+
+// Initialize config on module load (fire and forget)
+getConfig().catch(() => {
+  // Silently fall back to defaults
+})
+
+// Legacy export for backwards compatibility
+const config = defaultConfig
 
 /**
  * Extract a secure user identifier from the Authorization header.
@@ -131,11 +231,11 @@ function skip(req: Request): boolean {
 
 /**
  * General API rate limiter
- * 100 requests per 15 minutes per IP
+ * Uses database config with fallback to defaults
  */
 export const generalLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.general.windowMs,
-  max: config.general.max,
+  max: () => getConfigSync().general.max,
   message: { error: 'Too many requests, please try again later' },
   standardHeaders: true, // Return rate limit info in headers
   legacyHeaders: false, // Disable X-RateLimit-* headers
@@ -146,11 +246,11 @@ export const generalLimiter: RateLimitRequestHandler = rateLimit({
 
 /**
  * AI extraction rate limiter
- * 20 requests per hour per IP (expensive operation)
+ * Uses database config with fallback to defaults (expensive operation)
  */
 export const aiExtractionLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.ai.windowMs,
-  max: config.ai.max,
+  max: () => getConfigSync().ai.max,
   message: {
     error: 'AI extraction rate limit exceeded',
     code: 'AI_RATE_LIMIT_EXCEEDED',
@@ -175,11 +275,11 @@ export const aiExtractionLimiter: RateLimitRequestHandler = rateLimit({
 
 /**
  * OCR rate limiter
- * 30 requests per hour per IP
+ * Uses database config with fallback to defaults
  */
 export const ocrLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.ocr.windowMs,
-  max: config.ocr.max,
+  max: () => getConfigSync().ocr.max,
   message: {
     error: 'OCR rate limit exceeded',
     code: 'OCR_RATE_LIMIT_EXCEEDED',
@@ -203,11 +303,11 @@ export const ocrLimiter: RateLimitRequestHandler = rateLimit({
 
 /**
  * Chat rate limiter
- * 60 requests per hour per IP (more permissive than extraction)
+ * Uses database config with fallback to defaults (more permissive than extraction)
  */
 export const chatLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.chat.windowMs,
-  max: config.chat.max,
+  max: () => getConfigSync().chat.max,
   message: {
     error: 'Chat rate limit exceeded',
     code: 'CHAT_RATE_LIMIT_EXCEEDED',
@@ -231,11 +331,11 @@ export const chatLimiter: RateLimitRequestHandler = rateLimit({
 
 /**
  * Health check rate limiter
- * More permissive for monitoring tools
+ * Uses database config with fallback to defaults
  */
 export const healthLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: config.health.windowMs,
-  max: config.health.max,
+  max: () => getConfigSync().health.max,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req: Request) => req.ip === '127.0.0.1',
@@ -243,11 +343,12 @@ export const healthLimiter: RateLimitRequestHandler = rateLimit({
 
 /**
  * Strict limiter for authentication endpoints
+ * Uses database config with fallback to defaults
  * Prevents brute force attacks
  */
 export const authLimiter: RateLimitRequestHandler = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // 10 attempts per 15 minutes
+  windowMs: config.auth.windowMs,
+  max: () => getConfigSync().auth.max,
   message: {
     error: 'Too many authentication attempts',
     code: 'AUTH_RATE_LIMIT_EXCEEDED',
@@ -287,6 +388,28 @@ export function createRateLimiter(options: {
 }
 
 /**
+ * Refresh rate limit configuration from database
+ * Call this when admin updates settings
+ */
+export async function refreshRateLimitConfig(): Promise<void> {
+  try {
+    cachedConfig = await getRateLimitsConfig()
+    lastConfigFetch = Date.now()
+    console.log('[Rate Limit] Configuration refreshed from database')
+  } catch (error) {
+    console.warn('[Rate Limit] Failed to refresh config from database, using cached/defaults')
+  }
+}
+
+/**
  * Rate limit configuration for logging/debugging
+ * Returns current config (from database cache or defaults)
+ */
+export function getRateLimitConfig() {
+  return getConfigSync()
+}
+
+/**
+ * Legacy export for backwards compatibility
  */
 export const rateLimitConfig = config
