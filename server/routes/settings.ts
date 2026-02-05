@@ -50,7 +50,7 @@ const updateFeatureFlagSchema = z.object({
   enabled: z.boolean().optional(),
   rolloutPercentage: z.number().min(0).max(100).optional(),
   userSegments: z.array(z.string()).optional(),
-  conditions: z.record(z.unknown()).optional(),
+  conditions: z.record(z.string(), z.unknown()).optional(),
   expiresAt: z.string().optional(),
 })
 
