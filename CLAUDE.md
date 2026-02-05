@@ -9,8 +9,8 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**
-- **Production Readiness**: ~9.5/10 (6085+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**, **Admin Settings UI with validation and audit history**
+- **Production Readiness**: ~9.5/10 (6133+ tests, 0 lint errors, 46 warnings, PWA support, server hardening)
 - **Last Updated**: February 5, 2026
 
 ---
@@ -183,6 +183,18 @@ insurai/
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
 | `server/services/admin-db.ts` | Admin database operations |
 | `server/services/prompt-service.ts` | **NEW** Centralized prompt management service |
+
+### Admin Settings UI (Added Feb 2026)
+| File | Purpose |
+|------|---------|
+| `src/components/admin/tabs/SettingsTab.tsx` | **NEW** Settings tab with category navigation |
+| `src/components/admin/tabs/settings/AISettingsPanel.tsx` | **NEW** AI provider settings (models, temperature, timeouts) |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **NEW** Policy evaluation settings (weights, thresholds) |
+| `src/components/admin/tabs/settings/RateLimitsPanel.tsx` | **NEW** API rate limit configuration |
+| `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | **NEW** OCR decision engine settings |
+| `src/components/admin/tabs/settings/FeatureFlagsPanel.tsx` | **NEW** Feature flag management |
+| `src/components/admin/tabs/settings/SettingsHistoryPanel.tsx` | **NEW** Settings audit log viewer with search/filter |
+| `src/lib/admin/settings-validation.ts` | **NEW** Client-side validation utilities for settings |
 
 ### Configuration System (Added Feb 2026)
 | File | Purpose |
@@ -1120,9 +1132,9 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Jan 11, 2026)
-- **Total**: ~4500 tests across 130+ files
-- **Passing**: 100%
+### Test Counts (as of Feb 5, 2026)
+- **Total**: 6133+ tests across 184+ test files
+- **Passing**: 99%+ (some pre-existing component test failures)
 - **Coverage Target**: 80%+
 
 ### Key Test Files
@@ -1133,6 +1145,9 @@ Server Tests:               server/__tests__/
 | `src/components/PolicyDetailView.test.tsx` | 44 | Policy detail view |
 | `src/__tests__/performance/performance.test.ts` | 30 | Performance metrics |
 | `server/__tests__/chat-routes.test.ts` | 18 | Chat API |
+| `src/lib/admin/__tests__/settings-validation.test.ts` | 62 | Settings validation utilities |
+| `src/components/admin/tabs/settings/SettingsHistoryPanel.test.tsx` | 27 | Settings history UI |
+| `server/__tests__/settings-routes.test.ts` | 19 | Settings API endpoints |
 
 ### Running Tests
 ```bash
@@ -2680,6 +2695,34 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `ocr-engine-db-init.test.ts` - 13 tests for engine initialization
   - `configurable-thresholds.test.ts` - 19 tests for grade/status thresholds
 - **Commits**: `e7acaf7`, `0cc16f4`
+
+### 57. Admin Settings UI with Validation and History (Added Feb 5, 2026)
+- **Feature**: Complete Admin Dashboard Settings UI with client-side validation and audit history
+- **Components Created**:
+  - `SettingsTab.tsx` - Main tab container with category navigation (AI, Evaluation, Rate Limits, OCR, Feature Flags, History)
+  - `AISettingsPanel.tsx` - Configure AI models, temperatures, timeouts
+  - `EvaluationSettingsPanel.tsx` - Configure policy evaluation weights and grade thresholds
+  - `RateLimitsPanel.tsx` - Configure API rate limits per endpoint
+  - `OCRSettingsPanel.tsx` - Configure OCR decision engine thresholds and weights
+  - `FeatureFlagsPanel.tsx` - Manage feature flags with rollout percentages
+  - `SettingsHistoryPanel.tsx` - View audit log with search, category filter, pagination
+- **Validation System** (`src/lib/admin/settings-validation.ts`):
+  - Validators: `numberRange`, `percentage`, `ratio`, `positiveInteger`, `required`, `oneOf`, `milliseconds`
+  - Composite validators: `validateWeightsSum`, `validateGradeThresholds`, `validateOCRConfidenceOrder`
+  - Helper functions: `getValidationClass`, `shouldDisableSave`, `getValidationDescription`
+- **Settings History API** (`server/routes/settings.ts`):
+  - `GET /api/admin/settings/history` - Paginated audit log with category filter
+  - Resolves admin user emails for `changed_by` UUIDs
+  - Returns transformed entries with camelCase properties
+- **New Tests** (108 tests):
+  - `settings-validation.test.ts` - 62 tests for validators and composite validators
+  - `SettingsHistoryPanel.test.tsx` - 27 tests for component states and interactions
+  - `settings-routes.test.ts` - 19 tests for API data transformation and pagination
+- **Files Changed**:
+  - `src/components/admin/tabs/SettingsTab.tsx` - Added History tab to navigation
+  - `server/routes/settings.ts` - Added `/history` endpoint
+  - `server/middleware/rate-limit.ts` - Fixed unused variable lint error
+- **Commits**: `ae66160`, `b2a5c0a`, `a9547f0`, `dee49a9`
 
 ---
 
