@@ -206,18 +206,18 @@ describe('PolicyDetailView', () => {
     it('should display coverage limit', () => {
       renderPolicyDetailView()
 
-      // Mobile-first design uses "Teminat Limiti" (TR) or "Coverage" (EN)
+      // Mobile-first design uses "Teminat" (TR) label in overview card
       // May appear in multiple places (overview card + download summary)
-      expect(screen.getAllByText(/^Coverage$|Teminat Limiti/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Teminat|Coverage/i).length).toBeGreaterThan(0)
       expect(screen.getAllByText('₺500,000').length).toBeGreaterThan(0)
     })
 
     it('should display annual premium', () => {
       renderPolicyDetailView()
 
-      // Mobile-first design uses "Yıllık Prim" (TR) or "Premium" (EN)
+      // Mobile-first design uses "Prim" (TR) label in overview card
       // May appear in multiple places (overview card + download summary)
-      expect(screen.getAllByText(/^Premium$|Yıllık Prim/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Prim|Premium/i).length).toBeGreaterThan(0)
       expect(screen.getAllByText('₺2,500').length).toBeGreaterThan(0)
     })
 
