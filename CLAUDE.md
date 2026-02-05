@@ -10,7 +10,7 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**
-- **Production Readiness**: ~9.5/10 (5850+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
+- **Production Readiness**: ~9.5/10 (6085+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
 - **Last Updated**: February 5, 2026
 
 ---
@@ -2638,6 +2638,48 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Solution**: Changed `installCommand` in `railway.json` from `npm ci` to `npm ci --include=dev`
 - **File Changed**: `railway.json`
 - **Commit**: `d8687be`
+
+### 56. Connect Admin Settings to Application Functionality (Added Feb 5, 2026)
+- **Feature**: Database-stored admin settings now actively control application behavior
+- **Components Connected**:
+  1. **AI Settings** → Extraction endpoints (model selection, temperature, timeouts)
+  2. **Evaluation Settings** → Policy scoring (weights, grade thresholds)
+  3. **Rate Limits** → API middleware (requests per hour by endpoint)
+  4. **OCR Settings** → OCR Decision Engine (thresholds, confidence weights)
+- **OCR Decision Engine Integration**:
+  - Added `updateFromDatabaseConfig()` method to ConfigurationManager
+  - Added `isDatabaseConfigApplied()` and `resetToBaseSettings()` methods
+  - Added `refreshSettings()` and `getConfigurationManager()` to OCRDecisionEngine
+  - New exports: `initializeOCREngineWithConfig()`, `resetOCRDecisionEngine()`
+- **Pattern** (deep copy with database overrides):
+  ```typescript
+  // ConfigurationManager stores base JSON settings
+  private baseOcrSettings: OCRSettings  // Original from JSON
+  private ocrSettings: OCRSettings      // Active settings (base + DB overrides)
+
+  updateFromDatabaseConfig(dbConfig: OCRConfig): void {
+    // Start with deep copy of base, apply DB overrides
+    this.ocrSettings = this.applyDatabaseConfig(dbConfig)
+    this.databaseConfigApplied = true
+  }
+
+  resetToBaseSettings(): void {
+    this.ocrSettings = this.baseOcrSettings
+    this.databaseConfigApplied = false
+  }
+  ```
+- **Feature Flag**: `use_db_config` enabled by default (100% rollout)
+- **Files Changed**:
+  - `src/lib/ocr-decision/configuration-manager.ts` - DB config integration
+  - `src/lib/ocr-decision/ocr-decision-engine.ts` - Refresh and getter methods
+  - `src/lib/ocr-decision/index.ts` - New exports
+  - `src/lib/admin/config-manager.ts` - Feature flag default
+  - `supabase/migrations/013_seed_configuration_defaults.sql` - Enable flag
+- **New Tests** (49 tests):
+  - `configuration-manager-db.test.ts` - 17 tests for DB config merging
+  - `ocr-engine-db-init.test.ts` - 13 tests for engine initialization
+  - `configurable-thresholds.test.ts` - 19 tests for grade/status thresholds
+- **Commits**: `e7acaf7`, `0cc16f4`
 
 ---
 
