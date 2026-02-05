@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, **bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent**
-- **Production Readiness**: ~9.5/10 (5800+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
-- **Last Updated**: February 4, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**
+- **Production Readiness**: ~9.5/10 (5850+ tests, 0 lint errors, 45 warnings, PWA support, server hardening)
+- **Last Updated**: February 5, 2026
 
 ---
 
@@ -183,6 +183,16 @@ insurai/
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
 | `server/services/admin-db.ts` | Admin database operations |
 | `server/services/prompt-service.ts` | **NEW** Centralized prompt management service |
+
+### Configuration System (Added Feb 2026)
+| File | Purpose |
+|------|---------|
+| `src/lib/config/configuration-service.ts` | **NEW** Singleton ConfigurationService with caching |
+| `src/lib/config/types.ts` | **NEW** TypeScript types and default values |
+| `src/lib/config/index.ts` | **NEW** Module exports |
+| `server/routes/settings.ts` | **NEW** Admin API routes for settings management |
+| `supabase/migrations/012_configuration_system.sql` | **NEW** Database schema for config tables |
+| `supabase/migrations/013_seed_configuration_defaults.sql` | **NEW** Seeds all hardcoded values |
 
 ### Configuration
 | File | Purpose |
@@ -600,6 +610,13 @@ xl: 1280px  /* Large desktop */
 | `policies` | Extracted policy data |
 | `policy_documents` | Uploaded PDF file references |
 | `chat_conversations` | PolicyChat conversation history |
+| `app_settings` | **NEW** Admin-configurable application settings |
+| `settings_audit_log` | **NEW** Audit trail for settings changes |
+| `user_preferences` | **NEW** Per-user preference settings |
+| `market_benchmarks` | **NEW** Insurance market benchmark data by policy type |
+| `insurance_providers` | **NEW** Turkish insurance provider directory |
+| `regional_factors` | **NEW** Regional risk adjustment factors |
+| `feature_flags` | **NEW** Feature flag configuration for gradual rollouts |
 
 ### Policy Table Schema
 ```sql
@@ -635,6 +652,8 @@ Located in `supabase/migrations/`:
 - `004_chat_conversations.sql` - Chat history storage
 - `005_admin_tables.sql` - Admin authentication tables (admin_users, admin_sessions, security_events, audit_logs, prompt_templates, prompt_versions)
 - `006_seed_prompts.sql` - Seeds 16 AI prompts (extraction, chat, OCR, analysis)
+- `012_configuration_system.sql` - **NEW** Configuration system tables (app_settings, user_preferences, market_benchmarks, insurance_providers, regional_factors, feature_flags)
+- `013_seed_configuration_defaults.sql` - **NEW** Seeds all hardcoded values as database defaults
 
 ### Row Level Security (RLS)
 ```sql
@@ -936,6 +955,157 @@ These are automatically included in base kasko policies and should NOT be flagge
 - Yangın (Fire)
 - Doğal Afetler (Natural Disasters)
 - Sel/Su Baskını (Flood)
+
+---
+
+## Configuration System (Added Feb 2026)
+
+### Overview
+
+The configuration system provides a three-tier architecture for managing application settings:
+1. **System Defaults** - Hardcoded values in `src/lib/config/types.ts`
+2. **Admin Settings** - Database-stored overrides in `app_settings` table
+3. **User Preferences** - Per-user customizations in `user_preferences` table
+
+All 843+ previously hardcoded values are now configurable through the Admin Dashboard.
+
+### Location: `src/lib/config/`
+
+### Using the ConfigurationService
+
+```typescript
+import { configService, getAIConfig, isFeatureEnabled } from '@/lib/config'
+
+// Get typed configuration
+const aiConfig = await configService.getAIConfig()
+console.log(aiConfig.openaiExtractionModel)  // 'gpt-4o'
+console.log(aiConfig.temperature)            // 0.1
+
+// Or use convenience functions
+const config = await getAIConfig()
+
+// Check feature flags
+if (await isFeatureEnabled('new_evaluation_algorithm')) {
+  // Use new algorithm
+}
+
+// Get individual values with defaults
+const maxTokens = await configService.get('ai', 'max_tokens', 4096)
+
+// Get regional risk factors
+const factor = await configService.getRegionalFactor('marmara')  // 1.15
+
+// Get market benchmarks
+const benchmarks = await configService.getMarketBenchmarks('kasko')
+```
+
+### Configuration Categories
+
+| Category | Purpose | Example Settings |
+|----------|---------|------------------|
+| `ai` | AI provider settings | Models, temperatures, timeouts |
+| `evaluation` | Policy scoring | Weights, grade thresholds |
+| `rate_limits` | API rate limiting | Requests per hour by endpoint |
+| `ocr` | OCR processing | Confidence thresholds, density analysis |
+| `fuzzy_matching` | Duplicate detection | Match thresholds, tolerances |
+| `gap_analysis` | Gap detection | Importance weights, scoring |
+| `ui` | User interface | Items per page, animation speed |
+| `email` | Email settings | SMTP config, templates |
+
+### Typed Configuration Interfaces
+
+```typescript
+// AI Configuration
+interface AIConfig {
+  openaiExtractionModel: string      // 'gpt-4o'
+  openaiBackupModel: string          // 'gpt-4o-mini'
+  anthropicExtractionModel: string   // 'claude-sonnet-4-20250514'
+  anthropicBackupModel: string       // 'claude-3-5-haiku-20241022'
+  maxTokens: number                  // 4096
+  temperature: number                // 0.1
+  chatTemperature: number            // 0.7
+  minConfidence: number              // 0.7
+  extractionTimeoutMs: number        // 90000
+  preferredProvider: 'auto' | 'openai' | 'anthropic'
+  enableFallback: boolean            // true
+  consensusEnabled: boolean          // true
+  consensusAgreementThreshold: number // 0.8
+  consensusFields: string[]          // ['policyNumber', 'provider', ...]
+}
+
+// Evaluation Configuration
+interface EvaluationConfig {
+  weightPremium: number      // 20
+  weightCoverage: number     // 30
+  weightDeductible: number   // 15
+  weightCompliance: number   // 20
+  weightValue: number        // 15
+  gradeAThreshold: number    // 90
+  gradeBThreshold: number    // 80
+  gradeCThreshold: number    // 70
+  gradeDThreshold: number    // 60
+  // ... more settings
+}
+```
+
+### Admin API Endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/admin/settings/:category` | GET | Get all settings for a category |
+| `/api/admin/settings/:category/:key` | PUT | Update a specific setting |
+| `/api/admin/settings/:category/:key/history` | GET | View audit history |
+| `/api/admin/settings/feature-flags` | GET | List all feature flags |
+| `/api/admin/settings/feature-flags/:key` | PUT | Update feature flag |
+| `/api/admin/settings/regional-factors` | GET | List regional factors |
+| `/api/admin/settings/regional-factors/:region` | PUT | Update regional factor |
+| `/api/admin/settings/providers` | GET | List insurance providers |
+| `/api/admin/settings/benchmarks/:policyType` | GET | Get market benchmarks |
+
+### Feature Flags
+
+```typescript
+// Check if a feature is enabled
+if (await configService.isFeatureEnabled('use_db_config')) {
+  // Use database configuration
+}
+
+// Get all feature flags
+const flags = await configService.getFeatureFlags()
+// [{ key: 'use_db_config', enabled: false, rolloutPercentage: 0 }, ...]
+```
+
+### Caching
+
+The ConfigurationService includes in-memory caching with a 5-minute TTL:
+
+```typescript
+// Create service with custom cache settings
+const service = ConfigurationService.getInstance({
+  cacheTtlMs: 300000,  // 5 minutes (default)
+  enableCache: true     // Enable caching (default)
+})
+
+// Invalidate cache manually
+service.invalidateCache()         // All categories
+service.invalidateCache('ai')     // Specific category
+```
+
+### Database Schema
+
+The configuration system uses 7 tables:
+
+| Table | Purpose |
+|-------|---------|
+| `app_settings` | Key-value settings with validation schemas |
+| `settings_audit_log` | Automatic audit trail for all changes |
+| `user_preferences` | Per-user preference overrides |
+| `market_benchmarks` | Versioned market benchmark data |
+| `insurance_providers` | Turkish insurance provider directory |
+| `regional_factors` | Regional risk adjustment factors |
+| `feature_flags` | Feature flag configuration |
+
+All tables have Row Level Security (RLS) enabled and automatic `updated_at` triggers.
 
 ---
 
@@ -2425,6 +2595,42 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   }, [location, navigate])
   ```
 - **Commit**: `37ef119`
+
+### 54. Comprehensive Configuration System (Added Feb 5, 2026)
+- **Feature**: Three-tier configuration system making 843+ hardcoded values configurable
+- **Architecture**:
+  - **Tier 1**: System defaults in `src/lib/config/types.ts` (always available)
+  - **Tier 2**: Admin settings in `app_settings` database table
+  - **Tier 3**: User preferences in `user_preferences` table
+- **Database Tables Created**:
+  - `app_settings` - Key-value configuration with JSON schemas
+  - `settings_audit_log` - Automatic audit trail for all changes
+  - `user_preferences` - Per-user preference overrides
+  - `market_benchmarks` - Versioned market benchmark data
+  - `insurance_providers` - 15 Turkish insurance providers
+  - `regional_factors` - 7 Turkish regions with risk factors
+  - `feature_flags` - Feature flag management
+- **Key Files**:
+  - `src/lib/config/configuration-service.ts` - Singleton with 5-minute cache
+  - `src/lib/config/types.ts` - TypeScript types and default values
+  - `server/routes/settings.ts` - Admin API endpoints
+  - `supabase/migrations/012_configuration_system.sql` - Database schema
+  - `supabase/migrations/013_seed_configuration_defaults.sql` - Seeds all hardcoded values
+- **Usage**:
+  ```typescript
+  import { configService, getAIConfig, isFeatureEnabled } from '@/lib/config'
+
+  // Get typed configuration
+  const aiConfig = await configService.getAIConfig()
+  console.log(aiConfig.temperature)  // 0.1
+
+  // Check feature flags
+  if (await isFeatureEnabled('new_evaluation_algorithm')) {
+    // Use new algorithm
+  }
+  ```
+- **Categories**: ai, evaluation, rate_limits, ocr, fuzzy_matching, gap_analysis, ui, email
+- **Tests**: 46 unit tests for ConfigurationService
 
 ---
 
