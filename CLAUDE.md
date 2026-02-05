@@ -2632,6 +2632,13 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Categories**: ai, evaluation, rate_limits, ocr, fuzzy_matching, gap_analysis, ui, email
 - **Tests**: 46 unit tests for ConfigurationService
 
+### 55. Railway Build: TypeScript Not Found (Fixed Feb 5, 2026)
+- **Problem**: Railway build failed with `sh: 1: tsc: not found`
+- **Root Cause**: `npm ci` in production mode doesn't install devDependencies, but TypeScript is required for the build step
+- **Solution**: Changed `installCommand` in `railway.json` from `npm ci` to `npm ci --include=dev`
+- **File Changed**: `railway.json`
+- **Commit**: `d8687be`
+
 ---
 
 ## Turkish Market Considerations
