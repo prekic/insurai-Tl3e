@@ -8,6 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { SettingsSkeleton } from '@/components/ui/loading'
+import {
+  validateGradeThresholds,
+  type ValidationResult,
+} from '@/lib/admin/settings-validation'
 import {
   Save,
   Scale,
@@ -15,6 +20,7 @@ import {
   Target,
   AlertCircle,
   Info,
+  BarChart3,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -76,6 +82,19 @@ export function EvaluationSettingsPanel({
     const weights = editingWeights ? tempWeights : currentWeights
     return Object.values(weights).reduce((sum, w) => sum + w, 0)
   }, [editingWeights, tempWeights, currentWeights])
+
+  // Validate grade thresholds are in descending order
+  const gradeValidation = useMemo((): ValidationResult | null => {
+    if (!editingGrades) return null
+    return validateGradeThresholds({
+      grade_a_threshold: tempGrades.grade_a_threshold ?? 0,
+      grade_b_threshold: tempGrades.grade_b_threshold ?? 0,
+      grade_c_threshold: tempGrades.grade_c_threshold ?? 0,
+      grade_d_threshold: tempGrades.grade_d_threshold ?? 0,
+    })
+  }, [editingGrades, tempGrades])
+
+  const canSaveGrades = !gradeValidation || gradeValidation.valid
 
   const startEditingWeights = () => {
     setTempWeights({ ...currentWeights })
@@ -148,22 +167,26 @@ export function EvaluationSettingsPanel({
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading evaluation settings...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SettingsSkeleton groups={3} itemsPerGroup={4} />
   }
 
   if (settings.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>No evaluation settings found. Run the database migration to seed default values.</p>
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <BarChart3 className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">No Evaluation Settings Found</h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                Run the database migration to seed default scoring weights and grade thresholds.
+              </p>
+            </div>
+            <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+              npx supabase migration up
+            </code>
           </div>
         </CardContent>
       </Card>
@@ -249,7 +272,12 @@ export function EvaluationSettingsPanel({
                         max="100"
                         value={weight}
                         onChange={(e) => handleWeightChange(key, Number(e.target.value))}
-                        className="flex-1"
+                        className="flex-1 accent-blue-600"
+                        aria-label={`${getWeightLabel(key)} weight slider`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={weight}
+                        aria-valuetext={`${weight}%`}
                       />
                       <Input
                         type="number"
@@ -258,6 +286,7 @@ export function EvaluationSettingsPanel({
                         value={weight}
                         onChange={(e) => handleWeightChange(key, Number(e.target.value))}
                         className="w-20"
+                        aria-label={`${getWeightLabel(key)} weight input`}
                       />
                     </>
                   ) : (
@@ -314,7 +343,7 @@ export function EvaluationSettingsPanel({
               <Button onClick={startEditingGrades}>Edit Thresholds</Button>
             ) : (
               <div className="flex gap-2">
-                <Button onClick={saveGrades} disabled={isSaving}>
+                <Button onClick={saveGrades} disabled={isSaving || !canSaveGrades}>
                   <Save className="h-4 w-4 mr-1" />
                   Save
                 </Button>
@@ -405,12 +434,22 @@ export function EvaluationSettingsPanel({
             </div>
           )}
 
+          {/* Validation error for grade thresholds */}
+          {editingGrades && gradeValidation && !gradeValidation.valid && (
+            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+              <AlertCircle className="h-4 w-4" />
+              <span>{gradeValidation.error}</span>
+            </div>
+          )}
+
           {/* Info box */}
           <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-2 text-blue-700">
             <Info className="h-4 w-4 mt-0.5" />
             <div className="text-sm">
               <strong>How grades work:</strong> A policy with a score of 85 would receive grade B
               (if B threshold is 80 and A threshold is 90). Score below D threshold gets grade F.
+              <br />
+              <strong>Note:</strong> Thresholds must be in descending order (A {">"} B {">"} C {">"} D).
             </div>
           </div>
         </CardContent>

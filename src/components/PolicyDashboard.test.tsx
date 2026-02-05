@@ -164,6 +164,15 @@ vi.mock('sonner', () => ({
   },
 }))
 
+// Mock auth context for useTrialTransfer hook
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({
+    user: { id: 'user-1', email: 'test@example.com' },
+    loading: false,
+    isConfigured: true,
+  }),
+}))
+
 function renderDashboard() {
   return render(
     <BrowserRouter>

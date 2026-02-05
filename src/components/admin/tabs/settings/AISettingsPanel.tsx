@@ -3,11 +3,17 @@
  * Configure AI providers, models, temperatures, and extraction settings
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { SettingsSkeleton } from '@/components/ui/loading'
+import {
+  validateSetting,
+  getValidationDescription,
+  type ValidationResult,
+} from '@/lib/admin/settings-validation'
 import {
   Save,
   Sparkles,
@@ -16,6 +22,7 @@ import {
   Zap,
   ToggleLeft,
   ToggleRight,
+  FileQuestion,
   AlertCircle,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
@@ -75,6 +82,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editReason, setEditReason] = useState<string>('')
+  const [validationError, setValidationError] = useState<ValidationResult | null>(null)
 
   const getSettingByKey = (key: string): SettingValue | undefined => {
     return settings.find((s) => s.key === key)
@@ -84,37 +92,65 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
     setEditingKey(setting.key)
     setEditValue(String(setting.value))
     setEditReason('')
+    setValidationError(null)
   }
 
+  // Validate on value change
+  useEffect(() => {
+    if (editingKey && editValue !== '') {
+      const setting = getSettingByKey(editingKey)
+      if (setting) {
+        const valueToValidate = setting.valueType === 'number' ? Number(editValue) : editValue
+        const result = validateSetting(editingKey, valueToValidate)
+        setValidationError(result.valid ? null : result)
+      }
+    }
+  }, [editingKey, editValue])
+
   const handleSave = async (setting: SettingValue) => {
+    // Final validation before save
     let value: unknown = editValue
     if (setting.valueType === 'number') value = Number(editValue)
     if (setting.valueType === 'boolean') value = editValue === 'true'
+
+    const result = validateSetting(setting.key, value)
+    if (!result.valid) {
+      setValidationError(result)
+      return
+    }
+
     await onUpdate(setting.key, value, editReason || undefined)
     setEditingKey(null)
+    setValidationError(null)
   }
 
   const handleToggle = async (setting: SettingValue) => {
     await onUpdate(setting.key, !setting.value, 'Toggled via admin panel')
   }
 
+  const canSave = !validationError && editValue !== ''
+
   const renderSettingInput = (setting: SettingValue) => {
     const isEditing = editingKey === setting.key
 
     // Boolean toggle
     if (setting.valueType === 'boolean') {
+      const keyLabel = setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
       return (
         <button
           onClick={() => handleToggle(setting)}
           disabled={isSaving}
-          className={`p-1 rounded transition-colors ${
+          className={`p-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
             setting.value ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'
           }`}
+          role="switch"
+          aria-checked={setting.value as boolean}
+          aria-label={`${keyLabel}: ${setting.value ? 'Enabled' : 'Disabled'}`}
         >
           {setting.value ? (
-            <ToggleRight className="h-8 w-8" />
+            <ToggleRight className="h-7 w-7" />
           ) : (
-            <ToggleLeft className="h-8 w-8" />
+            <ToggleLeft className="h-7 w-7" />
           )}
         </button>
       )
@@ -172,6 +208,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
 
     // Number input with slider for temperatures
     if (setting.key.includes('temperature')) {
+      const validationHint = getValidationDescription(setting.key)
       if (isEditing) {
         return (
           <div className="flex flex-col gap-2 w-64">
@@ -183,10 +220,23 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
                 step="0.1"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
-                className="flex-1"
+                className={`flex-1 accent-blue-600 ${validationError ? 'accent-red-500' : ''}`}
+                aria-label={`${setting.key} slider`}
+                aria-invalid={!!validationError}
               />
-              <span className="font-mono text-sm w-12">{editValue}</span>
+              <span className={`font-mono text-sm w-12 ${validationError ? 'text-red-600' : ''}`}>
+                {editValue}
+              </span>
             </div>
+            {validationError && (
+              <div className="flex items-center gap-1 text-red-600 text-xs">
+                <AlertCircle className="h-3 w-3" />
+                <span>{validationError.error}</span>
+              </div>
+            )}
+            {validationHint && !validationError && (
+              <div className="text-xs text-gray-500">{validationHint}</div>
+            )}
             <Input
               placeholder="Reason for change"
               value={editReason}
@@ -194,7 +244,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
               className="text-sm"
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving}>
+              <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving || !canSave}>
                 <Save className="h-4 w-4 mr-1" />
                 Save
               </Button>
@@ -223,14 +273,25 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
 
     // Generic number/string input
     if (isEditing) {
+      const validationHint = getValidationDescription(setting.key)
       return (
         <div className="flex flex-col gap-2">
           <Input
             type={setting.valueType === 'number' ? 'number' : 'text'}
             value={editValue}
             onChange={(e) => setEditValue(e.target.value)}
-            className="w-40"
+            className={`w-40 ${validationError ? 'border-red-300 focus:ring-red-500' : ''}`}
+            aria-invalid={!!validationError}
           />
+          {validationError && (
+            <div className="flex items-center gap-1 text-red-600 text-xs">
+              <AlertCircle className="h-3 w-3" />
+              <span>{validationError.error}</span>
+            </div>
+          )}
+          {validationHint && !validationError && (
+            <div className="text-xs text-gray-500">{validationHint}</div>
+          )}
           <Input
             placeholder="Reason for change"
             value={editReason}
@@ -238,7 +299,7 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
             className="text-sm"
           />
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving}>
+            <Button size="sm" onClick={() => handleSave(setting)} disabled={isSaving || !canSave}>
               <Save className="h-4 w-4 mr-1" />
               Save
             </Button>
@@ -282,22 +343,26 @@ export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AIS
   }
 
   if (isLoading) {
-    return (
-      <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500">Loading AI settings...</div>
-        </CardContent>
-      </Card>
-    )
+    return <SettingsSkeleton groups={4} itemsPerGroup={3} />
   }
 
   if (settings.length === 0) {
     return (
       <Card>
-        <CardContent className="py-8">
-          <div className="text-center text-gray-500 flex flex-col items-center gap-2">
-            <AlertCircle className="h-8 w-8" />
-            <p>No AI settings found. Run the database migration to seed default values.</p>
+        <CardContent className="py-12">
+          <div className="text-center flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center">
+              <FileQuestion className="h-8 w-8 text-gray-400" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="font-semibold text-gray-900">No AI Settings Found</h3>
+              <p className="text-gray-500 text-sm max-w-sm">
+                Run the database migration to seed default AI configuration values.
+              </p>
+            </div>
+            <code className="px-3 py-2 bg-gray-100 rounded-lg text-sm text-gray-700 font-mono">
+              npx supabase migration up
+            </code>
           </div>
         </CardContent>
       </Card>

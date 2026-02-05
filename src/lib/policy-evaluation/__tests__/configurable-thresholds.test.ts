@@ -7,8 +7,6 @@ import {
   getGradeFromScore,
   getStatusFromScore,
   convertDatabaseConfigToEvaluatorConfig,
-  DEFAULT_GRADE_THRESHOLDS,
-  DEFAULT_STATUS_THRESHOLDS,
 } from '../types'
 import { evaluatePolicy, type EvaluatePolicyOptions } from '../evaluator'
 import type { Policy } from '@/types/policy'

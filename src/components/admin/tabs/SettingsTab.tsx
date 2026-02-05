@@ -16,6 +16,7 @@ import {
   X,
   AlertCircle,
   Sliders,
+  History,
 } from 'lucide-react'
 
 // Sub-panels
@@ -24,8 +25,9 @@ import { EvaluationSettingsPanel } from './settings/EvaluationSettingsPanel'
 import { RateLimitsPanel } from './settings/RateLimitsPanel'
 import { OCRSettingsPanel } from './settings/OCRSettingsPanel'
 import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
+import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -64,6 +66,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Feature Flags',
     description: 'Enable or disable features and manage rollouts',
     icon: <Sliders className="h-5 w-5" />,
+  },
+  {
+    id: 'history',
+    label: 'History',
+    description: 'View audit log of all settings changes',
+    icon: <History className="h-5 w-5" />,
   },
 ]
 
@@ -197,6 +205,8 @@ export function SettingsTab() {
         )
       case 'feature_flags':
         return <FeatureFlagsPanel />
+      case 'history':
+        return <SettingsHistoryPanel />
       default:
         return null
     }
@@ -237,19 +247,24 @@ export function SettingsTab() {
       )}
 
       {/* Category Navigation */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((category) => (
-          <Button
-            key={category.id}
-            variant={activeCategory === category.id ? 'default' : 'outline'}
-            onClick={() => setActiveCategory(category.id)}
-            className="flex items-center gap-2"
-          >
-            {category.icon}
-            {category.label}
-          </Button>
-        ))}
-      </div>
+      <nav aria-label="Settings categories">
+        <div className="flex overflow-x-auto pb-2 -mx-1 px-1 gap-2 scrollbar-hide md:flex-wrap md:overflow-visible">
+          {CATEGORIES.map((category) => (
+            <Button
+              key={category.id}
+              variant={activeCategory === category.id ? 'default' : 'outline'}
+              onClick={() => setActiveCategory(category.id)}
+              className="flex items-center gap-2 whitespace-nowrap flex-shrink-0"
+              aria-pressed={activeCategory === category.id}
+              aria-label={`${category.label}: ${category.description}`}
+            >
+              {category.icon}
+              <span className="hidden sm:inline">{category.label}</span>
+              <span className="sm:hidden">{category.label.split(' ')[0]}</span>
+            </Button>
+          ))}
+        </div>
+      </nav>
 
       {/* Active Panel */}
       <div className="min-h-[400px]">{renderPanel()}</div>
