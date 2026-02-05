@@ -140,6 +140,117 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 })
 
+// =============================================================================
+// FEATURE FLAGS ROUTES (must be before /:category to avoid route conflict)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/feature-flags
+ * List all feature flags
+ */
+router.get('/feature-flags', async (_req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  try {
+    const { data, error } = await supabase.from('feature_flags').select('*').order('key')
+
+    if (error) {
+      console.error('[Settings API] Error fetching feature flags:', error)
+      return res.status(500).json({ success: false, error: 'Failed to fetch feature flags' })
+    }
+
+    return res.json({
+      success: true,
+      data: (data || []).map((flag) => ({
+        id: flag.id,
+        key: flag.key,
+        name: flag.name,
+        description: flag.description,
+        enabled: flag.enabled,
+        rolloutPercentage: flag.rollout_percentage,
+        userSegments: flag.user_segments,
+        conditions: flag.conditions,
+        expiresAt: flag.expires_at,
+        createdAt: flag.created_at,
+        updatedAt: flag.updated_at,
+      })),
+    })
+  } catch (error) {
+    console.error('[Settings API] Exception:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/feature-flags/:key
+ * Update a feature flag
+ */
+router.put('/feature-flags/:key', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const { key } = req.params
+
+  const parseResult = updateFeatureFlagSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const updates = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  try {
+    const updateData: Record<string, unknown> = {
+      updated_by: adminUserId,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updates.enabled !== undefined) updateData.enabled = updates.enabled
+    if (updates.rolloutPercentage !== undefined)
+      updateData.rollout_percentage = updates.rolloutPercentage
+    if (updates.userSegments !== undefined) updateData.user_segments = updates.userSegments
+    if (updates.conditions !== undefined) updateData.conditions = updates.conditions
+    if (updates.expiresAt !== undefined) updateData.expires_at = updates.expiresAt
+
+    const { data, error } = await supabase
+      .from('feature_flags')
+      .update(updateData)
+      .eq('key', key)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Feature flag not found' })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        key: data.key,
+        enabled: data.enabled,
+        rolloutPercentage: data.rollout_percentage,
+        updatedAt: data.updated_at,
+      },
+    })
+  } catch (error) {
+    console.error('[Settings API] Exception:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// CATEGORY-BASED SETTINGS ROUTES
+// =============================================================================
+
 /**
  * GET /api/admin/settings/:category
  * Get all settings for a specific category
@@ -400,112 +511,6 @@ router.get('/:category/:key/history', async (req: Request, res: Response) => {
           changedAt: entry.changed_at,
           reason: entry.reason,
         })),
-      },
-    })
-  } catch (error) {
-    console.error('[Settings API] Exception:', error)
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-// =============================================================================
-// FEATURE FLAGS ROUTES
-// =============================================================================
-
-/**
- * GET /api/admin/settings/feature-flags
- * List all feature flags
- */
-router.get('/feature-flags', async (_req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  try {
-    const { data, error } = await supabase.from('feature_flags').select('*').order('key')
-
-    if (error) {
-      console.error('[Settings API] Error fetching feature flags:', error)
-      return res.status(500).json({ success: false, error: 'Failed to fetch feature flags' })
-    }
-
-    return res.json({
-      success: true,
-      data: (data || []).map((flag) => ({
-        id: flag.id,
-        key: flag.key,
-        name: flag.name,
-        description: flag.description,
-        enabled: flag.enabled,
-        rolloutPercentage: flag.rollout_percentage,
-        userSegments: flag.user_segments,
-        conditions: flag.conditions,
-        expiresAt: flag.expires_at,
-        updatedAt: flag.updated_at,
-      })),
-    })
-  } catch (error) {
-    console.error('[Settings API] Exception:', error)
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * PUT /api/admin/settings/feature-flags/:key
- * Update a feature flag
- */
-router.put('/feature-flags/:key', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const { key } = req.params
-
-  const parseResult = updateFeatureFlagSchema.safeParse(req.body)
-  if (!parseResult.success) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body',
-      details: parseResult.error.issues,
-    })
-  }
-
-  const updates = parseResult.data
-  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
-
-  try {
-    const updateData: Record<string, unknown> = {
-      updated_by: adminUserId,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (updates.enabled !== undefined) updateData.enabled = updates.enabled
-    if (updates.rolloutPercentage !== undefined)
-      updateData.rollout_percentage = updates.rolloutPercentage
-    if (updates.userSegments !== undefined) updateData.user_segments = updates.userSegments
-    if (updates.conditions !== undefined) updateData.conditions = updates.conditions
-    if (updates.expiresAt !== undefined) updateData.expires_at = updates.expiresAt
-
-    const { data, error } = await supabase
-      .from('feature_flags')
-      .update(updateData)
-      .eq('key', key)
-      .select()
-      .single()
-
-    if (error || !data) {
-      return res.status(404).json({ success: false, error: 'Feature flag not found' })
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        key: data.key,
-        enabled: data.enabled,
-        rolloutPercentage: data.rollout_percentage,
-        updatedAt: data.updated_at,
       },
     })
   } catch (error) {
