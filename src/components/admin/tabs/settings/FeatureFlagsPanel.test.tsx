@@ -210,6 +210,14 @@ describe('FeatureFlagsPanel', () => {
   })
 
   describe('Rollout Percentage', () => {
+    beforeEach(() => {
+      mockAdminFetch.mockReset()
+      mockAdminFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, data: mockFlags }),
+      })
+    })
+
     it('should display rollout controls for enabled flags', async () => {
       render(<FeatureFlagsPanel />)
 
@@ -307,7 +315,7 @@ describe('FeatureFlagsPanel - Info Section', () => {
     render(<FeatureFlagsPanel />)
 
     await waitFor(() => {
-      expect(screen.getByText(/feature flags/i)).toBeInTheDocument()
+      expect(screen.getAllByText(/feature flags/i).length).toBeGreaterThan(0)
     })
   })
 })

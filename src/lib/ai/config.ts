@@ -210,6 +210,7 @@ export async function getAnthropicClient(): Promise<any> {
   const { default: Anthropic } = await import('@anthropic-ai/sdk')
   cachedAnthropic = new Anthropic({
     apiKey,
+    dangerouslyAllowBrowser: true,
   })
   return cachedAnthropic
 }

@@ -192,7 +192,8 @@ export function ButtonLoader() {
  */
 export function SettingsSkeleton({ groups = 2, itemsPerGroup = 3 }: { groups?: number; itemsPerGroup?: number }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" role="status" aria-label="Loading settings">
+      <span className="sr-only">Loading settings...</span>
       {Array.from({ length: groups }).map((_, groupIndex) => (
         <div key={groupIndex} className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
           {/* Card Header */}
@@ -226,7 +227,8 @@ export function SettingsSkeleton({ groups = 2, itemsPerGroup = 3 }: { groups?: n
  */
 export function FeatureFlagSkeleton({ count = 3 }: { count?: number }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" role="status" aria-label="Loading feature flags">
+      <span className="sr-only">Loading feature flags...</span>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
           <div className="flex items-start justify-between">

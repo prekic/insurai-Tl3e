@@ -202,38 +202,38 @@ describe('AI Config', () => {
   })
 
   describe('getOpenAIClient', () => {
-    it('should return null when no key is configured and no proxy', () => {
+    it('should return null when no key is configured and no proxy', async () => {
       // Clear localStorage
       localStorage.removeItem('insurai_openai_key')
-      const client = getOpenAIClient()
+      const client = await getOpenAIClient()
       // Returns null when no key and no proxy, or null with warning when proxy is configured
       expect(client === null || typeof client === 'object').toBe(true)
     })
 
-    it('should return OpenAI client when key is in localStorage and no proxy', () => {
+    it('should return OpenAI client when key is in localStorage and no proxy', async () => {
       if (!isProxyConfigured()) {
         localStorage.setItem('insurai_openai_key', 'sk-test-valid-key-12345678901234567890')
-        const client = getOpenAIClient()
+        const client = await getOpenAIClient()
         expect(client === null || typeof client === 'object').toBe(true)
       }
     })
   })
 
   describe('getAnthropicClient', () => {
-    it('should return null when no key is configured and no proxy', () => {
+    it('should return null when no key is configured and no proxy', async () => {
       localStorage.removeItem('insurai_anthropic_key')
-      const client = getAnthropicClient()
+      const client = await getAnthropicClient()
       expect(client === null || typeof client === 'object').toBe(true)
     })
 
-    it('should return Anthropic client when key is in localStorage and no proxy', () => {
+    it('should return Anthropic client when key is in localStorage and no proxy', async () => {
       if (!isProxyConfigured()) {
         localStorage.setItem('insurai_anthropic_key', 'sk-ant-test-valid-key-12345678901234567890')
         try {
-          const client = getAnthropicClient()
+          const client = await getAnthropicClient()
           expect(client === null || typeof client === 'object').toBe(true)
         } catch (error) {
-          // Anthropic SDK throws in browser-like environments (like Vitest with happy-dom)
+          // Anthropic SDK throws in browser-like environments (like Vitest with jsdom)
           // without dangerouslyAllowBrowser: true. This is expected behavior.
           expect((error as Error).message).toContain('browser-like environment')
         }
