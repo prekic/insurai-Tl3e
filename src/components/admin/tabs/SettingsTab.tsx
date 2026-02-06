@@ -22,6 +22,7 @@ import {
   FileWarning,
   Activity,
   Layers,
+  Webhook,
 } from 'lucide-react'
 
 // Sub-panels
@@ -33,8 +34,9 @@ import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
 import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
 import { SettingsTemplatesPanel } from './settings/SettingsTemplatesPanel'
+import { SettingsWebhooksPanel } from './settings/SettingsWebhooksPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates' | 'webhooks'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -91,6 +93,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Templates',
     description: 'Apply predefined configuration profiles',
     icon: <Layers className="h-5 w-5" />,
+  },
+  {
+    id: 'webhooks',
+    label: 'Webhooks',
+    description: 'Notify external systems when settings change',
+    icon: <Webhook className="h-5 w-5" />,
   },
 ]
 
@@ -433,6 +441,8 @@ export function SettingsTab() {
             isSaving={isSaving}
           />
         )
+      case 'webhooks':
+        return <SettingsWebhooksPanel />
       default:
         return null
     }

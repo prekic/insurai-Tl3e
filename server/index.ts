@@ -25,6 +25,7 @@ import adminRoutes from './routes/admin.js'
 import pdfRoutes from './routes/pdf.js'
 import emailRoutes from './routes/email.js'
 import settingsRoutes from './routes/settings.js'
+import webhookRoutes from './routes/webhooks.js'
 import {
   generalLimiter,
   healthLimiter,
@@ -279,6 +280,9 @@ app.use('/api/admin', adminRoutes)
 
 // Admin settings API routes (configuration management)
 app.use('/api/admin/settings', settingsRoutes)
+
+// Admin webhooks API routes (settings change notifications)
+app.use('/api/admin/webhooks', webhookRoutes)
 
 // PDF extraction routes (with longer timeout for large files)
 app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)

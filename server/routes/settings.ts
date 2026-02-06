@@ -21,6 +21,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { fireWebhooks } from '../services/webhook-service.js'
 
 const router = Router()
 
@@ -856,6 +857,16 @@ router.post('/import', async (req: Request, res: Response) => {
       user_agent: req.get('user-agent'),
     })
 
+    // Fire webhooks for import (async, non-blocking)
+    if (totalUpdated > 0) {
+      fireWebhooks('setting.imported', {
+        category: '_system',
+        changes: [{ key: 'config_import', previous_value: null, new_value: { totalUpdated, totalErrors } }],
+        reason: importReason,
+        changed_by: adminUserId,
+      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }
+
     return res.json({
       success: true,
       data: {
@@ -1044,6 +1055,26 @@ router.put('/batch', async (req: Request, res: Response) => {
 
   const skippedCount = updates.length - validatedUpdates.length - validationErrors.length
 
+  // Fire webhooks for batch update (async, non-blocking)
+  if (results.length > 0) {
+    // Group changes by category for cleaner payloads
+    const byCategory = results.reduce<Record<string, Array<{ key: string; previous_value: unknown; new_value: unknown }>>>(
+      (acc, r) => {
+        if (!acc[r.category]) acc[r.category] = []
+        acc[r.category].push({ key: r.key, previous_value: r.previousValue, new_value: r.newValue })
+        return acc
+      }, {}
+    )
+    for (const [cat, changes] of Object.entries(byCategory)) {
+      fireWebhooks('setting.batch_updated', {
+        category: cat,
+        changes,
+        reason,
+        changed_by: adminUserId,
+      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }
+  }
+
   return res.json({
     success: errors.length === 0,
     data: {
@@ -1147,6 +1178,13 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
     if (error || !data) {
       return res.status(404).json({ success: false, error: 'Feature flag not found' })
     }
+
+    // Fire webhooks for feature flag toggle (async, non-blocking)
+    fireWebhooks('feature_flag.toggled', {
+      category: 'feature_flags',
+      changes: [{ key: data.key, previous_value: null, new_value: { enabled: data.enabled, rolloutPercentage: data.rollout_percentage } }],
+      changed_by: adminUserId,
+    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
 
     return res.json({
       success: true,
@@ -1371,6 +1409,14 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
         user_agent: req.get('user-agent'),
       })
     }
+
+    // Fire webhooks (async, non-blocking)
+    fireWebhooks('setting.updated', {
+      category,
+      changes: [{ key, previous_value: existing.value, new_value: value }],
+      reason,
+      changed_by: adminUserId,
+    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
 
     return res.json({
       success: true,
