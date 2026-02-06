@@ -34,7 +34,22 @@ export {
   getFuzzyMatchingConfig,
   isFeatureEnabled,
   getRegionalFactor,
+  getUIConfigForUser,
+  getEmailConfigForUser,
 } from './configuration-service'
+
+// User-overridable settings
+export {
+  USER_OVERRIDABLE_CATEGORIES,
+  USER_OVERRIDABLE_KEYS,
+  PREFERENCE_FIELDS,
+  isUserOverridableCategory,
+  isUserOverridableKey,
+  mergeWithUserPreferences,
+  extractOverridableValues,
+} from './user-overridable'
+
+export type { UserOverridableCategory, PreferenceFieldMeta } from './user-overridable'
 
 // Performance monitoring
 export {
