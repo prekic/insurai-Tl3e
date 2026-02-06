@@ -7,7 +7,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 export type NotificationType = 'error' | 'warning' | 'info'
-export type NotificationCategory = 'billing' | 'api_error' | 'rate_limit' | 'system' | 'security'
+export type NotificationCategory = 'billing' | 'api_error' | 'rate_limit' | 'system' | 'security' | 'performance'
 
 export interface AdminNotification {
   id?: string
@@ -208,6 +208,24 @@ export async function notifyRateLimit(
     title: `${provider.toUpperCase()} Rate Limit Exceeded`,
     message: `API rate limit reached for ${provider}. Requests are being throttled.`,
     provider,
+    details,
+  })
+}
+
+/**
+ * Helper: Create performance alert notification
+ */
+export async function notifyPerformanceAlert(
+  alertType: string,
+  severity: 'warning' | 'critical',
+  message: string,
+  details?: Record<string, unknown>
+): Promise<void> {
+  await createNotification({
+    type: severity === 'critical' ? 'error' : 'warning',
+    category: 'performance',
+    title: `Config Performance ${severity === 'critical' ? 'Critical' : 'Warning'}: ${alertType}`,
+    message,
     details,
   })
 }

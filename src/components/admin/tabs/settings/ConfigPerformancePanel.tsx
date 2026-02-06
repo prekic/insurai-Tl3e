@@ -2,19 +2,26 @@
  * Config Performance Panel
  *
  * Displays real-time config fetch performance metrics:
+ * - Active performance alerts with severity indicators
  * - Cache hit/miss rates
  * - DB fetch latency (avg, p50, p95, p99)
  * - Per-category breakdown
  * - TTL recommendation
+ * - Alert threshold configuration
  * - Recent events log
  */
 
 import { useState, useEffect, useCallback } from 'react'
 import { configPerformanceMonitor } from '@/lib/config'
-import type { PerformanceSnapshot } from '@/lib/config'
+import type { PerformanceSnapshot, AlertThresholds, PerformanceAlert } from '@/lib/config'
+import { DEFAULT_ALERT_THRESHOLDS } from '@/lib/config'
 import { adminFetch } from '@/lib/admin/api'
 import { Button } from '@/components/ui/button'
-import { RefreshCw, Activity, Database, Zap, Clock, AlertTriangle, CheckCircle, Server, Monitor } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import {
+  RefreshCw, Activity, Database, Zap, Clock, AlertTriangle, CheckCircle,
+  Server, Monitor, Bell, BellOff, Settings, X,
+} from 'lucide-react'
 
 type MetricsSource = 'client' | 'server'
 
@@ -23,9 +30,11 @@ export function ConfigPerformancePanel() {
   const [serverSnapshot, setServerSnapshot] = useState<Record<string, unknown> | null>(null)
   const [source, setSource] = useState<MetricsSource>('client')
   const [autoRefresh, setAutoRefresh] = useState(true)
+  const [showThresholdConfig, setShowThresholdConfig] = useState(false)
+  const [thresholdEdits, setThresholdEdits] = useState<Partial<AlertThresholds>>({})
+  const [isSavingThresholds, setIsSavingThresholds] = useState(false)
 
   const refreshMetrics = useCallback(() => {
-    // Client-side metrics are always available
     const snap = configPerformanceMonitor.getSnapshot()
     setClientSnapshot(snap)
   }, [])
@@ -52,14 +61,13 @@ export function ConfigPerformancePanel() {
     const interval = setInterval(() => {
       refreshMetrics()
       if (source === 'server') fetchServerMetrics()
-    }, 5000) // Refresh every 5 seconds
+    }, 5000)
     return () => clearInterval(interval)
   }, [autoRefresh, source, refreshMetrics, fetchServerMetrics])
 
   const snapshot = source === 'client' ? clientSnapshot : null
   const serverSnap = source === 'server' ? serverSnapshot : null
 
-  // Use either client or server snapshot for display
   const displayData = source === 'client' ? snapshot : serverSnap
   const totalEvents = source === 'client'
     ? (snapshot?.totalEvents ?? 0)
@@ -81,6 +89,45 @@ export function ConfigPerformancePanel() {
     ? snapshot?.categories
     : (serverSnap?.categories as PerformanceSnapshot['categories'] | undefined)
 
+  // Get alerts from the appropriate source
+  const alerts: PerformanceAlert[] = source === 'client'
+    ? (snapshot?.alerts ?? [])
+    : ((serverSnap?.alerts as PerformanceAlert[]) ?? [])
+
+  const currentThresholds: AlertThresholds = source === 'client'
+    ? (snapshot?.alertThresholds ?? DEFAULT_ALERT_THRESHOLDS)
+    : ((serverSnap?.alertThresholds as AlertThresholds) ?? DEFAULT_ALERT_THRESHOLDS)
+
+  const openThresholdConfig = () => {
+    setThresholdEdits({ ...currentThresholds })
+    setShowThresholdConfig(true)
+  }
+
+  const saveThresholds = async () => {
+    setIsSavingThresholds(true)
+    try {
+      if (source === 'client') {
+        configPerformanceMonitor.setAlertThresholds(thresholdEdits)
+        refreshMetrics()
+      } else {
+        const response = await adminFetch('/api/admin/settings/performance/thresholds', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(thresholdEdits),
+        })
+        const json = await response.json()
+        if (json.success) {
+          await fetchServerMetrics()
+        }
+      }
+      setShowThresholdConfig(false)
+    } catch {
+      // Failed to save
+    } finally {
+      setIsSavingThresholds(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -92,6 +139,12 @@ export function ConfigPerformancePanel() {
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
               <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
               Live
+            </span>
+          )}
+          {alerts.length > 0 && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full">
+              <Bell className="h-3 w-3" />
+              {alerts.length} alert{alerts.length > 1 ? 's' : ''}
             </span>
           )}
         </div>
@@ -128,6 +181,45 @@ export function ConfigPerformancePanel() {
           </Button>
         </div>
       </div>
+
+      {/* Active Alerts */}
+      {alerts.length > 0 && (
+        <div className="space-y-2" data-testid="active-alerts">
+          {alerts.map((alert) => (
+            <div
+              key={alert.id}
+              className={`flex items-start gap-3 p-3 rounded-lg border ${
+                alert.severity === 'critical'
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-amber-50 border-amber-200'
+              }`}
+            >
+              {alert.severity === 'critical' ? (
+                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+              ) : (
+                <Bell className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className={`text-sm font-medium ${
+                  alert.severity === 'critical' ? 'text-red-800' : 'text-amber-800'
+                }`}>
+                  {alert.message}
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  Triggered {new Date(alert.triggeredAt).toLocaleTimeString()}
+                </div>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                alert.severity === 'critical'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {alert.severity}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       {!displayData || totalEvents === 0 ? (
         <div className="text-center py-12 text-gray-500">
@@ -269,6 +361,134 @@ export function ConfigPerformancePanel() {
             </div>
           )}
 
+          {/* Alert Thresholds Configuration */}
+          <div className="bg-white border border-gray-200 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                Alert Thresholds
+              </h3>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => showThresholdConfig ? setShowThresholdConfig(false) : openThresholdConfig()}
+              >
+                {showThresholdConfig ? (
+                  <><X className="h-3.5 w-3.5 mr-1" /> Cancel</>
+                ) : (
+                  <><Settings className="h-3.5 w-3.5 mr-1" /> Configure</>
+                )}
+              </Button>
+            </div>
+
+            {showThresholdConfig ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <ThresholdInput
+                    label="Cache Hit Rate Warning"
+                    description="Alert when hit rate drops below"
+                    value={thresholdEdits.cacheHitRateWarning ?? currentThresholds.cacheHitRateWarning}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, cacheHitRateWarning: v })}
+                    format="percent"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                  <ThresholdInput
+                    label="Cache Hit Rate Critical"
+                    description="Critical alert when hit rate drops below"
+                    value={thresholdEdits.cacheHitRateCritical ?? currentThresholds.cacheHitRateCritical}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, cacheHitRateCritical: v })}
+                    format="percent"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                  />
+                  <ThresholdInput
+                    label="Error Rate Warning"
+                    description="Alert when error rate exceeds"
+                    value={thresholdEdits.errorRateWarning ?? currentThresholds.errorRateWarning}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, errorRateWarning: v })}
+                    format="percent"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                  />
+                  <ThresholdInput
+                    label="Error Rate Critical"
+                    description="Critical alert when error rate exceeds"
+                    value={thresholdEdits.errorRateCritical ?? currentThresholds.errorRateCritical}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, errorRateCritical: v })}
+                    format="percent"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                  />
+                  <ThresholdInput
+                    label="DB Latency Warning (ms)"
+                    description="Alert when avg DB latency exceeds"
+                    value={thresholdEdits.dbLatencyWarning ?? currentThresholds.dbLatencyWarning}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, dbLatencyWarning: v })}
+                    format="ms"
+                    min={0}
+                    max={10000}
+                    step={10}
+                  />
+                  <ThresholdInput
+                    label="DB Latency Critical (ms)"
+                    description="Critical alert when avg DB latency exceeds"
+                    value={thresholdEdits.dbLatencyCritical ?? currentThresholds.dbLatencyCritical}
+                    onChange={(v) => setThresholdEdits({ ...thresholdEdits, dbLatencyCritical: v })}
+                    format="ms"
+                    min={0}
+                    max={10000}
+                    step={10}
+                  />
+                </div>
+                <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                  <Button size="sm" onClick={saveThresholds} disabled={isSavingThresholds}>
+                    Save Thresholds
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setThresholdEdits({ ...DEFAULT_ALERT_THRESHOLDS })}
+                  >
+                    Reset to Defaults
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div>
+                  <span className="text-gray-500">Cache Hit Rate:</span>{' '}
+                  <span className="font-medium text-amber-600">{(currentThresholds.cacheHitRateWarning * 100).toFixed(0)}%</span>
+                  {' / '}
+                  <span className="font-medium text-red-600">{(currentThresholds.cacheHitRateCritical * 100).toFixed(0)}%</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Error Rate:</span>{' '}
+                  <span className="font-medium text-amber-600">{(currentThresholds.errorRateWarning * 100).toFixed(0)}%</span>
+                  {' / '}
+                  <span className="font-medium text-red-600">{(currentThresholds.errorRateCritical * 100).toFixed(0)}%</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">DB Latency:</span>{' '}
+                  <span className="font-medium text-amber-600">{currentThresholds.dbLatencyWarning}ms</span>
+                  {' / '}
+                  <span className="font-medium text-red-600">{currentThresholds.dbLatencyCritical}ms</span>
+                </div>
+              </div>
+            )}
+
+            {alerts.length === 0 && totalEvents >= (currentThresholds.minEventsForAlert ?? 20) && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-green-600">
+                <BellOff className="h-3.5 w-3.5" />
+                All metrics within thresholds
+              </div>
+            )}
+          </div>
+
           {/* TTL Recommendation (client-side only) */}
           {source === 'client' && snapshot?.ttlRecommendation && (
             <div className={`rounded-lg p-4 border ${getRecommendationStyle(snapshot.ttlRecommendation.suggestedTtlMs, snapshot.ttlRecommendation.currentTtlMs)}`}>
@@ -349,6 +569,47 @@ export function ConfigPerformancePanel() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// =============================================================================
+// THRESHOLD INPUT COMPONENT
+// =============================================================================
+
+interface ThresholdInputProps {
+  label: string
+  description: string
+  value: number
+  onChange: (value: number) => void
+  format: 'percent' | 'ms'
+  min: number
+  max: number
+  step: number
+}
+
+function ThresholdInput({ label, description, value, onChange, format, min, max, step }: ThresholdInputProps) {
+  const displayValue = format === 'percent' ? (value * 100).toFixed(0) : String(value)
+
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-medium text-gray-700">{label}</label>
+      <p className="text-xs text-gray-500">{description}</p>
+      <div className="flex items-center gap-2">
+        <Input
+          type="number"
+          value={displayValue}
+          onChange={(e) => {
+            const raw = Number(e.target.value)
+            onChange(format === 'percent' ? raw / 100 : raw)
+          }}
+          min={format === 'percent' ? min * 100 : min}
+          max={format === 'percent' ? max * 100 : max}
+          step={format === 'percent' ? step * 100 : step}
+          className="w-24 text-sm"
+        />
+        <span className="text-xs text-gray-500">{format === 'percent' ? '%' : 'ms'}</span>
+      </div>
     </div>
   )
 }

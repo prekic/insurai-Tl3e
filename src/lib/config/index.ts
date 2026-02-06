@@ -49,7 +49,13 @@ export type {
   CacheStats,
   CategoryStats,
   TtlRecommendation,
+  AlertThresholds,
+  AlertSeverity,
+  PerformanceAlert,
+  AlertEvaluation,
 } from './config-performance-monitor'
+
+export { DEFAULT_ALERT_THRESHOLDS } from './config-performance-monitor'
 
 // Types
 export type {

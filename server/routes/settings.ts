@@ -116,9 +116,43 @@ interface ServerConfigEvent {
   success: boolean
 }
 
+interface ServerAlertThresholds {
+  cacheHitRateWarning: number
+  cacheHitRateCritical: number
+  errorRateWarning: number
+  errorRateCritical: number
+  dbLatencyWarning: number
+  dbLatencyCritical: number
+  minEventsForAlert: number
+  alertCooldownMs: number
+}
+
+interface ServerPerformanceAlert {
+  id: string
+  type: 'cache_hit_rate' | 'error_rate' | 'db_latency'
+  severity: 'warning' | 'critical'
+  message: string
+  currentValue: number
+  threshold: number
+  triggeredAt: number
+}
+
 const serverPerfEvents: ServerConfigEvent[] = []
 const SERVER_PERF_MAX_EVENTS = 500
 const SERVER_PERF_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+
+let serverAlertThresholds: ServerAlertThresholds = {
+  cacheHitRateWarning: 0.5,
+  cacheHitRateCritical: 0.3,
+  errorRateWarning: 0.05,
+  errorRateCritical: 0.15,
+  dbLatencyWarning: 200,
+  dbLatencyCritical: 500,
+  minEventsForAlert: 20,
+  alertCooldownMs: 5 * 60 * 1000,
+}
+const serverLastAlertTimes = new Map<string, number>()
+let serverActiveAlerts: ServerPerformanceAlert[] = []
 
 function pruneServerPerfEvents(): void {
   const cutoff = Date.now() - SERVER_PERF_MAX_AGE_MS
@@ -200,8 +234,84 @@ function getServerPerformanceSnapshot() {
   }
 }
 
+function evaluateServerAlerts(): { alerts: ServerPerformanceAlert[]; suppressedCount: number } {
+  pruneServerPerfEvents()
+  const events = serverPerfEvents
+  const thresholds = serverAlertThresholds
+  const now = Date.now()
+  const alerts: ServerPerformanceAlert[] = []
+  let suppressedCount = 0
+
+  if (events.length < thresholds.minEventsForAlert) {
+    serverActiveAlerts = []
+    return { alerts: [], suppressedCount: 0 }
+  }
+
+  const totalHits = events.filter((e) => e.cacheHit).length
+  const hitRate = events.length > 0 ? totalHits / events.length : 0
+  const errorRate = events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
+  const dbEvents = events.filter((e) => !e.cacheHit && e.success)
+  const dbLatencies = dbEvents.map((e) => e.latencyMs)
+  const avgDbLatency = dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
+
+  const tryCreateAlert = (
+    type: ServerPerformanceAlert['type'],
+    severity: 'warning' | 'critical',
+    currentValue: number,
+    threshold: number
+  ): void => {
+    const key = `${type}:${severity}`
+    const last = serverLastAlertTimes.get(key) || 0
+    if (now - last < thresholds.alertCooldownMs) {
+      suppressedCount++
+      return
+    }
+    serverLastAlertTimes.set(key, now)
+    const messages: Record<string, string> = {
+      cache_hit_rate: `${severity === 'critical' ? 'Critical' : 'Warning'}: Cache hit rate at ${(currentValue * 100).toFixed(1)}% (threshold: ${(threshold * 100).toFixed(0)}%)`,
+      error_rate: `${severity === 'critical' ? 'Critical' : 'Warning'}: Error rate at ${(currentValue * 100).toFixed(1)}% (threshold: ${(threshold * 100).toFixed(0)}%)`,
+      db_latency: `${severity === 'critical' ? 'Critical' : 'Warning'}: DB latency at ${currentValue.toFixed(0)}ms (threshold: ${threshold.toFixed(0)}ms)`,
+    }
+    alerts.push({
+      id: `${type}-${severity}-${now}`,
+      type,
+      severity,
+      message: messages[type],
+      currentValue,
+      threshold,
+      triggeredAt: now,
+    })
+  }
+
+  // Cache hit rate checks
+  if (hitRate < thresholds.cacheHitRateCritical) {
+    tryCreateAlert('cache_hit_rate', 'critical', hitRate, thresholds.cacheHitRateCritical)
+  } else if (hitRate < thresholds.cacheHitRateWarning) {
+    tryCreateAlert('cache_hit_rate', 'warning', hitRate, thresholds.cacheHitRateWarning)
+  }
+
+  // Error rate checks
+  if (errorRate > thresholds.errorRateCritical) {
+    tryCreateAlert('error_rate', 'critical', errorRate, thresholds.errorRateCritical)
+  } else if (errorRate > thresholds.errorRateWarning) {
+    tryCreateAlert('error_rate', 'warning', errorRate, thresholds.errorRateWarning)
+  }
+
+  // DB latency checks
+  if (dbLatencies.length > 0) {
+    if (avgDbLatency > thresholds.dbLatencyCritical) {
+      tryCreateAlert('db_latency', 'critical', avgDbLatency, thresholds.dbLatencyCritical)
+    } else if (avgDbLatency > thresholds.dbLatencyWarning) {
+      tryCreateAlert('db_latency', 'warning', avgDbLatency, thresholds.dbLatencyWarning)
+    }
+  }
+
+  serverActiveAlerts = alerts
+  return { alerts, suppressedCount }
+}
+
 // Make the record function available to other server modules
-export { recordServerConfigFetch, getServerPerformanceSnapshot }
+export { recordServerConfigFetch, getServerPerformanceSnapshot, evaluateServerAlerts }
 
 // =============================================================================
 // SETTINGS ROUTES
@@ -275,15 +385,83 @@ router.get('/', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/admin/settings/performance
- * Get server-side config performance metrics
+ * Get server-side config performance metrics with alert evaluation
  */
 router.get('/performance', async (_req: Request, res: Response) => {
   try {
     const snapshot = getServerPerformanceSnapshot()
-    return res.json({ success: true, data: snapshot })
+    const alertEvaluation = evaluateServerAlerts()
+
+    // Fire notifications for new alerts
+    if (alertEvaluation.alerts.length > 0) {
+      // Lazy import to avoid circular dependencies
+      import('../services/admin-notification-service.js').then(({ notifyPerformanceAlert }) => {
+        for (const alert of alertEvaluation.alerts) {
+          const typeLabels: Record<string, string> = {
+            cache_hit_rate: 'Low Cache Hit Rate',
+            error_rate: 'High Error Rate',
+            db_latency: 'High DB Latency',
+          }
+          notifyPerformanceAlert(
+            typeLabels[alert.type] || alert.type,
+            alert.severity,
+            alert.message,
+            { currentValue: alert.currentValue, threshold: alert.threshold }
+          ).catch((err: unknown) => console.warn('[Settings API] Failed to create performance notification:', err))
+        }
+      }).catch(() => { /* notification service not available */ })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        ...snapshot,
+        alerts: alertEvaluation.alerts,
+        alertThresholds: serverAlertThresholds,
+        suppressedAlertCount: alertEvaluation.suppressedCount,
+      },
+    })
   } catch (error) {
     console.error('[Settings API] Performance snapshot error:', error)
     return res.status(500).json({ success: false, error: 'Failed to get performance metrics' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/performance/thresholds
+ * Update server-side alert thresholds
+ */
+const alertThresholdsSchema = z.object({
+  cacheHitRateWarning: z.number().min(0).max(1).optional(),
+  cacheHitRateCritical: z.number().min(0).max(1).optional(),
+  errorRateWarning: z.number().min(0).max(1).optional(),
+  errorRateCritical: z.number().min(0).max(1).optional(),
+  dbLatencyWarning: z.number().min(0).optional(),
+  dbLatencyCritical: z.number().min(0).optional(),
+  minEventsForAlert: z.number().int().min(1).optional(),
+  alertCooldownMs: z.number().min(0).optional(),
+})
+
+router.put('/performance/thresholds', async (req: Request, res: Response) => {
+  try {
+    const parsed = alertThresholdsSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid thresholds',
+        details: parsed.error.issues,
+      })
+    }
+
+    serverAlertThresholds = { ...serverAlertThresholds, ...parsed.data }
+
+    return res.json({
+      success: true,
+      data: { thresholds: serverAlertThresholds },
+    })
+  } catch (error) {
+    console.error('[Settings API] Update thresholds error:', error)
+    return res.status(500).json({ success: false, error: 'Failed to update thresholds' })
   }
 })
 
@@ -303,6 +481,7 @@ router.post('/performance', async (req: Request, res: Response) => {
         dbP95Latency: clientSnapshot.dbLatency?.p95Ms,
         errorRate: clientSnapshot.errorRate,
         recommendation: clientSnapshot.ttlRecommendation?.reason,
+        alerts: clientSnapshot.alerts?.length ?? 0,
       }))
     }
     return res.json({ success: true })

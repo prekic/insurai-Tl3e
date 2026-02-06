@@ -2,8 +2,9 @@
  * ConfigPerformanceMonitor Unit Tests
  */
 
-import { describe, it, expect, beforeEach } from 'vitest'
-import { ConfigPerformanceMonitor } from '../config-performance-monitor'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { ConfigPerformanceMonitor, DEFAULT_ALERT_THRESHOLDS } from '../config-performance-monitor'
+import type { AlertThresholds, PerformanceAlert } from '../config-performance-monitor'
 
 describe('ConfigPerformanceMonitor', () => {
   let monitor: ConfigPerformanceMonitor
@@ -315,6 +316,338 @@ describe('ConfigPerformanceMonitor', () => {
 
       // Should be pruned to MAX_EVENTS
       expect(monitor.getEventCount()).toBeLessThanOrEqual(1000)
+    })
+  })
+
+  // ===========================================================================
+  // ALERT EVALUATION TESTS
+  // ===========================================================================
+
+  describe('alert thresholds', () => {
+    it('should use default thresholds initially', () => {
+      const thresholds = monitor.getAlertThresholds()
+      expect(thresholds.cacheHitRateWarning).toBe(DEFAULT_ALERT_THRESHOLDS.cacheHitRateWarning)
+      expect(thresholds.cacheHitRateCritical).toBe(DEFAULT_ALERT_THRESHOLDS.cacheHitRateCritical)
+      expect(thresholds.errorRateWarning).toBe(DEFAULT_ALERT_THRESHOLDS.errorRateWarning)
+      expect(thresholds.errorRateCritical).toBe(DEFAULT_ALERT_THRESHOLDS.errorRateCritical)
+      expect(thresholds.dbLatencyWarning).toBe(DEFAULT_ALERT_THRESHOLDS.dbLatencyWarning)
+      expect(thresholds.dbLatencyCritical).toBe(DEFAULT_ALERT_THRESHOLDS.dbLatencyCritical)
+    })
+
+    it('should allow updating thresholds partially', () => {
+      monitor.setAlertThresholds({ cacheHitRateWarning: 0.6 })
+      const thresholds = monitor.getAlertThresholds()
+      expect(thresholds.cacheHitRateWarning).toBe(0.6)
+      expect(thresholds.cacheHitRateCritical).toBe(DEFAULT_ALERT_THRESHOLDS.cacheHitRateCritical)
+    })
+
+    it('should include alert thresholds in snapshot', () => {
+      monitor.setAlertThresholds({ cacheHitRateWarning: 0.7 })
+      monitor.record({ category: 'ai', method: 'get', latencyMs: 1, cacheHit: true, success: true })
+
+      const snap = monitor.getSnapshot()
+      expect(snap.alertThresholds.cacheHitRateWarning).toBe(0.7)
+    })
+  })
+
+  describe('evaluateAlerts', () => {
+    it('should return no alerts with insufficient events', () => {
+      // Less than minEventsForAlert (default: 20)
+      for (let i = 0; i < 5; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: false, success: false })
+      }
+
+      const result = monitor.evaluateAlerts()
+      expect(result.alerts).toHaveLength(0)
+    })
+
+    it('should trigger cache hit rate warning when below threshold', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // 2 hits, 8 misses = 20% hit rate (below default 50% warning)
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 10,
+          cacheHit: i < 2,
+          success: true,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      const cacheAlert = result.alerts.find((a) => a.type === 'cache_hit_rate')
+      expect(cacheAlert).toBeDefined()
+      expect(cacheAlert!.severity).toBe('critical') // 20% < 30% critical threshold
+      expect(cacheAlert!.message).toContain('20.0%')
+    })
+
+    it('should trigger cache hit rate warning (not critical) when between thresholds', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // 4 hits, 6 misses = 40% hit rate (below 50% warning but above 30% critical)
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 10,
+          cacheHit: i < 4,
+          success: true,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      const cacheAlert = result.alerts.find((a) => a.type === 'cache_hit_rate')
+      expect(cacheAlert).toBeDefined()
+      expect(cacheAlert!.severity).toBe('warning')
+    })
+
+    it('should trigger error rate alert when above threshold', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // 8 success, 2 failures = 20% error rate (above 15% critical)
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 10,
+          cacheHit: true,
+          success: i < 8,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      const errorAlert = result.alerts.find((a) => a.type === 'error_rate')
+      expect(errorAlert).toBeDefined()
+      expect(errorAlert!.severity).toBe('critical')
+    })
+
+    it('should trigger DB latency alert when above threshold', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // All cache misses with high latency
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 600, // Above 500ms critical threshold
+          cacheHit: false,
+          success: true,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      const latencyAlert = result.alerts.find((a) => a.type === 'db_latency')
+      expect(latencyAlert).toBeDefined()
+      expect(latencyAlert!.severity).toBe('critical')
+      expect(latencyAlert!.message).toContain('600ms')
+    })
+
+    it('should trigger DB latency warning (not critical) when between thresholds', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // Avg latency ~300ms (above 200 warning, below 500 critical)
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 300,
+          cacheHit: false,
+          success: true,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      const latencyAlert = result.alerts.find((a) => a.type === 'db_latency')
+      expect(latencyAlert).toBeDefined()
+      expect(latencyAlert!.severity).toBe('warning')
+    })
+
+    it('should not trigger alerts when metrics are within thresholds', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // Good metrics: 80% hit rate, 0% error rate, 10ms latency
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 10,
+          cacheHit: i < 8,
+          success: true,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      expect(result.alerts).toHaveLength(0)
+    })
+
+    it('should trigger multiple alerts simultaneously', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // Bad metrics across the board: 0% hit rate, 30% error rate, 600ms latency
+      for (let i = 0; i < 10; i++) {
+        monitor.record({
+          category: 'ai',
+          method: 'get',
+          latencyMs: 600,
+          cacheHit: false,
+          success: i < 7,
+        })
+      }
+
+      const result = monitor.evaluateAlerts()
+      expect(result.alerts.length).toBeGreaterThanOrEqual(2)
+      expect(result.alerts.find((a) => a.type === 'cache_hit_rate')).toBeDefined()
+      expect(result.alerts.find((a) => a.type === 'error_rate')).toBeDefined()
+    })
+  })
+
+  describe('alert cooldown', () => {
+    it('should suppress repeated alerts within cooldown period', () => {
+      // Use minEventsForAlert=11 so auto-eval at 10 events doesn't trigger alerts
+      monitor.setAlertThresholds({ minEventsForAlert: 11, alertCooldownMs: 60000 })
+
+      for (let i = 0; i < 11; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: false, success: false })
+      }
+
+      const first = monitor.evaluateAlerts()
+      expect(first.alerts.length).toBeGreaterThan(0)
+
+      // Evaluate again immediately - should be suppressed
+      const second = monitor.evaluateAlerts()
+      expect(second.suppressedCount).toBeGreaterThan(0)
+    })
+
+    it('should fire alerts after cooldown expires', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 11, alertCooldownMs: 0 })
+
+      for (let i = 0; i < 11; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: false, success: false })
+      }
+
+      const first = monitor.evaluateAlerts()
+      expect(first.alerts.length).toBeGreaterThan(0)
+
+      // Should fire again with no cooldown
+      const second = monitor.evaluateAlerts()
+      expect(second.alerts.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('alert callback', () => {
+    it('should invoke onAlert callback when alerts are triggered', () => {
+      const callback = vi.fn()
+      monitor.onAlert(callback)
+      // Use minEventsForAlert=11 so auto-eval at 10 events doesn't trigger
+      monitor.setAlertThresholds({ minEventsForAlert: 11, alertCooldownMs: 0 })
+
+      for (let i = 0; i < 11; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: false, success: false })
+      }
+
+      monitor.evaluateAlerts()
+      expect(callback).toHaveBeenCalledTimes(1)
+      expect(callback).toHaveBeenCalledWith(expect.arrayContaining([
+        expect.objectContaining({ type: expect.any(String), severity: expect.any(String) }),
+      ]))
+    })
+
+    it('should not invoke callback when no alerts', () => {
+      const callback = vi.fn()
+      monitor.onAlert(callback)
+      monitor.setAlertThresholds({ minEventsForAlert: 11, alertCooldownMs: 0 })
+
+      // Good metrics
+      for (let i = 0; i < 11; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: true, success: true })
+      }
+
+      monitor.evaluateAlerts()
+      expect(callback).not.toHaveBeenCalled()
+    })
+
+    it('should clear callback with null', () => {
+      const callback = vi.fn()
+      monitor.onAlert(callback)
+      monitor.onAlert(null)
+      monitor.setAlertThresholds({ minEventsForAlert: 11, alertCooldownMs: 0 })
+
+      for (let i = 0; i < 11; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: false, success: false })
+      }
+
+      monitor.evaluateAlerts()
+      expect(callback).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('getActiveAlerts', () => {
+    it('should return empty array initially', () => {
+      expect(monitor.getActiveAlerts()).toEqual([])
+    })
+
+    it('should return alerts after evaluation', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      for (let i = 0; i < 10; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 600, cacheHit: false, success: true })
+      }
+
+      monitor.evaluateAlerts()
+      const active = monitor.getActiveAlerts()
+      expect(active.length).toBeGreaterThan(0)
+    })
+
+    it('should clear active alerts when metrics recover', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // Trigger alerts
+      for (let i = 0; i < 10; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 600, cacheHit: false, success: true })
+      }
+      monitor.evaluateAlerts()
+      expect(monitor.getActiveAlerts().length).toBeGreaterThan(0)
+
+      // Clear and add good metrics
+      monitor.clear()
+      for (let i = 0; i < 10; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 10, cacheHit: true, success: true })
+      }
+      monitor.evaluateAlerts()
+      expect(monitor.getActiveAlerts()).toHaveLength(0)
+    })
+  })
+
+  describe('automatic alert evaluation on record', () => {
+    it('should evaluate alerts every 10 events', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      // Record 10 bad events (all cache misses, high error rate)
+      for (let i = 0; i < 10; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 600, cacheHit: false, success: false })
+      }
+
+      // After 10th record, alerts should have been evaluated automatically
+      const active = monitor.getActiveAlerts()
+      expect(active.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('snapshot includes alerts', () => {
+    it('should include alerts and thresholds in snapshot', () => {
+      monitor.setAlertThresholds({ minEventsForAlert: 10, alertCooldownMs: 0 })
+
+      for (let i = 0; i < 10; i++) {
+        monitor.record({ category: 'ai', method: 'get', latencyMs: 600, cacheHit: false, success: true })
+      }
+      monitor.evaluateAlerts()
+
+      const snap = monitor.getSnapshot()
+      expect(snap.alerts).toBeDefined()
+      expect(Array.isArray(snap.alerts)).toBe(true)
+      expect(snap.alertThresholds).toBeDefined()
+      expect(snap.alertThresholds.cacheHitRateWarning).toBeDefined()
     })
   })
 })
