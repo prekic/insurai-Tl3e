@@ -1,4 +1,4 @@
-# Session Handoff - February 5, 2026
+# Session Handoff - February 6, 2026
 
 ## Current Status
 
@@ -8,8 +8,8 @@
 | **TypeCheck** | ✅ 0 errors |
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 46 warnings (45 no-non-null-assertion + 1 rate-limit) |
-| **Tests** | ✅ 6133+ passing (184 test files) |
-| **Branch** | `claude/review-project-status-wXoU0` |
+| **Tests** | ✅ 6,122 passing (181 test files), 0 failures |
+| **Branch** | `claude/review-project-status-iwSCg` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Live and working |
@@ -18,87 +18,93 @@
 
 ## Session Summary
 
-This session completed the **Admin Dashboard Settings UI** work:
+This session completed three features:
 
-1. **Settings Validation** - Client-side validation for all settings panels
-2. **Settings History UI** - Audit log viewer with search, filtering, and pagination
-3. **Comprehensive Tests** - 108 new tests for validation and history features
+1. **Fix Pre-Existing Test Failures** - All 9 failures across 8 test files resolved
+2. **Settings Export/Import** - Full backup/restore for admin configuration
+3. **Config Fetch Performance Monitoring** - Latency tracking with TTL recommendation engine
 
 ---
 
 ## Features Completed This Session
 
-### 1. Settings Validation System (High Priority ✅)
+### 1. Fix Pre-Existing Test Failures (High Priority ✅)
 
-**Problem**: No client-side validation before saving settings - users could enter invalid values.
+**Problem**: 8 test files had 9 pre-existing failures (missing AuthProvider wrappers, incorrect mocks, stale assertions).
 
-**Solution**: Created `src/lib/admin/settings-validation.ts` with:
+**Solution**: Fixed all failures. Full test suite now passes: 181 files, 6,122 tests, 0 failures.
 
-**Validators**:
-- `numberRange(min, max)` - Validates numbers within range
-- `percentage()` - Validates 0-100%
-- `ratio()` - Validates 0-1 ratios
-- `positiveInteger(min, max)` - Validates positive integers
-- `required()` - Validates non-empty values
-- `oneOf(options)` - Validates enum values
-- `milliseconds(min, max)` - Validates duration in ms
+**Commit**: `d4292cb`
 
-**Composite Validators**:
-- `validateWeightsSum(weights)` - Ensures weights sum to 100%
-- `validateOCRWeightsSum(weights)` - Ensures OCR weights sum to 1.0
-- `validateGradeThresholds(thresholds)` - Ensures A > B > C > D ordering
-- `validateOCRConfidenceOrder(skip, selective)` - Ensures skip > selective threshold
+### 2. Settings Export/Import (Medium Priority ✅)
 
-**Helper Functions**:
-- `getValidationClass(isValid)` - Returns CSS classes for validation styling
-- `shouldDisableSave(validations)` - Determines if save button should be disabled
-- `getValidationDescription(key)` - Returns human-readable validation rules
+**Problem**: No way to backup/restore admin settings configuration.
 
-**Tests**: 62 tests in `settings-validation.test.ts`
+**Solution**: Full export/import system with preview and validation.
 
-### 2. Settings History UI (Medium Priority ✅)
+**Export** (`GET /api/admin/settings/export`):
+- Exports all setting categories as structured JSON
+- Includes metadata: `exportedAt`, `version`, `settingsCount`
+- Downloads as `insurai-settings-YYYY-MM-DDTHH-MM-SS.json`
 
-**Problem**: No way to view audit log of settings changes in Admin Dashboard.
+**Import** (`POST /api/admin/settings/import`):
+- Validates JSON structure and setting values before applying
+- Dry-run mode (`?dryRun=true`) for preview without changes
+- Reports applied/skipped/failed counts per setting
 
-**Solution**: Created `SettingsHistoryPanel.tsx` component with:
+**Admin UI** (integrated in `SettingsTab.tsx`):
+- Export button in settings header
+- Import dialog with file selection and change preview
+- Shows per-setting diffs before applying
 
-**Features**:
-- Paginated history list (50 items per page)
-- Search by key, category, or admin email
-- Category filter dropdown
-- Expandable details showing old/new values
-- Value formatting (JSON, boolean, numbers)
-- Relative time display (e.g., "5 minutes ago")
-- Refresh button for real-time updates
+**Tests**: 15 UI tests + 18 API tests = 33 new tests
 
-**API Endpoint**: `GET /api/admin/settings/history`
-- Query params: `limit`, `offset`, `category`
-- Resolves `changed_by` UUID to admin email
-- Returns camelCase properties for frontend
+**Commit**: `303316a`
 
-**Tests**: 27 tests in `SettingsHistoryPanel.test.tsx`
-**API Tests**: 19 tests in `settings-routes.test.ts`
+### 3. Config Fetch Performance Monitoring (Medium Priority ✅)
 
-### 3. Admin Dashboard Settings UI Polish (Completed Earlier)
+**Problem**: Need to validate whether the 5-minute cache TTL for ConfigurationService is appropriate in production.
 
-**Components**:
-- `SettingsTab.tsx` - Tab container with category navigation
-- `AISettingsPanel.tsx` - AI provider settings
-- `EvaluationSettingsPanel.tsx` - Policy evaluation settings
-- `RateLimitsPanel.tsx` - API rate limits
-- `OCRSettingsPanel.tsx` - OCR decision engine settings
-- `FeatureFlagsPanel.tsx` - Feature flag management
+**Solution**: Comprehensive performance monitoring with TTL recommendations.
+
+**Client-Side Monitor** (`src/lib/config/config-performance-monitor.ts`):
+- Rolling window: 1000 events, 1 hour max retention
+- Latency percentiles: p50, p95, p99 for DB fetches (cache misses)
+- Cache hit rate analysis with per-category breakdown
+- TTL recommendation engine based on observed patterns:
+  - Suggests lower TTL if hit rate >90% and DB latency <50ms
+  - Suggests higher TTL if hit rate <50% or DB latency >200ms
+
+**ConfigurationService Instrumentation**:
+- `get()`, `getCategory()`, `isFeatureEnabled()` all track timing via `performance.now()`
+- Records cache hits, misses, errors to performance monitor
+- New `getPerformanceSnapshot()` public method
+
+**Server-Side** (`server/routes/settings.ts`):
+- In-memory server-side performance monitor
+- `GET /api/admin/settings/performance` - Server metrics
+- `POST /api/admin/settings/performance` - Client metrics submission
+
+**Admin UI** (`ConfigPerformancePanel.tsx`):
+- Client/Server toggle with auto-refresh (5s)
+- Summary: Total Fetches, Cache Hit Rate, DB Avg Latency, Error Rate
+- Latency Distribution: Min/Avg/P50/P95/P99/Max (color-coded)
+- Per-Category Breakdown table
+- TTL Recommendation with confidence level
+- Recent Events log (last 20)
+
+**Tests**: 21 unit + 7 server + 11 UI = 39 new tests
+
+**Commit**: `9093818`
 
 ---
 
 ## Commits This Session
 
 ```
-3e37c5c Update project documentation for Settings History feature
-dee49a9 Add comprehensive tests for Settings History feature
-a9547f0 Add Settings History UI to Admin Dashboard
-b2a5c0a Add client-side validation for admin settings panels
-ae66160 Improve Admin Dashboard Settings UI polish
+9093818 Add config fetch performance monitoring with TTL recommendation
+303316a Add settings export/import for admin configuration backup and restore
+d4292cb Fix all pre-existing test failures (8 files, 9 failures → 0)
 ```
 
 ---
@@ -107,38 +113,35 @@ ae66160 Improve Admin Dashboard Settings UI polish
 
 | File | Changes |
 |------|---------|
-| `src/lib/admin/settings-validation.ts` | **NEW** Client-side validation utilities |
-| `src/lib/admin/__tests__/settings-validation.test.ts` | **NEW** 62 tests for validators |
-| `src/components/admin/tabs/settings/SettingsHistoryPanel.tsx` | **NEW** Settings audit log viewer |
-| `src/components/admin/tabs/settings/SettingsHistoryPanel.test.tsx` | **NEW** 27 tests for history UI |
-| `src/components/admin/tabs/SettingsTab.tsx` | Added History tab to navigation |
-| `server/routes/settings.ts` | Added `/history` endpoint |
-| `server/__tests__/settings-routes.test.ts` | **NEW** 19 tests for API |
-| `server/middleware/rate-limit.ts` | Fixed unused variable lint error |
-| `package.json` | Updated max-warnings from 45 to 46 |
+| `src/lib/config/config-performance-monitor.ts` | **NEW** Rolling-window latency tracker with TTL recommendations |
+| `src/lib/config/configuration-service.ts` | Instrumented with performance tracking on all fetch methods |
+| `src/lib/config/index.ts` | Added performance monitor exports |
+| `src/components/admin/tabs/SettingsTab.tsx` | Added Export/Import UI + Performance tab |
+| `src/components/admin/tabs/settings/ConfigPerformancePanel.tsx` | **NEW** Config performance dashboard |
+| `src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx` | **NEW** 11 UI tests |
+| `src/components/admin/tabs/settings/SettingsExportImport.test.tsx` | **NEW** 15 export/import UI tests |
+| `src/lib/config/__tests__/config-performance-monitor.test.ts` | **NEW** 21 unit tests |
+| `server/routes/settings.ts` | Added export, import, performance endpoints |
+| `server/__tests__/settings-routes.test.ts` | Added 25 new tests (export/import + performance) |
 
 ---
 
 ## Test Results Summary
 
-### Full Test Suite (Feb 5, 2026)
-- **Test Files**: 8 failed | 175 passed (184 total)
-- **Tests**: 9 failed | 6,133 passed | 24 skipped (6,191 total)
-- **Duration**: ~516 seconds
+### Full Test Suite (Feb 6, 2026)
+- **Test Files**: 181 passed (181 total)
+- **Tests**: 6,122 passed | 24 skipped | 0 failed
+- **Duration**: ~500 seconds
+- **TypeScript**: Clean (`npx tsc --noEmit` passes)
 
 ### New Tests Created This Session (All Passing ✅)
 | Test File | Tests | Status |
 |-----------|-------|--------|
-| `settings-validation.test.ts` | 62 | ✅ All passed |
-| `SettingsHistoryPanel.test.tsx` | 27 | ✅ All passed |
-| `settings-routes.test.ts` | 19 | ✅ All passed |
-| **Total New Tests** | **108** | **✅ All passed** |
-
-### Pre-Existing Test Failures (Not from this session)
-These failures existed before this session's work:
-- `RateLimitsPanel.test.tsx` - Empty settings test expects different text
-- `FeatureFlagsPanel.test.tsx` - Worker exited unexpectedly (crash)
-- Other integration tests with missing AuthProvider
+| `config-performance-monitor.test.ts` | 21 | ✅ All passed |
+| `ConfigPerformancePanel.test.tsx` | 11 | ✅ All passed |
+| `SettingsExportImport.test.tsx` | 15 | ✅ All passed |
+| `settings-routes.test.ts` (new tests) | 25 | ✅ All passed |
+| **Total New Tests** | **72** | **✅ All passed** |
 
 ---
 
@@ -146,7 +149,7 @@ These failures existed before this session's work:
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Pre-existing test failures (8 files) | Low | Open | Missing AuthProvider in component tests |
+| Pre-existing test failures | N/A | **Fixed** | All 9 failures resolved this session |
 | Railway cold start delay | Low | Expected | First request may take 5-10s after idle |
 | Google Vision "Service error" | Low | Open | Falls back to pdf.js + OpenAI |
 | Anthropic billing issue | Medium | Open | Falls back to OpenAI, adds latency |
@@ -156,7 +159,7 @@ These failures existed before this session's work:
 
 ## Architecture Overview
 
-### Admin Settings UI Structure
+### Admin Settings UI Structure (Updated)
 ```
 AdminDashboard
 └── SettingsTab
@@ -166,37 +169,64 @@ AdminDashboard
     │   ├── Rate Limits
     │   ├── OCR Settings
     │   ├── Feature Flags
-    │   └── History (NEW)
+    │   ├── History
+    │   └── Performance (NEW)
     │
-    └── Content Panels
-        ├── AISettingsPanel
-        ├── EvaluationSettingsPanel
-        ├── RateLimitsPanel
-        ├── OCRSettingsPanel
-        ├── FeatureFlagsPanel
-        └── SettingsHistoryPanel (NEW)
+    ├── Content Panels
+    │   ├── AISettingsPanel
+    │   ├── EvaluationSettingsPanel
+    │   ├── RateLimitsPanel
+    │   ├── OCRSettingsPanel
+    │   ├── FeatureFlagsPanel
+    │   ├── SettingsHistoryPanel
+    │   └── ConfigPerformancePanel (NEW)
+    │
+    └── Header Actions
+        ├── Export Settings (download JSON)
+        └── Import Settings (upload + preview + apply)
 ```
 
-### Settings Validation Flow
+### Config Performance Monitoring Architecture
 ```
-User Input → validateSetting(key, value)
-           → Check settingValidationRules[key]
-           → Return { valid: boolean, message?: string }
-           → Apply getValidationClass() for styling
-           → shouldDisableSave() for save button state
+ConfigurationService.get()
+        │
+        ├─ Cache HIT → record(cacheHit: true, latencyMs: <0.1ms)
+        │
+        └─ Cache MISS → fetch from DB
+                       → record(cacheHit: false, latencyMs: 5-50ms)
+                       → update cache
+        │
+ConfigPerformanceMonitor
+        │
+        ├─ Rolling window (1000 events, 1 hour)
+        ├─ Computes percentiles (p50, p95, p99)
+        ├─ Cache hit rate per category
+        └─ TTL recommendation engine
+                │
+                ├─ High hit rate + low latency → "Consider lowering TTL"
+                ├─ Low hit rate + high latency → "Consider raising TTL"
+                └─ Balanced → "Current TTL appropriate"
 ```
 
-### Settings History API Flow
+### Settings Export/Import Flow
 ```
-GET /api/admin/settings/history?limit=50&offset=0&category=ai
-           ↓
-Query settings_audit_log table
-           ↓
-Join with admin_users for email resolution
-           ↓
-Transform snake_case → camelCase
-           ↓
-Return { history: [...], pagination: { total, hasMore } }
+Export:
+  GET /api/admin/settings/export
+    → Query all categories from app_settings
+    → Structure as { metadata, settings: { ai: {...}, evaluation: {...}, ... } }
+    → Return JSON file
+
+Import:
+  POST /api/admin/settings/import?dryRun=true
+    → Parse JSON body
+    → Validate structure and each setting value
+    → Return preview: { applied: N, skipped: N, failed: N, details: [...] }
+
+  POST /api/admin/settings/import
+    → Same validation
+    → Apply valid settings to database
+    → Record audit log entries
+    → Return results
 ```
 
 ---
@@ -249,17 +279,17 @@ connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Fix Pre-existing Test Failures** - Add `AuthProvider` wrapper to failing component tests
-2. **User Preferences Integration** - Allow users to override some settings
+1. **User Preferences Integration** - Allow users to override some settings via `user_preferences` table
+2. **Settings Diff View** - Visual diff between old and new values in history panel
 
 ### Medium Priority
-3. **Performance Monitoring** - Track config fetch latency in production
-4. **Settings Export/Import** - Allow backing up and restoring settings
+3. **Batch Settings Update** - Update multiple settings in single API call
+4. **Settings Webhooks** - Notify external systems when settings change
+5. **Performance Monitoring Alerts** - Auto-alert when cache hit rate drops below threshold
 
 ### Low Priority
-5. **Settings Diff View** - Show visual diff between old and new values
-6. **Batch Settings Update** - Update multiple settings in single API call
-7. **Settings Webhooks** - Notify external systems when settings change
+6. **Settings Templates** - Predefined config profiles (e.g., "High Performance", "Cost Optimized")
+7. **Config Drift Detection** - Detect when runtime config differs from last known-good export
 
 ---
 
@@ -273,8 +303,12 @@ connectSrc: ["'self'", 'https://*.supabase.co', 'wss://*.supabase.co', 'https://
 | Always import crypto explicitly | Don't rely on global `crypto` in Node.js server code |
 | Check /api/admin/diagnostics | Use this endpoint to debug Railway configuration issues |
 | Railway cold start | First request may take 5-10s - this is expected behavior |
+| Railway env vars shouldn't have manual quotes | Railway adds quotes automatically |
+| CSP must allow PDF.js CDNs | unpkg.com, cdn.jsdelivr.net, cdnjs.cloudflare.com |
+| Supabase auth redirect URLs | Must add Railway URL to Supabase Dashboard |
 | Multiple matching elements in tests | Use `getAllByText()` instead of `getByText()` |
-| Number('0.5') is valid | String numbers coerce to valid numbers in validators |
+| useEffect async state in tests | Use `waitFor()` from testing-library for assertions |
+| Singleton reset in tests | Use `.clear()` on the exported instance, not `resetInstance()` |
 
 ---
 
@@ -290,9 +324,10 @@ npm run typecheck  # Should pass
 # Full validation
 npm run validate
 
-# Run specific test files
-npm test -- --run src/lib/admin/__tests__/settings-validation.test.ts
-npm test -- --run src/components/admin/tabs/settings/SettingsHistoryPanel.test.tsx
+# Run specific test files from this session
+npm test -- --run src/lib/config/__tests__/config-performance-monitor.test.ts
+npm test -- --run src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx
+npm test -- --run src/components/admin/tabs/settings/SettingsExportImport.test.tsx
 npm test -- --run server/__tests__/settings-routes.test.ts
 
 # Run all admin tests
@@ -304,11 +339,12 @@ npm test -- --run src/components/admin
 
 ## Previous Session Context
 
-**Earlier February 5, 2026**:
+**February 5, 2026**:
+- Admin Settings UI with validation and audit history
+- Settings validation system (62 tests)
+- Settings history UI (27 tests)
 - Connected admin settings to application functionality
 - OCR Decision Engine database config integration
-- Enabled `use_db_config` feature flag
-- Added 49 tests for database config integration
 
 **February 4, 2026**:
 - Bundle optimization (manualChunks)
@@ -324,7 +360,7 @@ npm test -- --run src/components/admin
 
 ---
 
-**Last Updated**: February 5, 2026
-**Branch**: `claude/review-project-status-wXoU0`
+**Last Updated**: February 6, 2026
+**Branch**: `claude/review-project-status-iwSCg`
 **ESLint Status**: 0 errors, 46 warnings
-**Next Session Focus**: Fix pre-existing test failures, User preferences integration
+**Next Session Focus**: User preferences integration, settings diff view

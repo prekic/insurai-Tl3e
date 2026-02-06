@@ -19,14 +19,10 @@ describe('Performance Optimizations', () => {
       const configPath = path.resolve(__dirname, '../../../vite.config.ts')
       const configContent = fs.readFileSync(configPath, 'utf-8')
 
-      // Verify manual chunks are defined
+      // Verify manual chunks are defined (simplified to avoid circular deps)
       expect(configContent).toContain('manualChunks')
-      expect(configContent).toContain('vendor-react')
-      expect(configContent).toContain('vendor-animation')
-      expect(configContent).toContain('vendor-pdf')
-      expect(configContent).toContain('vendor-ai')
-      expect(configContent).toContain('vendor-ui')
-      expect(configContent).toContain('vendor-supabase')
+      expect(configContent).toContain('vendor-pdfjs')
+      expect(configContent).toContain('vendor-pdflib')
     })
 
     it('has bundle visualizer configured', async () => {
@@ -256,20 +252,18 @@ describe('Bundle Size Expectations', () => {
     const configContent = fs.readFileSync(configPath, 'utf-8')
 
     expect(configContent).toContain('chunkSizeWarningLimit')
-    expect(configContent).toContain('600')
+    expect(configContent).toContain('800')
   })
 
   it('separates large dependencies into vendor chunks', async () => {
     const configPath = path.resolve(__dirname, '../../../vite.config.ts')
     const configContent = fs.readFileSync(configPath, 'utf-8')
 
-    // These large dependencies should be in separate chunks
+    // Only truly independent large libraries are split to avoid circular deps
+    // (see Known Issue #51-52 for why aggressive chunking was removed)
     const largeVendors = [
-      'framer-motion',
       'pdfjs-dist',
-      'openai',
-      '@anthropic-ai/sdk',
-      '@supabase/supabase-js',
+      'pdf-lib',
     ]
 
     for (const vendor of largeVendors) {

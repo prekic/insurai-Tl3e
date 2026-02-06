@@ -176,7 +176,7 @@ describe('RateLimitsPanel - Empty Settings', () => {
     )
 
     // Should show empty state message
-    expect(screen.getByText(/No rate limit settings found/)).toBeInTheDocument()
+    expect(screen.getByText(/No Rate Limit Settings Found/i)).toBeInTheDocument()
   })
 })
 
