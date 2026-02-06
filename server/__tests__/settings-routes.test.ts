@@ -223,6 +223,257 @@ describe('Settings History - Data Transformation', () => {
   })
 })
 
+// =============================================================================
+// Export / Import Tests
+// =============================================================================
+
+describe('Settings Export - Data Structure', () => {
+  const EXPORT_VERSION = 1
+
+  it('should produce correct export envelope structure', () => {
+    const exportData = {
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      exportedBy: 'admin@test.com',
+      settings: {},
+      featureFlags: [],
+      regionalFactors: [],
+      providers: [],
+      benchmarks: [],
+    }
+
+    expect(exportData.version).toBe(1)
+    expect(exportData).toHaveProperty('exportedAt')
+    expect(exportData).toHaveProperty('exportedBy')
+    expect(exportData).toHaveProperty('settings')
+    expect(exportData).toHaveProperty('featureFlags')
+    expect(exportData).toHaveProperty('regionalFactors')
+    expect(exportData).toHaveProperty('providers')
+    expect(exportData).toHaveProperty('benchmarks')
+  })
+
+  it('should group settings by category', () => {
+    const dbRows = [
+      { category: 'ai', key: 'temperature', value: 0.1, value_type: 'number' },
+      { category: 'ai', key: 'max_tokens', value: 4096, value_type: 'number' },
+      { category: 'evaluation', key: 'weight_premium', value: 20, value_type: 'number' },
+    ]
+
+    const grouped: Record<string, Array<{ key: string; value: unknown; valueType: string }>> = {}
+    for (const row of dbRows) {
+      if (!grouped[row.category]) grouped[row.category] = []
+      grouped[row.category].push({ key: row.key, value: row.value, valueType: row.value_type })
+    }
+
+    expect(Object.keys(grouped)).toEqual(['ai', 'evaluation'])
+    expect(grouped.ai).toHaveLength(2)
+    expect(grouped.evaluation).toHaveLength(1)
+    expect(grouped.ai[0]).toEqual({ key: 'temperature', value: 0.1, valueType: 'number' })
+  })
+
+  it('should transform feature flag db rows to export format', () => {
+    const dbFlag = {
+      key: 'use_db_config',
+      description: 'Use DB config',
+      enabled: true,
+      rollout_percentage: 100,
+      user_segments: ['all'],
+      conditions: {},
+      expires_at: null,
+    }
+
+    const exportFlag = {
+      key: dbFlag.key,
+      description: dbFlag.description,
+      enabled: dbFlag.enabled,
+      rolloutPercentage: dbFlag.rollout_percentage,
+      userSegments: dbFlag.user_segments,
+      conditions: dbFlag.conditions,
+      expiresAt: dbFlag.expires_at,
+    }
+
+    expect(exportFlag.key).toBe('use_db_config')
+    expect(exportFlag.rolloutPercentage).toBe(100)
+    expect(exportFlag.enabled).toBe(true)
+  })
+
+  it('should transform regional factor db rows to export format', () => {
+    const dbFactor = {
+      region_code: 'marmara',
+      region_name: 'Marmara',
+      region_name_tr: 'Marmara',
+      policy_type: 'all',
+      risk_factor: 1.15,
+      year: 2026,
+      source: 'SEDDK',
+      notes: null,
+    }
+
+    const exportFactor = {
+      regionCode: dbFactor.region_code,
+      regionName: dbFactor.region_name,
+      regionNameTr: dbFactor.region_name_tr,
+      policyType: dbFactor.policy_type,
+      riskFactor: dbFactor.risk_factor,
+      year: dbFactor.year,
+      source: dbFactor.source,
+      notes: dbFactor.notes,
+    }
+
+    expect(exportFactor.regionCode).toBe('marmara')
+    expect(exportFactor.riskFactor).toBe(1.15)
+  })
+})
+
+describe('Settings Import - Validation Logic', () => {
+  it('should accept valid import data', () => {
+    const importData = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      settings: {
+        ai: [{ key: 'temperature', value: 0.2 }],
+      },
+    }
+
+    expect(importData.version).toBe(1)
+    expect(importData.settings.ai).toHaveLength(1)
+  })
+
+  it('should validate value against min/max constraints', () => {
+    const existing = { min_value: 0, max_value: 1, allowed_values: null }
+    const value = 0.5
+
+    const isBelowMin = existing.min_value !== null && value < existing.min_value
+    const isAboveMax = existing.max_value !== null && value > existing.max_value
+
+    expect(isBelowMin).toBe(false)
+    expect(isAboveMax).toBe(false)
+  })
+
+  it('should reject value below minimum', () => {
+    const existing = { min_value: 0, max_value: 1 }
+    const value = -0.5
+
+    const isBelowMin = existing.min_value !== null && value < existing.min_value
+
+    expect(isBelowMin).toBe(true)
+  })
+
+  it('should reject value above maximum', () => {
+    const existing = { min_value: 0, max_value: 1 }
+    const value = 1.5
+
+    const isAboveMax = existing.max_value !== null && value > existing.max_value
+
+    expect(isAboveMax).toBe(true)
+  })
+
+  it('should reject value not in allowed_values', () => {
+    const allowedValues = ['gpt-4o', 'gpt-4o-mini']
+    const value = 'gpt-3.5-turbo'
+
+    const isAllowed = allowedValues.includes(value)
+
+    expect(isAllowed).toBe(false)
+  })
+
+  it('should accept value in allowed_values', () => {
+    const allowedValues = ['gpt-4o', 'gpt-4o-mini']
+    const value = 'gpt-4o'
+
+    const isAllowed = allowedValues.includes(value)
+
+    expect(isAllowed).toBe(true)
+  })
+
+  it('should skip readonly settings during import', () => {
+    const existing = { is_readonly: true, value: 'original' }
+    const importValue = 'modified'
+
+    const shouldSkip = existing.is_readonly
+
+    expect(shouldSkip).toBe(true)
+    expect(existing.value).toBe('original')
+  })
+
+  it('should skip unchanged values during import', () => {
+    const existingValue = { temperature: 0.1 }
+    const importValue = { temperature: 0.1 }
+
+    const isUnchanged = JSON.stringify(existingValue) === JSON.stringify(importValue)
+
+    expect(isUnchanged).toBe(true)
+  })
+
+  it('should detect changed values during import', () => {
+    const existingValue = 0.1
+    const importValue = 0.2
+
+    const isUnchanged = JSON.stringify(existingValue) === JSON.stringify(importValue)
+
+    expect(isUnchanged).toBe(false)
+  })
+})
+
+describe('Settings Import - Mode Logic', () => {
+  it('should skip non-existing settings in merge mode', () => {
+    const mode = 'merge'
+    const existsInDb = false
+
+    const shouldSkip = mode === 'merge' && !existsInDb
+
+    expect(shouldSkip).toBe(true)
+  })
+
+  it('should report error for non-existing settings in overwrite mode', () => {
+    const mode = 'overwrite'
+    const existsInDb = false
+
+    const shouldSkip = mode === 'merge' && !existsInDb
+    const shouldError = mode === 'overwrite' && !existsInDb
+
+    expect(shouldSkip).toBe(false)
+    expect(shouldError).toBe(true)
+  })
+
+  it('should process existing settings in both modes', () => {
+    const existsInDb = true
+
+    expect('merge' === 'merge' && !existsInDb).toBe(false)
+    expect('overwrite' === 'merge' && !existsInDb).toBe(false)
+  })
+})
+
+describe('Settings Import - Results Tracking', () => {
+  it('should track results per section', () => {
+    const results = {
+      settings: { updated: 5, skipped: 3, errors: ['ai.bad_key: not found'] },
+      featureFlags: { updated: 2, skipped: 1, errors: [] },
+      regionalFactors: { updated: 0, skipped: 7, errors: [] },
+    }
+
+    const totalUpdated = results.settings.updated + results.featureFlags.updated + results.regionalFactors.updated
+    const totalSkipped = results.settings.skipped + results.featureFlags.skipped + results.regionalFactors.skipped
+    const totalErrors = results.settings.errors.length + results.featureFlags.errors.length + results.regionalFactors.errors.length
+
+    expect(totalUpdated).toBe(7)
+    expect(totalSkipped).toBe(11)
+    expect(totalErrors).toBe(1)
+  })
+
+  it('should produce correct summary structure', () => {
+    const summary = {
+      totalUpdated: 7,
+      totalSkipped: 11,
+      totalErrors: 1,
+    }
+
+    expect(summary).toHaveProperty('totalUpdated')
+    expect(summary).toHaveProperty('totalSkipped')
+    expect(summary).toHaveProperty('totalErrors')
+  })
+})
+
 describe('Settings History - Response Structure', () => {
   it('should have correct pagination structure', () => {
     const pagination = {

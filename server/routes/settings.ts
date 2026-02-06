@@ -3,6 +3,8 @@
  *
  * Admin endpoints for managing application settings:
  * - GET /api/admin/settings - List all settings
+ * - GET /api/admin/settings/export - Export all configuration
+ * - POST /api/admin/settings/import - Import configuration backup
  * - GET /api/admin/settings/:category - Get settings by category
  * - GET /api/admin/settings/:category/:key - Get specific setting
  * - PUT /api/admin/settings/:category/:key - Update setting
@@ -74,6 +76,34 @@ const updateBenchmarkSchema = z.object({
   importance: z.enum(['critical', 'standard', 'optional']).optional(),
 })
 
+const EXPORT_VERSION = 1
+
+const importConfigSchema = z.object({
+  version: z.number().int().positive(),
+  exportedAt: z.string(),
+  settings: z.record(z.string(), z.array(z.object({
+    key: z.string(),
+    value: z.unknown(),
+  }))).optional(),
+  featureFlags: z.array(z.object({
+    key: z.string(),
+    enabled: z.boolean().optional(),
+    rolloutPercentage: z.number().min(0).max(100).optional(),
+  })).optional(),
+  regionalFactors: z.array(z.object({
+    regionCode: z.string(),
+    policyType: z.string().default('all'),
+    riskFactor: z.number().min(0).max(5),
+  })).optional(),
+})
+
+const importRequestSchema = z.object({
+  config: importConfigSchema,
+  mode: z.enum(['merge', 'overwrite']).default('merge'),
+  sections: z.array(z.enum(['settings', 'featureFlags', 'regionalFactors'])).optional(),
+  reason: z.string().optional(),
+})
+
 // =============================================================================
 // SETTINGS ROUTES
 // =============================================================================
@@ -136,6 +166,388 @@ router.get('/', async (_req: Request, res: Response) => {
     })
   } catch (error) {
     console.error('[Settings API] Exception:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// EXPORT / IMPORT ROUTES (must be before /:category to avoid route conflict)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/export
+ * Export all configuration as a JSON backup
+ */
+router.get('/export', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  try {
+    // Fetch all data in parallel
+    const [settingsResult, flagsResult, factorsResult, providersResult, benchmarksResult] =
+      await Promise.all([
+        supabase.from('app_settings').select('category, key, value, value_type').order('category').order('display_order'),
+        supabase.from('feature_flags').select('key, description, enabled, rollout_percentage, user_segments, conditions, expires_at').order('key'),
+        supabase.from('regional_factors').select('region_code, region_name, region_name_tr, policy_type, risk_factor, year, source, notes').eq('is_active', true).order('region_code'),
+        supabase.from('insurance_providers').select('code, name, name_tr, market_share, customer_rating, established_year, headquarters, website, specialties, is_active').order('code'),
+        supabase.from('market_benchmarks').select('policy_type, coverage_type, coverage_name_tr, region_code, year, min_limit, typical_limit, max_limit, min_deductible, typical_deductible, max_deductible, inclusion_rate, importance, source').eq('is_active', true).order('policy_type').order('coverage_type'),
+      ])
+
+    if (settingsResult.error) {
+      console.error('[Settings Export] Error fetching settings:', settingsResult.error)
+      return res.status(500).json({ success: false, error: 'Failed to export settings' })
+    }
+
+    // Group settings by category
+    const groupedSettings: Record<string, Array<{ key: string; value: unknown; valueType: string }>> = {}
+    for (const row of settingsResult.data || []) {
+      if (!groupedSettings[row.category]) {
+        groupedSettings[row.category] = []
+      }
+      groupedSettings[row.category].push({
+        key: row.key,
+        value: row.value,
+        valueType: row.value_type,
+      })
+    }
+
+    // Build the admin email for exportedBy
+    const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+    let exportedBy = 'unknown'
+    if (adminUserId) {
+      const { data: adminUser } = await supabase
+        .from('admin_users')
+        .select('email')
+        .eq('id', adminUserId)
+        .single()
+      if (adminUser) {
+        exportedBy = adminUser.email
+      }
+    }
+
+    const exportData = {
+      version: EXPORT_VERSION,
+      exportedAt: new Date().toISOString(),
+      exportedBy,
+      settings: groupedSettings,
+      featureFlags: (flagsResult.data || []).map((f) => ({
+        key: f.key,
+        description: f.description,
+        enabled: f.enabled,
+        rolloutPercentage: f.rollout_percentage,
+        userSegments: f.user_segments,
+        conditions: f.conditions,
+        expiresAt: f.expires_at,
+      })),
+      regionalFactors: (factorsResult.data || []).map((f) => ({
+        regionCode: f.region_code,
+        regionName: f.region_name,
+        regionNameTr: f.region_name_tr,
+        policyType: f.policy_type,
+        riskFactor: f.risk_factor,
+        year: f.year,
+        source: f.source,
+        notes: f.notes,
+      })),
+      providers: (providersResult.data || []).map((p) => ({
+        code: p.code,
+        name: p.name,
+        nameTr: p.name_tr,
+        marketShare: p.market_share,
+        customerRating: p.customer_rating,
+        establishedYear: p.established_year,
+        headquarters: p.headquarters,
+        website: p.website,
+        specialties: p.specialties,
+        isActive: p.is_active,
+      })),
+      benchmarks: (benchmarksResult.data || []).map((b) => ({
+        policyType: b.policy_type,
+        coverageType: b.coverage_type,
+        coverageNameTr: b.coverage_name_tr,
+        regionCode: b.region_code,
+        year: b.year,
+        minLimit: b.min_limit,
+        typicalLimit: b.typical_limit,
+        maxLimit: b.max_limit,
+        minDeductible: b.min_deductible,
+        typicalDeductible: b.typical_deductible,
+        maxDeductible: b.max_deductible,
+        inclusionRate: b.inclusion_rate,
+        importance: b.importance,
+        source: b.source,
+      })),
+    }
+
+    // Log the export action
+    await supabase.from('settings_audit_log').insert({
+      category: '_system',
+      key: 'config_export',
+      previous_value: null,
+      new_value: { sections: Object.keys(groupedSettings), featureFlags: (flagsResult.data || []).length, regionalFactors: (factorsResult.data || []).length },
+      changed_by: adminUserId,
+      reason: 'Configuration exported',
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    })
+
+    return res.json({ success: true, data: exportData })
+  } catch (error) {
+    console.error('[Settings Export] Exception:', error)
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * POST /api/admin/settings/import
+ * Import configuration from a backup file
+ *
+ * Body: { config: ExportData, mode: 'merge' | 'overwrite', sections?: string[], reason?: string }
+ * - merge: Only update settings that exist in both backup and DB
+ * - overwrite: Replace all values with backup values (still respects readonly)
+ * - sections: Limit import to specific sections (defaults to all)
+ */
+router.post('/import', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const parseResult = importRequestSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid import data',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const { config, mode, sections, reason } = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+  const importReason = reason || `Configuration imported (mode: ${mode})`
+
+  const results = {
+    settings: { updated: 0, skipped: 0, errors: [] as string[] },
+    featureFlags: { updated: 0, skipped: 0, errors: [] as string[] },
+    regionalFactors: { updated: 0, skipped: 0, errors: [] as string[] },
+  }
+
+  try {
+    // 1. Import app_settings
+    const shouldImportSettings = !sections || sections.includes('settings')
+    if (shouldImportSettings && config.settings) {
+      for (const [category, settingsList] of Object.entries(config.settings)) {
+        for (const setting of settingsList) {
+          try {
+            // Find the existing setting
+            const { data: existing } = await supabase
+              .from('app_settings')
+              .select('id, value, is_readonly, min_value, max_value, allowed_values')
+              .eq('category', category)
+              .eq('key', setting.key)
+              .single()
+
+            if (!existing) {
+              if (mode === 'merge') {
+                results.settings.skipped++
+                continue
+              }
+              results.settings.errors.push(`${category}.${setting.key}: not found in database`)
+              continue
+            }
+
+            if (existing.is_readonly) {
+              results.settings.skipped++
+              continue
+            }
+
+            // Validate value constraints
+            if (existing.min_value !== null && typeof setting.value === 'number' && setting.value < existing.min_value) {
+              results.settings.errors.push(`${category}.${setting.key}: value ${setting.value} below minimum ${existing.min_value}`)
+              continue
+            }
+            if (existing.max_value !== null && typeof setting.value === 'number' && setting.value > existing.max_value) {
+              results.settings.errors.push(`${category}.${setting.key}: value ${setting.value} above maximum ${existing.max_value}`)
+              continue
+            }
+            if (existing.allowed_values && Array.isArray(existing.allowed_values)) {
+              if (!(existing.allowed_values as unknown[]).includes(setting.value)) {
+                results.settings.errors.push(`${category}.${setting.key}: value not in allowed values`)
+                continue
+              }
+            }
+
+            // Skip if value is the same
+            if (JSON.stringify(existing.value) === JSON.stringify(setting.value)) {
+              results.settings.skipped++
+              continue
+            }
+
+            // Update the setting
+            const { error: updateError } = await supabase
+              .from('app_settings')
+              .update({
+                value: setting.value,
+                updated_by: adminUserId,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', existing.id)
+
+            if (updateError) {
+              results.settings.errors.push(`${category}.${setting.key}: ${updateError.message}`)
+              continue
+            }
+
+            // Audit log
+            await supabase.from('settings_audit_log').insert({
+              setting_id: existing.id,
+              category,
+              key: setting.key,
+              previous_value: existing.value,
+              new_value: setting.value,
+              changed_by: adminUserId,
+              reason: importReason,
+              ip_address: req.ip,
+              user_agent: req.get('user-agent'),
+            })
+
+            results.settings.updated++
+          } catch (error) {
+            results.settings.errors.push(`${category}.${setting.key}: ${error instanceof Error ? error.message : 'unknown error'}`)
+          }
+        }
+      }
+    }
+
+    // 2. Import feature flags
+    const shouldImportFlags = !sections || sections.includes('featureFlags')
+    if (shouldImportFlags && config.featureFlags) {
+      for (const flag of config.featureFlags) {
+        try {
+          const updateData: Record<string, unknown> = {
+            updated_by: adminUserId,
+            updated_at: new Date().toISOString(),
+          }
+
+          if (flag.enabled !== undefined) updateData.enabled = flag.enabled
+          if (flag.rolloutPercentage !== undefined) updateData.rollout_percentage = flag.rolloutPercentage
+
+          const { data: existing } = await supabase
+            .from('feature_flags')
+            .select('id, enabled, rollout_percentage')
+            .eq('key', flag.key)
+            .single()
+
+          if (!existing) {
+            if (mode === 'merge') {
+              results.featureFlags.skipped++
+              continue
+            }
+            results.featureFlags.errors.push(`${flag.key}: not found in database`)
+            continue
+          }
+
+          const { error: updateError } = await supabase
+            .from('feature_flags')
+            .update(updateData)
+            .eq('key', flag.key)
+
+          if (updateError) {
+            results.featureFlags.errors.push(`${flag.key}: ${updateError.message}`)
+            continue
+          }
+
+          results.featureFlags.updated++
+        } catch (error) {
+          results.featureFlags.errors.push(`${flag.key}: ${error instanceof Error ? error.message : 'unknown error'}`)
+        }
+      }
+    }
+
+    // 3. Import regional factors
+    const shouldImportFactors = !sections || sections.includes('regionalFactors')
+    if (shouldImportFactors && config.regionalFactors) {
+      for (const factor of config.regionalFactors) {
+        try {
+          const { data: existing } = await supabase
+            .from('regional_factors')
+            .select('id, risk_factor')
+            .eq('region_code', factor.regionCode)
+            .eq('policy_type', factor.policyType)
+            .eq('is_active', true)
+            .single()
+
+          if (!existing) {
+            if (mode === 'merge') {
+              results.regionalFactors.skipped++
+              continue
+            }
+            results.regionalFactors.errors.push(`${factor.regionCode}/${factor.policyType}: not found`)
+            continue
+          }
+
+          if (existing.risk_factor === factor.riskFactor) {
+            results.regionalFactors.skipped++
+            continue
+          }
+
+          const { error: updateError } = await supabase
+            .from('regional_factors')
+            .update({
+              risk_factor: factor.riskFactor,
+              updated_by: adminUserId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+
+          if (updateError) {
+            results.regionalFactors.errors.push(`${factor.regionCode}: ${updateError.message}`)
+            continue
+          }
+
+          results.regionalFactors.updated++
+        } catch (error) {
+          results.regionalFactors.errors.push(`${factor.regionCode}: ${error instanceof Error ? error.message : 'unknown error'}`)
+        }
+      }
+    }
+
+    // Log the import action
+    const totalUpdated = results.settings.updated + results.featureFlags.updated + results.regionalFactors.updated
+    const totalErrors = results.settings.errors.length + results.featureFlags.errors.length + results.regionalFactors.errors.length
+
+    await supabase.from('settings_audit_log').insert({
+      category: '_system',
+      key: 'config_import',
+      previous_value: null,
+      new_value: {
+        mode,
+        sections: sections || ['settings', 'featureFlags', 'regionalFactors'],
+        totalUpdated,
+        totalErrors,
+        exportedAt: config.exportedAt,
+      },
+      changed_by: adminUserId,
+      reason: importReason,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent'),
+    })
+
+    return res.json({
+      success: true,
+      data: {
+        results,
+        summary: {
+          totalUpdated,
+          totalSkipped: results.settings.skipped + results.featureFlags.skipped + results.regionalFactors.skipped,
+          totalErrors,
+        },
+      },
+    })
+  } catch (error) {
+    console.error('[Settings Import] Exception:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
