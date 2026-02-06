@@ -23,6 +23,7 @@ import {
   Activity,
   Layers,
   Webhook,
+  GitCompareArrows,
 } from 'lucide-react'
 
 // Sub-panels
@@ -35,8 +36,9 @@ import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
 import { SettingsTemplatesPanel } from './settings/SettingsTemplatesPanel'
 import { SettingsWebhooksPanel } from './settings/SettingsWebhooksPanel'
+import { ConfigDriftPanel } from './settings/ConfigDriftPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates' | 'webhooks'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates' | 'webhooks' | 'drift'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -99,6 +101,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Webhooks',
     description: 'Notify external systems when settings change',
     icon: <Webhook className="h-5 w-5" />,
+  },
+  {
+    id: 'drift',
+    label: 'Drift Detection',
+    description: 'Detect when config differs from a known-good baseline',
+    icon: <GitCompareArrows className="h-5 w-5" />,
   },
 ]
 
@@ -443,6 +451,8 @@ export function SettingsTab() {
         )
       case 'webhooks':
         return <SettingsWebhooksPanel />
+      case 'drift':
+        return <ConfigDriftPanel />
       default:
         return null
     }
