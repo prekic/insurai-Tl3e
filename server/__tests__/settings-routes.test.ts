@@ -388,7 +388,7 @@ describe('Settings Import - Validation Logic', () => {
 
   it('should skip readonly settings during import', () => {
     const existing = { is_readonly: true, value: 'original' }
-    const importValue = 'modified'
+    const _importValue = 'modified'
 
     const shouldSkip = existing.is_readonly
 
@@ -438,9 +438,11 @@ describe('Settings Import - Mode Logic', () => {
 
   it('should process existing settings in both modes', () => {
     const existsInDb = true
+    const mergeMode = 'merge'
+    const overwriteMode = 'overwrite'
 
-    expect('merge' === 'merge' && !existsInDb).toBe(false)
-    expect('overwrite' === 'merge' && !existsInDb).toBe(false)
+    expect(mergeMode === 'merge' && !existsInDb).toBe(false)
+    expect(overwriteMode === 'merge' && !existsInDb).toBe(false)
   })
 })
 
