@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**, **Admin Settings UI with validation and audit history**
-- **Production Readiness**: ~9.5/10 (6133+ tests, 0 lint errors, 46 warnings, PWA support, server hardening)
-- **Last Updated**: February 5, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**, **Admin Settings UI with validation and audit history**, **settings export/import for backup/restore**, **config fetch performance monitoring with TTL recommendations**
+- **Production Readiness**: ~9.5/10 (6122+ tests, 0 lint errors, 46 warnings, PWA support, server hardening)
+- **Last Updated**: February 6, 2026
 
 ---
 
@@ -187,24 +187,26 @@ insurai/
 ### Admin Settings UI (Added Feb 2026)
 | File | Purpose |
 |------|---------|
-| `src/components/admin/tabs/SettingsTab.tsx` | **NEW** Settings tab with category navigation |
-| `src/components/admin/tabs/settings/AISettingsPanel.tsx` | **NEW** AI provider settings (models, temperature, timeouts) |
-| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **NEW** Policy evaluation settings (weights, thresholds) |
-| `src/components/admin/tabs/settings/RateLimitsPanel.tsx` | **NEW** API rate limit configuration |
-| `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | **NEW** OCR decision engine settings |
-| `src/components/admin/tabs/settings/FeatureFlagsPanel.tsx` | **NEW** Feature flag management |
-| `src/components/admin/tabs/settings/SettingsHistoryPanel.tsx` | **NEW** Settings audit log viewer with search/filter |
-| `src/lib/admin/settings-validation.ts` | **NEW** Client-side validation utilities for settings |
+| `src/components/admin/tabs/SettingsTab.tsx` | Settings tab with category navigation + export/import UI |
+| `src/components/admin/tabs/settings/AISettingsPanel.tsx` | AI provider settings (models, temperature, timeouts) |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | Policy evaluation settings (weights, thresholds) |
+| `src/components/admin/tabs/settings/RateLimitsPanel.tsx` | API rate limit configuration |
+| `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | OCR decision engine settings |
+| `src/components/admin/tabs/settings/FeatureFlagsPanel.tsx` | Feature flag management |
+| `src/components/admin/tabs/settings/SettingsHistoryPanel.tsx` | Settings audit log viewer with search/filter |
+| `src/components/admin/tabs/settings/ConfigPerformancePanel.tsx` | **NEW** Config fetch latency dashboard with TTL recommendations |
+| `src/lib/admin/settings-validation.ts` | Client-side validation utilities for settings |
 
 ### Configuration System (Added Feb 2026)
 | File | Purpose |
 |------|---------|
-| `src/lib/config/configuration-service.ts` | **NEW** Singleton ConfigurationService with caching |
-| `src/lib/config/types.ts` | **NEW** TypeScript types and default values |
-| `src/lib/config/index.ts` | **NEW** Module exports |
-| `server/routes/settings.ts` | **NEW** Admin API routes for settings management |
-| `supabase/migrations/012_configuration_system.sql` | **NEW** Database schema for config tables |
-| `supabase/migrations/013_seed_configuration_defaults.sql` | **NEW** Seeds all hardcoded values |
+| `src/lib/config/configuration-service.ts` | Singleton ConfigurationService with caching + performance instrumentation |
+| `src/lib/config/config-performance-monitor.ts` | **NEW** Rolling-window latency tracker with TTL recommendations |
+| `src/lib/config/types.ts` | TypeScript types and default values |
+| `src/lib/config/index.ts` | Module exports |
+| `server/routes/settings.ts` | Admin API routes for settings, export/import, and performance |
+| `supabase/migrations/012_configuration_system.sql` | Database schema for config tables |
+| `supabase/migrations/013_seed_configuration_defaults.sql` | Seeds all hardcoded values |
 
 ### Configuration
 | File | Purpose |
@@ -1073,6 +1075,10 @@ interface EvaluationConfig {
 | `/api/admin/settings/regional-factors/:region` | PUT | Update regional factor |
 | `/api/admin/settings/providers` | GET | List insurance providers |
 | `/api/admin/settings/benchmarks/:policyType` | GET | Get market benchmarks |
+| `/api/admin/settings/export` | GET | Export all settings as JSON backup |
+| `/api/admin/settings/import` | POST | Import settings from JSON (supports `?dryRun=true`) |
+| `/api/admin/settings/performance` | GET | Get server-side config fetch metrics |
+| `/api/admin/settings/performance` | POST | Submit client-side metrics for logging |
 
 ### Feature Flags
 
@@ -1132,9 +1138,9 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 5, 2026)
-- **Total**: 6133+ tests across 184+ test files
-- **Passing**: 99%+ (some pre-existing component test failures)
+### Test Counts (as of Feb 6, 2026)
+- **Total**: 6122+ tests across 181+ test files
+- **Passing**: 100% (all pre-existing test failures fixed)
 - **Coverage Target**: 80%+
 
 ### Key Test Files
@@ -1147,7 +1153,10 @@ Server Tests:               server/__tests__/
 | `server/__tests__/chat-routes.test.ts` | 18 | Chat API |
 | `src/lib/admin/__tests__/settings-validation.test.ts` | 62 | Settings validation utilities |
 | `src/components/admin/tabs/settings/SettingsHistoryPanel.test.tsx` | 27 | Settings history UI |
-| `server/__tests__/settings-routes.test.ts` | 19 | Settings API endpoints |
+| `src/components/admin/tabs/settings/SettingsExportImport.test.tsx` | 15 | Settings export/import UI |
+| `src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx` | 11 | Config performance dashboard |
+| `src/lib/config/__tests__/config-performance-monitor.test.ts` | 21 | Performance monitor core |
+| `server/__tests__/settings-routes.test.ts` | 43 | Settings API (includes export/import + performance) |
 
 ### Running Tests
 ```bash
@@ -2724,6 +2733,81 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `server/middleware/rate-limit.ts` - Fixed unused variable lint error
 - **Commits**: `ae66160`, `b2a5c0a`, `a9547f0`, `dee49a9`
 
+### 58. Fix Pre-Existing Test Failures (Fixed Feb 6, 2026)
+- **Problem**: 8 test files had 9 pre-existing failures across component and settings tests
+- **Root Causes**: Missing AuthProvider wrappers, incorrect mock patterns, stale assertions
+- **Solution**: Fixed all 9 failures across 8 test files
+- **Result**: Full test suite now passes: 181 files, 6122 tests, 0 failures
+- **Commit**: `d4292cb`
+
+### 59. Settings Export/Import for Admin Configuration (Added Feb 6, 2026)
+- **Feature**: Admin dashboard can now export all settings as JSON and import them for backup/restore
+- **Export** (`GET /api/admin/settings/export`):
+  - Exports all categories of settings as structured JSON
+  - Includes metadata: `exportedAt`, `version`, `settingsCount`
+  - Downloads as `insurai-settings-YYYY-MM-DDTHH-MM-SS.json`
+- **Import** (`POST /api/admin/settings/import`):
+  - Validates JSON structure and setting values before applying
+  - Preview mode: shows changes that would be made before committing
+  - Dry-run validation: `?dryRun=true` returns preview without applying
+  - Reports skipped/failed/applied counts
+- **Admin UI** (integrated in `SettingsTab.tsx`):
+  - Export button in settings header
+  - Import dialog with file selection and preview
+  - Shows settings count, categories, and per-setting changes before applying
+  - Success/error feedback with detailed results
+- **New Tests**:
+  - `SettingsExportImport.test.tsx` - 15 UI tests
+  - `settings-routes.test.ts` - 18 new API tests (export validation, import dry-run, etc.)
+- **Commit**: `303316a`
+
+### 60. Config Fetch Performance Monitoring with TTL Recommendations (Added Feb 6, 2026)
+- **Feature**: Tracks ConfigurationService fetch latency to validate the 5-minute cache TTL
+- **Client-Side Monitor** (`src/lib/config/config-performance-monitor.ts`):
+  - Rolling window: 1000 events, 1 hour max retention
+  - Tracks: category, method, latencyMs, cacheHit, success, errorMessage
+  - Computes: latency percentiles (p50, p95, p99), cache hit rates, per-category breakdown
+  - TTL recommendation engine:
+    - Suggests lower TTL if hit rate >90% and DB latency <50ms
+    - Suggests higher TTL if hit rate <50% or DB latency >200ms
+    - Reports confidence level (high/medium/low) based on sample size
+- **ConfigurationService Instrumentation** (`configuration-service.ts`):
+  - `get()`, `getCategory()`, `isFeatureEnabled()` methods now record timing with `performance.now()`
+  - Tracks cache hits, misses, errors, and latency to performance monitor
+  - Added `getPerformanceSnapshot()` public method
+- **Server-Side** (`server/routes/settings.ts`):
+  - In-memory server-side performance monitor (parallel to client)
+  - `GET /api/admin/settings/performance` - Returns server metrics snapshot
+  - `POST /api/admin/settings/performance` - Accepts client-side metrics for logging
+- **Admin UI Panel** (`ConfigPerformancePanel.tsx`):
+  - Client/Server source toggle with auto-refresh (5s interval)
+  - Summary cards: Total Fetches, Cache Hit Rate, DB Avg Latency, Error Rate
+  - DB Fetch Latency Distribution: Min/Avg/P50/P95/P99/Max with color-coded thresholds
+  - Per-Category Breakdown table with fetch count, avg latency, hit rate, errors
+  - Cache TTL Recommendation section with confidence level
+  - Recent Events log (last 20 events in reverse chronological)
+- **SettingsTab Updated**: Added Performance tab (Activity icon) to category navigation
+- **New Tests** (39 total):
+  - `config-performance-monitor.test.ts` - 21 unit tests
+  - `settings-routes.test.ts` - 7 new server tests
+  - `ConfigPerformancePanel.test.tsx` - 11 UI tests
+- **Key Pattern** (performance instrumentation):
+  ```typescript
+  async get<T>(category: string, key: string, defaultValue: T): Promise<T> {
+    const start = performance.now()
+    const cached = this.cache.get(cacheKey)
+    if (cached) {
+      configPerformanceMonitor.record({
+        category, method: 'get', latencyMs: performance.now() - start,
+        cacheHit: true, success: true
+      })
+      return cached
+    }
+    // ... fetch from DB, record miss
+  }
+  ```
+- **Commit**: `9093818`
+
 ---
 
 ## Turkish Market Considerations
@@ -2798,6 +2882,14 @@ new Intl.NumberFormat('tr-TR', {
 - Service worker: `public/sw.js`
 - Cache strategies: cache-first (static), network-first (API)
 - PWA manifest for installability
+
+### Config Fetch Performance Monitoring (Added Feb 6, 2026)
+- In-memory rolling window tracker (1000 events, 1 hour)
+- Latency percentiles: p50, p95, p99 for cache misses (DB fetches)
+- Cache hit rate analysis with per-category breakdown
+- TTL recommendation engine based on observed patterns
+- Admin dashboard: Settings → Performance tab
+- Both client-side and server-side monitors with API endpoints
 
 ### Lighthouse Targets
 - FCP: < 2000ms
@@ -3110,5 +3202,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 5800+ tests, all passing (165 test files)
-**Last Updated**: February 4, 2026
+**Tests**: 6122+ tests, all passing (181 test files)
+**Last Updated**: February 6, 2026
