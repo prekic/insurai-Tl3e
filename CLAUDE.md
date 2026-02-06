@@ -2985,11 +2985,13 @@ Railway hosts both frontend and backend as a single service. The Express server 
 {
   "build": {
     "builder": "NIXPACKS",
-    "installCommand": "npm ci",
+    "installCommand": "npm ci --include=dev",
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
-    "startCommand": "NODE_ENV=production node dist-server/index.js"
+    "startCommand": "NODE_ENV=production node dist-server/index.js",
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
   }
 }
 ```
