@@ -695,6 +695,189 @@ router.post('/import', async (req: Request, res: Response) => {
 })
 
 // =============================================================================
+// BATCH UPDATE ROUTE (must be before /:category to avoid route conflict)
+// =============================================================================
+
+const batchUpdateSchema = z.object({
+  updates: z.array(z.object({
+    category: z.string().min(1),
+    key: z.string().min(1),
+    value: z.unknown(),
+  })).min(1).max(50),
+  reason: z.string().optional(),
+})
+
+/**
+ * PUT /api/admin/settings/batch
+ * Update multiple settings in a single request.
+ * Validates all settings upfront before applying any changes.
+ * Returns per-setting results with overall success/failure.
+ */
+router.put('/batch', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const parseResult = batchUpdateSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const { updates, reason } = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  // Phase 1: Fetch all existing settings and validate
+  const validationErrors: Array<{ category: string; key: string; error: string }> = []
+  const validatedUpdates: Array<{
+    category: string
+    key: string
+    value: unknown
+    existing: { id: string; value: unknown; is_readonly: boolean; min_value: number | null; max_value: number | null; allowed_values: unknown[] | null }
+  }> = []
+
+  // Supabase doesn't support OR-ing multiple AND conditions easily,
+  // so fetch all settings for the relevant categories and filter client-side
+  const uniqueCategories = [...new Set(updates.map((u) => u.category))]
+  const { data: allSettings, error: fetchError } = await supabase
+    .from('app_settings')
+    .select('*')
+    .in('category', uniqueCategories)
+
+  if (fetchError) {
+    console.error('[Settings API] Batch fetch error:', fetchError)
+    return res.status(500).json({ success: false, error: 'Failed to fetch settings' })
+  }
+
+  // Build lookup map
+  const settingsMap = new Map<string, typeof allSettings[0]>()
+  for (const s of allSettings || []) {
+    settingsMap.set(`${s.category}:${s.key}`, s)
+  }
+
+  // Validate each update
+  for (const update of updates) {
+    const mapKey = `${update.category}:${update.key}`
+    const existing = settingsMap.get(mapKey)
+
+    if (!existing) {
+      validationErrors.push({ category: update.category, key: update.key, error: 'Setting not found' })
+      continue
+    }
+
+    if (existing.is_readonly) {
+      validationErrors.push({ category: update.category, key: update.key, error: 'Setting is read-only' })
+      continue
+    }
+
+    if (existing.min_value !== null && typeof update.value === 'number' && update.value < existing.min_value) {
+      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at least ${existing.min_value}` })
+      continue
+    }
+
+    if (existing.max_value !== null && typeof update.value === 'number' && update.value > existing.max_value) {
+      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at most ${existing.max_value}` })
+      continue
+    }
+
+    if (existing.allowed_values && Array.isArray(existing.allowed_values)) {
+      const allowedValues = existing.allowed_values as unknown[]
+      if (!allowedValues.includes(update.value)) {
+        validationErrors.push({ category: update.category, key: update.key, error: `Value must be one of: ${allowedValues.join(', ')}` })
+        continue
+      }
+    }
+
+    // Skip if value unchanged
+    if (JSON.stringify(existing.value) === JSON.stringify(update.value)) {
+      continue
+    }
+
+    validatedUpdates.push({
+      category: update.category,
+      key: update.key,
+      value: update.value,
+      existing,
+    })
+  }
+
+  // If there are validation errors, return them all (don't apply any changes)
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed for one or more settings',
+      validationErrors,
+      validCount: validatedUpdates.length,
+    })
+  }
+
+  // Phase 2: Apply all validated updates
+  const results: Array<{ category: string; key: string; previousValue: unknown; newValue: unknown }> = []
+  const errors: Array<{ category: string; key: string; error: string }> = []
+
+  for (const update of validatedUpdates) {
+    try {
+      const { error: updateError } = await supabase
+        .from('app_settings')
+        .update({
+          value: update.value,
+          updated_by: adminUserId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('category', update.category)
+        .eq('key', update.key)
+
+      if (updateError) {
+        errors.push({ category: update.category, key: update.key, error: 'Database update failed' })
+        continue
+      }
+
+      results.push({
+        category: update.category,
+        key: update.key,
+        previousValue: update.existing.value,
+        newValue: update.value,
+      })
+
+      // Log audit entry
+      if (reason) {
+        await supabase.from('settings_audit_log').insert({
+          setting_id: update.existing.id,
+          category: update.category,
+          key: update.key,
+          previous_value: update.existing.value,
+          new_value: update.value,
+          changed_by: adminUserId,
+          reason: `[Batch] ${reason}`,
+          ip_address: req.ip,
+          user_agent: req.get('user-agent'),
+        })
+      }
+    } catch (error) {
+      console.error(`[Settings API] Batch update error for ${update.category}/${update.key}:`, error)
+      errors.push({ category: update.category, key: update.key, error: 'Internal error' })
+    }
+  }
+
+  const skippedCount = updates.length - validatedUpdates.length - validationErrors.length
+
+  return res.json({
+    success: errors.length === 0,
+    data: {
+      updated: results.length,
+      skipped: skippedCount,
+      errors: errors.length,
+      results,
+      ...(errors.length > 0 ? { errorDetails: errors } : {}),
+    },
+  })
+})
+
+// =============================================================================
 // FEATURE FLAGS ROUTES (must be before /:category to avoid route conflict)
 // =============================================================================
 

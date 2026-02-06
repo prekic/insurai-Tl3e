@@ -30,6 +30,7 @@ import type { SettingValue } from '../SettingsTab'
 interface AISettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
+  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }
@@ -78,7 +79,7 @@ const MODEL_OPTIONS = {
   ],
 }
 
-export function AISettingsPanel({ settings, onUpdate, isLoading, isSaving }: AISettingsPanelProps) {
+export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpdate, isLoading, isSaving }: AISettingsPanelProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editReason, setEditReason] = useState<string>('')

@@ -27,6 +27,7 @@ import type { SettingValue } from '../SettingsTab'
 interface EvaluationSettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
+  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }
@@ -49,6 +50,7 @@ const GRADE_KEYS = [
 export function EvaluationSettingsPanel({
   settings,
   onUpdate,
+  onBatchUpdate,
   isLoading,
   isSaving,
 }: EvaluationSettingsPanelProps) {
@@ -117,18 +119,38 @@ export function EvaluationSettingsPanel({
   }
 
   const saveWeights = async () => {
-    for (const [key, value] of Object.entries(tempWeights)) {
-      if (value !== currentWeights[key]) {
-        await onUpdate(key, value, editReason || 'Updated via weights panel')
+    const changedEntries = Object.entries(tempWeights).filter(
+      ([key, value]) => value !== currentWeights[key]
+    )
+    const reason = editReason || 'Updated via weights panel'
+
+    if (changedEntries.length > 0 && onBatchUpdate) {
+      await onBatchUpdate(
+        changedEntries.map(([key, value]) => ({ key, value })),
+        reason
+      )
+    } else {
+      for (const [key, value] of changedEntries) {
+        await onUpdate(key, value, reason)
       }
     }
     setEditingWeights(false)
   }
 
   const saveGrades = async () => {
-    for (const [key, value] of Object.entries(tempGrades)) {
-      if (value !== currentGrades[key]) {
-        await onUpdate(key, value, editReason || 'Updated via grades panel')
+    const changedEntries = Object.entries(tempGrades).filter(
+      ([key, value]) => value !== currentGrades[key]
+    )
+    const reason = editReason || 'Updated via grades panel'
+
+    if (changedEntries.length > 0 && onBatchUpdate) {
+      await onBatchUpdate(
+        changedEntries.map(([key, value]) => ({ key, value })),
+        reason
+      )
+    } else {
+      for (const [key, value] of changedEntries) {
+        await onUpdate(key, value, reason)
       }
     }
     setEditingGrades(false)

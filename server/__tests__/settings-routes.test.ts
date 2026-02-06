@@ -617,3 +617,318 @@ describe('Settings History - Response Structure', () => {
     expect(response.error).toBe('Database not configured')
   })
 })
+
+// =============================================================================
+// BATCH UPDATE TESTS
+// =============================================================================
+
+describe('Settings Batch Update - Request Validation', () => {
+  it('should require updates array', () => {
+    const body = {}
+    const hasUpdates = 'updates' in body && Array.isArray((body as Record<string, unknown>).updates)
+
+    expect(hasUpdates).toBe(false)
+  })
+
+  it('should require at least one update', () => {
+    const body = { updates: [] }
+    const isValid = body.updates.length >= 1
+
+    expect(isValid).toBe(false)
+  })
+
+  it('should enforce max 50 updates', () => {
+    const updates = Array.from({ length: 51 }, (_, i) => ({
+      category: 'ai',
+      key: `key_${i}`,
+      value: i,
+    }))
+    const isValid = updates.length <= 50
+
+    expect(isValid).toBe(false)
+  })
+
+  it('should require category and key for each update', () => {
+    const update = { category: 'ai', key: 'temperature', value: 0.5 }
+
+    expect(update.category).toBeTruthy()
+    expect(update.key).toBeTruthy()
+    expect('value' in update).toBe(true)
+  })
+
+  it('should accept optional reason', () => {
+    const body = {
+      updates: [{ category: 'ai', key: 'temperature', value: 0.5 }],
+      reason: 'Tuning model parameters',
+    }
+
+    expect(body.reason).toBe('Tuning model parameters')
+  })
+})
+
+describe('Settings Batch Update - Validation Logic', () => {
+  const createMockSettings = () => [
+    { id: 's1', category: 'ai', key: 'temperature', value: 0.1, is_readonly: false, min_value: 0, max_value: 2, allowed_values: null },
+    { id: 's2', category: 'ai', key: 'max_tokens', value: 4096, is_readonly: false, min_value: 100, max_value: 128000, allowed_values: null },
+    { id: 's3', category: 'ai', key: 'model_version', value: 'v1', is_readonly: true, min_value: null, max_value: null, allowed_values: null },
+    { id: 's4', category: 'evaluation', key: 'weight_premium', value: 20, is_readonly: false, min_value: 0, max_value: 100, allowed_values: null },
+    { id: 's5', category: 'ai', key: 'preferred_provider', value: 'auto', is_readonly: false, min_value: null, max_value: null, allowed_values: ['auto', 'openai', 'anthropic'] },
+  ]
+
+  it('should detect non-existent settings', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const update = { category: 'ai', key: 'nonexistent', value: 42 }
+    const existing = settingsMap.get(`${update.category}:${update.key}`)
+
+    expect(existing).toBeUndefined()
+  })
+
+  it('should detect readonly settings', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const update = { category: 'ai', key: 'model_version', value: 'v2' }
+    const existing = settingsMap.get(`${update.category}:${update.key}`)
+
+    expect(existing?.is_readonly).toBe(true)
+  })
+
+  it('should validate min/max constraints', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const update = { category: 'ai', key: 'temperature', value: 5.0 }
+    const existing = settingsMap.get(`${update.category}:${update.key}`)
+
+    const exceedsMax = existing!.max_value !== null &&
+      typeof update.value === 'number' &&
+      update.value > existing!.max_value
+
+    expect(exceedsMax).toBe(true)
+  })
+
+  it('should validate allowed values', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const update = { category: 'ai', key: 'preferred_provider', value: 'invalid_provider' }
+    const existing = settingsMap.get(`${update.category}:${update.key}`)
+
+    const isAllowed = !existing!.allowed_values ||
+      (existing!.allowed_values as string[]).includes(update.value as string)
+
+    expect(isAllowed).toBe(false)
+  })
+
+  it('should skip unchanged values', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const update = { category: 'ai', key: 'temperature', value: 0.1 }
+    const existing = settingsMap.get(`${update.category}:${update.key}`)
+
+    const isUnchanged = JSON.stringify(existing!.value) === JSON.stringify(update.value)
+
+    expect(isUnchanged).toBe(true)
+  })
+
+  it('should pass validation for valid updates', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const updates = [
+      { category: 'ai', key: 'temperature', value: 0.7 },
+      { category: 'ai', key: 'max_tokens', value: 8192 },
+      { category: 'evaluation', key: 'weight_premium', value: 25 },
+    ]
+
+    const errors: string[] = []
+    const valid: typeof updates = []
+
+    for (const update of updates) {
+      const existing = settingsMap.get(`${update.category}:${update.key}`)
+      if (!existing) { errors.push(`${update.key}: not found`); continue }
+      if (existing.is_readonly) { errors.push(`${update.key}: readonly`); continue }
+      if (existing.min_value !== null && typeof update.value === 'number' && update.value < existing.min_value) {
+        errors.push(`${update.key}: below min`); continue
+      }
+      if (existing.max_value !== null && typeof update.value === 'number' && update.value > existing.max_value) {
+        errors.push(`${update.key}: above max`); continue
+      }
+      if (JSON.stringify(existing.value) !== JSON.stringify(update.value)) {
+        valid.push(update)
+      }
+    }
+
+    expect(errors).toHaveLength(0)
+    expect(valid).toHaveLength(3)
+  })
+
+  it('should collect all validation errors before applying any updates', () => {
+    const settings = createMockSettings()
+    const settingsMap = new Map(settings.map((s) => [`${s.category}:${s.key}`, s]))
+
+    const updates = [
+      { category: 'ai', key: 'temperature', value: 5.0 },      // exceeds max
+      { category: 'ai', key: 'nonexistent', value: 42 },        // not found
+      { category: 'ai', key: 'model_version', value: 'v2' },    // readonly
+      { category: 'ai', key: 'preferred_provider', value: 'x' }, // not allowed
+    ]
+
+    const errors: Array<{ key: string; error: string }> = []
+
+    for (const update of updates) {
+      const existing = settingsMap.get(`${update.category}:${update.key}`)
+      if (!existing) { errors.push({ key: update.key, error: 'not found' }); continue }
+      if (existing.is_readonly) { errors.push({ key: update.key, error: 'readonly' }); continue }
+      if (existing.max_value !== null && typeof update.value === 'number' && update.value > existing.max_value) {
+        errors.push({ key: update.key, error: 'above max' }); continue
+      }
+      if (existing.allowed_values && !(existing.allowed_values as string[]).includes(update.value as string)) {
+        errors.push({ key: update.key, error: 'not allowed' }); continue
+      }
+    }
+
+    expect(errors).toHaveLength(4)
+    expect(errors[0].key).toBe('temperature')
+    expect(errors[1].key).toBe('nonexistent')
+    expect(errors[2].key).toBe('model_version')
+    expect(errors[3].key).toBe('preferred_provider')
+  })
+})
+
+describe('Settings Batch Update - Response Structure', () => {
+  it('should report updated, skipped, and error counts', () => {
+    const response = {
+      success: true,
+      data: {
+        updated: 3,
+        skipped: 1,
+        errors: 0,
+        results: [
+          { category: 'ai', key: 'temperature', previousValue: 0.1, newValue: 0.7 },
+          { category: 'ai', key: 'max_tokens', previousValue: 4096, newValue: 8192 },
+          { category: 'evaluation', key: 'weight_premium', previousValue: 20, newValue: 25 },
+        ],
+      },
+    }
+
+    expect(response.success).toBe(true)
+    expect(response.data.updated).toBe(3)
+    expect(response.data.skipped).toBe(1)
+    expect(response.data.errors).toBe(0)
+    expect(response.data.results).toHaveLength(3)
+  })
+
+  it('should include previous and new values in results', () => {
+    const result = { category: 'ai', key: 'temperature', previousValue: 0.1, newValue: 0.7 }
+
+    expect(result.previousValue).toBe(0.1)
+    expect(result.newValue).toBe(0.7)
+    expect(result.category).toBe('ai')
+    expect(result.key).toBe('temperature')
+  })
+
+  it('should include error details when some updates fail', () => {
+    const response = {
+      success: false,
+      data: {
+        updated: 2,
+        skipped: 0,
+        errors: 1,
+        results: [
+          { category: 'ai', key: 'temperature', previousValue: 0.1, newValue: 0.7 },
+          { category: 'ai', key: 'max_tokens', previousValue: 4096, newValue: 8192 },
+        ],
+        errorDetails: [
+          { category: 'ai', key: 'model_version', error: 'Database update failed' },
+        ],
+      },
+    }
+
+    expect(response.success).toBe(false)
+    expect(response.data.errors).toBe(1)
+    expect(response.data.errorDetails).toHaveLength(1)
+    expect(response.data.errorDetails[0].key).toBe('model_version')
+  })
+
+  it('should return validation errors with all failed keys', () => {
+    const response = {
+      success: false,
+      error: 'Validation failed for one or more settings',
+      validationErrors: [
+        { category: 'ai', key: 'temperature', error: 'Value must be at most 2' },
+        { category: 'ai', key: 'nonexistent', error: 'Setting not found' },
+      ],
+      validCount: 1,
+    }
+
+    expect(response.success).toBe(false)
+    expect(response.validationErrors).toHaveLength(2)
+    expect(response.validCount).toBe(1)
+  })
+})
+
+describe('Settings Batch Update - Audit Logging', () => {
+  it('should prefix reason with [Batch] for audit entries', () => {
+    const userReason = 'Tuning model parameters'
+    const auditReason = `[Batch] ${userReason}`
+
+    expect(auditReason).toBe('[Batch] Tuning model parameters')
+  })
+
+  it('should create audit entries only for changed values', () => {
+    const updates = [
+      { key: 'temperature', value: 0.7, previousValue: 0.1 },     // changed
+      { key: 'max_tokens', value: 4096, previousValue: 4096 },     // unchanged
+      { key: 'weight_premium', value: 25, previousValue: 20 },     // changed
+    ]
+
+    const changed = updates.filter((u) =>
+      JSON.stringify(u.value) !== JSON.stringify(u.previousValue)
+    )
+
+    expect(changed).toHaveLength(2)
+    expect(changed[0].key).toBe('temperature')
+    expect(changed[1].key).toBe('weight_premium')
+  })
+
+  it('should not create audit entries when reason is not provided', () => {
+    const reason: string | undefined = undefined
+    const shouldLog = !!reason
+
+    expect(shouldLog).toBe(false)
+  })
+})
+
+describe('Settings Batch Update - Cross-Category', () => {
+  it('should support updates across multiple categories', () => {
+    const updates = [
+      { category: 'ai', key: 'temperature', value: 0.7 },
+      { category: 'evaluation', key: 'weight_premium', value: 25 },
+      { category: 'rate_limits', key: 'chat_requests_per_hour', value: 100 },
+    ]
+
+    const uniqueCategories = [...new Set(updates.map((u) => u.category))]
+
+    expect(uniqueCategories).toHaveLength(3)
+    expect(uniqueCategories).toContain('ai')
+    expect(uniqueCategories).toContain('evaluation')
+    expect(uniqueCategories).toContain('rate_limits')
+  })
+
+  it('should fetch settings for all relevant categories efficiently', () => {
+    const updates = [
+      { category: 'ai', key: 'temperature', value: 0.7 },
+      { category: 'ai', key: 'max_tokens', value: 8192 },
+      { category: 'evaluation', key: 'weight_premium', value: 25 },
+    ]
+
+    const uniqueCategories = [...new Set(updates.map((u) => u.category))]
+
+    // Only 2 categories need to be fetched, not 3 individual queries
+    expect(uniqueCategories).toHaveLength(2)
+  })
+})
