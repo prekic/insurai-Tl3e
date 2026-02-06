@@ -43,6 +43,8 @@ import {
   DEFAULT_EMAIL_CONFIG,
 } from './types'
 
+import { configPerformanceMonitor } from './config-performance-monitor'
+
 // =============================================================================
 // CACHE IMPLEMENTATION
 // =============================================================================
@@ -221,6 +223,7 @@ export class ConfigurationService {
   private constructor(options: ConfigurationServiceOptions = {}) {
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS
     this.enableCache = options.enableCache ?? true
+    configPerformanceMonitor.setCacheTtl(this.cacheTtlMs)
   }
 
   /**
@@ -250,11 +253,19 @@ export class ConfigurationService {
    */
   async get<T>(category: ConfigCategory, key: string, defaultValue: T): Promise<T> {
     const cacheKey = getCacheKey(category, key)
+    const startTime = performance.now()
 
     // Check cache first
     if (this.enableCache) {
       const cached = getFromCache<T>(cacheKey)
       if (cached !== null) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'get',
+          latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+          cacheHit: true,
+          success: true,
+        })
         return cached
       }
     }
@@ -267,7 +278,16 @@ export class ConfigurationService {
         .eq('key', key)
         .single()
 
+      const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
+
       if (error || !data) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'get',
+          latencyMs,
+          cacheHit: false,
+          success: true, // returning default is not an error
+        })
         return defaultValue
       }
 
@@ -278,8 +298,24 @@ export class ConfigurationService {
         setInCache(cacheKey, value, this.cacheTtlMs)
       }
 
+      configPerformanceMonitor.record({
+        category,
+        method: 'get',
+        latencyMs,
+        cacheHit: false,
+        success: true,
+      })
+
       return value
-    } catch {
+    } catch (err) {
+      configPerformanceMonitor.record({
+        category,
+        method: 'get',
+        latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+        cacheHit: false,
+        success: false,
+        errorMessage: err instanceof Error ? err.message : 'unknown error',
+      })
       return defaultValue
     }
   }
@@ -289,11 +325,19 @@ export class ConfigurationService {
    */
   async getCategory(category: ConfigCategory): Promise<Record<string, unknown>> {
     const cacheKey = getCacheKey(category)
+    const startTime = performance.now()
 
     // Check cache first
     if (this.enableCache) {
       const cached = getFromCache<Record<string, unknown>>(cacheKey)
       if (cached !== null) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'getCategory',
+          latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+          cacheHit: true,
+          success: true,
+        })
         return cached
       }
     }
@@ -305,7 +349,16 @@ export class ConfigurationService {
         .eq('category', category)
         .order('display_order', { ascending: true })
 
+      const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
+
       if (error || !data) {
+        configPerformanceMonitor.record({
+          category,
+          method: 'getCategory',
+          latencyMs,
+          cacheHit: false,
+          success: true,
+        })
         return {}
       }
 
@@ -322,8 +375,24 @@ export class ConfigurationService {
         setInCache(cacheKey, result, this.cacheTtlMs)
       }
 
+      configPerformanceMonitor.record({
+        category,
+        method: 'getCategory',
+        latencyMs,
+        cacheHit: false,
+        success: true,
+      })
+
       return result
-    } catch {
+    } catch (err) {
+      configPerformanceMonitor.record({
+        category,
+        method: 'getCategory',
+        latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+        cacheHit: false,
+        success: false,
+        errorMessage: err instanceof Error ? err.message : 'unknown error',
+      })
       return {}
     }
   }
@@ -486,11 +555,19 @@ export class ConfigurationService {
    */
   async isFeatureEnabled(flagKey: string, userId?: string): Promise<boolean> {
     const cacheKey = `feature:${flagKey}:${userId || 'anon'}`
+    const startTime = performance.now()
 
     // Check cache
     if (this.enableCache) {
       const cached = getFromCache<boolean>(cacheKey)
       if (cached !== null) {
+        configPerformanceMonitor.record({
+          category: 'feature_flags',
+          method: 'isFeatureEnabled',
+          latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+          cacheHit: true,
+          success: true,
+        })
         return cached
       }
     }
@@ -502,7 +579,16 @@ export class ConfigurationService {
         .eq('key', flagKey)
         .single()
 
+      const latencyMs = Math.round((performance.now() - startTime) * 100) / 100
+
       if (error || !data) {
+        configPerformanceMonitor.record({
+          category: 'feature_flags',
+          method: 'isFeatureEnabled',
+          latencyMs,
+          cacheHit: false,
+          success: true,
+        })
         return false
       }
 
@@ -510,11 +596,25 @@ export class ConfigurationService {
 
       // Check if expired
       if (flag.expiresAt && new Date(flag.expiresAt) < new Date()) {
+        configPerformanceMonitor.record({
+          category: 'feature_flags',
+          method: 'isFeatureEnabled',
+          latencyMs,
+          cacheHit: false,
+          success: true,
+        })
         return false
       }
 
       // Check if globally disabled
       if (!flag.enabled) {
+        configPerformanceMonitor.record({
+          category: 'feature_flags',
+          method: 'isFeatureEnabled',
+          latencyMs,
+          cacheHit: false,
+          success: true,
+        })
         return false
       }
 
@@ -526,6 +626,13 @@ export class ConfigurationService {
           : Math.floor(Math.random() * 100)
 
         if (bucket >= flag.rolloutPercentage) {
+          configPerformanceMonitor.record({
+            category: 'feature_flags',
+            method: 'isFeatureEnabled',
+            latencyMs,
+            cacheHit: false,
+            success: true,
+          })
           return false
         }
       }
@@ -535,8 +642,24 @@ export class ConfigurationService {
         setInCache(cacheKey, true, this.cacheTtlMs)
       }
 
+      configPerformanceMonitor.record({
+        category: 'feature_flags',
+        method: 'isFeatureEnabled',
+        latencyMs,
+        cacheHit: false,
+        success: true,
+      })
+
       return true
-    } catch {
+    } catch (err) {
+      configPerformanceMonitor.record({
+        category: 'feature_flags',
+        method: 'isFeatureEnabled',
+        latencyMs: Math.round((performance.now() - startTime) * 100) / 100,
+        cacheHit: false,
+        success: false,
+        errorMessage: err instanceof Error ? err.message : 'unknown error',
+      })
       return false
     }
   }
@@ -833,6 +956,17 @@ export class ConfigurationService {
     } catch {
       return false
     }
+  }
+
+  // ===========================================================================
+  // PERFORMANCE MONITORING
+  // ===========================================================================
+
+  /**
+   * Get a performance snapshot of config fetch metrics
+   */
+  getPerformanceSnapshot() {
+    return configPerformanceMonitor.getSnapshot()
   }
 
   // ===========================================================================

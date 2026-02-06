@@ -105,6 +105,105 @@ const importRequestSchema = z.object({
 })
 
 // =============================================================================
+// SERVER-SIDE PERFORMANCE MONITOR (in-memory, rolling window)
+// =============================================================================
+
+interface ServerConfigEvent {
+  timestamp: number
+  category: string
+  latencyMs: number
+  cacheHit: boolean
+  success: boolean
+}
+
+const serverPerfEvents: ServerConfigEvent[] = []
+const SERVER_PERF_MAX_EVENTS = 500
+const SERVER_PERF_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+
+function pruneServerPerfEvents(): void {
+  const cutoff = Date.now() - SERVER_PERF_MAX_AGE_MS
+  while (serverPerfEvents.length > 0 && serverPerfEvents[0].timestamp < cutoff) {
+    serverPerfEvents.shift()
+  }
+  if (serverPerfEvents.length > SERVER_PERF_MAX_EVENTS) {
+    serverPerfEvents.splice(0, serverPerfEvents.length - SERVER_PERF_MAX_EVENTS)
+  }
+}
+
+function recordServerConfigFetch(category: string, latencyMs: number, cacheHit: boolean, success: boolean): void {
+  serverPerfEvents.push({ timestamp: Date.now(), category, latencyMs, cacheHit, success })
+  pruneServerPerfEvents()
+}
+
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0
+  const idx = Math.ceil((p / 100) * sorted.length) - 1
+  return sorted[Math.max(0, Math.min(idx, sorted.length - 1))]
+}
+
+function getServerPerformanceSnapshot() {
+  pruneServerPerfEvents()
+  const events = serverPerfEvents
+
+  const dbEvents = events.filter((e) => !e.cacheHit && e.success)
+  const dbLatencies = dbEvents.map((e) => e.latencyMs).sort((a, b) => a - b)
+  const allLatencies = events.filter((e) => e.success).map((e) => e.latencyMs).sort((a, b) => a - b)
+  const totalHits = events.filter((e) => e.cacheHit).length
+
+  // Per-category breakdown
+  const catMap = new Map<string, ServerConfigEvent[]>()
+  for (const ev of events) {
+    const arr = catMap.get(ev.category) || []
+    arr.push(ev)
+    catMap.set(ev.category, arr)
+  }
+
+  const categories = Array.from(catMap.entries()).map(([cat, evts]) => {
+    const success = evts.filter((e) => e.success)
+    const avgLatency = success.length > 0 ? success.reduce((s, e) => s + e.latencyMs, 0) / success.length : 0
+    return {
+      category: cat,
+      fetchCount: evts.length,
+      avgLatencyMs: Math.round(avgLatency * 100) / 100,
+      cacheHitRate: evts.length > 0 ? Math.round((evts.filter((e) => e.cacheHit).length / evts.length) * 10000) / 10000 : 0,
+      errorCount: evts.filter((e) => !e.success).length,
+    }
+  }).sort((a, b) => b.fetchCount - a.fetchCount)
+
+  const computeStats = (latencies: number[]) => {
+    if (latencies.length === 0) return { count: 0, avgMs: 0, minMs: 0, maxMs: 0, p50Ms: 0, p95Ms: 0, p99Ms: 0 }
+    const sum = latencies.reduce((a, b) => a + b, 0)
+    return {
+      count: latencies.length,
+      avgMs: Math.round((sum / latencies.length) * 100) / 100,
+      minMs: latencies[0],
+      maxMs: latencies[latencies.length - 1],
+      p50Ms: percentile(latencies, 50),
+      p95Ms: percentile(latencies, 95),
+      p99Ms: percentile(latencies, 99),
+    }
+  }
+
+  return {
+    snapshotAt: new Date().toISOString(),
+    totalEvents: events.length,
+    dbLatency: computeStats(dbLatencies),
+    overallLatency: computeStats(allLatencies),
+    cache: {
+      totalRequests: events.length,
+      cacheHits: totalHits,
+      cacheMisses: events.length - totalHits,
+      hitRate: events.length > 0 ? Math.round((totalHits / events.length) * 10000) / 10000 : 0,
+    },
+    categories,
+    errorRate: events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0,
+  }
+}
+
+// Make the record function available to other server modules
+export { recordServerConfigFetch, getServerPerformanceSnapshot }
+
+// =============================================================================
 // SETTINGS ROUTES
 // =============================================================================
 
@@ -167,6 +266,49 @@ router.get('/', async (_req: Request, res: Response) => {
   } catch (error) {
     console.error('[Settings API] Exception:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// PERFORMANCE MONITORING ROUTES (must be before /:category to avoid route conflict)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/performance
+ * Get server-side config performance metrics
+ */
+router.get('/performance', async (_req: Request, res: Response) => {
+  try {
+    const snapshot = getServerPerformanceSnapshot()
+    return res.json({ success: true, data: snapshot })
+  } catch (error) {
+    console.error('[Settings API] Performance snapshot error:', error)
+    return res.status(500).json({ success: false, error: 'Failed to get performance metrics' })
+  }
+})
+
+/**
+ * POST /api/admin/settings/performance
+ * Accept client-side performance metrics for centralized monitoring
+ */
+router.post('/performance', async (req: Request, res: Response) => {
+  try {
+    // Accept and log client-side metrics (for future aggregation)
+    const clientSnapshot = req.body
+    if (clientSnapshot?.totalEvents !== undefined) {
+      console.info('[Config Performance] Client report:', JSON.stringify({
+        totalEvents: clientSnapshot.totalEvents,
+        cacheHitRate: clientSnapshot.cache?.hitRate,
+        dbAvgLatency: clientSnapshot.dbLatency?.avgMs,
+        dbP95Latency: clientSnapshot.dbLatency?.p95Ms,
+        errorRate: clientSnapshot.errorRate,
+        recommendation: clientSnapshot.ttlRecommendation?.reason,
+      }))
+    }
+    return res.json({ success: true })
+  } catch (error) {
+    console.error('[Settings API] Performance report error:', error)
+    return res.status(500).json({ success: false, error: 'Failed to process performance report' })
   }
 })
 

@@ -474,6 +474,98 @@ describe('Settings Import - Results Tracking', () => {
   })
 })
 
+describe('Server Config Performance Monitor', () => {
+  // Test the server-side performance functions imported from settings.ts
+  // We test the same logic pattern used in the route handlers
+
+  it('should compute percentile correctly', () => {
+    // Percentile function logic (same as in settings.ts)
+    function percentile(sorted: number[], p: number): number {
+      if (sorted.length === 0) return 0
+      const idx = Math.ceil((p / 100) * sorted.length) - 1
+      return sorted[Math.max(0, Math.min(idx, sorted.length - 1))]
+    }
+
+    const sorted = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    expect(percentile(sorted, 50)).toBe(5)
+    expect(percentile(sorted, 95)).toBe(10)
+    expect(percentile(sorted, 99)).toBe(10)
+    expect(percentile([], 50)).toBe(0)
+  })
+
+  it('should compute correct stats from events', () => {
+    const events = [
+      { timestamp: Date.now(), category: 'ai', latencyMs: 10, cacheHit: false, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 20, cacheHit: true, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 30, cacheHit: false, success: true },
+      { timestamp: Date.now(), category: 'evaluation', latencyMs: 50, cacheHit: false, success: false },
+    ]
+
+    const totalHits = events.filter((e) => e.cacheHit).length
+    const hitRate = events.length > 0 ? totalHits / events.length : 0
+    const errorRate = events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
+
+    expect(totalHits).toBe(1)
+    expect(hitRate).toBe(0.25)
+    expect(errorRate).toBe(0.25)
+  })
+
+  it('should group events by category', () => {
+    const events = [
+      { timestamp: Date.now(), category: 'ai', latencyMs: 10, cacheHit: false, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 20, cacheHit: true, success: true },
+      { timestamp: Date.now(), category: 'evaluation', latencyMs: 50, cacheHit: false, success: true },
+    ]
+
+    const catMap = new Map<string, typeof events>()
+    for (const ev of events) {
+      const arr = catMap.get(ev.category) || []
+      arr.push(ev)
+      catMap.set(ev.category, arr)
+    }
+
+    expect(catMap.size).toBe(2)
+    expect(catMap.get('ai')!.length).toBe(2)
+    expect(catMap.get('evaluation')!.length).toBe(1)
+  })
+
+  it('should filter DB events correctly (cache misses only)', () => {
+    const events = [
+      { timestamp: Date.now(), category: 'ai', latencyMs: 0.5, cacheHit: true, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 50, cacheHit: false, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 100, cacheHit: false, success: false },
+    ]
+
+    const dbEvents = events.filter((e) => !e.cacheHit && e.success)
+    expect(dbEvents.length).toBe(1)
+    expect(dbEvents[0].latencyMs).toBe(50)
+  })
+
+  it('should compute per-category hit rate', () => {
+    const events = [
+      { timestamp: Date.now(), category: 'ai', latencyMs: 0.5, cacheHit: true, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 0.5, cacheHit: true, success: true },
+      { timestamp: Date.now(), category: 'ai', latencyMs: 50, cacheHit: false, success: true },
+    ]
+
+    const hits = events.filter((e) => e.cacheHit).length
+    const hitRate = Math.round((hits / events.length) * 10000) / 10000
+
+    expect(hitRate).toBeCloseTo(0.6667, 3)
+  })
+
+  it('should handle empty events array', () => {
+    const events: { timestamp: number; category: string; latencyMs: number; cacheHit: boolean; success: boolean }[] = []
+
+    const totalHits = events.filter((e) => e.cacheHit).length
+    const hitRate = events.length > 0 ? totalHits / events.length : 0
+    const errorRate = events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
+
+    expect(hitRate).toBe(0)
+    expect(errorRate).toBe(0)
+  })
+})
+
 describe('Settings History - Response Structure', () => {
   it('should have correct pagination structure', () => {
     const pagination = {

@@ -36,6 +36,21 @@ export {
   getRegionalFactor,
 } from './configuration-service'
 
+// Performance monitoring
+export {
+  ConfigPerformanceMonitor,
+  configPerformanceMonitor,
+} from './config-performance-monitor'
+
+export type {
+  ConfigFetchEvent,
+  PerformanceSnapshot,
+  LatencyStats,
+  CacheStats,
+  CategoryStats,
+  TtlRecommendation,
+} from './config-performance-monitor'
+
 // Types
 export type {
   ConfigCategory,

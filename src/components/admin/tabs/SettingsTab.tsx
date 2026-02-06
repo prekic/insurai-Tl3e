@@ -20,6 +20,7 @@ import {
   Download,
   Upload,
   FileWarning,
+  Activity,
 } from 'lucide-react'
 
 // Sub-panels
@@ -29,8 +30,9 @@ import { RateLimitsPanel } from './settings/RateLimitsPanel'
 import { OCRSettingsPanel } from './settings/OCRSettingsPanel'
 import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
 import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
+import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -75,6 +77,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'History',
     description: 'View audit log of all settings changes',
     icon: <History className="h-5 w-5" />,
+  },
+  {
+    id: 'performance',
+    label: 'Performance',
+    description: 'Config fetch latency and cache hit rates',
+    icon: <Activity className="h-5 w-5" />,
   },
 ]
 
@@ -336,6 +344,8 @@ export function SettingsTab() {
         return <FeatureFlagsPanel />
       case 'history':
         return <SettingsHistoryPanel />
+      case 'performance':
+        return <ConfigPerformancePanel />
       default:
         return null
     }
@@ -467,7 +477,7 @@ export function SettingsTab() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium text-gray-700">Contents</h3>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      {importPreview.settings && (
+                      {importPreview.settings != null && (
                         <div className="bg-blue-50 rounded px-3 py-2">
                           <span className="text-blue-700 font-medium">{Object.keys(importPreview.settings as object).length}</span>
                           <span className="text-blue-600 ml-1">setting categories</span>
