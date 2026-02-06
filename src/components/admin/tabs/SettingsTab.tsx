@@ -21,6 +21,7 @@ import {
   Upload,
   FileWarning,
   Activity,
+  Layers,
 } from 'lucide-react'
 
 // Sub-panels
@@ -31,8 +32,9 @@ import { OCRSettingsPanel } from './settings/OCRSettingsPanel'
 import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
 import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
+import { SettingsTemplatesPanel } from './settings/SettingsTemplatesPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -83,6 +85,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Performance',
     description: 'Config fetch latency and cache hit rates',
     icon: <Activity className="h-5 w-5" />,
+  },
+  {
+    id: 'templates',
+    label: 'Templates',
+    description: 'Apply predefined configuration profiles',
+    icon: <Layers className="h-5 w-5" />,
   },
 ]
 
@@ -417,6 +425,14 @@ export function SettingsTab() {
         return <SettingsHistoryPanel />
       case 'performance':
         return <ConfigPerformancePanel />
+      case 'templates':
+        return (
+          <SettingsTemplatesPanel
+            settings={settings}
+            onBatchUpdate={batchUpdateSettings}
+            isSaving={isSaving}
+          />
+        )
       default:
         return null
     }
