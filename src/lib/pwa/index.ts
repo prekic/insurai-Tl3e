@@ -460,7 +460,7 @@ export async function subscribeToPush(
   try {
     const subscription = await currentRegistration.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
     })
     return subscription
   } catch (error) {
