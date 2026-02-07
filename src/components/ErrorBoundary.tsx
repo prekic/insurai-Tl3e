@@ -77,11 +77,19 @@ export class ErrorBoundary extends Component<Props, State> {
               We&apos;re sorry, but something unexpected happened. Please try refreshing the page or go back to the home page.
             </p>
 
-            {import.meta.env.DEV && this.state.error && (
+            {this.state.error && (
               <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
                 <p className="text-sm font-mono text-red-600 break-all">
                   {this.state.error.message}
                 </p>
+                {this.state.error.stack && (
+                  <details className="mt-2">
+                    <summary className="text-xs text-gray-500 cursor-pointer">Details</summary>
+                    <pre className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all max-h-40 overflow-auto">
+                      {this.state.error.stack}
+                    </pre>
+                  </details>
+                )}
               </div>
             )}
 
