@@ -680,7 +680,6 @@ router.post(
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
     const startTime = Date.now()
-    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
     log.info('Unified extraction request received', { requestId })
 
     const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
