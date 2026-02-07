@@ -627,11 +627,14 @@ router.post(
         userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Anthropic rate limit exceeded - please wait and retry'
         shouldNotifyAdmin = true
         notificationCategory = 'rate_limit'
-      } else if (message.includes('credit') || message.includes('billing') || message.includes('overloaded')) {
+      } else if (message.includes('credit') || message.includes('billing') || message.includes('FAILED_PRECONDITION')) {
         code = 'BILLING_ERROR'
         userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic billing issue - check your account'
         shouldNotifyAdmin = true
         notificationCategory = 'billing'
+      } else if (message.includes('overloaded') || message.includes('529')) {
+        code = 'PROVIDER_OVERLOADED'
+        userMessage = IS_PRODUCTION ? 'AI service temporarily busy, please retry' : 'Anthropic API overloaded - temporary capacity issue'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
         userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
@@ -777,37 +780,53 @@ router.post(
         const message = error instanceof Error ? error.message : 'Unknown error'
         log.error('Anthropic failed', { requestId, error: message, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
 
-        // Determine if we should notify admin and fall back
-        const isBillingError = message.includes('credit') || message.includes('billing')
+        // Classify the Anthropic error for structured fallback reporting
+        const isBillingError = message.includes('credit') || message.includes('billing') || message.includes('FAILED_PRECONDITION')
         const isRateLimitError = message.includes('429') || message.includes('rate_limit')
         const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
+        const isOverloadedError = message.includes('overloaded') || message.includes('529')
 
-        // Notify admin for critical errors
+        // Determine fallback reason for structured response
+        let fallbackReason = 'ANTHROPIC_UNKNOWN_ERROR'
+        if (isBillingError) fallbackReason = 'ANTHROPIC_BILLING_ERROR'
+        else if (isRateLimitError) fallbackReason = 'ANTHROPIC_RATE_LIMITED'
+        else if (isAuthError) fallbackReason = 'ANTHROPIC_AUTH_ERROR'
+        else if (isOverloadedError) fallbackReason = 'ANTHROPIC_OVERLOADED'
+        else if (message.includes('timeout') || message.includes('ETIMEDOUT')) fallbackReason = 'ANTHROPIC_TIMEOUT'
+
+        // Notify admin for critical errors (not for transient capacity issues)
         if (isBillingError) {
-          log.warn('Anthropic billing error, falling back to OpenAI', { requestId })
+          log.warn('Anthropic billing error, falling back to OpenAI', { requestId, fallbackReason })
           adminNotificationService.notifyBillingIssue('Anthropic', message, {
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
           }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isRateLimitError) {
-          log.warn('Anthropic rate limit, falling back to OpenAI', { requestId })
+          log.warn('Anthropic rate limit, falling back to OpenAI', { requestId, fallbackReason })
           adminNotificationService.notifyRateLimit('Anthropic', {
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
           }).catch((err) => log.warn('Failed to notify rate limit', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isAuthError) {
-          log.warn('Anthropic auth error, falling back to OpenAI', { requestId })
+          log.warn('Anthropic auth error, falling back to OpenAI', { requestId, fallbackReason })
           adminNotificationService.notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
             requestId,
             timestamp: new Date().toISOString(),
           }).catch((err) => log.warn('Failed to notify API error', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
+        } else if (isOverloadedError) {
+          log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', { requestId, fallbackReason })
+        } else {
+          log.warn('Anthropic failed with unknown error, falling back to OpenAI', { requestId, fallbackReason, error: message })
         }
+
+        // Store fallback reason for response
+        (req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
 
         // Fall back to OpenAI if available
         if (openaiClient) {
-          log.info('Falling back to OpenAI', { requestId })
+          log.info('Falling back to OpenAI', { requestId, fallbackReason })
         }
       }
     }
@@ -872,14 +891,17 @@ router.post(
           throw new Error('AI returned invalid JSON — response could not be parsed')
         }
 
-        log.info('OpenAI extraction successful', { requestId, fallback: !!anthropicClient, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
+        const isFallback = !!anthropicClient
+        const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
+        log.info('OpenAI extraction successful', { requestId, fallback: isFallback, fallbackReason: storedFallbackReason, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
           data: parsedOpenAIData,
           usage: response.usage,
           model: response.model,
           provider: 'openai',
-          fallback: !!anthropicClient, // Indicates if we fell back from Anthropic
+          fallback: isFallback, // Indicates if we fell back from Anthropic
+          ...(isFallback && storedFallbackReason && { fallbackReason: storedFallbackReason }),
           cost: cost.totalCost,
         })
       } catch (error) {
@@ -1632,6 +1654,10 @@ function classifyDiagnosticError(error: string): string {
   if (error.includes('quota') || error.includes('insufficient_quota')) {
     return 'QUOTA_EXHAUSTED'
   }
+  // Overloaded is a transient capacity issue, NOT a billing error
+  if (error.includes('overloaded') || error.includes('529')) {
+    return 'PROVIDER_OVERLOADED'
+  }
   if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing') || error.includes('FAILED_PRECONDITION')) {
     return 'BILLING_ERROR'
   }
@@ -1660,6 +1686,7 @@ function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
     INVALID_CREDENTIALS: 'Service configuration error',
     RATE_LIMITED: 'Service temporarily busy',
     QUOTA_EXHAUSTED: 'Service quota exhausted',
+    PROVIDER_OVERLOADED: 'Service temporarily busy',
     BILLING_ERROR: 'Service temporarily unavailable',
     API_NOT_ENABLED: 'Service not available',
     NOT_FOUND: 'Service not configured',
