@@ -333,7 +333,7 @@ router.post('/auth/logout', authenticateAdmin, async (req: AuthenticatedRequest,
 
     res.json({ success: true, message: 'Logged out successfully' })
   } catch (error) {
-    console.error('Logout error:', error)
+    log.error('Logout error', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Logout failed' })
   }
 })
@@ -403,7 +403,7 @@ router.post('/auth/refresh', authLimiter, async (req: Request, res: Response) =>
       },
     })
   } catch (error) {
-    console.error('Token refresh error:', error)
+    log.error('Token refresh error', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Token refresh failed' })
   }
 })

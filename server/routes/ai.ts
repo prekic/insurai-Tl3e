@@ -434,10 +434,18 @@ router.post(
         }
       })
 
+      let parsedData: unknown
+      try {
+        parsedData = JSON.parse(content)
+      } catch (parseError) {
+        log.error('OpenAI returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: content.slice(0, 200) })
+        return res.status(502).json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
+      }
+
       log.info('Extraction successful', { requestId, inputTokens, outputTokens, cost: cost.totalCost })
       res.json({
         success: true,
-        data: JSON.parse(content),
+        data: parsedData,
         usage: response.usage,
         model: response.model,
         cost: cost.totalCost,
@@ -588,9 +596,17 @@ router.post(
         }
       })
 
+      let parsedData: unknown
+      try {
+        parsedData = JSON.parse(jsonContent)
+      } catch (parseError) {
+        log.error('Anthropic returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: jsonContent.slice(0, 200) })
+        return res.status(502).json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
+      }
+
       res.json({
         success: true,
-        data: JSON.parse(jsonContent),
+        data: parsedData,
         usage: {
           input_tokens: response.usage.input_tokens,
           output_tokens: response.usage.output_tokens,
@@ -1616,7 +1632,7 @@ router.post(
  * GET /api/ai/providers
  * Check which AI providers are configured
  */
-router.get('/providers', (_req: Request, res: Response) => {
+router.get('/providers', generalLimiter, (_req: Request, res: Response) => {
   // Google Vision can authenticate via API key OR service account OAuth
   const hasGoogleVision = !!process.env.GOOGLE_CLOUD_API_KEY || !!getGCPCredentialsPath()
   res.json({
@@ -1703,7 +1719,7 @@ function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
  * In production: Returns sanitized results suitable for end users
  * In development: Returns detailed diagnostic information for debugging
  */
-router.get('/diagnose', async (_req: Request, res: Response) => {
+router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => {
   const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
   const diagnostics: {
