@@ -914,9 +914,14 @@ router.post(
   validateOCR,
   async (req: Request, res: Response) => {
     try {
-      // Try OAuth token first (most secure - uses service account, no API key exposure)
-      const oauthToken = await getDocumentAIAccessToken()
+      // Only attempt OAuth if service account credentials exist (avoids wasted async call)
+      const hasServiceAccount = !!getGCPCredentialsPath()
+      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
       const apiKey = process.env.GOOGLE_CLOUD_API_KEY
+
+      if (hasServiceAccount && !oauthToken) {
+        log.warn('Vision OCR: service account found but OAuth token retrieval failed — falling back to API key')
+      }
 
       if (!oauthToken && !apiKey) {
         return res.status(503).json({
@@ -929,26 +934,18 @@ router.post(
       const { imageBase64 } = req.body as OCRInput
 
       // Build request with appropriate authentication
-      // Priority: OAuth token > API key header > API key query param
+      // Priority: OAuth token > API key query param
       let url = 'https://vision.googleapis.com/v1/images:annotate'
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
 
       if (oauthToken) {
-        // Most secure: OAuth bearer token from service account
         headers['Authorization'] = `Bearer ${oauthToken}`
-        if (process.env.NODE_ENV !== 'production') {
-          log.debug('Using OAuth bearer token authentication')
-        }
+        log.info('Vision OCR: using OAuth bearer token authentication')
       } else if (apiKey) {
-        // Fallback: API key in header (X-goog-api-key with correct capitalization)
-        // Note: Header keeps API key out of URL logs, but query param is more reliable
-        // Using query param as Google REST APIs have inconsistent header support
         url = `${url}?key=${apiKey}`
-        if (process.env.NODE_ENV !== 'production') {
-          log.debug('Using API key authentication', { method: 'query_param' })
-        }
+        log.info('Vision OCR: using API key authentication')
       }
 
       const response = await fetch(url, {
@@ -1582,10 +1579,12 @@ router.post(
  * Check which AI providers are configured
  */
 router.get('/providers', (_req: Request, res: Response) => {
+  // Google Vision can authenticate via API key OR service account OAuth
+  const hasGoogleVision = !!process.env.GOOGLE_CLOUD_API_KEY || !!getGCPCredentialsPath()
   res.json({
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
-    google: !!process.env.GOOGLE_CLOUD_API_KEY,
+    google: hasGoogleVision,
     documentAI: isDocumentAIConfigured(),
   })
 })
