@@ -24,9 +24,16 @@ import {
   regenerateSecret,
   getDeliveries,
   type WebhookEvent,
+  type WebhookInput,
 } from '../services/webhook-service.js'
 
 const router = Router()
+
+/** Safely extract a string from Express req.params or req.query. */
+function qstr(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ?? ''
+}
 
 // =============================================================================
 // VALIDATION SCHEMAS
@@ -100,7 +107,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const webhook = await createWebhook(parseResult.data)
+    const webhook = await createWebhook(parseResult.data as WebhookInput)
     if (!webhook) {
       return res.status(500).json({ success: false, error: 'Failed to create webhook' })
     }
@@ -119,7 +126,7 @@ router.post('/', async (req: Request, res: Response) => {
  */
 router.get('/:id', async (req: Request, res: Response) => {
   try {
-    const webhook = await getWebhook(req.params.id)
+    const webhook = await getWebhook(qstr(req.params.id))
     if (!webhook) {
       return res.status(404).json({ success: false, error: 'Webhook not found' })
     }
@@ -149,7 +156,7 @@ router.put('/:id', async (req: Request, res: Response) => {
   }
 
   try {
-    const webhook = await updateWebhook(req.params.id, parseResult.data)
+    const webhook = await updateWebhook(qstr(req.params.id), parseResult.data as Partial<WebhookInput>)
     if (!webhook) {
       return res.status(404).json({ success: false, error: 'Webhook not found' })
     }
@@ -170,7 +177,7 @@ router.put('/:id', async (req: Request, res: Response) => {
  */
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const success = await deleteWebhook(req.params.id)
+    const success = await deleteWebhook(qstr(req.params.id))
     if (!success) {
       return res.status(404).json({ success: false, error: 'Webhook not found or delete failed' })
     }
@@ -188,7 +195,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
  */
 router.post('/:id/test', async (req: Request, res: Response) => {
   try {
-    const result = await testWebhook(req.params.id)
+    const result = await testWebhook(qstr(req.params.id))
     return res.json({ success: true, data: result })
   } catch (error) {
     console.error('[Webhooks API] Test error:', error)
@@ -202,7 +209,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
  */
 router.post('/:id/regenerate-secret', async (req: Request, res: Response) => {
   try {
-    const newSecret = await regenerateSecret(req.params.id)
+    const newSecret = await regenerateSecret(qstr(req.params.id))
     if (!newSecret) {
       return res.status(404).json({ success: false, error: 'Webhook not found' })
     }
@@ -223,7 +230,7 @@ router.get('/:id/deliveries', async (req: Request, res: Response) => {
     const limit = Math.min(parseInt(req.query.limit as string) || 20, 100)
     const offset = parseInt(req.query.offset as string) || 0
 
-    const { deliveries, total } = await getDeliveries(req.params.id, { limit, offset })
+    const { deliveries, total } = await getDeliveries(qstr(req.params.id), { limit, offset })
 
     return res.json({
       success: true,

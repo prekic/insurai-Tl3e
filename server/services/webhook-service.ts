@@ -564,17 +564,17 @@ export async function getDeliveries(
 
 function mapDbToWebhook(row: Record<string, unknown>): Webhook {
   return {
-    id: row.id,
-    name: row.name,
-    url: row.url,
-    secret: row.secret,
-    events: row.events || [],
-    categories: row.categories || [],
-    enabled: row.enabled,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    last_triggered_at: row.last_triggered_at,
-    failure_count: row.failure_count || 0,
+    id: row.id as string,
+    name: row.name as string,
+    url: row.url as string,
+    secret: row.secret as string,
+    events: (row.events || []) as WebhookEvent[],
+    categories: (row.categories || []) as string[],
+    enabled: row.enabled as boolean,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+    last_triggered_at: row.last_triggered_at as string | undefined,
+    failure_count: (row.failure_count || 0) as number,
   }
 }
 

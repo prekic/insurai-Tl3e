@@ -203,7 +203,7 @@ export const PREFERENCE_FIELDS: Record<UserOverridableCategory, PreferenceFieldM
  * Merge admin settings with user preferences.
  * User preferences take priority over admin settings for overridable keys.
  */
-export function mergeWithUserPreferences<T extends Record<string, unknown>>(
+export function mergeWithUserPreferences<T extends object>(
   adminConfig: T,
   userPreferences: Record<string, unknown> | null,
   category: UserOverridableCategory,

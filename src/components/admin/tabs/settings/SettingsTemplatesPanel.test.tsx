@@ -285,7 +285,7 @@ describe('SettingsTemplatesPanel', () => {
   })
 
   it('should support keyboard navigation on template cards', async () => {
-    const user = userEvent.setup()
+    const _user = userEvent.setup()
     render(
       <SettingsTemplatesPanel
         settings={mockSettings}

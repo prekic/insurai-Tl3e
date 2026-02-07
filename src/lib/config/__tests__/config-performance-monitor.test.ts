@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { ConfigPerformanceMonitor, DEFAULT_ALERT_THRESHOLDS } from '../config-performance-monitor'
-import type { AlertThresholds, PerformanceAlert } from '../config-performance-monitor'
+// Types AlertThresholds and PerformanceAlert are available from config-performance-monitor if needed
 
 describe('ConfigPerformanceMonitor', () => {
   let monitor: ConfigPerformanceMonitor

@@ -153,7 +153,7 @@ let serverAlertThresholds: ServerAlertThresholds = {
   alertCooldownMs: 5 * 60 * 1000,
 }
 const serverLastAlertTimes = new Map<string, number>()
-let serverActiveAlerts: ServerPerformanceAlert[] = []
+// Active alerts (assigned in evaluateServerAlerts, available via getServerPerformanceSnapshot export)
 
 function pruneServerPerfEvents(): void {
   const cutoff = Date.now() - SERVER_PERF_MAX_AGE_MS
@@ -244,7 +244,6 @@ function evaluateServerAlerts(): { alerts: ServerPerformanceAlert[]; suppressedC
   let suppressedCount = 0
 
   if (events.length < thresholds.minEventsForAlert) {
-    serverActiveAlerts = []
     return { alerts: [], suppressedCount: 0 }
   }
 
@@ -307,7 +306,6 @@ function evaluateServerAlerts(): { alerts: ServerPerformanceAlert[]; suppressedC
     }
   }
 
-  serverActiveAlerts = alerts
   return { alerts, suppressedCount }
 }
 
@@ -1318,7 +1316,8 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
     return res.status(503).json({ success: false, error: 'Database not configured' })
   }
 
-  const { category, key } = req.params
+  const category = req.params.category as string
+  const key = req.params.key as string
 
   // Validate request body
   const parseResult = updateSettingSchema.safeParse(req.body)

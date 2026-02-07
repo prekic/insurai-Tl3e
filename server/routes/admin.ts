@@ -40,6 +40,16 @@ import * as promptService from '../services/prompt-service.js'
 const router = Router()
 
 // ============================================================================
+// HELPERS
+// ============================================================================
+
+/** Safely extract a string from Express req.params or req.query (which may be string | string[]). */
+function qstr(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ?? ''
+}
+
+// ============================================================================
 // IN-MEMORY FALLBACK STORAGE (Used when database is unavailable)
 // ============================================================================
 
@@ -593,7 +603,7 @@ router.post('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, 
  */
 router.put('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const { role, status, displayName, permissions, password } = req.body
 
     const updates: Record<string, any> = {}
@@ -626,7 +636,7 @@ router.put('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedReques
  */
 router.delete('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     // Prevent self-deletion
     if (id === req.adminUser?.id) {
@@ -1099,7 +1109,7 @@ router.post('/security/block-ip', authenticateAdmin, (req: AuthenticatedRequest,
 })
 
 router.delete('/security/block-ip/:ip', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const ip = req.params.ip
+  const ip = qstr(req.params.ip)
 
   if (blockedIPs.has(ip)) {
     blockedIPs.delete(ip)
@@ -1193,7 +1203,7 @@ router.get('/config', authenticateAdmin, (req: AuthenticatedRequest, res: Respon
 })
 
 router.put('/config/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params
+  const id = qstr(req.params.id)
   const { value } = req.body
 
   const config = appConfigs.get(id)
@@ -1267,7 +1277,7 @@ router.get('/feature-flags', authenticateAdmin, (_req: AuthenticatedRequest, res
 })
 
 router.put('/feature-flags/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const { id } = req.params
+  const id = qstr(req.params.id)
   const updates = req.body
 
   const flag = featureFlags.get(id)
@@ -1325,7 +1335,7 @@ router.get('/prompts', authenticateAdmin, async (req: AuthenticatedRequest, res:
 
 router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const template = await promptService.getPromptById(req.params.id)
+    const template = await promptService.getPromptById(qstr(req.params.id))
 
     if (!template) {
       res.status(404).json({ success: false, error: 'Template not found' })
@@ -1341,7 +1351,7 @@ router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
 
 router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const updates = req.body
 
     // Get current template for audit log
@@ -1571,7 +1581,7 @@ router.get('/budgets', authenticateAdmin, async (req: AuthenticatedRequest, res:
  */
 router.get('/budgets/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const budget = await costControl.getBudget(req.params.id)
+    const budget = await costControl.getBudget(qstr(req.params.id))
 
     if (!budget) {
       res.status(404).json({ success: false, error: 'Budget not found' })
@@ -1634,7 +1644,7 @@ router.post('/budgets', ...requireSuperAdmin(), async (req: AuthenticatedRequest
  */
 router.put('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const updates = req.body
 
     // Get existing budget
@@ -1666,7 +1676,7 @@ router.put('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequ
  */
 router.delete('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     // Get existing budget
     const existing = await costControl.getBudget(id)
@@ -1697,7 +1707,7 @@ router.delete('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
  */
 router.post('/budgets/:id/reset', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const success = await costControl.resetBudgetUsage(id)
 
@@ -1742,7 +1752,7 @@ router.get('/cost/alerts', authenticateAdmin, async (req: AuthenticatedRequest, 
  */
 router.post('/cost/alerts/:id/acknowledge', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const success = await costControl.acknowledgeAlert(id, req.adminUser?.email || 'unknown')
 
@@ -1902,7 +1912,7 @@ router.get('/prompts/templates', authenticateAdmin, async (req: AuthenticatedReq
  */
 router.get('/prompts/templates/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const template = await promptVersioning.getTemplate(req.params.id)
+    const template = await promptVersioning.getTemplate(qstr(req.params.id))
 
     if (!template) {
       res.status(404).json({ success: false, error: 'Template not found' })
@@ -1910,7 +1920,7 @@ router.get('/prompts/templates/:id', authenticateAdmin, async (req: Authenticate
     }
 
     // Get versions for this template
-    const versions = await promptVersioning.getVersions(req.params.id)
+    const versions = await promptVersioning.getVersions(qstr(req.params.id))
 
     res.json({ success: true, data: { ...template, versions } })
   } catch (error) {
@@ -1962,7 +1972,7 @@ router.post('/prompts/templates', ...requireSuperAdmin(), async (req: Authentica
  */
 router.put('/prompts/templates/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const { name, description, systemPrompt, userPromptTemplate, isActive, isDefault, changeDescription } = req.body
 
     const template = await promptVersioning.updateTemplate(
@@ -1993,7 +2003,7 @@ router.put('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Authent
  */
 router.delete('/prompts/templates/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const success = await promptVersioning.deleteTemplate(id)
 
@@ -2018,7 +2028,7 @@ router.delete('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Auth
  */
 router.get('/prompts/templates/:id/stats', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const stats = await promptVersioning.getTemplateStats(req.params.id)
+    const stats = await promptVersioning.getTemplateStats(qstr(req.params.id))
 
     res.json({ success: true, data: stats })
   } catch (error) {
@@ -2037,7 +2047,7 @@ router.get('/prompts/templates/:id/stats', authenticateAdmin, async (req: Authen
  */
 router.get('/prompts/templates/:templateId/versions', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const versions = await promptVersioning.getVersions(req.params.templateId)
+    const versions = await promptVersioning.getVersions(qstr(req.params.templateId))
 
     res.json({ success: true, data: versions })
   } catch (error) {
@@ -2052,7 +2062,7 @@ router.get('/prompts/templates/:templateId/versions', authenticateAdmin, async (
  */
 router.get('/prompts/versions/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const version = await promptVersioning.getVersion(req.params.id)
+    const version = await promptVersioning.getVersion(qstr(req.params.id))
 
     if (!version) {
       res.status(404).json({ success: false, error: 'Version not found' })
@@ -2072,7 +2082,8 @@ router.get('/prompts/versions/:id', authenticateAdmin, async (req: Authenticated
  */
 router.post('/prompts/templates/:templateId/rollback/:versionId', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { templateId, versionId } = req.params
+    const templateId = qstr(req.params.templateId)
+    const versionId = qstr(req.params.versionId)
 
     const template = await promptVersioning.rollbackToVersion(templateId, versionId, req.adminUser?.email)
 
@@ -2158,7 +2169,7 @@ router.get('/prompts/ab-tests', authenticateAdmin, async (req: AuthenticatedRequ
  */
 router.get('/prompts/ab-tests/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const test = await promptVersioning.getABTest(req.params.id)
+    const test = await promptVersioning.getABTest(qstr(req.params.id))
 
     if (!test) {
       res.status(404).json({ success: false, error: 'A/B test not found' })
@@ -2249,7 +2260,7 @@ router.post('/prompts/ab-tests', ...requireSuperAdmin(), async (req: Authenticat
  */
 router.put('/prompts/ab-tests/:id/status', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const { status } = req.body
 
     if (!status || !['draft', 'running', 'paused', 'completed', 'cancelled'].includes(status)) {
@@ -2283,7 +2294,7 @@ router.put('/prompts/ab-tests/:id/status', ...requireSuperAdmin(), async (req: A
  */
 router.get('/prompts/ab-tests/:id/results', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const results = await promptVersioning.calculateABTestResults(req.params.id)
+    const results = await promptVersioning.calculateABTestResults(qstr(req.params.id))
 
     if (!results) {
       res.status(404).json({ success: false, error: 'A/B test not found' })
@@ -2303,7 +2314,7 @@ router.get('/prompts/ab-tests/:id/results', authenticateAdmin, async (req: Authe
  */
 router.post('/prompts/ab-tests/:id/apply-winner', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     // Get test results
     const test = await promptVersioning.getABTest(id)
@@ -2529,7 +2540,7 @@ router.get('/monitoring/alert-rules', authenticateAdmin, (_req: AuthenticatedReq
  */
 router.get('/monitoring/alert-rules/:id', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
-    const rule = monitoring.getAlertRule(req.params.id)
+    const rule = monitoring.getAlertRule(qstr(req.params.id))
 
     if (!rule) {
       res.status(404).json({ success: false, error: 'Alert rule not found' })
@@ -2587,7 +2598,7 @@ router.post('/monitoring/alert-rules', ...requireSuperAdmin(), async (req: Authe
  */
 router.put('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const updates = req.body
 
     const rule = monitoring.updateAlertRule(id, updates)
@@ -2613,7 +2624,7 @@ router.put('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req: Au
  */
 router.delete('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const success = monitoring.deleteAlertRule(id)
 
@@ -2671,7 +2682,7 @@ router.get('/monitoring/alerts/history', authenticateAdmin, (req: AuthenticatedR
  */
 router.post('/monitoring/alerts/:id/acknowledge', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const alert = monitoring.acknowledgeAlert(id, req.adminUser?.email || 'unknown')
 
@@ -2696,7 +2707,7 @@ router.post('/monitoring/alerts/:id/acknowledge', authenticateAdmin, async (req:
  */
 router.post('/monitoring/alerts/:id/resolve', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
 
     const alert = monitoring.resolveAlert(id)
 
@@ -2789,7 +2800,7 @@ router.get('/processing-logs/stats', authenticateAdmin, async (req: Authenticate
  */
 router.get('/processing-logs/:documentId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { documentId } = req.params
+    const documentId = qstr(req.params.documentId)
     const log = await processingLogService.getProcessingLog(documentId)
 
     if (!log) {
@@ -2813,7 +2824,7 @@ router.get('/processing-logs/:documentId', authenticateAdmin, async (req: Authen
  */
 router.get('/processing-logs/by-policy/:policyId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { policyId } = req.params
+    const policyId = qstr(req.params.policyId)
     const log = await processingLogService.getProcessingLogByPolicyId(policyId)
 
     if (!log) {
@@ -2908,7 +2919,7 @@ router.get('/notifications', authenticateAdmin, async (req: AuthenticatedRequest
  */
 router.post('/notifications/:id/acknowledge', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const acknowledgedBy = req.adminUser?.email || 'unknown'
 
     const success = await adminNotificationService.acknowledgeNotification(id, acknowledgedBy)
@@ -3039,7 +3050,7 @@ router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, r
  */
 router.get('/benchmarks/:id', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const { client: supabase, error: supabaseError } = getSupabaseWithError()
 
     if (!supabase) {
@@ -3154,7 +3165,7 @@ router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequ
  */
 router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const updates = req.body
 
     const { client: supabase, error: supabaseError } = getSupabaseWithError()
@@ -3231,7 +3242,7 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
  */
 router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { id } = req.params
+    const id = qstr(req.params.id)
     const { client: supabase, error: supabaseError } = getSupabaseWithError()
 
     if (!supabase) {

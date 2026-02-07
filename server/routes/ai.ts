@@ -1898,7 +1898,7 @@ router.post('/processing-log', async (req: Request, res: Response) => {
  */
 router.patch('/processing-log/:documentId', async (req: Request, res: Response) => {
   try {
-    const { documentId } = req.params
+    const documentId = req.params.documentId as string
     const updates = req.body
 
     const result = await processingLogService.updateProcessingLog(documentId, updates)
@@ -1927,7 +1927,7 @@ router.patch('/processing-log/:documentId', async (req: Request, res: Response) 
  */
 router.post('/processing-log/:documentId/stage', async (req: Request, res: Response) => {
   try {
-    const { documentId } = req.params
+    const documentId = req.params.documentId as string
     const stage = req.body
 
     if (!stage.stage || !stage.status) {
@@ -1964,7 +1964,7 @@ router.post('/processing-log/:documentId/stage', async (req: Request, res: Respo
  */
 router.get('/processing-log/:documentId', async (req: Request, res: Response) => {
   try {
-    const { documentId } = req.params
+    const documentId = req.params.documentId as string
     const log = await processingLogService.getProcessingLog(documentId)
 
     if (!log) {

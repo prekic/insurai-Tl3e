@@ -23,6 +23,12 @@ import {
 
 const router = Router()
 
+/** Safely extract a string from Express req.params or req.query. */
+function qstr(value: string | string[] | undefined): string {
+  if (Array.isArray(value)) return value[0] ?? ''
+  return value ?? ''
+}
+
 // =============================================================================
 // VALIDATION
 // =============================================================================
@@ -114,7 +120,7 @@ router.post('/baselines', async (req: Request, res: Response) => {
  */
 router.put('/baselines/:id/activate', async (req: Request, res: Response) => {
   try {
-    const success = await activateBaseline(req.params.id)
+    const success = await activateBaseline(qstr(req.params.id))
     if (!success) {
       return res.status(404).json({ success: false, error: 'Baseline not found' })
     }
@@ -131,7 +137,7 @@ router.put('/baselines/:id/activate', async (req: Request, res: Response) => {
  */
 router.delete('/baselines/:id', async (req: Request, res: Response) => {
   try {
-    const success = await deleteBaseline(req.params.id)
+    const success = await deleteBaseline(qstr(req.params.id))
     if (!success) {
       return res.status(404).json({ success: false, error: 'Baseline not found or delete failed' })
     }
@@ -169,7 +175,7 @@ router.get('/check', async (_req: Request, res: Response) => {
  */
 router.get('/check/:id', async (req: Request, res: Response) => {
   try {
-    const report = await detectDriftAgainst(req.params.id)
+    const report = await detectDriftAgainst(qstr(req.params.id))
     if (!report) {
       return res.status(404).json({ success: false, error: 'Baseline not found' })
     }
