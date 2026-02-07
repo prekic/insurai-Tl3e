@@ -5,8 +5,10 @@ export interface ProviderDiagnostic {
   configured: boolean
   valid: boolean
   error?: string
+  errorCode?: string // Actionable error category (e.g., 'API_NOT_ENABLED', 'BILLING_ERROR')
   latencyMs?: number
   model?: string
+  authMethod?: string // Google Vision: 'oauth' | 'api_key'
 }
 
 export interface DiagnosticResult {

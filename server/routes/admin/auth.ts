@@ -46,12 +46,20 @@ router.get('/diagnostics', (_req: Request, res: Response) => {
   // Check Supabase client initialization
   const { client, error: supabaseError } = getSupabaseWithError()
 
+  // AI provider configuration checks
+  const hasOpenAI = !!process.env.OPENAI_API_KEY
+  const hasAnthropic = !!process.env.ANTHROPIC_API_KEY
+  const hasGoogleApiKey = !!process.env.GOOGLE_CLOUD_API_KEY
+  const hasGCPServiceAccount = !!(process.env.GCP_SERVICE_ACCOUNT_BASE64 || process.env.GCP_CREDENTIALS_BASE64 || process.env.GOOGLE_APPLICATION_CREDENTIALS)
+
   const issues: string[] = []
   if (!hasJwtSecret) issues.push('ADMIN_JWT_SECRET not configured')
   if (jwtSecretLength > 0 && jwtSecretLength < 32) issues.push('ADMIN_JWT_SECRET too short (< 32 chars)')
   if (!hasSupabaseUrl && !hasViteSupabaseUrl) issues.push('SUPABASE_URL not configured')
   if (!hasServiceKey) issues.push('SUPABASE_SERVICE_ROLE_KEY not configured')
   if (!client && supabaseError) issues.push(`Supabase init failed: ${supabaseError}`)
+  if (!hasOpenAI && !hasAnthropic) issues.push('No AI extraction provider configured (need OPENAI_API_KEY or ANTHROPIC_API_KEY)')
+  if (!hasGoogleApiKey && !hasGCPServiceAccount) issues.push('No Google Cloud credentials configured (need GOOGLE_CLOUD_API_KEY or GCP_SERVICE_ACCOUNT_BASE64)')
 
   res.json({
     success: issues.length === 0,
@@ -65,9 +73,15 @@ router.get('/diagnostics', (_req: Request, res: Response) => {
       hasServiceKey,
       supabaseClientInitialized: !!client,
       supabaseError: supabaseError || null,
+      // AI provider status (no secrets exposed — only boolean presence)
+      hasOpenAI,
+      hasAnthropic,
+      hasGoogleApiKey,
+      hasGCPServiceAccount,
     },
     issues: issues.length > 0 ? issues : undefined,
     nodeEnv: process.env.NODE_ENV,
+    hint: 'Run GET /api/ai/diagnose for live provider validation (makes test API calls)',
   })
 })
 
