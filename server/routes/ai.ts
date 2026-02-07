@@ -1103,31 +1103,39 @@ router.post(
 
       log.info('Calling Document AI API', { location: GCP_CONFIG.location, project: GCP_CONFIG.projectId, processor: GCP_CONFIG.processorId })
 
-      // Call Document AI
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          rawDocument: {
-            content: documentBase64,
-            mimeType,
+      // Call Document AI with 60-second timeout to prevent hanging
+      const controller = new AbortController()
+      const fetchTimeout = setTimeout(() => controller.abort(), 60000)
+      let response: globalThis.Response
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
           },
-          skipHumanReview: true,
-          // Note: enableImagelessMode is only available on Enterprise Document OCR processors
-          // Standard OCR processors have a 15-page limit
-          // For documents >15 pages, the fallback to pdf.js will be used
-          processOptions: {
-            ocrConfig: {
-              hints: {
-                languageHints: languageHints || ['tr', 'en'],
+          body: JSON.stringify({
+            rawDocument: {
+              content: documentBase64,
+              mimeType,
+            },
+            skipHumanReview: true,
+            // Note: enableImagelessMode is only available on Enterprise Document OCR processors
+            // Standard OCR processors have a 15-page limit
+            // For documents >15 pages, the fallback to pdf.js will be used
+            processOptions: {
+              ocrConfig: {
+                hints: {
+                  languageHints: languageHints || ['tr', 'en'],
+                },
               },
             },
-          },
-        }),
-      })
+          }),
+        })
+      } finally {
+        clearTimeout(fetchTimeout)
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}` } })) as DocumentAIResponse

@@ -154,8 +154,8 @@ export function TryAnalysis() {
 
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (90 seconds for larger documents)
-      const EXTRACTION_TIMEOUT_MS = 90000
+      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
+      const EXTRACTION_TIMEOUT_MS = 120000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
@@ -341,8 +341,8 @@ export function TryAnalysis() {
       // Track analysis started
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (90 seconds for larger documents)
-      const EXTRACTION_TIMEOUT_MS = 90000
+      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
+      const EXTRACTION_TIMEOUT_MS = 120000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
