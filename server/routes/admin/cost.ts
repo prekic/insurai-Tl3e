@@ -5,6 +5,7 @@
  */
 
 import { Router, Response } from 'express'
+import { logger } from '../../lib/logger.js'
 import {
   authenticateAdmin,
   requireSuperAdmin,
@@ -15,6 +16,7 @@ import {
 import type { AuthenticatedRequest } from './shared.js'
 
 const router = Router()
+const log = logger.child('AdminCost')
 
 // ============================================================================
 // COST BUDGET MANAGEMENT (Phase 2)
@@ -33,7 +35,7 @@ router.get('/budgets', authenticateAdmin, async (req: AuthenticatedRequest, res:
 
     res.json({ success: true, data: budgets })
   } catch (error) {
-    console.error('Failed to list budgets:', error)
+    log.error('Failed to list budgets', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to list budgets' })
   }
 })
@@ -53,7 +55,7 @@ router.get('/budgets/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
 
     res.json({ success: true, data: budget })
   } catch (error) {
-    console.error('Failed to get budget:', error)
+    log.error('Failed to get budget', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get budget' })
   }
 })
@@ -96,7 +98,7 @@ router.post('/budgets', ...requireSuperAdmin(), async (req: AuthenticatedRequest
 
     res.json({ success: true, data: budget })
   } catch (error) {
-    console.error('Failed to create budget:', error)
+    log.error('Failed to create budget', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create budget' })
   }
 })
@@ -128,7 +130,7 @@ router.put('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedRequ
 
     res.json({ success: true, data: budget })
   } catch (error) {
-    console.error('Failed to update budget:', error)
+    log.error('Failed to update budget', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update budget' })
   }
 })
@@ -159,7 +161,7 @@ router.delete('/budgets/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
 
     res.json({ success: true, message: 'Budget deactivated' })
   } catch (error) {
-    console.error('Failed to delete budget:', error)
+    log.error('Failed to delete budget', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to delete budget' })
   }
 })
@@ -184,7 +186,7 @@ router.post('/budgets/:id/reset', ...requireSuperAdmin(), async (req: Authentica
 
     res.json({ success: true, message: 'Budget usage reset' })
   } catch (error) {
-    console.error('Failed to reset budget:', error)
+    log.error('Failed to reset budget', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to reset budget' })
   }
 })
@@ -204,7 +206,7 @@ router.get('/cost/alerts', authenticateAdmin, async (req: AuthenticatedRequest, 
 
     res.json({ success: true, data: alerts })
   } catch (error) {
-    console.error('Failed to get alerts:', error)
+    log.error('Failed to get alerts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
 })
@@ -229,7 +231,7 @@ router.post('/cost/alerts/:id/acknowledge', authenticateAdmin, async (req: Authe
 
     res.json({ success: true, message: 'Alert acknowledged' })
   } catch (error) {
-    console.error('Failed to acknowledge alert:', error)
+    log.error('Failed to acknowledge alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
 })
@@ -254,7 +256,7 @@ router.get('/cost/usage', authenticateAdmin, async (req: AuthenticatedRequest, r
 
     res.json({ success: true, data: stats })
   } catch (error) {
-    console.error('Failed to get usage stats:', error)
+    log.error('Failed to get usage stats', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get usage stats' })
   }
 })
@@ -324,7 +326,7 @@ router.get('/cost/summary', authenticateAdmin, async (_req: AuthenticatedRequest
 
     res.json({ success: true, data: summary })
   } catch (error) {
-    console.error('Failed to get cost summary:', error)
+    log.error('Failed to get cost summary', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get cost summary' })
   }
 })
