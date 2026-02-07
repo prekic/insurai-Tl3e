@@ -14,6 +14,9 @@
 
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('WebhookService')
 
 // =============================================================================
 // TYPES
@@ -100,7 +103,7 @@ function getSupabase(): SupabaseClient | null {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    console.warn('[WebhookService] Supabase not configured')
+    log.warn('Supabase not configured')
     return null
   }
 
@@ -144,7 +147,7 @@ export async function listWebhooks(): Promise<Webhook[]> {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('[WebhookService] List error:', error)
+    log.error('List error', { error: String(error) })
     return []
   }
 
@@ -165,7 +168,7 @@ export async function getWebhook(id: string): Promise<Webhook | null> {
     .single()
 
   if (error) {
-    console.error('[WebhookService] Get error:', error)
+    log.error('Get error', { error: String(error) })
     return null
   }
 
@@ -196,7 +199,7 @@ export async function createWebhook(input: WebhookInput): Promise<Webhook | null
     .single()
 
   if (error) {
-    console.error('[WebhookService] Create error:', error)
+    log.error('Create error', { error: String(error) })
     return null
   }
 
@@ -230,7 +233,7 @@ export async function updateWebhook(
     .single()
 
   if (error) {
-    console.error('[WebhookService] Update error:', error)
+    log.error('Update error', { error: String(error) })
     return null
   }
 
@@ -250,7 +253,7 @@ export async function deleteWebhook(id: string): Promise<boolean> {
   const { error } = await client.from('settings_webhooks').delete().eq('id', id)
 
   if (error) {
-    console.error('[WebhookService] Delete error:', error)
+    log.error('Delete error', { error: String(error) })
     return false
   }
 
@@ -272,7 +275,7 @@ export async function regenerateSecret(id: string): Promise<string | null> {
     .eq('id', id)
 
   if (error) {
-    console.error('[WebhookService] Regenerate secret error:', error)
+    log.error('Regenerate secret error', { error: String(error) })
     return null
   }
 
@@ -314,7 +317,7 @@ export async function fireWebhooks(
   // Deliver to each webhook in parallel (fire-and-forget)
   const deliveryPromises = matchingWebhooks.map((wh) =>
     deliverToWebhook(mapDbToWebhook(wh), event, data).catch((err) =>
-      console.error(`[WebhookService] Delivery error for ${wh.name}:`, err)
+      log.error(`Delivery error for ${wh.name}`, { error: String(err) })
     )
   )
 
@@ -356,7 +359,7 @@ async function deliverToWebhook(
     .single()
 
   if (insertError || !delivery) {
-    console.error('[WebhookService] Failed to create delivery record:', insertError)
+    log.error('Failed to create delivery record', { error: String(insertError) })
     return
   }
 
@@ -435,7 +438,7 @@ async function attemptDelivery(
       // Retry after delay
       setTimeout(() => {
         attemptDelivery(webhook, deliveryId, bodyString, signPayload(bodyString, webhook.secret), attempt + 1)
-          .catch((err) => console.error('[WebhookService] Retry error:', err))
+          .catch((err) => log.error('Retry error', { error: String(err) }))
       }, delayMs)
     } else {
       // Final failure
@@ -453,7 +456,7 @@ async function attemptDelivery(
         updated_at: new Date().toISOString(),
       }).eq('id', webhook.id)
 
-      console.warn(`[WebhookService] Delivery failed after ${attempt} attempts for ${webhook.name}: ${errorMessage}`)
+      log.warn(`Delivery failed after ${attempt} attempts for ${webhook.name}`, { error: errorMessage })
     }
   }
 }
@@ -548,7 +551,7 @@ export async function getDeliveries(
     .range(offset, offset + limit - 1)
 
   if (error) {
-    console.error('[WebhookService] Deliveries fetch error:', error)
+    log.error('Deliveries fetch error', { error: String(error) })
     return { deliveries: [], total: 0 }
   }
 

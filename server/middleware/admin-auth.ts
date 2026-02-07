@@ -8,6 +8,9 @@ import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import logger from '../lib/logger.js'
+
+const log = logger.child('AdminAuth')
 
 type AnyDatabase = any
 
@@ -51,11 +54,11 @@ function getJWTSecret(): string {
   const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
   if (!secret) {
     const msg = 'ADMIN_JWT_SECRET is not configured. Set ADMIN_JWT_SECRET environment variable. Refusing to start with no secret.'
-    console.error('[Admin Auth] FATAL:', msg)
+    log.error('FATAL: JWT secret not configured', { message: msg })
     throw new Error(msg)
   }
   if (secret.length < 32) {
-    console.warn('[Admin Auth] WARNING: ADMIN_JWT_SECRET is shorter than 32 characters. Use a stronger secret in production.')
+    log.warn('JWT secret is shorter than 32 characters, use a stronger secret in production')
   }
   return secret
 }
@@ -96,24 +99,24 @@ export function getSupabaseWithError(): { client: SupabaseClient<AnyDatabase> | 
   // Validate required env vars
   if (!supabaseUrl) {
     supabaseInitError = 'SUPABASE_URL is not configured. Set SUPABASE_URL environment variable.'
-    console.error('[Admin Auth]', supabaseInitError)
+    log.error('Supabase URL not configured', { error: supabaseInitError })
     return { client: null, error: supabaseInitError }
   }
 
   if (!supabaseServiceKey) {
     supabaseInitError = 'SUPABASE_SERVICE_ROLE_KEY is not configured. Set SUPABASE_SERVICE_ROLE_KEY environment variable.'
-    console.error('[Admin Auth]', supabaseInitError)
+    log.error('Supabase service role key not configured', { error: supabaseInitError })
     return { client: null, error: supabaseInitError }
   }
 
   try {
-    console.log('[Admin Auth] Initializing Supabase client...')
+    log.info('Initializing Supabase client')
     supabase = createClient<AnyDatabase>(supabaseUrl, supabaseServiceKey)
-    console.log('[Admin Auth] Supabase client initialized successfully')
+    log.info('Supabase client initialized successfully')
     return { client: supabase, error: null }
   } catch (err) {
     supabaseInitError = `Failed to initialize Supabase client: ${err instanceof Error ? err.message : String(err)}`
-    console.error('[Admin Auth]', supabaseInitError)
+    log.error('Failed to initialize Supabase client', { error: supabaseInitError })
     return { client: null, error: supabaseInitError }
   }
 }
@@ -219,7 +222,7 @@ interface AdminUserRow {
 export async function getAdminUserById(id: string): Promise<AdminUser | null> {
   const db = getSupabase()
   if (!db) {
-    console.warn('Supabase not configured, using fallback admin check')
+    log.warn('Supabase not configured, using fallback admin check')
     return null
   }
 
@@ -247,15 +250,15 @@ export async function getAdminUserById(id: string): Promise<AdminUser | null> {
  * Get admin user by email from database
  */
 export async function getAdminUserByEmail(email: string): Promise<(AdminUser & { passwordHash?: string }) | null> {
-  console.log('[Admin Auth] getAdminUserByEmail called for:', email)
+  log.debug('getAdminUserByEmail called', { email })
 
   const db = getSupabase()
   if (!db) {
-    console.warn('[Admin Auth] getAdminUserByEmail: Supabase not configured, returning null')
+    log.warn('Supabase not configured, returning null for email lookup')
     return null
   }
 
-  console.log('[Admin Auth] Querying admin_users table...')
+  log.debug('Querying admin_users table')
   const { data, error } = await db
     .from('admin_users')
     .select('*')
@@ -263,16 +266,16 @@ export async function getAdminUserByEmail(email: string): Promise<(AdminUser & {
     .single()
 
   if (error) {
-    console.error('[Admin Auth] Database query error:', error.code, error.message, error.details)
+    log.error('Database query error', { code: error.code, message: error.message, details: error.details })
     return null
   }
 
   if (!data) {
-    console.log('[Admin Auth] No user found for email:', email)
+    log.info('No user found for email', { email })
     return null
   }
 
-  console.log('[Admin Auth] User found, id:', data.id, 'role:', data.role, 'status:', data.status)
+  log.debug('User found', { id: data.id, role: data.role, status: data.status })
   const row = data as AdminUserRow
   return {
     id: row.id,
@@ -314,7 +317,7 @@ export async function createAdminSession(
     .single()
 
   if (error) {
-    console.error('Failed to create admin session:', error)
+    log.error('Failed to create admin session', { error: String(error) })
     return null
   }
 
@@ -453,10 +456,10 @@ export function authenticateAdmin(req: AuthenticatedRequest, res: Response, next
   validateAdminSession(payload.sessionId, hashToken(token))
     .then((valid) => {
       if (!valid) {
-        console.warn(`Invalid session for admin ${payload.email}`)
+        log.warn('Invalid session for admin', { email: payload.email })
       }
     })
-    .catch(console.error)
+    .catch((err) => log.error('Session validation failed', { error: String(err) }))
 
   next()
 }

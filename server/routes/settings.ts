@@ -22,6 +22,9 @@ import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 import { fireWebhooks } from '../services/webhook-service.js'
+import logger from '../lib/logger.js'
+
+const log = logger.child('Settings')
 
 const router = Router()
 
@@ -334,7 +337,7 @@ router.get('/', async (_req: Request, res: Response) => {
       .order('display_order')
 
     if (error) {
-      console.error('[Settings API] Error fetching settings:', error)
+      log.error('Error fetching settings', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch settings' })
     }
 
@@ -373,7 +376,7 @@ router.get('/', async (_req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception listing settings', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -406,7 +409,7 @@ router.get('/performance', async (_req: Request, res: Response) => {
             alert.severity,
             alert.message,
             { currentValue: alert.currentValue, threshold: alert.threshold }
-          ).catch((err: unknown) => console.warn('[Settings API] Failed to create performance notification:', err))
+          ).catch((err: unknown) => log.warn('Failed to create performance notification', { error: String(err) }))
         }
       }).catch(() => { /* notification service not available */ })
     }
@@ -421,7 +424,7 @@ router.get('/performance', async (_req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Performance snapshot error:', error)
+    log.error('Performance snapshot error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Failed to get performance metrics' })
   }
 })
@@ -459,7 +462,7 @@ router.put('/performance/thresholds', async (req: Request, res: Response) => {
       data: { thresholds: serverAlertThresholds },
     })
   } catch (error) {
-    console.error('[Settings API] Update thresholds error:', error)
+    log.error('Update thresholds error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Failed to update thresholds' })
   }
 })
@@ -473,7 +476,7 @@ router.post('/performance', async (req: Request, res: Response) => {
     // Accept and log client-side metrics (for future aggregation)
     const clientSnapshot = req.body
     if (clientSnapshot?.totalEvents !== undefined) {
-      console.info('[Config Performance] Client report:', JSON.stringify({
+      log.info('Client performance report received', {
         totalEvents: clientSnapshot.totalEvents,
         cacheHitRate: clientSnapshot.cache?.hitRate,
         dbAvgLatency: clientSnapshot.dbLatency?.avgMs,
@@ -481,11 +484,11 @@ router.post('/performance', async (req: Request, res: Response) => {
         errorRate: clientSnapshot.errorRate,
         recommendation: clientSnapshot.ttlRecommendation?.reason,
         alerts: clientSnapshot.alerts?.length ?? 0,
-      }))
+      })
     }
     return res.json({ success: true })
   } catch (error) {
-    console.error('[Settings API] Performance report error:', error)
+    log.error('Performance report error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Failed to process performance report' })
   }
 })
@@ -516,7 +519,7 @@ router.get('/export', async (req: Request, res: Response) => {
       ])
 
     if (settingsResult.error) {
-      console.error('[Settings Export] Error fetching settings:', settingsResult.error)
+      log.error('Export failed to fetch settings', { error: String(settingsResult.error) })
       return res.status(500).json({ success: false, error: 'Failed to export settings' })
     }
 
@@ -615,7 +618,7 @@ router.get('/export', async (req: Request, res: Response) => {
 
     return res.json({ success: true, data: exportData })
   } catch (error) {
-    console.error('[Settings Export] Exception:', error)
+    log.error('Unhandled exception during export', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -862,7 +865,7 @@ router.post('/import', async (req: Request, res: Response) => {
         changes: [{ key: 'config_import', previous_value: null, new_value: { totalUpdated, totalErrors } }],
         reason: importReason,
         changed_by: adminUserId,
-      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+      }).catch((err) => log.warn('Webhook fire error on import', { error: String(err) }))
     }
 
     return res.json({
@@ -877,7 +880,7 @@ router.post('/import', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings Import] Exception:', error)
+    log.error('Unhandled exception during import', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -937,7 +940,7 @@ router.put('/batch', async (req: Request, res: Response) => {
     .in('category', uniqueCategories)
 
   if (fetchError) {
-    console.error('[Settings API] Batch fetch error:', fetchError)
+    log.error('Batch fetch error', { error: String(fetchError) })
     return res.status(500).json({ success: false, error: 'Failed to fetch settings' })
   }
 
@@ -1046,7 +1049,7 @@ router.put('/batch', async (req: Request, res: Response) => {
         })
       }
     } catch (error) {
-      console.error(`[Settings API] Batch update error for ${update.category}/${update.key}:`, error)
+      log.error('Batch update error for individual setting', { category: update.category, key: update.key, error: String(error) })
       errors.push({ category: update.category, key: update.key, error: 'Internal error' })
     }
   }
@@ -1069,7 +1072,7 @@ router.put('/batch', async (req: Request, res: Response) => {
         changes,
         reason,
         changed_by: adminUserId,
-      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+      }).catch((err) => log.warn('Webhook fire error on batch update', { category: cat, error: String(err) }))
     }
   }
 
@@ -1103,7 +1106,7 @@ router.get('/feature-flags', async (_req: Request, res: Response) => {
     const { data, error } = await supabase.from('feature_flags').select('*').order('key')
 
     if (error) {
-      console.error('[Settings API] Error fetching feature flags:', error)
+      log.error('Error fetching feature flags', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch feature flags' })
     }
 
@@ -1124,7 +1127,7 @@ router.get('/feature-flags', async (_req: Request, res: Response) => {
       })),
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception listing feature flags', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1182,7 +1185,7 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
       category: 'feature_flags',
       changes: [{ key: data.key, previous_value: null, new_value: { enabled: data.enabled, rolloutPercentage: data.rollout_percentage } }],
       changed_by: adminUserId,
-    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }).catch((err) => log.warn('Webhook fire error on feature flag toggle', { error: String(err) }))
 
     return res.json({
       success: true,
@@ -1194,7 +1197,7 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception updating feature flag', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1223,7 +1226,7 @@ router.get('/:category', async (req: Request, res: Response) => {
       .order('display_order')
 
     if (error) {
-      console.error('[Settings API] Error fetching category:', error)
+      log.error('Error fetching category', { category, error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch settings' })
     }
 
@@ -1253,7 +1256,7 @@ router.get('/:category', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception fetching category settings', { category, error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1301,7 +1304,7 @@ router.get('/:category/:key', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception fetching specific setting', { category, key, error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1390,7 +1393,7 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
       .single()
 
     if (updateError) {
-      console.error('[Settings API] Error updating setting:', updateError)
+      log.error('Error updating setting', { category, key, error: String(updateError) })
       return res.status(500).json({ success: false, error: 'Failed to update setting' })
     }
 
@@ -1415,7 +1418,7 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
       changes: [{ key, previous_value: existing.value, new_value: value }],
       reason,
       changed_by: adminUserId,
-    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }).catch((err) => log.warn('Webhook fire error on setting update', { category, key, error: String(err) }))
 
     return res.json({
       success: true,
@@ -1427,7 +1430,7 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception updating setting', { category, key, error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1475,7 +1478,7 @@ router.get('/history', async (req: Request, res: Response) => {
     const { data, error, count } = await query
 
     if (error) {
-      console.error('[Settings API] Error fetching history:', error)
+      log.error('Error fetching settings history', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch history' })
     }
 
@@ -1526,7 +1529,7 @@ router.get('/history', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception fetching settings history', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1554,7 +1557,7 @@ router.get('/:category/:key/history', async (req: Request, res: Response) => {
       .limit(limit)
 
     if (error) {
-      console.error('[Settings API] Error fetching history:', error)
+      log.error('Error fetching setting history', { category, key, error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch history' })
     }
 
@@ -1574,7 +1577,7 @@ router.get('/:category/:key/history', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception fetching setting history', { category, key, error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1604,7 +1607,7 @@ router.get('/regional-factors', async (req: Request, res: Response) => {
       .order('region_code')
 
     if (error) {
-      console.error('[Settings API] Error fetching regional factors:', error)
+      log.error('Error fetching regional factors', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch regional factors' })
     }
 
@@ -1623,7 +1626,7 @@ router.get('/regional-factors', async (req: Request, res: Response) => {
       })),
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception listing regional factors', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1679,7 +1682,7 @@ router.put('/regional-factors/:id', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception updating regional factor', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1705,7 +1708,7 @@ router.get('/providers', async (_req: Request, res: Response) => {
       .order('market_share', { ascending: false })
 
     if (error) {
-      console.error('[Settings API] Error fetching providers:', error)
+      log.error('Error fetching providers', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch providers' })
     }
 
@@ -1727,7 +1730,7 @@ router.get('/providers', async (_req: Request, res: Response) => {
       })),
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception listing providers', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1790,7 +1793,7 @@ router.put('/providers/:id', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception updating provider', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1828,7 +1831,7 @@ router.get('/benchmarks', async (req: Request, res: Response) => {
     const { data, error } = await query
 
     if (error) {
-      console.error('[Settings API] Error fetching benchmarks:', error)
+      log.error('Error fetching benchmarks', { error: String(error) })
       return res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
     }
 
@@ -1853,7 +1856,7 @@ router.get('/benchmarks', async (req: Request, res: Response) => {
       })),
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception listing benchmarks', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1920,7 +1923,7 @@ router.put('/benchmarks/:id', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Settings API] Exception:', error)
+    log.error('Unhandled exception updating benchmark', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

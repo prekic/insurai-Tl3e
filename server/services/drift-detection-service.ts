@@ -6,6 +6,9 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('DriftDetection')
 
 // =============================================================================
 // TYPES
@@ -56,7 +59,7 @@ function getSupabase(): SupabaseClient | null {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    console.warn('[DriftDetection] Supabase not configured')
+    log.warn('Supabase not configured')
     return null
   }
 
@@ -81,7 +84,7 @@ export async function listBaselines(): Promise<DriftBaseline[]> {
     .order('created_at', { ascending: false })
 
   if (error) {
-    console.error('[DriftDetection] List error:', error)
+    log.error('List error', { error: String(error) })
     return []
   }
 
@@ -142,7 +145,7 @@ export async function createBaseline(
     .single()
 
   if (error) {
-    console.error('[DriftDetection] Create baseline error:', error)
+    log.error('Create baseline error', { error: String(error) })
     return null
   }
 
@@ -168,7 +171,7 @@ export async function activateBaseline(id: string): Promise<boolean> {
     .eq('id', id)
 
   if (error) {
-    console.error('[DriftDetection] Activate error:', error)
+    log.error('Activate error', { error: String(error) })
     return false
   }
 
@@ -188,7 +191,7 @@ export async function deleteBaseline(id: string): Promise<boolean> {
     .eq('id', id)
 
   if (error) {
-    console.error('[DriftDetection] Delete error:', error)
+    log.error('Delete error', { error: String(error) })
     return false
   }
 
@@ -321,7 +324,7 @@ async function fetchCurrentSettingsSnapshot(
     .order('key')
 
   if (error) {
-    console.error('[DriftDetection] Fetch settings error:', error)
+    log.error('Fetch settings error', { error: String(error) })
     return null
   }
 

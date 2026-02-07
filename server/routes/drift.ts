@@ -12,6 +12,7 @@
 
 import { Router, type Request, type Response } from 'express'
 import { z } from 'zod'
+import { logger } from '../lib/logger.js'
 import {
   listBaselines,
   createBaseline,
@@ -21,6 +22,7 @@ import {
   detectDriftAgainst,
 } from '../services/drift-detection-service.js'
 
+const log = logger.child('DriftAPI')
 const router = Router()
 
 /** Safely extract a string from Express req.params or req.query. */
@@ -66,7 +68,7 @@ router.get('/baselines', async (_req: Request, res: Response) => {
 
     return res.json({ success: true, data: summaries })
   } catch (error) {
-    console.error('[Drift API] List error:', error)
+    log.error('List baselines error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -109,7 +111,7 @@ router.post('/baselines', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Drift API] Create error:', error)
+    log.error('Create baseline error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -126,7 +128,7 @@ router.put('/baselines/:id/activate', async (req: Request, res: Response) => {
     }
     return res.json({ success: true })
   } catch (error) {
-    console.error('[Drift API] Activate error:', error)
+    log.error('Activate baseline error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -143,7 +145,7 @@ router.delete('/baselines/:id', async (req: Request, res: Response) => {
     }
     return res.json({ success: true })
   } catch (error) {
-    console.error('[Drift API] Delete error:', error)
+    log.error('Delete baseline error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -164,7 +166,7 @@ router.get('/check', async (_req: Request, res: Response) => {
     }
     return res.json({ success: true, data: report })
   } catch (error) {
-    console.error('[Drift API] Check error:', error)
+    log.error('Check drift error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -181,7 +183,7 @@ router.get('/check/:id', async (req: Request, res: Response) => {
     }
     return res.json({ success: true, data: report })
   } catch (error) {
-    console.error('[Drift API] Check error:', error)
+    log.error('Check drift against baseline error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

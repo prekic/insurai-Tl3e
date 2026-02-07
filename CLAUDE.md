@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, **comprehensive configuration system with 843+ configurable settings**, **Admin Settings UI with validation and audit history**, **settings export/import for backup/restore**, **config fetch performance monitoring with TTL recommendations**
-- **Production Readiness**: ~9.5/10 (6122+ tests, 0 lint errors, 46 warnings, PWA support, server hardening)
-- **Last Updated**: February 6, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**
+- **Production Readiness**: ~9.5/10 (6122+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 7, 2026
 
 ---
 
@@ -65,9 +65,28 @@ insurai/
 │   └── __tests__/           # Integration & performance tests
 ├── server/
 │   ├── index.ts             # Express server entry (port 4001)
-│   ├── routes/              # API routes (ai.ts)
+│   ├── routes/              # API routes
+│   │   ├── ai.ts            # AI extraction, chat, OCR endpoints
+│   │   ├── admin/           # Admin API (split into 9 modules)
+│   │   │   ├── index.ts     # Router aggregator
+│   │   │   ├── auth.ts      # Login, sessions, diagnostics
+│   │   │   ├── users.ts     # User management
+│   │   │   ├── prompts.ts   # Prompt template CRUD
+│   │   │   ├── operations.ts # Audit logs, security events
+│   │   │   ├── monitoring.ts # Health, metrics, notifications
+│   │   │   ├── content.ts   # Content management
+│   │   │   ├── cost.ts      # Cost tracking
+│   │   │   └── shared.ts    # Shared utilities
+│   │   ├── settings.ts      # Configuration API
+│   │   ├── drift.ts         # Config drift detection
+│   │   ├── webhooks.ts      # Settings change webhooks
+│   │   └── email.ts         # Email endpoints
 │   ├── middleware/          # Auth, rate limiting, validation
-│   ├── lib/                 # Server utilities (Sentry)
+│   ├── lib/                 # Server utilities (Sentry, logger)
+│   ├── services/            # Business logic services
+│   │   ├── drift-detection-service.ts  # Config drift detection
+│   │   ├── webhook-service.ts          # Webhook delivery
+│   │   └── ...              # Admin DB, email, prompts
 │   └── __tests__/           # API route tests
 ├── e2e/                     # Playwright E2E tests
 ├── docs/                    # Deployment guides
@@ -166,12 +185,13 @@ insurai/
 ### Server
 | File | Purpose |
 |------|---------|
-| `server/index.ts` | Express server with graceful shutdown |
+| `server/index.ts` | Express server with graceful shutdown, HSTS, structured logging |
+| `server/lib/logger.ts` | **NEW** Structured logging with level control (production: info) |
 | `server/middleware/validation.ts` | Zod schemas for request validation |
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `server/lib/sentry.ts` | Sentry error tracking setup |
 
-### Admin Panel (Added Jan 2026)
+### Admin Panel (Refactored Feb 7, 2026)
 | File | Purpose |
 |------|---------|
 | `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
@@ -179,12 +199,23 @@ insurai/
 | `src/components/admin/tabs/PromptsTab.tsx` | Manage AI prompt templates |
 | `src/lib/admin/context.tsx` | Admin auth context provider (AdminAuthProvider) |
 | `src/lib/admin/api.ts` | Admin API client functions (includes `adminFetch` wrapper) |
-| `server/routes/admin.ts` | Admin API routes (login, users, config, prompts) |
+| `src/lib/admin/settings-templates.ts` | **NEW** Predefined configuration profile templates |
+| `server/routes/admin/index.ts` | **REFACTORED** Admin router aggregator (was single 3,390-line file) |
+| `server/routes/admin/auth.ts` | **NEW** Login, sessions, diagnostics routes |
+| `server/routes/admin/users.ts` | **NEW** User management routes |
+| `server/routes/admin/prompts.ts` | **NEW** Prompt template CRUD routes |
+| `server/routes/admin/operations.ts` | **NEW** Audit logs, security events routes |
+| `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes |
+| `server/routes/admin/content.ts` | **NEW** Content management routes |
+| `server/routes/admin/cost.ts` | **NEW** Cost tracking routes |
+| `server/routes/admin/shared.ts` | **NEW** Shared utilities (Supabase client, helpers) |
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
 | `server/services/admin-db.ts` | Admin database operations |
-| `server/services/prompt-service.ts` | **NEW** Centralized prompt management service |
+| `server/services/prompt-service.ts` | Centralized prompt management service |
+| `server/services/drift-detection-service.ts` | **NEW** Config drift detection with baselines |
+| `server/services/webhook-service.ts` | **NEW** Settings change webhook delivery |
 
-### Admin Settings UI (Added Feb 2026)
+### Admin Settings UI (Updated Feb 7, 2026)
 | File | Purpose |
 |------|---------|
 | `src/components/admin/tabs/SettingsTab.tsx` | Settings tab with category navigation + export/import UI |
@@ -194,19 +225,38 @@ insurai/
 | `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | OCR decision engine settings |
 | `src/components/admin/tabs/settings/FeatureFlagsPanel.tsx` | Feature flag management |
 | `src/components/admin/tabs/settings/SettingsHistoryPanel.tsx` | Settings audit log viewer with search/filter |
-| `src/components/admin/tabs/settings/ConfigPerformancePanel.tsx` | **NEW** Config fetch latency dashboard with TTL recommendations |
+| `src/components/admin/tabs/settings/SettingsDiffViewer.tsx` | **NEW** Visual diff viewer for old vs new setting values |
+| `src/components/admin/tabs/settings/SettingsTemplatesPanel.tsx` | **NEW** Predefined config profile management |
+| `src/components/admin/tabs/settings/SettingsWebhooksPanel.tsx` | **NEW** Webhook configuration for external notifications |
+| `src/components/admin/tabs/settings/ConfigPerformancePanel.tsx` | Config fetch latency dashboard with TTL recommendations |
+| `src/components/admin/tabs/settings/ConfigDriftPanel.tsx` | **NEW** Config drift detection with baseline comparison |
 | `src/lib/admin/settings-validation.ts` | Client-side validation utilities for settings |
+| `src/lib/admin/settings-templates.ts` | **NEW** Template definitions and management utilities |
 
-### Configuration System (Added Feb 2026)
+### User Preferences (Added Feb 7, 2026)
+| File | Purpose |
+|------|---------|
+| `src/components/UserPreferencesPanel.tsx` | **NEW** User-facing preferences UI panel |
+| `src/hooks/useUserPreferences.ts` | **NEW** Hook for three-tier config override (system → admin → user) |
+| `src/lib/config/user-overridable.ts` | **NEW** Defines which settings users can override |
+
+### Configuration System (Updated Feb 7, 2026)
 | File | Purpose |
 |------|---------|
 | `src/lib/config/configuration-service.ts` | Singleton ConfigurationService with caching + performance instrumentation |
-| `src/lib/config/config-performance-monitor.ts` | **NEW** Rolling-window latency tracker with TTL recommendations |
+| `src/lib/config/config-performance-monitor.ts` | Rolling-window latency tracker with TTL recommendations |
+| `src/lib/config/user-overridable.ts` | **NEW** User-overridable settings definitions for three-tier config |
 | `src/lib/config/types.ts` | TypeScript types and default values |
 | `src/lib/config/index.ts` | Module exports |
-| `server/routes/settings.ts` | Admin API routes for settings, export/import, and performance |
+| `server/routes/settings.ts` | Admin API routes for settings, export/import, performance, batch updates |
+| `server/routes/drift.ts` | **NEW** Config drift detection API endpoints |
+| `server/routes/webhooks.ts` | **NEW** Settings webhook management endpoints |
+| `server/services/drift-detection-service.ts` | **NEW** Drift detection with baseline snapshots |
+| `server/services/webhook-service.ts` | **NEW** Webhook delivery with retry logic |
 | `supabase/migrations/012_configuration_system.sql` | Database schema for config tables |
 | `supabase/migrations/013_seed_configuration_defaults.sql` | Seeds all hardcoded values |
+| `supabase/migrations/014_settings_webhooks.sql` | **NEW** Webhook configuration tables |
+| `supabase/migrations/015_config_drift_baselines.sql` | **NEW** Drift baseline snapshot tables |
 
 ### Configuration
 | File | Purpose |
@@ -2808,6 +2858,126 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Commit**: `9093818`
 
+### 61. Admin Routes Modularization (Refactored Feb 7, 2026)
+- **Problem**: `server/routes/admin.ts` was 3,390 lines — difficult to navigate, review, and maintain
+- **Solution**: Split into 9 focused modules under `server/routes/admin/`
+- **Modules Created**:
+  - `auth.ts` - Login, session management, diagnostics (410 lines)
+  - `users.ts` - User management (164 lines)
+  - `prompts.ts` - Prompt template CRUD (701 lines)
+  - `operations.ts` - Audit logs, security events (780 lines)
+  - `monitoring.ts` - Health, metrics, notifications (321 lines)
+  - `content.ts` - Content management (678 lines)
+  - `cost.ts` - Cost tracking (352 lines)
+  - `shared.ts` - Shared utilities, Supabase client (141 lines)
+  - `index.ts` - Router aggregator (31 lines)
+- **Migration**: No API changes — all endpoints preserved, just reorganized internally
+- **Commit**: `038d2cd`
+
+### 62. Structured Server Logging (Added Feb 7, 2026)
+- **Feature**: Centralized logging module with configurable levels for server-side code
+- **File**: `server/lib/logger.ts` (95 lines)
+- **Levels**: `debug` (dev), `info` (production default), `warn`, `error`
+- **Production level**: Changed from `warn` to `info` to make extraction timing and AI provider diagnostics visible in Railway logs
+- **Override**: Set `LOG_LEVEL=warn` env var to suppress info if needed
+- **Commit**: `c7f3d4a`
+
+### 63. Security Hardening - HSTS and Crypto (Added Feb 7, 2026)
+- **HSTS**: Added `Strict-Transport-Security` header via Helmet in production
+  - `maxAge: 31536000` (1 year), `includeSubDomains: true`
+  - File: `server/index.ts`
+- **Crypto**: Replaced `Math.random()` with `crypto.getRandomValues()` for share link IDs
+  - `Math.random()` is not cryptographically secure; share links should be unpredictable
+  - File: `src/lib/free-trial.ts`
+- **Commits**: `542333a`, `4819bc0`
+
+### 64. User Preferences with Three-Tier Config Override (Added Feb 7, 2026)
+- **Feature**: Users can override select admin settings with personal preferences
+- **Three-tier resolution**: System defaults → Admin settings → User preferences
+- **Components**:
+  - `src/lib/config/user-overridable.ts` - Defines which settings are user-overridable
+  - `src/hooks/useUserPreferences.ts` - React hook for reading/writing user preferences
+  - `src/components/UserPreferencesPanel.tsx` - UI panel for preference management
+- **Tests**: 201 (UserPreferencesPanel) + 251 (useUserPreferences) + 201 (user-overridable) = 653 new tests
+- **Commit**: `cc4e584`
+
+### 65. Config Drift Detection (Added Feb 7, 2026)
+- **Feature**: Detects when runtime configuration differs from a saved baseline snapshot
+- **Components**:
+  - `server/services/drift-detection-service.ts` - Core drift detection logic with baseline snapshots
+  - `server/routes/drift.ts` - API endpoints for drift management
+  - `src/components/admin/tabs/settings/ConfigDriftPanel.tsx` - Admin UI for drift monitoring
+  - `supabase/migrations/015_config_drift_baselines.sql` - Baseline storage table
+- **Tests**: 212 (drift detection service) + 191 (ConfigDriftPanel)
+- **Commit**: `765abaf`
+
+### 66. Settings Webhooks (Added Feb 7, 2026)
+- **Feature**: Notify external systems when admin settings change
+- **Components**:
+  - `server/services/webhook-service.ts` - Webhook delivery with retry logic (585 lines)
+  - `server/routes/webhooks.ts` - Webhook CRUD and test endpoints
+  - `src/components/admin/tabs/settings/SettingsWebhooksPanel.tsx` - Admin webhook management UI
+  - `supabase/migrations/014_settings_webhooks.sql` - Webhook configuration tables
+- **Tests**: 51 (webhook service) + 284 (SettingsWebhooksPanel)
+- **Commit**: `5f11bed`
+
+### 67. Settings Templates (Added Feb 7, 2026)
+- **Feature**: Predefined configuration profiles (e.g., "High Performance", "Cost Optimized")
+- **Components**:
+  - `src/lib/admin/settings-templates.ts` - Template definitions and management
+  - `src/components/admin/tabs/settings/SettingsTemplatesPanel.tsx` - Template browser and apply UI
+- **Tests**: 206 (settings-templates) + 301 (SettingsTemplatesPanel)
+- **Commit**: `516fab9`
+
+### 68. Batch Settings Update and Visual Diff (Added Feb 7, 2026)
+- **Batch Update**: Update multiple settings in a single API call
+  - Endpoint: `PUT /api/admin/settings/batch`
+  - Validates all settings before applying any (atomic operation)
+- **Visual Diff**: Side-by-side comparison of old vs new values in settings history
+  - Component: `src/components/admin/tabs/settings/SettingsDiffViewer.tsx`
+- **Tests**: 410 (SettingsDiffViewer)
+- **Commits**: `71096d9`, `8f5fd4d`
+
+### 69. Performance Monitoring Alerts (Added Feb 7, 2026)
+- **Feature**: Auto-alert when config performance metrics exceed thresholds
+- **Triggers**: Cache hit rate drops below threshold, DB latency exceeds threshold, error rate spikes
+- **Commit**: `bec8ac1`
+
+### 70. Document AI Server-Side Timeout (Added Feb 7, 2026)
+- **Problem**: Document AI OCR requests could hang indefinitely, blocking the extraction pipeline
+- **Solution**: Added 60-second `AbortSignal.timeout()` on server-side Document AI fetch, increased client-side timeout to 120 seconds
+- **File**: `server/routes/ai.ts`
+- **Commit**: `ed7ac1d`
+
+### 71. Extraction Fallback Returning Mock Data in Production (Fixed Feb 7, 2026)
+- **Problem**: "Try Policy Analysis" page showed mock/sample policy data instead of real AI results
+- **Root Cause**: `extractPolicyFromDocument()` called with default `useFallback: true`, so when any extraction error occurred, `createFallbackResult()` returned `success: true` with random sample data from `samplePolicies[]` — completely masking real errors
+- **Solution (4 commits)**:
+  1. Disabled fallback in TryAnalysis: both extraction paths now pass `{ useFallback: false }`
+  2. Added fallback source detection: reject results with `source === 'fallback'`
+  3. Added diagnostic `console.error` at all 5 `createFallbackResult` call sites
+  4. Fixed invisible server logs (production log level `warn` → `info`)
+  5. Fixed sanitized error messages (server was returning "Unable to process document" in production)
+  6. Fixed `extractViaProxy` to propagate server `details` field to client
+  7. Bumped SW cache to v13 to clear stale ErrorBoundary crash
+  8. Made ErrorBoundary show error details in production (was gated behind `import.meta.env.DEV`)
+- **Key Insight**: The fallback mechanism is useful for development/demos but must be disabled in production extraction paths where users expect real AI results
+- **Files Changed**:
+  - `src/components/TryAnalysis.tsx` - `{ useFallback: false }`, fallback source detection
+  - `src/lib/ai/policy-extractor.ts` - Diagnostic logging at all fallback sites, error details in messages
+  - `src/lib/ai/config.ts` - `extractViaProxy` propagates server error `details`
+  - `server/routes/ai.ts` - Always include error details in responses, timing instrumentation
+  - `server/lib/logger.ts` - Production log level `warn` → `info`
+  - `public/sw.js` - CACHE_VERSION v12 → v13
+  - `src/components/ErrorBoundary.tsx` - Show error details in production
+- **Commits**: `0e62fe1`, `37cac0c`, `1954792`, `dfbc443`
+
+### 72. Dependency Upgrade Plan (Added Feb 7, 2026)
+- **Feature**: Documented 5-stage risk-tiered dependency upgrade plan
+- **File**: `docs/DEPENDENCY_UPGRADE_PLAN.md` (171 lines)
+- **Stages**: Stage 1 (safe patches) → Stage 2 (low-risk minor) → Stage 3 (moderate breaking) → Stage 4 (high-risk major) → Stage 5 (framework major)
+- **Commit**: `b77db22`
+
 ---
 
 ## Turkish Market Considerations
@@ -3017,6 +3187,10 @@ VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 
+# Optional overrides
+# LOG_LEVEL=info          # Default in production; set to 'warn' to reduce noise
+# UNSUBSCRIBE_SECRET=xxx  # Falls back to ADMIN_JWT_SECRET if not set
+
 # NOT needed - auto-detected from window.location.origin
 # VITE_API_PROXY_URL is automatically set in production
 ```
@@ -3133,7 +3307,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v12)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v13)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
@@ -3156,6 +3330,29 @@ connectSrc: [
 - Pattern: `navigate('/try', { state: { file: valid[0] } })`
 - TryAnalysis reads from `location.state` and auto-processes
 - Use `useRef` to prevent duplicate processing on re-renders
+
+**Extraction Fallback (createFallbackResult) in Production:**
+- `createFallbackResult()` returns `success: true` with random sample data from `samplePolicies[]`
+- **NEVER** use `useFallback: true` in production extraction paths where users expect real AI results
+- TryAnalysis now passes `{ useFallback: false }` and checks for `source === 'fallback'`
+- Fallback is useful for dev/demos only — it completely masks real extraction errors
+- See Known Issue #71 for the full investigation chain
+
+**Server Error Message Sanitization:**
+- Server should include actual error details in API responses, not just "Unable to process document"
+- Client (`extractViaProxy`) must propagate the `details` field from server error responses
+- Check `server/routes/ai.ts` unified extract endpoint for response format
+
+**Production Logging Visibility:**
+- Server production log level is `info` (changed from `warn` in Feb 7 session)
+- If extraction timing or AI provider logs are invisible in Railway, check `LOG_LEVEL` env var
+- Override with `LOG_LEVEL=warn` to suppress info-level output if too noisy
+
+**Admin Routes Modularization:**
+- Admin routes are now split into 9 modules under `server/routes/admin/`
+- The old monolithic `server/routes/admin.ts` no longer exists
+- Import from `server/routes/admin/index.ts` which aggregates all sub-routers
+- Shared utilities (Supabase client, helpers) live in `server/routes/admin/shared.ts`
 
 ---
 
@@ -3205,4 +3402,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 6122+ tests, all passing (181 test files)
-**Last Updated**: February 6, 2026
+**Last Updated**: February 7, 2026

@@ -5,6 +5,9 @@
  */
 
 import { Router, Response } from 'express'
+import { logger } from '../../lib/logger.js'
+
+const log = logger.child('AdminUsers')
 import {
   requireSuperAdmin,
   hashPassword,
@@ -30,7 +33,7 @@ router.get('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, r
 
     res.json({ success: true, data: users })
   } catch (error) {
-    console.error('Failed to list admin users:', error)
+    log.error('Failed to list admin users', { error: String(error) })
     res.status(500).json({ success: false, error: 'Failed to list admin users' })
   }
 })
@@ -85,7 +88,7 @@ router.post('/users', ...requireSuperAdmin(), async (req: AuthenticatedRequest, 
       data: newUser,
     })
   } catch (error) {
-    console.error('Failed to create admin user:', error)
+    log.error('Failed to create admin user', { error: String(error) })
     res.status(500).json({ success: false, error: 'Failed to create admin user' })
   }
 })
@@ -118,7 +121,7 @@ router.put('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedReques
 
     res.json({ success: true, data: updated })
   } catch (error) {
-    console.error('Failed to update admin user:', error)
+    log.error('Failed to update admin user', { error: String(error) })
     res.status(500).json({ success: false, error: 'Failed to update admin user' })
   }
 })
@@ -153,7 +156,7 @@ router.delete('/users/:id', ...requireSuperAdmin(), async (req: AuthenticatedReq
 
     res.json({ success: true, message: 'User deleted' })
   } catch (error) {
-    console.error('Failed to delete admin user:', error)
+    log.error('Failed to delete admin user', { error: String(error) })
     res.status(500).json({ success: false, error: 'Failed to delete admin user' })
   }
 })

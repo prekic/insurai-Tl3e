@@ -154,8 +154,8 @@ export function TryAnalysis() {
 
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (90 seconds for larger documents)
-      const EXTRACTION_TIMEOUT_MS = 90000
+      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
+      const EXTRACTION_TIMEOUT_MS = 120000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
@@ -184,7 +184,7 @@ export function TryAnalysis() {
       }, 10000) // Update every 10 seconds
 
       const extractionResult = await Promise.race([
-        extractPolicyFromDocument(file),
+        extractPolicyFromDocument(file, { useFallback: false }),
         timeoutPromise,
       ])
 
@@ -197,6 +197,12 @@ export function TryAnalysis() {
 
       if (!extractionResult.success) {
         throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
+      }
+
+      // Reject fallback/sample data - user expects real AI results
+      if ('source' in extractionResult && extractionResult.source === 'fallback') {
+        console.error('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
+        throw new Error('AI extraction could not process this document. Please try again or use a different document.')
       }
 
       // Validate policy exists
@@ -341,8 +347,8 @@ export function TryAnalysis() {
       // Track analysis started
       trackTrialAnalysisStarted()
 
-      // Add timeout to prevent stuck state (90 seconds for larger documents)
-      const EXTRACTION_TIMEOUT_MS = 90000
+      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
+      const EXTRACTION_TIMEOUT_MS = 120000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
@@ -370,9 +376,9 @@ export function TryAnalysis() {
         })
       }, 10000) // Update every 10 seconds
 
-      // Run extraction with timeout
+      // Run extraction with timeout - useFallback: false to surface real errors instead of mock data
       const extractionResult = await Promise.race([
-        extractPolicyFromDocument(file),
+        extractPolicyFromDocument(file, { useFallback: false }),
         timeoutPromise,
       ])
 
@@ -385,6 +391,12 @@ export function TryAnalysis() {
 
       if (!extractionResult.success) {
         throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
+      }
+
+      // Reject fallback/sample data - user expects real AI results
+      if ('source' in extractionResult && extractionResult.source === 'fallback') {
+        console.error('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
+        throw new Error('AI extraction could not process this document. Please try again or use a different document.')
       }
 
       // Validate policy exists

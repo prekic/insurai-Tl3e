@@ -4,6 +4,9 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import logger from '../lib/logger.js'
+
+const log = logger.child('AdminDB')
 
 // ============================================================================
 // TYPES
@@ -170,13 +173,13 @@ export function getClientWithError(): { client: SupabaseClient | null; error: st
 
   if (!url) {
     initError = 'SUPABASE_URL is not configured'
-    console.error('[Admin DB]', initError)
+    log.error(initError)
     return { client: null, error: initError }
   }
 
   if (!serviceKey) {
     initError = 'SUPABASE_SERVICE_ROLE_KEY is not configured'
-    console.error('[Admin DB]', initError)
+    log.error(initError)
     return { client: null, error: initError }
   }
 
@@ -185,7 +188,7 @@ export function getClientWithError(): { client: SupabaseClient | null; error: st
     return { client: supabase, error: null }
   } catch (err) {
     initError = `Failed to create Supabase client: ${err instanceof Error ? err.message : String(err)}`
-    console.error('[Admin DB]', initError)
+    log.error('Failed to create Supabase client', { error: err instanceof Error ? err.message : String(err) })
     return { client: null, error: initError }
   }
 }
@@ -223,7 +226,7 @@ export async function getAdminUsers(): Promise<AdminUserRecord[]> {
     .order('email')
 
   if (error) {
-    console.error('Failed to fetch admin users:', error)
+    log.error('Failed to fetch admin users', { error })
     return []
   }
 
@@ -266,7 +269,7 @@ export async function createAdminUser(user: {
     .single()
 
   if (error) {
-    console.error('Failed to create admin user:', error)
+    log.error('Failed to create admin user', { error })
     return null
   }
 
@@ -301,7 +304,7 @@ export async function updateAdminUser(
     .single()
 
   if (error) {
-    console.error('Failed to update admin user:', error)
+    log.error('Failed to update admin user', { error })
     return null
   }
 
@@ -330,7 +333,7 @@ export async function deleteAdminUser(id: string): Promise<boolean> {
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to delete admin user:', error)
+    log.error('Failed to delete admin user', { error })
     return false
   }
 
@@ -364,7 +367,7 @@ export async function getConfigs(category?: string): Promise<AppConfig[]> {
 
   const { data, error } = await query.order('category').order('key')
   if (error) {
-    console.error('Failed to fetch configs:', error)
+    log.error('Failed to fetch configs', { error })
     return []
   }
 
@@ -412,7 +415,7 @@ export async function setConfig(
     .eq('key', key)
 
   if (updateError) {
-    console.error('Failed to update config:', updateError)
+    log.error('Failed to update config', { error: updateError })
     return false
   }
 
@@ -458,7 +461,7 @@ export async function getFeatureFlags(): Promise<FeatureFlag[]> {
     .order('name')
 
   if (error) {
-    console.error('Failed to fetch feature flags:', error)
+    log.error('Failed to fetch feature flags', { error })
     return []
   }
 
@@ -497,7 +500,7 @@ export async function updateFeatureFlag(
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to update feature flag:', error)
+    log.error('Failed to update feature flag', { error })
     return false
   }
 
@@ -528,7 +531,7 @@ export async function createFeatureFlag(
     .single()
 
   if (error) {
-    console.error('Failed to create feature flag:', error)
+    log.error('Failed to create feature flag', { error })
     return null
   }
 
@@ -598,39 +601,39 @@ export async function getAuditLogs(filters?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Failed to fetch audit logs:', error)
+    log.error('Failed to fetch audit logs', { error })
     return []
   }
 
   return data.map(mapAuditLog)
 }
 
-export async function createAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>): Promise<string | null> {
+export async function createAuditLog(entry: Omit<AuditLog, 'id' | 'timestamp'>): Promise<string | null> {
   const db = getClient()
   if (!db) return null
 
   const { data, error } = await db
     .from('audit_logs')
     .insert({
-      actor_id: log.actorId,
-      actor_email: log.actorEmail,
-      actor_role: log.actorRole,
-      action: log.action,
-      resource_type: log.resourceType,
-      resource_id: log.resourceId,
-      previous_state: log.previousState,
-      new_state: log.newState,
-      changes: log.changes,
-      ip_address: log.ipAddress,
-      user_agent: log.userAgent,
-      session_id: log.sessionId,
-      reason: log.reason,
+      actor_id: entry.actorId,
+      actor_email: entry.actorEmail,
+      actor_role: entry.actorRole,
+      action: entry.action,
+      resource_type: entry.resourceType,
+      resource_id: entry.resourceId,
+      previous_state: entry.previousState,
+      new_state: entry.newState,
+      changes: entry.changes,
+      ip_address: entry.ipAddress,
+      user_agent: entry.userAgent,
+      session_id: entry.sessionId,
+      reason: entry.reason,
     })
     .select('id')
     .single()
 
   if (error) {
-    console.error('Failed to create audit log:', error)
+    log.error('Failed to create audit log', { error })
     return null
   }
 
@@ -699,7 +702,7 @@ export async function getSecurityEvents(filters?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Failed to fetch security events:', error)
+    log.error('Failed to fetch security events', { error })
     return []
   }
 
@@ -726,7 +729,7 @@ export async function createSecurityEvent(
     .single()
 
   if (error) {
-    console.error('Failed to create security event:', error)
+    log.error('Failed to create security event', { error })
     return null
   }
 
@@ -752,7 +755,7 @@ export async function resolveSecurityEvent(
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to resolve security event:', error)
+    log.error('Failed to resolve security event', { error })
     return false
   }
 
@@ -790,7 +793,7 @@ export async function getBlockedIPs(): Promise<BlockedIP[]> {
     .order('blocked_at', { ascending: false })
 
   if (error) {
-    console.error('Failed to fetch blocked IPs:', error)
+    log.error('Failed to fetch blocked IPs', { error })
     return []
   }
 
@@ -820,7 +823,7 @@ export async function blockIP(
     })
 
   if (error) {
-    console.error('Failed to block IP:', error)
+    log.error('Failed to block IP', { error })
     return false
   }
 
@@ -837,7 +840,7 @@ export async function unblockIP(ip: string): Promise<boolean> {
     .eq('ip', ip)
 
   if (error) {
-    console.error('Failed to unblock IP:', error)
+    log.error('Failed to unblock IP', { error })
     return false
   }
 
@@ -896,7 +899,7 @@ export async function getPromptTemplates(category?: string): Promise<PromptTempl
   const { data, error } = await query.order('name')
 
   if (error) {
-    console.error('Failed to fetch prompt templates:', error)
+    log.error('Failed to fetch prompt templates', { error })
     return []
   }
 
@@ -967,7 +970,7 @@ export async function updatePromptTemplate(
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to update prompt template:', error)
+    log.error('Failed to update prompt template', { error })
     return false
   }
 
@@ -1001,7 +1004,7 @@ export async function createPromptTemplate(
     .single()
 
   if (error) {
-    console.error('Failed to create prompt template:', error)
+    log.error('Failed to create prompt template', { error })
     return null
   }
 
@@ -1018,7 +1021,7 @@ export async function deletePromptTemplate(id: string): Promise<boolean> {
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to delete prompt template:', error)
+    log.error('Failed to delete prompt template', { error })
     return false
   }
 
@@ -1105,7 +1108,7 @@ export async function getAIRequestLogs(filters?: {
   const { data, error } = await query
 
   if (error) {
-    console.error('Failed to fetch AI request logs:', error)
+    log.error('Failed to fetch AI request logs', { error })
     return []
   }
 
@@ -1113,7 +1116,7 @@ export async function getAIRequestLogs(filters?: {
 }
 
 export async function createAIRequestLog(
-  log: Omit<AIRequestLog, 'id' | 'timestamp'>
+  entry: Omit<AIRequestLog, 'id' | 'timestamp'>
 ): Promise<string | null> {
   const db = getClient()
   if (!db) return null
@@ -1121,33 +1124,33 @@ export async function createAIRequestLog(
   const { data, error } = await db
     .from('ai_request_logs')
     .insert({
-      user_id: log.userId,
-      session_id: log.sessionId,
-      provider: log.provider,
-      model: log.model,
-      operation: log.operation,
-      endpoint: log.endpoint,
-      policy_id: log.policyId,
-      document_id: log.documentId,
-      prompt_template_id: log.promptTemplateId,
-      input_tokens: log.inputTokens,
-      output_tokens: log.outputTokens,
-      total_tokens: log.totalTokens,
-      input_cost: log.inputCost,
-      output_cost: log.outputCost,
-      total_cost: log.totalCost,
-      response_time_ms: log.responseTimeMs,
-      status: log.status,
-      error_message: log.errorMessage,
-      error_code: log.errorCode,
-      client_ip: log.clientIp,
-      user_agent: log.userAgent,
+      user_id: entry.userId,
+      session_id: entry.sessionId,
+      provider: entry.provider,
+      model: entry.model,
+      operation: entry.operation,
+      endpoint: entry.endpoint,
+      policy_id: entry.policyId,
+      document_id: entry.documentId,
+      prompt_template_id: entry.promptTemplateId,
+      input_tokens: entry.inputTokens,
+      output_tokens: entry.outputTokens,
+      total_tokens: entry.totalTokens,
+      input_cost: entry.inputCost,
+      output_cost: entry.outputCost,
+      total_cost: entry.totalCost,
+      response_time_ms: entry.responseTimeMs,
+      status: entry.status,
+      error_message: entry.errorMessage,
+      error_code: entry.errorCode,
+      client_ip: entry.clientIp,
+      user_agent: entry.userAgent,
     })
     .select('id')
     .single()
 
   if (error) {
-    console.error('Failed to create AI request log:', error)
+    log.error('Failed to create AI request log', { error })
     return null
   }
 
@@ -1283,7 +1286,7 @@ export async function getCostBudgets(): Promise<CostBudget[]> {
     .order('name')
 
   if (error) {
-    console.error('Failed to fetch cost budgets:', error)
+    log.error('Failed to fetch cost budgets', { error })
     return []
   }
 
@@ -1303,7 +1306,7 @@ export async function updateCostBudget(
     .eq('id', id)
 
   if (error) {
-    console.error('Failed to update cost budget:', error)
+    log.error('Failed to update cost budget', { error })
     return false
   }
 
