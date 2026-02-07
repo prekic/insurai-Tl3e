@@ -880,17 +880,18 @@ router.post(
         }
 
         return res.status(500).json({
-          error: IS_PRODUCTION ? 'Unable to process document' : 'All AI providers failed',
+          error: 'All AI providers failed',
           code: 'ALL_PROVIDERS_FAILED',
-          ...(process.env.NODE_ENV !== 'production' && { details: message }),
+          details: message,
           timestamp: new Date().toISOString(),
         })
       }
     }
 
     // No providers available
+    log.error('No AI providers configured', { requestId, hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY, hasOpenaiKey: !!process.env.OPENAI_API_KEY })
     return res.status(503).json({
-      error: IS_PRODUCTION ? 'AI service unavailable' : 'No AI providers configured',
+      error: 'No AI providers configured. Check OPENAI_API_KEY and ANTHROPIC_API_KEY environment variables.',
       code: 'NO_PROVIDERS_CONFIGURED',
     })
   }

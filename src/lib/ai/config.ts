@@ -283,10 +283,13 @@ export async function extractViaProxy(
     })
 
     if (!response.ok) {
-      console.error('[extractViaProxy] HTTP error:', result.error || `HTTP ${response.status}`)
+      const errorMsg = result.details
+        ? `${result.error || 'Server error'}: ${result.details}`
+        : result.error || `HTTP ${response.status}`
+      console.error('[extractViaProxy] HTTP error:', errorMsg, { code: result.code, status: response.status })
       return {
         success: false,
-        error: result.error || `HTTP ${response.status}`,
+        error: errorMsg,
       }
     }
 

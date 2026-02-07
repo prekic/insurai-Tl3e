@@ -1059,7 +1059,7 @@ export async function extractPolicyFromDocument(
       success: false,
       error: {
         code: 'AI_ERROR',
-        message: 'Failed to extract policy data',
+        message: `Failed to extract policy data: ${errorMessage}`,
         details: errorMessage,
         stack: errorStack,
         type: errorType,

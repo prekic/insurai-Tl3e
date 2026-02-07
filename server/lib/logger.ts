@@ -21,8 +21,9 @@ function getMinLevel(): LogLevel {
   const envLevel = process.env.LOG_LEVEL?.toLowerCase()
   if (envLevel && envLevel in LEVEL_PRIORITY) return envLevel as LogLevel
 
-  // In production, suppress debug and info by default
-  return process.env.NODE_ENV === 'production' ? 'warn' : 'debug'
+  // In production, show info and above (not debug).
+  // Use LOG_LEVEL=warn to suppress info if needed.
+  return process.env.NODE_ENV === 'production' ? 'info' : 'debug'
 }
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production'
