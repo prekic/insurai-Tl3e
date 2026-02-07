@@ -44,6 +44,7 @@ import {
 } from './types'
 
 import { configPerformanceMonitor } from './config-performance-monitor'
+import { mergeWithUserPreferences, isUserOverridableCategory } from './user-overridable'
 
 // =============================================================================
 // CACHE IMPLEMENTATION
@@ -547,6 +548,55 @@ export class ConfigurationService {
   }
 
   // ===========================================================================
+  // USER-AWARE CONFIGURATION GETTERS (Tier 3 override)
+  // ===========================================================================
+
+  /**
+   * Get UI configuration with user preference overrides.
+   * Merges: System Defaults → Admin Settings → User Preferences
+   */
+  async getUIConfigForUser(userId: string): Promise<UIConfig> {
+    const adminConfig = await this.getUIConfig()
+    const userPrefs = await this.getUserPreferences(userId, 'ui')
+    return mergeWithUserPreferences(adminConfig, userPrefs, 'ui', UI_KEY_MAP)
+  }
+
+  /**
+   * Get email configuration with user preference overrides.
+   * Merges: System Defaults → Admin Settings → User Preferences
+   */
+  async getEmailConfigForUser(userId: string): Promise<EmailConfig> {
+    const adminConfig = await this.getEmailConfig()
+    const userPrefs = await this.getUserPreferences(userId, 'email')
+    return mergeWithUserPreferences(adminConfig, userPrefs, 'email', EMAIL_KEY_MAP)
+  }
+
+  /**
+   * Get a single setting value with user override support.
+   * For overridable categories (ui, email), checks user preferences first.
+   */
+  async getForUser<T>(
+    category: ConfigCategory,
+    key: string,
+    defaultValue: T,
+    userId?: string
+  ): Promise<T> {
+    // If no user or category not overridable, return admin value
+    if (!userId || !isUserOverridableCategory(category)) {
+      return this.get(category, key, defaultValue)
+    }
+
+    // Check user preferences first
+    const userPrefs = await this.getUserPreferences(userId, category)
+    if (userPrefs && userPrefs[key] !== undefined) {
+      return userPrefs[key] as T
+    }
+
+    // Fall back to admin setting
+    return this.get(category, key, defaultValue)
+  }
+
+  // ===========================================================================
   // FEATURE FLAGS
   // ===========================================================================
 
@@ -1040,4 +1090,18 @@ export async function getRegionalFactor(
   policyType?: string
 ): Promise<number> {
   return configService.getRegionalFactor(regionCode, policyType)
+}
+
+/**
+ * Get UI configuration with user overrides (convenience function)
+ */
+export async function getUIConfigForUser(userId: string): Promise<UIConfig> {
+  return configService.getUIConfigForUser(userId)
+}
+
+/**
+ * Get email configuration with user overrides (convenience function)
+ */
+export async function getEmailConfigForUser(userId: string): Promise<EmailConfig> {
+  return configService.getEmailConfigForUser(userId)
 }

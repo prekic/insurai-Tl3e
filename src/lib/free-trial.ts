@@ -125,9 +125,11 @@ export function getTrialResult(): TrialResult | null {
  */
 function generateShareId(): string {
   const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
   let result = ''
-  for (let i = 0; i < 12; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length))
+  for (let i = 0; i < 16; i++) {
+    result += chars.charAt(bytes[i] % chars.length)
   }
   return result
 }

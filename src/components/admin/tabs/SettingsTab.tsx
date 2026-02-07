@@ -21,6 +21,9 @@ import {
   Upload,
   FileWarning,
   Activity,
+  Layers,
+  Webhook,
+  GitCompareArrows,
 } from 'lucide-react'
 
 // Sub-panels
@@ -31,8 +34,11 @@ import { OCRSettingsPanel } from './settings/OCRSettingsPanel'
 import { FeatureFlagsPanel } from './settings/FeatureFlagsPanel'
 import { SettingsHistoryPanel } from './settings/SettingsHistoryPanel'
 import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
+import { SettingsTemplatesPanel } from './settings/SettingsTemplatesPanel'
+import { SettingsWebhooksPanel } from './settings/SettingsWebhooksPanel'
+import { ConfigDriftPanel } from './settings/ConfigDriftPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance'
+type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates' | 'webhooks' | 'drift'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -83,6 +89,24 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Performance',
     description: 'Config fetch latency and cache hit rates',
     icon: <Activity className="h-5 w-5" />,
+  },
+  {
+    id: 'templates',
+    label: 'Templates',
+    description: 'Apply predefined configuration profiles',
+    icon: <Layers className="h-5 w-5" />,
+  },
+  {
+    id: 'webhooks',
+    label: 'Webhooks',
+    description: 'Notify external systems when settings change',
+    icon: <Webhook className="h-5 w-5" />,
+  },
+  {
+    id: 'drift',
+    label: 'Drift Detection',
+    description: 'Detect when config differs from a known-good baseline',
+    icon: <GitCompareArrows className="h-5 w-5" />,
   },
 ]
 
@@ -186,6 +210,53 @@ export function SettingsTab() {
     } catch (err) {
       console.error('Failed to update setting:', err)
       setError(err instanceof Error ? err.message : 'Failed to update setting')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const batchUpdateSettings = async (
+    updates: Array<{ category: string; key: string; value: unknown }>,
+    reason?: string
+  ) => {
+    setIsSaving(true)
+    setError(null)
+    try {
+      const response = await adminFetch('/api/admin/settings/batch', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates, reason }),
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Update local state for all changed settings
+        setSettings((prev) => {
+          const next = { ...prev }
+          for (const result of data.data.results) {
+            const cat = result.category
+            next[cat] = (next[cat] || []).map((s: SettingValue) =>
+              s.key === result.key ? { ...s, value: result.newValue } : s
+            )
+          }
+          return next
+        })
+        const count = data.data.updated
+        setSuccessMessage(`${count} setting${count !== 1 ? 's' : ''} updated successfully`)
+        setTimeout(() => setSuccessMessage(null), 3000)
+      } else {
+        if (data.validationErrors) {
+          const msgs = data.validationErrors.map(
+            (e: { key: string; error: string }) => `${e.key}: ${e.error}`
+          )
+          setError(`Validation failed: ${msgs.join('; ')}`)
+        } else {
+          setError(data.error || 'Failed to update settings')
+        }
+      }
+    } catch (err) {
+      console.error('Failed to batch update settings:', err)
+      setError(err instanceof Error ? err.message : 'Failed to update settings')
     } finally {
       setIsSaving(false)
     }
@@ -309,6 +380,12 @@ export function SettingsTab() {
           <AISettingsPanel
             settings={categorySettings}
             onUpdate={(key, value, reason) => updateSetting('ai', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'ai' })),
+                reason
+              )
+            }
             isLoading={isLoading}
             isSaving={isSaving}
           />
@@ -318,6 +395,12 @@ export function SettingsTab() {
           <EvaluationSettingsPanel
             settings={categorySettings}
             onUpdate={(key, value, reason) => updateSetting('evaluation', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'evaluation' })),
+                reason
+              )
+            }
             isLoading={isLoading}
             isSaving={isSaving}
           />
@@ -327,6 +410,12 @@ export function SettingsTab() {
           <RateLimitsPanel
             settings={categorySettings}
             onUpdate={(key, value, reason) => updateSetting('rate_limits', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'rate_limits' })),
+                reason
+              )
+            }
             isLoading={isLoading}
             isSaving={isSaving}
           />
@@ -336,6 +425,12 @@ export function SettingsTab() {
           <OCRSettingsPanel
             settings={categorySettings}
             onUpdate={(key, value, reason) => updateSetting('ocr', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'ocr' })),
+                reason
+              )
+            }
             isLoading={isLoading}
             isSaving={isSaving}
           />
@@ -346,6 +441,18 @@ export function SettingsTab() {
         return <SettingsHistoryPanel />
       case 'performance':
         return <ConfigPerformancePanel />
+      case 'templates':
+        return (
+          <SettingsTemplatesPanel
+            settings={settings}
+            onBatchUpdate={batchUpdateSettings}
+            isSaving={isSaving}
+          />
+        )
+      case 'webhooks':
+        return <SettingsWebhooksPanel />
+      case 'drift':
+        return <ConfigDriftPanel />
       default:
         return null
     }

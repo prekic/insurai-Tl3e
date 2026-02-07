@@ -206,12 +206,14 @@ describe('SettingsHistoryPanel', () => {
         fireEvent.click(expandableEntry)
 
         await waitFor(() => {
-          expect(screen.getByText(/Previous Value/i)).toBeInTheDocument()
+          expect(screen.getByText(/Value Change/i)).toBeInTheDocument()
         })
 
-        expect(screen.getByText(/New Value/i)).toBeInTheDocument()
-        expect(screen.getByText(/old_value_1/i)).toBeInTheDocument()
-        expect(screen.getByText(/new_value_1/i)).toBeInTheDocument()
+        // The diff viewer renders values (may be split by inline highlight spans)
+        // Check for the changed part and common suffix separately
+        expect(screen.getByText('old')).toBeInTheDocument()
+        expect(screen.getByText('new')).toBeInTheDocument()
+        expect(screen.getAllByText('_value_1').length).toBeGreaterThan(0)
       }
     })
 
@@ -263,13 +265,13 @@ describe('SettingsHistoryPanel', () => {
         // Expand
         fireEvent.click(expandableEntry)
         await waitFor(() => {
-          expect(screen.getByText(/Previous Value/i)).toBeInTheDocument()
+          expect(screen.getByText(/Value Change/i)).toBeInTheDocument()
         })
 
         // Collapse
         fireEvent.click(expandableEntry)
         await waitFor(() => {
-          expect(screen.queryByText(/Previous Value/i)).not.toBeInTheDocument()
+          expect(screen.queryByText(/Value Change/i)).not.toBeInTheDocument()
         })
       }
     })
@@ -576,7 +578,7 @@ describe('SettingsHistoryPanel', () => {
   })
 
   describe('Value Formatting', () => {
-    it('should handle object values', async () => {
+    it('should handle object values with field-level diff', async () => {
       const mockHistory = createMockHistory(1)
       mockHistory[0].previousValue = { nested: 'object', value: 123 }
       mockHistory[0].newValue = { nested: 'updated', value: 456 }
@@ -595,12 +597,16 @@ describe('SettingsHistoryPanel', () => {
       fireEvent.click(expandableEntry)
 
       await waitFor(() => {
-        // JSON stringified values should be visible - use getAllByText since it appears twice
-        expect(screen.getAllByText(/"nested"/).length).toBeGreaterThan(0)
+        // Object diff renders field names as labels
+        expect(screen.getByText('nested')).toBeInTheDocument()
+        expect(screen.getByText('value')).toBeInTheDocument()
       })
+
+      // Should show fields changed count
+      expect(screen.getByText(/2 fields changed/i)).toBeInTheDocument()
     })
 
-    it('should handle null/undefined values', async () => {
+    it('should handle null to value transition with Value Set badge', async () => {
       const mockHistory = createMockHistory(1)
       mockHistory[0].previousValue = null
       mockHistory[0].newValue = 'new_value'
@@ -618,8 +624,10 @@ describe('SettingsHistoryPanel', () => {
       fireEvent.click(expandableEntry)
 
       await waitFor(() => {
-        expect(screen.getByText(/\(empty\)/)).toBeInTheDocument()
+        expect(screen.getByText(/Value Set/)).toBeInTheDocument()
       })
+
+      expect(screen.getByText('new_value')).toBeInTheDocument()
     })
   })
 })

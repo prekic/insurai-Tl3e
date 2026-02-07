@@ -24,6 +24,7 @@ import type { SettingValue } from '../SettingsTab'
 interface OCRSettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
+  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }

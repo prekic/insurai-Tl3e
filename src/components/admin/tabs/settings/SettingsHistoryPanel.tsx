@@ -18,7 +18,6 @@ import {
   Clock,
   User,
   FileText,
-  ArrowRight,
   Filter,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +27,7 @@ import {
   Eye,
   AlertCircle,
 } from 'lucide-react'
+import { SettingsDiffViewer } from './SettingsDiffViewer'
 
 interface SettingsHistoryEntry {
   id: string
@@ -141,18 +141,6 @@ export function SettingsHistoryPanel() {
     }
     return true
   })
-
-  const formatValue = (value: unknown): string => {
-    if (value === null || value === undefined) return '(empty)'
-    if (typeof value === 'object') {
-      try {
-        return JSON.stringify(value, null, 2)
-      } catch {
-        return String(value)
-      }
-    }
-    return String(value)
-  }
 
   const formatDate = (dateString: string): string => {
     const date = new Date(dateString)
@@ -347,8 +335,17 @@ export function SettingsHistoryPanel() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
+                      {expandedId !== entry.id && (
+                        <span className="hidden md:block">
+                          <SettingsDiffViewer
+                            previousValue={entry.previousValue}
+                            newValue={entry.newValue}
+                            inline
+                          />
+                        </span>
+                      )}
                       {entry.reason && (
-                        <span className="text-xs text-gray-400 max-w-[200px] truncate hidden sm:block">
+                        <span className="text-xs text-gray-400 max-w-[200px] truncate hidden lg:block">
                           {entry.reason}
                         </span>
                       )}
@@ -363,28 +360,13 @@ export function SettingsHistoryPanel() {
                   {/* Expanded Details */}
                   {expandedId === entry.id && (
                     <div className="p-4 border-t border-gray-200 bg-gray-50 space-y-4">
-                      {/* Value Change */}
+                      {/* Visual Diff */}
                       <div className="space-y-2">
                         <h4 className="font-medium text-sm text-gray-700">Value Change</h4>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                          <div className="flex-1 w-full">
-                            <div className="text-xs text-gray-500 mb-1">Previous Value</div>
-                            <div className="bg-red-50 border border-red-200 rounded px-3 py-2 font-mono text-sm text-red-800 overflow-x-auto">
-                              <pre className="whitespace-pre-wrap break-all">
-                                {formatValue(entry.previousValue)}
-                              </pre>
-                            </div>
-                          </div>
-                          <ArrowRight className="h-5 w-5 text-gray-400 flex-shrink-0 hidden sm:block" />
-                          <div className="flex-1 w-full">
-                            <div className="text-xs text-gray-500 mb-1">New Value</div>
-                            <div className="bg-green-50 border border-green-200 rounded px-3 py-2 font-mono text-sm text-green-800 overflow-x-auto">
-                              <pre className="whitespace-pre-wrap break-all">
-                                {formatValue(entry.newValue)}
-                              </pre>
-                            </div>
-                          </div>
-                        </div>
+                        <SettingsDiffViewer
+                          previousValue={entry.previousValue}
+                          newValue={entry.newValue}
+                        />
                       </div>
 
                       {/* Reason */}

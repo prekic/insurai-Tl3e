@@ -70,6 +70,10 @@ export interface PerformanceSnapshot {
   ttlRecommendation: TtlRecommendation
   /** Recent events (last 20) for live monitoring */
   recentEvents: ConfigFetchEvent[]
+  /** Active performance alerts */
+  alerts: PerformanceAlert[]
+  /** Alert thresholds configuration */
+  alertThresholds: AlertThresholds
 }
 
 export interface TtlRecommendation {
@@ -77,6 +81,58 @@ export interface TtlRecommendation {
   suggestedTtlMs: number
   reason: string
   confidence: 'high' | 'medium' | 'low'
+}
+
+// =============================================================================
+// ALERT TYPES
+// =============================================================================
+
+export type AlertSeverity = 'warning' | 'critical'
+
+export interface AlertThresholds {
+  /** Minimum cache hit rate before warning (0-1). Default: 0.5 */
+  cacheHitRateWarning: number
+  /** Minimum cache hit rate before critical alert (0-1). Default: 0.3 */
+  cacheHitRateCritical: number
+  /** Maximum error rate before warning (0-1). Default: 0.05 */
+  errorRateWarning: number
+  /** Maximum error rate before critical alert (0-1). Default: 0.15 */
+  errorRateCritical: number
+  /** Maximum average DB latency (ms) before warning. Default: 200 */
+  dbLatencyWarning: number
+  /** Maximum average DB latency (ms) before critical alert. Default: 500 */
+  dbLatencyCritical: number
+  /** Minimum events required before alert evaluation. Default: 20 */
+  minEventsForAlert: number
+  /** Cooldown between repeated alerts of the same type (ms). Default: 5 minutes */
+  alertCooldownMs: number
+}
+
+export interface PerformanceAlert {
+  id: string
+  type: 'cache_hit_rate' | 'error_rate' | 'db_latency'
+  severity: AlertSeverity
+  message: string
+  currentValue: number
+  threshold: number
+  triggeredAt: number
+}
+
+export interface AlertEvaluation {
+  alerts: PerformanceAlert[]
+  thresholds: AlertThresholds
+  suppressedCount: number
+}
+
+export const DEFAULT_ALERT_THRESHOLDS: AlertThresholds = {
+  cacheHitRateWarning: 0.5,
+  cacheHitRateCritical: 0.3,
+  errorRateWarning: 0.05,
+  errorRateCritical: 0.15,
+  dbLatencyWarning: 200,
+  dbLatencyCritical: 500,
+  minEventsForAlert: 20,
+  alertCooldownMs: 5 * 60 * 1000, // 5 minutes
 }
 
 // =============================================================================
@@ -96,6 +152,10 @@ export class ConfigPerformanceMonitor {
   private events: ConfigFetchEvent[] = []
   private startedAt: number = Date.now()
   private cacheTtlMs: number = DEFAULT_CACHE_TTL_MS
+  private alertThresholds: AlertThresholds = { ...DEFAULT_ALERT_THRESHOLDS }
+  private lastAlertTimes: Map<string, number> = new Map()
+  private activeAlerts: PerformanceAlert[] = []
+  private onAlertCallback: ((alerts: PerformanceAlert[]) => void) | null = null
 
   private constructor() {}
 
@@ -116,7 +176,7 @@ export class ConfigPerformanceMonitor {
     this.cacheTtlMs = ttlMs
   }
 
-  /** Record a config fetch event */
+  /** Record a config fetch event and evaluate alerts */
   record(event: Omit<ConfigFetchEvent, 'timestamp'>): void {
     const fullEvent: ConfigFetchEvent = {
       ...event,
@@ -125,6 +185,11 @@ export class ConfigPerformanceMonitor {
 
     this.events.push(fullEvent)
     this.pruneEvents()
+
+    // Evaluate alerts every 10 events to avoid overhead on every record
+    if (this.events.length % 10 === 0) {
+      this.evaluateAlerts()
+    }
   }
 
   /** Get a full performance snapshot */
@@ -150,6 +215,8 @@ export class ConfigPerformanceMonitor {
       cacheTtlMs: this.cacheTtlMs,
       ttlRecommendation: this.computeTtlRecommendation(events, dbLatencies),
       recentEvents: events.slice(-20).reverse(),
+      alerts: this.activeAlerts,
+      alertThresholds: { ...this.alertThresholds },
     }
   }
 
@@ -165,15 +232,137 @@ export class ConfigPerformanceMonitor {
     return this.events.length
   }
 
+  /** Set alert thresholds */
+  setAlertThresholds(thresholds: Partial<AlertThresholds>): void {
+    this.alertThresholds = { ...this.alertThresholds, ...thresholds }
+  }
+
+  /** Get current alert thresholds */
+  getAlertThresholds(): AlertThresholds {
+    return { ...this.alertThresholds }
+  }
+
+  /** Register a callback for when alerts are triggered */
+  onAlert(callback: ((alerts: PerformanceAlert[]) => void) | null): void {
+    this.onAlertCallback = callback
+  }
+
+  /** Get currently active alerts */
+  getActiveAlerts(): PerformanceAlert[] {
+    return [...this.activeAlerts]
+  }
+
+  /** Evaluate current metrics against thresholds and return any alerts */
+  evaluateAlerts(): AlertEvaluation {
+    this.pruneEvents()
+    const events = this.events
+    const thresholds = this.alertThresholds
+    const now = Date.now()
+    const alerts: PerformanceAlert[] = []
+    let suppressedCount = 0
+
+    // Not enough data to evaluate
+    if (events.length < thresholds.minEventsForAlert) {
+      this.activeAlerts = []
+      return { alerts: [], thresholds, suppressedCount: 0 }
+    }
+
+    const cacheStats = this.computeCacheStats(events)
+    const dbEvents = events.filter((e) => !e.cacheHit && e.success)
+    const dbLatencies = dbEvents.map((e) => e.latencyMs)
+    const avgDbLatency = dbLatencies.length > 0
+      ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length
+      : 0
+    const errorRate = events.length > 0
+      ? events.filter((e) => !e.success).length / events.length
+      : 0
+
+    // Cache hit rate alerts
+    if (cacheStats.hitRate < thresholds.cacheHitRateCritical) {
+      const alert = this.createAlert('cache_hit_rate', 'critical', cacheStats.hitRate, thresholds.cacheHitRateCritical, now)
+      if (alert) alerts.push(alert); else suppressedCount++
+    } else if (cacheStats.hitRate < thresholds.cacheHitRateWarning) {
+      const alert = this.createAlert('cache_hit_rate', 'warning', cacheStats.hitRate, thresholds.cacheHitRateWarning, now)
+      if (alert) alerts.push(alert); else suppressedCount++
+    }
+
+    // Error rate alerts
+    if (errorRate > thresholds.errorRateCritical) {
+      const alert = this.createAlert('error_rate', 'critical', errorRate, thresholds.errorRateCritical, now)
+      if (alert) alerts.push(alert); else suppressedCount++
+    } else if (errorRate > thresholds.errorRateWarning) {
+      const alert = this.createAlert('error_rate', 'warning', errorRate, thresholds.errorRateWarning, now)
+      if (alert) alerts.push(alert); else suppressedCount++
+    }
+
+    // DB latency alerts
+    if (dbLatencies.length > 0) {
+      if (avgDbLatency > thresholds.dbLatencyCritical) {
+        const alert = this.createAlert('db_latency', 'critical', avgDbLatency, thresholds.dbLatencyCritical, now)
+        if (alert) alerts.push(alert); else suppressedCount++
+      } else if (avgDbLatency > thresholds.dbLatencyWarning) {
+        const alert = this.createAlert('db_latency', 'warning', avgDbLatency, thresholds.dbLatencyWarning, now)
+        if (alert) alerts.push(alert); else suppressedCount++
+      }
+    }
+
+    this.activeAlerts = alerts
+
+    // Notify callback if there are new alerts
+    if (alerts.length > 0 && this.onAlertCallback) {
+      this.onAlertCallback(alerts)
+    }
+
+    return { alerts, thresholds, suppressedCount }
+  }
+
   /** Clear all events */
   clear(): void {
     this.events = []
     this.startedAt = Date.now()
+    this.activeAlerts = []
+    this.lastAlertTimes.clear()
   }
 
   // ===========================================================================
   // PRIVATE METHODS
   // ===========================================================================
+
+  private createAlert(
+    type: PerformanceAlert['type'],
+    severity: AlertSeverity,
+    currentValue: number,
+    threshold: number,
+    now: number
+  ): PerformanceAlert | null {
+    const alertKey = `${type}:${severity}`
+    const lastTriggered = this.lastAlertTimes.get(alertKey) || 0
+
+    if (now - lastTriggered < this.alertThresholds.alertCooldownMs) {
+      return null // Cooldown active
+    }
+
+    this.lastAlertTimes.set(alertKey, now)
+
+    const messages: Record<PerformanceAlert['type'], (s: AlertSeverity, v: number, t: number) => string> = {
+      cache_hit_rate: (s, v, t) =>
+        `${s === 'critical' ? 'Critical' : 'Warning'}: Cache hit rate dropped to ${(v * 100).toFixed(1)}% (threshold: ${(t * 100).toFixed(0)}%)`,
+      error_rate: (s, v, t) =>
+        `${s === 'critical' ? 'Critical' : 'Warning'}: Error rate at ${(v * 100).toFixed(1)}% (threshold: ${(t * 100).toFixed(0)}%)`,
+      db_latency: (s, v, t) =>
+        `${s === 'critical' ? 'Critical' : 'Warning'}: DB latency at ${v.toFixed(0)}ms (threshold: ${t.toFixed(0)}ms)`,
+    }
+
+    return {
+      id: `${type}-${severity}-${now}`,
+      type,
+      severity,
+      message: messages[type](severity, currentValue, threshold),
+      currentValue,
+      threshold,
+      triggeredAt: now,
+    }
+  }
 
   private pruneEvents(): void {
     const cutoff = Date.now() - MAX_AGE_MS

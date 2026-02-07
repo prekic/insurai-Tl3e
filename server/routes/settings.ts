@@ -21,6 +21,7 @@
 import { Router, type Request, type Response } from 'express'
 import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
+import { fireWebhooks } from '../services/webhook-service.js'
 
 const router = Router()
 
@@ -116,9 +117,43 @@ interface ServerConfigEvent {
   success: boolean
 }
 
+interface ServerAlertThresholds {
+  cacheHitRateWarning: number
+  cacheHitRateCritical: number
+  errorRateWarning: number
+  errorRateCritical: number
+  dbLatencyWarning: number
+  dbLatencyCritical: number
+  minEventsForAlert: number
+  alertCooldownMs: number
+}
+
+interface ServerPerformanceAlert {
+  id: string
+  type: 'cache_hit_rate' | 'error_rate' | 'db_latency'
+  severity: 'warning' | 'critical'
+  message: string
+  currentValue: number
+  threshold: number
+  triggeredAt: number
+}
+
 const serverPerfEvents: ServerConfigEvent[] = []
 const SERVER_PERF_MAX_EVENTS = 500
 const SERVER_PERF_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+
+let serverAlertThresholds: ServerAlertThresholds = {
+  cacheHitRateWarning: 0.5,
+  cacheHitRateCritical: 0.3,
+  errorRateWarning: 0.05,
+  errorRateCritical: 0.15,
+  dbLatencyWarning: 200,
+  dbLatencyCritical: 500,
+  minEventsForAlert: 20,
+  alertCooldownMs: 5 * 60 * 1000,
+}
+const serverLastAlertTimes = new Map<string, number>()
+// Active alerts (assigned in evaluateServerAlerts, available via getServerPerformanceSnapshot export)
 
 function pruneServerPerfEvents(): void {
   const cutoff = Date.now() - SERVER_PERF_MAX_AGE_MS
@@ -200,8 +235,82 @@ function getServerPerformanceSnapshot() {
   }
 }
 
+function evaluateServerAlerts(): { alerts: ServerPerformanceAlert[]; suppressedCount: number } {
+  pruneServerPerfEvents()
+  const events = serverPerfEvents
+  const thresholds = serverAlertThresholds
+  const now = Date.now()
+  const alerts: ServerPerformanceAlert[] = []
+  let suppressedCount = 0
+
+  if (events.length < thresholds.minEventsForAlert) {
+    return { alerts: [], suppressedCount: 0 }
+  }
+
+  const totalHits = events.filter((e) => e.cacheHit).length
+  const hitRate = events.length > 0 ? totalHits / events.length : 0
+  const errorRate = events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
+  const dbEvents = events.filter((e) => !e.cacheHit && e.success)
+  const dbLatencies = dbEvents.map((e) => e.latencyMs)
+  const avgDbLatency = dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
+
+  const tryCreateAlert = (
+    type: ServerPerformanceAlert['type'],
+    severity: 'warning' | 'critical',
+    currentValue: number,
+    threshold: number
+  ): void => {
+    const key = `${type}:${severity}`
+    const last = serverLastAlertTimes.get(key) || 0
+    if (now - last < thresholds.alertCooldownMs) {
+      suppressedCount++
+      return
+    }
+    serverLastAlertTimes.set(key, now)
+    const messages: Record<string, string> = {
+      cache_hit_rate: `${severity === 'critical' ? 'Critical' : 'Warning'}: Cache hit rate at ${(currentValue * 100).toFixed(1)}% (threshold: ${(threshold * 100).toFixed(0)}%)`,
+      error_rate: `${severity === 'critical' ? 'Critical' : 'Warning'}: Error rate at ${(currentValue * 100).toFixed(1)}% (threshold: ${(threshold * 100).toFixed(0)}%)`,
+      db_latency: `${severity === 'critical' ? 'Critical' : 'Warning'}: DB latency at ${currentValue.toFixed(0)}ms (threshold: ${threshold.toFixed(0)}ms)`,
+    }
+    alerts.push({
+      id: `${type}-${severity}-${now}`,
+      type,
+      severity,
+      message: messages[type],
+      currentValue,
+      threshold,
+      triggeredAt: now,
+    })
+  }
+
+  // Cache hit rate checks
+  if (hitRate < thresholds.cacheHitRateCritical) {
+    tryCreateAlert('cache_hit_rate', 'critical', hitRate, thresholds.cacheHitRateCritical)
+  } else if (hitRate < thresholds.cacheHitRateWarning) {
+    tryCreateAlert('cache_hit_rate', 'warning', hitRate, thresholds.cacheHitRateWarning)
+  }
+
+  // Error rate checks
+  if (errorRate > thresholds.errorRateCritical) {
+    tryCreateAlert('error_rate', 'critical', errorRate, thresholds.errorRateCritical)
+  } else if (errorRate > thresholds.errorRateWarning) {
+    tryCreateAlert('error_rate', 'warning', errorRate, thresholds.errorRateWarning)
+  }
+
+  // DB latency checks
+  if (dbLatencies.length > 0) {
+    if (avgDbLatency > thresholds.dbLatencyCritical) {
+      tryCreateAlert('db_latency', 'critical', avgDbLatency, thresholds.dbLatencyCritical)
+    } else if (avgDbLatency > thresholds.dbLatencyWarning) {
+      tryCreateAlert('db_latency', 'warning', avgDbLatency, thresholds.dbLatencyWarning)
+    }
+  }
+
+  return { alerts, suppressedCount }
+}
+
 // Make the record function available to other server modules
-export { recordServerConfigFetch, getServerPerformanceSnapshot }
+export { recordServerConfigFetch, getServerPerformanceSnapshot, evaluateServerAlerts }
 
 // =============================================================================
 // SETTINGS ROUTES
@@ -275,15 +384,83 @@ router.get('/', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/admin/settings/performance
- * Get server-side config performance metrics
+ * Get server-side config performance metrics with alert evaluation
  */
 router.get('/performance', async (_req: Request, res: Response) => {
   try {
     const snapshot = getServerPerformanceSnapshot()
-    return res.json({ success: true, data: snapshot })
+    const alertEvaluation = evaluateServerAlerts()
+
+    // Fire notifications for new alerts
+    if (alertEvaluation.alerts.length > 0) {
+      // Lazy import to avoid circular dependencies
+      import('../services/admin-notification-service.js').then(({ notifyPerformanceAlert }) => {
+        for (const alert of alertEvaluation.alerts) {
+          const typeLabels: Record<string, string> = {
+            cache_hit_rate: 'Low Cache Hit Rate',
+            error_rate: 'High Error Rate',
+            db_latency: 'High DB Latency',
+          }
+          notifyPerformanceAlert(
+            typeLabels[alert.type] || alert.type,
+            alert.severity,
+            alert.message,
+            { currentValue: alert.currentValue, threshold: alert.threshold }
+          ).catch((err: unknown) => console.warn('[Settings API] Failed to create performance notification:', err))
+        }
+      }).catch(() => { /* notification service not available */ })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        ...snapshot,
+        alerts: alertEvaluation.alerts,
+        alertThresholds: serverAlertThresholds,
+        suppressedAlertCount: alertEvaluation.suppressedCount,
+      },
+    })
   } catch (error) {
     console.error('[Settings API] Performance snapshot error:', error)
     return res.status(500).json({ success: false, error: 'Failed to get performance metrics' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/performance/thresholds
+ * Update server-side alert thresholds
+ */
+const alertThresholdsSchema = z.object({
+  cacheHitRateWarning: z.number().min(0).max(1).optional(),
+  cacheHitRateCritical: z.number().min(0).max(1).optional(),
+  errorRateWarning: z.number().min(0).max(1).optional(),
+  errorRateCritical: z.number().min(0).max(1).optional(),
+  dbLatencyWarning: z.number().min(0).optional(),
+  dbLatencyCritical: z.number().min(0).optional(),
+  minEventsForAlert: z.number().int().min(1).optional(),
+  alertCooldownMs: z.number().min(0).optional(),
+})
+
+router.put('/performance/thresholds', async (req: Request, res: Response) => {
+  try {
+    const parsed = alertThresholdsSchema.safeParse(req.body)
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid thresholds',
+        details: parsed.error.issues,
+      })
+    }
+
+    serverAlertThresholds = { ...serverAlertThresholds, ...parsed.data }
+
+    return res.json({
+      success: true,
+      data: { thresholds: serverAlertThresholds },
+    })
+  } catch (error) {
+    console.error('[Settings API] Update thresholds error:', error)
+    return res.status(500).json({ success: false, error: 'Failed to update thresholds' })
   }
 })
 
@@ -303,6 +480,7 @@ router.post('/performance', async (req: Request, res: Response) => {
         dbP95Latency: clientSnapshot.dbLatency?.p95Ms,
         errorRate: clientSnapshot.errorRate,
         recommendation: clientSnapshot.ttlRecommendation?.reason,
+        alerts: clientSnapshot.alerts?.length ?? 0,
       }))
     }
     return res.json({ success: true })
@@ -677,6 +855,16 @@ router.post('/import', async (req: Request, res: Response) => {
       user_agent: req.get('user-agent'),
     })
 
+    // Fire webhooks for import (async, non-blocking)
+    if (totalUpdated > 0) {
+      fireWebhooks('setting.imported', {
+        category: '_system',
+        changes: [{ key: 'config_import', previous_value: null, new_value: { totalUpdated, totalErrors } }],
+        reason: importReason,
+        changed_by: adminUserId,
+      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }
+
     return res.json({
       success: true,
       data: {
@@ -692,6 +880,209 @@ router.post('/import', async (req: Request, res: Response) => {
     console.error('[Settings Import] Exception:', error)
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
+})
+
+// =============================================================================
+// BATCH UPDATE ROUTE (must be before /:category to avoid route conflict)
+// =============================================================================
+
+const batchUpdateSchema = z.object({
+  updates: z.array(z.object({
+    category: z.string().min(1),
+    key: z.string().min(1),
+    value: z.unknown(),
+  })).min(1).max(50),
+  reason: z.string().optional(),
+})
+
+/**
+ * PUT /api/admin/settings/batch
+ * Update multiple settings in a single request.
+ * Validates all settings upfront before applying any changes.
+ * Returns per-setting results with overall success/failure.
+ */
+router.put('/batch', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const parseResult = batchUpdateSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const { updates, reason } = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  // Phase 1: Fetch all existing settings and validate
+  const validationErrors: Array<{ category: string; key: string; error: string }> = []
+  const validatedUpdates: Array<{
+    category: string
+    key: string
+    value: unknown
+    existing: { id: string; value: unknown; is_readonly: boolean; min_value: number | null; max_value: number | null; allowed_values: unknown[] | null }
+  }> = []
+
+  // Supabase doesn't support OR-ing multiple AND conditions easily,
+  // so fetch all settings for the relevant categories and filter client-side
+  const uniqueCategories = [...new Set(updates.map((u) => u.category))]
+  const { data: allSettings, error: fetchError } = await supabase
+    .from('app_settings')
+    .select('*')
+    .in('category', uniqueCategories)
+
+  if (fetchError) {
+    console.error('[Settings API] Batch fetch error:', fetchError)
+    return res.status(500).json({ success: false, error: 'Failed to fetch settings' })
+  }
+
+  // Build lookup map
+  const settingsMap = new Map<string, typeof allSettings[0]>()
+  for (const s of allSettings || []) {
+    settingsMap.set(`${s.category}:${s.key}`, s)
+  }
+
+  // Validate each update
+  for (const update of updates) {
+    const mapKey = `${update.category}:${update.key}`
+    const existing = settingsMap.get(mapKey)
+
+    if (!existing) {
+      validationErrors.push({ category: update.category, key: update.key, error: 'Setting not found' })
+      continue
+    }
+
+    if (existing.is_readonly) {
+      validationErrors.push({ category: update.category, key: update.key, error: 'Setting is read-only' })
+      continue
+    }
+
+    if (existing.min_value !== null && typeof update.value === 'number' && update.value < existing.min_value) {
+      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at least ${existing.min_value}` })
+      continue
+    }
+
+    if (existing.max_value !== null && typeof update.value === 'number' && update.value > existing.max_value) {
+      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at most ${existing.max_value}` })
+      continue
+    }
+
+    if (existing.allowed_values && Array.isArray(existing.allowed_values)) {
+      const allowedValues = existing.allowed_values as unknown[]
+      if (!allowedValues.includes(update.value)) {
+        validationErrors.push({ category: update.category, key: update.key, error: `Value must be one of: ${allowedValues.join(', ')}` })
+        continue
+      }
+    }
+
+    // Skip if value unchanged
+    if (JSON.stringify(existing.value) === JSON.stringify(update.value)) {
+      continue
+    }
+
+    validatedUpdates.push({
+      category: update.category,
+      key: update.key,
+      value: update.value,
+      existing,
+    })
+  }
+
+  // If there are validation errors, return them all (don't apply any changes)
+  if (validationErrors.length > 0) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed for one or more settings',
+      validationErrors,
+      validCount: validatedUpdates.length,
+    })
+  }
+
+  // Phase 2: Apply all validated updates
+  const results: Array<{ category: string; key: string; previousValue: unknown; newValue: unknown }> = []
+  const errors: Array<{ category: string; key: string; error: string }> = []
+
+  for (const update of validatedUpdates) {
+    try {
+      const { error: updateError } = await supabase
+        .from('app_settings')
+        .update({
+          value: update.value,
+          updated_by: adminUserId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('category', update.category)
+        .eq('key', update.key)
+
+      if (updateError) {
+        errors.push({ category: update.category, key: update.key, error: 'Database update failed' })
+        continue
+      }
+
+      results.push({
+        category: update.category,
+        key: update.key,
+        previousValue: update.existing.value,
+        newValue: update.value,
+      })
+
+      // Log audit entry
+      if (reason) {
+        await supabase.from('settings_audit_log').insert({
+          setting_id: update.existing.id,
+          category: update.category,
+          key: update.key,
+          previous_value: update.existing.value,
+          new_value: update.value,
+          changed_by: adminUserId,
+          reason: `[Batch] ${reason}`,
+          ip_address: req.ip,
+          user_agent: req.get('user-agent'),
+        })
+      }
+    } catch (error) {
+      console.error(`[Settings API] Batch update error for ${update.category}/${update.key}:`, error)
+      errors.push({ category: update.category, key: update.key, error: 'Internal error' })
+    }
+  }
+
+  const skippedCount = updates.length - validatedUpdates.length - validationErrors.length
+
+  // Fire webhooks for batch update (async, non-blocking)
+  if (results.length > 0) {
+    // Group changes by category for cleaner payloads
+    const byCategory = results.reduce<Record<string, Array<{ key: string; previous_value: unknown; new_value: unknown }>>>(
+      (acc, r) => {
+        if (!acc[r.category]) acc[r.category] = []
+        acc[r.category].push({ key: r.key, previous_value: r.previousValue, new_value: r.newValue })
+        return acc
+      }, {}
+    )
+    for (const [cat, changes] of Object.entries(byCategory)) {
+      fireWebhooks('setting.batch_updated', {
+        category: cat,
+        changes,
+        reason,
+        changed_by: adminUserId,
+      }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
+    }
+  }
+
+  return res.json({
+    success: errors.length === 0,
+    data: {
+      updated: results.length,
+      skipped: skippedCount,
+      errors: errors.length,
+      results,
+      ...(errors.length > 0 ? { errorDetails: errors } : {}),
+    },
+  })
 })
 
 // =============================================================================
@@ -785,6 +1176,13 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
     if (error || !data) {
       return res.status(404).json({ success: false, error: 'Feature flag not found' })
     }
+
+    // Fire webhooks for feature flag toggle (async, non-blocking)
+    fireWebhooks('feature_flag.toggled', {
+      category: 'feature_flags',
+      changes: [{ key: data.key, previous_value: null, new_value: { enabled: data.enabled, rolloutPercentage: data.rollout_percentage } }],
+      changed_by: adminUserId,
+    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
 
     return res.json({
       success: true,
@@ -918,7 +1316,8 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
     return res.status(503).json({ success: false, error: 'Database not configured' })
   }
 
-  const { category, key } = req.params
+  const category = req.params.category as string
+  const key = req.params.key as string
 
   // Validate request body
   const parseResult = updateSettingSchema.safeParse(req.body)
@@ -1009,6 +1408,14 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
         user_agent: req.get('user-agent'),
       })
     }
+
+    // Fire webhooks (async, non-blocking)
+    fireWebhooks('setting.updated', {
+      category,
+      changes: [{ key, previous_value: existing.value, new_value: value }],
+      reason,
+      changed_by: adminUserId,
+    }).catch((err) => console.error('[Settings API] Webhook fire error:', err))
 
     return res.json({
       success: true,
