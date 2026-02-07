@@ -21,7 +21,7 @@ const __dirname = path.dirname(__filename)
 dotenv.config()
 
 import aiRoutes from './routes/ai.js'
-import adminRoutes from './routes/admin.js'
+import adminRoutes from './routes/admin/index.js'
 import pdfRoutes from './routes/pdf.js'
 import emailRoutes from './routes/email.js'
 import settingsRoutes from './routes/settings.js'
