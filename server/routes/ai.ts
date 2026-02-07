@@ -9,7 +9,7 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { aiExtractionLimiter, ocrLimiter, chatLimiter } from '../middleware/rate-limit.js'
+import { aiExtractionLimiter, ocrLimiter, chatLimiter, generalLimiter } from '../middleware/rate-limit.js'
 import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
@@ -737,6 +737,14 @@ router.post(
           jsonContent = jsonMatch[1].trim()
         }
 
+        let parsedData: unknown
+        try {
+          parsedData = JSON.parse(jsonContent)
+        } catch (parseError) {
+          log.error('Anthropic returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: jsonContent.slice(0, 200) })
+          throw new Error('AI returned invalid JSON — response could not be parsed')
+        }
+
         // Track cost
         const usedModel = response.model || model || aiConfig.anthropicExtractionModel
         const inputTokens = response.usage.input_tokens
@@ -759,7 +767,7 @@ router.post(
         log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
-          data: JSON.parse(jsonContent),
+          data: parsedData,
           usage: { input_tokens: inputTokens, output_tokens: outputTokens },
           model: response.model,
           provider: 'anthropic',
@@ -856,10 +864,18 @@ router.post(
           timestamp: new Date().toISOString(),
         }).catch(() => {})
 
+        let parsedOpenAIData: unknown
+        try {
+          parsedOpenAIData = JSON.parse(content)
+        } catch (parseError) {
+          log.error('OpenAI returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: content.slice(0, 200) })
+          throw new Error('AI returned invalid JSON — response could not be parsed')
+        }
+
         log.info('OpenAI extraction successful', { requestId, fallback: !!anthropicClient, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
-          data: JSON.parse(content),
+          data: parsedOpenAIData,
           usage: response.usage,
           model: response.model,
           provider: 'openai',
@@ -1912,8 +1928,9 @@ import * as processingLogService from '../services/processing-log-service.js'
 /**
  * Create a new processing log
  * POST /api/ai/processing-log
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.post('/processing-log', async (req: Request, res: Response) => {
+router.post('/processing-log', generalLimiter, async (req: Request, res: Response) => {
   try {
     const logEntry = req.body
 
@@ -1948,8 +1965,9 @@ router.post('/processing-log', async (req: Request, res: Response) => {
 /**
  * Update a processing log
  * PATCH /api/ai/processing-log/:documentId
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.patch('/processing-log/:documentId', async (req: Request, res: Response) => {
+router.patch('/processing-log/:documentId', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const updates = req.body
@@ -1977,8 +1995,9 @@ router.patch('/processing-log/:documentId', async (req: Request, res: Response) 
 /**
  * Add a stage to a processing log
  * POST /api/ai/processing-log/:documentId/stage
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.post('/processing-log/:documentId/stage', async (req: Request, res: Response) => {
+router.post('/processing-log/:documentId/stage', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const stage = req.body
@@ -2014,8 +2033,9 @@ router.post('/processing-log/:documentId/stage', async (req: Request, res: Respo
 /**
  * Get a processing log by document ID
  * GET /api/ai/processing-log/:documentId
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.get('/processing-log/:documentId', async (req: Request, res: Response) => {
+router.get('/processing-log/:documentId', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const log = await processingLogService.getProcessingLog(documentId)

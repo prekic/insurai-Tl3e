@@ -6,6 +6,10 @@
 
 import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
+import { logger } from '../../lib/logger.js'
+
+const log = logger.child('AdminAuth')
+
 import {
   authenticateAdmin,
   generateAdminToken,
@@ -94,13 +98,13 @@ router.get('/diagnostics', (_req: Request, res: Response) => {
  * POST /api/admin/auth/login
  */
 router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
-  console.log('[Admin Login] Request received')
+  log.info('Login request received')
   try {
     const { email, password } = req.body
-    console.log('[Admin Login] Attempting login for:', email)
+    log.info('Attempting login', { email })
 
     if (!email || !password) {
-      console.log('[Admin Login] Missing credentials')
+      log.warn('Missing credentials')
       res.status(400).json({
         success: false,
         error: 'Email and password are required',
@@ -112,7 +116,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     // Check Supabase configuration FIRST - fail fast with clear error
     const { client: supabaseClient, error: supabaseError } = getSupabaseWithError()
     if (!supabaseClient) {
-      console.error('[Admin Login] Supabase not configured:', supabaseError)
+      log.error('Supabase not configured', { error: supabaseError })
       res.status(503).json({
         success: false,
         error: 'Database service unavailable',
@@ -127,13 +131,13 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     }
 
     // Get admin user from database
-    console.log('[Admin Login] Fetching user from database...')
+    log.info('Fetching user from database')
     let adminUser
     try {
       adminUser = await getAdminUserByEmail(email)
-      console.log('[Admin Login] User fetch result:', adminUser ? 'found' : 'not found', adminUser?.status)
+      log.info('User fetch result', { found: !!adminUser, status: adminUser?.status })
     } catch (dbError) {
-      console.error('[Admin Login] Database error fetching user:', dbError)
+      log.error('Database error fetching user', { error: dbError instanceof Error ? dbError.message : String(dbError) })
       const errorMessage = dbError instanceof Error ? dbError.message : String(dbError)
       res.status(500).json({
         success: false,
@@ -145,7 +149,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     }
 
     if (!adminUser || !adminUser.passwordHash) {
-      console.log('[Admin Login] No user or no password hash - adminUser:', !!adminUser, 'hasHash:', !!adminUser?.passwordHash)
+      log.warn('No user or no password hash', { hasUser: !!adminUser, hasHash: !!adminUser?.passwordHash })
       // Log failed attempt (non-blocking)
       adminDb.logSecurityEvent({
         eventType: 'login_failed',
@@ -182,13 +186,13 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     }
 
     // Verify password
-    console.log('[Admin Login] Verifying password...')
+    log.info('Verifying password')
     let passwordValid: boolean
     try {
       passwordValid = await verifyPassword(password, adminUser.passwordHash)
-      console.log('[Admin Login] Password valid:', passwordValid)
+      log.info('Password verification complete', { valid: passwordValid })
     } catch (pwError) {
-      console.error('[Admin Login] Password verification error:', pwError)
+      log.error('Password verification error', { error: pwError instanceof Error ? pwError.message : String(pwError) })
       res.status(500).json({
         success: false,
         error: 'Password verification failed',
@@ -218,7 +222,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     // Check JWT secret is configured before generating tokens
     const jwtSecret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
     if (!jwtSecret) {
-      console.error('[Admin Login] ADMIN_JWT_SECRET not configured')
+      log.error('ADMIN_JWT_SECRET not configured')
       res.status(503).json({
         success: false,
         error: 'Server configuration error',
@@ -229,16 +233,16 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
     }
 
     // Generate tokens
-    console.log('[Admin Login] Generating tokens...')
+    log.info('Generating tokens')
     const sessionId = crypto.randomUUID()
     let token: string
     let refreshToken: string
     try {
       token = generateAdminToken(adminUser, sessionId)
       refreshToken = generateRefreshToken(adminUser, sessionId)
-      console.log('[Admin Login] Tokens generated successfully')
+      log.info('Tokens generated successfully')
     } catch (tokenError) {
-      console.error('[Admin Login] Token generation failed:', tokenError)
+      log.error('Token generation failed', { error: tokenError instanceof Error ? tokenError.message : String(tokenError) })
       res.status(500).json({
         success: false,
         error: 'Token generation failed',
@@ -258,12 +262,12 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
         req.headers['user-agent'] || 'unknown'
       )
     } catch (sessionError) {
-      console.error('Failed to create session (non-critical):', sessionError)
+      log.warn('Failed to create session (non-critical)', { error: sessionError instanceof Error ? sessionError.message : String(sessionError) })
     }
 
     // Update login stats (non-blocking)
     updateAdminLogin(adminUser.id, getClientIp(req)).catch((err) => {
-      console.error('Failed to update login stats (non-critical):', err)
+      log.warn('Failed to update login stats (non-critical)', { error: err instanceof Error ? err.message : String(err) })
     })
 
     // Log successful login (non-blocking)
@@ -275,7 +279,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
       userAgent: req.headers['user-agent'] || 'unknown',
       details: { email, role: adminUser.role },
     }).catch((err) => {
-      console.error('Failed to log security event (non-critical):', err)
+      log.warn('Failed to log security event (non-critical)', { error: err instanceof Error ? err.message : String(err) })
     })
 
     res.json({
@@ -293,7 +297,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    console.error('[Admin Login] Unexpected error:', error)
+    log.error('Unexpected login error', { error: error instanceof Error ? error.message : String(error) })
     const errorMessage = error instanceof Error ? error.message : String(error)
     const errorStack = error instanceof Error ? error.stack : undefined
     res.status(500).json({

@@ -10,6 +10,9 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('PromptService')
 
 // ============================================================================
 // TYPES
@@ -94,7 +97,7 @@ function setCache(key: string, template: PromptTemplate): void {
 
 export function clearPromptCache(): void {
   promptCache.clear()
-  console.log('[PromptService] Cache cleared')
+  log.info('Cache cleared')
 }
 
 // ============================================================================
@@ -291,7 +294,7 @@ export async function getPromptById(id: string): Promise<PromptTemplate | null> 
   // Check fallback prompts by id
   const fallback = Object.values(FALLBACK_PROMPTS).find((p) => p.id === id)
   if (fallback) {
-    console.log(`[PromptService] Using fallback prompt for id "${id}"`)
+    log.info('Using fallback prompt', { id })
     return fallback
   }
 
@@ -333,7 +336,7 @@ export async function getPromptByName(name: string): Promise<PromptTemplate | nu
   // Fallback to hardcoded
   const fallback = FALLBACK_PROMPTS[name]
   if (fallback) {
-    console.log(`[PromptService] Using fallback prompt for "${name}"`)
+    log.info('Using fallback prompt', { name })
     return fallback
   }
 
