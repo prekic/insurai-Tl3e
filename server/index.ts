@@ -164,6 +164,9 @@ app.use(
       reportOnly: false,
     },
     // Additional security headers
+    strictTransportSecurity: IS_PRODUCTION
+      ? { maxAge: 31536000, includeSubDomains: true }
+      : false,
     crossOriginEmbedderPolicy: false, // Disable for Supabase compatibility
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
