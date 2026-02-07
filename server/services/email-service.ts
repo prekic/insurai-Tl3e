@@ -7,6 +7,9 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('EmailService')
 
 // Email provider configuration
 const RESEND_API_KEY = process.env.RESEND_API_KEY
@@ -69,7 +72,7 @@ export function isEmailConfigured(): boolean {
  */
 export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
   if (!RESEND_API_KEY) {
-    console.warn('[EmailService] Resend API key not configured, skipping email')
+    log.warn('Resend API key not configured, skipping email')
     return { success: false, error: 'Email service not configured' }
   }
 
@@ -93,7 +96,7 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
-      console.error('[EmailService] Resend API error:', response.status, errorData)
+      log.error('Resend API error', { status: response.status, error: JSON.stringify(errorData) })
       return {
         success: false,
         error: `Email send failed: ${response.status}`
@@ -101,14 +104,14 @@ export async function sendEmail(options: EmailOptions): Promise<EmailResult> {
     }
 
     const data = await response.json() as { id: string }
-    console.log('[EmailService] Email sent successfully:', data.id)
+    log.info('Email sent successfully', { messageId: data.id })
 
     // Log email to database
     await logEmailSent(options.to, options.subject, data.id)
 
     return { success: true, messageId: data.id }
   } catch (error) {
-    console.error('[EmailService] Failed to send email:', error)
+    log.error('Failed to send email', { error: String(error) })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -132,7 +135,7 @@ async function logEmailSent(to: string, subject: string, messageId: string): Pro
       sent_at: new Date().toISOString(),
     })
   } catch (error) {
-    console.warn('[EmailService] Failed to log email:', error)
+    log.warn('Failed to log email', { error: String(error) })
   }
 }
 
@@ -621,7 +624,7 @@ export async function updateEmailPreferences(
     })
 
   if (error) {
-    console.error('[EmailService] Failed to update preferences:', error)
+    log.error('Failed to update preferences', { error: String(error) })
     return false
   }
 

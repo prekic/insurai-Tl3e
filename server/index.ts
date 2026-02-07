@@ -37,6 +37,9 @@ import {
   setupSentryErrorHandler,
   captureServerError,
 } from './lib/sentry.js'
+import logger from './lib/logger.js'
+
+const log = logger.child('Server')
 
 // Initialize Sentry for error tracking
 initServerSentry()
@@ -313,7 +316,7 @@ setupSentryErrorHandler(app)
 // Error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   // Log error (also captured by Sentry in production/staging)
-  console.error('Server error:', err)
+  log.error('Unhandled server error', { message: err.message, stack: err.stack })
 
   // Capture to Sentry if not already handled by sentryErrorHandler
   if (process.env.NODE_ENV === 'development') {
@@ -329,21 +332,21 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling
 server = app.listen(PORT, () => {
-  console.log(`🚀 InsurAI API server running on port ${PORT}`)
+  log.info(`InsurAI API server running on port ${PORT}`)
   // Only show detailed provider configuration in non-production
   // to prevent information leakage about server capabilities
   if (!IS_PRODUCTION) {
-    console.log(`   Health check: http://localhost:${PORT}/api/health`)
-    console.log('')
-    console.log('   Configured providers:')
-    console.log(`   - OpenAI:    ${process.env.OPENAI_API_KEY ? '✓' : '✗'}`)
-    console.log(`   - Anthropic: ${process.env.ANTHROPIC_API_KEY ? '✓' : '✗'}`)
-    console.log(`   - Google:    ${process.env.GOOGLE_CLOUD_API_KEY ? '✓' : '✗'}`)
-    console.log('')
-    console.log('   Server configuration:')
-    console.log(`   - Request timeout: ${SERVER_CONFIG.REQUEST_TIMEOUT}ms`)
-    console.log(`   - AI request timeout: ${SERVER_CONFIG.AI_REQUEST_TIMEOUT}ms`)
-    console.log(`   - Shutdown timeout: ${SERVER_CONFIG.SHUTDOWN_TIMEOUT}ms`)
+    log.info('Health check endpoint', { url: `http://localhost:${PORT}/api/health` })
+    log.info('Configured providers', {
+      openai: !!process.env.OPENAI_API_KEY,
+      anthropic: !!process.env.ANTHROPIC_API_KEY,
+      google: !!process.env.GOOGLE_CLOUD_API_KEY,
+    })
+    log.info('Server configuration', {
+      requestTimeoutMs: SERVER_CONFIG.REQUEST_TIMEOUT,
+      aiRequestTimeoutMs: SERVER_CONFIG.AI_REQUEST_TIMEOUT,
+      shutdownTimeoutMs: SERVER_CONFIG.SHUTDOWN_TIMEOUT,
+    })
   }
 })
 
@@ -367,24 +370,24 @@ let isShuttingDown = false
 
 async function gracefulShutdown(signal: string): Promise<void> {
   if (isShuttingDown) {
-    console.log('Shutdown already in progress...')
+    log.warn('Shutdown already in progress')
     return
   }
 
   isShuttingDown = true
-  console.log(`\n${signal} received. Starting graceful shutdown...`)
+  log.info('Starting graceful shutdown', { signal })
 
   // Stop accepting new connections
   server.close((err) => {
     if (err) {
-      console.error('Error closing server:', err)
+      log.error('Error closing server', { message: err.message })
       process.exit(1)
     }
   })
 
   // Set a timeout for graceful shutdown
   const shutdownTimeout = setTimeout(() => {
-    console.error(`Graceful shutdown timed out after ${SERVER_CONFIG.SHUTDOWN_TIMEOUT}ms. Forcing exit.`)
+    log.error('Graceful shutdown timed out, forcing exit', { timeoutMs: SERVER_CONFIG.SHUTDOWN_TIMEOUT })
     // Force close remaining connections
     activeConnections.forEach((socket) => {
       socket.destroy()
@@ -397,10 +400,10 @@ async function gracefulShutdown(signal: string): Promise<void> {
     if (activeConnections.size === 0) {
       clearInterval(checkConnections)
       clearTimeout(shutdownTimeout)
-      console.log('All connections closed. Server shutdown complete.')
+      log.info('All connections closed. Server shutdown complete.')
       process.exit(0)
     } else if (!IS_PRODUCTION) {
-      console.log(`Waiting for ${activeConnections.size} connection(s) to close...`)
+      log.debug('Waiting for connections to close', { remaining: activeConnections.size })
     }
   }, 1000)
 
@@ -420,14 +423,14 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'))
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught exception:', error)
+  log.error('Uncaught exception', { message: error.message, stack: error.stack })
   captureServerError(error)
   gracefulShutdown('uncaughtException')
 })
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled rejection at:', promise, 'reason:', reason)
+  log.error('Unhandled rejection', { reason: String(reason), promise: String(promise) })
   if (reason instanceof Error) {
     captureServerError(reason)
   }

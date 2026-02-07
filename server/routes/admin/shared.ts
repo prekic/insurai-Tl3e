@@ -28,6 +28,7 @@ export {
 
 export type { AuthenticatedRequest } from '../../middleware/admin-auth.js'
 export { authLimiter } from '../../middleware/rate-limit.js'
+export { default as logger } from '../../lib/logger.js'
 
 // Re-export service modules used by multiple sub-routers.
 export * as adminDb from '../../services/admin-db.js'

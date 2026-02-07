@@ -14,6 +14,9 @@
 
 import { Router, type Request, type Response } from 'express'
 import { z } from 'zod'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('WebhooksAPI')
 import {
   listWebhooks,
   getWebhook,
@@ -87,7 +90,7 @@ router.get('/', async (_req: Request, res: Response) => {
 
     return res.json({ success: true, data: masked })
   } catch (error) {
-    console.error('[Webhooks API] List error:', error)
+    log.error('List webhooks error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -115,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
     // Return full secret on creation (only time it's shown in plaintext)
     return res.status(201).json({ success: true, data: webhook })
   } catch (error) {
-    console.error('[Webhooks API] Create error:', error)
+    log.error('Create webhook error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -136,7 +139,7 @@ router.get('/:id', async (req: Request, res: Response) => {
       data: { ...webhook, secret: maskSecret(webhook.secret) },
     })
   } catch (error) {
-    console.error('[Webhooks API] Get error:', error)
+    log.error('Get webhook error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -166,7 +169,7 @@ router.put('/:id', async (req: Request, res: Response) => {
       data: { ...webhook, secret: maskSecret(webhook.secret) },
     })
   } catch (error) {
-    console.error('[Webhooks API] Update error:', error)
+    log.error('Update webhook error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -184,7 +187,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     return res.json({ success: true })
   } catch (error) {
-    console.error('[Webhooks API] Delete error:', error)
+    log.error('Delete webhook error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -198,7 +201,7 @@ router.post('/:id/test', async (req: Request, res: Response) => {
     const result = await testWebhook(qstr(req.params.id))
     return res.json({ success: true, data: result })
   } catch (error) {
-    console.error('[Webhooks API] Test error:', error)
+    log.error('Test webhook error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -216,7 +219,7 @@ router.post('/:id/regenerate-secret', async (req: Request, res: Response) => {
 
     return res.json({ success: true, data: { secret: newSecret } })
   } catch (error) {
-    console.error('[Webhooks API] Regenerate secret error:', error)
+    log.error('Regenerate secret error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -238,7 +241,7 @@ router.get('/:id/deliveries', async (req: Request, res: Response) => {
       pagination: { total, limit, offset, hasMore: offset + limit < total },
     })
   } catch (error) {
-    console.error('[Webhooks API] Deliveries error:', error)
+    log.error('Deliveries fetch error', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })

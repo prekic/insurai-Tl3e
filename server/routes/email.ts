@@ -7,6 +7,9 @@
 import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import crypto from 'crypto'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('EmailRoutes')
 import {
   isEmailConfigured,
   getEmailPreferences,
@@ -112,7 +115,7 @@ router.get('/preferences', async (req: Request, res: Response) => {
     const preferences = await getEmailPreferences(userId)
     return res.json({ preferences })
   } catch (error) {
-    console.error('[EmailRoutes] Failed to get preferences:', error)
+    log.error('Failed to get preferences', { error: String(error) })
     return res.status(500).json({ error: 'Failed to get preferences' })
   }
 })
@@ -143,7 +146,7 @@ router.put('/preferences', async (req: Request, res: Response) => {
 
     return res.json({ success: true })
   } catch (error) {
-    console.error('[EmailRoutes] Failed to update preferences:', error)
+    log.error('Failed to update preferences', { error: String(error) })
     return res.status(500).json({ error: 'Failed to update preferences' })
   }
 })
@@ -172,11 +175,11 @@ router.post('/capture', async (req: Request, res: Response) => {
     }
 
     // Log the capture (for analytics)
-    console.log(`[EmailCapture] Email captured: ${email} (source: ${source || 'unknown'})`)
+    log.info('Email captured', { email, source: source || 'unknown' })
 
     return res.json({ success: true, message: 'Email captured successfully' })
   } catch (error) {
-    console.error('[EmailRoutes] Failed to capture email:', error)
+    log.error('Failed to capture email', { error: String(error) })
     return res.status(500).json({ error: 'Failed to capture email' })
   }
 })
@@ -221,7 +224,7 @@ router.post('/test', async (req: Request, res: Response) => {
       return res.status(500).json({ error: result.error })
     }
   } catch (error) {
-    console.error('[EmailRoutes] Failed to send test email:', error)
+    log.error('Failed to send test email', { error: String(error) })
     return res.status(500).json({ error: 'Failed to send test email' })
   }
 })
@@ -244,7 +247,7 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
 
     // Validate unsubscribe token - required for security
     if (!token || typeof token !== 'string') {
-      console.warn(`[EmailRoutes] Unsubscribe attempt without token for: ${normalizedEmail}`)
+      log.warn('Unsubscribe attempt without token', { email: normalizedEmail })
       return res.status(401).json({
         error: 'Invalid unsubscribe link',
         message: 'Please use the unsubscribe link from your email'
@@ -253,14 +256,14 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
 
     // Verify token matches expected hash
     if (!verifyUnsubscribeToken(normalizedEmail, token)) {
-      console.warn(`[EmailRoutes] Invalid unsubscribe token for: ${normalizedEmail}`)
+      log.warn('Invalid unsubscribe token', { email: normalizedEmail })
       return res.status(401).json({
         error: 'Invalid unsubscribe token',
         message: 'This unsubscribe link is invalid or expired. Please use the link from your most recent email.'
       })
     }
 
-    console.log(`[EmailRoutes] Valid unsubscribe request for: ${normalizedEmail}`)
+    log.info('Valid unsubscribe request', { email: normalizedEmail })
 
     // Update preferences to opt out of marketing
     // Note: For captured emails (no user account), we would store this in captured_emails table
@@ -271,7 +274,7 @@ router.post('/unsubscribe', async (req: Request, res: Response) => {
       message: 'Successfully unsubscribed from marketing emails',
     })
   } catch (error) {
-    console.error('[EmailRoutes] Failed to unsubscribe:', error)
+    log.error('Failed to unsubscribe', { error: String(error) })
     return res.status(500).json({ error: 'Failed to unsubscribe' })
   }
 })

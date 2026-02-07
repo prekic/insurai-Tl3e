@@ -5,6 +5,9 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('AdminNotification')
 
 export type NotificationType = 'error' | 'warning' | 'info'
 export type NotificationCategory = 'billing' | 'api_error' | 'rate_limit' | 'system' | 'security' | 'performance'
@@ -32,7 +35,7 @@ function getSupabase(): SupabaseClient | null {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    console.warn('[AdminNotificationService] Supabase not configured')
+    log.warn('Supabase not configured')
     return null
   }
 
@@ -49,7 +52,7 @@ export async function createNotification(
   const client = getSupabase()
   if (!client) {
     // Log to console if database not available
-    console.error('[AdminNotification]', notification.type.toUpperCase(), notification.title, notification.message)
+    log.error(`${notification.type.toUpperCase()} ${notification.title}: ${notification.message}`)
     return null
   }
 
@@ -63,13 +66,13 @@ export async function createNotification(
     .single()
 
   if (error) {
-    // Log to console as fallback
-    console.error('[AdminNotification] Failed to save:', error)
-    console.error('[AdminNotification]', notification.type.toUpperCase(), notification.title, notification.message)
+    // Log as fallback
+    log.error('Failed to save notification', { error: String(error) })
+    log.error(`${notification.type.toUpperCase()} ${notification.title}: ${notification.message}`)
     return null
   }
 
-  console.log('[AdminNotification] Created:', notification.title)
+  log.info('Created notification', { title: notification.title })
   return data as AdminNotification
 }
 
@@ -88,7 +91,7 @@ export async function getUnacknowledgedNotifications(): Promise<AdminNotificatio
     .limit(50)
 
   if (error) {
-    console.error('[AdminNotificationService] Failed to fetch:', error)
+    log.error('Failed to fetch unacknowledged notifications', { error: String(error) })
     return []
   }
 
@@ -121,7 +124,7 @@ export async function getNotifications(
   const { data, error, count } = await query
 
   if (error) {
-    console.error('[AdminNotificationService] Failed to fetch:', error)
+    log.error('Failed to fetch notifications', { error: String(error) })
     return { notifications: [], total: 0 }
   }
 
@@ -151,7 +154,7 @@ export async function acknowledgeNotification(
     .eq('id', notificationId)
 
   if (error) {
-    console.error('[AdminNotificationService] Failed to acknowledge:', error)
+    log.error('Failed to acknowledge notification', { error: String(error) })
     return false
   }
 

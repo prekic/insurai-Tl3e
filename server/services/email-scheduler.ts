@@ -11,6 +11,9 @@ import {
   sendPolicyExpiredEmail,
   isEmailConfigured,
 } from './email-service.js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('EmailScheduler')
 
 // Supabase client
 let supabase: SupabaseClient | null = null
@@ -22,7 +25,7 @@ function getSupabase(): SupabaseClient | null {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !key) {
-    console.warn('[EmailScheduler] Supabase not configured')
+    log.warn('Supabase not configured')
     return null
   }
 
@@ -53,16 +56,16 @@ export async function processExpirationReminders(): Promise<{
   sent: number
   errors: number
 }> {
-  console.log('[EmailScheduler] Starting expiration reminder processing...')
+  log.info('Starting expiration reminder processing...')
 
   if (!isEmailConfigured()) {
-    console.warn('[EmailScheduler] Email service not configured, skipping')
+    log.warn('Email service not configured, skipping')
     return { processed: 0, sent: 0, errors: 0 }
   }
 
   const client = getSupabase()
   if (!client) {
-    console.error('[EmailScheduler] Database not configured')
+    log.error('Database not configured')
     return { processed: 0, sent: 0, errors: 0 }
   }
 
@@ -77,16 +80,16 @@ export async function processExpirationReminders(): Promise<{
     })
 
     if (error) {
-      console.error('[EmailScheduler] Failed to fetch expiring policies:', error)
+      log.error('Failed to fetch expiring policies', { error: String(error) })
       return { processed: 0, sent: 0, errors: 1 }
     }
 
     if (!policies || policies.length === 0) {
-      console.log('[EmailScheduler] No expiring policies found')
+      log.info('No expiring policies found')
       return { processed: 0, sent: 0, errors: 0 }
     }
 
-    console.log(`[EmailScheduler] Found ${policies.length} expiring policies`)
+    log.info(`Found ${policies.length} expiring policies`)
 
     // Group policies by user to avoid spamming
     const policiesByUser = groupByUser(policies as ExpiringPolicy[])
@@ -113,7 +116,7 @@ export async function processExpirationReminders(): Promise<{
       )
 
       if (alreadySent) {
-        console.log(`[EmailScheduler] Reminder already sent for policy ${mostUrgent.policy_number}`)
+        log.debug(`Reminder already sent for policy ${mostUrgent.policy_number}`)
         continue
       }
 
@@ -131,21 +134,21 @@ export async function processExpirationReminders(): Promise<{
           sent++
           // Record that we sent this reminder
           await recordReminderSent(client, mostUrgent.policy_id, mostUrgent.days_remaining)
-          console.log(`[EmailScheduler] Sent reminder: ${mostUrgent.policy_number} (${mostUrgent.days_remaining} days)`)
+          log.info(`Sent reminder: ${mostUrgent.policy_number} (${mostUrgent.days_remaining} days)`)
         } else {
           errors++
-          console.error(`[EmailScheduler] Failed to send reminder: ${result.error}`)
+          log.error('Failed to send reminder', { error: String(result.error) })
         }
       } catch (err) {
         errors++
-        console.error(`[EmailScheduler] Error sending reminder:`, err)
+        log.error('Error sending reminder', { error: String(err) })
       }
     }
 
-    console.log(`[EmailScheduler] Completed: processed=${processed}, sent=${sent}, errors=${errors}`)
+    log.info('Completed expiration reminders', { processed, sent, errors })
     return { processed, sent, errors }
   } catch (err) {
-    console.error('[EmailScheduler] Processing error:', err)
+    log.error('Processing error', { error: String(err) })
     return { processed, sent, errors: errors + 1 }
   }
 }
@@ -159,16 +162,16 @@ export async function processExpiredNotifications(): Promise<{
   sent: number
   errors: number
 }> {
-  console.log('[EmailScheduler] Starting expired policy notification processing...')
+  log.info('Starting expired policy notification processing...')
 
   if (!isEmailConfigured()) {
-    console.warn('[EmailScheduler] Email service not configured, skipping')
+    log.warn('Email service not configured, skipping')
     return { processed: 0, sent: 0, errors: 0 }
   }
 
   const client = getSupabase()
   if (!client) {
-    console.error('[EmailScheduler] Database not configured')
+    log.error('Database not configured')
     return { processed: 0, sent: 0, errors: 0 }
   }
 
@@ -194,16 +197,16 @@ export async function processExpiredNotifications(): Promise<{
       .neq('status', 'expired')
 
     if (error) {
-      console.error('[EmailScheduler] Failed to fetch expired policies:', error)
+      log.error('Failed to fetch expired policies', { error: String(error) })
       return { processed: 0, sent: 0, errors: 1 }
     }
 
     if (!policies || policies.length === 0) {
-      console.log('[EmailScheduler] No newly expired policies found')
+      log.info('No newly expired policies found')
       return { processed: 0, sent: 0, errors: 0 }
     }
 
-    console.log(`[EmailScheduler] Found ${policies.length} expired policies`)
+    log.info(`Found ${policies.length} expired policies`)
 
     for (const policy of policies) {
       processed++
@@ -226,19 +229,19 @@ export async function processExpiredNotifications(): Promise<{
             .from('policies')
             .update({ status: 'expired' })
             .eq('id', policy.id)
-          console.log(`[EmailScheduler] Sent expired notification: ${policy.policy_number}`)
+          log.info(`Sent expired notification: ${policy.policy_number}`)
         } else {
           errors++
         }
       } catch (err) {
         errors++
-        console.error(`[EmailScheduler] Error sending expired notification:`, err)
+        log.error('Error sending expired notification', { error: String(err) })
       }
     }
 
     return { processed, sent, errors }
   } catch (err) {
-    console.error('[EmailScheduler] Processing error:', err)
+    log.error('Processing error', { error: String(err) })
     return { processed, sent, errors: errors + 1 }
   }
 }
@@ -247,7 +250,7 @@ export async function processExpiredNotifications(): Promise<{
  * Main scheduler function - runs all scheduled email jobs
  */
 export async function runScheduledEmailJobs(): Promise<void> {
-  console.log('[EmailScheduler] Running all scheduled email jobs...')
+  log.info('Running all scheduled email jobs...')
   const startTime = Date.now()
 
   // Process expiration reminders
@@ -257,9 +260,7 @@ export async function runScheduledEmailJobs(): Promise<void> {
   const expiredResults = await processExpiredNotifications()
 
   const duration = Date.now() - startTime
-  console.log(`[EmailScheduler] All jobs completed in ${duration}ms`)
-  console.log(`[EmailScheduler] Reminders: ${JSON.stringify(reminderResults)}`)
-  console.log(`[EmailScheduler] Expired: ${JSON.stringify(expiredResults)}`)
+  log.info(`All jobs completed in ${duration}ms`, { reminders: reminderResults, expired: expiredResults })
 }
 
 // =============================================================================
@@ -330,11 +331,11 @@ async function recordReminderSent(
 if (process.argv[1]?.includes('email-scheduler')) {
   runScheduledEmailJobs()
     .then(() => {
-      console.log('[EmailScheduler] CLI execution completed')
+      log.info('CLI execution completed')
       process.exit(0)
     })
     .catch((err) => {
-      console.error('[EmailScheduler] CLI execution failed:', err)
+      log.error('CLI execution failed', { error: String(err) })
       process.exit(1)
     })
 }
