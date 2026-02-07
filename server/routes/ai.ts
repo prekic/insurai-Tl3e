@@ -679,6 +679,7 @@ router.post(
   validateAnthropicExtraction, // Use same validation
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
+    const startTime = Date.now()
     const IS_PRODUCTION = process.env.NODE_ENV === 'production'
     log.info('Unified extraction request received', { requestId })
 
@@ -708,14 +709,15 @@ router.post(
 
     // Get AI config from database (falls back to defaults if unavailable)
     const aiConfig = await getAIConfig()
-    log.info('Using config', { requestId, anthropicModel: aiConfig.anthropicExtractionModel, openaiModel: aiConfig.openaiExtractionModel })
+    log.info('Using config', { requestId, anthropicModel: aiConfig.anthropicExtractionModel, openaiModel: aiConfig.openaiExtractionModel, setupMs: Date.now() - startTime })
 
     // Try Anthropic first if available
     const anthropicClient = getAnthropicClient()
     const openaiClient = getOpenAIClient()
 
     if (anthropicClient) {
-      log.info('Trying Anthropic first', { requestId })
+      const anthropicStart = Date.now()
+      log.info('Trying Anthropic first', { requestId, elapsedMs: anthropicStart - startTime })
       try {
         const response = await anthropicClient.messages.create({
           model: model || aiConfig.anthropicExtractionModel,
@@ -755,7 +757,7 @@ router.post(
           timestamp: new Date().toISOString(),
         }).catch(() => {})
 
-        log.info('Anthropic extraction successful', { requestId })
+        log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
           data: JSON.parse(jsonContent),
@@ -766,7 +768,7 @@ router.post(
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
-        log.error('Anthropic failed', { requestId, error: message })
+        log.error('Anthropic failed', { requestId, error: message, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
 
         // Determine if we should notify admin and fall back
         const isBillingError = message.includes('credit') || message.includes('billing')
@@ -805,6 +807,8 @@ router.post(
 
     // Try OpenAI (either as fallback or primary)
     if (openaiClient) {
+      const openaiStart = Date.now()
+      log.info('Trying OpenAI', { requestId, elapsedMs: openaiStart - startTime, isFallback: !!anthropicClient })
       try {
         // Ensure "json" is in the prompt for OpenAI
         const jsonReminder = '\n\nRespond with valid JSON only.'
@@ -853,7 +857,7 @@ router.post(
           timestamp: new Date().toISOString(),
         }).catch(() => {})
 
-        log.info('OpenAI extraction successful', { requestId, fallback: !!anthropicClient })
+        log.info('OpenAI extraction successful', { requestId, fallback: !!anthropicClient, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
           data: JSON.parse(content),
@@ -1101,7 +1105,7 @@ router.post(
       // Build Document AI endpoint
       const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
 
-      log.info('Calling Document AI API', { location: GCP_CONFIG.location, project: GCP_CONFIG.projectId, processor: GCP_CONFIG.processorId })
+      log.info('Calling Document AI API', { location: GCP_CONFIG.location, project: GCP_CONFIG.projectId, processor: GCP_CONFIG.processorId, setupMs: Date.now() - startTime })
 
       // Call Document AI with 60-second timeout to prevent hanging
       const controller = new AbortController()
@@ -1283,10 +1287,7 @@ router.post(
         if (!IS_PRODUCTION) log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
       })
 
-      // Log success in development
-      if (!IS_PRODUCTION) {
-        log.info('Processed document', { pageCount, formFields: formFields.length, tables: tables.length, processingTimeMs })
-      }
+      log.info('Document AI OCR complete', { pageCount, formFields: formFields.length, tables: tables.length, processingTimeMs })
 
       res.json({
         success: true,

@@ -248,6 +248,7 @@ export async function extractPolicyFromDocument(
 
   // Check if AI is configured
   if (!isAIConfigured()) {
+    console.error('[PolicyExtractor] FALLBACK TRIGGERED: AI not configured. isProxyConfigured:', isProxyConfigured())
     if (useFallback) {
       return createFallbackResult(file)
     }
@@ -422,7 +423,7 @@ export async function extractPolicyFromDocument(
       logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
       if (useFallback) {
-        console.warn('[Extraction] Both Document AI and pdf.js failed, using sample data fallback')
+        console.error('[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed')
         return createFallbackResult(file)
       }
 
@@ -441,6 +442,7 @@ export async function extractPolicyFromDocument(
   }
 
   if (!documentText || documentText.trim().length === 0) {
+    console.error('[PolicyExtractor] FALLBACK TRIGGERED: No text extracted from document (empty after OCR/pdf.js)')
     logger?.failStage('No text could be extracted from the document')
     if (useFallback) {
       return createFallbackResult(file)
@@ -643,8 +645,8 @@ export async function extractPolicyFromDocument(
     // Check confidence threshold
     if (confidenceOverall < AI_CONFIG.minConfidence) {
       if (useFallback) {
-        console.warn(
-          `Low confidence extraction (${confidenceOverall}), using fallback`
+        console.error(
+          `[PolicyExtractor] FALLBACK TRIGGERED: Low confidence extraction (${confidenceOverall} < ${AI_CONFIG.minConfidence})`
         )
         return createFallbackResult(file, extractedData)
       }
@@ -1049,7 +1051,7 @@ export async function extractPolicyFromDocument(
     }
 
     if (useFallback) {
-      console.warn(`AI extraction failed: ${errorMessage}, using fallback`)
+      console.error(`[PolicyExtractor] FALLBACK TRIGGERED: AI extraction threw error: ${errorMessage}`, { errorType, errorStack: errorStack?.substring(0, 500) })
       return createFallbackResult(file)
     }
 
@@ -1265,6 +1267,12 @@ function createFallbackResult(
   file: File,
   partialData?: ExtractedPolicyData
 ): ExtractionResult {
+  console.error('[PolicyExtractor] createFallbackResult called - returning SAMPLE data instead of real AI extraction', {
+    fileName: file.name,
+    fileSize: file.size,
+    hasPartialData: !!partialData,
+    partialPolicyNumber: partialData?.policyNumber,
+  })
   // Pick a random sample policy
   const samplePolicy = samplePolicies[Math.floor(Math.random() * samplePolicies.length)]
 

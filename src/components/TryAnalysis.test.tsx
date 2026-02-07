@@ -247,8 +247,8 @@ describe('TryAnalysis', () => {
         expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
       }, { timeout: 5000 })
 
-      // Should have processed the file
-      expect(mockExtractPolicy).toHaveBeenCalledWith(mockFile)
+      // Should have processed the file with useFallback: false to surface real errors
+      expect(mockExtractPolicy).toHaveBeenCalledWith(mockFile, { useFallback: false })
     })
 
     it('does not process file if trial already used', async () => {
