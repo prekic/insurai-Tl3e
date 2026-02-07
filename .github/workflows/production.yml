@@ -13,7 +13,7 @@ on:
         type: boolean
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   VITE_SENTRY_ENVIRONMENT: production
 
 # Ensure only one production deployment runs at a time
@@ -253,12 +253,39 @@ jobs:
     environment:
       name: production-rollback
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
       - name: Trigger rollback
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
           echo "::warning title=Rollback Initiated::Rolling back to previous deployment"
-          # Add Railway rollback command here if supported
-          # railway rollback --yes
+          railway service
+          LAST_GOOD=$(railway deployment list --json 2>/dev/null | jq -r '.[1].id // empty')
+          if [ -n "$LAST_GOOD" ]; then
+            echo "Rolling back to deployment: $LAST_GOOD"
+            railway rollback "$LAST_GOOD"
+          else
+            echo "::error title=Rollback Failed::Could not determine previous deployment. Manual rollback required."
+            echo "Manual steps: 1) Go to Railway dashboard 2) Select previous deployment 3) Click Rollback"
+            exit 1
+          fi
 
-      - name: Notify rollback
+      - name: Verify rollback health
         run: |
-          echo "::notice title=Rollback Complete::Production has been rolled back to previous version"
+          sleep 30
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://insurai-production.up.railway.app/api/health)
+            if [ "$STATUS" = "200" ]; then
+              echo "::notice title=Rollback Complete::Production has been rolled back and health check passed"
+              exit 0
+            fi
+            echo "Attempt $i: Status $STATUS, retrying in 10s..."
+            sleep 10
+          done
+          echo "::error title=Rollback Health Check Failed::Rollback deployed but health check failed after 5 attempts"
+          exit 1
