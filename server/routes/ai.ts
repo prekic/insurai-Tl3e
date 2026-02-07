@@ -9,7 +9,7 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { aiExtractionLimiter, ocrLimiter, chatLimiter } from '../middleware/rate-limit.js'
+import { aiExtractionLimiter, ocrLimiter, chatLimiter, generalLimiter } from '../middleware/rate-limit.js'
 import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
@@ -737,6 +737,14 @@ router.post(
           jsonContent = jsonMatch[1].trim()
         }
 
+        let parsedData: unknown
+        try {
+          parsedData = JSON.parse(jsonContent)
+        } catch (parseError) {
+          log.error('Anthropic returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: jsonContent.slice(0, 200) })
+          throw new Error('AI returned invalid JSON — response could not be parsed')
+        }
+
         // Track cost
         const usedModel = response.model || model || aiConfig.anthropicExtractionModel
         const inputTokens = response.usage.input_tokens
@@ -754,12 +762,12 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => log.warn('Failed to record Anthropic usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
 
         log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
-          data: JSON.parse(jsonContent),
+          data: parsedData,
           usage: { input_tokens: inputTokens, output_tokens: outputTokens },
           model: response.model,
           provider: 'anthropic',
@@ -781,20 +789,20 @@ router.post(
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isRateLimitError) {
           log.warn('Anthropic rate limit, falling back to OpenAI', { requestId })
           adminNotificationService.notifyRateLimit('Anthropic', {
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify rate limit', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isAuthError) {
           log.warn('Anthropic auth error, falling back to OpenAI', { requestId })
           adminNotificationService.notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
             requestId,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify API error', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         }
 
         // Fall back to OpenAI if available
@@ -854,12 +862,20 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => log.warn('Failed to record OpenAI usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
+
+        let parsedOpenAIData: unknown
+        try {
+          parsedOpenAIData = JSON.parse(content)
+        } catch (parseError) {
+          log.error('OpenAI returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: content.slice(0, 200) })
+          throw new Error('AI returned invalid JSON — response could not be parsed')
+        }
 
         log.info('OpenAI extraction successful', { requestId, fallback: !!anthropicClient, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
         return res.json({
           success: true,
-          data: JSON.parse(content),
+          data: parsedOpenAIData,
           usage: response.usage,
           model: response.model,
           provider: 'openai',
@@ -875,7 +891,7 @@ router.post(
           adminNotificationService.notifyBillingIssue('OpenAI', message, {
             requestId,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'OpenAI', requestId, error: err instanceof Error ? err.message : String(err) }))
         }
 
         return res.status(500).json({
@@ -914,9 +930,14 @@ router.post(
   validateOCR,
   async (req: Request, res: Response) => {
     try {
-      // Try OAuth token first (most secure - uses service account, no API key exposure)
-      const oauthToken = await getDocumentAIAccessToken()
+      // Only attempt OAuth if service account credentials exist (avoids wasted async call)
+      const hasServiceAccount = !!getGCPCredentialsPath()
+      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
       const apiKey = process.env.GOOGLE_CLOUD_API_KEY
+
+      if (hasServiceAccount && !oauthToken) {
+        log.warn('Vision OCR: service account found but OAuth token retrieval failed — falling back to API key')
+      }
 
       if (!oauthToken && !apiKey) {
         return res.status(503).json({
@@ -929,26 +950,18 @@ router.post(
       const { imageBase64 } = req.body as OCRInput
 
       // Build request with appropriate authentication
-      // Priority: OAuth token > API key header > API key query param
+      // Priority: OAuth token > API key query param
       let url = 'https://vision.googleapis.com/v1/images:annotate'
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
       }
 
       if (oauthToken) {
-        // Most secure: OAuth bearer token from service account
         headers['Authorization'] = `Bearer ${oauthToken}`
-        if (process.env.NODE_ENV !== 'production') {
-          log.debug('Using OAuth bearer token authentication')
-        }
+        log.info('Vision OCR: using OAuth bearer token authentication')
       } else if (apiKey) {
-        // Fallback: API key in header (X-goog-api-key with correct capitalization)
-        // Note: Header keeps API key out of URL logs, but query param is more reliable
-        // Using query param as Google REST APIs have inconsistent header support
         url = `${url}?key=${apiKey}`
-        if (process.env.NODE_ENV !== 'production') {
-          log.debug('Using API key authentication', { method: 'query_param' })
-        }
+        log.info('Vision OCR: using API key authentication')
       }
 
       const response = await fetch(url, {
@@ -1582,10 +1595,12 @@ router.post(
  * Check which AI providers are configured
  */
 router.get('/providers', (_req: Request, res: Response) => {
+  // Google Vision can authenticate via API key OR service account OAuth
+  const hasGoogleVision = !!process.env.GOOGLE_CLOUD_API_KEY || !!getGCPCredentialsPath()
   res.json({
     openai: !!process.env.OPENAI_API_KEY,
     anthropic: !!process.env.ANTHROPIC_API_KEY,
-    google: !!process.env.GOOGLE_CLOUD_API_KEY,
+    google: hasGoogleVision,
     documentAI: isDocumentAIConfigured(),
   })
 })
@@ -1597,35 +1612,61 @@ interface ProviderDiagnostic {
   configured: boolean
   valid: boolean
   error?: string
+  errorCode?: string // Always returned — actionable category for admins (e.g., 'API_NOT_ENABLED', 'BILLING_ERROR')
   latencyMs?: number
   model?: string
   authMethod?: string // 'oauth' | 'api_key' - only for Google Vision
 }
 
 /**
- * Sanitize diagnostic error message for production
- * In production, hide technical details like .env file paths and API key names
+ * Classify a diagnostic error into an actionable error code.
+ * Error codes are always returned (even in production) — they contain no secrets.
+ */
+function classifyDiagnosticError(error: string): string {
+  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect') || error.includes('Authentication failed') || error.includes('UNAUTHENTICATED')) {
+    return 'INVALID_CREDENTIALS'
+  }
+  if (error.includes('Rate limit') || error.includes('429') || error.includes('RESOURCE_EXHAUSTED')) {
+    return 'RATE_LIMITED'
+  }
+  if (error.includes('quota') || error.includes('insufficient_quota')) {
+    return 'QUOTA_EXHAUSTED'
+  }
+  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing') || error.includes('FAILED_PRECONDITION')) {
+    return 'BILLING_ERROR'
+  }
+  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled') || error.includes('has not been used') || error.includes('Permission denied')) {
+    return 'API_NOT_ENABLED'
+  }
+  if (error.includes('NOT_FOUND') || error.includes('not found') || error.includes('404')) {
+    return 'NOT_FOUND'
+  }
+  if (error.includes('ENOTFOUND') || error.includes('ECONNREFUSED') || error.includes('ETIMEDOUT') || error.includes('fetch failed')) {
+    return 'NETWORK_ERROR'
+  }
+  return 'UNKNOWN_ERROR'
+}
+
+/**
+ * Sanitize diagnostic error message for production.
+ * In production, hide technical details like .env file paths and API key names.
+ * Error codes (from classifyDiagnosticError) are always safe to expose.
  */
 function sanitizeDiagnosticError(error: string, isProduction: boolean): string {
   if (!isProduction) return error
 
-  // Map technical errors to user-friendly messages for SaaS
-  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect') || error.includes('Authentication failed')) {
-    return 'Service configuration error'
+  const code = classifyDiagnosticError(error)
+  const codeToMessage: Record<string, string> = {
+    INVALID_CREDENTIALS: 'Service configuration error',
+    RATE_LIMITED: 'Service temporarily busy',
+    QUOTA_EXHAUSTED: 'Service quota exhausted',
+    BILLING_ERROR: 'Service temporarily unavailable',
+    API_NOT_ENABLED: 'Service not available',
+    NOT_FOUND: 'Service not configured',
+    NETWORK_ERROR: 'Service unreachable',
+    UNKNOWN_ERROR: 'Service error',
   }
-  if (error.includes('Rate limit') || error.includes('429') || error.includes('quota') || error.includes('try again later')) {
-    return 'Service temporarily busy'
-  }
-  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing')) {
-    return 'Service temporarily unavailable'
-  }
-  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled') || error.includes('Permission denied')) {
-    return 'Service not available'
-  }
-  if (error.includes('NOT_FOUND') || error.includes('not found') || error.includes('404')) {
-    return 'Service not configured'
-  }
-  return 'Service error'
+  return codeToMessage[code] || 'Service error'
 }
 
 /**
@@ -1685,7 +1726,9 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
       } else if (errorMsg.includes('insufficient_quota')) {
         errorMsg = 'API quota exhausted - add credits to your OpenAI account'
       }
+      diagnostics.openai.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.openai.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+      log.warn('OpenAI diagnostic failed', { errorCode: diagnostics.openai.errorCode, error: errorMsg })
     }
   }
 
@@ -1721,7 +1764,9 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
       } else if (errorMsg.includes('credit') || errorMsg.includes('billing')) {
         errorMsg = 'Billing issue - check your Anthropic account'
       }
+      diagnostics.anthropic.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.anthropic.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+      log.warn('Anthropic diagnostic failed', { errorCode: diagnostics.anthropic.errorCode, error: errorMsg })
     }
   }
 
@@ -1736,6 +1781,10 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
     try {
       // Try OAuth token first (most secure)
       const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
+
+      if (hasServiceAccount && !oauthToken) {
+        log.warn('Google Vision diagnostic: service account found but OAuth token retrieval failed — falling back to API key')
+      }
 
       // Build request with appropriate authentication
       let url = 'https://vision.googleapis.com/v1/images:annotate'
@@ -1752,74 +1801,84 @@ router.get('/diagnose', async (_req: Request, res: Response) => {
         authMethod = 'api_key'
       }
 
-      // Make a minimal API call to verify credentials work
-      // Using a tiny 1x1 white PNG to minimize cost
-      const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
-        }),
-      })
-      diagnostics.google.latencyMs = Date.now() - startTime
-
-      if (response.ok) {
-        diagnostics.google.valid = true
-        // Only show details in non-production
-        if (!IS_PRODUCTION) {
-          diagnostics.google.model = 'cloud-vision-v1'
-          // Show which auth method was used (oauth is more secure than api_key)
-          diagnostics.google.authMethod = authMethod
-        }
-      } else {
-        const errorData = (await response.json().catch(() => ({}))) as {
-          error?: { message?: string; status?: string; code?: number }
-        }
+      if (authMethod === 'none') {
+        // Both auth methods failed — report clearly
         diagnostics.google.valid = false
+        diagnostics.google.latencyMs = Date.now() - startTime
+        diagnostics.google.errorCode = 'INVALID_CREDENTIALS'
+        diagnostics.google.error = sanitizeDiagnosticError('Authentication failed - no valid OAuth token or API key', IS_PRODUCTION)
+        log.warn('Google Vision diagnostic: no valid authentication method available', { hasServiceAccount, hasApiKey: !!googleApiKey })
+      } else {
+        // Make a minimal API call to verify credentials work
+        // Using a tiny 1x1 white PNG to minimize cost
+        const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
+          }),
+        })
+        diagnostics.google.latencyMs = Date.now() - startTime
 
-        // Check both message and status fields from Google Cloud API response
-        const errorMessage = errorData.error?.message || ''
-        const errorStatus = errorData.error?.status || ''
-        const httpStatus = response.status
+        // Always report auth method (no secret exposure — just 'oauth' or 'api_key')
+        diagnostics.google.authMethod = authMethod
 
-        // Log full error in development for debugging
-        if (!IS_PRODUCTION) {
-          log.debug('Vision diagnose error response', {
+        if (response.ok) {
+          diagnostics.google.valid = true
+          if (!IS_PRODUCTION) {
+            diagnostics.google.model = 'cloud-vision-v1'
+          }
+        } else {
+          const errorData = (await response.json().catch(() => ({}))) as {
+            error?: { message?: string; status?: string; code?: number }
+          }
+          diagnostics.google.valid = false
+
+          // Check both message and status fields from Google Cloud API response
+          const errorMessage = errorData.error?.message || ''
+          const errorStatus = errorData.error?.status || ''
+          const httpStatus = response.status
+
+          let errorMsg = errorMessage || `HTTP ${httpStatus}`
+
+          // Map Google Cloud error statuses to actionable messages
+          if (errorMsg.includes('API key not valid') || (httpStatus === 400 && !errorStatus)) {
+            errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
+          } else if (errorStatus === 'PERMISSION_DENIED' || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('has not been used')) {
+            errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+          } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
+            errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
+          } else if (errorStatus === 'FAILED_PRECONDITION' || errorMsg.includes('Billing') || errorMsg.includes('BILLING')) {
+            errorMsg = 'Billing not enabled on Google Cloud project'
+          } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
+            errorMsg = 'Rate limit exceeded - try again later'
+          } else if (errorStatus === 'NOT_FOUND' || httpStatus === 404) {
+            errorMsg = 'Vision API endpoint not found - check API configuration'
+          } else if (httpStatus === 403) {
+            errorMsg = `Permission denied (${errorStatus || 'unknown'}) - check API key permissions`
+          }
+
+          diagnostics.google.errorCode = classifyDiagnosticError(errorMsg)
+          diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+
+          // Always log the real error server-side (visible in Railway logs)
+          log.warn('Google Vision diagnostic failed', {
+            errorCode: diagnostics.google.errorCode,
             authMethod,
             httpStatus,
             errorStatus,
             errorMessage,
-            fullError: errorData.error as unknown as Record<string, unknown>
           })
         }
-
-        let errorMsg = errorMessage || `HTTP ${httpStatus}`
-
-        // Map Google Cloud error statuses to actionable messages
-        if (errorMsg.includes('API key not valid') || httpStatus === 400) {
-          errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
-        } else if (errorStatus === 'PERMISSION_DENIED' || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('has not been used')) {
-          errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
-        } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
-          errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
-        } else if (errorStatus === 'FAILED_PRECONDITION' || errorMsg.includes('Billing') || errorMsg.includes('BILLING')) {
-          errorMsg = 'Billing not enabled on Google Cloud project'
-        } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
-          errorMsg = 'Rate limit exceeded - try again later'
-        } else if (errorStatus === 'NOT_FOUND' || httpStatus === 404) {
-          errorMsg = 'Vision API endpoint not found - check API configuration'
-        } else if (httpStatus === 403) {
-          // Catch-all for 403 errors with unrecognized status
-          errorMsg = `Permission denied (${errorStatus || 'unknown'}) - check API key permissions`
-        }
-        diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
       }
     } catch (error) {
       diagnostics.google.valid = false
       diagnostics.google.latencyMs = Date.now() - startTime
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      diagnostics.google.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
+      log.warn('Google Vision diagnostic exception', { errorCode: diagnostics.google.errorCode, error: errorMsg })
     }
   }
 
@@ -1869,8 +1928,9 @@ import * as processingLogService from '../services/processing-log-service.js'
 /**
  * Create a new processing log
  * POST /api/ai/processing-log
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.post('/processing-log', async (req: Request, res: Response) => {
+router.post('/processing-log', generalLimiter, async (req: Request, res: Response) => {
   try {
     const logEntry = req.body
 
@@ -1905,8 +1965,9 @@ router.post('/processing-log', async (req: Request, res: Response) => {
 /**
  * Update a processing log
  * PATCH /api/ai/processing-log/:documentId
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.patch('/processing-log/:documentId', async (req: Request, res: Response) => {
+router.patch('/processing-log/:documentId', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const updates = req.body
@@ -1934,8 +1995,9 @@ router.patch('/processing-log/:documentId', async (req: Request, res: Response) 
 /**
  * Add a stage to a processing log
  * POST /api/ai/processing-log/:documentId/stage
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.post('/processing-log/:documentId/stage', async (req: Request, res: Response) => {
+router.post('/processing-log/:documentId/stage', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const stage = req.body
@@ -1971,8 +2033,9 @@ router.post('/processing-log/:documentId/stage', async (req: Request, res: Respo
 /**
  * Get a processing log by document ID
  * GET /api/ai/processing-log/:documentId
+ * Rate limited: general limiter (60 requests per minute)
  */
-router.get('/processing-log/:documentId', async (req: Request, res: Response) => {
+router.get('/processing-log/:documentId', generalLimiter, async (req: Request, res: Response) => {
   try {
     const documentId = req.params.documentId as string
     const log = await processingLogService.getProcessingLog(documentId)

@@ -10,7 +10,7 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**
-- **Production Readiness**: ~9.5/10 (6122+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
+- **Production Readiness**: ~9.5/10 (6338+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
 - **Last Updated**: February 7, 2026
 
 ---
@@ -1189,7 +1189,7 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 6, 2026)
-- **Total**: 6122+ tests across 181+ test files
+- **Total**: 6338+ tests across 192+ test files
 - **Passing**: 100% (all pre-existing test failures fixed)
 - **Coverage Target**: 80%+
 
@@ -2384,19 +2384,23 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/ocr-decision/ocr-decision-engine.ts`: `DEBUG_CONFIDENCE_CALCULATION = false`
 - **Commit**: `6b72aed`
 
-### 40. Google Vision OCR Service Error (Informational - Jan 30, 2026)
-- **Status**: Informational, not blocking
+### 40. Google Vision OCR Service Error (Fixed Feb 7, 2026)
+- **Status**: Fixed
 - **Symptom**: `/api/ai/diagnose` returns `"google": {"valid": false, "error": "Service error"}`
-- **Impact**:
-  - ❌ Google Vision OCR not working
-  - ✅ Document AI OCR may still work (uses different credentials)
-  - ✅ pdf.js text extraction works (for digital PDFs)
-  - ✅ OpenAI/Anthropic extraction working
-- **Possible Causes**:
-  - Cloud Vision API not enabled on Google Cloud project
-  - `GOOGLE_CLOUD_API_KEY` doesn't have Vision API permissions
-  - Billing not enabled on project
-- **Fallback Flow**: Digital PDF → pdf.js → OpenAI/Anthropic → Success ✅
+- **Root Causes** (two issues):
+  1. **Code**: Diagnostic endpoint sanitized all errors to "Service error" with no error codes, no server logging. Vision OCR auth attempted OAuth even when no service account existed.
+  2. **Config**: Google Cloud API key was restricted to "Generative Language API" only — Cloud Vision API and Cloud Document AI API not enabled.
+- **Code Fixes**:
+  - Added `classifyDiagnosticError()` returning actionable codes: `API_NOT_ENABLED`, `BILLING_ERROR`, `INVALID_CREDENTIALS`, `QUOTA_EXCEEDED`, `NETWORK_ERROR`, `PERMISSION_DENIED`, `SERVICE_ERROR`
+  - Added `errorCode` field to `ProviderDiagnostic` interface
+  - Added `log.warn()` for all provider diagnostic failures (visible in Railway)
+  - Skip unnecessary OAuth call when no service account exists
+  - Fixed `/api/ai/providers` to report `google: true` when OAuth credentials available
+  - Added AI provider config checks to admin diagnostics endpoint
+- **Config Fix**: Added Cloud Vision API and Cloud Document AI API to the API key restrictions in Google Cloud Console
+- **Verification**: All 3 providers now report `valid: true` on `/api/ai/diagnose`
+- **Files Changed**: `server/routes/ai.ts`, `server/routes/admin/auth.ts`, `src/hooks/useBackendHealth.ts`
+- **Commits**: `1cbe80e`, `a81dcba`
 
 ### 41. ANTHROPIC_SCHEMA_PROMPT for Reliable Claude JSON Extraction (Added Feb 4, 2026)
 - **Problem**: Claude doesn't support OpenAI's `response_format: { type: 'json_object' }` parameter
@@ -2787,7 +2791,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Problem**: 8 test files had 9 pre-existing failures across component and settings tests
 - **Root Causes**: Missing AuthProvider wrappers, incorrect mock patterns, stale assertions
 - **Solution**: Fixed all 9 failures across 8 test files
-- **Result**: Full test suite now passes: 181 files, 6122 tests, 0 failures
+- **Result**: Full test suite now passes: 192 files, 6338 tests, 0 failures
 - **Commit**: `d4292cb`
 
 ### 59. Settings Export/Import for Admin Configuration (Added Feb 6, 2026)
@@ -2977,6 +2981,46 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File**: `docs/DEPENDENCY_UPGRADE_PLAN.md` (171 lines)
 - **Stages**: Stage 1 (safe patches) → Stage 2 (low-risk minor) → Stage 3 (moderate breaking) → Stage 4 (high-risk major) → Stage 5 (framework major)
 - **Commit**: `b77db22`
+
+### 73. Production Hardening: JSON Parse, Startup Validation, Rate Limits, Logging (Added Feb 7, 2026)
+- **Problem**: Four production resilience gaps identified during comprehensive audit:
+  1. Unguarded `JSON.parse()` in extract endpoints — Anthropic/OpenAI invalid JSON crashes server
+  2. No startup environment variable validation — missing config discovered only at request time
+  3. Processing log endpoints (`/api/ai/processing-logs/*`) had no rate limiting
+  4. 20+ `console.log` calls in server code instead of structured logger
+- **Solutions**:
+  1. Wrapped `JSON.parse` in try-catch with structured error logging and descriptive error messages
+  2. Added startup env var check in `server/index.ts` — warns on missing `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET`
+  3. Added `generalLimiter` (60 req/min) to all 4 processing log endpoints
+  4. Replaced 20+ `console.log`/`console.error` with `log.info()`/`log.warn()`/`log.error()` across 4 files
+- **Files Changed**:
+  - `server/routes/ai.ts` — JSON parse guards, rate limiting
+  - `server/index.ts` — Startup env var validation
+  - `server/routes/admin/auth.ts` — Structured logging (20 replacements)
+  - `server/services/prompt-service.ts` — Structured logging
+  - `server/services/processing-log-service.ts` — Structured logging
+  - `server/middleware/rate-limit.ts` — Structured logging
+- **Commit**: `1696480`
+
+### 74. Silent .catch(() => {}) Error Swallowing (Fixed Feb 7, 2026)
+- **Problem**: 10 fire-and-forget `.catch(() => {})` patterns across server code silently swallowed errors on cost tracking, admin notifications, security event logging, and alert persistence
+- **Impact**: Failures in these non-critical paths were completely invisible in Railway logs, making debugging impossible
+- **Solution**: Replaced all 10 with `.catch((err) => log.warn('description', { context, error: err instanceof Error ? err.message : String(err) }))` so failures appear in logs
+- **Occurrences Fixed**:
+  - `server/routes/ai.ts` (6): Cost recording (Anthropic + OpenAI) + admin notifications (billing, rate limit, auth errors)
+  - `server/routes/admin/auth.ts` (3): Security event logging for failed login attempts (user not found, inactive account, wrong password)
+  - `server/middleware/monitoring.ts` (1): Alert persistence + added logger import
+- **Pattern**:
+  ```typescript
+  // BEFORE: Silently swallowed
+  recordUsage({ ... }).catch(() => {})
+
+  // AFTER: Logged with context
+  recordUsage({ ... }).catch((err) => log.warn('Failed to record usage', {
+    requestId, error: err instanceof Error ? err.message : String(err)
+  }))
+  ```
+- **Commit**: `6e5263f`
 
 ---
 
@@ -3305,6 +3349,18 @@ connectSrc: [
 - GCP credentials can be passed via `GCP_SERVICE_ACCOUNT_BASE64` (base64-encoded JSON)
 - For documents >15 pages, chunks are processed separately and results combined
 
+**Google Cloud API Key Restrictions:**
+- The `GOOGLE_CLOUD_API_KEY` must have **Cloud Vision API** and **Cloud Document AI API** enabled in API restrictions
+- If restricted to only "Generative Language API", Vision OCR will fail with `google: { valid: false }`
+- Use `/api/ai/diagnose` to check — now returns `errorCode` (e.g., `API_NOT_ENABLED`, `PERMISSION_DENIED`)
+- Vision OCR uses API key auth; Document AI uses OAuth service account — both need correct permissions
+- Admin diagnostics (`/api/admin/diagnostics`) now shows AI provider configuration status
+
+**Fire-and-Forget Patterns in Server Code:**
+- All `.catch(() => {})` patterns have been replaced with `.catch((err) => log.warn(...))`
+- If you add new fire-and-forget calls (cost tracking, notifications, security events), always log the catch
+- These are non-blocking on purpose but failures must be visible in Railway logs for debugging
+
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
 - Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v13)
@@ -3401,5 +3457,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6122+ tests, all passing (181 test files)
+**Tests**: 6338+ tests, all passing (192 test files)
 **Last Updated**: February 7, 2026

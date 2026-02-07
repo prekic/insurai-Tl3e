@@ -10,6 +10,9 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('monitoring')
 
 // ============================================================================
 // Database Client
@@ -657,7 +660,7 @@ function triggerAlert(rule: AlertRule, value: number): void {
   alertRules.set(rule.id, rule)
 
   // Persist alert
-  persistAlert(alert).catch(() => {})
+  persistAlert(alert).catch((err) => log.warn('Failed to persist alert', { alertId: alert.id, ruleName: alert.ruleName, error: err instanceof Error ? err.message : String(err) }))
 }
 
 /**

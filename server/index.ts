@@ -332,6 +332,25 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   })
 })
 
+// Validate required environment variables before starting
+const REQUIRED_ENV = {
+  SUPABASE_URL: process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  ADMIN_JWT_SECRET: process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET,
+}
+
+const missingEnv = Object.entries(REQUIRED_ENV)
+  .filter(([, value]) => !value)
+  .map(([key]) => key)
+
+if (missingEnv.length > 0) {
+  log.warn(`Missing environment variables: ${missingEnv.join(', ')} — some features will be unavailable`)
+}
+
+if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
+  log.warn('No AI provider configured (OPENAI_API_KEY or ANTHROPIC_API_KEY) — extraction will not work')
+}
+
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling
 server = app.listen(PORT, () => {

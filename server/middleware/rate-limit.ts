@@ -14,6 +14,9 @@ import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit'
 import crypto from 'crypto'
 import type { Request, Response } from 'express'
 import { getRateLimitsConfig, type RateLimitsConfig } from '../services/config-service.js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('RateLimit')
 
 // =============================================================================
 // CONFIGURATION CACHE
@@ -395,9 +398,9 @@ export async function refreshRateLimitConfig(): Promise<void> {
   try {
     cachedConfig = await getRateLimitsConfig()
     lastConfigFetch = Date.now()
-    console.log('[Rate Limit] Configuration refreshed from database')
+    log.info('Configuration refreshed from database')
   } catch (_error) {
-    console.warn('[Rate Limit] Failed to refresh config from database, using cached/defaults')
+    log.warn('Failed to refresh config from database, using cached/defaults')
   }
 }
 

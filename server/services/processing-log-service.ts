@@ -106,7 +106,7 @@ export async function createProcessingLog(
     return { data: null, error: 'Supabase client not configured' }
   }
 
-  console.log('[ProcessingLogService] Inserting log for document:', log.document_id)
+  logger.child('ProcessingLogService').info('Inserting log', { documentId: log.document_id })
 
   const { data, error } = await client
     .from('document_processing_logs')
@@ -115,11 +115,11 @@ export async function createProcessingLog(
     .single()
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to create log:', error)
+    logger.child('ProcessingLogService').error('Failed to create log', { code: error.code, message: error.message })
     return { data: null, error: `${error.code}: ${error.message}` }
   }
 
-  console.log('[ProcessingLogService] Log created successfully:', data?.id)
+  logger.child('ProcessingLogService').info('Log created successfully', { id: data?.id })
   return { data: data as DocumentProcessingLog, error: null }
 }
 
