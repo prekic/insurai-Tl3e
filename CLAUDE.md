@@ -3187,6 +3187,10 @@ VITE_SUPABASE_URL=https://xxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJ...
 VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 
+# Optional overrides
+# LOG_LEVEL=info          # Default in production; set to 'warn' to reduce noise
+# UNSUBSCRIBE_SECRET=xxx  # Falls back to ADMIN_JWT_SECRET if not set
+
 # NOT needed - auto-detected from window.location.origin
 # VITE_API_PROXY_URL is automatically set in production
 ```
