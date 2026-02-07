@@ -157,7 +157,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'user_not_found' },
-      }).catch(() => {})
+      }).catch((err) => log.warn('Failed to log security event', { event: 'login_failed', reason: 'user_not_found', error: err instanceof Error ? err.message : String(err) }))
 
       res.status(401).json({
         success: false,
@@ -175,7 +175,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'account_inactive', status: adminUser.status },
-      }).catch(() => {})
+      }).catch((err) => log.warn('Failed to log security event', { event: 'login_failed', reason: 'account_inactive', error: err instanceof Error ? err.message : String(err) }))
 
       res.status(401).json({
         success: false,
@@ -209,7 +209,7 @@ router.post('/auth/login', authLimiter, async (req: Request, res: Response) => {
         ipAddress: getClientIp(req),
         userAgent: req.headers['user-agent'] || 'unknown',
         details: { email, reason: 'invalid_password' },
-      }).catch(() => {})
+      }).catch((err) => log.warn('Failed to log security event', { event: 'login_failed', reason: 'invalid_password', error: err instanceof Error ? err.message : String(err) }))
 
       res.status(401).json({
         success: false,

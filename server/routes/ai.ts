@@ -762,7 +762,7 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => log.warn('Failed to record Anthropic usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
 
         log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
         return res.json({
@@ -789,20 +789,20 @@ router.post(
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isRateLimitError) {
           log.warn('Anthropic rate limit, falling back to OpenAI', { requestId })
           adminNotificationService.notifyRateLimit('Anthropic', {
             requestId,
             errorMessage: message,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify rate limit', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         } else if (isAuthError) {
           log.warn('Anthropic auth error, falling back to OpenAI', { requestId })
           adminNotificationService.notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
             requestId,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify API error', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
         }
 
         // Fall back to OpenAI if available
@@ -862,7 +862,7 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch(() => {})
+        }).catch((err) => log.warn('Failed to record OpenAI usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
 
         let parsedOpenAIData: unknown
         try {
@@ -891,7 +891,7 @@ router.post(
           adminNotificationService.notifyBillingIssue('OpenAI', message, {
             requestId,
             timestamp: new Date().toISOString(),
-          }).catch(() => {})
+          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'OpenAI', requestId, error: err instanceof Error ? err.message : String(err) }))
         }
 
         return res.status(500).json({
