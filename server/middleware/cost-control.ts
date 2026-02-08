@@ -5,6 +5,9 @@
 
 import { Request, Response, NextFunction } from 'express'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('CostControl')
 
 // ============================================================================
 // TYPES
@@ -778,7 +781,7 @@ export function costControlMiddleware(
 
       next()
     } catch (error) {
-      console.error('Cost control middleware error:', error)
+      log.error('Cost control middleware error', { error: error instanceof Error ? error.message : String(error) })
       // Don't block on errors - just continue
       next()
     }

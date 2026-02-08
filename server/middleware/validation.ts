@@ -7,6 +7,9 @@
 
 import { z, ZodError, ZodSchema } from 'zod'
 import type { Request, Response, NextFunction } from 'express'
+import { logger } from '../lib/logger.js'
+
+const log = logger.child('Validation')
 
 // =============================================================================
 // Sanitization Utilities
@@ -177,10 +180,7 @@ export function validate<T extends ZodSchema>(
 
       next()
     } catch (error) {
-      // Only log validation errors in development
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Validation middleware error:', error)
-      }
+      log.debug('Validation error', { error: error instanceof Error ? error.message : String(error) })
       return res.status(400).json({
         error: 'Invalid request data',
         code: 'VALIDATION_ERROR',

@@ -364,7 +364,7 @@ async function deliverToWebhook(
   }
 
   // Attempt delivery with retries
-  await attemptDelivery(webhook, delivery.id, bodyString, signature)
+  await attemptDelivery(webhook, delivery.id, bodyString, signature, event)
 }
 
 /**
@@ -375,6 +375,7 @@ async function attemptDelivery(
   deliveryId: string,
   bodyString: string,
   signature: string,
+  webhookEvent: WebhookEvent,
   attempt: number = 1
 ): Promise<void> {
   const client = getSupabase()
@@ -389,7 +390,7 @@ async function attemptDelivery(
       headers: {
         'Content-Type': 'application/json',
         'X-Webhook-Signature': signature,
-        'X-Webhook-Event': bodyString ? JSON.parse(bodyString).event : '',
+        'X-Webhook-Event': webhookEvent,
         'X-Webhook-Delivery': deliveryId,
         'User-Agent': 'InsurAI-Webhooks/1.0',
       },
@@ -437,7 +438,7 @@ async function attemptDelivery(
 
       // Retry after delay
       setTimeout(() => {
-        attemptDelivery(webhook, deliveryId, bodyString, signPayload(bodyString, webhook.secret), attempt + 1)
+        attemptDelivery(webhook, deliveryId, bodyString, signPayload(bodyString, webhook.secret), webhookEvent, attempt + 1)
           .catch((err) => log.error('Retry error', { error: String(err) }))
       }, delayMs)
     } else {

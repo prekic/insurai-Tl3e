@@ -59,7 +59,7 @@ function getClient(): SupabaseClient | null {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (!url || !serviceKey) {
-    console.warn('[PromptService] Supabase not configured, using fallback prompts')
+    log.warn('Supabase not configured, using fallback prompts')
     return null
   }
 
@@ -287,7 +287,7 @@ export async function getPromptById(id: string): Promise<PromptTemplate | null> 
         return template
       }
     } catch (err) {
-      console.warn(`[PromptService] Database error for id "${id}":`, err)
+      log.warn('Database error for id', { id, error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -329,7 +329,7 @@ export async function getPromptByName(name: string): Promise<PromptTemplate | nu
         return template
       }
     } catch (err) {
-      console.warn(`[PromptService] Database error for "${name}":`, err)
+      log.warn('Database error for name', { name, error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -361,7 +361,7 @@ export async function getPromptsByCategory(category: PromptCategory): Promise<Pr
         return data.map(mapFromDatabase)
       }
     } catch (err) {
-      console.warn(`[PromptService] Database error for category "${category}":`, err)
+      log.warn('Database error for category', { category, error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -387,7 +387,7 @@ export async function getAllPrompts(): Promise<PromptTemplate[]> {
         return data.map(mapFromDatabase)
       }
     } catch (err) {
-      console.warn('[PromptService] Database error:', err)
+      log.warn('Database error', { error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -431,7 +431,7 @@ export async function getRenderedPrompt(
 ): Promise<RenderedPrompt | null> {
   const template = await getPromptByName(name)
   if (!template) {
-    console.error(`[PromptService] Prompt not found: "${name}"`)
+    log.error('Prompt not found', { name })
     return null
   }
 
@@ -544,7 +544,7 @@ export async function updatePrompt(
 ): Promise<PromptTemplate | null> {
   const db = getClient()
   if (!db) {
-    console.error('[PromptService] Cannot update: database not configured')
+    log.error('Cannot update: database not configured')
     return null
   }
 
@@ -575,7 +575,7 @@ export async function updatePrompt(
       .single()
 
     if (error) {
-      console.error('[PromptService] Update error:', error)
+      log.error('Update error', { error: String(error) })
       return null
     }
 
@@ -596,7 +596,7 @@ export async function updatePrompt(
 
     return mapFromDatabase(data)
   } catch (err) {
-    console.error('[PromptService] Update exception:', err)
+    log.error('Update exception', { error: err instanceof Error ? err.message : String(err) })
     return null
   }
 }
@@ -609,7 +609,7 @@ export async function createPrompt(
 ): Promise<PromptTemplate | null> {
   const db = getClient()
   if (!db) {
-    console.error('[PromptService] Cannot create: database not configured')
+    log.error('Cannot create: database not configured')
     return null
   }
 
@@ -633,7 +633,7 @@ export async function createPrompt(
       .single()
 
     if (error) {
-      console.error('[PromptService] Create error:', error)
+      log.error('Create error', { error: String(error) })
       return null
     }
 
@@ -650,7 +650,7 @@ export async function createPrompt(
     clearPromptCache()
     return mapFromDatabase(data)
   } catch (err) {
-    console.error('[PromptService] Create exception:', err)
+    log.error('Create exception', { error: err instanceof Error ? err.message : String(err) })
     return null
   }
 }

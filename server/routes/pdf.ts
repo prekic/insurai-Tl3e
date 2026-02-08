@@ -8,6 +8,10 @@
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { PDFParse } from 'pdf-parse'
+import { logger } from '../lib/logger.js'
+import { aiExtractionLimiter } from '../middleware/rate-limit.js'
+
+const log = logger.child('PDF')
 
 const router = Router()
 
@@ -328,7 +332,7 @@ function cleanExtractedText(text: string): NoiseStrippingResult {
  * POST /api/pdf/extract
  * Extract text from uploaded PDF with quality analysis
  */
-router.post('/extract', upload.single('file'), async (
+router.post('/extract', aiExtractionLimiter, upload.single('file'), async (
   req: Request,
   res: Response<PDFExtractionResult | PDFExtractionError>
 ): Promise<void> => {
@@ -395,7 +399,7 @@ router.post('/extract', upload.single('file'), async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-    console.error('[PDF Extract] Error:', errorMessage)
+    log.error('PDF extraction error', { error: errorMessage })
 
     if (errorMessage.includes('password')) {
       res.status(400).json({

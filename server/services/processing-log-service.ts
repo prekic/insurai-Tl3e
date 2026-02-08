@@ -141,7 +141,7 @@ export async function updateProcessingLog(
     .single()
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to update log:', error)
+    log.error('Failed to update log', { error: String(error) })
     return null
   }
 
@@ -166,7 +166,7 @@ export async function addProcessingStage(
     .single()
 
   if (fetchError) {
-    console.error('[ProcessingLogService] Failed to fetch log for stage update:', fetchError)
+    log.error('Failed to fetch log for stage update', { error: String(fetchError) })
     return false
   }
 
@@ -182,7 +182,7 @@ export async function addProcessingStage(
     .eq('document_id', documentId)
 
   if (updateError) {
-    console.error('[ProcessingLogService] Failed to add stage:', updateError)
+    log.error('Failed to add stage', { error: String(updateError) })
     return false
   }
 
@@ -205,7 +205,7 @@ export async function getProcessingLog(
     .single()
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to get log:', error)
+    log.error('Failed to get log', { error: String(error) })
     return null
   }
 
@@ -229,7 +229,7 @@ export async function getProcessingLogByPolicyId(
 
   if (error && error.code !== 'PGRST116') {
     // PGRST116 = no rows returned
-    console.error('[ProcessingLogService] Failed to get log by policy:', error)
+    log.error('Failed to get log by policy', { error: String(error) })
     return null
   }
 
@@ -282,7 +282,7 @@ export async function listProcessingLogs(
   const { data, error, count } = await query
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to list logs:', error)
+    log.error('Failed to list logs', { error: String(error) })
     return { logs: [], total: 0 }
   }
 
@@ -320,7 +320,7 @@ export async function getProcessingStats(
     .gte('started_at', fromDate.toISOString())
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to get stats:', error)
+    log.error('Failed to get stats', { error: String(error) })
     return {
       total: 0,
       completed: 0,
@@ -382,7 +382,7 @@ export async function deleteOldLogs(daysOld: number = 90): Promise<number> {
     .select('id')
 
   if (error) {
-    console.error('[ProcessingLogService] Failed to delete old logs:', error)
+    log.error('Failed to delete old logs', { error: String(error) })
     return 0
   }
 
