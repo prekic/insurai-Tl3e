@@ -9,25 +9,24 @@ Upgrades are organized by risk level. Each tier should be completed and tested b
 
 ---
 
-### Tier 1: Safe Minor/Patch Upgrades (Low Risk)
+### Tier 1: Safe Minor/Patch Upgrades (Low Risk) — COMPLETED Feb 8, 2026
 
 These stay within their major version and should be drop-in replacements.
 
-| Package | Current | Target | Notes |
-|---------|---------|--------|-------|
-| `@anthropic-ai/sdk` | 0.71.2 | 0.73.0 | Pre-1.0, check changelog |
+| Package | Before | After | Notes |
+|---------|--------|-------|-------|
+| `@anthropic-ai/sdk` | 0.71.2 | 0.74.0 | Pre-1.0, no breaking changes |
 | `@playwright/test` | 1.58.1 | 1.58.2 | Patch |
 | `@supabase/supabase-js` | 2.94.1 | 2.95.3 | Minor |
 | `dotenv` | 17.2.3 | 17.2.4 | Patch |
 | `openai` | 6.17.0 | 6.18.0 | Minor |
-| `typescript` | 5.6.3 | 5.9.3 | Minor - may surface new type errors |
+| `typescript` | 5.6.3 | 5.9.3 | Minor - 2 type fixes needed (Uint8Array) |
 
-**Steps**:
-1. `npm update @anthropic-ai/sdk @playwright/test @supabase/supabase-js dotenv openai`
-2. Run `npm run validate` (typecheck + lint + test)
-3. Upgrade TypeScript separately: `npm install typescript@5.9.3`
-4. Run `npx tsc --noEmit` and fix any new type errors
-5. Run full test suite
+**TypeScript 5.9 Fixes Required**:
+- `pdf-splitter.ts`: `Uint8Array<ArrayBufferLike>` not assignable to `BlobPart` → copy to new `ArrayBuffer`
+- `pwa/index.ts`: Return `Uint8Array<ArrayBuffer>` from `urlBase64ToUint8Array` for `applicationServerKey`
+
+**Result**: All 6,338 tests pass. 0 lint errors. Both builds clean.
 
 ---
 
