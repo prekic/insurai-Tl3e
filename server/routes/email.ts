@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express'
 import { z } from 'zod'
 import crypto from 'crypto'
 import { logger } from '../lib/logger.js'
+import { authLimiter } from '../middleware/rate-limit.js'
 
 const log = logger.child('EmailRoutes')
 import {
@@ -155,7 +156,7 @@ router.put('/preferences', async (req: Request, res: Response) => {
  * POST /api/email/capture
  * Capture email from trial users (no auth required)
  */
-router.post('/capture', async (req: Request, res: Response) => {
+router.post('/capture', authLimiter, async (req: Request, res: Response) => {
   try {
     const parseResult = captureEmailSchema.safeParse(req.body)
     if (!parseResult.success) {
@@ -233,7 +234,7 @@ router.post('/test', async (req: Request, res: Response) => {
  * POST /api/email/unsubscribe
  * Unsubscribe from all marketing emails (no auth, uses token)
  */
-router.post('/unsubscribe', async (req: Request, res: Response) => {
+router.post('/unsubscribe', authLimiter, async (req: Request, res: Response) => {
   try {
     const { token, email } = req.body
 

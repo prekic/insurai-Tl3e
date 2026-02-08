@@ -5,18 +5,18 @@
  */
 
 import { Router, Response } from 'express'
-import { logger } from '../../lib/logger.js'
 import {
   authenticateAdmin,
   requireSuperAdmin,
   logAdminAction,
   costControl,
   qstr,
+  logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
 
-const router = Router()
 const log = logger.child('AdminCost')
+const router = Router()
 
 // ============================================================================
 // COST BUDGET MANAGEMENT (Phase 2)

@@ -17,12 +17,11 @@ import {
   requestCounters,
   qstr,
   getClientIp,
+  logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
-import { logger } from '../../lib/logger.js'
 
 const log = logger.child('AdminPrompts')
-
 const router = Router()
 
 // ============================================================================
@@ -44,7 +43,7 @@ router.get('/prompts', authenticateAdmin, async (req: AuthenticatedRequest, res:
 
     res.json({ success: true, data: templates })
   } catch (error) {
-    log.error('Error fetching prompts', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to fetch prompts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch prompts' })
   }
 })
@@ -60,7 +59,7 @@ router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    log.error('Error fetching prompt', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to fetch prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch prompt' })
   }
 })
@@ -108,7 +107,7 @@ router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'
 
     res.json({ success: true, data: updatedTemplate })
   } catch (error) {
-    log.error('Error updating prompt', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to update prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update prompt' })
   }
 })
@@ -157,7 +156,7 @@ router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    log.error('Error creating prompt', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to create prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create prompt' })
   }
 })
@@ -373,7 +372,7 @@ router.post('/prompts/templates/:templateId/rollback/:versionId', ...requireSupe
 
     res.json({ success: true, data: template })
   } catch (error) {
-    log.error('Failed to rollback', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to rollback version', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to rollback' })
   }
 })
@@ -630,7 +629,7 @@ router.post('/prompts/ab-tests/:id/apply-winner', ...requireSuperAdmin(), async 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    log.error('Failed to apply winner', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to apply A/B test winner', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to apply winner' })
   }
 })

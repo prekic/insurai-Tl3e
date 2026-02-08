@@ -76,23 +76,27 @@ export function initServerSentry(): void {
 
       // Remove sensitive body data
       if (event.request?.data) {
-        const data =
-          typeof event.request.data === 'string'
-            ? JSON.parse(event.request.data)
-            : event.request.data
+        try {
+          const data =
+            typeof event.request.data === 'string'
+              ? JSON.parse(event.request.data)
+              : event.request.data
 
-        if (data.apiKey) data.apiKey = '[REDACTED]'
-        if (data.password) data.password = '[REDACTED]'
-        if (data.token) data.token = '[REDACTED]'
-        if (data.content) {
-          // Truncate large content to avoid sending full documents
-          data.content =
-            data.content.length > 500
-              ? data.content.substring(0, 500) + '...[truncated]'
-              : data.content
+          if (data.apiKey) data.apiKey = '[REDACTED]'
+          if (data.password) data.password = '[REDACTED]'
+          if (data.token) data.token = '[REDACTED]'
+          if (data.content) {
+            // Truncate large content to avoid sending full documents
+            data.content =
+              data.content.length > 500
+                ? data.content.substring(0, 500) + '...[truncated]'
+                : data.content
+          }
+
+          event.request.data = JSON.stringify(data)
+        } catch {
+          // If request data isn't valid JSON, leave it as-is
         }
-
-        event.request.data = JSON.stringify(data)
       }
 
       return event

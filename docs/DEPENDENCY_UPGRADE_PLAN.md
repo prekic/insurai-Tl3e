@@ -10,7 +10,7 @@ Upgrades are organized by risk level. Each tier should be completed and tested b
 
 ---
 
-### Tier 1: Safe Minor/Patch Upgrades (Low Risk) — COMPLETED
+### Tier 1: Safe Minor/Patch Upgrades (Low Risk) — COMPLETED Feb 8, 2026
 
 Completed 2026-02-07. All upgrades applied, tests passing (6338+).
 
@@ -24,8 +24,10 @@ Completed 2026-02-07. All upgrades applied, tests passing (6338+).
 | `typescript` | 5.6.3 | **5.9.3** | 2 type errors fixed (Uint8Array stricter typing) |
 
 **TypeScript 5.9 Fixes Required**:
-- `src/lib/ai/pdf-splitter.ts`: `Uint8Array<ArrayBufferLike>` doesn't satisfy `BlobPart` — fixed with `as BlobPart` cast
-- `src/lib/pwa/index.ts`: `Uint8Array<ArrayBufferLike>` doesn't satisfy `BufferSource` — fixed with `as BufferSource` cast
+- `src/lib/ai/pdf-splitter.ts`: `Uint8Array<ArrayBufferLike>` doesn't satisfy `BlobPart` — fixed with cast
+- `src/lib/pwa/index.ts`: `Uint8Array<ArrayBufferLike>` doesn't satisfy `BufferSource` — fixed with cast
+
+**Result**: All tests pass. 0 lint errors. Both builds clean.
 
 ---
 

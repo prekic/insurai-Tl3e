@@ -575,7 +575,7 @@ export async function updatePrompt(
       .single()
 
     if (error) {
-      log.error('Update error', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Update error', { error: String(error) })
       return null
     }
 
@@ -633,7 +633,7 @@ export async function createPrompt(
       .single()
 
     if (error) {
-      log.error('Create error', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Create error', { error: String(error) })
       return null
     }
 

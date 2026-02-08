@@ -12,12 +12,11 @@ import {
   logAdminAction,
   monitoring,
   qstr,
+  logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
-import { logger } from '../../lib/logger.js'
 
 const log = logger.child('AdminMonitoring')
-
 const router = Router()
 
 // ============================================================================

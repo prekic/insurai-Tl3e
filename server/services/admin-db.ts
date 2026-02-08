@@ -432,11 +432,18 @@ export async function setConfig(
 }
 
 function mapConfig(row: Record<string, unknown>): AppConfig {
+  let parsedValue: unknown = row.value
+  try {
+    parsedValue = JSON.parse(row.value as string)
+  } catch {
+    log.warn('Failed to parse config value as JSON', { category: row.category, key: row.key })
+  }
+
   return {
     id: row.id as string,
     category: row.category as string,
     key: row.key as string,
-    value: JSON.parse(row.value as string),
+    value: parsedValue,
     valueType: row.value_type as string,
     description: row.description as string | undefined,
     isSecret: row.is_secret as boolean,

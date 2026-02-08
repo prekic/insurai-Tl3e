@@ -9,8 +9,8 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**
-- **Production Readiness**: ~9.5/10 (5,800+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**
+- **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
 - **Last Updated**: February 8, 2026
 
 ---
@@ -1189,10 +1189,10 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 8, 2026)
-- **Total**: 5,801 tests across 181 test files (reduced from 6,338/192 after dead code removal)
+- **Total**: 6,000+ tests across 185+ test files (5,801 base after dead code removal + 275 new tests for critical modules)
 - **Passing**: 100% (0 failures)
 - **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
-- **Note**: Test count decrease is from removing ~17,800 lines of dead code (unused hooks, orphaned libraries, dead types) — no production code was lost
+- **Note**: Base count decreased from 6,338/192 after removing ~17,800 lines of dead code, then increased with 275 new tests for admin-auth, email, cost-control, free-trial
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -1208,7 +1208,10 @@ Server Tests:               server/__tests__/
 | `src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx` | 11 | Config performance dashboard |
 | `src/lib/config/__tests__/config-performance-monitor.test.ts` | 21 | Performance monitor core |
 | `server/__tests__/settings-routes.test.ts` | 43 | Settings API (includes export/import + performance) |
-| `server/__tests__/admin-auth.test.ts` | 50 | Admin auth: password hashing, JWT, middleware |
+| `server/__tests__/admin-auth.test.ts` | 65 | JWT tokens, bcrypt, authenticateAdmin, requireRole, requirePermission |
+| `server/__tests__/email-routes.test.ts` | 71 | Unsubscribe tokens (HMAC-SHA256), all 7 email endpoints |
+| `server/__tests__/cost-control.test.ts` | 58 | Cost calculation, budgets, alerts, usage tracking, middleware |
+| `src/lib/free-trial.test.ts` | 84 | All 15 exported functions, localStorage, expiry, share URLs |
 | `src/lib/ai/pdf-splitter.test.ts` | 25 | PDF splitting: chunking, page ranges, edge cases |
 | `src/lib/ai/document-ocr.test.ts` | 16 | Document OCR: hash, config, extraction, errors |
 | `server/__tests__/pdf-routes.test.ts` | 23 | PDF quality analysis, Turkish OCR fixes |
@@ -3066,6 +3069,63 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Fix**: Changed to `toBeGreaterThanOrEqual(0)`
 - **Commit**: `de83f8d`
 
+### 79. Comprehensive Audit Hardening (Feb 8, 2026)
+- **Scope**: App-wide audit identified 5 issue categories; all resolved
+- **JSON.parse Crash Prevention** (3 files):
+  - `server/lib/sentry.ts` — Wrapped `JSON.parse(event.request.data)` in try-catch
+  - `server/services/webhook-service.ts` — Eliminated re-parse by threading `webhookEvent` parameter through `attemptDelivery()`
+  - `server/services/admin-db.ts` — Wrapped `JSON.parse(row.value)` in `mapConfig()` with fallback logging
+- **Structured Logging** (5 files, 21 calls replaced):
+  - `server/middleware/cost-control.ts` — Added logger import + child
+  - `server/middleware/validation.ts` — Added logger import + child, changed to `log.debug`
+  - `server/routes/pdf.ts` — Added logger import + child
+  - `server/services/processing-log-service.ts` — 8 `console.error` → `log.error`
+  - `server/services/prompt-service.ts` — 13 `console.warn/error` → `log.warn/error`
+- **Admin Route Logging** (9 modules, 69 calls replaced):
+  - All 9 admin route modules under `server/routes/admin/` — `console.error` → structured logger
+  - Commit: `1d2ca31`
+- **Rate Limiting** (3 endpoints):
+  - `POST /api/email/capture` → `authLimiter` (10 req/15min)
+  - `POST /api/email/unsubscribe` → `authLimiter` (10 req/15min)
+  - `POST /api/pdf/extract` → `aiExtractionLimiter` (20 req/hr)
+  - Note: All routes already had global `generalLimiter` (100/15min) via `server/index.ts`
+- **Commit**: `ce16af0`
+
+### 80. Critical Module Test Coverage (Added Feb 8, 2026)
+- **Problem**: 4 critical server modules had 0 test coverage totaling 2,088 lines
+- **Solution**: Added 275 comprehensive tests across 4 new test files
+- **Test Files Created**:
+  - `server/__tests__/admin-auth.test.ts` — 65 tests: JWT token gen/verify, bcrypt password hashing, `authenticateAdmin` middleware, `requireRole`, `requirePermission`, integration flows
+  - `server/__tests__/email-routes.test.ts` — 71 tests: HMAC-SHA256 unsubscribe token gen/verify, all 7 email endpoints via supertest, secret fallback chain, capture-unsubscribe roundtrip
+  - `server/__tests__/cost-control.test.ts` — 58 tests: Cost calculation for all providers, budget CRUD, budget checking with block/warn/notify, alert system, usage tracking aggregation, Express middleware
+  - `src/lib/free-trial.test.ts` — 84 tests: All 15 exported functions, mocked localStorage, 24h expiry logic, share URLs, lifecycle integration
+- **Key Testing Patterns Used**:
+  - `vi.hoisted()` for mock variables referenced in `vi.mock()` factories (avoids TDZ errors)
+  - `vi.resetModules()` + dynamic `import()` for testing module-level initialization (JWT secret, env vars)
+  - In-memory state isolation: cost-control budgets persist across tests; deactivate blocking budgets in subsequent tests
+  - `supertest` for Express route testing with mocked middleware
+- **Commit**: `1f81423`
+
+### 81. TryAnalysis Refactor (Feb 8, 2026)
+- **Problem**: `TryAnalysis.tsx` had duplicated extraction logic between proxy and direct paths (156 lines)
+- **Solution**: Extracted shared `runExtraction()` helper, consolidated both code paths
+- **Result**: 154 net lines removed, single code path for extraction with timeout and progress
+- **Commit**: `a06e850`
+
+### 82. Tier 1 Dependency Upgrades (Feb 8, 2026)
+- **Upgraded**: Safe patch/minor dependencies per `docs/DEPENDENCY_UPGRADE_PLAN.md` Stage 1
+- **TypeScript 5.9 fixes**: Resolved new type errors from stricter checking
+- **Commit**: `2c23c2b`
+
+### 83. E2E Extraction Flow Tests (Added Feb 8, 2026)
+- **File**: `e2e/extraction-flow.spec.ts` — 14 Playwright tests covering upload → extract → display pipeline
+- **Commit**: `a2bcd52`
+
+### 84. Vision OCR Server-Side Timeout (Added Feb 8, 2026)
+- **Problem**: Vision OCR fetch had no timeout, could hang indefinitely
+- **Solution**: Added 60s `AbortSignal.timeout()` on server-side fetch, timeout detection on both OCR routes
+- **Commit**: `a91c833`
+
 ---
 
 ## Turkish Market Considerations
@@ -3454,6 +3514,17 @@ connectSrc: [
 - Import from `server/routes/admin/index.ts` which aggregates all sub-routers
 - Shared utilities (Supabase client, helpers) live in `server/routes/admin/shared.ts`
 
+**Cost-Control In-Memory State in Tests:**
+- `server/middleware/cost-control.ts` uses module-level `Map`/`Array` for in-memory budgets, alerts, usage
+- These persist across tests since `vi.mock('@supabase/supabase-js')` forces in-memory mode
+- If a test creates a blocking budget (`actionOnExceed: 'block'`), subsequent tests may fail
+- Fix: Deactivate blocking budgets from prior tests with `upsertBudget({ id: '...', isActive: false })`
+
+**Testing Module-Level Initialization (JWT Secret, env vars):**
+- Use `vi.resetModules()` + dynamic `import()` to get a fresh module with cleared caches
+- Use `vi.hoisted()` for mock variables referenced inside `vi.mock()` factories (avoids TDZ errors)
+- Pattern: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` then reference in `vi.mock()`
+
 **Market Data: Two Parallel Systems (Migration Incomplete):**
 - Static files in `src/data/market-data/` (benchmarks.ts, providers.ts) are the **primary source** — used by 7 production consumers (gap analyzers, evaluator, extractor, comparison engine)
 - Database tables (`market_benchmarks`, `insurance_providers`, `regional_factors`) are seeded with the same data and `ConfigurationService` has methods to read from them, but the core business logic hasn't been switched over yet
@@ -3512,5 +3583,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 5,801 tests, all passing (181 test files)
+**Tests**: 6,000+ tests, all passing (185+ test files)
 **Last Updated**: February 8, 2026

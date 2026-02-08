@@ -1003,19 +1003,28 @@ router.post(
         log.info('Vision OCR: using API key authentication')
       }
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          requests: [
-            {
-              image: { content: imageBase64 },
-              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-              imageContext: { languageHints: ['tr', 'en'] },
-            },
-          ],
-        }),
-      })
+      // Call Vision OCR with 60-second timeout to prevent hanging
+      const controller = new AbortController()
+      const fetchTimeout = setTimeout(() => controller.abort(), 60000)
+      let response: globalThis.Response
+      try {
+        response = await fetch(url, {
+          method: 'POST',
+          headers,
+          signal: controller.signal,
+          body: JSON.stringify({
+            requests: [
+              {
+                image: { content: imageBase64 },
+                features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+                imageContext: { languageHints: ['tr', 'en'] },
+              },
+            ],
+          }),
+        })
+      } finally {
+        clearTimeout(fetchTimeout)
+      }
 
       if (!response.ok) {
         const errorData = (await response.json().catch(() => ({}))) as {
@@ -1085,7 +1094,10 @@ router.post(
       let code = 'OCR_FAILED'
       let userMessage = IS_PRODUCTION ? 'Unable to process scanned document' : 'OCR processing failed'
 
-      if (message.includes('API key not valid') || message.includes('400')) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        code = 'TIMEOUT'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Vision OCR timed out after 60s - try a smaller image'
+      } else if (message.includes('API key not valid') || message.includes('400')) {
         code = 'INVALID_API_KEY'
         userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Google Cloud API key is invalid'
       } else if (message.includes('PERMISSION_DENIED')) {
@@ -1369,7 +1381,10 @@ router.post(
       let code = 'DOCUMENT_AI_FAILED'
       let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Document AI processing failed'
 
-      if (message.includes('PERMISSION_DENIED')) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        code = 'TIMEOUT'
+        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Document AI timed out after 60s - try a smaller document'
+      } else if (message.includes('PERMISSION_DENIED')) {
         code = 'PERMISSION_DENIED'
         userMessage = IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI permission denied - check service account permissions'
       } else if (message.includes('NOT_FOUND')) {

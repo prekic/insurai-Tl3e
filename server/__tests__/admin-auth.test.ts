@@ -1,79 +1,113 @@
 /**
  * Admin Authentication Middleware Tests
  *
- * Comprehensive tests for JWT token generation/verification,
- * password hashing, Express middleware (authenticateAdmin, requireRole,
- * requirePermission), and refresh token generation.
+ * Comprehensive tests for JWT auth, password hashing, token management,
+ * and role/permission-based access control middleware.
  */
 
-import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Response, NextFunction } from 'express'
+import jwt from 'jsonwebtoken'
+import crypto from 'crypto'
 
 // ---------------------------------------------------------------------------
-// Environment setup - MUST happen before importing admin-auth
-// ---------------------------------------------------------------------------
-const TEST_JWT_SECRET = 'test-secret-that-is-at-least-32-characters-long-for-testing'
-const originalEnv = { ...process.env }
-
-// Set env vars before any import so the module picks them up
-process.env.ADMIN_JWT_SECRET = TEST_JWT_SECRET
-process.env.NODE_ENV = 'test'
-
-// ---------------------------------------------------------------------------
-// Mocks
+// Mocks — use vi.hoisted() so variables are available inside vi.mock factories
+// (vi.mock is hoisted above all other code by vitest)
 // ---------------------------------------------------------------------------
 
-// Mock the logger to silence output during tests
+const {
+  mockLogWarn,
+  mockLogError,
+  mockLogInfo,
+  mockLogDebug,
+  mockSingle,
+} = vi.hoisted(() => ({
+  mockLogWarn: vi.fn(),
+  mockLogError: vi.fn(),
+  mockLogInfo: vi.fn(),
+  mockLogDebug: vi.fn(),
+  mockSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+}))
+
+// Mock the structured logger so tests don't produce console output
 vi.mock('../lib/logger.js', () => {
-  const noopLogger: Record<string, unknown> = {
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
+  const child = {
+    debug: mockLogDebug,
+    info: mockLogInfo,
+    warn: mockLogWarn,
+    error: mockLogError,
+    child: vi.fn().mockReturnThis(),
   }
-  noopLogger.child = () => noopLogger
-  return { default: noopLogger, logger: noopLogger }
-})
-
-// Mock Supabase so that database calls don't run.
-// All mock references must be inline inside the factory (vi.mock is hoisted).
-vi.mock('@supabase/supabase-js', () => {
-  // Build a chain-able query object that returns { data: null, error: null }
-  const makeSingle = () => vi.fn().mockResolvedValue({ data: null, error: null })
-  const makeChain = (): Record<string, ReturnType<typeof vi.fn>> => {
-    const chain: Record<string, ReturnType<typeof vi.fn>> = {}
-    const single = makeSingle()
-    chain.single = single
-    chain.gt = vi.fn().mockReturnValue({ single })
-    chain.is = vi.fn().mockReturnValue({ gt: chain.gt, single })
-    chain.eq = vi.fn().mockImplementation(() => chain)
-    chain.select = vi.fn().mockReturnValue(chain)
-    chain.insert = vi.fn().mockReturnValue(chain)
-    chain.update = vi.fn().mockReturnValue(chain)
-    return chain
-  }
-  const queryChain = makeChain()
   return {
-    createClient: vi.fn().mockReturnValue({
-      from: vi.fn().mockReturnValue(queryChain),
-    }),
+    default: {
+      ...child,
+      child: vi.fn(() => child),
+    },
   }
 })
 
+// Mock Supabase so no real DB connection is attempted
+vi.mock('@supabase/supabase-js', () => ({
+  createClient: vi.fn(() => ({
+    from: vi.fn(() => ({
+      select: vi.fn().mockReturnThis(),
+      insert: vi.fn().mockReturnThis(),
+      update: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      is: vi.fn().mockReturnThis(),
+      gt: vi.fn().mockReturnThis(),
+      single: mockSingle,
+    })),
+  })),
+}))
+
 // ---------------------------------------------------------------------------
-// Import the module under test (after mocks are registered)
+// Test constants
 // ---------------------------------------------------------------------------
+
+const TEST_SECRET = 'test-jwt-secret-that-is-definitely-longer-than-32-characters-for-proper-validation'
+const SHORT_SECRET = 'tooshort'
+const TEST_SESSION_ID = 'session-abc-123'
+
+const TEST_ADMIN_USER = {
+  id: 'admin-user-id-001',
+  email: 'admin@insurai.test',
+  role: 'admin' as const,
+  status: 'active' as const,
+  permissions: ['read:policies', 'write:policies'],
+}
+
+const TEST_SUPER_ADMIN = {
+  id: 'super-admin-id-001',
+  email: 'super@insurai.test',
+  role: 'super_admin' as const,
+  status: 'active' as const,
+  permissions: [],
+}
+
+const TEST_WILDCARD_ADMIN = {
+  id: 'wildcard-admin-id-001',
+  email: 'wildcard@insurai.test',
+  role: 'admin' as const,
+  status: 'active' as const,
+  permissions: ['*'],
+}
+
+// Set test secret before the module is loaded (mocks are hoisted, but
+// `_jwtSecret` is lazily resolved on first use, so this is fine).
+process.env.ADMIN_JWT_SECRET = TEST_SECRET
+
+// Import the module under test — mocks are already in place
 import {
   generateAdminToken,
-  verifyAdminToken,
   generateRefreshToken,
+  verifyAdminToken,
   hashPassword,
   verifyPassword,
   hashToken,
   authenticateAdmin,
   requireRole,
   requirePermission,
-  type AdminUser,
   type AuthenticatedRequest,
 } from '../middleware/admin-auth.js'
 
@@ -81,18 +115,7 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeAdminUser(overrides: Partial<AdminUser> = {}): AdminUser {
-  return {
-    id: 'admin-user-123',
-    email: 'admin@test.com',
-    role: 'admin',
-    status: 'active',
-    permissions: [],
-    ...overrides,
-  }
-}
-
-function createMockReq(overrides: Record<string, unknown> = {}): AuthenticatedRequest {
+function createMockRequest(overrides: Partial<Record<string, unknown>> = {}): AuthenticatedRequest {
   return {
     headers: {},
     ip: '127.0.0.1',
@@ -101,779 +124,899 @@ function createMockReq(overrides: Record<string, unknown> = {}): AuthenticatedRe
   } as unknown as AuthenticatedRequest
 }
 
-function createMockRes() {
-  const res: Record<string, unknown> = { statusCode: 200 }
-  res.status = vi.fn((code: number) => {
-    res.statusCode = code
-    return res
-  })
-  res.json = vi.fn((body: unknown) => {
-    res.body = body
-    return res
-  })
-  return res as unknown as Response & { statusCode: number; body: Record<string, unknown> }
+function createMockResponse(): Response & { statusCode: number; _body: unknown } {
+  const res: Record<string, unknown> = {
+    statusCode: 200,
+    _body: null,
+    status(code: number) {
+      res.statusCode = code
+      return res
+    },
+    json(data: unknown) {
+      res._body = data
+      return res
+    },
+  }
+  return res as unknown as Response & { statusCode: number; _body: unknown }
 }
 
-function createMockNext(): NextFunction {
-  return vi.fn() as unknown as NextFunction
+function createMockNext(): NextFunction & { called: boolean } {
+  const fn = vi.fn() as unknown as NextFunction & { called: boolean }
+  Object.defineProperty(fn, 'called', {
+    get() {
+      return (fn as unknown as ReturnType<typeof vi.fn>).mock.calls.length > 0
+    },
+  })
+  return fn
 }
-
-// ---------------------------------------------------------------------------
-// Lifecycle
-// ---------------------------------------------------------------------------
-beforeAll(() => {
-  process.env.ADMIN_JWT_SECRET = TEST_JWT_SECRET
-})
-
-afterAll(() => {
-  process.env = originalEnv
-})
-
-beforeEach(() => {
-  vi.clearAllMocks()
-})
 
 // ============================================================================
 // TESTS
 // ============================================================================
 
-// ---------- generateAdminToken / verifyAdminToken ----------
-
-describe('generateAdminToken / verifyAdminToken', () => {
-  const sessionId = 'session-abc-123'
-
-  it('should generate a token that can be verified', () => {
-    const user = makeAdminUser()
-    const token = generateAdminToken(user, sessionId)
-
-    expect(typeof token).toBe('string')
-    expect(token.split('.')).toHaveLength(3) // JWT has 3 parts
-
-    const payload = verifyAdminToken(token)
-    expect(payload).not.toBeNull()
+describe('admin-auth', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.ADMIN_JWT_SECRET = TEST_SECRET
   })
 
-  it('should include correct sub, email, role, sessionId in payload', () => {
-    const user = makeAdminUser({
-      id: 'user-456',
-      email: 'super@test.com',
-      role: 'super_admin',
-    })
-    const token = generateAdminToken(user, 'sess-xyz')
-    const payload = verifyAdminToken(token)
-
-    expect(payload).not.toBeNull()
-    expect(payload!.sub).toBe('user-456')
-    expect(payload!.email).toBe('super@test.com')
-    expect(payload!.role).toBe('super_admin')
-    expect(payload!.sessionId).toBe('sess-xyz')
-  })
-
-  it('should include iat and exp in the payload', () => {
-    const user = makeAdminUser()
-    const token = generateAdminToken(user, sessionId)
-    const payload = verifyAdminToken(token)
-
-    expect(payload).not.toBeNull()
-    expect(typeof payload!.iat).toBe('number')
-    expect(typeof payload!.exp).toBe('number')
-    expect(payload!.exp).toBeGreaterThan(payload!.iat)
-  })
-
-  it('should return null for a tampered token', () => {
-    const user = makeAdminUser()
-    const token = generateAdminToken(user, sessionId)
-
-    // Tamper with the payload section
-    const parts = token.split('.')
-    parts[1] = parts[1] + 'tampered'
-    const tampered = parts.join('.')
-
-    expect(verifyAdminToken(tampered)).toBeNull()
-  })
-
-  it('should return null for a completely invalid string', () => {
-    expect(verifyAdminToken('not-a-jwt')).toBeNull()
-    expect(verifyAdminToken('')).toBeNull()
-    expect(verifyAdminToken('a.b.c')).toBeNull()
-  })
-
-  it('should return null for a token signed with a different secret', async () => {
-    // Dynamically import jsonwebtoken to sign with a different secret
-    const jwt = await import('jsonwebtoken')
-    const otherToken = jwt.default.sign(
-      { sub: 'admin-1', email: 'a@b.com', role: 'admin', sessionId: 's-1' },
-      'completely-different-secret-key-that-is-long-enough',
-      { issuer: 'insurai-admin', audience: 'insurai-admin-api' }
-    )
-
-    expect(verifyAdminToken(otherToken)).toBeNull()
-  })
-
-  it('should return null for wrong issuer', async () => {
-    const jwt = await import('jsonwebtoken')
-    const badIssuer = jwt.default.sign(
-      { sub: 'admin-1', email: 'a@b.com', role: 'admin', sessionId: 's-1' },
-      TEST_JWT_SECRET,
-      { issuer: 'wrong-issuer', audience: 'insurai-admin-api' }
-    )
-
-    expect(verifyAdminToken(badIssuer)).toBeNull()
-  })
-
-  it('should return null for wrong audience', async () => {
-    const jwt = await import('jsonwebtoken')
-    const badAudience = jwt.default.sign(
-      { sub: 'admin-1', email: 'a@b.com', role: 'admin', sessionId: 's-1' },
-      TEST_JWT_SECRET,
-      { issuer: 'insurai-admin', audience: 'wrong-audience' }
-    )
-
-    expect(verifyAdminToken(badAudience)).toBeNull()
-  })
-
-  it('should return null for an expired token', async () => {
-    const jwt = await import('jsonwebtoken')
-    const expired = jwt.default.sign(
-      { sub: 'admin-1', email: 'a@b.com', role: 'admin', sessionId: 's-1' },
-      TEST_JWT_SECRET,
-      { issuer: 'insurai-admin', audience: 'insurai-admin-api', expiresIn: '-10s' }
-    )
-
-    expect(verifyAdminToken(expired)).toBeNull()
-  })
-
-  it('should produce different tokens for different users', () => {
-    const user1 = makeAdminUser({ id: 'user-1', email: 'one@test.com' })
-    const user2 = makeAdminUser({ id: 'user-2', email: 'two@test.com' })
-
-    const token1 = generateAdminToken(user1, sessionId)
-    const token2 = generateAdminToken(user2, sessionId)
-
-    expect(token1).not.toBe(token2)
-  })
-})
-
-// ---------- generateRefreshToken ----------
-
-describe('generateRefreshToken', () => {
-  it('should generate a valid JWT string', () => {
-    const user = makeAdminUser()
-    const token = generateRefreshToken(user, 'sess-1')
-
-    expect(typeof token).toBe('string')
-    expect(token.split('.')).toHaveLength(3)
-  })
-
-  it('should contain the correct sub and sessionId', async () => {
-    const jwt = await import('jsonwebtoken')
-    const user = makeAdminUser({ id: 'refresh-user-99' })
-    const token = generateRefreshToken(user, 'sess-refresh')
-
-    // Decode without verification (refresh tokens don't have issuer/audience)
-    const decoded = jwt.default.decode(token) as Record<string, unknown>
-    expect(decoded.sub).toBe('refresh-user-99')
-    expect(decoded.sessionId).toBe('sess-refresh')
-    expect(decoded.type).toBe('refresh')
-  })
-
-  it('should produce a different token from generateAdminToken for the same user', () => {
-    const user = makeAdminUser()
-    const accessToken = generateAdminToken(user, 'sess-1')
-    const refreshToken = generateRefreshToken(user, 'sess-1')
-
-    expect(accessToken).not.toBe(refreshToken)
-  })
-})
-
-// ---------- hashPassword / verifyPassword ----------
-
-describe('hashPassword / verifyPassword', () => {
-  it('should hash and verify a correct password', async () => {
-    const password = 'SuperSecure123!'
-    const hash = await hashPassword(password)
-
-    expect(typeof hash).toBe('string')
-    expect(hash).not.toBe(password) // hash should differ from plaintext
-    expect(hash.startsWith('$2a$') || hash.startsWith('$2b$')).toBe(true)
-
-    const isValid = await verifyPassword(password, hash)
-    expect(isValid).toBe(true)
-  })
-
-  it('should reject a wrong password', async () => {
-    const hash = await hashPassword('correctPassword')
-    const isValid = await verifyPassword('wrongPassword', hash)
-    expect(isValid).toBe(false)
-  })
-
-  it('should produce different hashes for the same password (salt)', async () => {
-    const password = 'samePassword'
-    const hash1 = await hashPassword(password)
-    const hash2 = await hashPassword(password)
-
-    expect(hash1).not.toBe(hash2)
-
-    // But both should still verify
-    expect(await verifyPassword(password, hash1)).toBe(true)
-    expect(await verifyPassword(password, hash2)).toBe(true)
-  })
-
-  it('should handle empty string password', async () => {
-    const hash = await hashPassword('')
-    expect(typeof hash).toBe('string')
-    expect(await verifyPassword('', hash)).toBe(true)
-    expect(await verifyPassword('notempty', hash)).toBe(false)
-  })
-
-  it('should handle unicode passwords', async () => {
-    const password = 'Türkçe$ifre123'
-    const hash = await hashPassword(password)
-    expect(await verifyPassword(password, hash)).toBe(true)
-    expect(await verifyPassword('Turkce$ifre123', hash)).toBe(false)
-  })
-})
-
-// ---------- hashToken ----------
-
-describe('hashToken', () => {
-  it('should return a hex string', () => {
-    const result = hashToken('test-token')
-    expect(typeof result).toBe('string')
-    expect(result).toMatch(/^[0-9a-f]+$/)
-  })
-
-  it('should return consistent output for the same input', () => {
-    const a = hashToken('same-input')
-    const b = hashToken('same-input')
-    expect(a).toBe(b)
-  })
-
-  it('should return different output for different inputs', () => {
-    const a = hashToken('token-alpha')
-    const b = hashToken('token-beta')
-    expect(a).not.toBe(b)
-  })
-
-  it('should return a 64-character SHA-256 hex digest', () => {
-    const result = hashToken('any-token')
-    expect(result).toHaveLength(64)
-  })
-
-  it('should handle empty string', () => {
-    const result = hashToken('')
-    expect(typeof result).toBe('string')
-    expect(result).toHaveLength(64)
-  })
-})
-
-// ---------- authenticateAdmin middleware ----------
-
-describe('authenticateAdmin', () => {
-  it('should return 401 AUTH_REQUIRED when no Authorization header', () => {
-    const req = createMockReq()
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        success: false,
-        code: 'AUTH_REQUIRED',
-      })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 401 INVALID_AUTH_FORMAT for non-Bearer scheme', () => {
-    const req = createMockReq({
-      headers: { authorization: 'Basic dXNlcjpwYXNz' },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'INVALID_AUTH_FORMAT' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 401 INVALID_AUTH_FORMAT for malformed Bearer header', () => {
-    const req = createMockReq({
-      headers: { authorization: 'Bearer' }, // no space-separated token
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'INVALID_AUTH_FORMAT' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 401 INVALID_AUTH_FORMAT for Bearer with extra segments', () => {
-    const req = createMockReq({
-      headers: { authorization: 'Bearer token extra' },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'INVALID_AUTH_FORMAT' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 401 INVALID_TOKEN for an expired token', async () => {
-    const jwt = await import('jsonwebtoken')
-    const expired = jwt.default.sign(
-      { sub: 'admin-1', email: 'a@b.com', role: 'admin', sessionId: 's-1' },
-      TEST_JWT_SECRET,
-      { issuer: 'insurai-admin', audience: 'insurai-admin-api', expiresIn: '-10s' }
-    )
-
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${expired}` },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'INVALID_TOKEN' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 401 INVALID_TOKEN for a random invalid token', () => {
-    const req = createMockReq({
-      headers: { authorization: 'Bearer some.invalid.token' },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'INVALID_TOKEN' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should call next() and populate req.adminUser for a valid token', () => {
-    const user = makeAdminUser({
-      id: 'admin-mid-test',
-      email: 'middleware@test.com',
-      role: 'super_admin',
-    })
-    const token = generateAdminToken(user, 'sess-mid')
-
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${token}` },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-    expect((req as AuthenticatedRequest).adminUser).toEqual({
-      id: 'admin-mid-test',
-      email: 'middleware@test.com',
-      role: 'super_admin',
-      status: 'active',
-      permissions: [],
-    })
-  })
-
-  it('should populate req.adminSession with session id and tokenHash', () => {
-    const user = makeAdminUser()
-    const sessionId = 'sess-hash-check'
-    const token = generateAdminToken(user, sessionId)
-
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${token}` },
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    authenticateAdmin(req, res, next)
-
-    const session = (req as AuthenticatedRequest).adminSession
-    expect(session).toBeDefined()
-    expect(session!.id).toBe(sessionId)
-    expect(session!.tokenHash).toBe(hashToken(token))
-  })
-})
-
-// ---------- requireRole ----------
-
-describe('requireRole', () => {
-  it('should return 401 when req.adminUser is not set', () => {
-    const middleware = requireRole('admin')
-    const req = createMockReq() // no adminUser
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'AUTH_REQUIRED' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should return 403 INSUFFICIENT_ROLE when user has wrong role', () => {
-    const middleware = requireRole('super_admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 'INSUFFICIENT_ROLE',
-        requiredRoles: ['super_admin'],
-        userRole: 'admin',
-      })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should call next() when user has the required role', () => {
-    const middleware = requireRole('admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-    expect(res.status).not.toHaveBeenCalled()
-  })
-
-  it('should call next() when user has one of multiple allowed roles', () => {
-    const middleware = requireRole('admin', 'super_admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'super_admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-  })
-
-  it('should reject when role matches none of multiple allowed roles', () => {
-    const middleware = requireRole('super_admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should not grant super_admin access when only admin is required (strict role match)', () => {
-    // requireRole checks exact membership in the allowedRoles array
-    // super_admin does NOT automatically bypass requireRole — it must be listed
-    const middleware = requireRole('admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'super_admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    // super_admin is NOT in ['admin'], so it should be rejected
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should allow super_admin when explicitly included in allowed roles', () => {
-    const middleware = requireRole('admin', 'super_admin')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'super_admin' }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-  })
-})
-
-// ---------- requirePermission ----------
-
-describe('requirePermission', () => {
-  it('should return 401 when req.adminUser is not set', () => {
-    const middleware = requirePermission('manage_users')
-    const req = createMockReq()
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(401)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ code: 'AUTH_REQUIRED' })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should call next() for super_admin regardless of permissions', () => {
-    const middleware = requirePermission('manage_users', 'delete_everything')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'super_admin', permissions: [] }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-    expect(res.status).not.toHaveBeenCalled()
-  })
-
-  it('should call next() when user has wildcard (*) permission', () => {
-    const middleware = requirePermission('manage_users')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin', permissions: ['*'] }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-  })
-
-  it('should return 403 when admin lacks required permission', () => {
-    const middleware = requirePermission('manage_users')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin', permissions: ['view_logs'] }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        code: 'INSUFFICIENT_PERMISSIONS',
-        requiredPermissions: ['manage_users'],
-      })
-    )
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should call next() when admin has all required permissions', () => {
-    const middleware = requirePermission('manage_users', 'manage_prompts')
-    const req = createMockReq({
-      adminUser: makeAdminUser({
-        role: 'admin',
-        permissions: ['manage_users', 'manage_prompts', 'view_logs'],
-      }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-  })
-
-  it('should return 403 when admin has only some of the required permissions', () => {
-    const middleware = requirePermission('manage_users', 'manage_prompts')
-    const req = createMockReq({
-      adminUser: makeAdminUser({
-        role: 'admin',
-        permissions: ['manage_users'], // missing manage_prompts
-      }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(next).not.toHaveBeenCalled()
-  })
-
-  it('should call next() when no permissions are required (empty list)', () => {
-    const middleware = requirePermission()
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin', permissions: [] }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(next).toHaveBeenCalledTimes(1)
-  })
-
-  it('should handle admin with empty permissions array correctly', () => {
-    const middleware = requirePermission('some_permission')
-    const req = createMockReq({
-      adminUser: makeAdminUser({ role: 'admin', permissions: [] }),
-    })
-    const res = createMockRes()
-    const next = createMockNext()
-
-    middleware(req as AuthenticatedRequest, res, next)
-
-    expect(res.status).toHaveBeenCalledWith(403)
-    expect(next).not.toHaveBeenCalled()
-  })
-})
-
-// ---------- getJWTSecret edge cases ----------
-
-describe('getJWTSecret configuration', () => {
-  it('should throw when ADMIN_JWT_SECRET is not set', async () => {
-    // We need to re-import the module with the env var unset.
-    // Use vi.resetModules and dynamic import.
-    vi.resetModules()
-
-    const savedSecret = process.env.ADMIN_JWT_SECRET
+  // --------------------------------------------------------------------------
+  // JWT Secret Configuration
+  // --------------------------------------------------------------------------
+  describe('JWT Secret Configuration', () => {
+    const savedAdminSecret = process.env.ADMIN_JWT_SECRET
     const savedJwtSecret = process.env.JWT_SECRET
-    delete process.env.ADMIN_JWT_SECRET
-    delete process.env.JWT_SECRET
 
-    // Re-mock dependencies since we reset modules
-    vi.doMock('../lib/logger.js', () => {
-      const noopLogger = {
-        debug: vi.fn(),
-        info: vi.fn(),
-        warn: vi.fn(),
-        error: vi.fn(),
-        child: () => noopLogger,
+    afterEach(() => {
+      // Restore env vars after each test in this block
+      process.env.ADMIN_JWT_SECRET = savedAdminSecret ?? ''
+      if (savedJwtSecret !== undefined) {
+        process.env.JWT_SECRET = savedJwtSecret
+      } else {
+        delete process.env.JWT_SECRET
       }
-      return { default: noopLogger, logger: noopLogger }
     })
 
-    vi.doMock('@supabase/supabase-js', () => ({
-      createClient: vi.fn().mockReturnValue({
-        from: vi.fn().mockReturnValue({
-          select: vi.fn().mockReturnValue({ eq: vi.fn(), single: vi.fn() }),
-          insert: vi.fn(),
-          update: vi.fn(),
-        }),
-      }),
-    }))
+    it('throws when neither ADMIN_JWT_SECRET nor JWT_SECRET is configured', async () => {
+      vi.resetModules()
+      delete process.env.ADMIN_JWT_SECRET
+      delete process.env.JWT_SECRET
 
-    const mod = await import('../middleware/admin-auth.js')
+      const mod = await import('../middleware/admin-auth.js')
 
-    // generateAdminToken calls getJWTSecretCached -> getJWTSecret which should throw
-    expect(() =>
-      mod.generateAdminToken(makeAdminUser(), 'sess-1')
-    ).toThrow('ADMIN_JWT_SECRET is not configured')
+      expect(() => {
+        mod.generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      }).toThrow('ADMIN_JWT_SECRET is not configured')
+    })
 
-    // Restore
-    process.env.ADMIN_JWT_SECRET = savedSecret
-    if (savedJwtSecret) process.env.JWT_SECRET = savedJwtSecret
-    vi.resetModules()
+    it('falls back to JWT_SECRET when ADMIN_JWT_SECRET is not set', async () => {
+      vi.resetModules()
+      delete process.env.ADMIN_JWT_SECRET
+      process.env.JWT_SECRET = TEST_SECRET
+
+      const mod = await import('../middleware/admin-auth.js')
+      const token = mod.generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+
+      expect(token).toBeTruthy()
+      expect(typeof token).toBe('string')
+      // Verify the token is decodable with that secret
+      const decoded = jwt.verify(token, TEST_SECRET, {
+        issuer: 'insurai-admin',
+        audience: 'insurai-admin-api',
+      }) as jwt.JwtPayload
+      expect(decoded.sub).toBe(TEST_ADMIN_USER.id)
+    })
+
+    it('works but warns when secret is shorter than 32 characters', async () => {
+      vi.resetModules()
+      process.env.ADMIN_JWT_SECRET = SHORT_SECRET
+      delete process.env.JWT_SECRET
+
+      const mod = await import('../middleware/admin-auth.js')
+      // Should not throw — short secret still produces a valid token
+      const token = mod.generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      expect(token).toBeTruthy()
+
+      // Verify the token works with the short secret
+      const decoded = jwt.verify(token, SHORT_SECRET, {
+        issuer: 'insurai-admin',
+        audience: 'insurai-admin-api',
+      }) as jwt.JwtPayload
+      expect(decoded.sub).toBe(TEST_ADMIN_USER.id)
+    })
+
+    it('works with a valid long secret', async () => {
+      vi.resetModules()
+      process.env.ADMIN_JWT_SECRET = TEST_SECRET
+
+      const mod = await import('../middleware/admin-auth.js')
+      const token = mod.generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+
+      expect(token).toBeTruthy()
+      expect(typeof token).toBe('string')
+      expect(token.split('.')).toHaveLength(3) // JWT has 3 parts
+    })
   })
-})
 
-// ---------- Integration: authenticateAdmin + requireRole chain ----------
+  // --------------------------------------------------------------------------
+  // Token Generation
+  // --------------------------------------------------------------------------
+  describe('generateAdminToken', () => {
+    it('generates a valid JWT string with three parts', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
 
-describe('authenticateAdmin + requireRole integration', () => {
-  it('should pass through the full middleware chain for a valid admin user', () => {
-    const user = makeAdminUser({ role: 'admin' })
-    const token = generateAdminToken(user, 'sess-int')
-
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${token}` },
+      expect(typeof token).toBe('string')
+      expect(token.split('.')).toHaveLength(3)
     })
-    const res = createMockRes()
-    const next1 = createMockNext()
 
-    // Step 1: authenticateAdmin
-    authenticateAdmin(req as AuthenticatedRequest, res, next1)
-    expect(next1).toHaveBeenCalledTimes(1)
+    it('includes correct payload fields', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
 
-    // Step 2: requireRole
-    const roleMiddleware = requireRole('admin')
-    const next2 = createMockNext()
-    roleMiddleware(req as AuthenticatedRequest, res, next2)
-    expect(next2).toHaveBeenCalledTimes(1)
+      expect(decoded.sub).toBe(TEST_ADMIN_USER.id)
+      expect(decoded.email).toBe(TEST_ADMIN_USER.email)
+      expect(decoded.role).toBe(TEST_ADMIN_USER.role)
+      expect(decoded.sessionId).toBe(TEST_SESSION_ID)
+      expect(decoded.iat).toBeDefined()
+      expect(decoded.exp).toBeDefined()
+    })
+
+    it('sets issuer to insurai-admin', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
+
+      expect(decoded.iss).toBe('insurai-admin')
+    })
+
+    it('sets audience to insurai-admin-api', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
+
+      expect(decoded.aud).toBe('insurai-admin-api')
+    })
+
+    it('generates different tokens for different users', () => {
+      const token1 = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const token2 = generateAdminToken(TEST_SUPER_ADMIN, 'session-xyz')
+
+      expect(token1).not.toBe(token2)
+    })
+
+    it('sets expiration in the future', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
+
+      const nowSeconds = Math.floor(Date.now() / 1000)
+      expect(decoded.exp).toBeGreaterThan(nowSeconds)
+    })
   })
 
-  it('should block at requireRole if the token role does not match', () => {
-    const user = makeAdminUser({ role: 'admin' })
-    const token = generateAdminToken(user, 'sess-int2')
+  // --------------------------------------------------------------------------
+  // Refresh Token Generation
+  // --------------------------------------------------------------------------
+  describe('generateRefreshToken', () => {
+    it('generates a valid JWT string', () => {
+      const token = generateRefreshToken(TEST_ADMIN_USER, TEST_SESSION_ID)
 
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${token}` },
+      expect(typeof token).toBe('string')
+      expect(token.split('.')).toHaveLength(3)
     })
-    const res = createMockRes()
-    const next1 = createMockNext()
 
-    // Step 1: authenticateAdmin passes
-    authenticateAdmin(req as AuthenticatedRequest, res, next1)
-    expect(next1).toHaveBeenCalledTimes(1)
+    it('includes type "refresh" in payload', () => {
+      const token = generateRefreshToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
 
-    // Step 2: requireRole('super_admin') blocks
-    const roleMiddleware = requireRole('super_admin')
-    const res2 = createMockRes()
-    const next2 = createMockNext()
-    roleMiddleware(req as AuthenticatedRequest, res2, next2)
+      expect(decoded.type).toBe('refresh')
+    })
 
-    expect(res2.status).toHaveBeenCalledWith(403)
-    expect(next2).not.toHaveBeenCalled()
+    it('includes user id and session id', () => {
+      const token = generateRefreshToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const decoded = jwt.decode(token) as jwt.JwtPayload
+
+      expect(decoded.sub).toBe(TEST_ADMIN_USER.id)
+      expect(decoded.sessionId).toBe(TEST_SESSION_ID)
+    })
+
+    it('is a different token from the admin access token', () => {
+      const accessToken = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const refreshToken = generateRefreshToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+
+      expect(accessToken).not.toBe(refreshToken)
+    })
+
+    it('is verifiable with the same secret', () => {
+      const token = generateRefreshToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+
+      // Refresh tokens do NOT have issuer/audience claims
+      const decoded = jwt.verify(token, TEST_SECRET) as jwt.JwtPayload
+      expect(decoded.sub).toBe(TEST_ADMIN_USER.id)
+    })
   })
-})
 
-// ---------- Integration: authenticateAdmin + requirePermission chain ----------
+  // --------------------------------------------------------------------------
+  // Token Verification
+  // --------------------------------------------------------------------------
+  describe('verifyAdminToken', () => {
+    it('returns payload for a valid token', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const payload = verifyAdminToken(token)
 
-describe('authenticateAdmin + requirePermission integration', () => {
-  it('should pass when super_admin requests permission-gated resource', () => {
-    const user = makeAdminUser({ role: 'super_admin' })
-    const token = generateAdminToken(user, 'sess-perm')
-
-    const req = createMockReq({
-      headers: { authorization: `Bearer ${token}` },
+      expect(payload).not.toBeNull()
+      expect(payload!.sub).toBe(TEST_ADMIN_USER.id)
+      expect(payload!.email).toBe(TEST_ADMIN_USER.email)
+      expect(payload!.role).toBe(TEST_ADMIN_USER.role)
+      expect(payload!.sessionId).toBe(TEST_SESSION_ID)
     })
-    const res = createMockRes()
-    const next1 = createMockNext()
 
-    authenticateAdmin(req as AuthenticatedRequest, res, next1)
-    expect(next1).toHaveBeenCalledTimes(1)
+    it('returns null for a completely invalid token string', () => {
+      const result = verifyAdminToken('not-a-valid-jwt-at-all')
 
-    const permMiddleware = requirePermission('manage_users', 'manage_prompts')
-    const next2 = createMockNext()
-    permMiddleware(req as AuthenticatedRequest, res, next2)
-    expect(next2).toHaveBeenCalledTimes(1)
+      expect(result).toBeNull()
+    })
+
+    it('returns null for a token signed with a different secret', () => {
+      const token = jwt.sign(
+        { sub: TEST_ADMIN_USER.id, email: TEST_ADMIN_USER.email, role: 'admin', sessionId: 'x' },
+        'different-secret-entirely',
+        { issuer: 'insurai-admin', audience: 'insurai-admin-api', expiresIn: '30m' }
+      )
+
+      const result = verifyAdminToken(token)
+      expect(result).toBeNull()
+    })
+
+    it('returns null for an expired token', () => {
+      // Create a token with exp in the past
+      const token = jwt.sign(
+        {
+          sub: TEST_ADMIN_USER.id,
+          email: TEST_ADMIN_USER.email,
+          role: 'admin',
+          sessionId: TEST_SESSION_ID,
+          exp: Math.floor(Date.now() / 1000) - 60, // 60 seconds ago
+        },
+        TEST_SECRET,
+        { issuer: 'insurai-admin', audience: 'insurai-admin-api' }
+      )
+
+      const result = verifyAdminToken(token)
+      expect(result).toBeNull()
+    })
+
+    it('returns null for a token with wrong issuer', () => {
+      const token = jwt.sign(
+        { sub: TEST_ADMIN_USER.id, email: TEST_ADMIN_USER.email, role: 'admin', sessionId: 'x' },
+        TEST_SECRET,
+        { issuer: 'wrong-issuer', audience: 'insurai-admin-api', expiresIn: '30m' }
+      )
+
+      const result = verifyAdminToken(token)
+      expect(result).toBeNull()
+    })
+
+    it('returns null for a token with wrong audience', () => {
+      const token = jwt.sign(
+        { sub: TEST_ADMIN_USER.id, email: TEST_ADMIN_USER.email, role: 'admin', sessionId: 'x' },
+        TEST_SECRET,
+        { issuer: 'insurai-admin', audience: 'wrong-audience', expiresIn: '30m' }
+      )
+
+      const result = verifyAdminToken(token)
+      expect(result).toBeNull()
+    })
+
+    it('returns null for an empty string', () => {
+      expect(verifyAdminToken('')).toBeNull()
+    })
+
+    it('roundtrips through generate and verify', () => {
+      const token = generateAdminToken(TEST_SUPER_ADMIN, 'sess-789')
+      const payload = verifyAdminToken(token)
+
+      expect(payload).not.toBeNull()
+      expect(payload!.sub).toBe(TEST_SUPER_ADMIN.id)
+      expect(payload!.email).toBe(TEST_SUPER_ADMIN.email)
+      expect(payload!.role).toBe('super_admin')
+      expect(payload!.sessionId).toBe('sess-789')
+    })
+
+    it('returns null for a tampered token', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const parts = token.split('.')
+      parts[1] = parts[1] + 'tampered'
+      const tampered = parts.join('.')
+
+      expect(verifyAdminToken(tampered)).toBeNull()
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Password Hashing
+  // --------------------------------------------------------------------------
+  describe('hashPassword and verifyPassword', () => {
+    it('hashes a password and returns a bcrypt hash string', async () => {
+      const hash = await hashPassword('MyStrongP@ssw0rd!')
+
+      expect(typeof hash).toBe('string')
+      // bcrypt hashes start with $2a$ or $2b$
+      expect(hash).toMatch(/^\$2[ab]\$/)
+    })
+
+    it('verifies the correct password against its hash', async () => {
+      const password = 'CorrectHorse42Battery!'
+      const hash = await hashPassword(password)
+
+      const isValid = await verifyPassword(password, hash)
+      expect(isValid).toBe(true)
+    })
+
+    it('rejects an incorrect password', async () => {
+      const hash = await hashPassword('the-real-password')
+
+      const isValid = await verifyPassword('wrong-password', hash)
+      expect(isValid).toBe(false)
+    })
+
+    it('generates different hashes for the same password (unique salt)', async () => {
+      const password = 'SamePassword123'
+      const hash1 = await hashPassword(password)
+      const hash2 = await hashPassword(password)
+
+      expect(hash1).not.toBe(hash2)
+      // But both should verify against the original password
+      expect(await verifyPassword(password, hash1)).toBe(true)
+      expect(await verifyPassword(password, hash2)).toBe(true)
+    })
+
+    it('handles empty string password', async () => {
+      const hash = await hashPassword('')
+
+      expect(typeof hash).toBe('string')
+      expect(await verifyPassword('', hash)).toBe(true)
+      expect(await verifyPassword('non-empty', hash)).toBe(false)
+    })
+
+    it('handles unicode passwords', async () => {
+      const password = 'Parola-Turkce-ŞİÇ-123'
+      const hash = await hashPassword(password)
+
+      expect(await verifyPassword(password, hash)).toBe(true)
+      expect(await verifyPassword('Parola-Turkce-SIC-123', hash)).toBe(false)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Token Hashing (SHA-256)
+  // --------------------------------------------------------------------------
+  describe('hashToken', () => {
+    it('returns a hex string of SHA-256 length (64 chars)', () => {
+      const result = hashToken('some-token-value')
+
+      expect(typeof result).toBe('string')
+      expect(result).toHaveLength(64)
+      expect(result).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('is deterministic — same input always produces same hash', () => {
+      const input = 'deterministic-token'
+      const hash1 = hashToken(input)
+      const hash2 = hashToken(input)
+
+      expect(hash1).toBe(hash2)
+    })
+
+    it('produces different hashes for different inputs', () => {
+      const hash1 = hashToken('token-aaa')
+      const hash2 = hashToken('token-bbb')
+
+      expect(hash1).not.toBe(hash2)
+    })
+
+    it('matches the expected SHA-256 output from the crypto module', () => {
+      const input = 'verify-against-crypto'
+      const expected = crypto.createHash('sha256').update(input).digest('hex')
+
+      expect(hashToken(input)).toBe(expected)
+    })
+
+    it('handles an empty string', () => {
+      const result = hashToken('')
+      const expected = crypto.createHash('sha256').update('').digest('hex')
+
+      expect(result).toBe(expected)
+      expect(result).toHaveLength(64)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // authenticateAdmin Middleware
+  // --------------------------------------------------------------------------
+  describe('authenticateAdmin', () => {
+    it('returns 401 with AUTH_REQUIRED when no Authorization header is present', () => {
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('AUTH_REQUIRED')
+      expect((res._body as Record<string, unknown>).success).toBe(false)
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_AUTH_FORMAT when Authorization is not Bearer', () => {
+      const req = createMockRequest({
+        headers: { authorization: 'Basic dXNlcjpwYXNz' },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_AUTH_FORMAT')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_AUTH_FORMAT for "Bearer" with no token', () => {
+      const req = createMockRequest({
+        headers: { authorization: 'Bearer' },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_AUTH_FORMAT')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_AUTH_FORMAT for malformed Bearer header (extra parts)', () => {
+      const req = createMockRequest({
+        headers: { authorization: 'Bearer token extra-stuff' },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_AUTH_FORMAT')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_TOKEN when the JWT is invalid', () => {
+      const req = createMockRequest({
+        headers: { authorization: 'Bearer not.a.valid-jwt' },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_TOKEN')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_TOKEN for an expired JWT', () => {
+      const expiredToken = jwt.sign(
+        {
+          sub: TEST_ADMIN_USER.id,
+          email: TEST_ADMIN_USER.email,
+          role: TEST_ADMIN_USER.role,
+          sessionId: TEST_SESSION_ID,
+          exp: Math.floor(Date.now() / 1000) - 300, // 5 minutes ago
+        },
+        TEST_SECRET,
+        { issuer: 'insurai-admin', audience: 'insurai-admin-api' }
+      )
+
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${expiredToken}` },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_TOKEN')
+      expect(next.called).toBe(false)
+    })
+
+    it('calls next() and attaches adminUser for a valid token', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+      expect(req.adminUser).toBeDefined()
+      expect(req.adminUser!.id).toBe(TEST_ADMIN_USER.id)
+      expect(req.adminUser!.email).toBe(TEST_ADMIN_USER.email)
+      expect(req.adminUser!.role).toBe(TEST_ADMIN_USER.role)
+      expect(req.adminUser!.status).toBe('active')
+    })
+
+    it('attaches adminSession with session id and token hash', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(req.adminSession).toBeDefined()
+      expect(req.adminSession!.id).toBe(TEST_SESSION_ID)
+      expect(req.adminSession!.tokenHash).toBe(hashToken(token))
+    })
+
+    it('sets adminUser.permissions to an empty array', () => {
+      // authenticateAdmin sets permissions to [] since JWT doesn't carry them
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(req.adminUser!.permissions).toEqual([])
+    })
+
+    it('works with a super_admin token', () => {
+      const token = generateAdminToken(TEST_SUPER_ADMIN, 'super-session')
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+      expect(req.adminUser!.role).toBe('super_admin')
+      expect(req.adminUser!.email).toBe(TEST_SUPER_ADMIN.email)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // requireRole Middleware
+  // --------------------------------------------------------------------------
+  describe('requireRole', () => {
+    it('returns 401 when no adminUser is attached to the request', () => {
+      const middleware = requireRole('admin')
+      const req = createMockRequest() // no adminUser
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('AUTH_REQUIRED')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 403 when user role does not match required role', () => {
+      const middleware = requireRole('super_admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER } // role is 'admin'
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(403)
+      expect((res._body as Record<string, unknown>).code).toBe('INSUFFICIENT_ROLE')
+      expect((res._body as Record<string, unknown>).requiredRoles).toEqual(['super_admin'])
+      expect((res._body as Record<string, unknown>).userRole).toBe('admin')
+      expect(next.called).toBe(false)
+    })
+
+    it('calls next() when user has the required role', () => {
+      const middleware = requireRole('admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+      expect(res.statusCode).toBe(200) // unchanged
+    })
+
+    it('calls next() when user role matches one of multiple allowed roles', () => {
+      const middleware = requireRole('admin', 'super_admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER } // role is 'admin'
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('passes for super_admin when super_admin is in allowed roles', () => {
+      const middleware = requireRole('super_admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_SUPER_ADMIN }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('rejects super_admin when only admin role is explicitly required (strict role match)', () => {
+      // requireRole checks exact membership in the allowedRoles array
+      // super_admin does NOT automatically bypass requireRole — it must be listed
+      const middleware = requireRole('admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_SUPER_ADMIN } // role is 'super_admin'
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      // super_admin is NOT in ['admin'], so it should be rejected
+      expect(res.statusCode).toBe(403)
+      expect((res._body as Record<string, unknown>).code).toBe('INSUFFICIENT_ROLE')
+      expect(next.called).toBe(false)
+    })
+
+    it('includes helpful error message listing required roles', () => {
+      const middleware = requireRole('super_admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      const body = res._body as Record<string, unknown>
+      expect(body.error).toContain('super_admin')
+    })
+
+    it('lists multiple required roles in the error message', () => {
+      const middleware = requireRole('super_admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      const body = res._body as Record<string, unknown>
+      expect(body.error).toContain('Insufficient permissions')
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // requirePermission Middleware
+  // --------------------------------------------------------------------------
+  describe('requirePermission', () => {
+    it('returns 401 when no adminUser is attached to the request', () => {
+      const middleware = requirePermission('manage:users')
+      const req = createMockRequest()
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('AUTH_REQUIRED')
+      expect(next.called).toBe(false)
+    })
+
+    it('bypasses permission check for super_admin role', () => {
+      const middleware = requirePermission('manage:users', 'delete:everything')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_SUPER_ADMIN } // super_admin with no explicit permissions
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+      expect(res.statusCode).toBe(200)
+    })
+
+    it('passes when user has wildcard (*) permission', () => {
+      const middleware = requirePermission('manage:users', 'manage:settings')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_WILDCARD_ADMIN } // permissions: ['*']
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('passes when user has all required specific permissions', () => {
+      const middleware = requirePermission('read:policies', 'write:policies')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER } // permissions: ['read:policies', 'write:policies']
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('passes when user has a single required permission', () => {
+      const middleware = requirePermission('read:policies')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('passes when no permissions are required (empty argument list)', () => {
+      const middleware = requirePermission()
+      const req = createMockRequest()
+      req.adminUser = {
+        ...TEST_ADMIN_USER,
+        permissions: [],
+      }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('returns 403 when user is missing one of the required permissions', () => {
+      const middleware = requirePermission('read:policies', 'delete:policies')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_ADMIN_USER } // has read:policies and write:policies, but NOT delete:policies
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(403)
+      expect((res._body as Record<string, unknown>).code).toBe('INSUFFICIENT_PERMISSIONS')
+      expect((res._body as Record<string, unknown>).requiredPermissions).toEqual([
+        'read:policies',
+        'delete:policies',
+      ])
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 403 when user has no matching permissions at all', () => {
+      const middleware = requirePermission('manage:system')
+      const req = createMockRequest()
+      req.adminUser = {
+        ...TEST_ADMIN_USER,
+        permissions: [], // no permissions
+      }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(403)
+      expect((res._body as Record<string, unknown>).code).toBe('INSUFFICIENT_PERMISSIONS')
+      expect(next.called).toBe(false)
+    })
+
+    it('requires ALL permissions, not just one (AND logic)', () => {
+      const middleware = requirePermission('read:policies', 'manage:users')
+      const req = createMockRequest()
+      req.adminUser = {
+        ...TEST_ADMIN_USER,
+        permissions: ['read:policies'], // has one but not the other
+      }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(403)
+      expect(next.called).toBe(false)
+    })
+
+    it('does not treat admin role as super_admin for permission bypass', () => {
+      const middleware = requirePermission('manage:system')
+      const req = createMockRequest()
+      req.adminUser = {
+        ...TEST_ADMIN_USER,
+        role: 'admin',
+        permissions: [], // admin with no permissions
+      }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      // Should NOT bypass — only super_admin gets automatic bypass
+      expect(res.statusCode).toBe(403)
+      expect(next.called).toBe(false)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Integration: authenticateAdmin + requireRole
+  // --------------------------------------------------------------------------
+  describe('authenticateAdmin + requireRole integration', () => {
+    it('full pipeline passes for admin with correct role', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const nextAuth = createMockNext()
+
+      // Step 1: authenticate
+      authenticateAdmin(req, res as unknown as Response, nextAuth)
+      expect(nextAuth.called).toBe(true)
+
+      // Step 2: require role
+      const roleMiddleware = requireRole('admin')
+      const nextRole = createMockNext()
+      roleMiddleware(req, res as unknown as Response, nextRole)
+      expect(nextRole.called).toBe(true)
+    })
+
+    it('full pipeline rejects admin when super_admin is required', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const nextAuth = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, nextAuth)
+      expect(nextAuth.called).toBe(true)
+
+      const roleMiddleware = requireRole('super_admin')
+      const nextRole = createMockNext()
+      roleMiddleware(req, res as unknown as Response, nextRole)
+      expect(nextRole.called).toBe(false)
+      expect(res.statusCode).toBe(403)
+    })
+  })
+
+  // --------------------------------------------------------------------------
+  // Integration: authenticateAdmin + requirePermission
+  // --------------------------------------------------------------------------
+  describe('authenticateAdmin + requirePermission integration', () => {
+    it('super_admin passes any permission check after authentication', () => {
+      const token = generateAdminToken(TEST_SUPER_ADMIN, 'super-sess')
+      const req = createMockRequest({
+        headers: { authorization: `Bearer ${token}` },
+      })
+      const res = createMockResponse()
+      const nextAuth = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, nextAuth)
+      expect(nextAuth.called).toBe(true)
+
+      // super_admin should bypass any permission requirement
+      const permMiddleware = requirePermission('manage:everything', 'delete:all')
+      const nextPerm = createMockNext()
+      permMiddleware(req, res as unknown as Response, nextPerm)
+      expect(nextPerm.called).toBe(true)
+    })
   })
 })

@@ -11,14 +11,13 @@ import {
   logAdminAction,
   getSupabaseWithError,
   qstr,
+  logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
 import * as processingLogService from '../../services/processing-log-service.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
-import { logger } from '../../lib/logger.js'
 
 const log = logger.child('AdminContent')
-
 const router = Router()
 
 // ============================================================================
