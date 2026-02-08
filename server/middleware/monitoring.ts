@@ -234,8 +234,8 @@ export function recordRequest(metric: RequestMetric): void {
   checkAlertRules(metric)
 
   // Persist to database asynchronously
-  persistMetric(metric).catch(() => {
-    // Silently fail - metrics are also in memory
+  persistMetric(metric).catch((err) => {
+    log.debug('Metric persistence failed (in-memory buffer available)', { error: err instanceof Error ? err.message : String(err) })
   })
 }
 

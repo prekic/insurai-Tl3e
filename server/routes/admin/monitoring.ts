@@ -12,9 +12,11 @@ import {
   logAdminAction,
   monitoring,
   qstr,
+  logger,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
 
+const log = logger.child('AdminMonitoring')
 const router = Router()
 
 // ============================================================================
@@ -30,7 +32,7 @@ router.get('/monitoring/metrics', authenticateAdmin, (_req: AuthenticatedRequest
     const metrics = monitoring.getSystemMetrics()
     res.json({ success: true, data: metrics })
   } catch (error) {
-    console.error('Failed to get metrics:', error)
+    log.error('Failed to get metrics', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get metrics' })
   }
 })
@@ -44,7 +46,7 @@ router.get('/monitoring/health', async (_req: Request, res: Response) => {
     const health = await monitoring.runHealthChecks()
     res.json({ success: true, data: health })
   } catch (error) {
-    console.error('Failed to run health checks:', error)
+    log.error('Failed to run health checks', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to run health checks' })
   }
 })
@@ -58,7 +60,7 @@ router.get('/monitoring/dashboard', authenticateAdmin, async (_req: Authenticate
     const summary = await monitoring.getDashboardSummary()
     res.json({ success: true, data: summary })
   } catch (error) {
-    console.error('Failed to get dashboard summary:', error)
+    log.error('Failed to get dashboard summary', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get dashboard summary' })
   }
 })
@@ -72,7 +74,7 @@ router.get('/monitoring/endpoints', authenticateAdmin, (_req: AuthenticatedReque
     const stats = monitoring.getEndpointStats()
     res.json({ success: true, data: stats })
   } catch (error) {
-    console.error('Failed to get endpoint stats:', error)
+    log.error('Failed to get endpoint stats', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get endpoint stats' })
   }
 })
@@ -88,7 +90,7 @@ router.get('/monitoring/trends', authenticateAdmin, (req: AuthenticatedRequest, 
     const trends = monitoring.getTrends(periodMinutes, intervalMinutes)
     res.json({ success: true, data: trends })
   } catch (error) {
-    console.error('Failed to get trends:', error)
+    log.error('Failed to get trends', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get trends' })
   }
 })
@@ -103,7 +105,7 @@ router.get('/monitoring/activity', authenticateAdmin, (req: AuthenticatedRequest
     const activity = monitoring.getRecentActivity(limit)
     res.json({ success: true, data: activity })
   } catch (error) {
-    console.error('Failed to get recent activity:', error)
+    log.error('Failed to get recent activity', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get recent activity' })
   }
 })
@@ -121,7 +123,7 @@ router.get('/monitoring/alert-rules', authenticateAdmin, (_req: AuthenticatedReq
     const rules = monitoring.getAlertRules()
     res.json({ success: true, data: rules })
   } catch (error) {
-    console.error('Failed to get alert rules:', error)
+    log.error('Failed to get alert rules', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alert rules' })
   }
 })
@@ -141,7 +143,7 @@ router.get('/monitoring/alert-rules/:id', authenticateAdmin, (req: Authenticated
 
     res.json({ success: true, data: rule })
   } catch (error) {
-    console.error('Failed to get alert rule:', error)
+    log.error('Failed to get alert rule', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alert rule' })
   }
 })
@@ -179,7 +181,7 @@ router.post('/monitoring/alert-rules', ...requireSuperAdmin(), async (req: Authe
 
     res.json({ success: true, data: rule })
   } catch (error) {
-    console.error('Failed to create alert rule:', error)
+    log.error('Failed to create alert rule', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create alert rule' })
   }
 })
@@ -205,7 +207,7 @@ router.put('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req: Au
 
     res.json({ success: true, data: rule })
   } catch (error) {
-    console.error('Failed to update alert rule:', error)
+    log.error('Failed to update alert rule', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update alert rule' })
   }
 })
@@ -230,7 +232,7 @@ router.delete('/monitoring/alert-rules/:id', ...requireSuperAdmin(), async (req:
 
     res.json({ success: true, message: 'Alert rule deleted' })
   } catch (error) {
-    console.error('Failed to delete alert rule:', error)
+    log.error('Failed to delete alert rule', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to delete alert rule' })
   }
 })
@@ -248,7 +250,7 @@ router.get('/monitoring/alerts', authenticateAdmin, (_req: AuthenticatedRequest,
     const alerts = monitoring.getActiveAlerts()
     res.json({ success: true, data: alerts })
   } catch (error) {
-    console.error('Failed to get alerts:', error)
+    log.error('Failed to get active alerts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
 })
@@ -263,7 +265,7 @@ router.get('/monitoring/alerts/history', authenticateAdmin, (req: AuthenticatedR
     const history = monitoring.getAlertHistory(limit)
     res.json({ success: true, data: history })
   } catch (error) {
-    console.error('Failed to get alert history:', error)
+    log.error('Failed to get alert history', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alert history' })
   }
 })
@@ -288,7 +290,7 @@ router.post('/monitoring/alerts/:id/acknowledge', authenticateAdmin, async (req:
 
     res.json({ success: true, data: alert })
   } catch (error) {
-    console.error('Failed to acknowledge alert:', error)
+    log.error('Failed to acknowledge monitoring alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
 })
@@ -313,7 +315,7 @@ router.post('/monitoring/alerts/:id/resolve', authenticateAdmin, async (req: Aut
 
     res.json({ success: true, data: alert })
   } catch (error) {
-    console.error('Failed to resolve alert:', error)
+    log.error('Failed to resolve alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to resolve alert' })
   }
 })
