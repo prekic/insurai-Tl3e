@@ -19,6 +19,9 @@ import {
   getClientIp,
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
+import { logger } from '../../lib/logger.js'
+
+const log = logger.child('AdminPrompts')
 
 const router = Router()
 
@@ -41,7 +44,7 @@ router.get('/prompts', authenticateAdmin, async (req: AuthenticatedRequest, res:
 
     res.json({ success: true, data: templates })
   } catch (error) {
-    console.error('[Admin] Error fetching prompts:', error)
+    log.error('Error fetching prompts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch prompts' })
   }
 })
@@ -57,7 +60,7 @@ router.get('/prompts/:id', authenticateAdmin, async (req: AuthenticatedRequest, 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('[Admin] Error fetching prompt:', error)
+    log.error('Error fetching prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch prompt' })
   }
 })
@@ -105,7 +108,7 @@ router.put('/prompts/:id', authenticateAdmin, requireRole('admin', 'super_admin'
 
     res.json({ success: true, data: updatedTemplate })
   } catch (error) {
-    console.error('[Admin] Error updating prompt:', error)
+    log.error('Error updating prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update prompt' })
   }
 })
@@ -154,7 +157,7 @@ router.post('/prompts', authenticateAdmin, requireRole('admin', 'super_admin'), 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('[Admin] Error creating prompt:', error)
+    log.error('Error creating prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create prompt' })
   }
 })
@@ -174,7 +177,7 @@ router.get('/prompts/templates', authenticateAdmin, async (req: AuthenticatedReq
 
     res.json({ success: true, data: templates })
   } catch (error) {
-    console.error('Failed to list templates:', error)
+    log.error('Failed to list templates', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to list templates' })
   }
 })
@@ -197,7 +200,7 @@ router.get('/prompts/templates/:id', authenticateAdmin, async (req: Authenticate
 
     res.json({ success: true, data: { ...template, versions } })
   } catch (error) {
-    console.error('Failed to get template:', error)
+    log.error('Failed to get template', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get template' })
   }
 })
@@ -234,7 +237,7 @@ router.post('/prompts/templates', ...requireSuperAdmin(), async (req: Authentica
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('Failed to create template:', error)
+    log.error('Failed to create template', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create template' })
   }
 })
@@ -265,7 +268,7 @@ router.put('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Authent
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('Failed to update template:', error)
+    log.error('Failed to update template', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update template' })
   }
 })
@@ -290,7 +293,7 @@ router.delete('/prompts/templates/:id', ...requireSuperAdmin(), async (req: Auth
 
     res.json({ success: true, message: 'Template deleted' })
   } catch (error) {
-    console.error('Failed to delete template:', error)
+    log.error('Failed to delete template', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to delete template' })
   }
 })
@@ -305,7 +308,7 @@ router.get('/prompts/templates/:id/stats', authenticateAdmin, async (req: Authen
 
     res.json({ success: true, data: stats })
   } catch (error) {
-    console.error('Failed to get template stats:', error)
+    log.error('Failed to get template stats', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get template stats' })
   }
 })
@@ -324,7 +327,7 @@ router.get('/prompts/templates/:templateId/versions', authenticateAdmin, async (
 
     res.json({ success: true, data: versions })
   } catch (error) {
-    console.error('Failed to get versions:', error)
+    log.error('Failed to get versions', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get versions' })
   }
 })
@@ -344,7 +347,7 @@ router.get('/prompts/versions/:id', authenticateAdmin, async (req: Authenticated
 
     res.json({ success: true, data: version })
   } catch (error) {
-    console.error('Failed to get version:', error)
+    log.error('Failed to get version', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get version' })
   }
 })
@@ -370,7 +373,7 @@ router.post('/prompts/templates/:templateId/rollback/:versionId', ...requireSupe
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('Failed to rollback:', error)
+    log.error('Failed to rollback', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to rollback' })
   }
 })
@@ -411,7 +414,7 @@ router.get('/prompts/versions/compare', authenticateAdmin, async (req: Authentic
       },
     })
   } catch (error) {
-    console.error('Failed to compare versions:', error)
+    log.error('Failed to compare versions', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to compare versions' })
   }
 })
@@ -431,7 +434,7 @@ router.get('/prompts/ab-tests', authenticateAdmin, async (req: AuthenticatedRequ
 
     res.json({ success: true, data: tests })
   } catch (error) {
-    console.error('Failed to list A/B tests:', error)
+    log.error('Failed to list A/B tests', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to list A/B tests' })
   }
 })
@@ -464,7 +467,7 @@ router.get('/prompts/ab-tests/:id', authenticateAdmin, async (req: Authenticated
       },
     })
   } catch (error) {
-    console.error('Failed to get A/B test:', error)
+    log.error('Failed to get A/B test', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get A/B test' })
   }
 })
@@ -522,7 +525,7 @@ router.post('/prompts/ab-tests', ...requireSuperAdmin(), async (req: Authenticat
 
     res.json({ success: true, data: test })
   } catch (error) {
-    console.error('Failed to create A/B test:', error)
+    log.error('Failed to create A/B test', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create A/B test' })
   }
 })
@@ -556,7 +559,7 @@ router.put('/prompts/ab-tests/:id/status', ...requireSuperAdmin(), async (req: A
 
     res.json({ success: true, data: test })
   } catch (error) {
-    console.error('Failed to update A/B test status:', error)
+    log.error('Failed to update A/B test status', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update A/B test status' })
   }
 })
@@ -576,7 +579,7 @@ router.get('/prompts/ab-tests/:id/results', authenticateAdmin, async (req: Authe
 
     res.json({ success: true, data: results })
   } catch (error) {
-    console.error('Failed to get A/B test results:', error)
+    log.error('Failed to get A/B test results', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get A/B test results' })
   }
 })
@@ -627,7 +630,7 @@ router.post('/prompts/ab-tests/:id/apply-winner', ...requireSuperAdmin(), async 
 
     res.json({ success: true, data: template })
   } catch (error) {
-    console.error('Failed to apply winner:', error)
+    log.error('Failed to apply winner', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to apply winner' })
   }
 })
@@ -671,7 +674,7 @@ router.post('/prompts/preview', authenticateAdmin, async (req: AuthenticatedRequ
 
     res.json({ success: true, data: rendered })
   } catch (error) {
-    console.error('Failed to preview prompt:', error)
+    log.error('Failed to preview prompt', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to preview prompt' })
   }
 })
@@ -693,7 +696,7 @@ router.post('/prompts/extract-variables', authenticateAdmin, (req: Authenticated
 
     res.json({ success: true, data: { variables } })
   } catch (error) {
-    console.error('Failed to extract variables:', error)
+    log.error('Failed to extract variables', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to extract variables' })
   }
 })

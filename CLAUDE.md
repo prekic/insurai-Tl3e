@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**
-- **Production Readiness**: ~9.5/10 (6338+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 7, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**
+- **Production Readiness**: ~9.5/10 (5,800+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 8, 2026
 
 ---
 
@@ -19,7 +19,7 @@
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Frontend | React + TypeScript | 18.3 / 5.6 |
+| Frontend | React + TypeScript | 18.3 / 5.9.3 |
 | Styling | Tailwind CSS | v4 |
 | Routing | React Router | v7 |
 | Build | Vite | v6 |
@@ -29,7 +29,7 @@
 | AI | OpenAI, Anthropic, Google | Multi-provider |
 | PDF | pdf.js (browser), pdf-parse (server) | v5.4 |
 | Monitoring | Sentry | v10 |
-| Testing | Vitest + Playwright | v2.1 / v1.57 |
+| Testing | Vitest + Playwright | v2.1 / v1.58 |
 
 ---
 
@@ -1188,10 +1188,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 6, 2026)
-- **Total**: 6338+ tests across 192+ test files
-- **Passing**: 100% (all pre-existing test failures fixed)
-- **Coverage Target**: 80%+
+### Test Counts (as of Feb 8, 2026)
+- **Total**: 5,801 tests across 181 test files (reduced from 6,338/192 after dead code removal)
+- **Passing**: 100% (0 failures)
+- **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
+- **Note**: Test count decrease is from removing ~17,800 lines of dead code (unused hooks, orphaned libraries, dead types) — no production code was lost
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -1207,6 +1208,11 @@ Server Tests:               server/__tests__/
 | `src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx` | 11 | Config performance dashboard |
 | `src/lib/config/__tests__/config-performance-monitor.test.ts` | 21 | Performance monitor core |
 | `server/__tests__/settings-routes.test.ts` | 43 | Settings API (includes export/import + performance) |
+| `server/__tests__/admin-auth.test.ts` | 50 | Admin auth: password hashing, JWT, middleware |
+| `src/lib/ai/pdf-splitter.test.ts` | 25 | PDF splitting: chunking, page ranges, edge cases |
+| `src/lib/ai/document-ocr.test.ts` | 16 | Document OCR: hash, config, extraction, errors |
+| `server/__tests__/pdf-routes.test.ts` | 23 | PDF quality analysis, Turkish OCR fixes |
+| `server/__tests__/error-classification.test.ts` | 53 | AI provider error classification |
 
 ### Running Tests
 ```bash
@@ -1341,13 +1347,11 @@ Base components built with Tailwind CSS, following shadcn/ui patterns:
 | `usePolicyEvaluation` | Evaluate policy against benchmarks | `{ evaluation, isLoading }` |
 | `usePolicyComparison` | Compare multiple policies | `{ comparison, compare }` |
 | `useRegionalBenchmark` | Get regional risk data | `{ benchmarks, region }` |
-| `useMarketData` | Fetch market provider data | `{ providers, benchmarks }` |
 | `usePdfExport` | Export policy to PDF | `{ exportPdf, isExporting }` |
-| `useAnalytics` | Track user actions | `{ track, identify }` |
 | `useCostTracking` | Track AI API costs | `{ costs, addCost }` |
-| `usePrivacy` | KVKK/GDPR consent management | `{ hasConsent, requestConsent }` |
-| `useIndustryRisk` | Industry-specific risk factors | `{ riskFactor, industryData }` |
-| `usePolicyTemplates` | Predefined policy templates | `{ templates, applyTemplate }` |
+| `useUserPreferences` | Three-tier config override | `{ preferences, updatePreference }` |
+
+> **Removed (Feb 8, 2026)**: `useAnalytics`, `usePrivacy`, `useMarketData`, `useIndustryRisk`, `usePolicyTemplates` — zero production imports, functionality served by other modules (see Known Issue #75).
 
 ### Hook Pattern
 ```tsx
@@ -3022,6 +3026,46 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Commit**: `6e5263f`
 
+### 75. Dead Code Cleanup — ~17,800 Lines Removed (Feb 8, 2026)
+- **Problem**: Coverage audit revealed significant dead code: 5 unused hooks, 3 orphaned library modules, 3 dead type files, 1 dead utility module, and 8 dead exports in active files
+- **Dead Hooks Removed**: `useAnalytics` (→ `src/lib/analytics.ts`), `usePrivacy` (→ `src/lib/privacy/`), `useMarketData` (→ `src/data/market-data/`), `useIndustryRisk` (→ `src/lib/regional-benchmark/`), `usePolicyTemplates` (→ `server/services/prompt-service.ts`)
+- **Dead Libraries Removed**: `src/lib/data-repository/` (7 files), `src/lib/industry-risk/` (5 files), `src/lib/policy-templates/` (7 files)
+- **Dead Types Removed**: `src/types/data-repository.ts`, `src/types/industry-risk.ts`, `src/types/policy-template.ts`
+- **Dead Utility Removed**: `src/lib/preflight-check.ts`
+- **Dead Exports Removed from Active Files**:
+  - `src/lib/free-trial.ts`: `getShareUrl()`
+  - `src/lib/policy-utils.ts`: `getSimilarityLabelTr()`, `getSignificanceLabel()`, `getSignificanceLabelTr()`
+  - `src/lib/policy-upload-check.ts`: `ConflictSummary`, `getConflictSummary()`
+  - `src/lib/insurance-display.ts`: `getCoverageLabel()`
+- **Verification**: All exports confirmed 0 production imports via `grep -r` (excluding test files)
+- **Impact**: Tests reduced from 6,338 (192 files) → 5,801 (181 files) — no production functionality lost
+- **Commit**: `de83f8d`
+
+### 76. Production Hardening Phase 3 (Feb 8, 2026)
+- **Feature**: Medium/low priority hardening and comprehensive test coverage additions
+- **Changes**:
+  - PDF magic byte validation (`%PDF-` header check) in `server/routes/pdf.ts`
+  - Hidden source maps for Sentry error tracking in `vite.config.ts`
+  - Fix 4 silent `.catch(() => {})` in IndexedDB cache with debug-mode logging
+  - Railway CLI rollback in GitHub Actions production workflow
+  - Service worker background sync with IndexedDB pending queue
+  - npm audit overrides for transitive vulnerabilities in `@lhci/cli`
+  - Node.js version updated to 22 in CI workflows (matches `.nvmrc`)
+- **New Tests**: 111 tests across 5 files (admin-auth, pdf-splitter, document-ocr, pdf-routes, admin-flows E2E)
+- **Commit**: `acfa3ad`
+
+### 77. Missing requestId in Anthropic Extraction Endpoint (Fixed Feb 8, 2026)
+- **Problem**: Railway build failed with `TS2552: Cannot find name 'requestId'` at `server/routes/ai.ts:603`
+- **Root Cause**: Standalone `/api/ai/extract/anthropic` endpoint referenced `requestId` in `log.error()` but never defined it (the OpenAI and unified endpoints both had it)
+- **Fix**: Added `const requestId = 'ext-ant-${Date.now()}'` at the top of the handler
+- **Commit**: `41782f7`
+
+### 78. Flaky duration_ms Assertion in OCR Regression Test (Fixed Feb 8, 2026)
+- **Problem**: `ocr-decision-engine.regression.test.ts` intermittently failed on `expect(decision.duration_ms).toBeGreaterThan(0)`
+- **Root Cause**: `performance.now()` granularity varies by environment — operation can complete in 0ms
+- **Fix**: Changed to `toBeGreaterThanOrEqual(0)`
+- **Commit**: `de83f8d`
+
 ---
 
 ## Turkish Market Considerations
@@ -3410,6 +3454,17 @@ connectSrc: [
 - Import from `server/routes/admin/index.ts` which aggregates all sub-routers
 - Shared utilities (Supabase client, helpers) live in `server/routes/admin/shared.ts`
 
+**Market Data: Two Parallel Systems (Migration Incomplete):**
+- Static files in `src/data/market-data/` (benchmarks.ts, providers.ts) are the **primary source** — used by 7 production consumers (gap analyzers, evaluator, extractor, comparison engine)
+- Database tables (`market_benchmarks`, `insurance_providers`, `regional_factors`) are seeded with the same data and `ConfigurationService` has methods to read from them, but the core business logic hasn't been switched over yet
+- The deleted `data-repository/` was an unused intermediate abstraction layer that was never wired in
+- **Migration TODO**: Switch gap analyzers, evaluator, and extractor from static imports to `configService.getMarketBenchmarks()` / `configService.getRegionalFactor()` so admins can update benchmark data via Settings UI without code changes
+
+**Dead Code Verification Pattern:**
+- Before deleting any export, verify 0 production imports with: `grep -r "functionName" src/ server/ --include="*.ts" --include="*.tsx" | grep -v ".test." | grep -v "__tests__"`
+- Check for orphaned dependency chains: a dead hook may be the only consumer of an entire library directory
+- Test files referencing deleted exports will cause import errors — update test files when removing exports
+
 ---
 
 ## CI/CD
@@ -3457,5 +3512,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6338+ tests, all passing (192 test files)
-**Last Updated**: February 7, 2026
+**Tests**: 5,801 tests, all passing (181 test files)
+**Last Updated**: February 8, 2026

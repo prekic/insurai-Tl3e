@@ -10,6 +10,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 import { logger } from '../lib/logger.js'
 
 const log = logger.child('monitoring')
@@ -519,7 +520,7 @@ export function createAlertRule(
   const now = new Date().toISOString()
   const newRule: AlertRule = {
     ...rule,
-    id: `rule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `rule_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`,
     createdAt: now,
     updatedAt: now,
   }
@@ -634,7 +635,7 @@ function checkAlertRules(metric: RequestMetric): void {
  */
 function triggerAlert(rule: AlertRule, value: number): void {
   const alert: Alert = {
-    id: `alert_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    id: `alert_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`,
     ruleId: rule.id,
     ruleName: rule.name,
     metric: rule.metric,

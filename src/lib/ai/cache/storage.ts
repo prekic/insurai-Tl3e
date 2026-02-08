@@ -88,13 +88,17 @@ export class CacheStorage<T> {
           // Check expiration
           if (entry.expiresAt < Date.now()) {
             // Entry expired, delete it asynchronously
-            this.delete(key).catch(() => {})
+            this.delete(key).catch((err) => {
+              if (this.config.debug) console.warn('[AICache] Failed to delete expired entry:', err)
+            })
             resolve(null)
             return
           }
 
           // Update hit count asynchronously
-          this.incrementHits(fullKey).catch(() => {})
+          this.incrementHits(fullKey).catch((err) => {
+            if (this.config.debug) console.warn('[AICache] Failed to increment hits:', err)
+          })
 
           resolve(entry)
         }
@@ -139,7 +143,9 @@ export class CacheStorage<T> {
 
         request.onsuccess = () => {
           // Check if we need to evict old entries
-          this.evictIfNeeded().catch(() => {})
+          this.evictIfNeeded().catch((err) => {
+            if (this.config.debug) console.warn('[AICache] Cache eviction failed:', err)
+          })
           resolve()
         }
 
@@ -265,7 +271,8 @@ export class CacheStorage<T> {
                 oldestEntry,
                 newestEntry,
               })
-            }).catch(() => {
+            }).catch((err) => {
+              if (this.config.debug) console.warn('[AICache] Failed to retrieve stats metadata:', err)
               resolve({
                 hits,
                 misses: 0,

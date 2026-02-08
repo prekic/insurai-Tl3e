@@ -4,6 +4,7 @@
  */
 
 import { Request, Response, NextFunction } from 'express'
+import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // ============================================================================
@@ -465,7 +466,7 @@ function createAlert(
   }
 
   return {
-    id: `alert-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    id: `alert-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`,
     budgetId: budget.id,
     budgetName: budget.name,
     alertType,

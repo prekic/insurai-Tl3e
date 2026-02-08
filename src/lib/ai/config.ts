@@ -247,6 +247,7 @@ export async function extractViaProxy(
   error?: string
   provider?: 'openai' | 'anthropic'
   fallback?: boolean
+  fallbackReason?: string
   usage?: { input_tokens?: number; output_tokens?: number }
 }> {
   const proxyUrl = getProxyUrl()
@@ -308,6 +309,7 @@ export async function extractViaProxy(
       data: result.data,
       provider: result.provider,
       fallback: result.fallback,
+      ...(result.fallbackReason && { fallbackReason: result.fallbackReason }),
       usage: result.usage,
     }
   } catch (error) {

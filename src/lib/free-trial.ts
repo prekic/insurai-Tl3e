@@ -260,24 +260,6 @@ export function getTrialEmail(): string | null {
 // ============================================================================
 
 /**
- * Get the share URL for the current trial result
- */
-export function getShareUrl(): string | null {
-  try {
-    const shareId = localStorage.getItem(STORAGE_KEYS.TRIAL_SHARE_ID)
-    if (!shareId) return null
-
-    // Check if trial is still valid
-    if (!hasValidTrialResult()) return null
-
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
-    return `${baseUrl}/share/${shareId}`
-  } catch {
-    return null
-  }
-}
-
-/**
  * Get share ID for the current trial
  */
 export function getShareId(): string | null {

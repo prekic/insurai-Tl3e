@@ -15,6 +15,9 @@ import {
 import type { AuthenticatedRequest } from './shared.js'
 import * as processingLogService from '../../services/processing-log-service.js'
 import * as adminNotificationService from '../../services/admin-notification-service.js'
+import { logger } from '../../lib/logger.js'
+
+const log = logger.child('AdminContent')
 
 const router = Router()
 
@@ -60,7 +63,7 @@ router.get('/processing-logs', authenticateAdmin, async (req: AuthenticatedReque
       offset: filters.offset,
     })
   } catch (error) {
-    console.error('Failed to list processing logs:', error)
+    log.error('Failed to list processing logs', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to list processing logs' })
   }
 })
@@ -79,7 +82,7 @@ router.get('/processing-logs/stats', authenticateAdmin, async (req: Authenticate
       data: stats,
     })
   } catch (error) {
-    console.error('Failed to get processing stats:', error)
+    log.error('Failed to get processing stats', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get processing stats' })
   }
 })
@@ -91,19 +94,19 @@ router.get('/processing-logs/stats', authenticateAdmin, async (req: Authenticate
 router.get('/processing-logs/:documentId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const documentId = qstr(req.params.documentId)
-    const log = await processingLogService.getProcessingLog(documentId)
+    const logRecord = await processingLogService.getProcessingLog(documentId)
 
-    if (!log) {
+    if (!logRecord) {
       res.status(404).json({ success: false, error: 'Processing log not found' })
       return
     }
 
     res.json({
       success: true,
-      data: log,
+      data: logRecord,
     })
   } catch (error) {
-    console.error('Failed to get processing log:', error)
+    log.error('Failed to get processing log', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get processing log' })
   }
 })
@@ -115,19 +118,19 @@ router.get('/processing-logs/:documentId', authenticateAdmin, async (req: Authen
 router.get('/processing-logs/by-policy/:policyId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const policyId = qstr(req.params.policyId)
-    const log = await processingLogService.getProcessingLogByPolicyId(policyId)
+    const logRecord = await processingLogService.getProcessingLogByPolicyId(policyId)
 
-    if (!log) {
+    if (!logRecord) {
       res.status(404).json({ success: false, error: 'Processing log not found for this policy' })
       return
     }
 
     res.json({
       success: true,
-      data: log,
+      data: logRecord,
     })
   } catch (error) {
-    console.error('Failed to get processing log by policy:', error)
+    log.error('Failed to get processing log by policy', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get processing log' })
   }
 })
@@ -150,7 +153,7 @@ router.post('/processing-logs/cleanup', authenticateAdmin, requireSuperAdmin, as
       deletedCount,
     })
   } catch (error) {
-    console.error('Failed to cleanup processing logs:', error)
+    log.error('Failed to cleanup processing logs', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to cleanup processing logs' })
   }
 })
@@ -172,7 +175,7 @@ router.get('/notifications/unacknowledged', authenticateAdmin, async (_req: Auth
       count: notifications.length,
     })
   } catch (error) {
-    console.error('Failed to get unacknowledged notifications:', error)
+    log.error('Failed to get unacknowledged notifications', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get notifications' })
   }
 })
@@ -196,7 +199,7 @@ router.get('/notifications', authenticateAdmin, async (req: AuthenticatedRequest
       offset,
     })
   } catch (error) {
-    console.error('Failed to get notifications:', error)
+    log.error('Failed to get notifications', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get notifications' })
   }
 })
@@ -222,7 +225,7 @@ router.post('/notifications/:id/acknowledge', authenticateAdmin, async (req: Aut
 
     res.json({ success: true, message: 'Notification acknowledged' })
   } catch (error) {
-    console.error('Failed to acknowledge notification:', error)
+    log.error('Failed to acknowledge notification', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge notification' })
   }
 })
@@ -253,7 +256,7 @@ router.post('/notifications/acknowledge-all', authenticateAdmin, async (req: Aut
       acknowledgedCount,
     })
   } catch (error) {
-    console.error('Failed to acknowledge all notifications:', error)
+    log.error('Failed to acknowledge all notifications', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge notifications' })
   }
 })
@@ -320,14 +323,14 @@ router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, r
     const { data, error } = await query
 
     if (error) {
-      console.error('Failed to fetch benchmarks:', error)
+      log.error('Failed to fetch benchmarks', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
       return
     }
 
     res.json({ success: true, data: data as PremiumBenchmark[] })
   } catch (error) {
-    console.error('Failed to fetch benchmarks:', error)
+    log.error('Failed to fetch benchmarks', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
   }
 })
@@ -359,7 +362,7 @@ router.get('/benchmarks/:id', authenticateAdmin, async (req: AuthenticatedReques
 
     res.json({ success: true, data: data as PremiumBenchmark })
   } catch (error) {
-    console.error('Failed to fetch benchmark:', error)
+    log.error('Failed to fetch benchmark', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch benchmark' })
   }
 })
@@ -432,7 +435,7 @@ router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequ
       .single()
 
     if (error) {
-      console.error('Failed to create benchmark:', error)
+      log.error('Failed to create benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to create benchmark' })
       return
     }
@@ -442,7 +445,7 @@ router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequ
 
     res.json({ success: true, data: data as PremiumBenchmark })
   } catch (error) {
-    console.error('Failed to create benchmark:', error)
+    log.error('Failed to create benchmark', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to create benchmark' })
   }
 })
@@ -509,7 +512,7 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
       .single()
 
     if (error) {
-      console.error('Failed to update benchmark:', error)
+      log.error('Failed to update benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to update benchmark' })
       return
     }
@@ -519,7 +522,7 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
 
     res.json({ success: true, data: data as PremiumBenchmark })
   } catch (error) {
-    console.error('Failed to update benchmark:', error)
+    log.error('Failed to update benchmark', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to update benchmark' })
   }
 })
@@ -545,7 +548,7 @@ router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: Authenticat
       .eq('id', id)
 
     if (error) {
-      console.error('Failed to delete benchmark:', error)
+      log.error('Failed to delete benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to delete benchmark' })
       return
     }
@@ -555,7 +558,7 @@ router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: Authenticat
 
     res.json({ success: true, message: 'Benchmark deactivated' })
   } catch (error) {
-    console.error('Failed to delete benchmark:', error)
+    log.error('Failed to delete benchmark', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to delete benchmark' })
   }
 })
@@ -579,7 +582,7 @@ router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: Authen
       .eq('is_active', true)
 
     if (error) {
-      console.error('Failed to fetch insurance types:', error)
+      log.error('Failed to fetch insurance types', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to fetch insurance types' })
       return
     }
@@ -589,7 +592,7 @@ router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: Authen
 
     res.json({ success: true, data: types })
   } catch (error) {
-    console.error('Failed to fetch insurance types:', error)
+    log.error('Failed to fetch insurance types', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to fetch insurance types' })
   }
 })
@@ -630,7 +633,7 @@ router.put('/benchmarks/bulk-update', ...requireSuperAdmin(), async (req: Authen
     const { data: benchmarks, error: fetchError } = await query
 
     if (fetchError) {
-      console.error('Failed to fetch benchmarks for bulk update:', fetchError)
+      log.error('Failed to fetch benchmarks for bulk update', { error: fetchError instanceof Error ? fetchError.message : String(fetchError) })
       res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
       return
     }
@@ -670,7 +673,7 @@ router.put('/benchmarks/bulk-update', ...requireSuperAdmin(), async (req: Authen
       updatedCount,
     })
   } catch (error) {
-    console.error('Failed to bulk update benchmarks:', error)
+    log.error('Failed to bulk update benchmarks', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to bulk update benchmarks' })
   }
 })
