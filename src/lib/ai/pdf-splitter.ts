@@ -108,7 +108,9 @@ export function chunkToFile(
   chunkIndex: number,
   pageRange: [number, number]
 ): File {
-  const blob = new Blob([chunk], { type: 'application/pdf' })
+  const buffer = new ArrayBuffer(chunk.byteLength)
+  new Uint8Array(buffer).set(chunk)
+  const blob = new Blob([buffer], { type: 'application/pdf' })
   const chunkFilename = `${originalFilename.replace('.pdf', '')}_chunk${chunkIndex + 1}_pages${pageRange[0]}-${pageRange[1]}.pdf`
   return new File([blob], chunkFilename, { type: 'application/pdf' })
 }

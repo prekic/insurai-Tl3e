@@ -308,13 +308,11 @@ test.describe('Anonymous Trial Extraction Flow', () => {
 
     // Should show validation error or not proceed
     // The file input may reject it via accept attribute, or validation shows error
-    const errorMsg = page.getByText(/pdf|invalid|unsupported/i)
     // Give a moment for validation
     await page.waitForTimeout(1000)
 
-    // Either error is shown or file was rejected (input cleared)
-    const currentUrl = page.url()
-    expect(currentUrl).toContain('/try') // Should NOT navigate away
+    // Either error is shown or file was rejected (input cleared) — should NOT navigate away
+    expect(page.url()).toContain('/try')
   })
 })
 
