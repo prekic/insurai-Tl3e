@@ -1,4 +1,4 @@
-# Session Handoff - February 7, 2026 (Session 2)
+# Session Handoff - February 8, 2026
 
 ## Current Status
 
@@ -8,8 +8,8 @@
 | **TypeCheck** | ✅ 0 errors |
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 46 warnings (45 no-non-null-assertion + 1 rate-limit) |
-| **Tests** | ✅ 6,338 passing (192 test files), 0 failures |
-| **Branch** | `claude/review-handoff-5noRe` |
+| **Tests** | ✅ 6,613+ passing (196 test files), 0 failures |
+| **Branch** | `claude/review-handoff-gWqM4` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Live — extraction pipeline fully operational |
@@ -20,73 +20,95 @@
 
 ## Session Summary
 
-This session (continuation of Feb 7) focused on **production resilience and observability**:
+This session focused on **comprehensive app audit hardening and critical test coverage**:
 
-1. **Google Vision OCR fix** — Resolved both code-level diagnostic issues and Google Cloud API key configuration
-2. **Production hardening** — Safe JSON parsing, startup env validation, rate limiting gaps, structured logging
-3. **Silent error elimination** — Replaced all 10 `.catch(() => {})` patterns with logged catches
+1. **Comprehensive audit** — Identified 5 issue categories across the entire codebase
+2. **JSON.parse crash prevention** — 3 unguarded calls fixed across sentry, webhook, admin-db
+3. **Structured logging completion** — Replaced final 21 `console.*` calls in 5 server files
+4. **Targeted rate limiting** — Added stricter limits to 3 highest-risk unauthenticated endpoints
+5. **Critical test coverage** — 275 new tests for 4 previously untested modules (admin-auth, email, cost-control, free-trial)
+6. **TryAnalysis refactor** — Extracted shared `runExtraction()`, removed 154 lines of duplication
+7. **Tier 1 dependency upgrades** — Safe patch/minor upgrades per upgrade plan
+8. **E2E extraction flow tests** — 16 Playwright tests for upload → extract → display
+9. **Vision OCR timeout** — 60s server-side timeout on Vision OCR fetch
 
 ---
 
 ## Features Completed This Session
 
-### 1. Google Vision OCR Diagnostics Fix (Critical Fix ✅)
+### 1. Comprehensive Audit Hardening (✅)
 
-**Problem**: `/api/ai/diagnose` returned `google: { valid: false, error: "Service error" }` with no actionable information.
+**JSON.parse Crash Prevention** (3 files):
+- `server/lib/sentry.ts` — Wrapped `JSON.parse(event.request.data)` in try-catch
+- `server/services/webhook-service.ts` — Eliminated re-parse by threading `webhookEvent` parameter through `attemptDelivery()`
+- `server/services/admin-db.ts` — Wrapped `JSON.parse(row.value)` in `mapConfig()` with fallback logging
 
-**Root Causes**:
-1. Code: `sanitizeDiagnosticError()` stripped all details to generic "Service error"
-2. Code: Vision OCR auth attempted OAuth even when no service account existed
-3. Config: Google Cloud API key was restricted to "Generative Language API" only
+**Structured Logging** (5 files, 21 calls):
+- `server/middleware/cost-control.ts` — Added logger import + child
+- `server/middleware/validation.ts` — Added logger, changed to `log.debug`
+- `server/routes/pdf.ts` — Added logger import + child
+- `server/services/processing-log-service.ts` — 8 `console.error` → `log.error`
+- `server/services/prompt-service.ts` — 13 `console.warn/error` → `log.warn/error`
 
-**Fixes**:
-- Added `classifyDiagnosticError()` returning codes: `API_NOT_ENABLED`, `BILLING_ERROR`, `INVALID_CREDENTIALS`, `QUOTA_EXCEEDED`, `NETWORK_ERROR`, `PERMISSION_DENIED`, `SERVICE_ERROR`
-- Added `errorCode` field to `ProviderDiagnostic` interface (frontend + backend)
-- Skip unnecessary OAuth when no service account credentials exist
-- Fixed `/api/ai/providers` to report `google: true` when OAuth credentials available
-- Added AI provider config checks to admin `/api/admin/diagnostics` endpoint
-- Added `log.warn()` for all provider diagnostic failures
+**Rate Limiting** (3 endpoints):
+- `POST /api/email/capture` → `authLimiter` (10 req/15min)
+- `POST /api/email/unsubscribe` → `authLimiter` (10 req/15min)
+- `POST /api/pdf/extract` → `aiExtractionLimiter` (20 req/hr)
 
-**Config Fix**: Added Cloud Vision API + Cloud Document AI API to API key restrictions in Google Cloud Console.
+**Commit**: `ce16af0`
 
-**Verification**: All 3 providers now report `valid: true`.
+### 2. Critical Module Test Coverage — 275 Tests (✅)
 
-**Commits**: `1cbe80e`, `a81dcba`
+| File | Tests | Coverage |
+|------|-------|----------|
+| `server/__tests__/admin-auth.test.ts` | 62 | JWT gen/verify, bcrypt, authenticateAdmin, requireRole, requirePermission, integration |
+| `server/__tests__/email-routes.test.ts` | 71 | HMAC-SHA256 tokens, all 7 endpoints via supertest, secret fallback, roundtrip |
+| `server/__tests__/cost-control.test.ts` | 58 | Cost calc, budget CRUD, block/warn/notify, alerts, usage stats, middleware |
+| `src/lib/free-trial.test.ts` | 84 | All 15 exported functions, mocked localStorage, 24h expiry, share URLs |
 
-### 2. Production Hardening (Infrastructure ✅)
+**Commit**: `1f81423`
 
-**4 issues fixed**:
+### 3. TryAnalysis Refactor (✅)
 
-1. **JSON.parse crash guard** — Wrapped AI extraction JSON parsing in try-catch for both Anthropic and OpenAI endpoints. Previously, invalid/truncated JSON from AI would crash the request handler.
+- Extracted shared `runExtraction()` helper consolidating proxy and direct paths
+- Removed 154 lines of duplication
+- **Commit**: `a06e850`
 
-2. **Startup env var validation** — `server/index.ts` now checks `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_JWT_SECRET` at startup and logs warnings for missing vars (doesn't crash, just warns).
+### 4. Tier 1 Dependency Upgrades (✅)
 
-3. **Rate limiting on processing log endpoints** — Added `generalLimiter` (60 req/min) to 4 previously unprotected `/api/ai/processing-logs/*` endpoints.
+- Safe patch/minor upgrades per `docs/DEPENDENCY_UPGRADE_PLAN.md` Stage 1
+- Fixed TypeScript 5.9 type errors
+- **Commit**: `2c23c2b`
 
-4. **Structured logging** — Replaced 20+ `console.log`/`console.error` calls with structured logger across `server/routes/admin/auth.ts`, `server/services/prompt-service.ts`, `server/services/processing-log-service.ts`, `server/middleware/rate-limit.ts`.
+### 5. E2E Extraction Flow Tests (✅)
 
-**Commit**: `1696480`
+- `e2e/extraction-flow.spec.ts` — 16 Playwright tests for upload → extract → display
+- **Commit**: `a2bcd52`
 
-### 3. Silent .catch(() => {}) Elimination (Observability ✅)
+### 6. Vision OCR Server-Side Timeout (✅)
 
-**Problem**: 10 fire-and-forget `.catch(() => {})` patterns silently swallowed errors on cost tracking, admin notifications, security event logging, and alert persistence.
+- 60s `AbortSignal.timeout()` on Vision OCR fetch
+- Timeout detection on both OCR routes
+- **Commit**: `a91c833`
 
-**Fix**: All 10 replaced with `.catch((err) => log.warn('description', { context, error }))`:
-- `server/routes/ai.ts` (6): Cost recording + admin billing/rate-limit/auth notifications
-- `server/routes/admin/auth.ts` (3): Security event logging for login failures
-- `server/middleware/monitoring.ts` (1): Alert persistence + added logger import
+### 7. Admin Route Structured Logging (✅)
 
-**Commit**: `6e5263f`
+- Replaced 69 remaining `console.error` calls with structured logger in all 9 admin route modules
+- **Commit**: `1d2ca31`
 
 ---
 
 ## Commits This Session
 
 ```
-6e5263f Replace silent .catch(() => {}) with log.warn() across server code
-1696480 Harden production: safe JSON parse, startup validation, rate limits, structured logging
-a81dcba Fix Vision OCR auth: skip unnecessary OAuth calls, log fallbacks, fix /providers status
-1cbe80e Fix Google Vision OCR diagnostics: add error codes, server logging, and admin config checks
+1f81423 Add comprehensive tests for 4 critical untested modules (275 tests)
+ce16af0 Guard JSON.parse calls, replace remaining console.* with structured logger, add rate limiting
+a06e850 Refactor TryAnalysis: extract shared runExtraction helper, remove 156 lines of duplication
+1d2ca31 Replace 69 remaining console.error calls with structured logger in admin routes
+bce89d7 Mark Tier 1 dependency upgrades as completed in upgrade plan
+2c23c2b Upgrade Tier 1 dependencies and fix TypeScript 5.9 type errors
+a2bcd52 Add E2E tests for extraction flow (upload → extract → display pipeline)
+a91c833 Add 60s timeout to Vision OCR fetch and timeout detection to both OCR routes
 ```
 
 ---
@@ -95,14 +117,22 @@ a81dcba Fix Vision OCR auth: skip unnecessary OAuth calls, log fallbacks, fix /p
 
 | File | Changes |
 |------|---------|
-| `server/routes/ai.ts` | Error codes in diagnostics, JSON parse guards, rate limits, catch logging, Vision auth fix |
-| `server/routes/admin/auth.ts` | Structured logging (20 replacements), AI provider diagnostics, catch logging |
-| `server/index.ts` | Startup env var validation |
-| `server/middleware/monitoring.ts` | Logger import, catch logging |
-| `server/middleware/rate-limit.ts` | Structured logging |
-| `server/services/prompt-service.ts` | Structured logging |
-| `server/services/processing-log-service.ts` | Structured logging |
-| `src/hooks/useBackendHealth.ts` | Added `errorCode` and `authMethod` to ProviderDiagnostic interface |
+| `server/lib/sentry.ts` | JSON.parse crash guard in beforeSend |
+| `server/services/webhook-service.ts` | Eliminated JSON.parse, threaded webhookEvent param |
+| `server/services/admin-db.ts` | JSON.parse crash guard in mapConfig |
+| `server/middleware/cost-control.ts` | Added structured logger |
+| `server/middleware/validation.ts` | Added structured logger |
+| `server/routes/pdf.ts` | Added structured logger + aiExtractionLimiter |
+| `server/routes/email.ts` | Added authLimiter to capture + unsubscribe |
+| `server/services/processing-log-service.ts` | 8 console → structured logger |
+| `server/services/prompt-service.ts` | 13 console → structured logger |
+| `server/routes/admin/*.ts` | 69 console.error → structured logger |
+| `src/components/TryAnalysis.tsx` | Refactored: extracted runExtraction, -154 lines |
+| `e2e/extraction-flow.spec.ts` | **NEW** 16 E2E tests |
+| `server/__tests__/admin-auth.test.ts` | **NEW** 62 tests |
+| `server/__tests__/email-routes.test.ts` | **NEW** 71 tests |
+| `server/__tests__/cost-control.test.ts` | **NEW** 58 tests |
+| `src/lib/free-trial.test.ts` | **NEW** 84 tests |
 
 ---
 
@@ -113,8 +143,11 @@ a81dcba Fix Vision OCR auth: skip unnecessary OAuth calls, log fallbacks, fix /p
 | Google Vision OCR | Critical | **Fixed** | Code + GCP Console config. See CLAUDE.md #40 |
 | Extraction mock data | Critical | **Fixed** | Previous session. See CLAUDE.md #71 |
 | Silent error swallowing | Medium | **Fixed** | All 10 `.catch(() => {})` replaced |
-| JSON.parse crash | Medium | **Fixed** | Guards added for Anthropic + OpenAI |
-| Unprotected endpoints | Medium | **Fixed** | Rate limiting added to processing-logs |
+| JSON.parse crash (AI routes) | Medium | **Fixed** | Previous session. See CLAUDE.md #73 |
+| JSON.parse crash (sentry, webhook, admin-db) | Medium | **Fixed** | This session. See CLAUDE.md #75 |
+| Unprotected endpoints | Medium | **Fixed** | Rate limiting added to all high-risk routes |
+| Remaining console.* calls | Medium | **Fixed** | Only 4 intentional in sentry.ts fallback |
+| Critical modules untested | Medium | **Fixed** | 275 tests added. See CLAUDE.md #76 |
 | Anthropic billing | Medium | Open | Falls back to OpenAI, adds latency |
 | 46 ESLint warnings | Low | Deferred | 45 no-non-null-assertion + 1 rate-limit |
 | Railway cold start | Low | Expected | First request may take 5-10s after idle |
@@ -126,13 +159,13 @@ a81dcba Fix Vision OCR auth: skip unnecessary OAuth calls, log fallbacks, fix /p
 
 | Gotcha | Details |
 |--------|---------|
-| Google Cloud API key restrictions | Key must have Cloud Vision API + Cloud Document AI API enabled — "Generative Language API" alone is insufficient |
-| Vision OCR dual auth | Vision uses API key auth, Document AI uses OAuth service account — both must be configured correctly |
-| `/api/ai/diagnose` error codes | Now returns `errorCode` field (e.g., `API_NOT_ENABLED`) — use this for programmatic error handling |
-| `/api/admin/diagnostics` | Now shows AI provider config status — useful for checking deployment configuration |
-| Silent `.catch(() => {})` | Never use on fire-and-forget calls — always log with `log.warn()` so failures appear in Railway |
-| `JSON.parse` on AI responses | AI providers can return invalid/truncated JSON — always wrap in try-catch |
-| Startup env var validation | Server warns but doesn't crash on missing vars — check Railway logs after deploy |
+| Cost-control in-memory state leaks between tests | Module-level `Map`/`Array` persist — deactivate blocking budgets from prior tests |
+| `vi.hoisted()` for mock variables | Use when mock variables are referenced inside `vi.mock()` factories to avoid TDZ errors |
+| `vi.resetModules()` + dynamic import | Required for testing module-level initialization (JWT secret cache, env vars) |
+| PostgrestError not assignable to `Record<string, unknown>` | Use `{ error: String(error) }` pattern when passing Supabase errors to structured logger |
+| `unknown` catch block variables | Use `err instanceof Error ? err.message : String(err)` pattern for logger data objects |
+| `[ModulePrefix]` in log messages redundant | `logger.child('Module')` already adds context — don't also prefix messages |
+| Global rate limiter covers all routes | `generalLimiter` (100/15min) applied in `server/index.ts` line 233 — targeted limiters are supplementary |
 
 ---
 
@@ -145,13 +178,9 @@ a81dcba Fix Vision OCR auth: skip unnecessary OAuth calls, log fallbacks, fix /p
 - **Build**: `npm run build && npm run build:server`
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
-### Google Cloud Configuration (Updated)
-The `GOOGLE_CLOUD_API_KEY` must have these APIs enabled in key restrictions:
-- Generative Language API (for Gemini)
-- **Cloud Vision API** (for Vision OCR)
-- **Cloud Document AI API** (for Document AI OCR)
-
-Without these, Vision OCR returns "Service error" and Document AI fails silently.
+### Pending Deployment
+- 8 commits on `claude/review-handoff-gWqM4` not yet deployed to production
+- Includes audit hardening, test coverage, TryAnalysis refactor, Tier 1 dep upgrades, E2E tests, Vision OCR timeout
 
 ### Database Migrations
 - ✅ `014_settings_webhooks.sql` — Applied
@@ -162,14 +191,14 @@ Without these, Vision OCR returns "Service error" and Document AI fails silently
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Investigate Anthropic billing** — Currently falling back to OpenAI, adding latency. Check credit balance or upgrade billing plan.
-2. **Deploy latest commits** — 4 new commits on `claude/review-handoff-5noRe` need deployment to production (merge to main or deploy branch).
-3. **E2E tests for extraction flow** — Add Playwright test covering full upload → extract → display flow.
+1. **Deploy latest commits** — 8 commits on `claude/review-handoff-gWqM4` with audit hardening + test coverage need deployment to production
+2. **Investigate Anthropic billing** — Currently falling back to OpenAI, adding latency. Check credit balance or upgrade billing plan.
 
 ### Medium Priority
-4. **Execute dependency upgrade plan** — Follow the 5-stage plan in `docs/DEPENDENCY_UPGRADE_PLAN.md`
-5. **Performance baseline** — Run config performance monitor in production to establish baseline metrics and validate the 5-minute cache TTL
-6. **Monitor new logging** — Review Railway logs after deployment to verify the new `log.warn()` catches and structured logging are working as expected
+3. **Execute dependency upgrade plan (Stages 2-5)** — Follow `docs/DEPENDENCY_UPGRADE_PLAN.md`. Stage 1 (safe patches) completed.
+4. **Performance baseline** — Run config performance monitor in production to establish baseline metrics and validate the 5-minute cache TTL
+5. **Monitor new logging** — Review Railway logs after deployment to verify structured logging and catch handlers work as expected
+6. **Remaining test coverage** — 17 other untested files identified in audit (lower priority — the 4 critical ones are now covered)
 
 ### Low Priority
 7. **Reduce ESLint warnings** — 45 `no-non-null-assertion` warnings across 10+ files
@@ -188,7 +217,11 @@ npm run validate  # typecheck + lint + test
 npm run build:server  # Should pass cleanly
 
 # Run all tests
-npm test -- --run  # 6338 passing, 192 files
+npm test -- --run  # 6613+ passing, 196 files
+
+# Run just the new tests
+npx vitest run server/__tests__/admin-auth.test.ts server/__tests__/email-routes.test.ts server/__tests__/cost-control.test.ts src/lib/free-trial.test.ts
+# 275 passing
 
 # Check AI providers
 curl https://insurai-production.up.railway.app/api/ai/diagnose
@@ -202,6 +235,11 @@ curl https://insurai-production.up.railway.app/api/admin/diagnostics
 ---
 
 ## Previous Session Context
+
+**February 7, 2026 (Session 2)** (`claude/review-handoff-5noRe`):
+- Google Vision OCR diagnostics fix (code + GCP config)
+- Production hardening (JSON parse guards, startup validation, rate limits)
+- Silent `.catch(() => {})` elimination (10 patterns)
 
 **February 7, 2026 (Session 1)** (`claude/review-project-status-jpuTI`):
 - Admin routes modularization (3,390 lines → 9 modules)
@@ -225,7 +263,7 @@ curl https://insurai-production.up.railway.app/api/admin/diagnostics
 
 ---
 
-**Last Updated**: February 7, 2026
-**Branch**: `claude/review-handoff-5noRe`
+**Last Updated**: February 8, 2026
+**Branch**: `claude/review-handoff-gWqM4`
 **ESLint Status**: 0 errors, 46 warnings
-**Next Session Focus**: Anthropic billing, deploy latest commits, E2E extraction tests
+**Next Session Focus**: Deploy latest commits, investigate Anthropic billing, dependency upgrades Stage 2+

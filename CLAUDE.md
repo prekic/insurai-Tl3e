@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**
-- **Production Readiness**: ~9.5/10 (6338+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 7, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**
+- **Production Readiness**: ~9.5/10 (6613+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 8, 2026
 
 ---
 
@@ -1188,8 +1188,8 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 6, 2026)
-- **Total**: 6338+ tests across 192+ test files
+### Test Counts (as of Feb 8, 2026)
+- **Total**: 6613+ tests across 196+ test files
 - **Passing**: 100% (all pre-existing test failures fixed)
 - **Coverage Target**: 80%+
 
@@ -1207,6 +1207,10 @@ Server Tests:               server/__tests__/
 | `src/components/admin/tabs/settings/ConfigPerformancePanel.test.tsx` | 11 | Config performance dashboard |
 | `src/lib/config/__tests__/config-performance-monitor.test.ts` | 21 | Performance monitor core |
 | `server/__tests__/settings-routes.test.ts` | 43 | Settings API (includes export/import + performance) |
+| `server/__tests__/admin-auth.test.ts` | 62 | **NEW** JWT tokens, bcrypt, authenticateAdmin, requireRole, requirePermission |
+| `server/__tests__/email-routes.test.ts` | 71 | **NEW** Unsubscribe tokens (HMAC-SHA256), all 7 email endpoints |
+| `server/__tests__/cost-control.test.ts` | 58 | **NEW** Cost calculation, budgets, alerts, usage tracking, middleware |
+| `src/lib/free-trial.test.ts` | 84 | **NEW** All 15 exported functions, localStorage, expiry, share URLs |
 
 ### Running Tests
 ```bash
@@ -3022,6 +3026,60 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Commit**: `6e5263f`
 
+### 75. Comprehensive Audit Hardening (Feb 8, 2026)
+- **Scope**: App-wide audit identified 5 issue categories; all resolved
+- **JSON.parse Crash Prevention** (3 files):
+  - `server/lib/sentry.ts` — Wrapped `JSON.parse(event.request.data)` in try-catch
+  - `server/services/webhook-service.ts` — Eliminated re-parse by threading `webhookEvent` parameter through `attemptDelivery()`
+  - `server/services/admin-db.ts` — Wrapped `JSON.parse(row.value)` in `mapConfig()` with fallback logging
+- **Structured Logging** (5 files, 21 calls replaced):
+  - `server/middleware/cost-control.ts` — Added logger import + child
+  - `server/middleware/validation.ts` — Added logger import + child, changed to `log.debug`
+  - `server/routes/pdf.ts` — Added logger import + child
+  - `server/services/processing-log-service.ts` — 8 `console.error` → `log.error`
+  - `server/services/prompt-service.ts` — 13 `console.warn/error` → `log.warn/error`
+- **Rate Limiting** (3 endpoints):
+  - `POST /api/email/capture` → `authLimiter` (10 req/15min)
+  - `POST /api/email/unsubscribe` → `authLimiter` (10 req/15min)
+  - `POST /api/pdf/extract` → `aiExtractionLimiter` (20 req/hr)
+  - Note: All routes already had global `generalLimiter` (100/15min) via `server/index.ts`
+- **Commit**: `ce16af0`
+
+### 76. Critical Module Test Coverage (Added Feb 8, 2026)
+- **Problem**: 4 critical server modules had 0 test coverage totaling 2,088 lines
+- **Solution**: Added 275 comprehensive tests across 4 new test files
+- **Test Files Created**:
+  - `server/__tests__/admin-auth.test.ts` — 62 tests: JWT token gen/verify, bcrypt password hashing, `authenticateAdmin` middleware, `requireRole`, `requirePermission`, integration flows
+  - `server/__tests__/email-routes.test.ts` — 71 tests: HMAC-SHA256 unsubscribe token gen/verify, all 7 email endpoints via supertest, secret fallback chain, capture-unsubscribe roundtrip
+  - `server/__tests__/cost-control.test.ts` — 58 tests: Cost calculation for all providers, budget CRUD, budget checking with block/warn/notify, alert system, usage tracking aggregation, Express middleware
+  - `src/lib/free-trial.test.ts` — 84 tests: All 15 exported functions, mocked localStorage, 24h expiry logic, share URLs, lifecycle integration
+- **Key Testing Patterns Used**:
+  - `vi.hoisted()` for mock variables referenced in `vi.mock()` factories (avoids TDZ errors)
+  - `vi.resetModules()` + dynamic `import()` for testing module-level initialization (JWT secret, env vars)
+  - In-memory state isolation: cost-control budgets persist across tests; deactivate blocking budgets in subsequent tests
+  - `supertest` for Express route testing with mocked middleware
+- **Commit**: `1f81423`
+
+### 77. TryAnalysis Refactor (Feb 8, 2026)
+- **Problem**: `TryAnalysis.tsx` had duplicated extraction logic between proxy and direct paths (156 lines)
+- **Solution**: Extracted shared `runExtraction()` helper, consolidated both code paths
+- **Result**: 154 net lines removed, single code path for extraction with timeout and progress
+- **Commit**: `a06e850`
+
+### 78. Tier 1 Dependency Upgrades (Feb 8, 2026)
+- **Upgraded**: Safe patch/minor dependencies per `docs/DEPENDENCY_UPGRADE_PLAN.md` Stage 1
+- **TypeScript 5.9 fixes**: Resolved new type errors from stricter checking
+- **Commit**: `2c23c2b`
+
+### 79. E2E Extraction Flow Tests (Added Feb 8, 2026)
+- **File**: `e2e/extraction-flow.spec.ts` — 16 Playwright tests covering upload → extract → display pipeline
+- **Commit**: `a2bcd52`
+
+### 80. Vision OCR Server-Side Timeout (Added Feb 8, 2026)
+- **Problem**: Vision OCR fetch had no timeout, could hang indefinitely
+- **Solution**: Added 60s `AbortSignal.timeout()` on server-side fetch, timeout detection on both OCR routes
+- **Commit**: `a91c833`
+
 ---
 
 ## Turkish Market Considerations
@@ -3410,6 +3468,17 @@ connectSrc: [
 - Import from `server/routes/admin/index.ts` which aggregates all sub-routers
 - Shared utilities (Supabase client, helpers) live in `server/routes/admin/shared.ts`
 
+**Cost-Control In-Memory State in Tests:**
+- `server/middleware/cost-control.ts` uses module-level `Map`/`Array` for in-memory budgets, alerts, usage
+- These persist across tests since `vi.mock('@supabase/supabase-js')` forces in-memory mode
+- If a test creates a blocking budget (`actionOnExceed: 'block'`), subsequent tests may fail
+- Fix: Deactivate blocking budgets from prior tests with `upsertBudget({ id: '...', isActive: false })`
+
+**Testing Module-Level Initialization (JWT Secret, env vars):**
+- Use `vi.resetModules()` + dynamic `import()` to get a fresh module with cleared caches
+- Use `vi.hoisted()` for mock variables referenced inside `vi.mock()` factories (avoids TDZ errors)
+- Pattern: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` then reference in `vi.mock()`
+
 ---
 
 ## CI/CD
@@ -3457,5 +3526,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6338+ tests, all passing (192 test files)
-**Last Updated**: February 7, 2026
+**Tests**: 6613+ tests, all passing (196 test files)
+**Last Updated**: February 8, 2026
