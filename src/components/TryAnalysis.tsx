@@ -102,34 +102,8 @@ export function TryAnalysis() {
 
   const backendReady = health.status === 'healthy'
 
-  // Separate function for processing file from state to avoid circular deps
-  const processFileFromState = useCallback(async (file: File) => {
-    // Check trial eligibility first
-    const trialCheck = canPerformFreeTrial()
-    if (!trialCheck.canTry) {
-      toast.error('Free trial already used', {
-        description: trialCheck.reason,
-      })
-      setState('trial-used')
-      return
-    }
-
-    // Validate file
-    const { valid, errors } = validateFiles([file])
-    if (errors.length > 0 || valid.length === 0) {
-      const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
-      toast.error(errorInfo.title, { description: errorInfo.description })
-      return
-    }
-
-    // Check backend availability
-    if (!isAIConfigured()) {
-      toast.error('Analysis service unavailable', {
-        description: 'Please try again in a moment.',
-      })
-      return
-    }
-
+  // Core extraction logic shared by both entry points (file from state, file from user selection)
+  const runExtraction = useCallback(async (file: File) => {
     // Track upload started
     trackTrialUploadStarted(file.type, file.size)
 
@@ -140,211 +114,17 @@ export function TryAnalysis() {
     setProgressMessage('Preparing document...')
     setError(null)
 
-    // Declare progressInterval outside try block so it's accessible in catch
     let progressInterval: ReturnType<typeof setInterval> | null = null
 
     try {
       setProgress(20)
       setProgressMessage('Uploading document...')
-      await new Promise((r) => setTimeout(r, 300))
+      await new Promise((r) => setTimeout(r, 400))
 
       setState('analyzing')
       setProgress(40)
       setProgressMessage('Extracting text from PDF...')
 
-      trackTrialAnalysisStarted()
-
-      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
-      const EXTRACTION_TIMEOUT_MS = 120000
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
-        }, EXTRACTION_TIMEOUT_MS)
-      })
-
-      // Update progress during extraction
-      progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev < 85) return prev + 5
-          return prev
-        })
-        setProgressMessage((prev) => {
-          const messages = [
-            'Extracting text from PDF...',
-            'Analyzing document structure...',
-            'Processing with AI...',
-            'Almost there...',
-          ]
-          const currentIndex = messages.indexOf(prev)
-          if (currentIndex < messages.length - 1) {
-            return messages[currentIndex + 1]
-          }
-          return prev
-        })
-      }, 10000) // Update every 10 seconds
-
-      const extractionResult = await Promise.race([
-        extractPolicyFromDocument(file, { useFallback: false }),
-        timeoutPromise,
-      ])
-
-      if (progressInterval) clearInterval(progressInterval)
-
-      // Handle null/undefined result
-      if (!extractionResult) {
-        throw new Error('Failed to analyze policy - no response received')
-      }
-
-      if (!extractionResult.success) {
-        throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
-      }
-
-      // Reject fallback/sample data - user expects real AI results
-      if ('source' in extractionResult && extractionResult.source === 'fallback') {
-        console.error('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
-        throw new Error('AI extraction could not process this document. Please try again or use a different document.')
-      }
-
-      // Validate policy exists
-      if (!extractionResult.policy) {
-        throw new Error('Analysis completed but no policy data was extracted')
-      }
-
-      setProgress(95)
-      setProgressMessage('Finalizing analysis...')
-
-      const policy = extractionResult.policy
-      const fileName = sanitizeFileName(file.name)
-
-      // Ensure policy has required fields for display
-      const policyWithDefaults = {
-        ...policy,
-        id: policy.id || 'trial-' + Date.now(),
-        fileName,
-      }
-
-      saveTrialResult(policyWithDefaults, fileName)
-
-      setProgress(100)
-      setProgressMessage('Analysis complete!')
-
-      trackTrialAnalysisCompleted(
-        policy.type,
-        policy.aiConfidence,
-        policy.coverages?.length || 0
-      )
-
-      toast.success('Analysis complete!', {
-        description: 'Your policy has been analyzed successfully.',
-      })
-
-      // Navigate to PolicyDetailView with the result
-      navigate('/policy/trial', {
-        state: {
-          policy: policyWithDefaults,
-          isTrialResult: true,
-        },
-        replace: true,
-      })
-    } catch (err) {
-      if (progressInterval) clearInterval(progressInterval)
-      console.error('[TryAnalysis] Error:', err)
-      const message = err instanceof Error ? err.message : 'Analysis failed'
-      setError(message)
-      setState('error')
-      trackTrialAnalysisFailed(message)
-      toast.error('Analysis failed', { description: message })
-    }
-  }, [navigate])
-
-  // Process file passed from landing page UploadWidget via router state
-  useEffect(() => {
-    const locationState = location.state as LocationState | null
-    const fileFromState = locationState?.file
-
-    // Only process once, when we have a file and backend is ready
-    if (
-      fileFromState &&
-      !processedFromStateRef.current &&
-      backendReady &&
-      state === 'idle'
-    ) {
-      processedFromStateRef.current = true
-      // Clear location state to prevent reprocessing on refresh
-      navigate(location.pathname, { replace: true, state: {} })
-      // Start processing the file
-      processFileFromState(fileFromState)
-    }
-  }, [location, backendReady, state, navigate, processFileFromState])
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length > 0) {
-      processFile(files[0])
-    }
-    e.target.value = ''
-  }
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    const files = Array.from(e.dataTransfer.files)
-    if (files.length > 0) {
-      processFile(files[0])
-    }
-  }
-
-  const processFile = async (file: File) => {
-    // Check trial eligibility
-    const trialCheck = canPerformFreeTrial()
-    if (!trialCheck.canTry) {
-      toast.error('Free trial already used', {
-        description: trialCheck.reason,
-      })
-      setState('trial-used')
-      return
-    }
-
-    // Validate file
-    const { valid, errors } = validateFiles([file])
-    if (errors.length > 0 || valid.length === 0) {
-      const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
-      toast.error(errorInfo.title, { description: errorInfo.description })
-      return
-    }
-
-    // Check backend availability
-    if (!backendReady || !isAIConfigured()) {
-      toast.error('Analysis service unavailable', {
-        description: 'Please try again in a moment.',
-      })
-      return
-    }
-
-    // Track upload started
-    trackTrialUploadStarted(file.type, file.size)
-
-    // Start analysis
-    setSelectedFile(file)
-    setState('uploading')
-    setProgress(10)
-    setProgressMessage('Preparing document...')
-    setError(null)
-
-    // Declare progressInterval outside try block so it's accessible in catch
-    let progressInterval: ReturnType<typeof setInterval> | null = null
-
-    try {
-      // Simulate upload progress
-      setProgress(20)
-      setProgressMessage('Uploading document...')
-      await new Promise((r) => setTimeout(r, 500))
-
-      setState('analyzing')
-      setProgress(40)
-      setProgressMessage('Extracting text from PDF...')
-
-      // Track analysis started
       trackTrialAnalysisStarted()
 
       // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
@@ -395,7 +175,7 @@ export function TryAnalysis() {
 
       // Reject fallback/sample data - user expects real AI results
       if ('source' in extractionResult && extractionResult.source === 'fallback') {
-        console.error('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
+        console.warn('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
         throw new Error('AI extraction could not process this document. Please try again or use a different document.')
       }
 
@@ -417,13 +197,11 @@ export function TryAnalysis() {
         fileName,
       }
 
-      // Save to localStorage
       saveTrialResult(policyWithDefaults, fileName)
 
       setProgress(100)
       setProgressMessage('Analysis complete!')
 
-      // Track completion
       trackTrialAnalysisCompleted(
         policy.type,
         policy.aiConfidence,
@@ -444,12 +222,80 @@ export function TryAnalysis() {
       })
     } catch (err) {
       if (progressInterval) clearInterval(progressInterval)
-      console.error('[TryAnalysis] Error:', err)
+      console.warn('[TryAnalysis] Extraction error:', err instanceof Error ? err.message : err)
       const message = err instanceof Error ? err.message : 'Analysis failed'
       setError(message)
       setState('error')
       trackTrialAnalysisFailed(message)
       toast.error('Analysis failed', { description: message })
+    }
+  }, [navigate])
+
+  // Validate file and check eligibility before running extraction
+  const processFile = useCallback((file: File) => {
+    // Check trial eligibility
+    const trialCheck = canPerformFreeTrial()
+    if (!trialCheck.canTry) {
+      toast.error('Free trial already used', {
+        description: trialCheck.reason,
+      })
+      setState('trial-used')
+      return
+    }
+
+    // Validate file
+    const { valid, errors } = validateFiles([file])
+    if (errors.length > 0 || valid.length === 0) {
+      const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
+      toast.error(errorInfo.title, { description: errorInfo.description })
+      return
+    }
+
+    // Check backend availability
+    if (!backendReady || !isAIConfigured()) {
+      toast.error('Analysis service unavailable', {
+        description: 'Please try again in a moment.',
+      })
+      return
+    }
+
+    runExtraction(file)
+  }, [backendReady, runExtraction])
+
+  // Process file passed from landing page UploadWidget via router state
+  useEffect(() => {
+    const locationState = location.state as LocationState | null
+    const fileFromState = locationState?.file
+
+    // Only process once, when we have a file and backend is ready
+    if (
+      fileFromState &&
+      !processedFromStateRef.current &&
+      backendReady &&
+      state === 'idle'
+    ) {
+      processedFromStateRef.current = true
+      // Clear location state to prevent reprocessing on refresh
+      navigate(location.pathname, { replace: true, state: {} })
+      // Start processing the file
+      processFile(fileFromState)
+    }
+  }, [location, backendReady, state, navigate, processFile])
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length > 0) {
+      processFile(files[0])
+    }
+    e.target.value = ''
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragging(false)
+    const files = Array.from(e.dataTransfer.files)
+    if (files.length > 0) {
+      processFile(files[0])
     }
   }
 
