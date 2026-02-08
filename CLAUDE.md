@@ -3038,6 +3038,9 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `server/routes/pdf.ts` — Added logger import + child
   - `server/services/processing-log-service.ts` — 8 `console.error` → `log.error`
   - `server/services/prompt-service.ts` — 13 `console.warn/error` → `log.warn/error`
+- **Admin Route Logging** (9 modules, 69 calls replaced):
+  - All 9 admin route modules under `server/routes/admin/` — `console.error` → structured logger
+  - Commit: `1d2ca31`
 - **Rate Limiting** (3 endpoints):
   - `POST /api/email/capture` → `authLimiter` (10 req/15min)
   - `POST /api/email/unsubscribe` → `authLimiter` (10 req/15min)
