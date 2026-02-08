@@ -44,6 +44,9 @@ export default defineConfig({
     },
   },
   build: {
+    // Generate hidden source maps for Sentry error tracking
+    // 'hidden' means maps are generated and uploaded to Sentry but not referenced in bundles
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         manualChunks(id: string) {

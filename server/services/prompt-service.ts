@@ -287,7 +287,7 @@ export async function getPromptById(id: string): Promise<PromptTemplate | null> 
         return template
       }
     } catch (err) {
-      log.warn('Database error for id', { id, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt id', { id, error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -329,7 +329,7 @@ export async function getPromptByName(name: string): Promise<PromptTemplate | nu
         return template
       }
     } catch (err) {
-      log.warn('Database error for name', { name, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt name', { name, error: err instanceof Error ? err.message : String(err) })
     }
   }
 
@@ -361,7 +361,7 @@ export async function getPromptsByCategory(category: PromptCategory): Promise<Pr
         return data.map(mapFromDatabase)
       }
     } catch (err) {
-      log.warn('Database error for category', { category, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt category', { category, error: err instanceof Error ? err.message : String(err) })
     }
   }
 

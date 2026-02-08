@@ -419,6 +419,15 @@ describe('admin-auth', () => {
       expect(payload!.role).toBe('super_admin')
       expect(payload!.sessionId).toBe('sess-789')
     })
+
+    it('returns null for a tampered token', () => {
+      const token = generateAdminToken(TEST_ADMIN_USER, TEST_SESSION_ID)
+      const parts = token.split('.')
+      parts[1] = parts[1] + 'tampered'
+      const tampered = parts.join('.')
+
+      expect(verifyAdminToken(tampered)).toBeNull()
+    })
   })
 
   // --------------------------------------------------------------------------
@@ -539,6 +548,20 @@ describe('admin-auth', () => {
     it('returns 401 with INVALID_AUTH_FORMAT when Authorization is not Bearer', () => {
       const req = createMockRequest({
         headers: { authorization: 'Basic dXNlcjpwYXNz' },
+      })
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      authenticateAdmin(req, res as unknown as Response, next)
+
+      expect(res.statusCode).toBe(401)
+      expect((res._body as Record<string, unknown>).code).toBe('INVALID_AUTH_FORMAT')
+      expect(next.called).toBe(false)
+    })
+
+    it('returns 401 with INVALID_AUTH_FORMAT for "Bearer" with no token', () => {
+      const req = createMockRequest({
+        headers: { authorization: 'Bearer' },
       })
       const res = createMockResponse()
       const next = createMockNext()
@@ -737,6 +760,23 @@ describe('admin-auth', () => {
       expect(next.called).toBe(true)
     })
 
+    it('rejects super_admin when only admin role is explicitly required (strict role match)', () => {
+      // requireRole checks exact membership in the allowedRoles array
+      // super_admin does NOT automatically bypass requireRole — it must be listed
+      const middleware = requireRole('admin')
+      const req = createMockRequest()
+      req.adminUser = { ...TEST_SUPER_ADMIN } // role is 'super_admin'
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      // super_admin is NOT in ['admin'], so it should be rejected
+      expect(res.statusCode).toBe(403)
+      expect((res._body as Record<string, unknown>).code).toBe('INSUFFICIENT_ROLE')
+      expect(next.called).toBe(false)
+    })
+
     it('includes helpful error message listing required roles', () => {
       const middleware = requireRole('super_admin')
       const req = createMockRequest()
@@ -822,6 +862,21 @@ describe('admin-auth', () => {
       const middleware = requirePermission('read:policies')
       const req = createMockRequest()
       req.adminUser = { ...TEST_ADMIN_USER }
+      const res = createMockResponse()
+      const next = createMockNext()
+
+      middleware(req, res as unknown as Response, next)
+
+      expect(next.called).toBe(true)
+    })
+
+    it('passes when no permissions are required (empty argument list)', () => {
+      const middleware = requirePermission()
+      const req = createMockRequest()
+      req.adminUser = {
+        ...TEST_ADMIN_USER,
+        permissions: [],
+      }
       const res = createMockResponse()
       const next = createMockNext()
 

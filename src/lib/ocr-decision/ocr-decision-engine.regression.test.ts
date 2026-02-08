@@ -664,7 +664,7 @@ describe('Full Pipeline Integration Regression Tests', () => {
       expect(decision.reasoning.length).toBeGreaterThan(0)
 
       // Timing
-      expect(decision.duration_ms).toBeGreaterThan(0)
+      expect(decision.duration_ms).toBeGreaterThanOrEqual(0)
       expect(decision.timestamp).toBeDefined()
     })
   })

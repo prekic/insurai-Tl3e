@@ -4,6 +4,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import crypto from 'crypto'
 
 // ============================================================================
 // TYPES
@@ -1081,7 +1082,7 @@ function mapABTestFromDb(row: Record<string, unknown>): ABTest {
  * Log prompt usage
  */
 export async function logPromptUsage(usage: Omit<PromptUsageLog, 'id'>): Promise<void> {
-  const id = `usage-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const id = `usage-${Date.now()}-${crypto.randomBytes(6).toString('hex')}`
   const log: PromptUsageLog = { id, ...usage }
 
   const db = getClient()

@@ -719,7 +719,8 @@ router.post('/import', async (req: Request, res: Response) => {
               .eq('id', existing.id)
 
             if (updateError) {
-              results.settings.errors.push(`${category}.${setting.key}: ${updateError.message}`)
+              log.error('Settings import: update failed', { category, key: setting.key, error: updateError.message })
+              results.settings.errors.push(`${category}.${setting.key}: update failed`)
               continue
             }
 
@@ -778,7 +779,8 @@ router.post('/import', async (req: Request, res: Response) => {
             .eq('key', flag.key)
 
           if (updateError) {
-            results.featureFlags.errors.push(`${flag.key}: ${updateError.message}`)
+            log.error('Settings import: flag update failed', { key: flag.key, error: updateError.message })
+            results.featureFlags.errors.push(`${flag.key}: update failed`)
             continue
           }
 
@@ -826,7 +828,8 @@ router.post('/import', async (req: Request, res: Response) => {
             .eq('id', existing.id)
 
           if (updateError) {
-            results.regionalFactors.errors.push(`${factor.regionCode}: ${updateError.message}`)
+            log.error('Settings import: factor update failed', { regionCode: factor.regionCode, error: updateError.message })
+            results.regionalFactors.errors.push(`${factor.regionCode}: update failed`)
             continue
           }
 

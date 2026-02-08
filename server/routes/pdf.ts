@@ -15,6 +15,9 @@ const log = logger.child('PDF')
 
 const router = Router()
 
+/** PDF magic bytes: %PDF- (hex: 25 50 44 46 2D) */
+const PDF_MAGIC_BYTES = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D])
+
 // Configure multer for PDF uploads (memory storage, 50MB limit)
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -350,6 +353,23 @@ router.post('/extract', aiExtractionLimiter, upload.single('file'), async (
       return
     }
 
+    // Validate PDF magic bytes (%PDF- header)
+    if (file.buffer.length < 5 || !Buffer.from(file.buffer.slice(0, 5)).equals(PDF_MAGIC_BYTES)) {
+      log.warn('Rejected file with invalid PDF header', {
+        filename: file.originalname,
+        size: file.size,
+        headerBytes: Buffer.from(file.buffer.slice(0, 5)).toString('hex'),
+      })
+      res.status(400).json({
+        success: false,
+        error: {
+          code: 'INVALID_PDF',
+          message: 'File does not have a valid PDF header (%PDF-)',
+        },
+      })
+      return
+    }
+
     // Parse PDF using PDFParse class (pdf-parse v2.x API)
     const parser = new PDFParse({ data: file.buffer })
 
@@ -399,7 +419,7 @@ router.post('/extract', aiExtractionLimiter, upload.single('file'), async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-    log.error('PDF extraction error', { error: errorMessage })
+    log.error('PDF extraction failed', { error: errorMessage })
 
     if (errorMessage.includes('password')) {
       res.status(400).json({

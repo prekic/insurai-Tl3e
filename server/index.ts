@@ -32,6 +32,7 @@ import {
   healthLimiter,
   rateLimitConfig,
 } from './middleware/rate-limit.js'
+import { authenticateAdmin } from './middleware/admin-auth.js'
 import {
   initServerSentry,
   setupSentryErrorHandler,
@@ -188,8 +189,8 @@ if (IS_PRODUCTION) {
 // Support multiple origins for local dev, Codespaces, and Railway
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
-  'http://localhost:5173',
-  'http://localhost:3000',
+  // localhost origins only in non-production environments
+  ...(IS_PRODUCTION ? [] : ['http://localhost:5173', 'http://localhost:3000']),
 ]
 
 const corsOptions: cors.CorsOptions = {
@@ -238,24 +239,41 @@ app.use(express.json({ limit: '10mb' }))
 // Health check endpoint (with separate, more permissive limiter)
 // In production (SaaS): Hide rate limit details to prevent abuse planning
 // In development: Show rate limits for debugging
-app.get('/api/health', healthLimiter, (_req, res) => {
+app.get('/api/health', healthLimiter, async (_req, res) => {
+  // Verify database connectivity (lightweight query)
+  let dbHealthy = false
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (supabaseUrl && serviceKey) {
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(supabaseUrl, serviceKey)
+      const { error } = await supabase.from('app_settings').select('key').limit(1)
+      dbHealthy = !error
+    }
+  } catch {
+    dbHealthy = false
+  }
+
   const response: {
     status: string
     timestamp: string
     providers: { openai: boolean; anthropic: boolean; google: boolean }
+    database: boolean
     rateLimits?: {
       general: { windowMs: number; max: number }
       ai: { windowMs: number; max: number }
       ocr: { windowMs: number; max: number }
     }
   } = {
-    status: 'ok',
+    status: dbHealthy ? 'ok' : 'degraded',
     timestamp: new Date().toISOString(),
     providers: {
       openai: !!process.env.OPENAI_API_KEY,
       anthropic: !!process.env.ANTHROPIC_API_KEY,
       google: !!process.env.GOOGLE_CLOUD_API_KEY,
     },
+    database: dbHealthy,
   }
 
   // Only expose rate limit configuration in non-production environments
@@ -285,14 +303,14 @@ app.use('/api/ai', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), aiRoutes)
 // Admin dashboard API routes
 app.use('/api/admin', adminRoutes)
 
-// Admin settings API routes (configuration management)
-app.use('/api/admin/settings', settingsRoutes)
+// Admin settings API routes (configuration management) — requires admin auth
+app.use('/api/admin/settings', authenticateAdmin, settingsRoutes)
 
-// Admin webhooks API routes (settings change notifications)
-app.use('/api/admin/webhooks', webhookRoutes)
+// Admin webhooks API routes (settings change notifications) — requires admin auth
+app.use('/api/admin/webhooks', authenticateAdmin, webhookRoutes)
 
-// Admin config drift detection routes
-app.use('/api/admin/drift', driftRoutes)
+// Admin config drift detection routes — requires admin auth
+app.use('/api/admin/drift', authenticateAdmin, driftRoutes)
 
 // PDF extraction routes (with longer timeout for large files)
 app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)

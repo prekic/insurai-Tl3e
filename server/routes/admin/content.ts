@@ -93,16 +93,16 @@ router.get('/processing-logs/stats', authenticateAdmin, async (req: Authenticate
 router.get('/processing-logs/:documentId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const documentId = qstr(req.params.documentId)
-    const log = await processingLogService.getProcessingLog(documentId)
+    const logRecord = await processingLogService.getProcessingLog(documentId)
 
-    if (!log) {
+    if (!logRecord) {
       res.status(404).json({ success: false, error: 'Processing log not found' })
       return
     }
 
     res.json({
       success: true,
-      data: log,
+      data: logRecord,
     })
   } catch (error) {
     log.error('Failed to get processing log', { error: error instanceof Error ? error.message : String(error) })
@@ -117,16 +117,16 @@ router.get('/processing-logs/:documentId', authenticateAdmin, async (req: Authen
 router.get('/processing-logs/by-policy/:policyId', authenticateAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const policyId = qstr(req.params.policyId)
-    const log = await processingLogService.getProcessingLogByPolicyId(policyId)
+    const logRecord = await processingLogService.getProcessingLogByPolicyId(policyId)
 
-    if (!log) {
+    if (!logRecord) {
       res.status(404).json({ success: false, error: 'Processing log not found for this policy' })
       return
     }
 
     res.json({
       success: true,
-      data: log,
+      data: logRecord,
     })
   } catch (error) {
     log.error('Failed to get processing log by policy', { error: error instanceof Error ? error.message : String(error) })
@@ -322,7 +322,7 @@ router.get('/benchmarks', authenticateAdmin, async (req: AuthenticatedRequest, r
     const { data, error } = await query
 
     if (error) {
-      log.error('Failed to fetch benchmarks from database', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to fetch benchmarks', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
       return
     }
@@ -434,7 +434,7 @@ router.post('/benchmarks', ...requireSuperAdmin(), async (req: AuthenticatedRequ
       .single()
 
     if (error) {
-      log.error('Failed to create benchmark in database', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to create benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to create benchmark' })
       return
     }
@@ -511,7 +511,7 @@ router.put('/benchmarks/:id', ...requireSuperAdmin(), async (req: AuthenticatedR
       .single()
 
     if (error) {
-      log.error('Failed to update benchmark in database', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to update benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to update benchmark' })
       return
     }
@@ -547,7 +547,7 @@ router.delete('/benchmarks/:id', ...requireSuperAdmin(), async (req: Authenticat
       .eq('id', id)
 
     if (error) {
-      log.error('Failed to delete benchmark from database', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to delete benchmark', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to delete benchmark' })
       return
     }
@@ -581,7 +581,7 @@ router.get('/benchmarks/insurance-types', authenticateAdmin, async (_req: Authen
       .eq('is_active', true)
 
     if (error) {
-      log.error('Failed to fetch insurance types from database', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to fetch insurance types', { error: error instanceof Error ? error.message : String(error) })
       res.status(500).json({ success: false, error: 'Failed to fetch insurance types' })
       return
     }

@@ -1,4 +1,4 @@
-/* global self, caches, fetch, URL, Response, Headers, clients, console */
+/* global self, caches, fetch, URL, Response, Headers, clients, console, indexedDB */
 /**
  * InsurAI Service Worker
  *
@@ -287,25 +287,103 @@ self.addEventListener('sync', (event) => {
 })
 
 /**
- * Sync policies that were saved offline
+ * Sync policies that were saved offline.
+ * Reads pending policy uploads from the 'offline_sync' IndexedDB store
+ * and replays them against the server API when connectivity is restored.
  */
 async function syncPolicies() {
-  try {
-    // Get pending policies from IndexedDB
-    // This is a placeholder - actual implementation would use IndexedDB
-    console.log('[SW] Syncing offline policies')
+  const DB_NAME = 'insurai_offline'
+  const STORE_NAME = 'pending_uploads'
 
-    // Notify clients that sync is complete
-    const clients = await self.clients.matchAll()
-    clients.forEach((client) => {
-      client.postMessage({
-        type: 'SYNC_COMPLETE',
-        payload: { success: true },
-      })
+  try {
+    console.warn('[SW] Background sync: checking for pending policy uploads')
+
+    // Open IndexedDB for pending uploads
+    const db = await new Promise((resolve, reject) => {
+      const request = indexedDB.open(DB_NAME, 1)
+      request.onupgradeneeded = (event) => {
+        const database = event.target.result
+        if (!database.objectStoreNames.contains(STORE_NAME)) {
+          database.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true })
+        }
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+
+    // Read all pending uploads
+    const pending = await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly')
+      const store = tx.objectStore(STORE_NAME)
+      const request = store.getAll()
+      request.onsuccess = () => resolve(request.result || [])
+      request.onerror = () => reject(request.error)
+    })
+
+    if (pending.length === 0) {
+      console.warn('[SW] Background sync: no pending uploads')
+      notifyClients({ type: 'SYNC_COMPLETE', payload: { success: true, synced: 0 } })
+      db.close()
+      return
+    }
+
+    console.warn(`[SW] Background sync: replaying ${pending.length} pending upload(s)`)
+
+    let synced = 0
+    let failed = 0
+
+    for (const item of pending) {
+      try {
+        const response = await fetch(item.url || '/api/ai/extract', {
+          method: 'POST',
+          headers: item.headers || { 'Content-Type': 'application/json' },
+          body: item.body,
+        })
+
+        if (response.ok) {
+          // Remove from pending store on success
+          await new Promise((resolve, reject) => {
+            const tx = db.transaction(STORE_NAME, 'readwrite')
+            const store = tx.objectStore(STORE_NAME)
+            const deleteReq = store.delete(item.id)
+            deleteReq.onsuccess = () => resolve()
+            deleteReq.onerror = () => reject(deleteReq.error)
+          })
+          synced++
+        } else {
+          console.warn(`[SW] Background sync: server returned ${response.status} for item ${item.id}`)
+          failed++
+        }
+      } catch (err) {
+        console.warn(`[SW] Background sync: failed to sync item ${item.id}:`, err)
+        failed++
+      }
+    }
+
+    db.close()
+    console.warn(`[SW] Background sync complete: ${synced} synced, ${failed} failed`)
+
+    notifyClients({
+      type: 'SYNC_COMPLETE',
+      payload: { success: failed === 0, synced, failed },
     })
   } catch (error) {
-    console.error('[SW] Sync failed:', error)
+    console.error('[SW] Background sync error:', error)
+    notifyClients({
+      type: 'SYNC_COMPLETE',
+      payload: { success: false, error: error.message || 'Sync failed' },
+    })
   }
+}
+
+/**
+ * Notify all connected clients with a message
+ */
+async function notifyClients(message) {
+  const allClients = await self.clients.matchAll()
+  allClients.forEach((client) => {
+    client.postMessage(message)
+  })
 }
 
 // Handle messages from clients

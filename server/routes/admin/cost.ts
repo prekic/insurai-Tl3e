@@ -206,7 +206,7 @@ router.get('/cost/alerts', authenticateAdmin, async (req: AuthenticatedRequest, 
 
     res.json({ success: true, data: alerts })
   } catch (error) {
-    log.error('Failed to get cost alerts', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to get alerts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
 })
@@ -231,7 +231,7 @@ router.post('/cost/alerts/:id/acknowledge', authenticateAdmin, async (req: Authe
 
     res.json({ success: true, message: 'Alert acknowledged' })
   } catch (error) {
-    log.error('Failed to acknowledge cost alert', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to acknowledge alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
 })

@@ -250,7 +250,7 @@ router.get('/monitoring/alerts', authenticateAdmin, (_req: AuthenticatedRequest,
     const alerts = monitoring.getActiveAlerts()
     res.json({ success: true, data: alerts })
   } catch (error) {
-    log.error('Failed to get active alerts', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to get alerts', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to get alerts' })
   }
 })
@@ -290,7 +290,7 @@ router.post('/monitoring/alerts/:id/acknowledge', authenticateAdmin, async (req:
 
     res.json({ success: true, data: alert })
   } catch (error) {
-    log.error('Failed to acknowledge monitoring alert', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to acknowledge alert', { error: error instanceof Error ? error.message : String(error) })
     res.status(500).json({ success: false, error: 'Failed to acknowledge alert' })
   }
 })

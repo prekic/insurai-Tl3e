@@ -11,7 +11,6 @@ import {
   canPerformFreeTrial,
   saveTrialEmail,
   getTrialEmail,
-  getShareUrl,
   getShareId,
   getTrialDataForTransfer,
   hasPendingTrialTransfer,
@@ -651,63 +650,6 @@ describe('getTrialEmail', () => {
 })
 
 // ===========================================================================
-// getShareUrl
-// ===========================================================================
-describe('getShareUrl', () => {
-  it('returns null when no share ID stored', () => {
-    expect(getShareUrl()).toBeNull()
-  })
-
-  it('returns null when share ID exists but no valid trial result', () => {
-    store.set(STORAGE_KEYS.TRIAL_SHARE_ID, 'abc123')
-    // Missing TRIAL_RESULT and TRIAL_TIMESTAMP
-    expect(getShareUrl()).toBeNull()
-  })
-
-  it('returns share URL when share ID and valid result exist', () => {
-    store.set(STORAGE_KEYS.TRIAL_SHARE_ID, 'testShareId123')
-    store.set(STORAGE_KEYS.TRIAL_RESULT, JSON.stringify(makeMockPolicy()))
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
-
-    const url = getShareUrl()
-    expect(url).not.toBeNull()
-    expect(url).toContain('/share/testShareId123')
-  })
-
-  it('includes window.location.origin in share URL', () => {
-    store.set(STORAGE_KEYS.TRIAL_SHARE_ID, 'xyz')
-    store.set(STORAGE_KEYS.TRIAL_RESULT, '{}')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
-
-    const url = getShareUrl()
-    // In test env, window.location.origin is typically 'http://localhost:3000' or similar
-    expect(url).toMatch(/\/share\/xyz$/)
-  })
-
-  it('returns null when trial result is expired', () => {
-    const expiredTime = Date.now() - TRIAL_EXPIRY_MS - 1
-    store.set(STORAGE_KEYS.TRIAL_SHARE_ID, 'expired-share')
-    store.set(STORAGE_KEYS.TRIAL_RESULT, JSON.stringify(makeMockPolicy()))
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, expiredTime.toString())
-
-    expect(getShareUrl()).toBeNull()
-  })
-
-  it('returns null when localStorage throws', () => {
-    Object.defineProperty(globalThis, 'localStorage', {
-      value: {
-        getItem: () => { throw new Error('Error') },
-        setItem: vi.fn(),
-        removeItem: vi.fn(),
-      },
-      writable: true,
-      configurable: true,
-    })
-    expect(getShareUrl()).toBeNull()
-  })
-})
-
-// ===========================================================================
 // getShareId
 // ===========================================================================
 describe('getShareId', () => {
@@ -841,7 +783,6 @@ describe('integration', () => {
 
     // 4. Share link works
     expect(getShareId()).not.toBeNull()
-    expect(getShareUrl()).not.toBeNull()
 
     // 5. Time remaining is about 24h
     expect(getTrialTimeRemaining()).toBe(TRIAL_EXPIRY_MS)
@@ -885,7 +826,6 @@ describe('integration', () => {
     expect(getTrialResult()).toBeNull()
     expect(getTrialEmail()).toBeNull()
     expect(getShareId()).toBeNull()
-    expect(getShareUrl()).toBeNull()
     expect(getTrialDataForTransfer()).toBeNull()
     expect(hasPendingTrialTransfer()).toBe(false)
   })

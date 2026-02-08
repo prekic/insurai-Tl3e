@@ -11,7 +11,7 @@ on:
       - staging
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '22'
   VITE_SENTRY_ENVIRONMENT: staging
 
 jobs:
