@@ -22,7 +22,7 @@ import {
   policyRowToPolicy,
   policyToUpdateData,
   generateChangeSummary,
-  getConflictSummary,
+
 } from './policy-upload-check'
 
 import {
@@ -486,65 +486,6 @@ describe('policy-upload-check', () => {
 
       const summary = generateChangeSummary(changes, 'en')
       expect(summary).toContain('2 other change(s)')
-    })
-  })
-
-  describe('getConflictSummary', () => {
-    it('should return none type for noConflict', () => {
-      const summary = getConflictSummary({ type: 'noConflict' })
-
-      expect(summary.type).toBe('none')
-      expect(summary.criticalChangeCount).toBe(0)
-    })
-
-    it('should return exact-duplicate type for exactDuplicate', () => {
-      const existingPolicy = createMockPolicy()
-      const summary = getConflictSummary({ type: 'exactDuplicate', existingPolicy })
-
-      expect(summary.type).toBe('exact-duplicate')
-      expect(summary.existingPolicy).toEqual(existingPolicy)
-      expect(summary.summaryText).toContain('already exists')
-    })
-
-    it('should count changes for amendment', () => {
-      const existingPolicy = createMockPolicy()
-      const changes: PolicyFieldDiff[] = [
-        {
-          field: 'policyNumber',
-          fieldLabel: 'Policy Number',
-          fieldLabelTr: 'Police No',
-          oldValue: 'OLD-001',
-          newValue: 'NEW-001',
-          significance: 'critical',
-        },
-        {
-          field: 'coverage',
-          fieldLabel: 'Coverage',
-          fieldLabelTr: 'Teminat',
-          oldValue: 500000,
-          newValue: 600000,
-          significance: 'major',
-        },
-        {
-          field: 'location',
-          fieldLabel: 'Location',
-          fieldLabelTr: 'Konum',
-          oldValue: 'Istanbul',
-          newValue: 'Ankara',
-          significance: 'minor',
-        },
-      ]
-
-      const summary = getConflictSummary({
-        type: 'amendment',
-        existingPolicy,
-        changes,
-      })
-
-      expect(summary.type).toBe('amendment')
-      expect(summary.criticalChangeCount).toBe(1)
-      expect(summary.majorChangeCount).toBe(1)
-      expect(summary.totalChangeCount).toBe(3)
     })
   })
 

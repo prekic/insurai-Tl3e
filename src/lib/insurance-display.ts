@@ -187,27 +187,6 @@ export function getMainCoverageValue(policy: AnalyzedPolicy): number {
 }
 
 /**
- * Get label for coverage column based on policy type
- */
-export function getCoverageLabel(type: PolicyType, locale: 'en' | 'tr' = 'en'): string {
-  const coverageType = getCoverageType(type)
-
-  if (locale === 'tr') {
-    switch (coverageType) {
-      case 'limit': return 'Limit'
-      case 'sumInsured': return 'Sigorta Bedeli'
-      case 'benefit': return 'Teminat'
-    }
-  } else {
-    switch (coverageType) {
-      case 'limit': return 'Limit'
-      case 'sumInsured': return 'Sum Insured'
-      case 'benefit': return 'Coverage'
-    }
-  }
-}
-
-/**
  * Extract the insured subject from a policy
  * Returns plate number for auto, address for property, etc.
  */

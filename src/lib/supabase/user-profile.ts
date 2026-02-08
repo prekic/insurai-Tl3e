@@ -169,7 +169,7 @@ export async function fetchUserStats(userId: string): Promise<UserStats> {
     .eq('user_id', userId)
 
   if (error) {
-    console.error('Failed to fetch user stats:', error)
+    console.warn('Failed to fetch user stats:', error)
     return { policiesAnalyzed: 0, comparisons: 0, savedReports: 0 }
   }
 

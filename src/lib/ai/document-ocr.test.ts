@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest'
-import { computePdfHash, isDocumentOCRAvailable, extractWithDocumentAI } from './document-ocr'
+import { computePdfHash, computePdfHashFromFile, isDocumentOCRAvailable, extractWithDocumentAI } from './document-ocr'
 import * as config from './config'
 import * as pdfSplitter from './pdf-splitter'
 
@@ -96,6 +96,39 @@ describe('Document OCR Module', () => {
   })
 
   // ==========================================================================
+  // computePdfHashFromFile
+  // ==========================================================================
+
+  describe('computePdfHashFromFile', () => {
+    it('should compute hash from a File object', async () => {
+      const file = new File(['test pdf content'], 'test.pdf', { type: 'application/pdf' })
+      const hash = await computePdfHashFromFile(file)
+
+      expect(hash).toHaveLength(64)
+      expect(hash).toMatch(/^[a-f0-9]{64}$/)
+    })
+
+    it('should produce same hash as computePdfHash for same content', async () => {
+      const content = 'matching content for hash test'
+      const file = new File([content], 'test.pdf', { type: 'application/pdf' })
+      const fileHash = await computePdfHashFromFile(file)
+
+      const buffer = new TextEncoder().encode(content).buffer
+      const bufferHash = await computePdfHash(buffer)
+
+      expect(fileHash).toBe(bufferHash)
+    })
+
+    it('should handle empty file', async () => {
+      const file = new File([], 'empty.pdf', { type: 'application/pdf' })
+      const hash = await computePdfHashFromFile(file)
+
+      // Empty file should produce the SHA-256 of empty input
+      expect(hash).toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855')
+    })
+  })
+
+  // ==========================================================================
   // isDocumentOCRAvailable
   // ==========================================================================
 
@@ -178,7 +211,7 @@ describe('Document OCR Module', () => {
       mockIsProxyConfigured.mockReturnValue(true)
       mockGetPdfPageCount.mockResolvedValue(10)
 
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({
           success: true,
@@ -191,21 +224,40 @@ describe('Document OCR Module', () => {
               text: `Page ${i + 1} content`,
               confidence: 0.92,
             })),
-            formFields: [],
+            formFields: [{ name: 'PolicyNo', value: '123', confidence: 0.9, page: 1 }],
             tables: [],
           },
         }),
-      }))
+      })
+      vi.stubGlobal('fetch', mockFetch)
 
       const file = new File(['test pdf'], 'test.pdf', { type: 'application/pdf' })
       const result = await extractWithDocumentAI(file)
 
+      // Verify fetch was called with correct endpoint and parameters
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      const [url, options] = mockFetch.mock.calls[0]
+      expect(url).toBe('http://localhost:4001/api/ai/ocr/document-ai')
+      expect(options.method).toBe('POST')
+      expect(options.headers['Content-Type']).toBe('application/json')
+      const body = JSON.parse(options.body)
+      expect(body.languageHints).toEqual(['tr', 'en'])
+      expect(body.mimeType).toBe('application/pdf')
+      expect(body.documentBase64).toBeDefined()
+
+      // Verify result structure
       expect(result.success).toBe(true)
       if (result.success) {
         expect(result.data.pageCount).toBe(10)
+        expect(result.data.pages).toHaveLength(10)
+        expect(result.data.pages[0].pageNumber).toBe(1)
+        expect(result.data.pages[9].pageNumber).toBe(10)
         expect(result.data.confidence).toBeCloseTo(0.92)
         expect(result.data.metadata.backend).toBe('document-ai')
         expect(result.data.pdfHash).toHaveLength(64)
+        expect(result.data.formFields).toHaveLength(1)
+        expect(result.data.formFields[0].name).toBe('PolicyNo')
+        expect(result.data.metadata.processingTimeMs).toBeGreaterThanOrEqual(0)
       }
     })
 

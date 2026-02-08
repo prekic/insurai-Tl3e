@@ -164,13 +164,6 @@ export function onMetricUpdate(callback: MetricCallback): () => void {
 }
 
 /**
- * Get all collected metrics
- */
-export function getCollectedMetrics(): Map<string, WebVitalMetric> {
-  return new Map(collectedMetrics)
-}
-
-/**
  * Get a specific metric
  */
 export function getMetric(name: WebVitalName): WebVitalMetric | undefined {
@@ -178,10 +171,34 @@ export function getMetric(name: WebVitalName): WebVitalMetric | undefined {
 }
 
 /**
+ * Get all collected metrics
+ */
+export function getCollectedMetrics(): Map<string, WebVitalMetric> {
+  return collectedMetrics
+}
+
+/**
  * Clear all collected metrics (useful for testing)
  */
 export function clearMetrics(): void {
   collectedMetrics.clear()
+}
+
+/**
+ * Measure an async function's execution time
+ */
+export async function measureAsync<T>(name: string, op: string, fn: () => Promise<T>): Promise<T> {
+  const transaction = startTransaction({ name, op })
+  try {
+    const result = await fn()
+    transaction.setStatus('ok')
+    return result
+  } catch (error) {
+    transaction.setStatus('error')
+    throw error
+  } finally {
+    transaction.finish()
+  }
 }
 
 /**
@@ -279,27 +296,6 @@ export function startTransaction(options: TransactionOptions): ActiveTransaction
         span.setAttribute(key, value)
       }
     },
-  }
-}
-
-/**
- * Measure a function's execution time
- */
-export async function measureAsync<T>(
-  name: string,
-  op: string,
-  fn: () => Promise<T>
-): Promise<T> {
-  const transaction = startTransaction({ name, op })
-  try {
-    const result = await fn()
-    transaction.setStatus('ok')
-    return result
-  } catch (error) {
-    transaction.setStatus('error')
-    throw error
-  } finally {
-    transaction.finish()
   }
 }
 

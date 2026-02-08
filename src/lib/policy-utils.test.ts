@@ -6,7 +6,7 @@ import {
   checkForDuplicate,
   groupDuplicatePolicies,
   getSimilarityLabel,
-  getSimilarityLabelTr,
+
   createPolicyTimestamp,
   ensurePolicyTimestamps,
   normalizeForOCR,
@@ -336,14 +336,6 @@ describe('policy-utils', () => {
       expect(getSimilarityLabel('exact')).toBe('Exact duplicate')
       expect(getSimilarityLabel('high')).toBe('Very similar')
       expect(getSimilarityLabel('medium')).toBe('Possibly duplicate')
-    })
-  })
-
-  describe('getSimilarityLabelTr', () => {
-    it('should return correct Turkish labels', () => {
-      expect(getSimilarityLabelTr('exact')).toBe('Birebir kopya')
-      expect(getSimilarityLabelTr('high')).toBe('Çok benzer')
-      expect(getSimilarityLabelTr('medium')).toBe('Muhtemel kopya')
     })
   })
 

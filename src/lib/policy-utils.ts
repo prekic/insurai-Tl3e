@@ -1350,35 +1350,6 @@ export function getSimilarityLabel(similarity: 'exact' | 'high' | 'medium'): str
   }
 }
 
-export function getSimilarityLabelTr(similarity: 'exact' | 'high' | 'medium'): string {
-  switch (similarity) {
-    case 'exact':
-      return 'Birebir kopya'
-    case 'high':
-      return 'Çok benzer'
-    case 'medium':
-      return 'Muhtemel kopya'
-  }
-}
-
-export function getSignificanceLabel(significance: PolicyFieldDiff['significance']): string {
-  switch (significance) {
-    case 'critical': return 'Critical Change'
-    case 'major': return 'Major Change'
-    case 'moderate': return 'Moderate Change'
-    case 'minor': return 'Minor Change'
-  }
-}
-
-export function getSignificanceLabelTr(significance: PolicyFieldDiff['significance']): string {
-  switch (significance) {
-    case 'critical': return 'Kritik Değişiklik'
-    case 'major': return 'Önemli Değişiklik'
-    case 'moderate': return 'Orta Değişiklik'
-    case 'minor': return 'Küçük Değişiklik'
-  }
-}
-
 // ============================================================================
 // TIMESTAMPS
 // ============================================================================
