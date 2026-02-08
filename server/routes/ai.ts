@@ -510,6 +510,7 @@ router.post(
   aiExtractionLimiter,
   validateAnthropicExtraction,
   async (req: Request, res: Response) => {
+    const requestId = `ext-ant-${Date.now()}`
     try {
       const client = getAnthropicClient()
       if (!client) {
