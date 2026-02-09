@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**
 - **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 8, 2026
+- **Last Updated**: February 9, 2026
 
 ---
 
@@ -19,17 +19,17 @@
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Frontend | React + TypeScript | 18.3 / 5.9.3 |
+| Frontend | React + TypeScript | 19.1 / 5.9.3 |
 | Styling | Tailwind CSS | v4 |
 | Routing | React Router | v7 |
-| Build | Vite | v6 |
-| Backend | Express + TypeScript | v4.21 |
+| Build | Vite | v7 |
+| Backend | Express + TypeScript | v5 |
 | Database | Supabase (PostgreSQL) | - |
 | Auth | Supabase Auth | - |
 | AI | OpenAI, Anthropic, Google | Multi-provider |
 | PDF | pdf.js (browser), pdf-parse (server) | v5.4 |
 | Monitoring | Sentry | v10 |
-| Testing | Vitest + Playwright | v2.1 / v1.58 |
+| Testing | Vitest + Playwright | v4 / v1.58 |
 
 ---
 
@@ -512,12 +512,12 @@ const OCR_SUBSTITUTIONS = {
 | `Hero.tsx` | Main hero with gradient bg, nav, upload widget, comparison mock |
 | `Benefits.tsx` | Feature grid with icons (AI extraction, benchmarking, etc.) |
 | `HowItWorks.tsx` | 3-step process (Upload → Analyze → Compare) |
-| `Stats.tsx` | Key metrics (policies analyzed, time saved, etc.) |
-| `WhoItsFor.tsx` | Target audience cards (brokers, risk managers, etc.) |
-| `WhyChooseUs.tsx` | Differentiators vs competitors |
-| `CompareSection.tsx` | Interactive policy comparison demo |
-| `ComparisonMock.tsx` | Visual comparison result mockup |
-| `Testimonials.tsx` | Customer quotes carousel |
+| `Stats.tsx` | **UPDATED** Authentic capability metrics (7 types, TR/EN, 15+ checks, <60s) |
+| `WhoItsFor.tsx` | Target audience cards (hidden on mobile — covered by Testimonials) |
+| `WhyChooseUs.tsx` | **UPDATED** Authentic differentiators (KVKK, No Signup, Turkey-Focused) |
+| `CompareSection.tsx` | Interactive policy comparison demo (hidden on mobile) |
+| `ComparisonMock.tsx` | **UPDATED** Real provider names with disclaimer |
+| `Testimonials.tsx` | **UPDATED** Use-case scenarios for 3 audience types (replaces fake testimonials) |
 | `FAQ.tsx` | Accordion with common questions |
 | `Footer.tsx` | Links, legal, social |
 | `LanguageToggle.tsx` | TR/EN language switcher |
@@ -1188,11 +1188,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 8, 2026)
-- **Total**: 6,000+ tests across 185+ test files (5,801 base after dead code removal + 275 new tests for critical modules)
+### Test Counts (as of Feb 9, 2026)
+- **Total**: 6,000+ tests across 185+ test files
 - **Passing**: 100% (0 failures)
 - **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
-- **Note**: Base count decreased from 6,338/192 after removing ~17,800 lines of dead code, then increased with 275 new tests for admin-auth, email, cost-control, free-trial
+- **Note**: Includes 275 tests for critical modules (admin-auth, email, cost-control, free-trial), 21 user-profile functional tests, 14 E2E extraction flow tests
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3126,6 +3126,65 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Solution**: Added 60s `AbortSignal.timeout()` on server-side fetch, timeout detection on both OCR routes
 - **Commit**: `a91c833`
 
+### 85. Market Data DB Migration (Added Feb 9, 2026)
+- **Feature**: Core business logic (gap analyzers, evaluator, extractor, comparison) now uses `ConfigurationService` DB instead of static files
+- **Previously**: Static files in `src/data/market-data/` were the only source — DB tables were seeded but not consumed
+- **Now**: `MarketDataService` provides DB-first access with static file fallback
+- **Files Changed**:
+  - `src/lib/market-data/service.ts` — New `MarketDataService` with async DB-backed methods
+  - `src/lib/ai/comparison.ts` — Switched from static imports to async `MarketDataService`
+  - `src/lib/ai/multi-ai-analysis.ts` — Switched to async market data access
+  - `src/lib/ai/policy-extractor.ts` — Updated to use async benchmarks
+- **Commit**: `4e8711a`
+
+### 86. User Profile Functional Tests (Added Feb 9, 2026)
+- **Feature**: 21 new functional tests for `src/lib/supabase/user-profile.ts`
+- **File**: `src/lib/supabase/user-profile.functional.test.ts`
+- **Coverage**: Profile CRUD, preferences, avatar handling, validation
+- **Commit**: `c901281`
+
+### 87. Major Dependency Upgrades (Feb 9, 2026)
+- **Express 4 → 5** (`379c2a0`): Universal wildcard `app.get('*')` → `app.get(/.*/)`, `req.query` returns `unknown`, async errors auto-forwarded
+- **Vite 6 → 7** (`01a5e42`): With `@vitejs/plugin-react` 4 → 5
+- **React 18 → 19** (`eb0d66f`): `useRef()` requires initial value — `useRef<T>()` → `useRef<T | undefined>(undefined)`
+- **Vitest 2 → 4** (`23ef73d`): Arrow function mocks can't be constructors — must use `function()` syntax for `new`
+- **lucide-react + tailwind-merge** (`e1eae25`): Minor version bumps
+- **globals + jsdom** (`fcd9593`): Tooling updates
+- **express-rate-limit 7 → 8** (`759a2f9`): Requires `validate: { keyGeneratorIpFallback: false }` on custom keyGenerators
+- All upgrades follow `docs/DEPENDENCY_UPGRADE_PLAN.md` tiers
+
+### 88. Tiered Confidence System for AI Extraction (Added Feb 9, 2026)
+- **Feature**: Two-tier confidence thresholds for extraction results
+  - `minConfidence` (0.4): Hard rejection — extraction fails below this
+  - `warningConfidence` (0.7): Warning — results shown with caution banner
+- **Components Updated**:
+  - `src/lib/ai/policy-extractor.ts` — Checks both thresholds, adds `confidenceWarning` flag
+  - `src/components/PolicyUpload.tsx` — Shows warning banner for low-confidence extractions
+  - `src/components/TryAnalysis.tsx` — Warning banner in free trial flow
+  - `src/components/PolicyDetailView.tsx` — Persistent warning on policy detail page
+  - `src/lib/config/types.ts` — New `warningConfidence` setting in AIConfig
+  - `src/components/admin/tabs/settings/AISettingsPanel.tsx` — Admin UI for warning threshold
+- **Commit**: `7e1729e`
+
+### 89. Mobile Landing Page UX Overhaul (Feb 9, 2026)
+- **Problem**: Multiple UX issues on mobile anonymous user landing page:
+  - CTA not visible above the fold (buried below 9 staggered items)
+  - Brand name hidden on mobile
+  - Fabricated stats throughout (4.9/5, 15K+, 50+, 2300+, 24/7)
+  - Fake testimonials with invented names
+  - Page too long on mobile (redundant sections)
+- **Fixes across 4 commits** (`203784f`, `b195fd8`, `a35a6c1`, `e0cbaf4`):
+  1. **Hero restructured**: CTA moved to 3rd position in StaggeredList, brand always visible, utility bar hidden on mobile, sub-headline shortened, headline `text-3xl` on smallest screens
+  2. **CTA tightened**: Grouped CTA + "Free, no signup required" micro-copy + trust badges (KVKK, SSL) into single block, shadow on CTA button, secondary CTA demoted to text link
+  3. **Stats replaced**: Fabricated counters (2300+, 15K+, 98%, 24/7) → authentic capabilities (7 policy types, TR/EN, 15+ checks, <60s)
+  4. **ComparisonMock**: "Kasko A/B" → real provider names (Allianz/AXA) with disclaimer
+  5. **TrustedProviders**: "50+ Turkish Insurers" → "Works with major Turkish insurers"
+  6. **SampleReportPreview**: Expanded compact version with 3-line bulleted deliverables
+  7. **WhyChooseUs**: Fabricated stats (4.9/5, 15K+, 50+) → authentic differentiators (KVKK Compliant, No Signup Required, Turkey-Focused)
+  8. **Testimonials**: Fake names/quotes → honest use-case scenarios for 3 audience types
+  9. **Mobile page length**: Hidden WhoItsFor, PolicyComparisonSection, CompareSection on mobile
+- **Files Changed**: Hero.tsx, Hero.test.tsx, UploadWidget.tsx, Stats.tsx, Stats.test.tsx, ComparisonMock.tsx, TrustedProviders.tsx, SampleReportPreview.tsx, WhyChooseUs.tsx, WhyChooseUs.test.tsx, Testimonials.tsx, Testimonials.test.tsx, LandingPage.tsx
+
 ---
 
 ## Turkish Market Considerations
@@ -3525,11 +3584,35 @@ connectSrc: [
 - Use `vi.hoisted()` for mock variables referenced inside `vi.mock()` factories (avoids TDZ errors)
 - Pattern: `const { mockFn } = vi.hoisted(() => ({ mockFn: vi.fn() }))` then reference in `vi.mock()`
 
-**Market Data: Two Parallel Systems (Migration Incomplete):**
-- Static files in `src/data/market-data/` (benchmarks.ts, providers.ts) are the **primary source** — used by 7 production consumers (gap analyzers, evaluator, extractor, comparison engine)
-- Database tables (`market_benchmarks`, `insurance_providers`, `regional_factors`) are seeded with the same data and `ConfigurationService` has methods to read from them, but the core business logic hasn't been switched over yet
-- The deleted `data-repository/` was an unused intermediate abstraction layer that was never wired in
-- **Migration TODO**: Switch gap analyzers, evaluator, and extractor from static imports to `configService.getMarketBenchmarks()` / `configService.getRegionalFactor()` so admins can update benchmark data via Settings UI without code changes
+**Market Data: DB-First with Static Fallback (Migration Complete):**
+- `MarketDataService` in `src/lib/market-data/service.ts` provides DB-first access with static file fallback
+- Core consumers (comparison engine, multi-AI analysis, extractor) now use async `MarketDataService` methods
+- Static files in `src/data/market-data/` remain as fallback if DB unavailable
+- Admins can now update benchmark data via Settings UI without code changes
+
+**Express 5 Migration Gotchas:**
+- `app.get('*')` no longer works as universal wildcard — use `app.get(/.*/)` regex
+- `req.query` returns `unknown` instead of `any` — add type assertions
+- Async errors in route handlers are automatically forwarded to error middleware (no need for try-catch wrappers for next())
+- `res.send(status)` removed — use `res.sendStatus(status)`
+
+**express-rate-limit v7 → v8 Migration:**
+- v8 throws fatal `ValidationError` (ERR_ERL_KEY_GEN_IPV6) when custom `keyGenerator` uses `req.ip` without `ipKeyGenerator` helper
+- Fix: Add `validate: { keyGeneratorIpFallback: false }` to every `rateLimit()` call with a custom keyGenerator
+- This crashes the server on startup in production environments
+
+**Vitest 2 → 4 Migration:**
+- Arrow functions in `vi.fn().mockImplementation(() => ...)` CANNOT be used as constructors
+- If code calls `new Something()`, mock must use `function() { return ... }` instead of `() => ...`
+- Vitest 4 prints warning: "The vi.fn() mock did not use 'function' or 'class' in its implementation"
+
+**React 18 → 19 Migration:**
+- `useRef()` requires initial value — change `useRef<T>()` to `useRef<T | undefined>(undefined)`
+
+**Landing Page: No Fabricated Data:**
+- Never use fake stats, testimonials, or social proof (4.9/5 ratings, "15K+ users", invented names)
+- Use authentic capability metrics or honest use-case scenarios instead
+- If the product doesn't have real user data yet, show what it can do rather than inventing numbers
 
 **Dead Code Verification Pattern:**
 - Before deleting any export, verify 0 production imports with: `grep -r "functionName" src/ server/ --include="*.ts" --include="*.tsx" | grep -v ".test." | grep -v "__tests__"`
