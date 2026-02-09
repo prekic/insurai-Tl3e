@@ -12,7 +12,7 @@ vi.mock('./config', () => ({
   isAIConfigured: vi.fn(() => false),
   isOCRConfigured: vi.fn(() => false),
   isProxyConfigured: vi.fn(() => false),
-  AI_CONFIG: { minConfidence: 0.7 },
+  AI_CONFIG: { minConfidence: 0.4, warningConfidence: 0.7 },
   getConfiguredProviders: vi.fn(() => []),
 }))
 
@@ -597,7 +597,7 @@ describe('AI Extraction', () => {
 
   it('should fall back when confidence is too low', async () => {
     const config = await import('./config')
-    vi.mocked(config.AI_CONFIG).minConfidence = 0.7
+    vi.mocked(config.AI_CONFIG).minConfidence = 0.4
 
     const openai = await import('./providers/openai')
     vi.mocked(openai.extractWithOpenAI).mockResolvedValue({

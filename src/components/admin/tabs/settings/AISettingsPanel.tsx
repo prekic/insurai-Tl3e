@@ -50,7 +50,7 @@ const SETTING_GROUPS = {
   parameters: {
     title: 'Model Parameters',
     description: 'Fine-tune model behavior',
-    keys: ['temperature', 'chat_temperature', 'max_tokens', 'min_confidence'],
+    keys: ['temperature', 'chat_temperature', 'max_tokens', 'min_confidence', 'warning_confidence'],
   },
   timeouts: {
     title: 'Timeouts & Limits',

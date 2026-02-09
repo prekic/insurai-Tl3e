@@ -120,7 +120,8 @@ describe('ConfigurationService', () => {
       expect(config.maxTokens).toBe(4096)
       expect(config.temperature).toBe(0.1)
       expect(config.chatTemperature).toBe(0.7)
-      expect(config.minConfidence).toBe(0.7)
+      expect(config.minConfidence).toBe(0.4)
+      expect(config.warningConfidence).toBe(0.7)
       expect(config.extractionTimeoutMs).toBe(90000)
     })
 

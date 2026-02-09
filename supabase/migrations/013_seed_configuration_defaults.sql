@@ -27,17 +27,18 @@ INSERT INTO public.app_settings (category, key, value, value_type, description, 
 ('ai', 'max_tokens', '4096', 'number', 'Maximum tokens for AI response', 'AI yanıtı için maksimum token', 5, NULL),
 ('ai', 'temperature', '0.1', 'number', 'AI temperature for extraction (lower = more deterministic)', 'Çıkarma için AI sıcaklığı (düşük = daha belirleyici)', 6, NULL),
 ('ai', 'chat_temperature', '0.7', 'number', 'AI temperature for chat (higher = more creative)', 'Sohbet için AI sıcaklığı (yüksek = daha yaratıcı)', 7, NULL),
-('ai', 'min_confidence', '0.7', 'number', 'Minimum confidence threshold for extraction', 'Çıkarma için minimum güven eşiği', 8, NULL),
-('ai', 'extraction_timeout_ms', '90000', 'number', 'Extraction timeout in milliseconds', 'Milisaniye cinsinden çıkarma zaman aşımı', 9, NULL),
+('ai', 'min_confidence', '0.4', 'number', 'Hard reject threshold — below this, extraction is too unreliable', 'Kesin red eşiği — altında çıkarma güvenilmez', 8, NULL),
+('ai', 'warning_confidence', '0.7', 'number', 'Warning threshold — below this, results shown with low-confidence warning', 'Uyarı eşiği — altında sonuçlar düşük güven uyarısıyla gösterilir', 9, NULL),
+('ai', 'extraction_timeout_ms', '90000', 'number', 'Extraction timeout in milliseconds', 'Milisaniye cinsinden çıkarma zaman aşımı', 10, NULL),
 
 -- Provider Settings
-('ai', 'preferred_provider', '"auto"', 'string', 'Preferred AI provider (auto = cost-optimized)', 'Tercih edilen AI sağlayıcı (auto = maliyet optimizasyonlu)', 10, '["auto", "openai", "anthropic"]'),
-('ai', 'enable_fallback', 'true', 'boolean', 'Enable automatic fallback to secondary provider', 'İkincil sağlayıcıya otomatik geri dönüşü etkinleştir', 11, NULL),
+('ai', 'preferred_provider', '"auto"', 'string', 'Preferred AI provider (auto = cost-optimized)', 'Tercih edilen AI sağlayıcı (auto = maliyet optimizasyonlu)', 11, '["auto", "openai", "anthropic"]'),
+('ai', 'enable_fallback', 'true', 'boolean', 'Enable automatic fallback to secondary provider', 'İkincil sağlayıcıya otomatik geri dönüşü etkinleştir', 12, NULL),
 
 -- Consensus Settings
-('ai', 'consensus_enabled', 'true', 'boolean', 'Enable multi-model consensus for high-confidence extraction', 'Yüksek güvenilirlik çıkarma için çoklu model konsensüsünü etkinleştir', 12, NULL),
-('ai', 'consensus_agreement_threshold', '0.8', 'number', 'Minimum agreement threshold for consensus', 'Konsensüs için minimum anlaşma eşiği', 13, NULL),
-('ai', 'consensus_fields', '["policyNumber", "provider", "premium", "startDate", "endDate"]', 'array', 'Fields to check for consensus', 'Konsensüs için kontrol edilecek alanlar', 14, NULL)
+('ai', 'consensus_enabled', 'true', 'boolean', 'Enable multi-model consensus for high-confidence extraction', 'Yüksek güvenilirlik çıkarma için çoklu model konsensüsünü etkinleştir', 13, NULL),
+('ai', 'consensus_agreement_threshold', '0.8', 'number', 'Minimum agreement threshold for consensus', 'Konsensüs için minimum anlaşma eşiği', 14, NULL),
+('ai', 'consensus_fields', '["policyNumber", "provider", "premium", "startDate", "endDate"]', 'array', 'Fields to check for consensus', 'Konsensüs için kontrol edilecek alanlar', 15, NULL)
 
 ON CONFLICT (category, key) DO NOTHING;
 

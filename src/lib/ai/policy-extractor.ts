@@ -37,6 +37,10 @@ export interface ExtractionResult {
   policy: AnalyzedPolicy
   extractedData: ExtractedPolicyData
   source: 'ai' | 'fallback' | 'ocr'
+  /** True when extraction confidence is below warningConfidence but above minConfidence */
+  lowConfidence?: boolean
+  /** The raw AI confidence score (0-1) */
+  confidenceScore?: number
   // Multi-model consensus info
   consensus?: {
     providers: AIProvider[]
@@ -642,7 +646,11 @@ export async function extractPolicyFromDocument(
       full_extracted_json: JSON.stringify(extractedData, null, 2),
     })
 
-    // Check confidence threshold
+    // Tiered confidence check:
+    // - Below minConfidence (default 0.4): hard reject — data too unreliable
+    // - Between minConfidence and warningConfidence (default 0.7): show results with warning
+    // - At or above warningConfidence: full confidence results
+    const isLowConfidence = confidenceOverall < AI_CONFIG.warningConfidence
     if (confidenceOverall < AI_CONFIG.minConfidence) {
       if (useFallback) {
         console.error(
@@ -655,10 +663,13 @@ export async function extractPolicyFromDocument(
         error: {
           code: 'LOW_CONFIDENCE',
           message: `Extraction confidence too low: ${Math.round(confidenceOverall * 100)}%`,
-          details: 'The AI could not reliably extract policy information',
+          details: 'The AI could not reliably extract policy information. Please try with a clearer document.',
         },
         fallbackAvailable: false,
       }
+    }
+    if (isLowConfidence) {
+      console.warn(`[PolicyExtractor] Low confidence extraction (${Math.round(confidenceOverall * 100)}%) — results will include warning`)
     }
 
     // ========================================================================
@@ -993,6 +1004,8 @@ export async function extractPolicyFromDocument(
       policy,
       extractedData: enhancedExtractedData,
       source: usedOCR ? 'ocr' : 'ai',
+      lowConfidence: isLowConfidence || undefined,
+      confidenceScore: confidenceOverall,
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
       patternValidation: patternValidation ? {
