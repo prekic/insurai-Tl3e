@@ -105,6 +105,31 @@ export interface ExtractionOptions {
 }
 
 /**
+ * Recalculate overall confidence using weighted formula.
+ * Weights: policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%
+ * This ensures consistent scoring regardless of AI model behavior.
+ */
+function recalculateOverallConfidence(
+  confidence: { overall?: number; policyNumber?: number; provider?: number; dates?: number; premium?: number; coverages?: number } | undefined | null,
+  fallback: number
+): number {
+  if (!confidence) return fallback
+
+  const pn = confidence.policyNumber
+  const pr = confidence.provider
+  const dt = confidence.dates
+  const pm = confidence.premium
+  const cv = confidence.coverages
+
+  // If any per-field scores are missing, use the AI-reported overall
+  if (pn == null || pr == null || dt == null || pm == null || cv == null) {
+    return fallback
+  }
+
+  return pn * 0.20 + pr * 0.15 + dt * 0.20 + pm * 0.20 + cv * 0.25
+}
+
+/**
  * Safely get lowercase name from coverage, handling undefined/null
  */
 function getCoverageName(coverage: { name?: string | null; description?: string | null } | undefined | null): string {
@@ -620,9 +645,14 @@ export async function extractPolicyFromDocument(
       })
     }
 
-    // Log AI extraction success
-    const confidenceOverall = extractedData.confidence?.overall ?? 0.7
-    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall)
+    // Recalculate overall confidence using weighted formula as a safety net.
+    // The AI may not follow the exact formula, so we enforce it server-side.
+    const rawOverall = extractedData.confidence?.overall ?? 0.7
+    const confidenceOverall = recalculateOverallConfidence(extractedData.confidence, rawOverall)
+    if (extractedData.confidence) {
+      extractedData.confidence.overall = confidenceOverall
+    }
+    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall, '(AI reported:', rawOverall, ')')
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {

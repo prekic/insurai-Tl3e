@@ -157,16 +157,41 @@ export const EXTRACTION_JSON_SCHEMA = {
       confidence: {
         type: 'object',
         properties: {
-          overall: { type: 'number', description: '0-1 confidence in extraction quality' },
-          policyNumber: { type: 'number', description: '0-1 confidence' },
-          provider: { type: 'number', description: '0-1 confidence' },
-          dates: { type: 'number', description: '0-1 confidence' },
-          premium: { type: 'number', description: '0-1 confidence' },
-          coverages: { type: 'number', description: '0-1 confidence' },
+          overall: {
+            type: 'number',
+            description:
+              'Weighted average of per-field scores: policyNumber*0.20 + provider*0.15 + dates*0.20 + premium*0.20 + coverages*0.25. A clearly printed document with readable fields should score 0.85-0.95.',
+          },
+          policyNumber: {
+            type: 'number',
+            description:
+              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred, 0.1-0.4=guessed, 0.0=not found',
+          },
+          provider: {
+            type: 'number',
+            description:
+              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred, 0.1-0.4=guessed, 0.0=not found',
+          },
+          dates: {
+            type: 'number',
+            description:
+              '1.0=both dates found clearly, 0.8-0.9=dates found with minor ambiguity, 0.5-0.7=only one date or format unclear, 0.0=not found',
+          },
+          premium: {
+            type: 'number',
+            description:
+              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred from context, 0.1-0.4=guessed, 0.0=not found',
+          },
+          coverages: {
+            type: 'number',
+            description:
+              '1.0=all coverages clearly listed with limits, 0.8-0.9=most coverages found, 0.5-0.7=partial coverage list, 0.1-0.4=few coverages found, 0.0=none found',
+          },
         },
         required: ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'],
         additionalProperties: false,
-        description: 'Confidence scores for extracted fields',
+        description:
+          'Confidence scores for extracted fields. Overall is a weighted average (policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%). A well-structured readable document should score 0.85-0.95 overall.',
       },
     },
     required: [

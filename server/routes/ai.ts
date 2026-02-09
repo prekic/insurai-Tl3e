@@ -123,11 +123,33 @@ You MUST respond with ONLY valid JSON matching this exact schema. Do not include
 
 ## Important Notes:
 - Dates must be in YYYY-MM-DD format
-- Confidence scores must be between 0 and 1
 - For Turkish policies, include both English (name) and Turkish (nameTr) coverage names
 - Set isUnlimited: true for "Sınırsız" coverages
 - Set isMarketValue: true for "Rayiç Değer" coverages
 - Extract all coverages found in the document
+
+## Confidence Scoring Rules (CRITICAL — follow exactly):
+Each confidence score (0 to 1) reflects how clearly the field was found in the document.
+
+**Per-field confidence:**
+- 1.0: Field found explicitly and unambiguously (exact value clearly printed)
+- 0.8-0.9: Field found but minor ambiguity (e.g., OCR artifact near value, slightly unclear formatting)
+- 0.5-0.7: Field inferred or partially found (e.g., derived from context, only part of value visible)
+- 0.1-0.4: Field guessed with low certainty
+- 0.0: Field not found at all (use null for the value)
+
+**Overall confidence calculation:**
+Compute the overall confidence as a weighted average of per-field scores:
+- policyNumber: weight 20%
+- provider: weight 15%
+- dates (startDate + endDate): weight 20%
+- premium: weight 20%
+- coverages: weight 25%
+
+For example, if policyNumber=1.0, provider=1.0, dates=0.9, premium=1.0, coverages=0.8:
+overall = 0.20*1.0 + 0.15*1.0 + 0.20*0.9 + 0.20*1.0 + 0.25*0.8 = 0.93
+
+**Important:** A well-structured, clearly printed policy document where most fields are readable should score 0.85-0.95 overall. Only score below 0.7 if the document is genuinely hard to read (scanned with poor quality, handwritten, significantly damaged, or missing critical sections).
 
 Now analyze the following policy document:
 `

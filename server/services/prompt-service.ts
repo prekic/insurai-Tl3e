@@ -148,7 +148,14 @@ Your task is to extract structured information from insurance policy documents.
 
 4. **Currency Detection**: Look for ₺, TL, TRY for Turkish Lira. Default to TRY.
 
-5. **Confidence Scores**: Rate confidence 0-1 based on text clarity.
+5. **Confidence Scores**: Rate each field's confidence 0-1:
+   - 1.0: Field found explicitly and unambiguously
+   - 0.8-0.9: Found with minor ambiguity (e.g., OCR artifact near value)
+   - 0.5-0.7: Inferred or partially found
+   - 0.1-0.4: Guessed with low certainty
+   - 0.0: Not found (use null for the value)
+   Overall confidence = weighted average: policyNumber*0.20 + provider*0.15 + dates*0.20 + premium*0.20 + coverages*0.25
+   A clearly printed document with readable fields should score 0.85-0.95 overall.
 
 6. **Missing Information**: Use null for fields you cannot confidently extract.
 
