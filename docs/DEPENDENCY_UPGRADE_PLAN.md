@@ -1,8 +1,8 @@
 # Dependency Upgrade Plan
 
 **Created**: 2026-02-07
-**Updated**: 2026-02-07
-**Current State**: All builds passing, 6338+ tests green, Tier 1 complete
+**Updated**: 2026-02-09
+**Current State**: All builds passing, 6000+ tests green, Tiers 1-5 complete
 
 ## Upgrade Tiers
 
@@ -31,9 +31,7 @@ Completed 2026-02-07. All upgrades applied, tests passing (6338+).
 
 ---
 
-### Tier 2: Major Framework Upgrades (Medium Risk)
-
-These require migration steps but have well-documented upgrade paths.
+### Tier 2: Major Framework Upgrades (Medium Risk) — COMPLETED Feb 9, 2026
 
 #### Express 4 → 5
 | Package | Current | Target |
@@ -74,9 +72,7 @@ These require migration steps but have well-documented upgrade paths.
 
 ---
 
-### Tier 3: Major UI/Testing Upgrades (Higher Risk)
-
-These have larger API surface changes and need careful testing.
+### Tier 3: Major UI/Testing Upgrades (Higher Risk) — COMPLETED Feb 9, 2026
 
 #### React 18 → 19
 | Package | Current | Target |
@@ -121,9 +117,9 @@ These have larger API surface changes and need careful testing.
 
 ---
 
-### Tier 4: UI Library Upgrades (Optional)
+### Tier 4: UI Library Upgrades (Optional) — PARTIAL Feb 9, 2026
 
-Lower priority - upgrade when convenient.
+lucide-react and tailwind-merge upgraded. framer-motion, recharts, sonner deferred (medium risk, breaking API changes).
 
 | Package | Current | Target | Risk |
 |---------|---------|--------|------|
@@ -135,7 +131,9 @@ Lower priority - upgrade when convenient.
 
 ---
 
-### Tier 5: Tooling Upgrades (Optional)
+### Tier 5: Tooling Upgrades (Optional) — PARTIAL Feb 9, 2026
+
+globals and jsdom upgraded. ESLint 10 and eslint-plugin-react-hooks 7 deferred (config format changes).
 
 | Package | Current | Target | Risk |
 |---------|---------|--------|------|
