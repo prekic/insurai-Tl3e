@@ -13,21 +13,25 @@ const mockOpenAICreate = vi.fn()
 const mockAnthropicCreate = vi.fn()
 
 vi.mock('openai', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    chat: {
-      completions: {
-        create: mockOpenAICreate,
+  default: vi.fn().mockImplementation(function () {
+    return {
+      chat: {
+        completions: {
+          create: mockOpenAICreate,
+        },
       },
-    },
-  })),
+    }
+  }),
 }))
 
 vi.mock('@anthropic-ai/sdk', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    messages: {
-      create: mockAnthropicCreate,
-    },
-  })),
+  default: vi.fn().mockImplementation(function () {
+    return {
+      messages: {
+        create: mockAnthropicCreate,
+      },
+    }
+  }),
 }))
 
 // Set up environment variables before importing routes

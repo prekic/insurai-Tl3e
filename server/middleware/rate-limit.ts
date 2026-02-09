@@ -245,6 +245,7 @@ export const generalLimiter: RateLimitRequestHandler = rateLimit({
   keyGenerator,
   handler: rateLimitHandler,
   skip,
+  validate: { keyGeneratorIpFallback: false }, // Our keyGenerator handles IP correctly via req.ip + trust proxy
 })
 
 /**
@@ -274,6 +275,7 @@ export const aiExtractionLimiter: RateLimitRequestHandler = rateLimit({
     })
   },
   skip,
+  validate: { keyGeneratorIpFallback: false },
 })
 
 /**
@@ -302,6 +304,7 @@ export const ocrLimiter: RateLimitRequestHandler = rateLimit({
     })
   },
   skip,
+  validate: { keyGeneratorIpFallback: false },
 })
 
 /**
@@ -330,6 +333,7 @@ export const chatLimiter: RateLimitRequestHandler = rateLimit({
     })
   },
   skip,
+  validate: { keyGeneratorIpFallback: false },
 })
 
 /**
@@ -342,6 +346,7 @@ export const healthLimiter: RateLimitRequestHandler = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req: Request) => req.ip === '127.0.0.1',
+  validate: { keyGeneratorIpFallback: false },
 })
 
 /**
@@ -368,6 +373,7 @@ export const authLimiter: RateLimitRequestHandler = rateLimit({
     })
   },
   skip,
+  validate: { keyGeneratorIpFallback: false },
 })
 
 /**
@@ -387,6 +393,7 @@ export function createRateLimiter(options: {
     keyGenerator,
     handler: rateLimitHandler,
     skip,
+    validate: { keyGeneratorIpFallback: false },
   })
 }
 

@@ -326,7 +326,8 @@ app.use('/api', (_req, res) => {
 // Handle client-side routing in production - serve index.html for all other routes
 if (IS_PRODUCTION) {
   const distPath = path.join(__dirname, '..', 'dist')
-  app.get('*', (_req, res) => {
+  // Express 5: '*' is no longer a universal wildcard. Use regex for SPA catch-all.
+  app.get(/.*/, (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
   })
 }
