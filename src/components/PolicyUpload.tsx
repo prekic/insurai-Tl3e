@@ -101,7 +101,7 @@ export function PolicyUpload() {
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
   const filesReceivedRef = useRef(false)
   // Ref to hold the latest addFiles function to avoid stale closures in useEffect
-  const addFilesRef = useRef<(files: File[]) => Promise<void>>()
+  const addFilesRef = useRef<((files: File[]) => Promise<void>) | undefined>(undefined)
 
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
