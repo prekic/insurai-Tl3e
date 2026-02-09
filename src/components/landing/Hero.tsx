@@ -260,44 +260,45 @@ export function Hero() {
                 <span className="text-sm font-medium text-gray-700">AI-powered policy analysis</span>
               </div>,
 
-              <h1 key="headline" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.1] tracking-tight">
+              <h1 key="headline" className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.1] tracking-tight">
                 Understand and <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">benchmark</span> your insurance policies
               </h1>,
 
-              <p key="subheadline" className="text-lg sm:text-xl md:text-2xl text-gray-600 leading-relaxed">
+              <p key="subheadline" className="text-lg sm:text-xl md:text-2xl text-gray-600 leading-relaxed -mt-1">
                 Upload a policy PDF and get plain-language coverage analysis in seconds.
               </p>,
 
-              /* CTA immediately after sub-headline — above the fold on mobile */
-              <div key="ctas" className="flex flex-col sm:flex-row gap-3 pt-2">
-                <UploadWidget
-                  compact={true}
-                  buttonText="Analyze Your Policy Free"
-                  loadingText="Analyzing..."
-                />
-                <AnimatedButton
-                  onClick={() => navigate('/samples')}
-                  className="group inline-flex items-center justify-center gap-2 px-6 py-4 text-gray-600 hover:text-blue-700 transition-all font-medium text-sm"
-                >
-                  <span>See Example Analysis</span>
-                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                </AnimatedButton>
-              </div>,
-
-              /* Trust signals inline after CTA */
-              <div key="trust-inline" className="flex flex-wrap items-center gap-3 pt-1">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
-                  <ShieldCheck size={14} className="text-emerald-600" />
-                  <span className="text-xs font-medium text-emerald-700">KVKK Uyumlu</span>
+              /* CTA + micro-copy + trust badges — tightly grouped above the fold */
+              <div key="cta-block" className="space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <UploadWidget
+                    compact={true}
+                    buttonText="Analyze Your Policy Free"
+                    loadingText="Analyzing..."
+                  />
+                  <AnimatedButton
+                    onClick={() => navigate('/samples')}
+                    className="group inline-flex items-center justify-center gap-2 px-6 py-4 text-gray-600 hover:text-blue-700 transition-all font-medium text-sm"
+                  >
+                    <span>See Example Analysis</span>
+                    <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                  </AnimatedButton>
                 </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-                  <Lock size={14} className="text-blue-600" />
-                  <span className="text-xs font-medium text-blue-700">256-bit SSL</span>
+                <p className="text-xs text-gray-500">Free, no signup required</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-emerald-50 border border-emerald-200 rounded-full">
+                    <ShieldCheck size={12} className="text-emerald-600" />
+                    <span className="text-xs font-medium text-emerald-700">KVKK Uyumlu</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-full">
+                    <Lock size={12} className="text-blue-600" />
+                    <span className="text-xs font-medium text-blue-700">256-bit SSL</span>
+                  </div>
                 </div>
               </div>,
 
               /* Benefits below CTA — reinforces the decision */
-              <div key="benefits" className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-6 text-sm text-gray-600 pt-2">
+              <div key="benefits" className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-6 text-sm text-gray-600">
                 {['PDF, Word, and scanned images', 'Turkish/English coverage explanations', 'Side-by-side policy comparison'].map((benefit, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -311,12 +312,12 @@ export function Hero() {
               </div>,
 
               /* Sample report preview — below the fold on mobile, that's fine */
-              <div key="sample-report" className="mt-4">
+              <div key="sample-report" className="mt-2">
                 <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
                 <SampleReportPreviewCompact />
               </div>,
 
-              <div key="samples-cta" className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
+              <div key="samples-cta" className="mt-2 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="text-2xl">📋</div>
