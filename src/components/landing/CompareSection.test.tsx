@@ -4,10 +4,16 @@
  * Tests for the CTA compare section
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { CompareSection } from './CompareSection'
+
+// Mock auth context — CompareSection now uses useAuth for dynamic routing
+vi.mock('@/lib/supabase/auth-context', () => ({
+  useAuth: () => ({ user: null, signOut: vi.fn() }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}))
 
 const renderWithRouter = (component: React.ReactElement) => {
   return render(<BrowserRouter>{component}</BrowserRouter>)
@@ -29,23 +35,23 @@ describe('CompareSection', () => {
   })
 
   describe('CTA Button', () => {
-    it('should have Get Started Free button', () => {
+    it('should have Analyze Your Policy Free button', () => {
       renderWithRouter(<CompareSection />)
 
-      expect(screen.getByText('Get Started Free')).toBeInTheDocument()
+      expect(screen.getByText('Analyze Your Policy Free')).toBeInTheDocument()
     })
 
-    it('should link to upload page', () => {
+    it('should link to try page for anonymous users', () => {
       renderWithRouter(<CompareSection />)
 
-      const link = screen.getByText('Get Started Free').closest('a')
-      expect(link).toHaveAttribute('href', '/upload?autoOpen=true')
+      const link = screen.getByText('Analyze Your Policy Free').closest('a')
+      expect(link).toHaveAttribute('href', '/try')
     })
 
-    it('should display no credit card message', () => {
+    it('should display free no signup message', () => {
       renderWithRouter(<CompareSection />)
 
-      expect(screen.getByText('No credit card required')).toBeInTheDocument()
+      expect(screen.getByText('Free, no signup required')).toBeInTheDocument()
     })
   })
 

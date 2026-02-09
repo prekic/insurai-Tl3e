@@ -81,14 +81,12 @@ export const LandingPage = memo(function LandingPage() {
         </LazySection>
       </Suspense>
 
-      {/* CompareSection hidden on mobile — redundant with hero comparison mock */}
-      <div className="hidden md:block">
-        <Suspense fallback={<SectionSkeleton />}>
-          <LazySection height="500px" rootMargin="200px">
-            <CompareSection />
-          </LazySection>
-        </Suspense>
-      </div>
+      {/* Bottom CTA — visible on all screens to capture scroll-through users */}
+      <Suspense fallback={<SectionSkeleton />}>
+        <LazySection height="300px" rootMargin="200px">
+          <CompareSection />
+        </LazySection>
+      </Suspense>
 
       <Suspense fallback={<SectionSkeleton />}>
         <LazySection height="500px" rootMargin="200px">

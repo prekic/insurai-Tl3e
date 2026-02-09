@@ -84,7 +84,7 @@ describe('FAQ', () => {
       fireEvent.click(secondQuestion)
 
       // Second answer should now be visible
-      expect(screen.getByText(/Our AI achieves 98% accuracy/)).toBeInTheDocument()
+      expect(screen.getByText(/Our AI uses multiple models to cross-verify/)).toBeInTheDocument()
     })
 
     it('should toggle item when clicking the same question', () => {

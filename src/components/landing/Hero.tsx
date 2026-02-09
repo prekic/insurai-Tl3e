@@ -252,7 +252,8 @@ export function Hero() {
           {/* Left Column - Text Content */}
           <StaggeredList staggerDelay={0.15}>
             {[
-              <div key="badge" className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-blue-100 rounded-full shadow-sm">
+              /* Badge — hidden on mobile to reclaim above-fold space; headline already communicates value */
+              <div key="badge" className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-white/80 backdrop-blur-sm border border-blue-100 rounded-full shadow-sm">
                 <div className="flex items-center gap-1.5">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
                   <Sparkles className="text-blue-600" size={16} />
@@ -260,11 +261,17 @@ export function Hero() {
                 <span className="text-sm font-medium text-gray-700">AI-powered policy analysis</span>
               </div>,
 
-              <h1 key="headline" className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.1] tracking-tight">
-                Understand and <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">benchmark</span> your insurance policies
+              /* Headline — shorter on mobile (2 lines max), full on desktop */
+              <h1 key="headline" className="tracking-tight leading-[1.1]">
+                <span className="sm:hidden text-3xl">
+                  <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">Benchmark</span> your insurance policies
+                </span>
+                <span className="hidden sm:inline text-5xl md:text-6xl lg:text-7xl">
+                  Understand and <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">benchmark</span> your insurance policies
+                </span>
               </h1>,
 
-              <p key="subheadline" className="text-lg sm:text-xl md:text-2xl text-gray-600 leading-relaxed -mt-1">
+              <p key="subheadline" className="text-base sm:text-xl md:text-2xl text-gray-600 leading-relaxed -mt-1">
                 Upload a policy PDF and get plain-language coverage analysis in seconds.
               </p>,
 
@@ -297,7 +304,13 @@ export function Hero() {
                 </div>
               </div>,
 
-              /* Benefits below CTA — reinforces the decision */
+              /* Visual product preview — shows the output immediately after CTA to hook users */
+              <div key="sample-report" className="mt-1">
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
+                <SampleReportPreviewCompact />
+              </div>,
+
+              /* Benefits below preview — reinforces the decision */
               <div key="benefits" className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-6 text-sm text-gray-600">
                 {['PDF, Word, and scanned images', 'Turkish/English coverage explanations', 'Side-by-side policy comparison'].map((benefit, i) => (
                   <div key={i} className="flex items-center gap-2">
@@ -309,12 +322,6 @@ export function Hero() {
                     <span>{benefit}</span>
                   </div>
                 ))}
-              </div>,
-
-              /* Sample report preview — below the fold on mobile, that's fine */
-              <div key="sample-report" className="mt-2">
-                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
-                <SampleReportPreviewCompact />
               </div>,
 
               <div key="samples-cta" className="mt-2 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
