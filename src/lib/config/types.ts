@@ -92,6 +92,12 @@ export interface AIConfig {
   consensusEnabled: boolean
   consensusAgreementThreshold: number
   consensusFields: string[]
+  // Confidence Scoring Weights (must sum to 1.0)
+  confidenceWeightPolicyNumber: number
+  confidenceWeightProvider: number
+  confidenceWeightDates: number
+  confidenceWeightPremium: number
+  confidenceWeightCoverages: number
 }
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
@@ -110,6 +116,11 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
+  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightProvider: 0.15,
+  confidenceWeightDates: 0.20,
+  confidenceWeightPremium: 0.20,
+  confidenceWeightCoverages: 0.25,
 }
 
 // =============================================================================

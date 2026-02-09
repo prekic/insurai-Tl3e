@@ -94,6 +94,11 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   consensus_enabled: 'consensusEnabled',
   consensus_agreement_threshold: 'consensusAgreementThreshold',
   consensus_fields: 'consensusFields',
+  confidence_weight_policy_number: 'confidenceWeightPolicyNumber',
+  confidence_weight_provider: 'confidenceWeightProvider',
+  confidence_weight_dates: 'confidenceWeightDates',
+  confidence_weight_premium: 'confidenceWeightPremium',
+  confidence_weight_coverages: 'confidenceWeightCoverages',
 }
 
 const EVALUATION_KEY_MAP: Record<string, keyof EvaluationConfig> = {

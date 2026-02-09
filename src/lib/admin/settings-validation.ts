@@ -161,6 +161,13 @@ export const settingValidationRules: Record<string, ValidationRule> = {
   consensus_agreement_threshold: validators.ratio(),
   preferred_provider: validators.oneOf(['auto', 'openai', 'anthropic']),
 
+  // Confidence Scoring Weights (must sum to 1.0)
+  confidence_weight_policy_number: validators.ratio(),
+  confidence_weight_provider: validators.ratio(),
+  confidence_weight_dates: validators.ratio(),
+  confidence_weight_premium: validators.ratio(),
+  confidence_weight_coverages: validators.ratio(),
+
   // Evaluation Settings - Weights
   weight_premium: validators.percentage(false),
   weight_coverage: validators.percentage(false),
@@ -250,6 +257,21 @@ export function validateOCRWeightsSum(weights: Record<string, number>): Validati
     return {
       valid: false,
       error: `Weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`
+    }
+  }
+  return { valid: true }
+}
+
+/**
+ * Validate that confidence scoring weights sum to 1
+ */
+export function validateConfidenceWeightsSum(weights: Record<string, number>): ValidationResult {
+  const sum = Object.values(weights).reduce((acc, w) => acc + w, 0)
+  const roundedSum = Math.round(sum * 100) / 100
+  if (roundedSum !== 1) {
+    return {
+      valid: false,
+      error: `Confidence weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`
     }
   }
   return { valid: true }

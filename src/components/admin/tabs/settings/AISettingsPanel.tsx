@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
 import {
   validateSetting,
+  validateConfidenceWeightsSum,
   getValidationDescription,
   type ValidationResult,
 } from '@/lib/admin/settings-validation'
@@ -24,6 +25,7 @@ import {
   ToggleRight,
   FileQuestion,
   AlertCircle,
+  Scale,
 } from 'lucide-react'
 import type { SettingValue } from '../SettingsTab'
 
@@ -65,6 +67,17 @@ const SETTING_GROUPS = {
       'enable_fallback',
       'consensus_enabled',
       'consensus_agreement_threshold',
+    ],
+  },
+  confidenceWeights: {
+    title: 'Confidence Scoring Weights',
+    description: 'Control how per-field confidence scores combine into the overall confidence. Weights must sum to 1.0.',
+    keys: [
+      'confidence_weight_policy_number',
+      'confidence_weight_provider',
+      'confidence_weight_dates',
+      'confidence_weight_premium',
+      'confidence_weight_coverages',
     ],
   },
 }
@@ -379,6 +392,19 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
 
         if (groupSettings.length === 0) return null
 
+        // Compute confidence weight sum for inline validation
+        let confidenceWeightSum: number | null = null
+        let confidenceWeightValid = true
+        if (groupKey === 'confidenceWeights') {
+          const weightMap: Record<string, number> = {}
+          for (const s of groupSettings) {
+            weightMap[s.key] = Number(s.value) || 0
+          }
+          confidenceWeightSum = Object.values(weightMap).reduce((acc, v) => acc + v, 0)
+          const validation = validateConfidenceWeightsSum(weightMap)
+          confidenceWeightValid = validation.valid
+        }
+
         return (
           <Card key={groupKey}>
             <CardHeader>
@@ -387,6 +413,7 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
                 {groupKey === 'parameters' && <Thermometer className="h-5 w-5 text-orange-500" />}
                 {groupKey === 'timeouts' && <Clock className="h-5 w-5 text-blue-500" />}
                 {groupKey === 'fallback' && <Zap className="h-5 w-5 text-yellow-500" />}
+                {groupKey === 'confidenceWeights' && <Scale className="h-5 w-5 text-indigo-500" />}
                 {group.title}
               </CardTitle>
               <CardDescription>{group.description}</CardDescription>
@@ -395,6 +422,22 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
               <div className="divide-y divide-gray-100">
                 {groupSettings.map((setting) => renderSettingRow(setting))}
               </div>
+              {groupKey === 'confidenceWeights' && confidenceWeightSum !== null && (
+                <div className={`mt-4 px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                  confidenceWeightValid
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-red-50 text-red-700 border border-red-200'
+                }`}>
+                  {confidenceWeightValid ? (
+                    <span>Sum: {confidenceWeightSum.toFixed(2)} = 1.00</span>
+                  ) : (
+                    <>
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Sum: {confidenceWeightSum.toFixed(2)} — must equal 1.00</span>
+                    </>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         )

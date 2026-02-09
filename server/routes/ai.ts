@@ -44,12 +44,63 @@ import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 const router = Router()
 
 /**
- * ANTHROPIC_SCHEMA_PROMPT
+ * Confidence weight type used to build dynamic prompt sections.
+ */
+interface ConfidenceWeights {
+  policyNumber: number
+  provider: number
+  dates: number
+  premium: number
+  coverages: number
+}
+
+const DEFAULT_CONFIDENCE_WEIGHTS: ConfidenceWeights = {
+  policyNumber: 0.20,
+  provider: 0.15,
+  dates: 0.20,
+  premium: 0.20,
+  coverages: 0.25,
+}
+
+/**
+ * Build the confidence scoring section of the prompt using admin-configurable weights.
+ */
+function buildConfidencePromptSection(w: ConfidenceWeights): string {
+  // Compute the example overall: each field at the example values
+  const exOverall = (w.policyNumber * 1.0 + w.provider * 1.0 + w.dates * 0.9 + w.premium * 1.0 + w.coverages * 0.8).toFixed(2)
+
+  return `## Confidence Scoring Rules (CRITICAL — follow exactly):
+Each confidence score (0 to 1) reflects how clearly the field was found in the document.
+
+**Per-field confidence:**
+- 1.0: Field found explicitly and unambiguously (exact value clearly printed)
+- 0.8-0.9: Field found but minor ambiguity (e.g., OCR artifact near value, slightly unclear formatting)
+- 0.5-0.7: Field inferred or partially found (e.g., derived from context, only part of value visible)
+- 0.1-0.4: Field guessed with low certainty
+- 0.0: Field not found at all (use null for the value)
+
+**Overall confidence calculation:**
+Compute the overall confidence as a weighted average of per-field scores:
+- policyNumber: weight ${(w.policyNumber * 100).toFixed(0)}%
+- provider: weight ${(w.provider * 100).toFixed(0)}%
+- dates (startDate + endDate): weight ${(w.dates * 100).toFixed(0)}%
+- premium: weight ${(w.premium * 100).toFixed(0)}%
+- coverages: weight ${(w.coverages * 100).toFixed(0)}%
+
+For example, if policyNumber=1.0, provider=1.0, dates=0.9, premium=1.0, coverages=0.8:
+overall = ${w.policyNumber.toFixed(2)}*1.0 + ${w.provider.toFixed(2)}*1.0 + ${w.dates.toFixed(2)}*0.9 + ${w.premium.toFixed(2)}*1.0 + ${w.coverages.toFixed(2)}*0.8 = ${exOverall}
+
+**Important:** A well-structured, clearly printed policy document where most fields are readable should score 0.85-0.95 overall. Only score below 0.7 if the document is genuinely hard to read (scanned with poor quality, handwritten, significantly damaged, or missing critical sections).`
+}
+
+/**
+ * ANTHROPIC_SCHEMA_PROMPT builder
  * Claude doesn't support OpenAI's response_format parameter, so the JSON schema
  * must be included in the prompt text itself to ensure structured output.
  * This is critical for reliable extraction with Claude models.
  */
-const ANTHROPIC_SCHEMA_PROMPT = `
+function buildAnthropicSchemaPrompt(weights: ConfidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS): string {
+  return `
 You are an expert insurance policy analyzer. Extract all policy information and return it as valid JSON.
 
 ## CRITICAL: Output Format
@@ -128,31 +179,13 @@ You MUST respond with ONLY valid JSON matching this exact schema. Do not include
 - Set isMarketValue: true for "Rayiç Değer" coverages
 - Extract all coverages found in the document
 
-## Confidence Scoring Rules (CRITICAL — follow exactly):
-Each confidence score (0 to 1) reflects how clearly the field was found in the document.
-
-**Per-field confidence:**
-- 1.0: Field found explicitly and unambiguously (exact value clearly printed)
-- 0.8-0.9: Field found but minor ambiguity (e.g., OCR artifact near value, slightly unclear formatting)
-- 0.5-0.7: Field inferred or partially found (e.g., derived from context, only part of value visible)
-- 0.1-0.4: Field guessed with low certainty
-- 0.0: Field not found at all (use null for the value)
-
-**Overall confidence calculation:**
-Compute the overall confidence as a weighted average of per-field scores:
-- policyNumber: weight 20%
-- provider: weight 15%
-- dates (startDate + endDate): weight 20%
-- premium: weight 20%
-- coverages: weight 25%
-
-For example, if policyNumber=1.0, provider=1.0, dates=0.9, premium=1.0, coverages=0.8:
-overall = 0.20*1.0 + 0.15*1.0 + 0.20*0.9 + 0.20*1.0 + 0.25*0.8 = 0.93
-
-**Important:** A well-structured, clearly printed policy document where most fields are readable should score 0.85-0.95 overall. Only score below 0.7 if the document is genuinely hard to read (scanned with poor quality, handwritten, significantly damaged, or missing critical sections).
+${buildConfidencePromptSection(weights)}
 
 Now analyze the following policy document:
 `
+}
+
+// Note: callers should use buildAnthropicSchemaPrompt(weights) with config-driven weights
 
 // Initialize clients (lazy - only when keys are available)
 let openaiClient: OpenAI | null = null
@@ -545,6 +578,19 @@ router.post(
       // Body is validated and sanitized by middleware
       const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string }
 
+      // Get AI config from database first (needed for dynamic confidence weights in prompt)
+      const aiConfig = await getAIConfig()
+
+      // Build Anthropic schema prompt with admin-configurable confidence weights
+      const confidenceWeights: ConfidenceWeights = {
+        policyNumber: aiConfig.confidenceWeightPolicyNumber,
+        provider: aiConfig.confidenceWeightProvider,
+        dates: aiConfig.confidenceWeightDates,
+        premium: aiConfig.confidenceWeightPremium,
+        coverages: aiConfig.confidenceWeightCoverages,
+      }
+      const schemaPrompt = buildAnthropicSchemaPrompt(confidenceWeights)
+
       // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
       let finalSystemPrompt: string
       let finalUserPrompt = documentText
@@ -553,25 +599,22 @@ router.post(
       if (clientPrompt) {
         // Use client-provided prompt (backward compatibility)
         // Still prepend schema for reliable JSON output
-        finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
+        finalSystemPrompt = schemaPrompt
         finalUserPrompt = clientPrompt + '\n\n' + documentText
       } else {
         // Use admin-managed prompt with schema
         const renderedPrompt = await getExtractionPrompt(documentText, policyType)
         if (renderedPrompt) {
           // Prepend schema to admin prompt for reliable JSON output
-          finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
+          finalSystemPrompt = schemaPrompt
           finalUserPrompt = renderedPrompt.userPrompt
           promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
           log.info('Using prompt template', { provider: 'anthropic', template: promptTemplateUsed, withSchema: true })
         } else {
-          finalSystemPrompt = ANTHROPIC_SCHEMA_PROMPT
+          finalSystemPrompt = schemaPrompt
           log.info('Using ANTHROPIC_SCHEMA_PROMPT fallback', { provider: 'anthropic' })
         }
       }
-
-      // Get AI config from database (falls back to defaults if unavailable)
-      const aiConfig = await getAIConfig()
 
       const response = await client.messages.create({
         model: model || aiConfig.anthropicExtractionModel,
@@ -726,10 +769,22 @@ router.post(
 
     const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
 
+    // Get AI config from database first (needed for dynamic confidence weights in prompt)
+    const aiConfig = await getAIConfig()
+
+    // Build Anthropic schema prompt with admin-configurable confidence weights
+    const confidenceWeights: ConfidenceWeights = {
+      policyNumber: aiConfig.confidenceWeightPolicyNumber,
+      provider: aiConfig.confidenceWeightProvider,
+      dates: aiConfig.confidenceWeightDates,
+      premium: aiConfig.confidenceWeightPremium,
+      coverages: aiConfig.confidenceWeightCoverages,
+    }
+    const anthropicSystemPrompt = buildAnthropicSchemaPrompt(confidenceWeights)
+
     // Get extraction prompt (shared between providers)
-    // For Anthropic, we use ANTHROPIC_SCHEMA_PROMPT to ensure structured JSON output
+    // For Anthropic, we use schema prompt to ensure structured JSON output
     // For OpenAI, we use response_format: json_schema
-    const anthropicSystemPrompt: string = ANTHROPIC_SCHEMA_PROMPT
     let openaiSystemPrompt: string
     let finalUserPrompt = documentText
 
@@ -748,8 +803,6 @@ router.post(
       }
     }
 
-    // Get AI config from database (falls back to defaults if unavailable)
-    const aiConfig = await getAIConfig()
     log.info('Using config', { requestId, anthropicModel: aiConfig.anthropicExtractionModel, openaiModel: aiConfig.openaiExtractionModel, setupMs: Date.now() - startTime })
 
     // Try Anthropic first if available

@@ -33,6 +33,11 @@ export interface AIConfig {
   consensusEnabled: boolean
   consensusAgreementThreshold: number
   consensusFields: string[]
+  confidenceWeightPolicyNumber: number
+  confidenceWeightProvider: number
+  confidenceWeightDates: number
+  confidenceWeightPremium: number
+  confidenceWeightCoverages: number
 }
 
 export interface RateLimitsConfig {
@@ -83,6 +88,11 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
+  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightProvider: 0.15,
+  confidenceWeightDates: 0.20,
+  confidenceWeightPremium: 0.20,
+  confidenceWeightCoverages: 0.25,
 }
 
 const DEFAULT_RATE_LIMITS_CONFIG: RateLimitsConfig = {
@@ -133,6 +143,11 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   consensus_enabled: 'consensusEnabled',
   consensus_agreement_threshold: 'consensusAgreementThreshold',
   consensus_fields: 'consensusFields',
+  confidence_weight_policy_number: 'confidenceWeightPolicyNumber',
+  confidence_weight_provider: 'confidenceWeightProvider',
+  confidence_weight_dates: 'confidenceWeightDates',
+  confidence_weight_premium: 'confidenceWeightPremium',
+  confidence_weight_coverages: 'confidenceWeightCoverages',
 }
 
 const RATE_LIMITS_KEY_MAP: Record<string, keyof RateLimitsConfig> = {

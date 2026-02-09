@@ -191,7 +191,7 @@ export const EXTRACTION_JSON_SCHEMA = {
         required: ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'],
         additionalProperties: false,
         description:
-          'Confidence scores for extracted fields. Overall is a weighted average (policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%). A well-structured readable document should score 0.85-0.95 overall.',
+          'Confidence scores for extracted fields. Overall is a weighted average of per-field scores (default: policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%). A well-structured readable document should score 0.85-0.95 overall.',
       },
     },
     required: [

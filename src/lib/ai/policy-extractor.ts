@@ -1,4 +1,5 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isProxyConfigured, type AIProvider } from './config'
+import { getAIConfig } from '@/lib/config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { isPDFFile, extractTextFromPDFWithRetry } from './pdf-parser'
 import {
@@ -105,13 +106,25 @@ export interface ExtractionOptions {
 }
 
 /**
+ * Default confidence scoring weights (used when DB config unavailable).
+ */
+const DEFAULT_CONFIDENCE_WEIGHTS = {
+  policyNumber: 0.20,
+  provider: 0.15,
+  dates: 0.20,
+  premium: 0.20,
+  coverages: 0.25,
+}
+
+/**
  * Recalculate overall confidence using weighted formula.
- * Weights: policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%
+ * Weights are configurable via Admin Settings > AI > Confidence Scoring Weights.
  * This ensures consistent scoring regardless of AI model behavior.
  */
 function recalculateOverallConfidence(
   confidence: { overall?: number; policyNumber?: number; provider?: number; dates?: number; premium?: number; coverages?: number } | undefined | null,
-  fallback: number
+  fallback: number,
+  weights = DEFAULT_CONFIDENCE_WEIGHTS,
 ): number {
   if (!confidence) return fallback
 
@@ -126,7 +139,7 @@ function recalculateOverallConfidence(
     return fallback
   }
 
-  return pn * 0.20 + pr * 0.15 + dt * 0.20 + pm * 0.20 + cv * 0.25
+  return pn * weights.policyNumber + pr * weights.provider + dt * weights.dates + pm * weights.premium + cv * weights.coverages
 }
 
 /**
@@ -645,10 +658,23 @@ export async function extractPolicyFromDocument(
       })
     }
 
-    // Recalculate overall confidence using weighted formula as a safety net.
-    // The AI may not follow the exact formula, so we enforce it server-side.
+    // Recalculate overall confidence using admin-configurable weighted formula.
+    // Weights are loaded from DB config; falls back to hardcoded defaults.
     const rawOverall = extractedData.confidence?.overall ?? 0.7
-    const confidenceOverall = recalculateOverallConfidence(extractedData.confidence, rawOverall)
+    let confidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS
+    try {
+      const aiCfg = await getAIConfig()
+      confidenceWeights = {
+        policyNumber: aiCfg.confidenceWeightPolicyNumber,
+        provider: aiCfg.confidenceWeightProvider,
+        dates: aiCfg.confidenceWeightDates,
+        premium: aiCfg.confidenceWeightPremium,
+        coverages: aiCfg.confidenceWeightCoverages,
+      }
+    } catch {
+      // DB unavailable — use hardcoded defaults
+    }
+    const confidenceOverall = recalculateOverallConfidence(extractedData.confidence, rawOverall, confidenceWeights)
     if (extractedData.confidence) {
       extractedData.confidence.overall = confidenceOverall
     }
