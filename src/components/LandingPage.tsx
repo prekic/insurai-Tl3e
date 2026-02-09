@@ -60,11 +60,14 @@ export const LandingPage = memo(function LandingPage() {
         </LazySection>
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton />}>
-        <LazySection height="400px" rootMargin="200px">
-          <WhoItsFor />
-        </LazySection>
-      </Suspense>
+      {/* WhoItsFor hidden on mobile — audience targeting now covered by Testimonials use cases */}
+      <div className="hidden md:block">
+        <Suspense fallback={<SectionSkeleton />}>
+          <LazySection height="400px" rootMargin="200px">
+            <WhoItsFor />
+          </LazySection>
+        </Suspense>
+      </div>
 
       <Suspense fallback={<SectionSkeleton />}>
         <LazySection height="400px" rootMargin="200px">
