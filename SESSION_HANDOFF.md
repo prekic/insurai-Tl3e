@@ -119,6 +119,7 @@ This session covered **3 major workstreams** on **February 9, 2026**:
 
 ```
 # Branch: claude/review-handoff-docs-MAjiD
+2ad0ffb docs: update project documentation for Feb 9 session
 e0cbaf4 fix: remove fabricated social proof, replace fake testimonials with use cases
 a35a6c1 fix: replace fabricated stats, fix provider claims, improve mobile page length
 b195fd8 fix: tighten mobile hero — smaller headline, micro-copy, shadow CTA, less spacing
@@ -181,12 +182,24 @@ c901281 test: add functional tests for user-profile.ts (21 new tests)
 - All commits on `claude/review-handoff-docs-MAjiD` not yet deployed to production
 - Includes: dependency upgrades (React 19, Express 5, Vite 7, Vitest 4), tiered confidence system, market data DB migration, mobile landing page overhaul
 
+### Deployment Risk Assessment
+| Change | Risk | Mitigation |
+|--------|------|------------|
+| **Express 4 → 5** | **High** | Major server framework upgrade — wildcard routes, query types, error handling all changed. Tested locally but Railway runtime may differ. |
+| **express-rate-limit 7 → 8** | **High** | Was crashing server at startup before fix (`759a2f9`). All custom keyGenerators patched with `validate: { keyGeneratorIpFallback: false }`. |
+| **React 18 → 19** | Medium | Frontend-only; useRef fix is straightforward. Bundle size may change slightly. |
+| **Vite 6 → 7** | Low | Build tool only — affects build output, not runtime. |
+| **Vitest 2 → 4** | None | Test runner only — not deployed. |
+| **Market data async** | Medium | Core extraction and comparison logic now async. Fallback to static files if DB unavailable. |
+
 ### Post-Deployment Verification
-After merging and deploying, verify:
-1. `curl https://insurai-production.up.railway.app/api/health` — Server starts without rate-limit crash
+After merging and deploying, verify **in this order**:
+1. `curl https://insurai-production.up.railway.app/api/health` — Server starts without rate-limit crash (Express 5 + rate-limit v8)
 2. `curl https://insurai-production.up.railway.app/api/ai/diagnose` — All 3 providers valid
-3. Visit mobile landing page — no fabricated data, CTA above fold
-4. Test extraction — confidence warning banner appears for low-confidence results
+3. `curl https://insurai-production.up.railway.app/api/admin/diagnostics` — Admin config intact
+4. Upload a test PDF via `/try` — extraction pipeline works end-to-end with async market data
+5. Visit mobile landing page — no fabricated data, CTA above fold
+6. Test low-confidence extraction — warning banner appears (tiered confidence system)
 
 ### Database Migrations
 - ✅ All migrations up to `015_config_drift_baselines.sql` applied
