@@ -30,22 +30,23 @@ import {
 } from './analyzers'
 
 /**
- * Perform comprehensive gap analysis on a policy
+ * Perform comprehensive gap analysis on a policy (async, DB-backed benchmarks)
  */
-export function analyzeGapsComprehensive(
+export async function analyzeGapsComprehensive(
   policy: AnalyzedPolicy,
   options: {
     config?: Partial<GapDetectionConfig>
     region?: TurkishRegion
     includePortfolio?: boolean
   } = {}
-): ComprehensiveGapAnalysis {
+): Promise<ComprehensiveGapAnalysis> {
   const config = { ...DEFAULT_GAP_CONFIG, ...options.config }
   const region = options.region ?? detectRegionFromAddress(policy.location)
 
-  // Run all analyzers
+  // Run all analyzers (coverage analyzer is async, others are sync)
+  const coverageGaps = await analyzeCoverageGaps(policy, config, region)
   const allGaps: DetectedGap[] = [
-    ...analyzeCoverageGaps(policy, config, region),
+    ...coverageGaps,
     ...analyzeLimitGaps(policy, config, region),
     ...analyzeDeductibleGaps(policy, config, region),
     ...analyzeExclusionGaps(policy, config, region),
@@ -102,13 +103,13 @@ export function analyzeGapsComprehensive(
 /**
  * Get quick gap summary for dashboard display
  */
-export function getQuickGapSummary(policy: AnalyzedPolicy): {
+export async function getQuickGapSummary(policy: AnalyzedPolicy): Promise<{
   score: number
   criticalCount: number
   topIssue: string | null
   recommendation: string | null
-} {
-  const analysis = analyzeGapsComprehensive(policy)
+}> {
+  const analysis = await analyzeGapsComprehensive(policy)
 
   return {
     score: analysis.overallScore,

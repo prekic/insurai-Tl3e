@@ -108,6 +108,11 @@ vi.mock('@/lib/market-data/service', () => ({
     avgPremium: 2500,
     avgCoverage: 500000,
   })),
+  generateMarketComparisonDataAsync: vi.fn(() => Promise.resolve({
+    percentile: 50,
+    avgPremium: 2500,
+    avgCoverage: 500000,
+  })),
 }))
 
 vi.mock('@/data/market-data/benchmarks', () => ({
@@ -157,13 +162,27 @@ vi.mock('@/lib/ml', () => ({
 
 vi.mock('@/lib/gap-detection', () => ({
   GapDetectionService: {
-    analyzePolicy: vi.fn(() => ({
+    analyzePolicy: vi.fn(() => Promise.resolve({
       overallScore: 30,
       gapCount: { critical: 0, high: 1, medium: 2, low: 1, total: 4 },
       prioritizedGaps: [],
       financialSummary: { totalExpectedLoss: 10000, estimatedRemediationCost: 500 },
     })),
-    getActionItems: vi.fn(() => []),
+    getActionItems: vi.fn(() => Promise.resolve([])),
+  },
+}))
+
+vi.mock('@/lib/market-data/market-data-provider', () => ({
+  marketDataProvider: {
+    getBenchmark: vi.fn(() => Promise.resolve({
+      commonCoverages: [],
+      premiumRange: { min: 1000, max: 10000, average: 5000, median: 4500, percentile75: 7500 },
+      coverageRange: { min: 50000, max: 1000000, average: 500000, median: 450000 },
+      trends: { premiumChangeYoY: 10 },
+    })),
+    getRegionalFactor: vi.fn(() => Promise.resolve(1.0)),
+    calculatePremiumPercentile: vi.fn(() => Promise.resolve(50)),
+    calculateCoveragePercentile: vi.fn(() => Promise.resolve(50)),
   },
 }))
 

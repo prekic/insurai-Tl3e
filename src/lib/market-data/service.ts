@@ -26,7 +26,8 @@ import {
   getProvidersByMarketShare,
 } from '@/data/market-data/providers'
 import { detectRegionFromAddress } from './region-detector'
-import { analyzeGaps, generateGapInsights } from './gap-analyzer'
+import { analyzeGaps, analyzeGapsSync, generateGapInsights } from './gap-analyzer'
+import { marketDataProvider } from './market-data-provider'
 
 /**
  * Market Data Service class
@@ -34,7 +35,68 @@ import { analyzeGaps, generateGapInsights } from './gap-analyzer'
  */
 export class MarketDataService {
   /**
-   * Get comprehensive benchmark analysis for a policy
+   * Get comprehensive benchmark analysis for a policy (async, DB-backed)
+   */
+  static async analyzePolicyBenchmarkAsync(
+    policy: AnalyzedPolicy,
+    region?: TurkishRegion
+  ): Promise<BenchmarkResult> {
+    const detectedRegion = region || detectRegionFromAddress(policy.location)
+    const benchmark = await marketDataProvider.getBenchmark(policy.type)
+
+    const premiumPercentile = await marketDataProvider.calculatePremiumPercentile(
+      policy.premium,
+      policy.type,
+      detectedRegion
+    )
+    const coveragePercentile = await marketDataProvider.calculateCoveragePercentile(
+      policy.coverage,
+      policy.type
+    )
+
+    const userValueRatio = policy.coverage / policy.premium
+    const marketValueRatio = benchmark.coverageRange.average / benchmark.premiumRange.average
+    const valueScore = Math.min(100, Math.round((userValueRatio / marketValueRatio) * 50))
+
+    const regionalFactor = await marketDataProvider.getRegionalFactor(policy.type, detectedRegion)
+    const adjustedPremium = policy.premium / regionalFactor
+    const regionalAdjustedPercentile = await marketDataProvider.calculatePremiumPercentile(
+      adjustedPremium,
+      policy.type
+    )
+
+    const providerInfo = marketDataProvider.findProviderByName(policy.provider)
+    const providerRank = providerInfo ? marketDataProvider.getProviderRank(providerInfo.id) : 0
+    const providerCount = marketDataProvider.getProviderCount()
+
+    const premiumVsAverage = ((policy.premium - benchmark.premiumRange.average) / benchmark.premiumRange.average) * 100
+    const coverageVsAverage = ((policy.coverage - benchmark.coverageRange.average) / benchmark.coverageRange.average) * 100
+
+    const insights = this.generateBenchmarkInsights(
+      policy,
+      premiumPercentile,
+      coveragePercentile,
+      valueScore,
+      detectedRegion,
+      providerInfo
+    )
+
+    return {
+      premiumPercentile,
+      coveragePercentile,
+      valueScore,
+      premiumVsAverage: Math.round(premiumVsAverage),
+      coverageVsAverage: Math.round(coverageVsAverage),
+      region: detectedRegion,
+      regionalAdjustedPercentile,
+      providerRank,
+      providerCount,
+      insights,
+    }
+  }
+
+  /**
+   * Get comprehensive benchmark analysis for a policy (sync, static data only)
    */
   static analyzePolicyBenchmark(
     policy: AnalyzedPolicy,
@@ -101,7 +163,64 @@ export class MarketDataService {
   }
 
   /**
-   * Get market comparison summary
+   * Get market comparison summary (async, DB-backed)
+   */
+  static async getMarketComparisonAsync(
+    policy: AnalyzedPolicy,
+    region?: TurkishRegion
+  ): Promise<MarketComparison> {
+    const detectedRegion = region || detectRegionFromAddress(policy.location)
+    const benchmark = await marketDataProvider.getBenchmark(policy.type)
+    const providerInfo = marketDataProvider.findProviderByName(policy.provider)
+
+    const premiumPercentile = await marketDataProvider.calculatePremiumPercentile(
+      policy.premium,
+      policy.type,
+      detectedRegion
+    )
+    const coveragePercentile = await marketDataProvider.calculateCoveragePercentile(
+      policy.coverage,
+      policy.type
+    )
+
+    const premiumRating = this.getPremiumRating(premiumPercentile)
+    const coverageRating = this.getCoverageRating(coveragePercentile)
+
+    const userValueRatio = policy.coverage / policy.premium
+    const marketValueRatio = benchmark.coverageRange.average / benchmark.premiumRange.average
+    const valueRating = this.getValueRating(userValueRatio, marketValueRatio)
+
+    const marketTrend = benchmark.trends.premiumChangeYoY > 5
+      ? 'increasing'
+      : benchmark.trends.premiumChangeYoY < -5
+        ? 'decreasing'
+        : 'stable'
+
+    return {
+      policyType: policy.type,
+      region: detectedRegion,
+      userPremium: policy.premium,
+      marketAverage: benchmark.premiumRange.average,
+      marketMedian: benchmark.premiumRange.median,
+      premiumPercentile,
+      premiumRating,
+      userCoverage: policy.coverage,
+      marketAverageCoverage: benchmark.coverageRange.average,
+      coveragePercentile,
+      coverageRating,
+      userValueRatio,
+      marketValueRatio,
+      valueRating,
+      providerMarketShare: providerInfo?.marketShare ?? 0,
+      providerRating: providerInfo?.rating ?? 0,
+      providerRank: providerInfo ? marketDataProvider.getProviderRank(providerInfo.id) : 0,
+      marketTrend,
+      trendPercentage: benchmark.trends.premiumChangeYoY,
+    }
+  }
+
+  /**
+   * Get market comparison summary (sync, static data only)
    */
   static getMarketComparison(
     policy: AnalyzedPolicy,
@@ -160,14 +279,25 @@ export class MarketDataService {
   }
 
   /**
-   * Get gap analysis for a policy
+   * Get gap analysis for a policy (async, DB-backed)
+   */
+  static async analyzeGapsAsync(
+    policy: AnalyzedPolicy,
+    region?: TurkishRegion
+  ): Promise<GapAnalysis> {
+    const detectedRegion = region || detectRegionFromAddress(policy.location)
+    return analyzeGaps(policy, detectedRegion)
+  }
+
+  /**
+   * Get gap analysis for a policy (sync, static data only)
    */
   static analyzeGaps(
     policy: AnalyzedPolicy,
     region?: TurkishRegion
   ): GapAnalysis {
     const detectedRegion = region || detectRegionFromAddress(policy.location)
-    return analyzeGaps(policy, detectedRegion)
+    return analyzeGapsSync(policy, detectedRegion)
   }
 
   /**
@@ -178,7 +308,14 @@ export class MarketDataService {
   }
 
   /**
-   * Get benchmark data for a policy type
+   * Get benchmark data for a policy type (async, DB-backed)
+   */
+  static async getBenchmarkDataAsync(policyType: PolicyType): Promise<PolicyTypeMarketData> {
+    return marketDataProvider.getBenchmark(policyType)
+  }
+
+  /**
+   * Get benchmark data for a policy type (sync, static data only)
    */
   static getBenchmarkData(policyType: PolicyType): PolicyTypeMarketData {
     return MARKET_BENCHMARKS[policyType]
@@ -206,7 +343,33 @@ export class MarketDataService {
   }
 
   /**
-   * Get recommended coverage based on policy type and region
+   * Get recommended coverage based on policy type and region (async, DB-backed)
+   */
+  static async getRecommendedCoveragesAsync(
+    policyType: PolicyType,
+    region: TurkishRegion = 'marmara'
+  ): Promise<{ name: string; nameTr: string; recommendedLimit: number; importance: string }[]> {
+    const benchmark = await marketDataProvider.getBenchmark(policyType)
+    const regionalFactor = await marketDataProvider.getRegionalFactor(policyType, region)
+
+    return benchmark.commonCoverages
+      .filter(c => c.inclusionRate >= 50)
+      .map(c => ({
+        name: c.name,
+        nameTr: c.nameTr,
+        recommendedLimit: Math.round(c.typicalLimit * regionalFactor),
+        importance: c.inclusionRate >= 90 ? 'critical' :
+                   c.inclusionRate >= 70 ? 'recommended' : 'optional',
+      }))
+      .sort((a, b) => {
+        const order = { critical: 0, recommended: 1, optional: 2 }
+        return (order[a.importance as keyof typeof order] || 2) -
+               (order[b.importance as keyof typeof order] || 2)
+      })
+  }
+
+  /**
+   * Get recommended coverage based on policy type and region (sync, static data only)
    */
   static getRecommendedCoverages(
     policyType: PolicyType,
@@ -410,7 +573,27 @@ export class MarketDataService {
 }
 
 /**
- * Convenience function to get market comparison data
+ * Convenience function to get market comparison data (async, DB-backed)
+ */
+export async function generateMarketComparisonDataAsync(
+  premium: number,
+  _coverage: number,
+  policyType: PolicyType,
+  location?: string
+): Promise<{ averagePremium: number; averageCoverage: number; percentile: number }> {
+  const region = detectRegionFromAddress(location)
+  const benchmark = await marketDataProvider.getBenchmark(policyType)
+  const percentile = await marketDataProvider.calculatePremiumPercentile(premium, policyType, region)
+
+  return {
+    averagePremium: benchmark.premiumRange.average,
+    averageCoverage: benchmark.coverageRange.average,
+    percentile,
+  }
+}
+
+/**
+ * Convenience function to get market comparison data (sync, static data only)
  * Compatible with existing marketComparison field format
  */
 export function generateMarketComparisonData(

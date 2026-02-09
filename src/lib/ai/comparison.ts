@@ -8,6 +8,7 @@ import type { AnalyzedPolicy } from '@/types/policy'
 import { formatCurrency } from '@/lib/utils'
 import { MarketDataService } from '@/lib/market-data/service'
 import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { marketDataProvider } from '@/lib/market-data/market-data-provider'
 import type { BenchmarkInsight, MarketComparison } from '@/types/market-data'
 
 export interface PolicyComparisonResult {
@@ -50,7 +51,40 @@ export interface ComparisonDifference {
 }
 
 /**
- * Compare multiple policies and generate analysis
+ * Compare multiple policies and generate analysis (async, DB-backed benchmarks)
+ */
+export async function comparePoliciesAsync(
+  policies: AnalyzedPolicy[],
+  options: { includeMarketBenchmarks?: boolean } = {}
+): Promise<PolicyComparisonResult> {
+  if (policies.length < 2) {
+    throw new Error('At least 2 policies required for comparison')
+  }
+
+  const { includeMarketBenchmarks = true } = options
+
+  const summary = calculateSummary(policies)
+  const differences = findDifferences(policies)
+  const recommendations = generateRecommendations(policies, summary, differences)
+
+  let marketBenchmarks: PolicyMarketBenchmark[] | undefined
+  if (includeMarketBenchmarks) {
+    marketBenchmarks = await generateMarketBenchmarksAsync(policies)
+    const benchmarkRecs = await generateBenchmarkRecommendationsAsync(policies, marketBenchmarks)
+    recommendations.push(...benchmarkRecs)
+  }
+
+  return {
+    policies,
+    summary,
+    differences,
+    recommendations,
+    marketBenchmarks,
+  }
+}
+
+/**
+ * Compare multiple policies and generate analysis (sync, static data only)
  */
 export function comparePolicies(
   policies: AnalyzedPolicy[],
@@ -85,7 +119,24 @@ export function comparePolicies(
 }
 
 /**
- * Generate market benchmarks for each policy
+ * Generate market benchmarks for each policy (async, DB-backed)
+ */
+async function generateMarketBenchmarksAsync(policies: AnalyzedPolicy[]): Promise<PolicyMarketBenchmark[]> {
+  return Promise.all(policies.map(async policy => {
+    const marketComparison = await MarketDataService.getMarketComparisonAsync(policy)
+    const benchmarkResult = await MarketDataService.analyzePolicyBenchmarkAsync(policy)
+
+    return {
+      policyId: policy.id,
+      provider: policy.provider,
+      marketComparison,
+      insights: benchmarkResult.insights,
+    }
+  }))
+}
+
+/**
+ * Generate market benchmarks for each policy (sync, static data only)
  */
 function generateMarketBenchmarks(policies: AnalyzedPolicy[]): PolicyMarketBenchmark[] {
   return policies.map(policy => {
@@ -102,7 +153,55 @@ function generateMarketBenchmarks(policies: AnalyzedPolicy[]): PolicyMarketBench
 }
 
 /**
- * Generate recommendations based on market benchmarks
+ * Generate recommendations based on market benchmarks (async, DB-backed)
+ */
+async function generateBenchmarkRecommendationsAsync(
+  policies: AnalyzedPolicy[],
+  benchmarks: PolicyMarketBenchmark[]
+): Promise<string[]> {
+  const recommendations: string[] = []
+
+  const bestPremiumPosition = benchmarks.reduce((best, current) =>
+    current.marketComparison.premiumPercentile < best.marketComparison.premiumPercentile ? current : best
+  )
+
+  const policy = policies.find(p => p.id === bestPremiumPosition.policyId)
+  if (policy && bestPremiumPosition.marketComparison.premiumPercentile < 40) {
+    recommendations.push(
+      `📊 Pazar analizi: ${policy.provider} piyasa ortalamasının altında prim sunuyor (${bestPremiumPosition.marketComparison.premiumPercentile}. yüzdelik)`
+    )
+  }
+
+  const policyTypes = [...new Set(policies.map(p => p.type))]
+  for (const policyType of policyTypes) {
+    const benchmark = await marketDataProvider.getBenchmark(policyType)
+    if (benchmark.trends.premiumChangeYoY > 30) {
+      recommendations.push(
+        `📈 ${benchmark.typeTr} primleri yıllık %${Math.round(benchmark.trends.premiumChangeYoY)} arttı - erken yenileme düşünün`
+      )
+    }
+  }
+
+  const bestValue = benchmarks.reduce((best, current) =>
+    current.marketComparison.valueRating === 'excellent' ||
+    (current.marketComparison.valueRating === 'good' && best.marketComparison.valueRating !== 'excellent')
+      ? current : best
+  )
+
+  if (bestValue.marketComparison.valueRating === 'excellent' || bestValue.marketComparison.valueRating === 'good') {
+    const valuePolicy = policies.find(p => p.id === bestValue.policyId)
+    if (valuePolicy) {
+      recommendations.push(
+        `💎 ${valuePolicy.provider} prim/teminat oranında "${bestValue.marketComparison.valueRating === 'excellent' ? 'mükemmel' : 'iyi'}" değer sunuyor`
+      )
+    }
+  }
+
+  return recommendations
+}
+
+/**
+ * Generate recommendations based on market benchmarks (sync, static data only)
  */
 function generateBenchmarkRecommendations(
   policies: AnalyzedPolicy[],
