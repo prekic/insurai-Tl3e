@@ -73,28 +73,36 @@ export function SampleReportPreview() {
 }
 
 /**
- * Compact version for mobile or smaller spaces
+ * Compact version for mobile or smaller spaces.
+ * Shows key report deliverables as a bulleted list so users understand the value.
  */
 export function SampleReportPreviewCompact() {
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-4">
-      <div className="flex items-center gap-4">
-        {/* Score Badge */}
-        <div className="w-14 h-14 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
-          <span className="text-white text-xl font-bold">B+</span>
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-11 h-11 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center shadow-md flex-shrink-0">
+          <span className="text-white text-lg font-bold">B+</span>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
+        <div>
+          <div className="flex items-center gap-1.5">
             <TrendingUp size={14} className="text-emerald-600" />
-            <span className="text-sm font-semibold text-gray-900">Sample Report</span>
+            <span className="text-sm font-semibold text-gray-900">Benchmark Report</span>
           </div>
-          <p className="text-xs text-gray-500 mt-0.5">Score: 78/100 - Above average</p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">3 strengths</span>
-            <span className="text-xs px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">1 gap</span>
-          </div>
+          <p className="text-xs text-gray-500">Score: 78/100 &middot; Above market average</p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+          <span className="text-xs text-gray-700">Collision, theft, fire coverage confirmed</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={14} className="text-amber-500 flex-shrink-0" />
+          <span className="text-xs text-gray-700">Gap: Natural disaster coverage missing</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Shield size={14} className="text-blue-500 flex-shrink-0" />
+          <span className="text-xs text-gray-700">AI recommendation: Add flood coverage</span>
         </div>
       </div>
     </div>

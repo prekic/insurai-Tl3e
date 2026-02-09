@@ -11,31 +11,35 @@ import request from 'supertest'
 // Mock the AI client libraries
 vi.mock('openai', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      chat: {
-        completions: {
-          create: vi.fn().mockResolvedValue({
-            choices: [{ message: { content: '{"policyNumber": "POL-123"}' } }],
-            usage: { prompt_tokens: 100, completion_tokens: 50 },
-            model: 'gpt-4o',
-          }),
+    default: vi.fn().mockImplementation(function () {
+      return {
+        chat: {
+          completions: {
+            create: vi.fn().mockResolvedValue({
+              choices: [{ message: { content: '{"policyNumber": "POL-123"}' } }],
+              usage: { prompt_tokens: 100, completion_tokens: 50 },
+              model: 'gpt-4o',
+            }),
+          },
         },
-      },
-    })),
+      }
+    }),
   }
 })
 
 vi.mock('@anthropic-ai/sdk', () => {
   return {
-    default: vi.fn().mockImplementation(() => ({
-      messages: {
-        create: vi.fn().mockResolvedValue({
-          content: [{ type: 'text', text: '{"policyNumber": "POL-456"}' }],
-          usage: { input_tokens: 100, output_tokens: 50 },
-          model: 'claude-sonnet-4-20250514',
-        }),
-      },
-    })),
+    default: vi.fn().mockImplementation(function () {
+      return {
+        messages: {
+          create: vi.fn().mockResolvedValue({
+            content: [{ type: 'text', text: '{"policyNumber": "POL-456"}' }],
+            usage: { input_tokens: 100, output_tokens: 50 },
+            model: 'claude-sonnet-4-20250514',
+          }),
+        },
+      }
+    }),
   }
 })
 

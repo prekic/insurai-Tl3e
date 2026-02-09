@@ -440,8 +440,11 @@ export const AI_CONFIG = {
   // Temperature for more deterministic outputs
   temperature: 0.1,
 
-  // Minimum confidence threshold
-  minConfidence: 0.7,
+  // Hard reject threshold — below this, extraction is considered too unreliable
+  minConfidence: 0.4,
+
+  // Warning threshold — below this, results shown with a low-confidence warning
+  warningConfidence: 0.7,
 
   // Multi-model consensus settings
   consensus: {

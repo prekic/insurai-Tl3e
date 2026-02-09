@@ -82,6 +82,12 @@ vi.mock('./gap-analyzer', () => ({
     optional: [],
     score: 75,
   })),
+  analyzeGapsSync: vi.fn(() => ({
+    critical: [],
+    recommended: [],
+    optional: [],
+    score: 75,
+  })),
   generateGapInsights: vi.fn(() => [
     { type: 'info', category: 'coverage', message: 'Good coverage' },
   ]),

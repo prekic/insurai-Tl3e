@@ -154,6 +154,7 @@ export const settingValidationRules: Record<string, ValidationRule> = {
   chat_temperature: validators.numberRange(0, 2),
   max_tokens: validators.positiveInteger(100, 8192),
   min_confidence: validators.ratio(),
+  warning_confidence: validators.ratio(),
   extraction_timeout_ms: validators.milliseconds(5000, 300000),
   max_retries: validators.positiveInteger(0, 10),
   retry_delay_ms: validators.milliseconds(100, 30000),

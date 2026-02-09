@@ -83,6 +83,7 @@ export interface AIConfig {
   temperature: number
   chatTemperature: number
   minConfidence: number
+  warningConfidence: number
   extractionTimeoutMs: number
   // Provider
   preferredProvider: 'auto' | 'openai' | 'anthropic'
@@ -101,7 +102,8 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   maxTokens: 4096,
   temperature: 0.1,
   chatTemperature: 0.7,
-  minConfidence: 0.7,
+  minConfidence: 0.4,
+  warningConfidence: 0.7,
   extractionTimeoutMs: 90000,
   preferredProvider: 'auto',
   enableFallback: true,

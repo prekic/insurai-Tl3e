@@ -1,7 +1,7 @@
 /**
  * Testimonials Component Tests
  *
- * Tests for the testimonials section
+ * Tests for the use cases section (formerly testimonials)
  */
 
 import { describe, it, expect } from 'vitest'
@@ -13,69 +13,49 @@ describe('Testimonials', () => {
     it('should render the section', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText(/Trusted by/)).toBeInTheDocument()
+      expect(screen.getByText(/What you can/)).toBeInTheDocument()
     })
 
-    it('should display "thousands" highlighted', () => {
+    it('should display highlighted text', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('thousands')).toBeInTheDocument()
+      expect(screen.getByText('do with InsurAI')).toBeInTheDocument()
     })
 
     it('should display subtitle', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('See what our users have to say about InsurAI.')).toBeInTheDocument()
+      expect(screen.getByText('Real use cases for insurance professionals and policyholders.')).toBeInTheDocument()
     })
   })
 
-  describe('Testimonial Cards', () => {
-    it('should render Ahmet Yilmaz testimonial', () => {
+  describe('Use Case Cards', () => {
+    it('should render Insurance Brokers use case', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Ahmet Yilmaz')).toBeInTheDocument()
-      expect(screen.getByText('Insurance Broker, Yilmaz Sigorta')).toBeInTheDocument()
-      expect(screen.getByText(/InsurAI has transformed how I analyze policies/)).toBeInTheDocument()
+      expect(screen.getByText('Insurance Brokers')).toBeInTheDocument()
+      expect(screen.getByText(/Upload client policies, get instant coverage gap reports/)).toBeInTheDocument()
     })
 
-    it('should render Elif Demir testimonial', () => {
+    it('should render Corporate Risk Managers use case', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Elif Demir')).toBeInTheDocument()
-      expect(screen.getByText('Risk Manager, Koc Holding')).toBeInTheDocument()
-      expect(screen.getByText(/The AI-powered analysis catches details/)).toBeInTheDocument()
+      expect(screen.getByText('Corporate Risk Managers')).toBeInTheDocument()
+      expect(screen.getByText(/Analyze complex commercial policies against market benchmarks/)).toBeInTheDocument()
     })
 
-    it('should render Mehmet Ozturk testimonial', () => {
+    it('should render Individual Policyholders use case', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Mehmet Ozturk')).toBeInTheDocument()
-      expect(screen.getByText('Individual User')).toBeInTheDocument()
-      expect(screen.getByText(/Finally, I can understand my insurance policies/)).toBeInTheDocument()
+      expect(screen.getByText('Individual Policyholders')).toBeInTheDocument()
+      expect(screen.getByText(/Upload your kasko or health policy/)).toBeInTheDocument()
     })
 
-    it('should render all 3 testimonial cards', () => {
+    it('should render all 3 use case cards', () => {
       const { container } = render(<Testimonials />)
 
       const cards = container.querySelectorAll('.rounded-2xl.shadow-lg')
       expect(cards.length).toBe(3)
-    })
-  })
-
-  describe('Star Ratings', () => {
-    it('should render 5-star ratings for all testimonials', () => {
-      const { container } = render(<Testimonials />)
-
-      // Each testimonial has 5 stars, so 15 total
-      const stars = container.querySelectorAll('.lucide-star')
-      expect(stars.length).toBe(15)
-    })
-
-    it('should have filled yellow stars', () => {
-      const { container } = render(<Testimonials />)
-
-      const stars = container.querySelectorAll('.text-yellow-400.fill-yellow-400')
-      expect(stars.length).toBe(15)
     })
   })
 

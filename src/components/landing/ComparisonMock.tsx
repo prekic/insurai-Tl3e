@@ -92,21 +92,25 @@ export function ComparisonMockMobile() {
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4">
         <div className="flex items-center gap-2">
           <Shield className="text-white" size={16} />
-          <span className="text-white font-medium text-sm">Quick Compare</span>
+          <span className="text-white font-medium text-sm">Sample Comparison</span>
         </div>
       </div>
 
       <div className="p-4 space-y-3">
         {[
-          { label: 'Best Coverage', value: 'Kasko A', color: 'blue' },
-          { label: 'Best Price', value: 'Kasko B', color: 'green' },
-          { label: 'AI Recommendation', value: 'Kasko A', color: 'purple' },
+          { label: 'Best Coverage', value: 'Allianz Kasko', color: 'text-blue-600' },
+          { label: 'Lowest Premium', value: 'AXA Kasko', color: 'text-green-600' },
+          { label: 'AI Pick', value: 'Allianz Kasko', color: 'text-purple-600' },
         ].map((item, i) => (
           <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
             <span className="text-sm text-gray-600">{item.label}</span>
-            <span className={`text-sm font-semibold text-${item.color}-600`}>{item.value}</span>
+            <span className={`text-sm font-semibold ${item.color}`}>{item.value}</span>
           </div>
         ))}
+      </div>
+
+      <div className="px-4 pb-4">
+        <p className="text-xs text-gray-400 text-center">Illustrative example — your results will reflect your actual policies</p>
       </div>
     </div>
   )

@@ -16,49 +16,49 @@ import {
 
 describe('Coverage Gap Analyzer', () => {
   describe('analyzeCoverageGaps', () => {
-    it('should return an array of gaps', () => {
+    it('should return an array of gaps', async () => {
       const policy = createMockPolicy()
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       expect(Array.isArray(gaps)).toBe(true)
     })
 
-    it('should find no missing coverages for well-covered policy', () => {
-      const gaps = analyzeCoverageGaps(WELL_COVERED_HOME_POLICY)
+    it('should find no missing coverages for well-covered policy', async () => {
+      const gaps = await analyzeCoverageGaps(WELL_COVERED_HOME_POLICY)
 
       // Well-covered policy should have minimal missing coverage gaps
       const criticalMissing = gaps.filter(g => g.subCategory === 'missing_critical')
       expect(criticalMissing.length).toBe(0)
     })
 
-    it('should find missing coverages for poorly-covered policy', () => {
-      const gaps = analyzeCoverageGaps(POORLY_COVERED_HOME_POLICY)
+    it('should find missing coverages for poorly-covered policy', async () => {
+      const gaps = await analyzeCoverageGaps(POORLY_COVERED_HOME_POLICY)
 
       // Poorly-covered policy should have missing coverages
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should identify missing critical coverages as critical severity', () => {
+    it('should identify missing critical coverages as critical severity', async () => {
       // Policy with no coverages
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Should find critical missing coverages for home policy (fire, theft, etc.)
       const criticalGaps = gaps.filter(g => g.severity === 'critical')
       expect(criticalGaps.length).toBeGreaterThan(0)
     })
 
-    it('should set correct severity based on inclusion rate', () => {
+    it('should set correct severity based on inclusion rate', async () => {
       const policy = createMockPolicy({
         type: 'kasko',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // High inclusion rate coverages should be critical/high
       const collision = gaps.find(g => g.affectedCoverage?.includes('Collision'))
@@ -67,13 +67,13 @@ describe('Coverage Gap Analyzer', () => {
       }
     })
 
-    it('should include Turkish translations', () => {
+    it('should include Turkish translations', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       gaps.forEach(gap => {
         expect(gap.titleTr).toBeDefined()
@@ -83,13 +83,13 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should calculate financial impact', () => {
+    it('should calculate financial impact', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       gaps.forEach(gap => {
         expect(gap.financialImpact).toBeDefined()
@@ -100,13 +100,13 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should include remediation steps', () => {
+    it('should include remediation steps', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       gaps.forEach(gap => {
         expect(gap.remediation).toBeDefined()
@@ -118,13 +118,13 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should set confidence level', () => {
+    it('should set confidence level', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       gaps.forEach(gap => {
         expect(gap.confidence).toBeDefined()
@@ -133,13 +133,13 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should generate unique gap IDs', () => {
+    it('should generate unique gap IDs', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       const ids = gaps.map(g => g.id)
       const uniqueIds = new Set(ids)
 
@@ -151,7 +151,7 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should respect minimum inclusion rate threshold', () => {
+    it('should respect minimum inclusion rate threshold', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
@@ -166,22 +166,22 @@ describe('Coverage Gap Analyzer', () => {
         },
       }
 
-      const defaultGaps = analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG)
-      const highThresholdGaps = analyzeCoverageGaps(policy, highThresholdConfig)
+      const defaultGaps = await analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG)
+      const highThresholdGaps = await analyzeCoverageGaps(policy, highThresholdConfig)
 
       expect(highThresholdGaps.length).toBeLessThanOrEqual(defaultGaps.length)
     })
   })
 
   describe('Partial Coverage Detection', () => {
-    it('should detect partial/limited coverages', () => {
-      const gaps = analyzeCoverageGaps(PARTIAL_COVERAGE_POLICY)
+    it('should detect partial/limited coverages', async () => {
+      const gaps = await analyzeCoverageGaps(PARTIAL_COVERAGE_POLICY)
 
       const partialGaps = gaps.filter(g => g.subCategory === 'partial_coverage')
       expect(partialGaps.length).toBeGreaterThan(0)
     })
 
-    it('should detect very low limits as partial', () => {
+    it('should detect very low limits as partial', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -193,7 +193,7 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       const partialGap = gaps.find(
         g => g.subCategory === 'partial_coverage' && g.affectedCoverage === 'Fire'
@@ -201,7 +201,7 @@ describe('Coverage Gap Analyzer', () => {
       expect(partialGap).toBeDefined()
     })
 
-    it('should detect limited coverage from description', () => {
+    it('should detect limited coverage from description', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -214,14 +214,14 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Should detect as partial due to "limited" in description
       const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
       expect(partialGap).toBeDefined()
     })
 
-    it('should detect Turkish sınırlı keyword', () => {
+    it('should detect Turkish sınırlı keyword', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -234,7 +234,7 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       const partialGap = gaps.find(g => g.subCategory === 'partial_coverage')
       expect(partialGap).toBeDefined()
@@ -242,39 +242,39 @@ describe('Coverage Gap Analyzer', () => {
   })
 
   describe('Mandatory Coverage Detection', () => {
-    it('should detect missing mandatory coverages for home policy', () => {
+    it('should detect missing mandatory coverages for home policy', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Home policies should require yangın, deprem, hırsızlık
       const mandatoryMissing = gaps.filter(g => g.subCategory === 'missing_critical')
       expect(mandatoryMissing.length).toBeGreaterThan(0)
     })
 
-    it('should detect missing mandatory coverages for kasko policy', () => {
+    it('should detect missing mandatory coverages for kasko policy', async () => {
       const policy = createMockPolicy({
         type: 'kasko',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Kasko should require hasar, hırsızlık, cam kırılması
       const mandatoryMissing = gaps.filter(g => g.subCategory === 'missing_critical')
       expect(mandatoryMissing.length).toBeGreaterThan(0)
     })
 
-    it('should detect missing mandatory coverages for health policy', () => {
+    it('should detect missing mandatory coverages for health policy', async () => {
       const policy = createMockPolicy({
         type: 'health',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Health should require yatış, ameliyat, ayakta tedavi
       const mandatoryMissing = gaps.filter(g => g.subCategory === 'missing_critical')
@@ -283,14 +283,14 @@ describe('Coverage Gap Analyzer', () => {
   })
 
   describe('Regional Coverage Importance', () => {
-    it('should boost severity for regionally important coverages', () => {
+    it('should boost severity for regionally important coverages', async () => {
       const policy = createMockPolicy({
         type: 'home',
         location: 'Istanbul',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG, 'marmara')
+      const gaps = await analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG, 'marmara')
 
       // Earthquake should be important in Marmara
       const earthquakeGap = gaps.find(g =>
@@ -303,14 +303,14 @@ describe('Coverage Gap Analyzer', () => {
       }
     })
 
-    it('should boost severity for flood coverage in Black Sea region', () => {
+    it('should boost severity for flood coverage in Black Sea region', async () => {
       const policy = createMockPolicy({
         type: 'home',
         location: 'Trabzon',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG, 'karadeniz')
+      const gaps = await analyzeCoverageGaps(policy, DEFAULT_GAP_CONFIG, 'karadeniz')
 
       // Sel should be important in Karadeniz
       const floodGap = gaps.find(g =>
@@ -325,7 +325,7 @@ describe('Coverage Gap Analyzer', () => {
   })
 
   describe('Coverage Matching', () => {
-    it('should match coverages by English name', () => {
+    it('should match coverages by English name', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -333,7 +333,7 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Should not report Fire as missing since it's present
       const fireGap = gaps.find(g =>
@@ -343,7 +343,7 @@ describe('Coverage Gap Analyzer', () => {
       expect(fireGap).toBeUndefined()
     })
 
-    it('should match coverages by Turkish name', () => {
+    it('should match coverages by Turkish name', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -351,7 +351,7 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Should recognize yangın as fire coverage
       const fireGap = gaps.find(g =>
@@ -362,7 +362,7 @@ describe('Coverage Gap Analyzer', () => {
       expect(fireGap).toBeUndefined()
     })
 
-    it('should perform fuzzy matching', () => {
+    it('should perform fuzzy matching', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [
@@ -370,7 +370,7 @@ describe('Coverage Gap Analyzer', () => {
         ],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       // Should recognize "fire protection" as fire coverage
       const fireGap = gaps.find(g =>
@@ -382,13 +382,13 @@ describe('Coverage Gap Analyzer', () => {
   })
 
   describe('Market Reference', () => {
-    it('should include market benchmark reference', () => {
+    it('should include market benchmark reference', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       gaps.forEach(gap => {
         if (gap.marketReference) {
@@ -399,13 +399,13 @@ describe('Coverage Gap Analyzer', () => {
       })
     })
 
-    it('should set percentile to 0 for missing coverages', () => {
+    it('should set percentile to 0 for missing coverages', async () => {
       const policy = createMockPolicy({
         type: 'home',
         coverages: [],
       })
 
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
 
       const gapsWithRef = gaps.filter(g => g.marketReference)
       gapsWithRef.forEach(gap => {
@@ -415,39 +415,39 @@ describe('Coverage Gap Analyzer', () => {
   })
 
   describe('Policy Type Support', () => {
-    it('should handle kasko policies', () => {
+    it('should handle kasko policies', async () => {
       const policy = createMockPolicy({ type: 'kasko', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should handle health policies', () => {
+    it('should handle health policies', async () => {
       const policy = createMockPolicy({ type: 'health', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should handle business policies', () => {
+    it('should handle business policies', async () => {
       const policy = createMockPolicy({ type: 'business', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should handle life policies', () => {
+    it('should handle life policies', async () => {
       const policy = createMockPolicy({ type: 'life', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should handle dask policies', () => {
+    it('should handle dask policies', async () => {
       const policy = createMockPolicy({ type: 'dask', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
 
-    it('should handle traffic policies', () => {
+    it('should handle traffic policies', async () => {
       const policy = createMockPolicy({ type: 'traffic', coverages: [] })
-      const gaps = analyzeCoverageGaps(policy)
+      const gaps = await analyzeCoverageGaps(policy)
       expect(gaps.length).toBeGreaterThan(0)
     })
   })

@@ -7,18 +7,18 @@ import type { Coverage, PolicyType, AnalyzedPolicy } from '@/types/policy'
 import type { CoverageBenchmark, TurkishRegion } from '@/types/market-data'
 import type { DetectedGap, GapRemediation, GapDetectionConfig } from '@/types/gap'
 import { generateGapId, DEFAULT_GAP_CONFIG } from '@/types/gap'
-import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { marketDataProvider } from '@/lib/market-data/market-data-provider'
 
 /**
- * Analyze coverage gaps in a policy
+ * Analyze coverage gaps in a policy (async, DB-backed with static fallback)
  */
-export function analyzeCoverageGaps(
+export async function analyzeCoverageGaps(
   policy: AnalyzedPolicy,
   config: GapDetectionConfig = DEFAULT_GAP_CONFIG,
   region: TurkishRegion = 'marmara'
-): DetectedGap[] {
+): Promise<DetectedGap[]> {
   const gaps: DetectedGap[] = []
-  const benchmark = MARKET_BENCHMARKS[policy.type]
+  const benchmark = await marketDataProvider.getBenchmark(policy.type)
 
   if (!benchmark) return gaps
 

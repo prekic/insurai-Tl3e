@@ -11,15 +11,16 @@ import type {
   BenchmarkInsight,
 } from '@/types/market-data'
 import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { marketDataProvider } from './market-data-provider'
 
 /**
- * Analyze coverage gaps in a policy
+ * Analyze coverage gaps in a policy (async, DB-backed with static fallback)
  */
-export function analyzeGaps(
+export async function analyzeGaps(
   policy: AnalyzedPolicy,
   region: TurkishRegion = 'marmara'
-): GapAnalysis {
-  const benchmark = MARKET_BENCHMARKS[policy.type]
+): Promise<GapAnalysis> {
+  const benchmark = await marketDataProvider.getBenchmark(policy.type)
 
   const missingCoverages = findMissingCoverages(policy.coverages, benchmark.commonCoverages)
   const underinsuredCoverages = findUnderinsuredCoverages(policy.coverages, benchmark.commonCoverages)
@@ -35,6 +36,44 @@ export function analyzeGaps(
   )
 
   // Estimate cost to close gaps
+  const estimatedCostToClose = await estimateGapClosureCostAsync(
+    missingCoverages,
+    underinsuredCoverages,
+    policy.type,
+    region
+  )
+
+  return {
+    missingCoverages,
+    underinsuredCoverages,
+    highDeductibles,
+    exclusionWarnings,
+    gapScore,
+    estimatedCostToClose,
+  }
+}
+
+/**
+ * Synchronous version for backward compatibility (uses static data only)
+ */
+export function analyzeGapsSync(
+  policy: AnalyzedPolicy,
+  region: TurkishRegion = 'marmara'
+): GapAnalysis {
+  const benchmark = MARKET_BENCHMARKS[policy.type]
+
+  const missingCoverages = findMissingCoverages(policy.coverages, benchmark.commonCoverages)
+  const underinsuredCoverages = findUnderinsuredCoverages(policy.coverages, benchmark.commonCoverages)
+  const highDeductibles = findHighDeductibles(policy.coverages, benchmark.commonCoverages)
+  const exclusionWarnings = analyzeExclusions(policy.exclusions, policy.type)
+
+  const gapScore = calculateGapScore(
+    missingCoverages,
+    underinsuredCoverages,
+    highDeductibles,
+    exclusionWarnings
+  )
+
   const estimatedCostToClose = estimateGapClosureCost(
     missingCoverages,
     underinsuredCoverages,
@@ -282,6 +321,31 @@ function calculateGapScore(
 
 /**
  * Estimate cost to close all gaps
+ */
+async function estimateGapClosureCostAsync(
+  missingCoverages: GapAnalysis['missingCoverages'],
+  underinsuredCoverages: GapAnalysis['underinsuredCoverages'],
+  policyType: PolicyType,
+  region: TurkishRegion
+): Promise<number> {
+  const benchmark = await marketDataProvider.getBenchmark(policyType)
+  const regionalFactor = benchmark.regionalFactors[region] || 1.0
+
+  let totalCost = 0
+  for (const missing of missingCoverages) {
+    totalCost += missing.estimatedCost * regionalFactor
+  }
+  for (const under of underinsuredCoverages) {
+    const upgradeFactor = under.recommendedLimit / under.currentLimit
+    const upgradeMultiplier = Math.log2(upgradeFactor) * 0.15
+    const baseCost = benchmark.premiumRange.average * 0.1
+    totalCost += baseCost * upgradeMultiplier * regionalFactor
+  }
+  return Math.round(totalCost)
+}
+
+/**
+ * Estimate cost to close all gaps (sync version, static data only)
  */
 function estimateGapClosureCost(
   missingCoverages: GapAnalysis['missingCoverages'],

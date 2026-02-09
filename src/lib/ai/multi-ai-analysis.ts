@@ -525,11 +525,18 @@ async function findSimilarPolicies(_policy: AnalyzedPolicy): Promise<SimilarPoli
  * Get market benchmarks for the policy type
  */
 async function getMarketBenchmarks(policy: AnalyzedPolicy): Promise<MarketBenchmarkResult> {
+  const { marketDataProvider } = await import('@/lib/market-data/market-data-provider')
   const { getBenchmarkData, MARKET_BENCHMARKS } = await import('@/data/market-data/benchmarks')
 
   try {
-    const benchmarkData = getBenchmarkData(policy.type)
-    const marketData = benchmarkData || MARKET_BENCHMARKS[policy.type]
+    // Try DB-backed provider first, fall back to static
+    let marketData
+    try {
+      marketData = await marketDataProvider.getBenchmark(policy.type)
+    } catch {
+      const benchmarkData = getBenchmarkData(policy.type)
+      marketData = benchmarkData || MARKET_BENCHMARKS[policy.type]
+    }
 
     // Get common coverages as standard coverages (CoverageBenchmark has name/nameTr)
     type BenchmarkCoverage = { name: string; nameTr: string; inclusionRate?: number }

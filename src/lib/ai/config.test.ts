@@ -62,7 +62,8 @@ describe('AI Config', () => {
     it('should have correct extraction settings', () => {
       expect(AI_CONFIG.maxTokens).toBe(4096)
       expect(AI_CONFIG.temperature).toBe(0.1)
-      expect(AI_CONFIG.minConfidence).toBe(0.7)
+      expect(AI_CONFIG.minConfidence).toBe(0.4)
+      expect(AI_CONFIG.warningConfidence).toBe(0.7)
     })
 
     it('should have correct consensus settings', () => {

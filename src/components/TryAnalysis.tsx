@@ -190,6 +190,10 @@ export function TryAnalysis() {
       const policy = extractionResult.policy
       const fileName = sanitizeFileName(file.name)
 
+      // Check for low confidence warning
+      const isLowConfidence = 'lowConfidence' in extractionResult && extractionResult.lowConfidence === true
+      const confidenceScore = 'confidenceScore' in extractionResult ? extractionResult.confidenceScore as number : undefined
+
       // Ensure policy has required fields for display
       const policyWithDefaults = {
         ...policy,
@@ -208,15 +212,23 @@ export function TryAnalysis() {
         policy.coverages?.length || 0
       )
 
-      toast.success('Analysis complete!', {
-        description: 'Your policy has been analyzed successfully.',
-      })
+      if (isLowConfidence) {
+        toast.warning('Analysis complete with low confidence', {
+          description: `Confidence: ${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%. Some extracted data may be inaccurate.`,
+        })
+      } else {
+        toast.success('Analysis complete!', {
+          description: 'Your policy has been analyzed successfully.',
+        })
+      }
 
       // Navigate to PolicyDetailView with the result
       navigate('/policy/trial', {
         state: {
           policy: policyWithDefaults,
           isTrialResult: true,
+          lowConfidence: isLowConfidence,
+          confidenceScore,
         },
         replace: true,
       })

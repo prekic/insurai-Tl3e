@@ -1,7 +1,7 @@
 /**
  * WhyChooseUs Component Tests
  *
- * Tests for the why choose us section
+ * Tests for the differentiators banner section
  */
 
 import { describe, it, expect } from 'vitest'
@@ -18,32 +18,32 @@ describe('WhyChooseUs', () => {
     })
   })
 
-  describe('Feature Stats', () => {
-    it('should display user rating', () => {
+  describe('Differentiators', () => {
+    it('should display KVKK Compliant', () => {
       render(<WhyChooseUs />)
 
-      expect(screen.getByText('4.9/5')).toBeInTheDocument()
-      expect(screen.getByText('User Rating')).toBeInTheDocument()
+      expect(screen.getByText('KVKK Compliant')).toBeInTheDocument()
+      expect(screen.getByText('Privacy-first design for Turkish data protection')).toBeInTheDocument()
     })
 
-    it('should display active users', () => {
+    it('should display No Signup Required', () => {
       render(<WhyChooseUs />)
 
-      expect(screen.getByText('15K+')).toBeInTheDocument()
-      expect(screen.getByText('Active Users')).toBeInTheDocument()
+      expect(screen.getByText('No Signup Required')).toBeInTheDocument()
+      expect(screen.getByText('Try a full policy analysis free, instantly')).toBeInTheDocument()
     })
 
-    it('should display insurance partners', () => {
+    it('should display Turkey-Focused', () => {
       render(<WhyChooseUs />)
 
-      expect(screen.getByText('50+')).toBeInTheDocument()
-      expect(screen.getByText('Insurance Partners')).toBeInTheDocument()
+      expect(screen.getByText('Turkey-Focused')).toBeInTheDocument()
+      expect(screen.getByText('Built specifically for Turkish insurance market')).toBeInTheDocument()
     })
 
-    it('should render all 3 feature items', () => {
+    it('should render all 3 differentiator items', () => {
       const { container } = render(<WhyChooseUs />)
 
-      const items = container.querySelectorAll('.text-center.text-white')
+      const items = container.querySelectorAll('.text-white')
       expect(items.length).toBe(3)
     })
   })

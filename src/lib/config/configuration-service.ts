@@ -87,6 +87,7 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   temperature: 'temperature',
   chat_temperature: 'chatTemperature',
   min_confidence: 'minConfidence',
+  warning_confidence: 'warningConfidence',
   extraction_timeout_ms: 'extractionTimeoutMs',
   preferred_provider: 'preferredProvider',
   enable_fallback: 'enableFallback',

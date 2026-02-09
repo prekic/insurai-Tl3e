@@ -748,6 +748,8 @@ import type { AnalyzedPolicy } from '@/types/policy'
 interface LocationState {
   policy?: AnalyzedPolicy
   isTrialResult?: boolean
+  lowConfidence?: boolean
+  confidenceScore?: number
 }
 
 export function PolicyDetailView() {
@@ -761,6 +763,8 @@ export function PolicyDetailView() {
   const locationState = location.state as LocationState | null
   const trialPolicy = locationState?.policy
   const isTrialResult = locationState?.isTrialResult ?? false
+  const lowConfidence = locationState?.lowConfidence ?? false
+  const confidenceScore = locationState?.confidenceScore
 
   // Try local cache first, then fetch from Supabase if not found
   const [policy, setPolicy] = useState<AnalyzedPolicy | undefined>(() =>
@@ -843,6 +847,25 @@ export function PolicyDetailView() {
             >
               {locale === 'tr' ? 'Kayıt Ol ve Kaydet' : 'Sign Up & Save'}
             </Button>
+          </div>
+        </div>
+      )}
+      {lowConfidence && (
+        <div className="bg-amber-50 border-b border-amber-200 py-3 px-4">
+          <div className="max-w-6xl mx-auto flex items-center gap-3">
+            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
+            <div className="flex-1">
+              <span className="text-sm font-medium text-amber-800">
+                {locale === 'tr'
+                  ? `Düşük güven skoru (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Bazı veriler hatalı olabilir`
+                  : `Low confidence extraction (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Some data may be inaccurate`}
+              </span>
+              <span className="text-xs text-amber-600 ml-2">
+                {locale === 'tr'
+                  ? 'Lütfen önemli alanları doğrulayın.'
+                  : 'Please verify important fields.'}
+              </span>
+            </div>
           </div>
         </div>
       )}

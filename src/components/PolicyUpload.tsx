@@ -73,6 +73,8 @@ interface UploadedFile {
   error?: string
   extractionSource?: 'ai' | 'fallback' | 'ocr'
   aiConfidence?: number
+  /** True when extraction confidence is below warningConfidence but above minConfidence */
+  lowConfidence?: boolean
   /** Conflict detected during pre-upload check */
   conflict?: PreUploadCheckResult
   /** Whether this file is awaiting conflict resolution */
@@ -101,7 +103,7 @@ export function PolicyUpload() {
   const [isRunningDiagnostics, setIsRunningDiagnostics] = useState(false)
   const filesReceivedRef = useRef(false)
   // Ref to hold the latest addFiles function to avoid stale closures in useEffect
-  const addFilesRef = useRef<(files: File[]) => Promise<void>>()
+  const addFilesRef = useRef<((files: File[]) => Promise<void>) | undefined>(undefined)
 
   // Conflict resolution dialog state
   const [conflictDialog, setConflictDialog] = useState<ConflictDialogState>({
@@ -342,6 +344,7 @@ export function PolicyUpload() {
       }
 
       const { policy, source, extractedData } = result
+      const isLowConfidence = 'lowConfidence' in result && result.lowConfidence === true
 
       // ========== DUPLICATE CHECK STAGE ==========
       logger.startStage('duplicate_check', {
@@ -489,6 +492,7 @@ export function PolicyUpload() {
                 policy,
                 extractionSource: source,
                 aiConfidence: extractedData.confidence.overall,
+                lowConfidence: isLowConfidence,
               }
             : f
         )
@@ -501,9 +505,15 @@ export function PolicyUpload() {
         ? ` (${Math.round(extractedData.confidence.overall * 100)}% confidence)`
         : ' (demo mode)'
 
-      toast.success('Analysis complete', {
-        description: `${displayName} has been analyzed${aiNote}${storageNote}.`,
-      })
+      if (isLowConfidence) {
+        toast.warning('Analysis complete — low confidence', {
+          description: `${displayName} has been analyzed${aiNote}${storageNote}. Some data may be inaccurate — please verify.`,
+        })
+      } else {
+        toast.success('Analysis complete', {
+          description: `${displayName} has been analyzed${aiNote}${storageNote}.`,
+        })
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
@@ -1209,11 +1219,11 @@ export function PolicyUpload() {
                         </span>
                       )}
                       {uploadedFile.status === 'complete' && !uploadedFile.awaitingResolution && (
-                        <span className="text-green-600 flex items-center gap-1">
-                          <Check size={14} />
+                        <span className={`flex items-center gap-1 ${uploadedFile.lowConfidence ? 'text-amber-600' : 'text-green-600'}`}>
+                          {uploadedFile.lowConfidence ? <AlertTriangle size={14} /> : <Check size={14} />}
                           {uploadedFile.extractionSource === 'ai' ? (
                             <>
-                              AI extracted
+                              {uploadedFile.lowConfidence ? 'Low confidence' : 'AI extracted'}
                               {uploadedFile.aiConfidence !== undefined && (
                                 <span className="text-gray-500 ml-1">
                                   ({Math.round(uploadedFile.aiConfidence * 100)}%)

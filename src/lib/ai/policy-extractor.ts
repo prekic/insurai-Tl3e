@@ -21,8 +21,8 @@ import {
 import type { AnalyzedPolicy, PolicyType, Coverage, CoverageImportance } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
-import { generateMarketComparisonData } from '@/lib/market-data/service'
-import { MARKET_BENCHMARKS } from '@/data/market-data/benchmarks'
+import { generateMarketComparisonData, generateMarketComparisonDataAsync } from '@/lib/market-data/service'
+import { marketDataProvider } from '@/lib/market-data/market-data-provider'
 import { RiskAssessmentService } from '@/lib/ml'
 import { GapDetectionService } from '@/lib/gap-detection'
 import { validateCurrencyRegion } from '@/lib/utils'
@@ -37,6 +37,10 @@ export interface ExtractionResult {
   policy: AnalyzedPolicy
   extractedData: ExtractedPolicyData
   source: 'ai' | 'fallback' | 'ocr'
+  /** True when extraction confidence is below warningConfidence but above minConfidence */
+  lowConfidence?: boolean
+  /** The raw AI confidence score (0-1) */
+  confidenceScore?: number
   // Multi-model consensus info
   consensus?: {
     providers: AIProvider[]
@@ -642,7 +646,11 @@ export async function extractPolicyFromDocument(
       full_extracted_json: JSON.stringify(extractedData, null, 2),
     })
 
-    // Check confidence threshold
+    // Tiered confidence check:
+    // - Below minConfidence (default 0.4): hard reject — data too unreliable
+    // - Between minConfidence and warningConfidence (default 0.7): show results with warning
+    // - At or above warningConfidence: full confidence results
+    const isLowConfidence = confidenceOverall < AI_CONFIG.warningConfidence
     if (confidenceOverall < AI_CONFIG.minConfidence) {
       if (useFallback) {
         console.error(
@@ -655,10 +663,13 @@ export async function extractPolicyFromDocument(
         error: {
           code: 'LOW_CONFIDENCE',
           message: `Extraction confidence too low: ${Math.round(confidenceOverall * 100)}%`,
-          details: 'The AI could not reliably extract policy information',
+          details: 'The AI could not reliably extract policy information. Please try with a clearer document.',
         },
         fallbackAvailable: false,
       }
+    }
+    if (isLowConfidence) {
+      console.warn(`[PolicyExtractor] Low confidence extraction (${Math.round(confidenceOverall * 100)}%) — results will include warning`)
     }
 
     // ========================================================================
@@ -947,7 +958,7 @@ export async function extractPolicyFromDocument(
 
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
+    const policy = await convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
 
     // Add validation warnings to AI insights
     if (patternValidation) {
@@ -993,6 +1004,8 @@ export async function extractPolicyFromDocument(
       policy,
       extractedData: enhancedExtractedData,
       source: usedOCR ? 'ocr' : 'ai',
+      lowConfidence: isLowConfidence || undefined,
+      confidenceScore: confidenceOverall,
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
       patternValidation: patternValidation ? {
@@ -1090,7 +1103,7 @@ async function extractWithProvider(provider: AIProvider, documentText: string): 
  * @param rawText - Raw extracted text from PDF/OCR (for reference)
  * @param processedText - AI-processed text with OCR corrections (for display and chat)
  */
-function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?: string, processedText?: string): AnalyzedPolicy {
+async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?: string, processedText?: string): Promise<AnalyzedPolicy> {
   const now = new Date()
 
   // Debug logging for production troubleshooting
@@ -1213,8 +1226,8 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
     currency: data.currency ?? (data.premium && typeof data.premium === 'object' ? (data.premium as { currency?: string }).currency : undefined) ?? 'TRY',
     // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
     aiConfidence: typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
-    aiInsights: generateAIInsights(data),
-    marketComparison: generateMarketComparison(data),
+    aiInsights: await generateAIInsightsAsync(data),
+    marketComparison: await generateMarketComparisonAsync(data),
     extractedText: rawText,
     processedText: processedText || rawText, // Use processed text if available, otherwise raw
   }
@@ -1238,8 +1251,8 @@ function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?
 
   // Perform comprehensive gap analysis
   try {
-    const gapAnalysis = GapDetectionService.analyzePolicy(basePolicy)
-    const actionItems = GapDetectionService.getActionItems(basePolicy)
+    const gapAnalysis = await GapDetectionService.analyzePolicy(basePolicy)
+    const actionItems = await GapDetectionService.getActionItems(basePolicy)
 
     basePolicy.gapAnalysis = {
       overallScore: gapAnalysis.overallScore,
@@ -1333,25 +1346,20 @@ function createEmptyExtractedData(): ExtractedPolicyData {
 /**
  * Generate all AI insights including currency validation warnings
  */
-function generateAIInsights(data: ExtractedPolicyData): string[] {
+/**
+ * Generate AI insights (async, DB-backed benchmarks)
+ */
+async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const insights: string[] = []
-
-  // Add strengths
   insights.push(...generateStrengths(data).map(s => `✓ ${s}`))
+  insights.push(...(await generateGapsAsync(data)).map(g => `⚠ ${g}`))
+  insights.push(...(await generateRecommendationsAsync(data)).map(r => `💡 ${r}`))
 
-  // Add gaps
-  insights.push(...generateGaps(data).map(g => `⚠ ${g}`))
-
-  // Add recommendations
-  insights.push(...generateRecommendations(data).map(r => `💡 ${r}`))
-
-  // Validate currency against address
   const currency = data.currency ?? 'TRY'
   const address = data.insuredAddress
   const currencyValidation = validateCurrencyRegion(currency, address)
-
   if (currencyValidation.warning) {
-    insights.push(`🔍 ${currencyValidation.warning}`)
+    insights.push(`⚠ ${currencyValidation.warning}`)
   }
 
   return insights
@@ -1420,54 +1428,40 @@ const KASKO_IMPLICIT_COVERAGES = [
 ]
 
 /**
- * Generate policy gaps based on extracted data and market benchmarks
+ * Generate policy gaps (async, DB-backed benchmarks)
  */
-function generateGaps(data: ExtractedPolicyData): string[] {
+async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const gaps: string[] = []
   const policyType = (data.policyType ?? 'home') as PolicyType
-  const benchmark = MARKET_BENCHMARKS[policyType]
+  const benchmark = await marketDataProvider.getBenchmark(policyType)
 
-  // Check for high exclusion count
   if (data.exclusions.length > 5) {
     gaps.push('Multiple exclusions may limit coverage in certain scenarios')
   }
 
-  // Check for high deductibles compared to market
   const avgDeductible = benchmark.commonCoverages.reduce(
-    (sum, c) => sum + c.typicalDeductible,
-    0
+    (sum, c) => sum + c.typicalDeductible, 0
   ) / benchmark.commonCoverages.length
 
   if (data.coverages.some((c) => c.deductible && c.deductible > avgDeductible * 2)) {
     gaps.push('High deductibles may result in significant out-of-pocket costs')
   }
 
-  // Check for limited coverage areas
   const criticalCoverages = benchmark.commonCoverages.filter(c => c.inclusionRate >= 90)
-
-  // For kasko policies, check if base kasko coverage exists
-  // If so, fundamental coverages (collision, theft, fire, etc.) are implicitly included
   const isKaskoPolicy = policyType === 'kasko'
   const hasBaseKasko = isKaskoPolicy && hasKaskoBaseCoverage(data.coverages)
-
-  // Check for missing critical coverages with smart matching
-  // For traffic insurance, match based on coverage name AND limit to handle per-person/per-accident variants
   const isTrafficPolicy = policyType === 'traffic'
 
   for (const critical of criticalCoverages) {
     const criticalNameLower = critical.nameTr.toLowerCase()
 
-    // For kasko: skip implicit coverages if base kasko exists
     if (hasBaseKasko) {
       const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(implicit =>
         criticalNameLower.includes(implicit) || getCoverageName(critical).includes(implicit)
       )
-      if (isImplicitCoverage) {
-        continue // Skip - this is included in base kasko coverage
-      }
+      if (isImplicitCoverage) continue
     }
 
-    // Extract base name without qualifier (e.g., "Maddi Hasar" from "Maddi Hasar (kaza başı)")
     const baseNameMatch = criticalNameLower.match(/^([^(]+)/)
     const criticalBaseName = baseNameMatch ? baseNameMatch[1].trim() : criticalNameLower
 
@@ -1475,28 +1469,19 @@ function generateGaps(data: ExtractedPolicyData): string[] {
       const coverageNameLower = getCoverageName(c)
       const coverageLimit = c.limit ?? 0
 
-      // Direct match
       if (coverageNameLower.includes(getCoverageName(critical)) ||
           coverageNameLower.includes(criticalNameLower)) {
         return true
       }
 
-      // For traffic insurance, match base name + limit tolerance
       if (isTrafficPolicy) {
-        // Check if the coverage matches the base name
         const matchesBaseName = coverageNameLower.includes(criticalBaseName) ||
           criticalBaseName.includes(coverageNameLower.replace(/\([^)]*\)/g, '').trim())
 
         if (matchesBaseName) {
-          // If limits match within 10% tolerance, consider it a match
           const limitTolerance = critical.typicalLimit * 0.1
-          if (Math.abs(coverageLimit - critical.typicalLimit) <= limitTolerance) {
-            return true
-          }
-          // Per-accident limits are always higher, so also match if coverage >= expected
-          if (criticalNameLower.includes('kaza başı') && coverageLimit >= critical.typicalLimit * 0.9) {
-            return true
-          }
+          if (Math.abs(coverageLimit - critical.typicalLimit) <= limitTolerance) return true
+          if (criticalNameLower.includes('kaza başı') && coverageLimit >= critical.typicalLimit * 0.9) return true
         }
       }
 
@@ -1504,99 +1489,70 @@ function generateGaps(data: ExtractedPolicyData): string[] {
     })
 
     if (!hasCoverage) {
-      // For traffic insurance, don't report per-person variants as missing if per-accident variant exists
-      // since policies often only show the per-accident (higher) limit
       if (isTrafficPolicy && criticalNameLower.includes('kişi başı')) {
         const hasPerAccident = data.coverages.some(c =>
           getCoverageName(c).includes(criticalBaseName) &&
           (c.limit ?? 0) >= critical.typicalLimit
         )
-        if (hasPerAccident) continue // Skip this gap, per-accident coverage exists
+        if (hasPerAccident) continue
       }
-
       gaps.push(`Missing common coverage: ${critical.nameTr}`)
     }
   }
 
-  // Check for underinsured coverages
   const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
   if (totalCoverage < benchmark.coverageRange.average * 0.5) {
     gaps.push('Total coverage significantly below market average')
   }
 
-  // DASK check for home policies
   if (policyType === 'home') {
     const hasDaskMention = data.coverages.some(c => {
       const nameLower = getCoverageName(c)
-      return nameLower.includes('deprem') ||
-        nameLower.includes('dask') ||
-        nameLower.includes('earthquake')
+      return nameLower.includes('deprem') || nameLower.includes('dask') || nameLower.includes('earthquake')
     })
     if (!hasDaskMention) {
       gaps.push('Consider adding DASK earthquake insurance if not included')
     }
   }
 
-  return gaps.slice(0, 5) // Limit to top 5 gaps
+  return gaps.slice(0, 5)
 }
 
 /**
- * Generate recommendations based on extracted data and market benchmarks
+ * Generate recommendations (async, DB-backed benchmarks)
  */
-function generateRecommendations(data: ExtractedPolicyData): string[] {
+async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const recommendations: string[] = []
   const policyType = (data.policyType ?? 'home') as PolicyType
-  const benchmark = MARKET_BENCHMARKS[policyType]
+  const benchmark = await marketDataProvider.getBenchmark(policyType)
 
-  // Premium comparison recommendation
   if (data.premium && data.premium > benchmark.premiumRange.percentile75) {
     recommendations.push('Premium is above 75th percentile - compare with other providers')
   }
 
-  // Coverage limit recommendation
   const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
   if (totalCoverage < benchmark.coverageRange.median) {
     recommendations.push('Coverage below market median - consider increasing limits')
   }
 
-  // Market trend awareness
   if (benchmark.trends.premiumChangeYoY > 30) {
     recommendations.push(`Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`)
   }
 
-  // Annual review recommendation
   recommendations.push('Review coverage limits annually to ensure adequate protection')
-
-  // Specific policy type recommendations
-  if (policyType === 'kasko') {
-    recommendations.push('Consider bundling with traffic insurance for discounts')
-  } else if (policyType === 'health') {
-    recommendations.push('Review network hospitals and coverage scope before renewal')
-  } else if (policyType === 'business') {
-    if (!data.coverages.some(c => {
-      const nameLower = getCoverageName(c)
-      return nameLower.includes('siber') || nameLower.includes('cyber')
-    })) {
-      recommendations.push('Consider cyber insurance for digital business risks')
-    }
-  }
-
-  return recommendations.slice(0, 4) // Limit to top 4 recommendations
+  return recommendations.slice(0, 5)
 }
 
 /**
- * Generate market comparison data using real market benchmarks
+ * Generate market comparison (async, DB-backed)
  */
-function generateMarketComparison(data: ExtractedPolicyData): AnalyzedPolicy['marketComparison'] {
+async function generateMarketComparisonAsync(data: ExtractedPolicyData): Promise<AnalyzedPolicy['marketComparison']> {
   const premium = data.premium ?? 0
   const policyType = (data.policyType ?? 'home') as PolicyType
   const location = data.insuredAddress ?? undefined
-
-  // Calculate total coverage from coverages
   const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
 
-  // Use the new market data service for accurate benchmarking
-  return generateMarketComparisonData(premium, totalCoverage, policyType, location)
+  return generateMarketComparisonDataAsync(premium, totalCoverage, policyType, location)
 }
 
 // ============================================================================
