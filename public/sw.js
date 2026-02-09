@@ -9,7 +9,7 @@
  * - HTML pages: Stale-while-revalidate
  */
 
-const CACHE_VERSION = 'v13'
+const CACHE_VERSION = 'v14'
 const STATIC_CACHE = `insurai-static-${CACHE_VERSION}`
 const DYNAMIC_CACHE = `insurai-dynamic-${CACHE_VERSION}`
 const API_CACHE = `insurai-api-${CACHE_VERSION}`
@@ -161,6 +161,19 @@ async function cacheFirst(request, cacheName) {
     }
 
     const networkResponse = await fetch(request)
+
+    // Guard against MIME-type mismatch: if we requested a JS/CSS file but got
+    // text/html back, the asset is missing (server returned SPA index.html).
+    // Don't cache the wrong response — notify clients to reload instead.
+    const contentType = networkResponse.headers.get('content-type') || ''
+    const requestedExt = new URL(request.url).pathname.split('.').pop()
+    const isJsOrCss = requestedExt === 'js' || requestedExt === 'css'
+    if (isJsOrCss && contentType.includes('text/html')) {
+      console.warn('[SW] MIME mismatch: requested', requestedExt, 'but got text/html — asset missing, triggering reload')
+      notifyClients({ type: 'ASSET_MISSING', payload: { url: request.url } })
+      return networkResponse
+    }
+
     if (networkResponse.ok) {
       const cache = await caches.open(cacheName)
       const responseToCache = networkResponse.clone()

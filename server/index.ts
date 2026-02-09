@@ -326,6 +326,15 @@ app.use('/api', (_req, res) => {
 // Handle client-side routing in production - serve index.html for all other routes
 if (IS_PRODUCTION) {
   const distPath = path.join(__dirname, '..', 'dist')
+
+  // Return 404 for missing static assets instead of serving index.html
+  // This prevents 'text/html is not a valid JavaScript MIME type' errors
+  // when the browser requests stale JS/CSS chunk filenames after a deployment
+  const STATIC_ASSET_RE = /\.(?:js|css|map|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|eot|json)$/
+  app.get(STATIC_ASSET_RE, (_req, res) => {
+    res.status(404).end()
+  })
+
   // Express 5: '*' is no longer a universal wildcard. Use regex for SPA catch-all.
   app.get(/.*/, (_req, res) => {
     res.sendFile(path.join(distPath, 'index.html'))
