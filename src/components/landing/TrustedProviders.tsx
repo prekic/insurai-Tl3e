@@ -28,7 +28,7 @@ export function TrustedProviders() {
         <div className="flex items-center justify-center gap-2 mb-6">
           <Building2 size={18} className="text-gray-400" />
           <span className="text-sm font-medium text-gray-500">
-            Supports <span className="text-gray-700 font-semibold">50+</span> Turkish Insurers
+            Works with major Turkish insurers
           </span>
         </div>
 
@@ -50,7 +50,7 @@ export function TrustedProviders() {
             ))}
             {/* "and more" badge */}
             <div className="flex-shrink-0 px-4 py-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-full text-sm font-medium text-blue-700">
-              +38 more
+              and more
             </div>
           </div>
         </div>
@@ -77,7 +77,7 @@ export function TrustedProvidersInline() {
         </span>
       ))}
       <span className="px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-full text-xs font-medium text-blue-600">
-        +44 more
+        +6 more
       </span>
     </div>
   )

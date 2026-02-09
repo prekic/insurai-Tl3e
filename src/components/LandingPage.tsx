@@ -45,11 +45,14 @@ export const LandingPage = memo(function LandingPage() {
         </LazySection>
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton />}>
-        <LazySection height="600px" rootMargin="200px">
-          <PolicyComparisonSection />
-        </LazySection>
-      </Suspense>
+      {/* PolicyComparisonSection hidden on mobile — hero ComparisonMock already demonstrates the feature */}
+      <div className="hidden md:block">
+        <Suspense fallback={<SectionSkeleton />}>
+          <LazySection height="600px" rootMargin="200px">
+            <PolicyComparisonSection />
+          </LazySection>
+        </Suspense>
+      </div>
 
       <Suspense fallback={<SectionSkeleton />}>
         <LazySection height="500px" rootMargin="200px">
@@ -75,11 +78,14 @@ export const LandingPage = memo(function LandingPage() {
         </LazySection>
       </Suspense>
 
-      <Suspense fallback={<SectionSkeleton />}>
-        <LazySection height="500px" rootMargin="200px">
-          <CompareSection />
-        </LazySection>
-      </Suspense>
+      {/* CompareSection hidden on mobile — redundant with hero comparison mock */}
+      <div className="hidden md:block">
+        <Suspense fallback={<SectionSkeleton />}>
+          <LazySection height="500px" rootMargin="200px">
+            <CompareSection />
+          </LazySection>
+        </Suspense>
+      </div>
 
       <Suspense fallback={<SectionSkeleton />}>
         <LazySection height="500px" rootMargin="200px">

@@ -1,19 +1,12 @@
 /**
  * Stats Component Tests
  *
- * Tests for the statistics section
+ * Tests for the capabilities section (formerly statistics counters)
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Stats } from './Stats'
-
-// Mock NumberCounter
-vi.mock('../animations/AnimatedComponents', () => ({
-  NumberCounter: ({ value, suffix }: { value: number; suffix?: string }) => (
-    <span data-testid="number-counter">{value}{suffix}</span>
-  ),
-}))
 
 describe('Stats', () => {
   describe('Rendering', () => {
@@ -25,40 +18,40 @@ describe('Stats', () => {
     })
   })
 
-  describe('Statistics', () => {
-    it('should display policies analyzed stat', () => {
+  describe('Capabilities', () => {
+    it('should display policy types supported', () => {
       render(<Stats />)
 
-      expect(screen.getByText('Policies Analyzed')).toBeInTheDocument()
-      expect(screen.getByText('2300+')).toBeInTheDocument()
+      expect(screen.getByText('Policy Types Supported')).toBeInTheDocument()
+      expect(screen.getByText('7')).toBeInTheDocument()
     })
 
-    it('should display happy users stat', () => {
+    it('should display languages', () => {
       render(<Stats />)
 
-      expect(screen.getByText('Happy Users')).toBeInTheDocument()
-      expect(screen.getByText('15K+')).toBeInTheDocument()
+      expect(screen.getByText('Languages')).toBeInTheDocument()
+      expect(screen.getByText('TR / EN')).toBeInTheDocument()
     })
 
-    it('should display accuracy rate stat', () => {
+    it('should display coverage checks', () => {
       render(<Stats />)
 
-      expect(screen.getByText('Accuracy Rate')).toBeInTheDocument()
-      expect(screen.getByText('98%')).toBeInTheDocument()
+      expect(screen.getByText('Coverage Checks')).toBeInTheDocument()
+      expect(screen.getByText('15+')).toBeInTheDocument()
     })
 
-    it('should display AI support stat', () => {
+    it('should display analysis time', () => {
       render(<Stats />)
 
-      expect(screen.getByText('AI Support')).toBeInTheDocument()
-      expect(screen.getByText('24/7')).toBeInTheDocument()
+      expect(screen.getByText('Analysis Time')).toBeInTheDocument()
+      expect(screen.getByText('<60s')).toBeInTheDocument()
     })
 
-    it('should render all 4 stat items', () => {
-      render(<Stats />)
+    it('should render all 4 capability items', () => {
+      const { container } = render(<Stats />)
 
-      const counters = screen.getAllByTestId('number-counter')
-      expect(counters.length).toBe(4)
+      const items = container.querySelectorAll('.text-center')
+      expect(items.length).toBe(4)
     })
   })
 
