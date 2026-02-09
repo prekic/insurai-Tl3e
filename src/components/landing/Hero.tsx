@@ -1,10 +1,10 @@
-import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Phone, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
+import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { UploadWidget } from './UploadWidget'
 import { SampleReportPreviewCompact } from './SampleReportPreview'
-import { StaggeredList, AnimatedButton, NumberCounter, ScaleOnHover } from '../animations/AnimatedComponents'
+import { StaggeredList, AnimatedButton, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
 import { LanguageToggle } from './LanguageToggle'
 import { usePolicies } from '@/lib/policy-context'
@@ -54,8 +54,8 @@ export function Hero() {
 
       {/* Navigation */}
       <nav className="relative bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
-        {/* Top utility bar */}
-        <div className="bg-slate-50 border-b border-gray-200">
+        {/* Top utility bar - hidden on mobile to save vertical space */}
+        <div className="hidden sm:block bg-slate-50 border-b border-gray-200">
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-9 text-xs">
               <div className="flex items-center gap-4">
@@ -69,14 +69,6 @@ export function Hero() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <a
-                  href="tel:1-855-555-0123"
-                  className="flex items-center gap-1.5 text-gray-700 hover:text-slate-900 font-medium transition-colors"
-                >
-                  <Phone size={12} />
-                  <span className="hidden sm:inline">1-855-555-0123</span>
-                  <span className="sm:hidden">Call Us</span>
-                </a>
                 <Link
                   to="/help"
                   className="text-gray-600 hover:text-slate-900 transition-colors"
@@ -91,16 +83,16 @@ export function Hero() {
         {/* Main navigation */}
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo */}
+            {/* Logo - always show brand name */}
             <Link to="/" className="flex items-center gap-3">
               <ScaleOnHover>
                 <div className="w-9 h-9 bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl flex items-center justify-center shadow-md">
                   <Shield className="text-white" size={18} />
                 </div>
               </ScaleOnHover>
-              <div className="hidden sm:block">
+              <div>
                 <div className="font-bold text-gray-900">InsurAI</div>
-                <div className="text-xs text-gray-500">Policy Analysis Platform</div>
+                <div className="hidden sm:block text-xs text-gray-500">Policy Analysis Platform</div>
               </div>
             </Link>
 
@@ -255,7 +247,7 @@ export function Hero() {
       </nav>
 
       {/* Hero Content */}
-      <div className="relative container mx-auto px-4 py-16 md:py-24">
+      <div className="relative container mx-auto px-4 py-10 md:py-24">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left Column - Text Content */}
           <StaggeredList staggerDelay={0.15}>
@@ -268,18 +260,47 @@ export function Hero() {
                 <span className="text-sm font-medium text-gray-700">AI-powered policy analysis</span>
               </div>,
 
-              <h1 key="headline" className="text-5xl md:text-6xl lg:text-7xl leading-[1.1] tracking-tight">
+              <h1 key="headline" className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl leading-[1.1] tracking-tight">
                 Understand and <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">benchmark</span> your insurance policies
               </h1>,
 
-              <p key="subheadline" className="text-xl md:text-2xl text-gray-600 leading-relaxed">
-                Upload your policy documents and let AI translate coverage, extensions, and exclusions into plain language. Compare policies side-by-side.
+              <p key="subheadline" className="text-lg sm:text-xl md:text-2xl text-gray-600 leading-relaxed">
+                Upload a policy PDF and get plain-language coverage analysis in seconds.
               </p>,
 
-              <div key="benefits" className="flex flex-wrap gap-6 text-sm text-gray-600">
-                {['Works with PDF, Word, and scanned images', 'Explains coverage in Turkish/English', 'Renewal reminders and alerts'].map((benefit, i) => (
+              /* CTA immediately after sub-headline — above the fold on mobile */
+              <div key="ctas" className="flex flex-col sm:flex-row gap-3 pt-2">
+                <UploadWidget
+                  compact={true}
+                  buttonText="Analyze Your Policy Free"
+                  loadingText="Analyzing..."
+                />
+                <AnimatedButton
+                  onClick={() => navigate('/samples')}
+                  className="group inline-flex items-center justify-center gap-2 px-6 py-4 text-gray-600 hover:text-blue-700 transition-all font-medium text-sm"
+                >
+                  <span>See Example Analysis</span>
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </AnimatedButton>
+              </div>,
+
+              /* Trust signals inline after CTA */
+              <div key="trust-inline" className="flex flex-wrap items-center gap-3 pt-1">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  <span className="text-xs font-medium text-emerald-700">KVKK Uyumlu</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
+                  <Lock size={14} className="text-blue-600" />
+                  <span className="text-xs font-medium text-blue-700">256-bit SSL</span>
+                </div>
+              </div>,
+
+              /* Benefits below CTA — reinforces the decision */
+              <div key="benefits" className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-6 text-sm text-gray-600 pt-2">
+                {['PDF, Word, and scanned images', 'Turkish/English coverage explanations', 'Side-by-side policy comparison'].map((benefit, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center">
+                    <div className="w-5 h-5 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
                       <svg className="w-3 h-3 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd"/>
                       </svg>
@@ -289,34 +310,10 @@ export function Hero() {
                 ))}
               </div>,
 
-              <div key="ctas" className="flex flex-col sm:flex-row gap-4 pt-4">
-                <UploadWidget
-                  compact={true}
-                  buttonText="Analyze Your Policy Free"
-                  loadingText="Analyzing..."
-                />
-                <AnimatedButton
-                  onClick={() => navigate(uploadPath)}
-                  className="group inline-flex items-center justify-center gap-2.5 px-8 py-4 bg-white border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-500 hover:bg-gradient-to-r hover:from-blue-50 hover:to-indigo-50 hover:text-blue-700 transition-all shadow-sm hover:shadow-md font-semibold"
-                >
-                  <span>See Demo Report</span>
-                  <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                </AnimatedButton>
-              </div>,
-
-              <div key="security-badges" className="flex flex-wrap items-center gap-4 pt-2">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
-                  <ShieldCheck size={14} className="text-emerald-600" />
-                  <span className="text-xs font-medium text-emerald-700">KVKK Uyumlu</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-full">
-                  <Lock size={14} className="text-blue-600" />
-                  <span className="text-xs font-medium text-blue-700">256-bit SSL</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 border border-purple-200 rounded-full">
-                  <Shield size={14} className="text-purple-600" />
-                  <span className="text-xs font-medium text-purple-700">Verileriniz Korunur</span>
-                </div>
+              /* Sample report preview — below the fold on mobile, that's fine */
+              <div key="sample-report" className="mt-4">
+                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
+                <SampleReportPreviewCompact />
               </div>,
 
               <div key="samples-cta" className="mt-4 p-4 bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl">
@@ -338,21 +335,10 @@ export function Hero() {
                 </div>
               </div>,
 
-              <div key="sample-report" className="mt-4">
-                <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">What you&apos;ll get:</p>
-                <SampleReportPreviewCompact />
-              </div>,
-
-              <div key="trust" className="pt-6 flex items-center gap-8 text-sm text-gray-500">
-                <div>
-                  <NumberCounter value={4.9} decimals={1} suffix="★" className="text-2xl font-semibold text-gray-900" />
-                  <div>15K+ reviews</div>
-                </div>
-                <div className="w-px h-12 bg-gray-200" />
-                <div>
-                  <NumberCounter value={2300} suffix="+" className="text-2xl font-semibold text-gray-900" decimals={0} />
-                  <div>Policies analyzed</div>
-                </div>
+              <div key="trust-proof" className="pt-4 text-sm text-gray-500">
+                <span className="font-medium text-gray-700">Built for Turkish insurance professionals</span>
+                <span className="mx-2 text-gray-300">|</span>
+                <span>Kasko, Trafik, DASK, Health, and more</span>
               </div>
             ]}
           </StaggeredList>

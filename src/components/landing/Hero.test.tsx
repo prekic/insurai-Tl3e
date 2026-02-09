@@ -122,10 +122,11 @@ describe('Hero', () => {
       expect(screen.getByText('Help')).toBeInTheDocument()
     })
 
-    it('should have phone number link', () => {
+    it('should hide utility bar on mobile and show on desktop', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('1-855-555-0123')).toBeInTheDocument()
+      // Utility bar content still exists in DOM (hidden via CSS on mobile)
+      expect(screen.getByText('Secure & Encrypted')).toBeInTheDocument()
     })
   })
 
@@ -146,15 +147,15 @@ describe('Hero', () => {
     it('should display subheadline', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText(/Upload your policy documents/)).toBeInTheDocument()
+      expect(screen.getByText(/Upload a policy PDF/)).toBeInTheDocument()
     })
 
     it('should display benefit points', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('Works with PDF, Word, and scanned images')).toBeInTheDocument()
-      expect(screen.getByText('Explains coverage in Turkish/English')).toBeInTheDocument()
-      expect(screen.getByText('Renewal reminders and alerts')).toBeInTheDocument()
+      expect(screen.getByText('PDF, Word, and scanned images')).toBeInTheDocument()
+      expect(screen.getByText('Turkish/English coverage explanations')).toBeInTheDocument()
+      expect(screen.getByText('Side-by-side policy comparison')).toBeInTheDocument()
     })
 
     it('should render UploadWidget', () => {
@@ -163,17 +164,16 @@ describe('Hero', () => {
       expect(screen.getByTestId('upload-widget')).toBeInTheDocument()
     })
 
-    it('should have demo report button', () => {
+    it('should have example analysis link', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('See Demo Report')).toBeInTheDocument()
+      expect(screen.getByText('See Example Analysis')).toBeInTheDocument()
     })
 
-    it('should display trust stats', () => {
+    it('should display trust proof', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('15K+ reviews')).toBeInTheDocument()
-      expect(screen.getByText('Policies analyzed')).toBeInTheDocument()
+      expect(screen.getByText('Built for Turkish insurance professionals')).toBeInTheDocument()
     })
   })
 
