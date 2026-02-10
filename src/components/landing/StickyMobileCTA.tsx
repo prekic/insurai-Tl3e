@@ -2,6 +2,7 @@ import { Upload } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 /**
  * StickyMobileCTA - A floating CTA button that appears on mobile
@@ -12,6 +13,7 @@ import { useAuth } from '@/lib/supabase/auth-context'
 export function StickyMobileCTA() {
   const navigate = useNavigate()
   const { user } = useAuth()
+  const { t } = useTranslation()
   const [isVisible, setIsVisible] = useState(false)
 
   // Route to /try for anonymous users, /upload for logged-in users
@@ -67,16 +69,16 @@ export function StickyMobileCTA() {
           active:scale-[0.98]
           transition-all duration-200
         "
-        aria-label="Analyze your policy for free"
+        aria-label={t.landing.analyzeCtaButton}
       >
         <Upload size={20} />
-        <span>Analyze Your Policy Free</span>
+        <span>{t.landing.analyzeCtaButton}</span>
       </button>
 
       {/* Trust indicator below button */}
       <div className="flex items-center justify-center gap-2 mt-2">
         <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-        <span className="text-xs text-gray-500">Free instant analysis</span>
+        <span className="text-xs text-gray-500">{t.landing.freeInstantAnalysis}</span>
       </div>
     </div>
   )

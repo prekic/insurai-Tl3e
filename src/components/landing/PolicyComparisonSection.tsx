@@ -1,17 +1,20 @@
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function PolicyComparisonSection() {
+  const { t } = useTranslation()
+
   const policies = [
     { name: 'Policy A', provider: 'Insurer ABC' },
     { name: 'Policy B', provider: 'Insurer XYZ' },
   ]
 
   const comparisonRows = [
-    { label: 'Coverage Limit', values: ['₺500,000', '₺750,000'], trend: [null, 'up'] },
-    { label: 'Annual Premium', values: ['₺4,800', '₺4,200'], trend: [null, 'down'] },
-    { label: 'Deductible', values: ['₺2,500', '₺1,000'], trend: [null, 'down'] },
-    { label: 'Flood Protection', values: ['Included', 'Excluded'], trend: ['up', 'down'] },
-    { label: 'Earthquake Coverage', values: ['Included', 'Optional'], trend: ['up', 'neutral'] },
+    { label: t.landing.compareCoverageLimit, values: ['₺500,000', '₺750,000'], trend: [null, 'up'] },
+    { label: t.landing.compareAnnualPremium, values: ['₺4,800', '₺4,200'], trend: [null, 'down'] },
+    { label: t.landing.compareDeductible, values: ['₺2,500', '₺1,000'], trend: [null, 'down'] },
+    { label: t.landing.compareFloodProtection, values: [t.landing.compareIncluded, t.landing.compareExcluded], trend: ['up', 'down'] },
+    { label: t.landing.compareEarthquakeCoverage, values: [t.landing.compareIncluded, t.landing.compareOptional], trend: ['up', 'neutral'] },
   ]
 
   const renderTrend = (trend: string | null) => {
@@ -26,17 +29,17 @@ export function PolicyComparisonSection() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl md:text-5xl mb-6 tracking-tight">
-            Compare policies <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">side-by-side</span>
+            {t.landing.compareSideBySide} <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{t.landing.compareSideBySideHighlight}</span>
           </h2>
           <p className="text-xl text-gray-600">
-            See the differences between your policies at a glance.
+            {t.landing.compareDesc}
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
           {/* Header */}
           <div className="grid grid-cols-3 bg-gray-50 border-b border-gray-200">
-            <div className="p-4 font-semibold text-gray-700">Coverage</div>
+            <div className="p-4 font-semibold text-gray-700">{t.landing.compareCoverage}</div>
             {policies.map((policy, i) => (
               <div key={i} className="p-4 text-center border-l border-gray-200">
                 <p className="font-semibold text-gray-900">{policy.name}</p>

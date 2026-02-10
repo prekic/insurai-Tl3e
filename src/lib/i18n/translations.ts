@@ -252,6 +252,36 @@ export interface TranslationDictionary {
     uploadTryAgain: string
     uploadNoValidFiles: string
     uploadFailedDesc: string
+
+    // CompareSection (CTA)
+    ctaTitle: string
+    ctaDescription: string
+    freeInstantAnalysis: string
+
+    // PolicyComparisonSection
+    compareSideBySide: string
+    compareSideBySideHighlight: string
+    compareDesc: string
+    compareCoverage: string
+    compareCoverageLimit: string
+    compareAnnualPremium: string
+    compareDeductible: string
+    compareFloodProtection: string
+    compareEarthquakeCoverage: string
+    compareIncluded: string
+    compareExcluded: string
+    compareOptional: string
+
+    // WhoItsFor
+    whoTitle: string
+    whoHighlight: string
+    whoDesc: string
+    whoBrokersTitle: string
+    whoBrokersDesc: string
+    whoRiskTitle: string
+    whoRiskDesc: string
+    whoPolicyholdersTitle: string
+    whoPolicyholdersDesc: string
   }
 
   // Policy related
@@ -536,6 +566,71 @@ export interface TranslationDictionary {
     standard: string
     minor: string
   }
+
+  // Try Analysis (anonymous free trial)
+  tryAnalysis: {
+    preparingDocument: string
+    uploadingDocument: string
+    extractingText: string
+    analyzingStructure: string
+    processingWithAI: string
+    almostThere: string
+    analysisTimedOut: string
+    noResponse: string
+    analysisFailed: string
+    aiExtractionFailed: string
+    noDataExtracted: string
+    finalizingAnalysis: string
+    analysisComplete: string
+    lowConfidenceTitle: string
+    analysisSuccessDesc: string
+    trialAlreadyUsed: string
+    serviceUnavailableToast: string
+    pleaseWait: string
+    trialAlreadyUsedTitle: string
+    trialAlreadyUsedDesc: string
+    tryAgainIn: string
+    signUpUnlimited: string
+    backToHome: string
+    freeAnalysisBadge: string
+    title: string
+    subtitle: string
+    analysisFailedTitle: string
+    tryAgain: string
+    percentComplete: string
+    aiAnalyzing: string
+    dropFileHere: string
+    uploadYourPolicy: string
+    dragDropOrClick: string
+    secure: string
+    aiPowered: string
+    oneFreeAnalysis: string
+    serviceUnavailable: string
+    serviceStartingUp: string
+    alreadyHaveAccount: string
+  }
+
+  // User Preferences
+  preferences: {
+    signInRequired: string
+    signInDescription: string
+    displayPreferences: string
+    displayDescription: string
+    emailPreferences: string
+    emailDescription: string
+    title: string
+    subtitle: string
+    saving: string
+    modified: string
+    resetAll: string
+    defaultLabel: string
+    resetToDefault: string
+    remove: string
+    add: string
+    notAvailable: string
+    on: string
+    off: string
+  }
 }
 
 // Base English translations
@@ -764,6 +859,36 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Try again',
     uploadNoValidFiles: 'No valid files selected. Please check file type and size.',
     uploadFailedDesc: 'There was a problem uploading your files. Please try again.',
+
+    // CompareSection (CTA)
+    ctaTitle: 'Ready to understand your policies?',
+    ctaDescription: 'Upload your first policy and see the power of AI-driven insurance analysis.',
+    freeInstantAnalysis: 'Free instant analysis',
+
+    // PolicyComparisonSection
+    compareSideBySide: 'Compare policies',
+    compareSideBySideHighlight: 'side-by-side',
+    compareDesc: 'See the differences between your policies at a glance.',
+    compareCoverage: 'Coverage',
+    compareCoverageLimit: 'Coverage Limit',
+    compareAnnualPremium: 'Annual Premium',
+    compareDeductible: 'Deductible',
+    compareFloodProtection: 'Flood Protection',
+    compareEarthquakeCoverage: 'Earthquake Coverage',
+    compareIncluded: 'Included',
+    compareExcluded: 'Excluded',
+    compareOptional: 'Optional',
+
+    // WhoItsFor
+    whoTitle: 'Built for',
+    whoHighlight: 'insurance professionals',
+    whoDesc: 'Whether you\'re a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.',
+    whoBrokersTitle: 'Insurance Brokers',
+    whoBrokersDesc: 'Quickly analyze and compare policies for your clients.',
+    whoRiskTitle: 'Corporate Risk Managers',
+    whoRiskDesc: 'Manage complex policy portfolios with ease.',
+    whoPolicyholdersTitle: 'Individual Policyholders',
+    whoPolicyholdersDesc: 'Understand your coverage in plain language.',
   },
 
   policy: {
@@ -1032,6 +1157,69 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     standard: 'Standard',
     minor: 'Minor',
   },
+
+  tryAnalysis: {
+    preparingDocument: 'Preparing document...',
+    uploadingDocument: 'Uploading document...',
+    extractingText: 'Extracting text from PDF...',
+    analyzingStructure: 'Analyzing document structure...',
+    processingWithAI: 'Processing with AI...',
+    almostThere: 'Almost there...',
+    analysisTimedOut: 'Analysis timed out. The AI service may be busy. Please try again.',
+    noResponse: 'No response received from analysis service.',
+    analysisFailed: 'Analysis failed',
+    aiExtractionFailed: 'AI extraction failed',
+    noDataExtracted: 'No data could be extracted from this document.',
+    finalizingAnalysis: 'Finalizing analysis...',
+    analysisComplete: 'Analysis complete!',
+    lowConfidenceTitle: 'Low Confidence Result',
+    analysisSuccessDesc: 'Your policy has been analyzed successfully.',
+    trialAlreadyUsed: 'You have already used your free trial.',
+    serviceUnavailableToast: 'Analysis service is temporarily unavailable. Please try again later.',
+    pleaseWait: 'Please wait...',
+    trialAlreadyUsedTitle: 'Trial Already Used',
+    trialAlreadyUsedDesc: 'You have already used your free policy analysis for this session.',
+    tryAgainIn: 'Try again in',
+    signUpUnlimited: 'Sign up for unlimited analysis',
+    backToHome: 'Back to Home',
+    freeAnalysisBadge: 'Free Policy Analysis',
+    title: 'Analyze Your Policy',
+    subtitle: 'Upload a PDF policy document for instant AI-powered analysis',
+    analysisFailedTitle: 'Analysis Failed',
+    tryAgain: 'Try Again',
+    percentComplete: '% complete',
+    aiAnalyzing: 'AI is analyzing your policy...',
+    dropFileHere: 'Drop your policy file here',
+    uploadYourPolicy: 'Upload Your Policy',
+    dragDropOrClick: 'Drag and drop your PDF here, or click to browse',
+    secure: 'Secure',
+    aiPowered: 'AI-Powered',
+    oneFreeAnalysis: 'One free analysis per session',
+    serviceUnavailable: 'Analysis service is temporarily unavailable',
+    serviceStartingUp: 'The analysis service may be starting up. Please try again in a moment.',
+    alreadyHaveAccount: 'Already have an account?',
+  },
+
+  preferences: {
+    signInRequired: 'Sign in required',
+    signInDescription: 'Please sign in to manage your preferences.',
+    displayPreferences: 'Display Preferences',
+    displayDescription: 'Customize how information is displayed.',
+    emailPreferences: 'Email Preferences',
+    emailDescription: 'Manage your email notification settings.',
+    title: 'Preferences',
+    subtitle: 'Customize your experience',
+    saving: 'Saving...',
+    modified: 'modified',
+    resetAll: 'Reset All to Defaults',
+    defaultLabel: 'Default',
+    resetToDefault: 'Reset to default',
+    remove: 'Remove',
+    add: 'Add',
+    notAvailable: 'N/A',
+    on: 'On',
+    off: 'Off',
+  },
 }
 
 // Turkish translations (pre-loaded for the Turkish market focus)
@@ -1260,6 +1448,36 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Tekrar dene',
     uploadNoValidFiles: 'Geçerli dosya seçilmedi. Dosya türünü ve boyutunu kontrol edin.',
     uploadFailedDesc: 'Dosyalarınız yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.',
+
+    // CompareSection (CTA)
+    ctaTitle: 'Poliçelerinizi anlamaya hazır mısınız?',
+    ctaDescription: 'İlk poliçenizi yükleyin ve yapay zeka destekli sigorta analizinin gücünü görün.',
+    freeInstantAnalysis: 'Ücretsiz anlık analiz',
+
+    // PolicyComparisonSection
+    compareSideBySide: 'Poliçeleri',
+    compareSideBySideHighlight: 'yan yana karşılaştırın',
+    compareDesc: 'Poliçeleriniz arasındaki farkları bir bakışta görün.',
+    compareCoverage: 'Teminat',
+    compareCoverageLimit: 'Teminat Limiti',
+    compareAnnualPremium: 'Yıllık Prim',
+    compareDeductible: 'Muafiyet',
+    compareFloodProtection: 'Sel Koruması',
+    compareEarthquakeCoverage: 'Deprem Teminatı',
+    compareIncluded: 'Dahil',
+    compareExcluded: 'Hariç',
+    compareOptional: 'İsteğe Bağlı',
+
+    // WhoItsFor
+    whoTitle: 'Sigorta profesyonelleri',
+    whoHighlight: 'için tasarlandı',
+    whoDesc: 'İster broker, ister risk yöneticisi veya poliçe sahibi olun, InsurAI teminatınızı anlamanıza yardımcı olur.',
+    whoBrokersTitle: 'Sigorta Brokerleri',
+    whoBrokersDesc: 'Müşterileriniz için poliçeleri hızla analiz edin ve karşılaştırın.',
+    whoRiskTitle: 'Kurumsal Risk Yöneticileri',
+    whoRiskDesc: 'Karmaşık poliçe portföylerini kolayca yönetin.',
+    whoPolicyholdersTitle: 'Bireysel Poliçe Sahipleri',
+    whoPolicyholdersDesc: 'Teminatınızı anlaşılır bir dilde anlayın.',
   },
 
   policy: {
@@ -1527,6 +1745,69 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     critical: 'Kritik',
     standard: 'Standart',
     minor: 'Küçük',
+  },
+
+  tryAnalysis: {
+    preparingDocument: 'Belge hazırlanıyor...',
+    uploadingDocument: 'Belge yükleniyor...',
+    extractingText: 'PDF\'den metin çıkarılıyor...',
+    analyzingStructure: 'Belge yapısı analiz ediliyor...',
+    processingWithAI: 'Yapay zeka ile işleniyor...',
+    almostThere: 'Neredeyse bitti...',
+    analysisTimedOut: 'Analiz zaman aşımına uğradı. Yapay zeka servisi meşgul olabilir. Lütfen tekrar deneyin.',
+    noResponse: 'Analiz servisinden yanıt alınamadı.',
+    analysisFailed: 'Analiz başarısız oldu',
+    aiExtractionFailed: 'Yapay zeka çıkarımı başarısız oldu',
+    noDataExtracted: 'Bu belgeden veri çıkarılamadı.',
+    finalizingAnalysis: 'Analiz sonuçlandırılıyor...',
+    analysisComplete: 'Analiz tamamlandı!',
+    lowConfidenceTitle: 'Düşük Güvenilirlik Sonucu',
+    analysisSuccessDesc: 'Poliçeniz başarıyla analiz edildi.',
+    trialAlreadyUsed: 'Ücretsiz denemenizi zaten kullandınız.',
+    serviceUnavailableToast: 'Analiz servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
+    pleaseWait: 'Lütfen bekleyin...',
+    trialAlreadyUsedTitle: 'Deneme Zaten Kullanıldı',
+    trialAlreadyUsedDesc: 'Bu oturum için ücretsiz poliçe analizinizi zaten kullandınız.',
+    tryAgainIn: 'Tekrar deneyin:',
+    signUpUnlimited: 'Sınırsız analiz için kayıt olun',
+    backToHome: 'Ana Sayfaya Dön',
+    freeAnalysisBadge: 'Ücretsiz Poliçe Analizi',
+    title: 'Poliçenizi Analiz Edin',
+    subtitle: 'Anlık yapay zeka destekli analiz için PDF poliçe belgesi yükleyin',
+    analysisFailedTitle: 'Analiz Başarısız',
+    tryAgain: 'Tekrar Dene',
+    percentComplete: '% tamamlandı',
+    aiAnalyzing: 'Yapay zeka poliçenizi analiz ediyor...',
+    dropFileHere: 'Poliçe dosyanızı buraya bırakın',
+    uploadYourPolicy: 'Poliçenizi Yükleyin',
+    dragDropOrClick: 'PDF dosyanızı sürükleyip bırakın veya tıklayarak seçin',
+    secure: 'Güvenli',
+    aiPowered: 'Yapay Zeka Destekli',
+    oneFreeAnalysis: 'Oturum başına bir ücretsiz analiz',
+    serviceUnavailable: 'Analiz servisi geçici olarak kullanılamıyor',
+    serviceStartingUp: 'Analiz servisi başlatılıyor olabilir. Lütfen bir dakika sonra tekrar deneyin.',
+    alreadyHaveAccount: 'Zaten hesabınız var mı?',
+  },
+
+  preferences: {
+    signInRequired: 'Giriş yapmanız gerekiyor',
+    signInDescription: 'Tercihlerinizi yönetmek için lütfen giriş yapın.',
+    displayPreferences: 'Görüntüleme Tercihleri',
+    displayDescription: 'Bilgilerin nasıl görüntüleneceğini özelleştirin.',
+    emailPreferences: 'E-posta Tercihleri',
+    emailDescription: 'E-posta bildirim ayarlarınızı yönetin.',
+    title: 'Tercihler',
+    subtitle: 'Deneyiminizi özelleştirin',
+    saving: 'Kaydediliyor...',
+    modified: 'değiştirildi',
+    resetAll: 'Tümünü Varsayılana Sıfırla',
+    defaultLabel: 'Varsayılan',
+    resetToDefault: 'Varsayılana sıfırla',
+    remove: 'Kaldır',
+    add: 'Ekle',
+    notAvailable: 'Mevcut Değil',
+    on: 'Açık',
+    off: 'Kapalı',
   },
 }
 

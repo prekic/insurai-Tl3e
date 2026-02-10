@@ -1,75 +1,101 @@
 /**
  * WhoItsFor Component Tests
  *
- * Tests for the target audience section
+ * Tests for the target audience section with i18n support
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WhoItsFor } from './WhoItsFor'
+import { EN_TRANSLATIONS, TR_TRANSLATIONS } from '@/lib/i18n/translations'
+
+// Mock i18n context - default to English
+const mockTranslations = { current: EN_TRANSLATIONS }
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: mockTranslations.current, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+}))
 
 describe('WhoItsFor', () => {
+  beforeEach(() => {
+    mockTranslations.current = EN_TRANSLATIONS
+  })
+
   describe('Rendering', () => {
     it('should render the section', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText(/Built for/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoTitle)).toBeInTheDocument()
     })
 
     it('should display highlighted text', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText('insurance professionals')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoHighlight)).toBeInTheDocument()
     })
 
     it('should display subtitle', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText(/Whether you're a broker, risk manager, or policyholder/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoDesc)).toBeInTheDocument()
     })
   })
 
   describe('Audience Cards', () => {
     it('should render Insurance Brokers card', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText('Insurance Brokers')).toBeInTheDocument()
-      expect(screen.getByText('Quickly analyze and compare policies for your clients.')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoBrokersTitle)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoBrokersDesc)).toBeInTheDocument()
     })
 
     it('should render Corporate Risk Managers card', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText('Corporate Risk Managers')).toBeInTheDocument()
-      expect(screen.getByText('Manage complex policy portfolios with ease.')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoRiskTitle)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoRiskDesc)).toBeInTheDocument()
     })
 
     it('should render Individual Policyholders card', () => {
       render(<WhoItsFor />)
-
-      expect(screen.getByText('Individual Policyholders')).toBeInTheDocument()
-      expect(screen.getByText('Understand your coverage in plain language.')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoPolicyholdersTitle)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.landing.whoPolicyholdersDesc)).toBeInTheDocument()
     })
 
     it('should render all 3 audience cards', () => {
       const { container } = render(<WhoItsFor />)
-
       const cards = container.querySelectorAll('.bg-white.rounded-2xl.shadow-lg')
       expect(cards.length).toBe(3)
+    })
+  })
+
+  describe('Turkish translations', () => {
+    it('should render Turkish title when locale is TR', () => {
+      mockTranslations.current = TR_TRANSLATIONS
+      render(<WhoItsFor />)
+      expect(screen.getByText(TR_TRANSLATIONS.landing.whoTitle)).toBeInTheDocument()
+    })
+
+    it('should render Turkish broker card when locale is TR', () => {
+      mockTranslations.current = TR_TRANSLATIONS
+      render(<WhoItsFor />)
+      expect(screen.getByText(TR_TRANSLATIONS.landing.whoBrokersTitle)).toBeInTheDocument()
+      expect(screen.getByText(TR_TRANSLATIONS.landing.whoBrokersDesc)).toBeInTheDocument()
+    })
+
+    it('should not contain English text when locale is TR', () => {
+      mockTranslations.current = TR_TRANSLATIONS
+      render(<WhoItsFor />)
+      expect(screen.queryByText('Insurance Brokers')).not.toBeInTheDocument()
+      expect(screen.queryByText('Corporate Risk Managers')).not.toBeInTheDocument()
+      expect(screen.queryByText('Individual Policyholders')).not.toBeInTheDocument()
     })
   })
 
   describe('Styling', () => {
     it('should have slate background', () => {
       const { container } = render(<WhoItsFor />)
-
       const section = container.querySelector('section')
       expect(section).toHaveClass('bg-slate-50')
     })
 
     it('should use grid layout', () => {
       const { container } = render(<WhoItsFor />)
-
       const grid = container.querySelector('.grid.md\\:grid-cols-3')
       expect(grid).toBeInTheDocument()
     })
