@@ -3,6 +3,7 @@ import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { TryAnalysis } from './TryAnalysis'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
 
 // Hoisted mocks - must be hoisted before vi.mock calls
 const {
@@ -115,6 +116,12 @@ vi.mock('@/lib/sanitize', () => ({
   sanitizeFileName: vi.fn((name) => name),
 }))
 
+// Mock i18n context
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+}))
+
 // Helper to create mock policy
 const createMockPolicy = (overrides = {}) => ({
   id: 'test-policy-1',
@@ -195,9 +202,9 @@ describe('TryAnalysis', () => {
     it('renders the upload interface for anonymous users', () => {
       renderWithRouter()
 
-      expect(screen.getByText('Try Policy Analysis')).toBeInTheDocument()
-      expect(screen.getByText('Upload your policy')).toBeInTheDocument()
-      expect(screen.getByText(/Free Analysis/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.title)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.freeAnalysisBadge)).toBeInTheDocument()
     })
 
     it('shows trial-used state when trial already used', () => {
@@ -206,7 +213,7 @@ describe('TryAnalysis', () => {
 
       renderWithRouter()
 
-      expect(screen.getByText('Free Trial Already Used')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsedTitle)).toBeInTheDocument()
     })
 
     it('restores previous analysis result if exists', async () => {
@@ -260,7 +267,7 @@ describe('TryAnalysis', () => {
 
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
-          'Free trial already used',
+          EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsed,
           expect.objectContaining({ description: 'Already used' })
         )
       })
@@ -279,11 +286,11 @@ describe('TryAnalysis', () => {
       renderWithRouter(['/try'], { file: mockFile })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
       })
 
       expect(mockToast.error).toHaveBeenCalledWith(
-        'Analysis failed',
+        EN_TRANSLATIONS.tryAnalysis.analysisFailed,
         expect.objectContaining({ description: 'Extraction failed' })
       )
     })
@@ -320,7 +327,7 @@ describe('TryAnalysis', () => {
 
       renderWithRouter()
 
-      const dropZone = screen.getByText('Upload your policy').closest('label')!
+      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('label')!
       const mockFile = createMockFile()
 
       // Simulate drop
@@ -412,7 +419,7 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
         expect(screen.getByText('Network error')).toBeInTheDocument()
       })
     })
@@ -430,7 +437,7 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
       })
 
       // Click try again
@@ -441,7 +448,7 @@ describe('TryAnalysis', () => {
       })
 
       // Should be back to idle state
-      expect(screen.getByText('Upload your policy')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)).toBeInTheDocument()
     })
 
     it('shows service unavailable message when AI not configured', async () => {
@@ -459,7 +466,7 @@ describe('TryAnalysis', () => {
       renderWithRouter()
 
       // Backend warning should be shown
-      expect(screen.getByText(/Service temporarily unavailable/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.serviceUnavailable)).toBeInTheDocument()
     })
   })
 
@@ -486,7 +493,7 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
       })
     })
 
@@ -506,7 +513,7 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
       })
 
       // Should show a default error message
@@ -529,7 +536,7 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Analysis Failed')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
       })
     })
 
@@ -549,7 +556,7 @@ describe('TryAnalysis', () => {
       renderWithRouter()
 
       // Find the drop zone by label text
-      const dropZone = screen.getByText('Upload your policy').closest('label')
+      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('label')
       if (!dropZone) {
         // Skip if drop zone not found (component structure changed)
         return

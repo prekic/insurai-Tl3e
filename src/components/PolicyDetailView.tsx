@@ -737,7 +737,7 @@ function RawExtractedTextSection({
 }
 
 import { usePolicies } from '@/lib/policy-context'
-import { useI18n } from '@/lib/i18n'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
 import { GradeBadge } from './evaluation/GradeBadge'
 import { StatusIndicator } from './evaluation/StatusIndicator'
@@ -757,7 +757,7 @@ export function PolicyDetailView() {
   const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const { getPolicyById, fetchPolicyById } = usePolicies()
-  const { locale } = useI18n()
+  const { t, locale } = useTranslation()
 
   // Check for policy passed via location state (for trial results)
   const locationState = location.state as LocationState | null
@@ -808,7 +808,7 @@ export function PolicyDetailView() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading policy...</p>
+          <p className="text-gray-600">{t.common.loading}</p>
         </div>
       </div>
     )
@@ -818,9 +818,9 @@ export function PolicyDetailView() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Policy not found</h2>
-          <p className="text-gray-600 mb-4">The policy you&apos;re looking for doesn&apos;t exist.</p>
-          <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found'}</h2>
+          <p className="text-gray-600 mb-4">{locale === 'tr' ? 'Aradığınız poliçe mevcut değil.' : 'The policy you\'re looking for doesn\'t exist.'}</p>
+          <Button onClick={() => navigate('/dashboard')}>{locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard'}</Button>
         </div>
       </div>
     )
@@ -1147,7 +1147,7 @@ export function PolicyDetailView() {
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
-                  <span className="truncate">AI Insights</span>
+                  <span className="truncate">{locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}</span>
                   <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 ml-auto">
                     {Math.round(policy.aiConfidence * 100)}%
                   </Badge>
@@ -1394,15 +1394,15 @@ export function PolicyDetailView() {
               <CardContent className="pt-6">
                 <div className="text-center">
                   <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="mb-4">
-                    {policy.status === 'active' ? 'Active' : 'Expiring Soon'}
+                    {policy.status === 'active' ? (locale === 'tr' ? 'Aktif' : 'Active') : (locale === 'tr' ? 'Bitiyor' : 'Expiring Soon')}
                   </Badge>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Start Date</span>
+                      <span className="text-gray-500">{locale === 'tr' ? 'Başlangıç' : 'Start Date'}</span>
                       <span className="font-medium">{formatDate(policy.startDate)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Expiry Date</span>
+                      <span className="text-gray-500">{locale === 'tr' ? 'Bitiş' : 'Expiry Date'}</span>
                       <span className="font-medium">{formatDate(policy.expiryDate)}</span>
                     </div>
                   </div>
@@ -1473,13 +1473,13 @@ export function PolicyDetailView() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-900">
                   <Sparkles className="text-purple-600" size={20} />
-                  AI Insights
+                  {locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-purple-600">Confidence:</span>
+                    <span className="text-purple-600">{locale === 'tr' ? 'Güven:' : 'Confidence:'}</span>
                     <span className="font-semibold text-purple-900">{Math.round(policy.aiConfidence * 100)}%</span>
                   </div>
                   {policy.aiInsights.map((insight, i) => (
