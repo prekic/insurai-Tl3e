@@ -1,30 +1,32 @@
 import { useState, useId } from 'react'
 import { ChevronDown } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function FAQ() {
+  const { t } = useTranslation()
   const [openIndex, setOpenIndex] = useState<number | null>(0)
   const baseId = useId()
 
   const faqs = [
     {
-      question: 'What file formats are supported?',
-      answer: 'We support PDF, Word documents (DOC, DOCX), and image files (PNG, JPG, JPEG). Our AI can also process scanned documents through OCR.',
+      question: t.landing.faqQ1,
+      answer: t.landing.faqA1,
     },
     {
-      question: 'How accurate is the AI analysis?',
-      answer: 'Our AI uses multiple models to cross-verify extracted data and flags any uncertainties. Each result includes a confidence score so you know how reliable the extraction is.',
+      question: t.landing.faqQ2,
+      answer: t.landing.faqA2,
     },
     {
-      question: 'Is my data secure?',
-      answer: 'Yes, we use bank-level encryption (AES-256) for all documents. Your files are processed securely and never shared with third parties. We are fully KVKK compliant.',
+      question: t.landing.faqQ3,
+      answer: t.landing.faqA3,
     },
     {
-      question: 'Which insurance types are supported?',
-      answer: 'We support all major Turkish insurance types including Kasko, Traffic (Trafik), Home (Konut), Health (Saglik), DASK, Life, and Commercial policies.',
+      question: t.landing.faqQ4,
+      answer: t.landing.faqA4,
     },
     {
-      question: 'Can I compare policies from different insurers?',
-      answer: 'Yes. Upload policies from any Turkish insurance company and compare them side-by-side with our AI-powered analysis.',
+      question: t.landing.faqQ5,
+      answer: t.landing.faqA5,
     },
   ]
 
@@ -60,17 +62,17 @@ export function FAQ() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-8 md:mb-16">
           <h2 id="faq-heading" className="text-2xl sm:text-4xl md:text-5xl mb-3 md:mb-6 tracking-tight">
-            Frequently asked <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">questions</span>
+            {t.landing.faq}
           </h2>
           <p className="text-base md:text-xl text-gray-600">
-            Everything you need to know about InsurAI.
+            {t.landing.faqSubtitle}
           </p>
         </div>
 
         <div
           className="max-w-3xl mx-auto space-y-3 md:space-y-4"
           role="region"
-          aria-label="Frequently asked questions"
+          aria-label={t.landing.faq}
         >
           {faqs.map((faq, i) => {
             const isOpen = openIndex === i

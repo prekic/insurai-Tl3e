@@ -5,8 +5,10 @@ import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
@@ -66,9 +68,9 @@ export function GlobalNavigation() {
   const currentPage = location.pathname
 
   const navItems = [
-    { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: '/compare', label: 'Compare', icon: Scale },
-    { id: '/chat', label: 'Chat', icon: MessageSquare, showCount: true },
+    { id: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
+    { id: '/compare', label: t.nav.compare, icon: Scale },
+    { id: '/chat', label: t.nav.chat, icon: MessageSquare, showCount: true },
   ]
 
   // Handle keyboard navigation in profile menu
@@ -130,11 +132,11 @@ export function GlobalNavigation() {
 
     try {
       await signOut()
-      toast.success('Signed out successfully')
+      toast.success(t.landing.signedOutSuccess)
       navigate('/')
     } catch (error) {
       console.error('Sign out error:', error)
-      toast.error('Failed to sign out')
+      toast.error(t.landing.signOutFailed)
       // Navigate anyway on error
       navigate('/')
     }
@@ -159,7 +161,7 @@ export function GlobalNavigation() {
             </div>
             <div className="hidden sm:block">
               <div className="font-bold text-gray-900">InsurAI</div>
-              <div className="text-xs text-gray-500">Policy Analysis</div>
+              <div className="text-xs text-gray-500">{t.landing.policyAnalysisPlatform}</div>
             </div>
           </Link>
 
@@ -234,11 +236,11 @@ export function GlobalNavigation() {
                     aria-label="Notifications"
                   >
                     <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                      <span className="font-semibold text-gray-900 text-sm">Notifications</span>
+                      <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
                     </div>
                     <div className="py-8 text-center text-sm text-gray-500">
                       <Bell size={24} className="mx-auto mb-2 text-gray-300" />
-                      No notifications yet
+                      {t.nav.noNotifications}
                     </div>
                   </div>
                 </>
@@ -259,7 +261,7 @@ export function GlobalNavigation() {
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2 focus-ring"
             >
               <Upload size={18} aria-hidden="true" />
-              <span>Upload</span>
+              <span>{t.nav.upload}</span>
             </button>
 
             {/* Profile Menu */}
@@ -331,9 +333,9 @@ export function GlobalNavigation() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 truncate">
-                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t.landing.guest}
                           </p>
-                          <p className="text-sm text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
+                          <p className="text-sm text-gray-500 truncate">{user?.email || t.landing.notSignedIn}</p>
                         </div>
                       </div>
                     </div>
@@ -350,8 +352,7 @@ export function GlobalNavigation() {
                             <User size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                           </div>
                           <div>
-                            <span className="font-medium">My Account</span>
-                            <p className="text-xs text-gray-400 group-hover:text-blue-500">Profile & preferences</p>
+                            <span className="font-medium">{t.nav.myAccount}</span>
                           </div>
                         </button>
                       )}
@@ -364,8 +365,7 @@ export function GlobalNavigation() {
                           <Settings size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                         </div>
                         <div>
-                          <span className="font-medium">Settings</span>
-                          <p className="text-xs text-gray-400 group-hover:text-blue-500">App configuration</p>
+                          <span className="font-medium">{t.nav.settings}</span>
                         </div>
                       </button>
                       <button
@@ -377,8 +377,7 @@ export function GlobalNavigation() {
                           <HelpCircle size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                         </div>
                         <div>
-                          <span className="font-medium">Help Center</span>
-                          <p className="text-xs text-gray-400 group-hover:text-blue-500">Support & documentation</p>
+                          <span className="font-medium">{t.nav.helpCenter}</span>
                         </div>
                       </button>
                     </div>
@@ -392,7 +391,7 @@ export function GlobalNavigation() {
                           role="menuitem"
                         >
                           <LogOut size={18} aria-hidden="true" />
-                          <span>Sign Out</span>
+                          <span>{t.auth.signOut}</span>
                         </button>
                       ) : (
                         <button
@@ -401,7 +400,7 @@ export function GlobalNavigation() {
                           role="menuitem"
                         >
                           <LogIn size={18} aria-hidden="true" />
-                          <span>Sign In</span>
+                          <span>{t.auth.signIn}</span>
                         </button>
                       )}
                     </div>

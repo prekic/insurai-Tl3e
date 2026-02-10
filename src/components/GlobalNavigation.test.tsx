@@ -10,6 +10,13 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { GlobalNavigation } from './GlobalNavigation'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+
+// Mock i18n context to return English translations
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+}))
 
 // Mock hooks and dependencies
 const mockNavigate = vi.fn()
@@ -76,7 +83,7 @@ describe('GlobalNavigation', () => {
       renderNavigation()
 
       expect(screen.getByText('InsurAI')).toBeInTheDocument()
-      expect(screen.getByText('Policy Analysis')).toBeInTheDocument()
+      expect(screen.getByText('Policy Analysis Platform')).toBeInTheDocument()
     })
 
     it('should render the home link', () => {

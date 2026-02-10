@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface UploadWidgetProps {
   compact?: boolean
@@ -16,6 +17,7 @@ export function UploadWidget({
   buttonText = 'Upload your policy',
   loadingText = 'Uploading...'
 }: UploadWidgetProps) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const [isDragging, setIsDragging] = useState(false)
@@ -51,7 +53,7 @@ export function UploadWidget({
 
       // If no valid files, show inline error and return
       if (valid.length === 0) {
-        setError('No valid files selected. Please check file type and size.')
+        setError(t.landing.uploadNoValidFiles)
         return
       }
     }
@@ -74,12 +76,12 @@ export function UploadWidget({
       }
     } catch (err) {
       setIsUploading(false)
-      const message = err instanceof Error ? err.message : 'Upload failed'
+      const message = err instanceof Error ? err.message : t.landing.uploadFailed
       setError(message)
-      toast.error('Upload failed', {
-        description: 'There was a problem uploading your files. Please try again.',
+      toast.error(t.landing.uploadFailed, {
+        description: t.landing.uploadFailedDesc,
         action: {
-          label: 'Retry',
+          label: t.common.retry,
           onClick: () => handleFiles(valid),
         },
       })
@@ -137,7 +139,7 @@ export function UploadWidget({
       {isUploading ? (
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="text-gray-600">Processing your policy...</p>
+          <p className="text-gray-600">{t.landing.uploadProcessing}</p>
         </div>
       ) : error ? (
         <div className="flex flex-col items-center gap-4">
@@ -145,12 +147,12 @@ export function UploadWidget({
             <AlertCircle className="text-red-600" size={32} />
           </div>
           <div>
-            <p className="font-semibold text-red-800">Upload failed</p>
+            <p className="font-semibold text-red-800">{t.landing.uploadFailed}</p>
             <p className="text-sm text-red-600 mt-1">{error}</p>
           </div>
           <label className="cursor-pointer">
             <span className="text-sm font-medium text-blue-600 hover:text-blue-700">
-              Try again
+              {t.landing.uploadTryAgain}
             </span>
             <input
               type="file"
@@ -167,8 +169,8 @@ export function UploadWidget({
             <FileText className="text-blue-600" size={32} />
           </div>
           <div>
-            <p className="font-semibold text-gray-900">Drop your policy here</p>
-            <p className="text-sm text-gray-500 mt-1">or click to browse</p>
+            <p className="font-semibold text-gray-900">{t.landing.uploadDropHere}</p>
+            <p className="text-sm text-gray-500 mt-1">{t.landing.uploadOrClick}</p>
           </div>
           <p className="text-xs text-gray-400">
             {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} up to {FILE_CONSTRAINTS.MAX_SIZE_MB}MB

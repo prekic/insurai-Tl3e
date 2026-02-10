@@ -1,23 +1,26 @@
 import { Upload, Sparkles, Award } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function HowItWorks() {
+  const { t } = useTranslation()
+
   const steps = [
     {
       icon: Upload,
-      title: 'Upload policies',
-      description: 'Drop your insurance documents—PDF, Word, or scanned images. We accept any format.',
+      title: t.landing.step1Title,
+      description: t.landing.step1Description,
       color: 'from-blue-500 to-cyan-500',
     },
     {
       icon: Sparkles,
-      title: 'AI analyzes coverage',
-      description: 'Our AI extracts limits, deductibles, extensions, and exclusions and explains them in everyday language.',
+      title: t.landing.step2Title,
+      description: t.landing.step2Description,
       color: 'from-purple-500 to-pink-500',
     },
     {
       icon: Award,
-      title: 'Compare & track',
-      description: 'Compare policies side-by-side and set reminders for renewals and key dates.',
+      title: t.landing.step3Title,
+      description: t.landing.step3Description,
       color: 'from-green-500 to-emerald-500',
     },
   ]
@@ -28,13 +31,13 @@ export function HowItWorks() {
         <div className="text-center max-w-3xl mx-auto mb-10 md:mb-20">
           <div className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-100 rounded-full mb-4 md:mb-6">
             <Sparkles className="text-blue-600" size={16} />
-            <span className="text-sm font-medium text-blue-900">Simple Process</span>
+            <span className="text-sm font-medium text-blue-900">{t.landing.simpleProcess}</span>
           </div>
           <h2 className="text-2xl sm:text-4xl md:text-5xl mb-3 md:mb-6 tracking-tight">
-            Three steps to <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">benchmark your policies</span>
+            {t.landing.howItWorksHeadline}
           </h2>
           <p className="text-base md:text-xl text-gray-600">
-            No jargon, no manuals—just clear coverage in your own language.
+            {t.landing.howItWorksDesc}
           </p>
         </div>
 

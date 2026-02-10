@@ -38,6 +38,7 @@ export interface TranslationDictionary {
     signOut: string
     search: string
     notifications: string
+    noNotifications: string
     userMenu: string
   }
 
@@ -71,24 +72,186 @@ export interface TranslationDictionary {
 
   // Landing Page
   landing: {
+    // Hero
     heroTitle: string
     heroSubtitle: string
     heroDescription: string
     uploadCta: string
     viewDemo: string
     trustedBy: string
+    badge: string
+    headlineMobile: string
+    headlineDesktop: string
+    headlineHighlight: string
+    subheadline: string
+    analyzeCtaButton: string
+    analyzingText: string
+    seeExample: string
+    freeNoSignup: string
+    kvkkCompliant: string
+    sslBadge: string
+    whatYouGet: string
+    benefitFormats: string
+    benefitBilingual: string
+    benefitComparison: string
+    samplePoliciesTitle: string
+    samplePoliciesDesc: string
+    viewAll: string
+    builtForProfessionals: string
+    supportedPolicyTypes: string
+    policyAnalysisPlatform: string
+    secureEncrypted: string
+    licensedAdvisors: string
+    uploadPolicyButton: string
+    signedOutSuccess: string
+    signOutFailed: string
+    guest: string
+    notSignedIn: string
+
+    // How It Works
     howItWorks: string
     howItWorksSubtitle: string
+    simpleProcess: string
+    howItWorksHeadline: string
+    howItWorksDesc: string
     step1Title: string
     step1Description: string
     step2Title: string
     step2Description: string
     step3Title: string
     step3Description: string
+
+    // Benefits
     benefits: string
     benefitsSubtitle: string
+    benefitsSectionDesc: string
+    benefitAnalysisTitle: string
+    benefitAnalysisDesc: string
+    benefitInstantTitle: string
+    benefitInstantDesc: string
+    benefitMultiLangTitle: string
+    benefitMultiLangDesc: string
+    benefitRenewalTitle: string
+    benefitRenewalDesc: string
+    benefitSecurityTitle: string
+    benefitSecurityDesc: string
+    benefitBenchmarkTitle: string
+    benefitBenchmarkDesc: string
+
+    // Stats
+    statPolicyTypes: string
+    statPolicyTypesValue: string
+    statPolicyTypesDetail: string
+    statLanguages: string
+    statLanguagesValue: string
+    statLanguagesDetail: string
+    statCoverageChecks: string
+    statCoverageChecksValue: string
+    statCoverageChecksDetail: string
+    statAnalysisTime: string
+    statAnalysisTimeValue: string
+    statAnalysisTimeDetail: string
+
+    // WhyChooseUs
+    whyKvkkTitle: string
+    whyKvkkDesc: string
+    whyNoSignupTitle: string
+    whyNoSignupDesc: string
+    whyTurkeyTitle: string
+    whyTurkeyDesc: string
+
+    // Testimonials / Use Cases
+    useCasesTitle: string
+    useCasesHighlight: string
+    useCasesSubtitle: string
+    useCaseBrokers: string
+    useCaseBrokersDesc: string
+    useCaseRiskManagers: string
+    useCaseRiskManagersDesc: string
+    useCasePolicyholders: string
+    useCasePolicyholdersDesc: string
+
+    // FAQ
     faq: string
     faqSubtitle: string
+    faqHighlight: string
+    faqQ1: string
+    faqA1: string
+    faqQ2: string
+    faqA2: string
+    faqQ3: string
+    faqA3: string
+    faqQ4: string
+    faqA4: string
+    faqQ5: string
+    faqA5: string
+
+    // Footer
+    footerDescription: string
+    footerProduct: string
+    footerFeatures: string
+    footerPricing: string
+    footerApi: string
+    footerIntegrations: string
+    footerCompany: string
+    footerAbout: string
+    footerBlog: string
+    footerCareers: string
+    footerContact: string
+    footerLocation: string
+    footerCopyright: string
+    footerPrivacy: string
+    footerTerms: string
+    footerCookies: string
+
+    // ComparisonMock
+    comparisonTitle: string
+    comparisonSubtitle: string
+    comparisonCoverage: string
+    comparisonCollision: string
+    comparisonTheft: string
+    comparisonNaturalDisaster: string
+    comparisonGlass: string
+    comparisonRoadside: string
+    comparisonAiInsight: string
+    comparisonAiInsightText: string
+    comparisonSample: string
+    comparisonBestCoverage: string
+    comparisonLowestPremium: string
+    comparisonAiPick: string
+    comparisonDisclaimer: string
+
+    // SampleReportPreview
+    reportBenchmark: string
+    reportSample: string
+    reportOverallScore: string
+    reportAboveAverage: string
+    reportStrongCoverage: string
+    reportStrongCoverageDesc: string
+    reportGapDetected: string
+    reportGapDesc: string
+    reportAiRecommendation: string
+    reportAiRecommendationDesc: string
+    reportFullAnalysis: string
+    reportCoverageConfirmed: string
+    reportGapMissing: string
+    reportAiRecShort: string
+    reportScoreLabel: string
+
+    // TrustedProviders
+    trustedProvidersTitle: string
+    trustedProvidersMore: string
+    trustedProvidersWorksWith: string
+    trustedProvidersMoreCount: string
+
+    // UploadWidget
+    uploadDropHere: string
+    uploadOrClick: string
+    uploadProcessing: string
+    uploadFailed: string
+    uploadTryAgain: string
+    uploadNoValidFiles: string
+    uploadFailedDesc: string
   }
 
   // Policy related
@@ -389,6 +552,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     signOut: 'Sign Out',
     search: 'Search policies',
     notifications: 'Notifications',
+    noNotifications: 'No notifications yet',
     userMenu: 'User menu',
   },
 
@@ -420,24 +584,186 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   },
 
   landing: {
+    // Hero
     heroTitle: 'AI-Powered Insurance Analysis',
     heroSubtitle: 'for Turkish Market Professionals',
     heroDescription: 'Upload your policies, get instant AI analysis, and benchmark against market standards.',
     uploadCta: 'Upload your policy',
     viewDemo: 'View Demo',
     trustedBy: 'Trusted by insurance professionals',
+    badge: 'AI-powered policy analysis',
+    headlineMobile: 'Benchmark your insurance policies',
+    headlineDesktop: 'Understand and',
+    headlineHighlight: 'benchmark',
+    subheadline: 'Upload a policy PDF and get plain-language coverage analysis in seconds.',
+    analyzeCtaButton: 'Analyze Your Policy Free',
+    analyzingText: 'Analyzing...',
+    seeExample: 'See Example Analysis',
+    freeNoSignup: 'Free, no signup required',
+    kvkkCompliant: 'KVKK Compliant',
+    sslBadge: '256-bit SSL',
+    whatYouGet: 'What you\'ll get:',
+    benefitFormats: 'PDF, Word, and scanned images',
+    benefitBilingual: 'Turkish/English coverage explanations',
+    benefitComparison: 'Side-by-side policy comparison',
+    samplePoliciesTitle: 'Sample Policies Collection',
+    samplePoliciesDesc: 'See all Turkish insurance line samples',
+    viewAll: 'View All',
+    builtForProfessionals: 'Built for Turkish insurance professionals',
+    supportedPolicyTypes: 'Kasko, Traffic, DASK, Health, and more',
+    policyAnalysisPlatform: 'Policy Analysis Platform',
+    secureEncrypted: 'Secure & Encrypted',
+    licensedAdvisors: 'Licensed Insurance Advisors',
+    uploadPolicyButton: 'Upload Policy',
+    signedOutSuccess: 'Signed out successfully',
+    signOutFailed: 'Failed to sign out',
+    guest: 'Guest',
+    notSignedIn: 'Not signed in',
+
+    // How It Works
     howItWorks: 'How it works',
     howItWorksSubtitle: 'Get started in three simple steps',
-    step1Title: 'Upload',
-    step1Description: 'Upload your insurance policy documents in PDF, Word, or image format.',
-    step2Title: 'Analyze',
-    step2Description: 'Our AI extracts and analyzes policy details, coverage, and terms.',
-    step3Title: 'Compare',
-    step3Description: 'Get insights and compare against market benchmarks.',
+    simpleProcess: 'Simple Process',
+    howItWorksHeadline: 'Three steps to benchmark your policies',
+    howItWorksDesc: 'No jargon, no manuals—just clear coverage in your own language.',
+    step1Title: 'Upload policies',
+    step1Description: 'Drop your insurance documents—PDF, Word, or scanned images. We accept any format.',
+    step2Title: 'AI analyzes coverage',
+    step2Description: 'Our AI extracts limits, deductibles, extensions, and exclusions and explains them in everyday language.',
+    step3Title: 'Compare & track',
+    step3Description: 'Compare policies side-by-side and set reminders for renewals and key dates.',
+
+    // Benefits
     benefits: 'Why choose InsurAI',
     benefitsSubtitle: 'Built for insurance professionals',
+    benefitsSectionDesc: 'The most powerful insurance analysis platform for Turkish market professionals.',
+    benefitAnalysisTitle: 'Comprehensive Analysis',
+    benefitAnalysisDesc: 'AI extracts every detail from your policy documents automatically.',
+    benefitInstantTitle: 'Instant Results',
+    benefitInstantDesc: 'Get detailed coverage breakdowns in seconds, not hours.',
+    benefitMultiLangTitle: 'Multi-Language Support',
+    benefitMultiLangDesc: 'Works with Turkish and English policies seamlessly.',
+    benefitRenewalTitle: 'Renewal Tracking',
+    benefitRenewalDesc: 'Never miss a renewal with automated reminders.',
+    benefitSecurityTitle: 'Bank-Level Security',
+    benefitSecurityDesc: 'Your documents are encrypted and protected.',
+    benefitBenchmarkTitle: 'Market Benchmarks',
+    benefitBenchmarkDesc: 'Compare your coverage against market standards.',
+
+    // Stats
+    statPolicyTypes: 'Policy Types Supported',
+    statPolicyTypesValue: '7',
+    statPolicyTypesDetail: 'Kasko, Traffic, DASK, Health, Life, Home, Business',
+    statLanguages: 'Languages',
+    statLanguagesValue: 'TR / EN',
+    statLanguagesDetail: 'Full Turkish and English support',
+    statCoverageChecks: 'Coverage Checks',
+    statCoverageChecksValue: '15+',
+    statCoverageChecksDetail: 'Gaps, limits, exclusions, compliance',
+    statAnalysisTime: 'Analysis Time',
+    statAnalysisTimeValue: '<60s',
+    statAnalysisTimeDetail: 'From upload to full benchmark report',
+
+    // WhyChooseUs
+    whyKvkkTitle: 'KVKK Compliant',
+    whyKvkkDesc: 'Privacy-first design for Turkish data protection',
+    whyNoSignupTitle: 'No Signup Required',
+    whyNoSignupDesc: 'Try a full policy analysis free, instantly',
+    whyTurkeyTitle: 'Turkey-Focused',
+    whyTurkeyDesc: 'Built specifically for Turkish insurance market',
+
+    // Testimonials / Use Cases
+    useCasesTitle: 'What you can',
+    useCasesHighlight: 'do with InsurAI',
+    useCasesSubtitle: 'Real use cases for insurance professionals and policyholders.',
+    useCaseBrokers: 'Insurance Brokers',
+    useCaseBrokersDesc: 'Upload client policies, get instant coverage gap reports, and present side-by-side comparisons — all in minutes instead of hours.',
+    useCaseRiskManagers: 'Corporate Risk Managers',
+    useCaseRiskManagersDesc: 'Analyze complex commercial policies against market benchmarks and identify under-insured areas before renewal season.',
+    useCasePolicyholders: 'Individual Policyholders',
+    useCasePolicyholdersDesc: 'Upload your kasko or health policy and get a plain-language explanation of what is and isn\'t covered.',
+
+    // FAQ
     faq: 'Frequently asked questions',
     faqSubtitle: 'Everything you need to know about InsurAI.',
+    faqHighlight: 'questions',
+    faqQ1: 'What file formats are supported?',
+    faqA1: 'We support PDF, Word documents (DOC, DOCX), and image files (PNG, JPG, JPEG). Our AI can also process scanned documents through OCR.',
+    faqQ2: 'How accurate is the AI analysis?',
+    faqA2: 'Our AI uses multiple models to cross-verify extracted data and flags any uncertainties. Each result includes a confidence score so you know how reliable the extraction is.',
+    faqQ3: 'Is my data secure?',
+    faqA3: 'Yes, we use bank-level encryption (AES-256) for all documents. Your files are processed securely and never shared with third parties. We are fully KVKK compliant.',
+    faqQ4: 'Which insurance types are supported?',
+    faqA4: 'We support all major Turkish insurance types including Kasko, Traffic, Home, Health, DASK, Life, and Commercial policies.',
+    faqQ5: 'Can I compare policies from different insurers?',
+    faqA5: 'Yes. Upload policies from any Turkish insurance company and compare them side-by-side with our AI-powered analysis.',
+
+    // Footer
+    footerDescription: 'AI-powered insurance policy analysis platform for Turkish market professionals.',
+    footerProduct: 'Product',
+    footerFeatures: 'Features',
+    footerPricing: 'Pricing',
+    footerApi: 'API',
+    footerIntegrations: 'Integrations',
+    footerCompany: 'Company',
+    footerAbout: 'About',
+    footerBlog: 'Blog',
+    footerCareers: 'Careers',
+    footerContact: 'Contact',
+    footerLocation: 'Istanbul, Turkey',
+    footerCopyright: '© 2025 InsurAI. All rights reserved.',
+    footerPrivacy: 'Privacy Policy',
+    footerTerms: 'Terms of Service',
+    footerCookies: 'Cookie Policy',
+
+    // ComparisonMock
+    comparisonTitle: 'Policy Comparison',
+    comparisonSubtitle: 'Side-by-side analysis',
+    comparisonCoverage: 'Coverage',
+    comparisonCollision: 'Collision Coverage',
+    comparisonTheft: 'Theft Protection',
+    comparisonNaturalDisaster: 'Natural Disaster',
+    comparisonGlass: 'Glass Coverage',
+    comparisonRoadside: 'Roadside Assist',
+    comparisonAiInsight: 'AI Insight:',
+    comparisonAiInsightText: 'Policy A offers better natural disaster coverage',
+    comparisonSample: 'Sample Comparison',
+    comparisonBestCoverage: 'Best Coverage',
+    comparisonLowestPremium: 'Lowest Premium',
+    comparisonAiPick: 'AI Pick',
+    comparisonDisclaimer: 'Illustrative example — your results will reflect your actual policies',
+
+    // SampleReportPreview
+    reportBenchmark: 'Benchmark Report',
+    reportSample: 'Sample',
+    reportOverallScore: 'Overall Score',
+    reportAboveAverage: 'Above market average',
+    reportStrongCoverage: 'Strong Coverage',
+    reportStrongCoverageDesc: 'Collision, theft, fire included',
+    reportGapDetected: 'Gap Detected',
+    reportGapDesc: 'Missing: Natural disaster coverage',
+    reportAiRecommendation: 'AI Recommendation',
+    reportAiRecommendationDesc: 'Add flood coverage for +12% protection',
+    reportFullAnalysis: 'Full analysis includes 15+ metrics and comparisons',
+    reportCoverageConfirmed: 'Collision, theft, fire coverage confirmed',
+    reportGapMissing: 'Gap: Natural disaster coverage missing',
+    reportAiRecShort: 'AI recommendation: Add flood coverage',
+    reportScoreLabel: 'Score: 78/100',
+
+    // TrustedProviders
+    trustedProvidersTitle: 'Works with major Turkish insurers',
+    trustedProvidersMore: '+more',
+    trustedProvidersWorksWith: 'Works with:',
+    trustedProvidersMoreCount: '+4 more',
+
+    // UploadWidget
+    uploadDropHere: 'Drop your policy here',
+    uploadOrClick: 'or click to browse',
+    uploadProcessing: 'Processing your policy...',
+    uploadFailed: 'Upload failed',
+    uploadTryAgain: 'Try again',
+    uploadNoValidFiles: 'No valid files selected. Please check file type and size.',
+    uploadFailedDesc: 'There was a problem uploading your files. Please try again.',
   },
 
   policy: {
@@ -722,6 +1048,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     signOut: 'Çıkış Yap',
     search: 'Poliçe ara',
     notifications: 'Bildirimler',
+    noNotifications: 'Henüz bildirim yok',
     userMenu: 'Kullanıcı menüsü',
   },
 
@@ -753,24 +1080,186 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
   },
 
   landing: {
+    // Hero
     heroTitle: 'Yapay Zeka Destekli Sigorta Analizi',
     heroSubtitle: 'Türkiye Sigorta Profesyonelleri için',
     heroDescription: 'Poliçelerinizi yükleyin, anında AI analizi alın ve piyasa standartlarıyla karşılaştırın.',
     uploadCta: 'Poliçenizi yükleyin',
     viewDemo: 'Demo Görüntüle',
     trustedBy: 'Sigorta profesyonellerinin güvendiği',
+    badge: 'Yapay zeka destekli poliçe analizi',
+    headlineMobile: 'Sigorta poliçelerinizi kıyaslayın',
+    headlineDesktop: 'Sigorta poliçelerinizi anlayın ve',
+    headlineHighlight: 'kıyaslayın',
+    subheadline: 'Bir poliçe PDF yükleyin ve saniyeler içinde anlaşılır teminat analizi alın.',
+    analyzeCtaButton: 'Poliçenizi Ücretsiz Analiz Edin',
+    analyzingText: 'Analiz ediliyor...',
+    seeExample: 'Örnek Analiz Görüntüle',
+    freeNoSignup: 'Ücretsiz, kayıt gerekmez',
+    kvkkCompliant: 'KVKK Uyumlu',
+    sslBadge: '256-bit SSL',
+    whatYouGet: 'Ne alacaksınız:',
+    benefitFormats: 'PDF, Word ve taranmış belgeler',
+    benefitBilingual: 'Türkçe/İngilizce teminat açıklamaları',
+    benefitComparison: 'Yan yana poliçe karşılaştırması',
+    samplePoliciesTitle: 'Örnek Poliçe Koleksiyonu',
+    samplePoliciesDesc: 'Tüm Türk sigorta branş örneklerini görün',
+    viewAll: 'Tümünü Gör',
+    builtForProfessionals: 'Türk sigorta profesyonelleri için tasarlandı',
+    supportedPolicyTypes: 'Kasko, Trafik, DASK, Sağlık ve daha fazlası',
+    policyAnalysisPlatform: 'Poliçe Analiz Platformu',
+    secureEncrypted: 'Güvenli ve Şifreli',
+    licensedAdvisors: 'Lisanslı Sigorta Danışmanları',
+    uploadPolicyButton: 'Poliçe Yükle',
+    signedOutSuccess: 'Başarıyla çıkış yapıldı',
+    signOutFailed: 'Çıkış yapılamadı',
+    guest: 'Misafir',
+    notSignedIn: 'Giriş yapılmadı',
+
+    // How It Works
     howItWorks: 'Nasıl çalışır',
     howItWorksSubtitle: 'Üç basit adımda başlayın',
-    step1Title: 'Yükle',
-    step1Description: 'Sigorta poliçe belgelerinizi PDF, Word veya resim formatında yükleyin.',
-    step2Title: 'Analiz Et',
-    step2Description: 'Yapay zekamız poliçe detaylarını, teminatları ve koşulları analiz eder.',
-    step3Title: 'Karşılaştır',
-    step3Description: 'İçgörüler alın ve piyasa kriterleriyle karşılaştırın.',
+    simpleProcess: 'Basit Süreç',
+    howItWorksHeadline: 'Poliçelerinizi kıyaslamak için üç adım',
+    howItWorksDesc: 'Jargon yok, kılavuz yok—sadece kendi dilinizde net teminat bilgisi.',
+    step1Title: 'Poliçe yükleyin',
+    step1Description: 'Sigorta belgelerinizi bırakın—PDF, Word veya taranmış görüntüler. Her formatı kabul ediyoruz.',
+    step2Title: 'AI teminatları analiz eder',
+    step2Description: 'Yapay zekamız limitleri, muafiyetleri, ek teminatları ve istisnaları çıkarır ve günlük dilde açıklar.',
+    step3Title: 'Karşılaştırın ve takip edin',
+    step3Description: 'Poliçeleri yan yana karşılaştırın ve yenileme tarihleri için hatırlatıcılar ayarlayın.',
+
+    // Benefits
     benefits: 'Neden InsurAI',
     benefitsSubtitle: 'Sigorta profesyonelleri için tasarlandı',
+    benefitsSectionDesc: 'Türk sigorta piyasası profesyonelleri için en güçlü sigorta analiz platformu.',
+    benefitAnalysisTitle: 'Kapsamlı Analiz',
+    benefitAnalysisDesc: 'Yapay zeka, poliçe belgelerinizdeki her detayı otomatik olarak çıkarır.',
+    benefitInstantTitle: 'Anlık Sonuçlar',
+    benefitInstantDesc: 'Saatler yerine saniyeler içinde detaylı teminat dökümü alın.',
+    benefitMultiLangTitle: 'Çoklu Dil Desteği',
+    benefitMultiLangDesc: 'Türkçe ve İngilizce poliçelerle sorunsuz çalışır.',
+    benefitRenewalTitle: 'Yenileme Takibi',
+    benefitRenewalDesc: 'Otomatik hatırlatıcılarla hiçbir yenilemeyi kaçırmayın.',
+    benefitSecurityTitle: 'Banka Düzeyinde Güvenlik',
+    benefitSecurityDesc: 'Belgeleriniz şifrelenir ve korunur.',
+    benefitBenchmarkTitle: 'Piyasa Kıyaslaması',
+    benefitBenchmarkDesc: 'Teminatınızı piyasa standartlarıyla karşılaştırın.',
+
+    // Stats
+    statPolicyTypes: 'Desteklenen Poliçe Türleri',
+    statPolicyTypesValue: '7',
+    statPolicyTypesDetail: 'Kasko, Trafik, DASK, Sağlık, Hayat, Konut, İşyeri',
+    statLanguages: 'Dil',
+    statLanguagesValue: 'TR / EN',
+    statLanguagesDetail: 'Tam Türkçe ve İngilizce destek',
+    statCoverageChecks: 'Teminat Kontrolleri',
+    statCoverageChecksValue: '15+',
+    statCoverageChecksDetail: 'Eksiklikler, limitler, istisnalar, uyumluluk',
+    statAnalysisTime: 'Analiz Süresi',
+    statAnalysisTimeValue: '<60sn',
+    statAnalysisTimeDetail: 'Yüklemeden tam kıyaslama raporuna',
+
+    // WhyChooseUs
+    whyKvkkTitle: 'KVKK Uyumlu',
+    whyKvkkDesc: 'Türk veri koruma mevzuatına uygun tasarım',
+    whyNoSignupTitle: 'Kayıt Gerekmez',
+    whyNoSignupDesc: 'Hemen ücretsiz tam poliçe analizi deneyin',
+    whyTurkeyTitle: 'Türkiye Odaklı',
+    whyTurkeyDesc: 'Özellikle Türk sigorta piyasası için geliştirildi',
+
+    // Testimonials / Use Cases
+    useCasesTitle: 'InsurAI ile neler',
+    useCasesHighlight: 'yapabilirsiniz',
+    useCasesSubtitle: 'Sigorta profesyonelleri ve poliçe sahipleri için gerçek kullanım senaryoları.',
+    useCaseBrokers: 'Sigorta Brokerleri',
+    useCaseBrokersDesc: 'Müşteri poliçelerini yükleyin, anında teminat eksikliği raporları alın ve yan yana karşılaştırmalar sunun — saatler yerine dakikalar içinde.',
+    useCaseRiskManagers: 'Kurumsal Risk Yöneticileri',
+    useCaseRiskManagersDesc: 'Karmaşık ticari poliçeleri piyasa kıyaslamalarıyla analiz edin ve yenileme sezonundan önce eksik teminatlı alanları belirleyin.',
+    useCasePolicyholders: 'Bireysel Poliçe Sahipleri',
+    useCasePolicyholdersDesc: 'Kasko veya sağlık poliçenizi yükleyin ve neyin teminatta olup olmadığının anlaşılır bir açıklamasını alın.',
+
+    // FAQ
     faq: 'Sıkça sorulan sorular',
     faqSubtitle: 'InsurAI hakkında bilmeniz gereken her şey.',
+    faqHighlight: 'sorular',
+    faqQ1: 'Hangi dosya formatları desteklenir?',
+    faqA1: 'PDF, Word belgeleri (DOC, DOCX) ve görüntü dosyaları (PNG, JPG, JPEG) desteklenmektedir. Yapay zekamız OCR ile taranmış belgeleri de işleyebilir.',
+    faqQ2: 'AI analizi ne kadar doğru?',
+    faqA2: 'Yapay zekamız çıkarılan verileri çapraz doğrulamak için birden fazla model kullanır ve belirsizlikleri işaretler. Her sonuç, çıkarımın ne kadar güvenilir olduğunu gösteren bir güven puanı içerir.',
+    faqQ3: 'Verilerim güvende mi?',
+    faqA3: 'Evet, tüm belgeler için banka düzeyinde şifreleme (AES-256) kullanıyoruz. Dosyalarınız güvenli şekilde işlenir ve üçüncü taraflarla paylaşılmaz. Tamamen KVKK uyumluyuz.',
+    faqQ4: 'Hangi sigorta türleri desteklenir?',
+    faqA4: 'Kasko, Trafik, Konut, Sağlık, DASK, Hayat ve Ticari poliçeler dahil tüm büyük Türk sigorta türlerini destekliyoruz.',
+    faqQ5: 'Farklı sigortacıların poliçelerini karşılaştırabilir miyim?',
+    faqA5: 'Evet. Herhangi bir Türk sigorta şirketinden poliçe yükleyin ve yapay zeka destekli analizimizle yan yana karşılaştırın.',
+
+    // Footer
+    footerDescription: 'Türk sigorta piyasası profesyonelleri için yapay zeka destekli poliçe analiz platformu.',
+    footerProduct: 'Ürün',
+    footerFeatures: 'Özellikler',
+    footerPricing: 'Fiyatlandırma',
+    footerApi: 'API',
+    footerIntegrations: 'Entegrasyonlar',
+    footerCompany: 'Şirket',
+    footerAbout: 'Hakkımızda',
+    footerBlog: 'Blog',
+    footerCareers: 'Kariyer',
+    footerContact: 'İletişim',
+    footerLocation: 'İstanbul, Türkiye',
+    footerCopyright: '© 2025 InsurAI. Tüm hakları saklıdır.',
+    footerPrivacy: 'Gizlilik Politikası',
+    footerTerms: 'Kullanım Koşulları',
+    footerCookies: 'Çerez Politikası',
+
+    // ComparisonMock
+    comparisonTitle: 'Poliçe Karşılaştırması',
+    comparisonSubtitle: 'Yan yana analiz',
+    comparisonCoverage: 'Teminat',
+    comparisonCollision: 'Çarpma/Çarpışma',
+    comparisonTheft: 'Hırsızlık Koruması',
+    comparisonNaturalDisaster: 'Doğal Afet',
+    comparisonGlass: 'Cam Teminatı',
+    comparisonRoadside: 'Yol Yardım',
+    comparisonAiInsight: 'AI İçgörüsü:',
+    comparisonAiInsightText: 'A poliçesi daha iyi doğal afet teminatı sunuyor',
+    comparisonSample: 'Örnek Karşılaştırma',
+    comparisonBestCoverage: 'En İyi Teminat',
+    comparisonLowestPremium: 'En Düşük Prim',
+    comparisonAiPick: 'AI Seçimi',
+    comparisonDisclaimer: 'Örnek gösterim — sonuçlarınız gerçek poliçelerinizi yansıtacaktır',
+
+    // SampleReportPreview
+    reportBenchmark: 'Kıyaslama Raporu',
+    reportSample: 'Örnek',
+    reportOverallScore: 'Genel Puan',
+    reportAboveAverage: 'Piyasa ortalamasının üzerinde',
+    reportStrongCoverage: 'Güçlü Teminat',
+    reportStrongCoverageDesc: 'Çarpma, hırsızlık, yangın dahil',
+    reportGapDetected: 'Eksiklik Tespit Edildi',
+    reportGapDesc: 'Eksik: Doğal afet teminatı',
+    reportAiRecommendation: 'AI Önerisi',
+    reportAiRecommendationDesc: '+%12 koruma için sel teminatı ekleyin',
+    reportFullAnalysis: 'Tam analiz 15+ metrik ve karşılaştırma içerir',
+    reportCoverageConfirmed: 'Çarpma, hırsızlık, yangın teminatı onaylandı',
+    reportGapMissing: 'Eksiklik: Doğal afet teminatı eksik',
+    reportAiRecShort: 'AI önerisi: Sel teminatı ekleyin',
+    reportScoreLabel: 'Puan: 78/100',
+
+    // TrustedProviders
+    trustedProvidersTitle: 'Büyük Türk sigortacılarıyla çalışır',
+    trustedProvidersMore: '+daha fazla',
+    trustedProvidersWorksWith: 'Çalıştığımız:',
+    trustedProvidersMoreCount: '+4 daha',
+
+    // UploadWidget
+    uploadDropHere: 'Poliçenizi buraya bırakın',
+    uploadOrClick: 'veya göz atmak için tıklayın',
+    uploadProcessing: 'Poliçeniz işleniyor...',
+    uploadFailed: 'Yükleme başarısız',
+    uploadTryAgain: 'Tekrar dene',
+    uploadNoValidFiles: 'Geçerli dosya seçilmedi. Dosya türünü ve boyutunu kontrol edin.',
+    uploadFailedDesc: 'Dosyalarınız yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.',
   },
 
   policy: {
