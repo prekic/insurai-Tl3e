@@ -14,8 +14,10 @@ export function GlobalNavigation() {
   const policyCount = policies.length
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const notificationRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file upload directly from navigation
@@ -180,9 +182,9 @@ export function GlobalNavigation() {
                 >
                   <Icon size={18} aria-hidden="true" />
                   <span>{item.label}</span>
-                  {item.showCount && policyCount > 0 && (
+                  {item.showCount && user && policyCount > 0 && (
                     <span
-                      className="px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded-full font-semibold"
+                      className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-slate-700 text-white text-xs rounded-full font-semibold leading-none"
                       aria-label={`${policyCount} policies loaded`}
                     >
                       {policyCount > 9 ? '9+' : policyCount}
@@ -201,18 +203,47 @@ export function GlobalNavigation() {
             >
               <Search size={20} aria-hidden="true" />
             </button>
-            <button
-              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-              aria-label={policyCount > 0 ? `Notifications, ${policyCount} new` : 'Notifications'}
-            >
-              <Bell size={20} aria-hidden="true" />
-              {policyCount > 0 && (
-                <span
-                  className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
-                  aria-hidden="true"
-                />
+            <div className="relative" ref={notificationRef}>
+              <button
+                onClick={() => {
+                  if (!user) {
+                    navigate('/auth')
+                    return
+                  }
+                  setShowProfileMenu(false)
+                  setShowNotifications(!showNotifications)
+                }}
+                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                aria-label="Notifications"
+                aria-expanded={showNotifications}
+                aria-haspopup="true"
+              >
+                <Bell size={20} aria-hidden="true" />
+              </button>
+
+              {showNotifications && user && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifications(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    role="dialog"
+                    aria-label="Notifications"
+                  >
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <span className="font-semibold text-gray-900 text-sm">Notifications</span>
+                    </div>
+                    <div className="py-8 text-center text-sm text-gray-500">
+                      <Bell size={24} className="mx-auto mb-2 text-gray-300" />
+                      No notifications yet
+                    </div>
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             {/* Hidden file input for immediate upload */}
             <input
               ref={fileInputRef}
@@ -235,7 +266,10 @@ export function GlobalNavigation() {
             <div className="relative">
               <button
                 ref={profileButtonRef}
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                onClick={() => {
+                  setShowNotifications(false)
+                  setShowProfileMenu(!showProfileMenu)
+                }}
                 className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
                   showProfileMenu
                     ? 'bg-blue-50 ring-2 ring-blue-500'
