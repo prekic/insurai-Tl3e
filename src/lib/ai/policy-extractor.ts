@@ -616,10 +616,20 @@ export async function extractPolicyFromDocument(
   const useMultiProvider = useConsensus && configuredProviders.length > 1 && !isProxyConfigured()
   const provider = primaryProvider || configuredProviders[0]
 
+  // Set extraction mode for observability
+  if (useMultiProvider) {
+    logger?.setExtractionMode('consensus')
+  } else if (isProxyConfigured()) {
+    logger?.setExtractionMode('proxy')
+  } else {
+    logger?.setExtractionMode('direct')
+  }
+
   logger?.startStage('ai_extraction', {
     text_length: processedText.length,
     provider: useMultiProvider ? 'consensus' : provider,
     multi_provider: useMultiProvider,
+    extraction_mode: isProxyConfigured() ? 'proxy' : 'direct',
   })
   logger?.setAIProvider(provider)
 
@@ -656,6 +666,24 @@ export async function extractPolicyFromDocument(
         hasConfidence: !!extractedData?.confidence,
         hasCoverages: !!extractedData?.coverages,
       })
+    }
+
+    // Record proxy metadata for observability (route, fallback, request ID)
+    if (extractedData._proxyMeta) {
+      const meta = extractedData._proxyMeta
+      if (meta.requestId) logger?.setRequestId(meta.requestId)
+      if (meta.route) logger?.setExtractionRoute(meta.route)
+      if (meta.provider) logger?.setAIProvider(meta.provider)
+      if (meta.fallback !== undefined || meta.fallbackChain) {
+        logger?.setFallbackInfo({
+          fallback_used: !!meta.fallback,
+          chain: meta.fallbackChain || [
+            { provider: meta.provider || provider, success: true },
+          ],
+        })
+      }
+      // Clean up metadata before further processing
+      delete extractedData._proxyMeta
     }
 
     // Recalculate overall confidence using admin-configurable weighted formula.

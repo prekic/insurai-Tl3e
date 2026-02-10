@@ -147,11 +147,26 @@ export interface DocumentProcessingLog {
     timestamp?: string
   }
 
+  // Request correlation
+  request_id?: string             // Links frontend extraction to server-side logs
+
   // Summary flags for filtering
   ocr_used: boolean
   ocr_engine?: string
   ai_provider?: string
   extraction_confidence?: number
+
+  // Route and fallback tracking
+  extraction_route?: string       // Server endpoint used (e.g., '/api/ai/extract', '/api/ai/extract/openai')
+  extraction_mode?: 'proxy' | 'direct' | 'consensus'  // How extraction was invoked
+  fallback_used?: boolean         // True if primary provider failed and fallback was used
+  fallback_chain?: Array<{        // Full provider attempt chain
+    provider: string              // e.g., 'anthropic', 'openai'
+    success: boolean
+    duration_ms?: number
+    error?: string                // Error message if failed
+    error_code?: string           // Structured error code (e.g., 'ANTHROPIC_BILLING_ERROR')
+  }>
 
   // Extracted summary
   extracted_summary?: ExtractedSummary

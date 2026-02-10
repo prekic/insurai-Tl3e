@@ -867,6 +867,8 @@ router.post(
           model: response.model,
           provider: 'anthropic',
           cost: cost.totalCost,
+          requestId,
+          route: '/api/ai/extract',
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
@@ -995,6 +997,12 @@ router.post(
           fallback: isFallback, // Indicates if we fell back from Anthropic
           ...(isFallback && storedFallbackReason && { fallbackReason: storedFallbackReason }),
           cost: cost.totalCost,
+          requestId,
+          route: '/api/ai/extract',
+          ...(isFallback && { fallbackChain: [
+            { provider: 'anthropic', success: false, error_code: storedFallbackReason },
+            { provider: 'openai', success: true, duration_ms: Date.now() - openaiStart },
+          ]}),
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'

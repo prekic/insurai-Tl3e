@@ -133,6 +133,16 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
 
       result = proxyResult.data as unknown as ExtractedPolicyData
 
+      // Attach proxy metadata for observability logging
+      result._proxyMeta = {
+        requestId: proxyResult.requestId,
+        route: proxyResult.route,
+        provider: proxyResult.provider,
+        fallback: proxyResult.fallback,
+        fallbackReason: proxyResult.fallbackReason,
+        fallbackChain: proxyResult.fallbackChain,
+      }
+
       console.warn('[OpenAI Extract] Parsed result:', {
         hasConfidence: !!result.confidence,
         confidenceOverall: result.confidence?.overall,
