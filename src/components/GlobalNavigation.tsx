@@ -18,9 +18,11 @@ export function GlobalNavigation() {
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+  const languageRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file upload directly from navigation
@@ -206,6 +208,68 @@ export function GlobalNavigation() {
             >
               <Search size={20} aria-hidden="true" />
             </button>
+            {/* Language Picker */}
+            <div className="relative" ref={languageRef}>
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false)
+                  setShowNotifications(false)
+                  setShowLanguagePicker(!showLanguagePicker)
+                }}
+                className={`p-2 rounded-lg transition-colors focus-ring ${
+                  showLanguagePicker
+                    ? 'text-blue-600 bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                aria-label="Change language"
+                aria-expanded={showLanguagePicker}
+                aria-haspopup="true"
+              >
+                <Globe size={20} aria-hidden="true" />
+              </button>
+
+              {showLanguagePicker && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowLanguagePicker(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="absolute right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    role="radiogroup"
+                    aria-label="Language"
+                  >
+                    <button
+                      onClick={() => { setLocale('tr'); setShowLanguagePicker(false) }}
+                      role="radio"
+                      aria-checked={locale === 'tr'}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        locale === 'tr'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-base">🇹🇷</span>
+                      <span>Türkçe</span>
+                    </button>
+                    <button
+                      onClick={() => { setLocale('en'); setShowLanguagePicker(false) }}
+                      role="radio"
+                      aria-checked={locale === 'en'}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        locale === 'en'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-base">🇬🇧</span>
+                      <span>English</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => {
@@ -214,6 +278,7 @@ export function GlobalNavigation() {
                     return
                   }
                   setShowProfileMenu(false)
+                  setShowLanguagePicker(false)
                   setShowNotifications(!showNotifications)
                 }}
                 className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
@@ -271,6 +336,7 @@ export function GlobalNavigation() {
                 ref={profileButtonRef}
                 onClick={() => {
                   setShowNotifications(false)
+                  setShowLanguagePicker(false)
                   setShowProfileMenu(!showProfileMenu)
                 }}
                 className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
