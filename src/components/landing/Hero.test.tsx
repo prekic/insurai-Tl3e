@@ -53,9 +53,6 @@ vi.mock('./ComparisonMock', () => ({
   ComparisonMockMobile: () => <div data-testid="comparison-mock-mobile">Comparison Mock Mobile</div>,
 }))
 
-vi.mock('./LanguageToggle', () => ({
-  LanguageToggle: () => <div data-testid="language-toggle">Language Toggle</div>,
-}))
 
 vi.mock('../animations/AnimatedComponents', () => ({
   StaggeredList: ({ children }: { children: React.ReactNode[] }) => <div>{children}</div>,
@@ -281,11 +278,5 @@ describe('Hero', () => {
       expect(screen.getByTestId('comparison-mock')).toBeInTheDocument()
     })
 
-    it('should render language toggle', () => {
-      renderWithRouter(<Hero />)
-
-      const toggles = screen.getAllByTestId('language-toggle')
-      expect(toggles.length).toBeGreaterThan(0)
-    })
-  })
+})
 })

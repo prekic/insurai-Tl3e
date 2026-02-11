@@ -6,7 +6,7 @@ import { UploadWidget } from './UploadWidget'
 import { SampleReportPreviewCompact } from './SampleReportPreview'
 import { StaggeredList, AnimatedButton, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
-import { LanguageToggle } from './LanguageToggle'
+
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -355,9 +355,6 @@ export function Hero() {
 
           {/* Right Column - Comparison Mock */}
           <div className="hidden lg:block relative">
-            <div className="absolute -top-4 -right-4 z-10">
-              <LanguageToggle />
-            </div>
             <div className="relative">
               <ComparisonMock />
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-3xl blur-2xl -z-10" />
@@ -367,9 +364,6 @@ export function Hero() {
 
         {/* Mobile Comparison Mock */}
         <div className="lg:hidden mt-12">
-          <div className="mb-4 flex justify-center">
-            <LanguageToggle />
-          </div>
           <ComparisonMockMobile />
         </div>
       </div>
