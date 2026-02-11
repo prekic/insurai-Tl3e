@@ -623,7 +623,7 @@ export function PolicyChat() {
       )
     )
     toast.success(type === 'helpful' ? t.chat.thanksFeedback : t.chat.willImprove)
-  }, [])
+  }, [t.chat.thanksFeedback, t.chat.willImprove])
 
   // Extract referenced policies from AI response content
   const extractReferencedPolicies = useCallback((content: string): string[] => {
@@ -667,7 +667,7 @@ export function PolicyChat() {
                   {connectionError && (
                     <span className="text-xs text-red-500 flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
-                      {t.chat.connectionError}
+                      {t.chat.connectionIssue}
                     </span>
                   )}
                 </div>

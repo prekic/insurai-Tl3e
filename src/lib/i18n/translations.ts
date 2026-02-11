@@ -448,6 +448,7 @@ export interface TranslationDictionary {
     askAboutPolicies: string
     send: string
     sending: string
+    connectionIssue: string
     connectionError: string
     retryMessage: string
     welcomeMessage: string
@@ -1199,6 +1200,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     askAboutPolicies: 'Ask about your policies...',
     send: 'Send',
     sending: 'Sending...',
+    connectionIssue: 'Connection issue',
     connectionError: 'Having trouble connecting to the AI assistant',
     retryMessage: 'Retry',
     welcomeMessage: "Hello! I'm your AI insurance assistant. I can help you understand your policies. Ask me anything about your coverage, compare policies, or get recommendations.",
@@ -1935,6 +1937,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     askAboutPolicies: 'Poliçeleriniz hakkında sorun...',
     send: 'Gönder',
     sending: 'Gönderiliyor...',
+    connectionIssue: 'Bağlantı sorunu',
     connectionError: 'AI asistanına bağlanırken sorun yaşanıyor',
     retryMessage: 'Tekrar Dene',
     welcomeMessage: 'Merhaba! Ben AI sigorta asistanınızım. Poliçelerinizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
