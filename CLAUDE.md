@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**
 - **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 9, 2026
+- **Last Updated**: February 11, 2026
 
 ---
 
@@ -3185,6 +3185,42 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   9. **Mobile page length**: Hidden WhoItsFor, PolicyComparisonSection, CompareSection on mobile
 - **Files Changed**: Hero.tsx, Hero.test.tsx, UploadWidget.tsx, Stats.tsx, Stats.test.tsx, ComparisonMock.tsx, TrustedProviders.tsx, SampleReportPreview.tsx, WhyChooseUs.tsx, WhyChooseUs.test.tsx, Testimonials.tsx, Testimonials.test.tsx, LandingPage.tsx
 
+### 90. Comprehensive i18n for All User-Facing Components (Feb 11, 2026)
+- **Feature**: Complete internationalization (TR/EN) for all user-facing components using `useTranslation` hook
+- **Scope**: 20+ components across landing page, navigation, policy detail, upload, and preferences
+- **Phases**:
+  1. **Landing page + Navigation** (`0e14e55`): Hero, Benefits, HowItWorks, Stats, FAQ, Footer, ComparisonMock, SampleReportPreview, TrustedProviders, Testimonials, WhyChooseUs, GlobalNavigation
+  2. **CTA + Comparison** (`6694321`): CompareSection, StickyMobileCTA, PolicyComparisonSection, WhoItsFor + 64 language consistency tests
+  3. **Core components** (`a10f57e`): TryAnalysis, PolicyDetailView, UserPreferencesPanel
+  4. **Coverage names + AI insights** (`9c5b910`, `97b0660`): Locale-aware coverage name display, AI insight translation
+- **Translation Architecture**:
+  - `src/lib/i18n/translations.ts` — Central `TranslationDictionary` with `EN_TRANSLATIONS` and `TR_TRANSLATIONS`
+  - `src/lib/i18n/i18n-context.tsx` — React context with `useTranslation()` hook returning `{ t, locale, isLoading }`
+  - Default locale: `'tr'` (Turkish market focus)
+  - Locale persisted in localStorage under key `'insurai_locale'`
+- **Coverage Name Translation**:
+  - **Problem**: AI extraction sets both `name` and `nameTr` to the same English value (line 1242 in `policy-extractor.ts`)
+  - **Solution**: 90+ entry `COVERAGE_NAME_TR` fallback map in `PolicyDetailView.tsx`
+  - `getLocalizedCoverageName()` checks: (1) `nameTr` differs from `name`? Use it. (2) Exact match in map? Use translation. (3) Case-insensitive match? Use it. (4) Fall back to `nameTr || name`
+- **AI Insight Translation**:
+  - **Problem**: `generateAIInsightsAsync()` produces English-only strings (strengths, gaps, recommendations)
+  - **Solution**: `translateInsight()` function with 12 exact translations + 3 dynamic pattern matchers
+  - Handles prefixes (✓ ⚠ 💡 ❌): strips, translates text, re-adds prefix
+  - Dynamic patterns: "Missing common coverage: X", "Invalid TC Kimlik: X", "Market premiums increased N% YoY"
+- **Test Coverage**:
+  - 64 language consistency tests (key parity, non-empty values, EN/TR difference, CTA regression)
+  - Updated test files for TryAnalysis (18 tests), PolicyDetailView (44 tests)
+  - i18n mock pattern: `vi.mock('@/lib/i18n/i18n-context', () => ({ useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }) }))`
+- **Key Files Changed**:
+  - `src/lib/i18n/translations.ts` — Added `tryAnalysis` (35 keys), `preferences` (18 keys), 30+ landing keys, CTA/comparison/WhoItsFor keys
+  - `src/components/PolicyDetailView.tsx` — `getLocalizedCoverageName()`, `translateInsight()`, `COVERAGE_NAME_TR` map
+  - `src/components/TryAnalysis.tsx` — All ~25 hardcoded strings → `t.tryAnalysis.*`
+  - `src/components/UserPreferencesPanel.tsx` — All ~15 strings → `t.preferences.*`
+  - 14 landing components — All strings → `t.landing.*`
+  - `src/components/GlobalNavigation.tsx` — All nav strings → `t.nav.*`, `t.landing.*`
+  - `src/lib/i18n/__tests__/language-consistency.test.ts` — 64 tests for translation parity
+- **Commits**: `0e14e55`, `da6744e`, `6694321`, `a10f57e`, `9c5b910`, `97b0660`
+
 ---
 
 ## Turkish Market Considerations
@@ -3619,6 +3655,16 @@ connectSrc: [
 - Check for orphaned dependency chains: a dead hook may be the only consumer of an entire library directory
 - Test files referencing deleted exports will cause import errors — update test files when removing exports
 
+**i18n and Coverage Name Translation:**
+- `policy-extractor.ts` line 1242 sets `nameTr: coverageName` — both `name` and `nameTr` are the SAME English value from AI extraction
+- Simply checking `coverage.nameTr` is NOT enough — you must also check that `nameTr !== name` to know if it's a real Turkish translation
+- `PolicyDetailView.tsx` has a 90+ entry `COVERAGE_NAME_TR` fallback map for translating English coverage names to Turkish at display time
+- For new coverage names from AI, add entries to `COVERAGE_NAME_TR` in `PolicyDetailView.tsx`
+- AI-generated insights (aiInsights array) are always in English — `translateInsight()` provides runtime Turkish translation
+- When adding new insight strings in `generateStrengths()`, `generateGapsAsync()`, or `generateRecommendationsAsync()`, also add the translation to `translateInsight()` in PolicyDetailView.tsx
+- The i18n mock pattern for tests: `vi.mock('@/lib/i18n/i18n-context', () => ({ useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }) }))`
+- Test assertions should use `EN_TRANSLATIONS.section.key` instead of hardcoded strings to stay in sync with translation changes
+
 ---
 
 ## CI/CD
@@ -3667,4 +3713,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 6,000+ tests, all passing (185+ test files)
-**Last Updated**: February 8, 2026
+**Last Updated**: February 11, 2026
