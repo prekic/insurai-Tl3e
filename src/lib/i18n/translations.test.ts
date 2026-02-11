@@ -146,9 +146,9 @@ describe('EN_TRANSLATIONS', () => {
     })
 
     it('should have step descriptions', () => {
-      expect(EN_TRANSLATIONS.landing.step1Title).toBe('Upload')
-      expect(EN_TRANSLATIONS.landing.step2Title).toBe('Analyze')
-      expect(EN_TRANSLATIONS.landing.step3Title).toBe('Compare')
+      expect(EN_TRANSLATIONS.landing.step1Title).toBe('Upload policies')
+      expect(EN_TRANSLATIONS.landing.step2Title).toBe('AI analyzes coverage')
+      expect(EN_TRANSLATIONS.landing.step3Title).toBe('Compare & track')
     })
   })
 

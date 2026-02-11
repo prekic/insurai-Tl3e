@@ -1758,6 +1758,33 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
             </div>
           </div>
 
+          {log.extraction_route && (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-sm text-gray-500">Route</div>
+              <div className="text-sm font-mono font-semibold text-gray-900">
+                {log.extraction_route}
+              </div>
+            </div>
+          )}
+
+          {log.extraction_mode && (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-sm text-gray-500">Mode</div>
+              <div className="text-lg font-semibold text-gray-900 capitalize">
+                {log.extraction_mode}
+              </div>
+            </div>
+          )}
+
+          {log.request_id && (
+            <div className="bg-gray-50 rounded-lg p-3">
+              <div className="text-sm text-gray-500">Request ID</div>
+              <div className="text-xs font-mono font-semibold text-gray-900 break-all">
+                {log.request_id}
+              </div>
+            </div>
+          )}
+
           {stats.totalTokens > 0 && (
             <div className="bg-purple-50 rounded-lg p-3">
               <div className="text-sm text-purple-600">Total Tokens</div>
@@ -1785,6 +1812,34 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
             </div>
           )}
         </div>
+
+        {/* Provider Fallback Chain */}
+        {log.fallback_used && log.fallback_chain && log.fallback_chain.length > 0 && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="text-sm font-medium text-amber-800 mb-2">Provider Fallback Chain</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {log.fallback_chain.map((step, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  {i > 0 && <span className="text-amber-400">&rarr;</span>}
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                    step.success
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    <span className={`w-2 h-2 rounded-full ${step.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {step.provider}
+                    {step.duration_ms != null && (
+                      <span className="text-xs opacity-70">({step.duration_ms}ms)</span>
+                    )}
+                  </div>
+                  {step.error_code && (
+                    <span className="text-xs text-red-600 font-mono">{step.error_code}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Extracted summary */}
         {log.extracted_summary && (

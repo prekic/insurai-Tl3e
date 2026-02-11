@@ -1,14 +1,31 @@
 /**
  * LanguageToggle Component Tests
  *
- * Tests for the language toggle button
+ * Tests for the language toggle button connected to i18n context
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { LanguageToggle } from './LanguageToggle'
 
+let currentLocale = 'tr'
+const mockSetLocale = vi.fn((locale: string) => {
+  currentLocale = locale
+})
+
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useI18n: () => ({
+    locale: currentLocale,
+    setLocale: mockSetLocale,
+  }),
+}))
+
 describe('LanguageToggle', () => {
+  beforeEach(() => {
+    currentLocale = 'tr'
+    mockSetLocale.mockClear()
+  })
+
   describe('Rendering', () => {
     it('should render the toggle', () => {
       render(<LanguageToggle />)
@@ -37,37 +54,39 @@ describe('LanguageToggle', () => {
   })
 
   describe('Toggle Functionality', () => {
-    it('should switch to EN when EN is clicked', () => {
+    it('should call setLocale with en when EN is clicked', () => {
       render(<LanguageToggle />)
 
       const enButton = screen.getByText('EN')
       fireEvent.click(enButton)
 
+      expect(mockSetLocale).toHaveBeenCalledWith('en')
+    })
+
+    it('should show EN as selected when locale is en', () => {
+      currentLocale = 'en'
+      render(<LanguageToggle />)
+
+      const enButton = screen.getByText('EN')
       expect(enButton).toHaveClass('bg-white')
       expect(enButton).toHaveClass('text-blue-600')
     })
 
-    it('should switch back to TR when TR is clicked', () => {
+    it('should call setLocale with tr when TR is clicked', () => {
+      currentLocale = 'en'
       render(<LanguageToggle />)
 
-      const enButton = screen.getByText('EN')
       const trButton = screen.getByText('TR')
-
-      fireEvent.click(enButton)
       fireEvent.click(trButton)
 
-      expect(trButton).toHaveClass('bg-white')
-      expect(trButton).toHaveClass('text-blue-600')
+      expect(mockSetLocale).toHaveBeenCalledWith('tr')
     })
 
-    it('should unselect TR when EN is selected', () => {
+    it('should unselect TR when locale is EN', () => {
+      currentLocale = 'en'
       render(<LanguageToggle />)
 
-      const enButton = screen.getByText('EN')
       const trButton = screen.getByText('TR')
-
-      fireEvent.click(enButton)
-
       expect(trButton).not.toHaveClass('bg-white')
       expect(trButton).toHaveClass('text-gray-600')
     })

@@ -1,17 +1,20 @@
 import { Shield, Check, X, AlertTriangle } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function ComparisonMock() {
+  const { t } = useTranslation()
+
   const policies = [
     { name: 'Kasko A', provider: 'Allianz', premium: '₺4,200/yr', coverage: '₺500,000' },
     { name: 'Kasko B', provider: 'AXA', premium: '₺3,800/yr', coverage: '₺450,000' },
   ]
 
   const features = [
-    { name: 'Collision Coverage', policy1: true, policy2: true },
-    { name: 'Theft Protection', policy1: true, policy2: true },
-    { name: 'Natural Disaster', policy1: true, policy2: false },
-    { name: 'Glass Coverage', policy1: true, policy2: 'partial' },
-    { name: 'Roadside Assist', policy1: true, policy2: true },
+    { name: t.landing.comparisonCollision, policy1: true, policy2: true },
+    { name: t.landing.comparisonTheft, policy1: true, policy2: true },
+    { name: t.landing.comparisonNaturalDisaster, policy1: true, policy2: false },
+    { name: t.landing.comparisonGlass, policy1: true, policy2: 'partial' },
+    { name: t.landing.comparisonRoadside, policy1: true, policy2: true },
   ]
 
   return (
@@ -23,8 +26,8 @@ export function ComparisonMock() {
             <Shield className="text-white" size={20} />
           </div>
           <div>
-            <h3 className="text-white font-semibold">Policy Comparison</h3>
-            <p className="text-slate-300 text-sm">Side-by-side analysis</p>
+            <h3 className="text-white font-semibold">{t.landing.comparisonTitle}</h3>
+            <p className="text-slate-300 text-sm">{t.landing.comparisonSubtitle}</p>
           </div>
         </div>
       </div>
@@ -32,7 +35,7 @@ export function ComparisonMock() {
       {/* Policy Headers */}
       <div className="grid grid-cols-3 border-b border-gray-100">
         <div className="p-4 bg-gray-50">
-          <span className="text-sm font-medium text-gray-600">Coverage</span>
+          <span className="text-sm font-medium text-gray-600">{t.landing.comparisonCoverage}</span>
         </div>
         {policies.map((policy, i) => (
           <div key={i} className="p-4 text-center border-l border-gray-100">
@@ -79,7 +82,7 @@ export function ComparisonMock() {
       {/* Footer */}
       <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50">
         <p className="text-sm text-center text-gray-600">
-          <span className="font-medium text-blue-600">AI Insight:</span> Policy A offers better natural disaster coverage
+          <span className="font-medium text-blue-600">{t.landing.comparisonAiInsight}</span> {t.landing.comparisonAiInsightText}
         </p>
       </div>
     </div>
@@ -87,20 +90,22 @@ export function ComparisonMock() {
 }
 
 export function ComparisonMockMobile() {
+  const { t } = useTranslation()
+
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
       <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-4">
         <div className="flex items-center gap-2">
           <Shield className="text-white" size={16} />
-          <span className="text-white font-medium text-sm">Sample Comparison</span>
+          <span className="text-white font-medium text-sm">{t.landing.comparisonSample}</span>
         </div>
       </div>
 
       <div className="p-4 space-y-3">
         {[
-          { label: 'Best Coverage', value: 'Allianz Kasko', color: 'text-blue-600' },
-          { label: 'Lowest Premium', value: 'AXA Kasko', color: 'text-green-600' },
-          { label: 'AI Pick', value: 'Allianz Kasko', color: 'text-purple-600' },
+          { label: t.landing.comparisonBestCoverage, value: 'Allianz Kasko', color: 'text-blue-600' },
+          { label: t.landing.comparisonLowestPremium, value: 'AXA Kasko', color: 'text-green-600' },
+          { label: t.landing.comparisonAiPick, value: 'Allianz Kasko', color: 'text-purple-600' },
         ].map((item, i) => (
           <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
             <span className="text-sm text-gray-600">{item.label}</span>
@@ -110,7 +115,7 @@ export function ComparisonMockMobile() {
       </div>
 
       <div className="px-4 pb-4">
-        <p className="text-xs text-gray-400 text-center">Illustrative example — your results will reflect your actual policies</p>
+        <p className="text-xs text-gray-400 text-center">{t.landing.comparisonDisclaimer}</p>
       </div>
     </div>
   )

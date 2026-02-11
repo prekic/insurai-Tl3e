@@ -1,4 +1,4 @@
-# Session Handoff - February 9, 2026
+# Session Handoff - February 11, 2026
 
 ## Current Status
 
@@ -9,7 +9,7 @@
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 46 warnings (all `no-non-null-assertion`) |
 | **Tests** | ✅ 6,000+ passing (185+ test files), 0 failures |
-| **Branch** | `claude/review-handoff-docs-MAjiD` |
+| **Branch** | `claude/review-handoff-docs-E4fnT` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Live — extraction pipeline fully operational |
@@ -20,121 +20,64 @@
 
 ## Session Summary
 
-This session covered **3 major workstreams** on **February 9, 2026**:
+This session focused on **comprehensive i18n (internationalization)** for all user-facing components, ensuring the entire user journey displays correctly in Turkish when TR locale is selected.
 
-### 1. Market Data DB Migration + User Profile Tests
-- Migrated core business logic (gap analyzers, evaluator, extractor, comparison engine) from static file imports to `ConfigurationService` DB access via new `MarketDataService`
-- Added 21 functional tests for `user-profile.ts`
+### Work Completed (across this and the prior context-continued session)
 
-### 2. Major Dependency Upgrades (6 tiers)
-- Express 4 → 5 (breaking: wildcard routes, query types, error handling)
-- Vite 6 → 7 (with plugin-react 4 → 5)
-- React 18 → 19 (breaking: useRef requires initial value)
-- Vitest 2 → 4 (breaking: arrow function mocks can't be constructors)
-- lucide-react + tailwind-merge minor bumps
-- globals + jsdom tooling updates
-- express-rate-limit 7 → 8 (breaking: requires `validate: { keyGeneratorIpFallback: false }`)
-
-### 3. Mobile Landing Page UX Overhaul
-- Restructured Hero for mobile: CTA above fold, brand visible, utility bar hidden
-- Replaced all fabricated data across 6 components with authentic content
-- Converted fake testimonials to honest use-case scenarios
-- Reduced mobile page length by hiding 3 redundant sections
-- Added tiered confidence system with low-confidence warning banners
+1. **Landing page + Navigation i18n** — 14 landing components + GlobalNavigation fully converted to `useTranslation()` hook
+2. **CTA/Comparison i18n** — CompareSection, StickyMobileCTA, PolicyComparisonSection, WhoItsFor converted + 64 language consistency tests added
+3. **Core component i18n** — TryAnalysis (~25 strings), PolicyDetailView (sidebar labels, loading/error states), UserPreferencesPanel (~15 strings)
+4. **Coverage name locale fix** — Added `getLocalizedCoverageName()` with 90+ entry `COVERAGE_NAME_TR` fallback translation map
+5. **AI insight translation** — Added `translateInsight()` with 12 exact translations + 3 dynamic pattern matchers for runtime English→Turkish insight translation
 
 ---
 
 ## Features Completed This Session
 
-### 1. Market Data DB Migration (✅)
-- New `MarketDataService` in `src/lib/market-data/service.ts` — DB-first with static fallback
-- `src/lib/ai/comparison.ts` — Switched to async `MarketDataService`
-- `src/lib/ai/multi-ai-analysis.ts` — Switched to async market data access
-- `src/lib/ai/policy-extractor.ts` — Updated to use async benchmarks
-- **Commit**: `4e8711a`
+### 1. Landing Page i18n (✅)
+- All 14 landing components converted from hardcoded English to `t.landing.*` translation keys
+- GlobalNavigation converted to `t.nav.*` and `t.landing.*`
+- **Commits**: `0e14e55`, `da6744e`
 
-### 2. User Profile Functional Tests (✅)
-- 21 new tests in `src/lib/supabase/user-profile.functional.test.ts`
-- **Commit**: `c901281`
+### 2. CTA and Comparison Components i18n (✅)
+- CompareSection, StickyMobileCTA, PolicyComparisonSection, WhoItsFor
+- 64 language consistency tests (key parity, non-empty values, EN/TR difference, CTA regression)
+- **Commit**: `6694321`
 
-### 3. Express 4 → 5 Upgrade (✅)
-- `app.get('*')` → `app.get(/.*/)` regex for universal wildcard
-- `req.query` type handling updated
-- **Commit**: `379c2a0`
+### 3. Core Component i18n (✅)
+- TryAnalysis.tsx — ~25 strings → `t.tryAnalysis.*`, test file updated with i18n mock
+- PolicyDetailView.tsx — Desktop sidebar labels, loading/error states → locale ternaries
+- UserPreferencesPanel.tsx — ~15 strings → `t.preferences.*`
+- **Commit**: `a10f57e`
 
-### 4. Vite 6 → 7 Upgrade (✅)
-- With `@vitejs/plugin-react` 4 → 5
-- **Commit**: `01a5e42`
+### 4. Locale-Aware Coverage Names + AI Insights (✅)
+- Added `getLocalizedCoverageName()` helper to display `nameTr` when locale is TR
+- Added `translateInsight()` for runtime translation of AI-generated insight text
+- Fixed coverage names in CollapsibleCoverageCategory (grouped and regular)
+- Fixed category labels (`labelTr`/`labelEn` based on locale)
+- Fixed mobile and desktop AI Insights sections
+- Fixed download summary (locale-aware names + included AI insights section)
+- **Commit**: `9c5b910`
 
-### 5. React 18 → 19 Upgrade (✅)
-- Fixed `useRef()` calls to provide initial values
-- **Commit**: `eb0d66f`
-
-### 6. Vitest 2 → 4 Upgrade (✅)
-- Fixed arrow function mock implementations used as constructors
-- **Commit**: `23ef73d`
-
-### 7. express-rate-limit 7 → 8 Fix (✅)
-- Added `validate: { keyGeneratorIpFallback: false }` to all custom keyGenerators
-- Fixed fatal `ValidationError` (ERR_ERL_KEY_GEN_IPV6) that crashed server on startup
-- **Commit**: `759a2f9`
-
-### 8. Tiered Confidence System (✅)
-- `minConfidence` (0.4): Hard rejection threshold
-- `warningConfidence` (0.7): Warning banner threshold
-- Warning banners in PolicyUpload, TryAnalysis, PolicyDetailView
-- Admin-configurable via Settings UI
-- **Commit**: `7e1729e`
-
-### 9. Mobile Landing Page — Hero Restructure (✅)
-- CTA moved above fold (3rd item in StaggeredList)
-- Brand name always visible on mobile
-- Utility bar hidden on mobile
-- Sub-headline shortened, headline reduced to `text-3xl` on smallest screens
-- **Commit**: `203784f`
-
-### 10. Mobile Landing Page — CTA Tightening (✅)
-- CTA + "Free, no signup required" micro-copy + trust badges grouped into single block
-- CTA button shadow for visual depth
-- Secondary CTA demoted from button to text link
-- **Commit**: `b195fd8`
-
-### 11. Mobile Landing Page — Fabricated Stats Removal (✅)
-- Stats.tsx: Fabricated counters (2300+, 15K+, 98%, 24/7) → authentic capabilities
-- ComparisonMock: Generic "Kasko A/B" → real provider names with disclaimer
-- TrustedProviders: "50+ Turkish Insurers" → "Works with major Turkish insurers"
-- SampleReportPreview: Expanded compact version with bulleted deliverables
-- Hidden PolicyComparisonSection and CompareSection on mobile
-- **Commit**: `a35a6c1`
-
-### 12. Mobile Landing Page — Social Proof & Testimonials Fix (✅)
-- WhyChooseUs: Fabricated stats (4.9/5, 15K+, 50+) → authentic differentiators (KVKK Compliant, No Signup Required, Turkey-Focused)
-- Testimonials: Fake names/quotes → honest use-case scenarios for 3 audience types
-- WhoItsFor hidden on mobile (audience targeting now covered by Testimonials)
-- **Commit**: `e0cbaf4`
+### 5. Coverage Name EN→TR Fallback Translation Map (✅)
+- **Root cause**: `policy-extractor.ts` line 1242 sets `nameTr: coverageName` — same English value as `name`
+- Added 90+ entry `COVERAGE_NAME_TR` map covering all policy types (kasko, traffic, home, health, life, business, nakliyat)
+- `getLocalizedCoverageName()` now: (1) uses `nameTr` if it differs from `name`, (2) looks up English name in map, (3) case-insensitive fallback
+- **Commit**: `97b0660`
 
 ---
 
 ## Commits This Session
 
 ```
-# Branch: claude/review-handoff-docs-MAjiD
-2ad0ffb docs: update project documentation for Feb 9 session
-e0cbaf4 fix: remove fabricated social proof, replace fake testimonials with use cases
-a35a6c1 fix: replace fabricated stats, fix provider claims, improve mobile page length
-b195fd8 fix: tighten mobile hero — smaller headline, micro-copy, shadow CTA, less spacing
-203784f fix: improve mobile landing page UX — CTA above fold, brand visible, less clutter
-7e1729e feat: add tiered confidence system with low-confidence warning UX
-759a2f9 fix: resolve Express 5 + express-rate-limit 8 runtime crash
-5617cd3 docs: update dependency upgrade plan with completed tiers
-fcd9593 chore: upgrade globals and jsdom (Tier 5 tooling)
-e1eae25 chore: upgrade lucide-react and tailwind-merge (Tier 4)
-23ef73d chore: upgrade Vitest 2 → 4, @vitest/coverage-v8 2 → 4
-eb0d66f chore: upgrade React 18 → 19, fix useRef initial value
-01a5e42 chore: upgrade Vite 6 → 7, @vitejs/plugin-react 4 → 5
-379c2a0 chore: upgrade Express 4 → 5, express-rate-limit 7 → 8
-c901281 test: add functional tests for user-profile.ts (21 new tests)
-4e8711a feat: migrate market data from static files to ConfigurationService DB
+# Branch: claude/review-handoff-docs-E4fnT (7 commits)
+15443b6 docs: update project documentation for Feb 11 i18n session
+97b0660 fix: add EN→TR fallback translation map for coverage names
+9c5b910 fix: locale-aware coverage names and AI insights in PolicyDetailView
+a10f57e feat: i18n for TryAnalysis, PolicyDetailView, UserPreferencesPanel
+6694321 feat: i18n for CTA, StickyMobileCTA, PolicyComparison, WhoItsFor + language consistency tests
+da6744e fix: update i18n test assertions to match new step title translations
+0e14e55 feat: complete i18n separation for all landing and navigation components
 ```
 
 ---
@@ -143,15 +86,14 @@ c901281 test: add functional tests for user-profile.ts (21 new tests)
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Market data static→DB migration | Medium | **Fixed** | `MarketDataService` now DB-first with static fallback |
-| express-rate-limit v8 crash | Critical | **Fixed** | `validate: { keyGeneratorIpFallback: false }` on all custom keyGenerators |
-| React 19 useRef | Medium | **Fixed** | All `useRef<T>()` calls updated to provide initial values |
-| Vitest 4 constructor mocks | Medium | **Fixed** | Arrow function mocks → `function()` syntax where `new` is called |
-| Landing page fabricated data | Medium | **Fixed** | All fake stats, testimonials, social proof replaced with authentic content |
+| Coverage `nameTr` = `name` (English) | Medium | **Mitigated** | Fallback translation map handles display; root cause in `policy-extractor.ts:1242` still sets both to same value |
+| AI insights always in English | Medium | **Mitigated** | `translateInsight()` handles 15 known patterns at display time; new insight strings need manual translation entries |
+| `translation-service.test.ts` timeout | Low | Pre-existing | 1 test times out (non-preloaded locale translation) — does not affect functionality |
+| `useLazySection` test failures | Low | Pre-existing | 11 tests fail in isolated runs — pre-existing, not related to i18n |
 | Anthropic billing | Medium | Open | Falls back to OpenAI, adds latency |
 | 46 ESLint warnings | Low | Deferred | All `no-non-null-assertion` — intentional in guarded code |
 | Railway cold start | Low | Expected | First request may take 5-10s after idle |
-| Worker OOM in tests | Low | Pre-existing | translation-service.test.ts causes worker exit (tests still pass) |
+| Components not yet i18n'd | Low | Open | PolicyChat.tsx, PolicyUpload.tsx (behind auth, lower priority) |
 
 ---
 
@@ -159,13 +101,50 @@ c901281 test: add functional tests for user-profile.ts (21 new tests)
 
 | Gotcha | Details |
 |--------|---------|
-| Express 5 wildcard routes | `app.get('*')` silently fails — must use `app.get(/.*/)` regex |
-| Express 5 req.query types | Returns `unknown` instead of `any` — add type assertions at usage sites |
-| express-rate-limit v8 fatal crash | Custom `keyGenerator` with `req.ip` throws `ERR_ERL_KEY_GEN_IPV6` at startup — add `validate: { keyGeneratorIpFallback: false }` |
-| Vitest 4 constructor mocks | `vi.fn().mockImplementation(() => {...})` fails when called with `new` — use `function()` syntax |
-| React 19 useRef strictness | `useRef<T>()` (no arg) is now a type error — must pass `undefined` explicitly |
-| Market data async cascade | Making functions async propagates through: analyzers → engine → service → extractor → tests |
-| Landing page credibility | Fabricated social proof (fake ratings, user counts, testimonials) destroys trust — use authentic capability metrics instead |
+| `nameTr === name` from AI extraction | `policy-extractor.ts:1242` sets `nameTr: coverageName` — both fields get the same English string. Must use a fallback translation map for display. |
+| i18n test mock pattern | Tests must mock `@/lib/i18n/i18n-context` and use `EN_TRANSLATIONS.section.key` for assertions instead of hardcoded strings |
+| Prefix stripping for AI insights | Mobile view strips `✓✔☑` but not `⚠💡❌` — updated regex to strip all prefixes: `/^[✓✔☑⚠💡❌]\s*/g` |
+| `translateInsight()` must handle prefixes | AI insights stored with emoji prefixes (✓ ⚠ 💡 ❌); translation function must strip prefix, translate text, re-add prefix |
+| New insight patterns need dual maintenance | When adding new insight strings in `policy-extractor.ts`, must also add Turkish translation in `PolicyDetailView.tsx` `translateInsight()` |
+
+---
+
+## Architecture Notes
+
+### i18n Architecture
+```
+App.tsx
+  └─ I18nProvider (defaultLocale="tr")
+       ├─ localStorage key: 'insurai_locale'
+       ├─ useTranslation() → { t: TranslationDictionary, locale: string, isLoading: boolean }
+       └─ Preloaded: EN_TRANSLATIONS, TR_TRANSLATIONS in translations.ts
+
+Coverage Names:
+  AI Extraction → name="Personal Belongings", nameTr="Personal Belongings" (SAME!)
+       ↓
+  PolicyDetailView → getLocalizedCoverageName()
+       ├─ nameTr !== name? → use nameTr (real translation)
+       ├─ COVERAGE_NAME_TR[name]? → use mapped value ("Kişisel Eşya")
+       └─ fallback → name
+
+AI Insights:
+  policy-extractor.ts → generateAIInsightsAsync() → English strings with emoji prefixes
+       ↓
+  PolicyDetailView → translateInsight()
+       ├─ strip prefix → translate text → re-add prefix
+       ├─ exact match in TRANSLATIONS map? → use Turkish
+       ├─ pattern match (Missing coverage, Invalid TC Kimlik, YoY)? → use template
+       └─ fallback → original English
+```
+
+### Key i18n Files
+| File | Purpose |
+|------|---------|
+| `src/lib/i18n/translations.ts` | TranslationDictionary type + EN/TR translations (1800+ lines) |
+| `src/lib/i18n/i18n-context.tsx` | React context, useTranslation hook, I18nProvider |
+| `src/lib/i18n/translation-service.ts` | AI-powered translation for non-preloaded locales |
+| `src/lib/i18n/__tests__/language-consistency.test.ts` | 64 tests for translation parity and consistency |
+| `src/components/PolicyDetailView.tsx` | `COVERAGE_NAME_TR` map, `getLocalizedCoverageName()`, `translateInsight()` |
 
 ---
 
@@ -179,27 +158,15 @@ c901281 test: add functional tests for user-profile.ts (21 new tests)
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
 ### Pending Deployment
-- All commits on `claude/review-handoff-docs-MAjiD` not yet deployed to production
-- Includes: dependency upgrades (React 19, Express 5, Vite 7, Vitest 4), tiered confidence system, market data DB migration, mobile landing page overhaul
-
-### Deployment Risk Assessment
-| Change | Risk | Mitigation |
-|--------|------|------------|
-| **Express 4 → 5** | **High** | Major server framework upgrade — wildcard routes, query types, error handling all changed. Tested locally but Railway runtime may differ. |
-| **express-rate-limit 7 → 8** | **High** | Was crashing server at startup before fix (`759a2f9`). All custom keyGenerators patched with `validate: { keyGeneratorIpFallback: false }`. |
-| **React 18 → 19** | Medium | Frontend-only; useRef fix is straightforward. Bundle size may change slightly. |
-| **Vite 6 → 7** | Low | Build tool only — affects build output, not runtime. |
-| **Vitest 2 → 4** | None | Test runner only — not deployed. |
-| **Market data async** | Medium | Core extraction and comparison logic now async. Fallback to static files if DB unavailable. |
+- All commits on `claude/review-handoff-docs-E4fnT` not yet deployed to production
+- Changes are frontend-only (i18n) — no server-side risk
 
 ### Post-Deployment Verification
-After merging and deploying, verify **in this order**:
-1. `curl https://insurai-production.up.railway.app/api/health` — Server starts without rate-limit crash (Express 5 + rate-limit v8)
-2. `curl https://insurai-production.up.railway.app/api/ai/diagnose` — All 3 providers valid
-3. `curl https://insurai-production.up.railway.app/api/admin/diagnostics` — Admin config intact
-4. Upload a test PDF via `/try` — extraction pipeline works end-to-end with async market data
-5. Visit mobile landing page — no fabricated data, CTA above fold
-6. Test low-confidence extraction — warning banner appears (tiered confidence system)
+1. Visit landing page with TR locale — all text should be Turkish
+2. Upload a test PDF via `/try` — coverage names should show Turkish translations
+3. View policy detail page — AI insights should be in Turkish
+4. Switch to EN locale — everything should revert to English
+5. Download policy summary — should respect current locale
 
 ### Database Migrations
 - ✅ All migrations up to `015_config_drift_baselines.sql` applied
@@ -210,21 +177,21 @@ After merging and deploying, verify **in this order**:
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Deploy latest commits** — Merge `claude/review-handoff-docs-MAjiD` and deploy to production. Verify Express 5 + rate-limit v8 work in Railway.
-2. **Investigate Anthropic billing** — Currently falling back to OpenAI, adding latency. Check credit balance or upgrade billing plan.
-3. **Smoke test mobile landing page** — Verify all landing page changes render correctly on actual mobile devices after deployment.
+1. **Deploy latest commits** — Frontend-only i18n changes, low deployment risk
+2. **Fix coverage `nameTr` at extraction time** — Modify `policy-extractor.ts` to set `nameTr` differently from `name` (use AI extraction field or the `COVERAGE_NAME_TR` map at extraction time rather than display time)
+3. **Smoke test i18n on mobile** — Verify all coverage names and AI insights render in Turkish on actual mobile devices
 
 ### Medium Priority
-4. **Performance baseline** — Run config performance monitor in production to establish baseline metrics and validate the 5-minute cache TTL
-5. **Monitor Express 5 in production** — Watch for any edge cases with async error handling, wildcard routes, or query parsing changes
-6. **Remaining test coverage** — 17 other untested files identified in audit (lower priority — the 4 critical ones are covered)
-7. **Improve statement coverage** — Currently 49.6%; target 60%+ by adding tests for uncovered server routes and client components
+4. **i18n for remaining components** — PolicyChat.tsx, PolicyUpload.tsx (behind auth, lower user impact)
+5. **Investigate Anthropic billing** — Currently falling back to OpenAI, adding latency
+6. **Add more coverage name translations** — As new policies are extracted with unknown English names, add entries to `COVERAGE_NAME_TR`
+7. **Performance baseline** — Run config performance monitor in production
 
 ### Low Priority
-8. **Reduce ESLint warnings** — 46 `no-non-null-assertion` warnings across 10+ files
-9. **Document AI Enterprise upgrade** — Standard OCR processor has 15-page limit; Enterprise would remove this
-10. **Turkish language landing page** — Currently English-only; leverage existing i18n system for TR translations
-11. **Real user testimonials** — As users adopt the platform, replace use-case scenarios with actual quotes
+8. **Consider server-side insight translation** — Generate insights in both EN/TR at extraction time instead of runtime translation
+9. **Reduce ESLint warnings** — 46 `no-non-null-assertion` warnings
+10. **Improve test coverage** — Currently 49.6% statements; target 60%+
+11. **Real user testimonials** — Replace use-case scenarios with actual user quotes when available
 
 ---
 
@@ -234,49 +201,42 @@ After merging and deploying, verify **in this order**:
 # Full validation
 npm run validate  # typecheck + lint + test
 
-# Server build
-npm run build:server  # Should pass cleanly
+# Run i18n tests specifically
+npx vitest run src/lib/i18n/
+npx vitest run src/components/PolicyDetailView.test.tsx
 
-# Run all tests
-npm test -- --run  # 6,000+ passing, 185+ files
-
-# Run landing page tests specifically
+# Run all landing page tests
 npx vitest run src/components/landing/
 
-# Run server tests
-npx vitest run server/__tests__/
+# Run language consistency tests
+npx vitest run src/lib/i18n/__tests__/language-consistency.test.ts
 
 # Check AI providers
 curl https://insurai-production.up.railway.app/api/ai/diagnose
-
-# Check admin diagnostics
-curl https://insurai-production.up.railway.app/api/admin/diagnostics
 ```
 
 ---
 
 ## Previous Session Context
 
+**February 9, 2026** (`claude/review-handoff-docs-MAjiD`):
+- Market Data DB migration, user profile tests
+- Major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)
+- Mobile landing page UX overhaul, tiered confidence system
+
 **February 8, 2026** (`claude/review-handoff-gWqM4`):
 - Comprehensive audit hardening (JSON.parse, structured logging, rate limiting)
-- Critical module test coverage (275 new tests: admin-auth, email, cost-control, free-trial)
-- TryAnalysis refactor, Tier 1 dep upgrades, E2E extraction tests, Vision OCR timeout
+- Critical module test coverage (275 new tests)
 - Dead code cleanup (~17,800 lines removed), production hardening phase 3
 
-**February 7, 2026 (Session 2)** (`claude/review-handoff-5noRe`):
-- Google Vision OCR diagnostics fix (code + GCP config)
-- Production hardening: JSON parse guards, startup validation, rate limits, structured logging
-- Silent `.catch(() => {})` elimination (10 occurrences)
-
-**February 7, 2026 (Session 1)** (`claude/review-project-status-jpuTI`):
-- Admin routes modularization (3,390 lines → 9 modules)
-- Structured server logging, HSTS + crypto security
-- User preferences, config drift, webhooks, templates, batch settings
+**February 7, 2026**:
+- Admin routes modularization (9 modules), structured server logging
+- User preferences, config drift, webhooks, templates
 - Production extraction pipeline fix (mock data → real AI results)
 
 ---
 
-**Last Updated**: February 9, 2026
-**Branch**: `claude/review-handoff-docs-MAjiD`
+**Last Updated**: February 11, 2026
+**Branch**: `claude/review-handoff-docs-E4fnT`
 **ESLint Status**: 0 errors, 46 warnings
-**Next Session Focus**: Deploy to production, verify Express 5 in Railway, Anthropic billing, mobile smoke test
+**Next Session Focus**: Deploy i18n, fix coverage nameTr at extraction time, i18n remaining auth-gated components

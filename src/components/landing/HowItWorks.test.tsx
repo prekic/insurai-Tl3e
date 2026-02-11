@@ -61,7 +61,7 @@ describe('HowItWorks', () => {
     it('should render all 3 step cards', () => {
       const { container } = render(<HowItWorks />)
 
-      const cards = container.querySelectorAll('.bg-white.rounded-3xl')
+      const cards = container.querySelectorAll('.bg-white.rounded-2xl')
       expect(cards.length).toBe(3)
     })
   })

@@ -281,6 +281,48 @@ export class ProcessingLogger {
   }
 
   /**
+   * Set request ID for correlating frontend and backend logs
+   */
+  setRequestId(requestId: string): void {
+    this.log.request_id = requestId
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Set the extraction route used on the server
+   */
+  setExtractionRoute(route: string): void {
+    this.log.extraction_route = route
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Set the extraction mode (proxy, direct, consensus)
+   */
+  setExtractionMode(mode: 'proxy' | 'direct' | 'consensus'): void {
+    this.log.extraction_mode = mode
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
+   * Record a provider fallback event
+   */
+  setFallbackInfo(info: {
+    fallback_used: boolean
+    chain: Array<{
+      provider: string
+      success: boolean
+      duration_ms?: number
+      error?: string
+      error_code?: string
+    }>
+  }): void {
+    this.log.fallback_used = info.fallback_used
+    this.log.fallback_chain = info.chain
+    this.log.updated_at = new Date().toISOString()
+  }
+
+  /**
    * Set extraction confidence score
    */
   setExtractionConfidence(confidence: number): void {

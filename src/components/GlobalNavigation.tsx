@@ -5,8 +5,10 @@ import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
+  const { t } = useTranslation()
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
@@ -14,8 +16,10 @@ export function GlobalNavigation() {
   const policyCount = policies.length
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showNotifications, setShowNotifications] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
+  const notificationRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file upload directly from navigation
@@ -64,9 +68,9 @@ export function GlobalNavigation() {
   const currentPage = location.pathname
 
   const navItems = [
-    { id: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: '/compare', label: 'Compare', icon: Scale },
-    { id: '/chat', label: 'Chat', icon: MessageSquare, showCount: true },
+    { id: '/dashboard', label: t.nav.dashboard, icon: LayoutDashboard },
+    { id: '/compare', label: t.nav.compare, icon: Scale },
+    { id: '/chat', label: t.nav.chat, icon: MessageSquare, showCount: true },
   ]
 
   // Handle keyboard navigation in profile menu
@@ -128,11 +132,11 @@ export function GlobalNavigation() {
 
     try {
       await signOut()
-      toast.success('Signed out successfully')
+      toast.success(t.landing.signedOutSuccess)
       navigate('/')
     } catch (error) {
       console.error('Sign out error:', error)
-      toast.error('Failed to sign out')
+      toast.error(t.landing.signOutFailed)
       // Navigate anyway on error
       navigate('/')
     }
@@ -157,7 +161,7 @@ export function GlobalNavigation() {
             </div>
             <div className="hidden sm:block">
               <div className="font-bold text-gray-900">InsurAI</div>
-              <div className="text-xs text-gray-500">Policy Analysis</div>
+              <div className="text-xs text-gray-500">{t.landing.policyAnalysisPlatform}</div>
             </div>
           </Link>
 
@@ -180,9 +184,9 @@ export function GlobalNavigation() {
                 >
                   <Icon size={18} aria-hidden="true" />
                   <span>{item.label}</span>
-                  {item.showCount && policyCount > 0 && (
+                  {item.showCount && user && policyCount > 0 && (
                     <span
-                      className="px-1.5 py-0.5 bg-slate-700 text-white text-xs rounded-full font-semibold"
+                      className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-slate-700 text-white text-xs rounded-full font-semibold leading-none"
                       aria-label={`${policyCount} policies loaded`}
                     >
                       {policyCount > 9 ? '9+' : policyCount}
@@ -201,18 +205,47 @@ export function GlobalNavigation() {
             >
               <Search size={20} aria-hidden="true" />
             </button>
-            <button
-              className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-              aria-label={policyCount > 0 ? `Notifications, ${policyCount} new` : 'Notifications'}
-            >
-              <Bell size={20} aria-hidden="true" />
-              {policyCount > 0 && (
-                <span
-                  className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"
-                  aria-hidden="true"
-                />
+            <div className="relative" ref={notificationRef}>
+              <button
+                onClick={() => {
+                  if (!user) {
+                    navigate('/auth')
+                    return
+                  }
+                  setShowProfileMenu(false)
+                  setShowNotifications(!showNotifications)
+                }}
+                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                aria-label="Notifications"
+                aria-expanded={showNotifications}
+                aria-haspopup="true"
+              >
+                <Bell size={20} aria-hidden="true" />
+              </button>
+
+              {showNotifications && user && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowNotifications(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    role="dialog"
+                    aria-label="Notifications"
+                  >
+                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                      <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
+                    </div>
+                    <div className="py-8 text-center text-sm text-gray-500">
+                      <Bell size={24} className="mx-auto mb-2 text-gray-300" />
+                      {t.nav.noNotifications}
+                    </div>
+                  </div>
+                </>
               )}
-            </button>
+            </div>
             {/* Hidden file input for immediate upload */}
             <input
               ref={fileInputRef}
@@ -228,14 +261,17 @@ export function GlobalNavigation() {
               className="hidden md:flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2 focus-ring"
             >
               <Upload size={18} aria-hidden="true" />
-              <span>Upload</span>
+              <span>{t.nav.upload}</span>
             </button>
 
             {/* Profile Menu */}
             <div className="relative">
               <button
                 ref={profileButtonRef}
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
+                onClick={() => {
+                  setShowNotifications(false)
+                  setShowProfileMenu(!showProfileMenu)
+                }}
                 className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
                   showProfileMenu
                     ? 'bg-blue-50 ring-2 ring-blue-500'
@@ -297,9 +333,9 @@ export function GlobalNavigation() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 truncate">
-                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Guest'}
+                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t.landing.guest}
                           </p>
-                          <p className="text-sm text-gray-500 truncate">{user?.email || 'Not signed in'}</p>
+                          <p className="text-sm text-gray-500 truncate">{user?.email || t.landing.notSignedIn}</p>
                         </div>
                       </div>
                     </div>
@@ -316,8 +352,7 @@ export function GlobalNavigation() {
                             <User size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                           </div>
                           <div>
-                            <span className="font-medium">My Account</span>
-                            <p className="text-xs text-gray-400 group-hover:text-blue-500">Profile & preferences</p>
+                            <span className="font-medium">{t.nav.myAccount}</span>
                           </div>
                         </button>
                       )}
@@ -330,8 +365,7 @@ export function GlobalNavigation() {
                           <Settings size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                         </div>
                         <div>
-                          <span className="font-medium">Settings</span>
-                          <p className="text-xs text-gray-400 group-hover:text-blue-500">App configuration</p>
+                          <span className="font-medium">{t.nav.settings}</span>
                         </div>
                       </button>
                       <button
@@ -343,8 +377,7 @@ export function GlobalNavigation() {
                           <HelpCircle size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
                         </div>
                         <div>
-                          <span className="font-medium">Help Center</span>
-                          <p className="text-xs text-gray-400 group-hover:text-blue-500">Support & documentation</p>
+                          <span className="font-medium">{t.nav.helpCenter}</span>
                         </div>
                       </button>
                     </div>
@@ -358,7 +391,7 @@ export function GlobalNavigation() {
                           role="menuitem"
                         >
                           <LogOut size={18} aria-hidden="true" />
-                          <span>Sign Out</span>
+                          <span>{t.auth.signOut}</span>
                         </button>
                       ) : (
                         <button
@@ -367,7 +400,7 @@ export function GlobalNavigation() {
                           role="menuitem"
                         >
                           <LogIn size={18} aria-hidden="true" />
-                          <span>Sign In</span>
+                          <span>{t.auth.signIn}</span>
                         </button>
                       )}
                     </div>

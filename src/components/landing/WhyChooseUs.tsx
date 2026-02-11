@@ -1,21 +1,24 @@
 import { ShieldCheck, Zap, Target } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function WhyChooseUs() {
+  const { t } = useTranslation()
+
   const differentiators = [
     {
       icon: ShieldCheck,
-      title: 'KVKK Compliant',
-      description: 'Privacy-first design for Turkish data protection',
+      title: t.landing.whyKvkkTitle,
+      description: t.landing.whyKvkkDesc,
     },
     {
       icon: Zap,
-      title: 'No Signup Required',
-      description: 'Try a full policy analysis free, instantly',
+      title: t.landing.whyNoSignupTitle,
+      description: t.landing.whyNoSignupDesc,
     },
     {
       icon: Target,
-      title: 'Turkey-Focused',
-      description: 'Built specifically for Turkish insurance market',
+      title: t.landing.whyTurkeyTitle,
+      description: t.landing.whyTurkeyDesc,
     },
   ]
 

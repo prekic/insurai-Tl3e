@@ -10,6 +10,13 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { GlobalNavigation } from './GlobalNavigation'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+
+// Mock i18n context to return English translations
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+}))
 
 // Mock hooks and dependencies
 const mockNavigate = vi.fn()
@@ -19,6 +26,15 @@ const mockPolicies = [
   { id: '1', policyNumber: 'POL-001' },
   { id: '2', policyNumber: 'POL-002' },
 ]
+
+const mockUser = {
+  id: 'user-1',
+  email: 'test@example.com',
+  user_metadata: { full_name: 'Test User' },
+}
+
+// Mutable mock user — set to null for anonymous user tests
+let currentMockUser: typeof mockUser | null = mockUser
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -37,11 +53,7 @@ vi.mock('@/lib/policy-context', () => ({
 
 vi.mock('@/lib/supabase/auth-context', () => ({
   useAuth: () => ({
-    user: {
-      id: 'user-1',
-      email: 'test@example.com',
-      user_metadata: { full_name: 'Test User' },
-    },
+    user: currentMockUser,
     signOut: mockSignOut,
   }),
 }))
@@ -71,7 +83,7 @@ describe('GlobalNavigation', () => {
       renderNavigation()
 
       expect(screen.getByText('InsurAI')).toBeInTheDocument()
-      expect(screen.getByText('Policy Analysis')).toBeInTheDocument()
+      expect(screen.getByText('Policy Analysis Platform')).toBeInTheDocument()
     })
 
     it('should render the home link', () => {
@@ -126,19 +138,30 @@ describe('GlobalNavigation', () => {
   })
 
   describe('Policy Count Badge', () => {
-    it('should show policy count badge on chat link', () => {
+    it('should show policy count badge on chat link when user is logged in', () => {
       renderNavigation()
 
-      // The badge shows count for policies
+      // The badge shows count for loaded policies (user is logged in via mock)
       expect(screen.getByText('2')).toBeInTheDocument()
     })
 
-    it('should show notification indicator when policies exist', () => {
+    it('should render notification button with correct aria attributes', () => {
       renderNavigation()
 
-      // Notification button should indicate policies exist
-      const notifButton = screen.getByLabelText(/notifications, 2 new/i)
+      const notifButton = screen.getByLabelText('Notifications')
       expect(notifButton).toBeInTheDocument()
+      expect(notifButton).toHaveAttribute('aria-haspopup', 'true')
+    })
+
+    it('should open notification dropdown when clicked by logged-in user', async () => {
+      const user = userEvent.setup()
+      renderNavigation()
+
+      await user.click(screen.getByLabelText('Notifications'))
+
+      await waitFor(() => {
+        expect(screen.getByText('No notifications yet')).toBeInTheDocument()
+      })
     })
   })
 
@@ -350,18 +373,42 @@ describe('GlobalNavigation', () => {
 describe('GlobalNavigation - No User', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-
-    vi.doMock('@/lib/supabase/auth-context', () => ({
-      useAuth: () => ({
-        user: null,
-        signOut: vi.fn(),
-      }),
-    }))
+    currentMockUser = null
+    mockSignOut.mockResolvedValue(undefined)
   })
 
-  it('should show Not signed in when no user', async () => {
-    // This would need proper mock reset
-    // The component shows email?.split('@')[0] || 'User' for display name
-    // and email || 'Not signed in' for email display
+  afterEach(() => {
+    // Restore default mock user
+    currentMockUser = mockUser
+  })
+
+  it('should hide policy count badge when user is not logged in', () => {
+    renderNavigation()
+
+    // Badge showing "2" should NOT be present for anonymous users
+    expect(screen.queryByText('2')).not.toBeInTheDocument()
+  })
+
+  it('should navigate to auth when anonymous user clicks notification bell', async () => {
+    const user = userEvent.setup()
+    renderNavigation()
+
+    await user.click(screen.getByLabelText('Notifications'))
+
+    expect(mockNavigate).toHaveBeenCalledWith('/auth')
+    // Should NOT show notification dropdown
+    expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument()
+  })
+
+  it('should show Sign In button in profile menu instead of Sign Out', async () => {
+    const user = userEvent.setup()
+    renderNavigation()
+
+    await user.click(screen.getByLabelText('User menu'))
+
+    await waitFor(() => {
+      expect(screen.getByRole('menuitem', { name: /sign in/i })).toBeInTheDocument()
+      expect(screen.queryByRole('menuitem', { name: /sign out/i })).not.toBeInTheDocument()
+    })
   })
 })

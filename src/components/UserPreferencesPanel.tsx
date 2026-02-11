@@ -7,6 +7,8 @@
 
 import { useState } from 'react'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
+import { useTranslation } from '@/lib/i18n/i18n-context'
+import type { TranslationDictionary } from '@/lib/i18n/translations'
 import { Button } from '@/components/ui/button'
 import {
   Save,
@@ -38,14 +40,16 @@ export function UserPreferencesPanel() {
     getFieldMeta,
   } = useUserPreferences()
 
+  const { t } = useTranslation()
+
   const [expandedCategory, setExpandedCategory] = useState<UserOverridableCategory | null>('ui')
 
   if (!isAuthenticated) {
     return (
       <div className="text-center py-12 text-gray-500">
         <Settings2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-        <p className="text-lg font-medium text-gray-600">Sign in to customize preferences</p>
-        <p className="text-sm mt-1">Personal preferences are available to logged-in users.</p>
+        <p className="text-lg font-medium text-gray-600">{t.preferences.signInRequired}</p>
+        <p className="text-sm mt-1">{t.preferences.signInDescription}</p>
       </div>
     )
   }
@@ -73,15 +77,15 @@ export function UserPreferencesPanel() {
   }> = [
     {
       id: 'ui',
-      label: 'Display Preferences',
+      label: t.preferences.displayPreferences,
       icon: <Settings2 className="h-5 w-5" />,
-      description: 'Customize how content is displayed',
+      description: t.preferences.displayDescription,
     },
     {
       id: 'email',
-      label: 'Email Preferences',
+      label: t.preferences.emailPreferences,
       icon: <Mail className="h-5 w-5" />,
-      description: 'Manage email notifications and reminders',
+      description: t.preferences.emailDescription,
     },
   ]
 
@@ -94,21 +98,21 @@ export function UserPreferencesPanel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">My Preferences</h2>
+          <h2 className="text-xl font-semibold text-gray-900">{t.preferences.title}</h2>
           <p className="text-sm text-gray-500 mt-1">
-            Customize your experience. These settings override system defaults.
+            {t.preferences.subtitle}
           </p>
         </div>
         <Button onClick={savePreferences} disabled={isSaving || !hasAnyModifications}>
           {isSaving ? (
             <span className="flex items-center gap-2">
               <Save className="h-4 w-4 animate-pulse" />
-              Saving...
+              {t.preferences.saving}
             </span>
           ) : (
             <span className="flex items-center gap-2">
               <Save className="h-4 w-4" />
-              Save Preferences
+              {t.common.save}
             </span>
           )}
         </Button>
@@ -155,7 +159,7 @@ export function UserPreferencesPanel() {
                 <div className="flex items-center gap-3">
                   {modifiedCount > 0 && (
                     <span className="bg-blue-100 text-blue-700 text-xs font-medium px-2 py-0.5 rounded-full">
-                      {modifiedCount} customized
+                      {modifiedCount} {t.preferences.modified}
                     </span>
                   )}
                   {isExpanded ? (
@@ -198,7 +202,7 @@ export function UserPreferencesPanel() {
                         disabled={isSaving}
                       >
                         <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
-                        Reset {category.label} to Defaults
+                        {t.preferences.resetAll}
                       </Button>
                     </div>
                   )}
@@ -234,6 +238,8 @@ function PreferenceField({
   onChange,
   onReset,
 }: PreferenceFieldProps) {
+  const { t } = useTranslation()
+
   return (
     <div className="px-5 py-4 flex items-center justify-between gap-4">
       <div className="flex-1 min-w-0">
@@ -241,14 +247,14 @@ function PreferenceField({
           <span className="text-sm font-medium text-gray-900">{field.label}</span>
           {isOverridden && (
             <span className="bg-blue-50 text-blue-600 text-xs px-1.5 py-0.5 rounded">
-              customized
+              {t.preferences.modified}
             </span>
           )}
         </div>
         <p className="text-xs text-gray-500 mt-0.5">{field.description}</p>
         {isOverridden && adminDefault !== undefined && (
           <p className="text-xs text-gray-400 mt-0.5">
-            Default: {formatValue(adminDefault)}
+            {t.preferences.defaultLabel}: {formatValue(adminDefault, t)}
           </p>
         )}
       </div>
@@ -281,8 +287,8 @@ function PreferenceField({
           <button
             onClick={onReset}
             className="text-gray-400 hover:text-gray-600 p-1"
-            title="Reset to default"
-            aria-label={`Reset ${field.label} to default`}
+            title={t.preferences.resetToDefault}
+            aria-label={`${t.preferences.resetToDefault} ${field.label}`}
           >
             <X className="h-4 w-4" />
           </button>
@@ -350,6 +356,7 @@ function ArrayInput({
   value: number[]
   onChange: (v: number[]) => void
 }) {
+  const { t } = useTranslation()
   const [inputValue, setInputValue] = useState('')
 
   const currentValues = Array.isArray(value) ? value : []
@@ -379,7 +386,7 @@ function ArrayInput({
             <button
               onClick={() => handleRemove(num)}
               className="text-gray-400 hover:text-gray-600"
-              aria-label={`Remove ${num}`}
+              aria-label={`${t.preferences.remove} ${num}`}
             >
               <X className="h-3 w-3" />
             </button>
@@ -392,7 +399,7 @@ function ArrayInput({
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-          placeholder="Add"
+          placeholder={t.preferences.add}
           className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
         <Button variant="outline" size="sm" onClick={handleAdd} disabled={!inputValue} className="h-6 px-2 text-xs">
@@ -407,9 +414,9 @@ function ArrayInput({
 // HELPERS
 // =============================================================================
 
-function formatValue(value: unknown): string {
-  if (value === null || value === undefined) return 'N/A'
-  if (typeof value === 'boolean') return value ? 'On' : 'Off'
+function formatValue(value: unknown, t: TranslationDictionary): string {
+  if (value === null || value === undefined) return t.preferences.notAvailable
+  if (typeof value === 'boolean') return value ? t.preferences.on : t.preferences.off
   if (typeof value === 'number') return String(value)
   if (Array.isArray(value)) return value.join(', ')
   if (typeof value === 'string') return value

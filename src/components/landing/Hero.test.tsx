@@ -8,6 +8,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { Hero } from './Hero'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+
+// Mock i18n context to return English translations
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+}))
 
 // Mock dependencies
 vi.mock('@/lib/policy-context', () => ({
@@ -119,7 +126,7 @@ describe('Hero', () => {
     it('should have Help link', () => {
       renderWithRouter(<Hero />)
 
-      expect(screen.getByText('Help')).toBeInTheDocument()
+      expect(screen.getByText('Help Center')).toBeInTheDocument()
     })
 
     it('should hide utility bar on mobile and show on desktop', () => {
@@ -141,7 +148,9 @@ describe('Hero', () => {
       renderWithRouter(<Hero />)
 
       expect(screen.getByText(/Understand and/)).toBeInTheDocument()
-      expect(screen.getByText('benchmark')).toBeInTheDocument()
+      // "benchmark" appears in both mobile and desktop headlines
+      const benchmarkElements = screen.getAllByText('benchmark')
+      expect(benchmarkElements.length).toBeGreaterThan(0)
     })
 
     it('should display subheadline', () => {

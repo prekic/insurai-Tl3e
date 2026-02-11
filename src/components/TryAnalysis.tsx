@@ -16,6 +16,7 @@ import { sanitizeFileName } from '@/lib/sanitize'
 import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
 import { useAuth } from '@/lib/supabase/auth-context'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import {
   hasUsedFreeTrial,
   canPerformFreeTrial,
@@ -46,6 +47,7 @@ export function TryAnalysis() {
   const { user } = useAuth()
   const { health } = useBackendHealth()
   const processedFromStateRef = useRef(false)
+  const { t } = useTranslation()
 
   const [state, setState] = useState<AnalysisState>('idle')
   const [progress, setProgress] = useState(0)
@@ -111,19 +113,19 @@ export function TryAnalysis() {
     setSelectedFile(file)
     setState('uploading')
     setProgress(10)
-    setProgressMessage('Preparing document...')
+    setProgressMessage(t.tryAnalysis.preparingDocument)
     setError(null)
 
     let progressInterval: ReturnType<typeof setInterval> | null = null
 
     try {
       setProgress(20)
-      setProgressMessage('Uploading document...')
+      setProgressMessage(t.tryAnalysis.uploadingDocument)
       await new Promise((r) => setTimeout(r, 400))
 
       setState('analyzing')
       setProgress(40)
-      setProgressMessage('Extracting text from PDF...')
+      setProgressMessage(t.tryAnalysis.extractingText)
 
       trackTrialAnalysisStarted()
 
@@ -131,7 +133,7 @@ export function TryAnalysis() {
       const EXTRACTION_TIMEOUT_MS = 120000
       const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
-          reject(new Error('Analysis timed out. The document may be too large or complex. Please try a smaller document.'))
+          reject(new Error(t.tryAnalysis.analysisTimedOut))
         }, EXTRACTION_TIMEOUT_MS)
       })
 
@@ -143,10 +145,10 @@ export function TryAnalysis() {
         })
         setProgressMessage((prev) => {
           const messages = [
-            'Extracting text from PDF...',
-            'Analyzing document structure...',
-            'Processing with AI...',
-            'Almost there...',
+            t.tryAnalysis.extractingText,
+            t.tryAnalysis.analyzingStructure,
+            t.tryAnalysis.processingWithAI,
+            t.tryAnalysis.almostThere,
           ]
           const currentIndex = messages.indexOf(prev)
           if (currentIndex < messages.length - 1) {
@@ -166,7 +168,7 @@ export function TryAnalysis() {
 
       // Handle null/undefined result
       if (!extractionResult) {
-        throw new Error('Failed to analyze policy - no response received')
+        throw new Error(t.tryAnalysis.noResponse)
       }
 
       if (!extractionResult.success) {
@@ -176,16 +178,16 @@ export function TryAnalysis() {
       // Reject fallback/sample data - user expects real AI results
       if ('source' in extractionResult && extractionResult.source === 'fallback') {
         console.warn('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
-        throw new Error('AI extraction could not process this document. Please try again or use a different document.')
+        throw new Error(t.tryAnalysis.aiExtractionFailed)
       }
 
       // Validate policy exists
       if (!extractionResult.policy) {
-        throw new Error('Analysis completed but no policy data was extracted')
+        throw new Error(t.tryAnalysis.noDataExtracted)
       }
 
       setProgress(95)
-      setProgressMessage('Finalizing analysis...')
+      setProgressMessage(t.tryAnalysis.finalizingAnalysis)
 
       const policy = extractionResult.policy
       const fileName = sanitizeFileName(file.name)
@@ -204,7 +206,7 @@ export function TryAnalysis() {
       saveTrialResult(policyWithDefaults, fileName)
 
       setProgress(100)
-      setProgressMessage('Analysis complete!')
+      setProgressMessage(t.tryAnalysis.analysisComplete)
 
       trackTrialAnalysisCompleted(
         policy.type,
@@ -213,12 +215,12 @@ export function TryAnalysis() {
       )
 
       if (isLowConfidence) {
-        toast.warning('Analysis complete with low confidence', {
+        toast.warning(t.tryAnalysis.lowConfidenceTitle, {
           description: `Confidence: ${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%. Some extracted data may be inaccurate.`,
         })
       } else {
-        toast.success('Analysis complete!', {
-          description: 'Your policy has been analyzed successfully.',
+        toast.success(t.tryAnalysis.analysisComplete, {
+          description: t.tryAnalysis.analysisSuccessDesc,
         })
       }
 
@@ -235,20 +237,20 @@ export function TryAnalysis() {
     } catch (err) {
       if (progressInterval) clearInterval(progressInterval)
       console.warn('[TryAnalysis] Extraction error:', err instanceof Error ? err.message : err)
-      const message = err instanceof Error ? err.message : 'Analysis failed'
+      const message = err instanceof Error ? err.message : t.tryAnalysis.analysisFailed
       setError(message)
       setState('error')
       trackTrialAnalysisFailed(message)
-      toast.error('Analysis failed', { description: message })
+      toast.error(t.tryAnalysis.analysisFailed, { description: message })
     }
-  }, [navigate])
+  }, [navigate, t])
 
   // Validate file and check eligibility before running extraction
   const processFile = useCallback((file: File) => {
     // Check trial eligibility
     const trialCheck = canPerformFreeTrial()
     if (!trialCheck.canTry) {
-      toast.error('Free trial already used', {
+      toast.error(t.tryAnalysis.trialAlreadyUsed, {
         description: trialCheck.reason,
       })
       setState('trial-used')
@@ -265,14 +267,14 @@ export function TryAnalysis() {
 
     // Check backend availability
     if (!backendReady || !isAIConfigured()) {
-      toast.error('Analysis service unavailable', {
-        description: 'Please try again in a moment.',
+      toast.error(t.tryAnalysis.serviceUnavailableToast, {
+        description: t.tryAnalysis.pleaseWait,
       })
       return
     }
 
     runExtraction(file)
-  }, [backendReady, runExtraction])
+  }, [backendReady, runExtraction, t])
 
   // Process file passed from landing page UploadWidget via router state
   useEffect(() => {
@@ -335,13 +337,13 @@ export function TryAnalysis() {
               <Clock className="text-amber-600" size={32} />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Free Trial Already Used
+              {t.tryAnalysis.trialAlreadyUsedTitle}
             </h1>
             <p className="text-gray-600 mb-6">
-              You&apos;ve already analyzed a policy with your free trial.
+              {t.tryAnalysis.trialAlreadyUsedDesc}
               {timeRemaining > 0 && (
                 <span className="block mt-2 text-sm text-gray-500">
-                  Try again in {formatTimeRemaining(timeRemaining)}
+                  {t.tryAnalysis.tryAgainIn} {formatTimeRemaining(timeRemaining)}
                 </span>
               )}
             </p>
@@ -352,10 +354,10 @@ export function TryAnalysis() {
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-lg"
               >
                 <Sparkles size={18} className="mr-2" />
-                Sign Up for Unlimited Access
+                {t.tryAnalysis.signUpUnlimited}
               </Button>
               <Button variant="outline" onClick={() => navigate('/')}>
-                Back to Home
+                {t.tryAnalysis.backToHome}
               </Button>
             </div>
           </div>
@@ -373,13 +375,13 @@ export function TryAnalysis() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full mb-4">
             <Sparkles size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium text-emerald-700">Free Analysis - No Sign Up Required</span>
+            <span className="text-sm font-medium text-emerald-700">{t.tryAnalysis.freeAnalysisBadge}</span>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Try Policy Analysis
+            {t.tryAnalysis.title}
           </h1>
           <p className="text-gray-600">
-            Upload your insurance policy and see instant AI-powered analysis.
+            {t.tryAnalysis.subtitle}
           </p>
         </div>
 
@@ -390,10 +392,10 @@ export function TryAnalysis() {
               <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <XCircle className="text-red-600" size={32} />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Analysis Failed</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">{t.tryAnalysis.analysisFailedTitle}</h2>
               <p className="text-gray-600 mb-6">{error}</p>
               <Button onClick={handleTryAgain} variant="outline">
-                Try Again
+                {t.tryAnalysis.tryAgain}
               </Button>
             </div>
           ) : state === 'uploading' || state === 'analyzing' ? (
@@ -417,7 +419,7 @@ export function TryAnalysis() {
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-sm text-gray-500 text-center">{Math.round(progress)}% complete</p>
+              <p className="text-sm text-gray-500 text-center">{Math.round(progress)}{t.tryAnalysis.percentComplete}</p>
 
               {/* Analyzing animation */}
               {state === 'analyzing' && (
@@ -426,7 +428,7 @@ export function TryAnalysis() {
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.1s]" />
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <span className="text-sm text-indigo-700 ml-2">AI analyzing your policy...</span>
+                    <span className="text-sm text-indigo-700 ml-2">{t.tryAnalysis.aiAnalyzing}</span>
                   </div>
                 </div>
               )}
@@ -457,10 +459,10 @@ export function TryAnalysis() {
                   />
                 </div>
                 <p className="font-semibold text-gray-900 mb-1">
-                  {isDragging ? 'Drop your file here' : 'Upload your policy'}
+                  {isDragging ? t.tryAnalysis.dropFileHere : t.tryAnalysis.uploadYourPolicy}
                 </p>
                 <p className="text-sm text-gray-500 mb-4">
-                  Drag & drop or click to browse
+                  {t.tryAnalysis.dragDropOrClick}
                 </p>
                 <p className="text-xs text-gray-400">
                   {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} up to {FILE_CONSTRAINTS.MAX_SIZE_MB}MB
@@ -483,14 +485,14 @@ export function TryAnalysis() {
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-1.5 text-gray-500">
                     <Shield size={14} className="text-emerald-500" />
-                    <span>Secure</span>
+                    <span>{t.tryAnalysis.secure}</span>
                   </div>
                   <div className="flex items-center gap-1.5 text-gray-500">
                     <Sparkles size={14} className="text-blue-500" />
-                    <span>AI-Powered</span>
+                    <span>{t.tryAnalysis.aiPowered}</span>
                   </div>
                 </div>
-                <span className="text-gray-400">1 free analysis</span>
+                <span className="text-gray-400">{t.tryAnalysis.oneFreeAnalysis}</span>
               </div>
             </div>
           )}
@@ -502,9 +504,9 @@ export function TryAnalysis() {
             <div className="flex items-start gap-3">
               <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-medium text-amber-800">Service temporarily unavailable</p>
+                <p className="font-medium text-amber-800">{t.tryAnalysis.serviceUnavailable}</p>
                 <p className="text-sm text-amber-700 mt-1">
-                  The analysis service is starting up. Please try again in a moment.
+                  {t.tryAnalysis.serviceStartingUp}
                 </p>
               </div>
             </div>
@@ -514,12 +516,12 @@ export function TryAnalysis() {
         {/* Already have account? */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-500">
-            Already have an account?{' '}
+            {t.tryAnalysis.alreadyHaveAccount}{' '}
             <button
               onClick={() => navigate('/auth')}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              Sign in
+              {t.auth.signIn}
             </button>
           </p>
         </div>

@@ -1,37 +1,16 @@
 import { Shield, Zap, Globe, Clock, Lock, BarChart3 } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function Benefits() {
+  const { t } = useTranslation()
+
   const benefits = [
-    {
-      icon: Shield,
-      title: 'Comprehensive Analysis',
-      description: 'AI extracts every detail from your policy documents automatically.',
-    },
-    {
-      icon: Zap,
-      title: 'Instant Results',
-      description: 'Get detailed coverage breakdowns in seconds, not hours.',
-    },
-    {
-      icon: Globe,
-      title: 'Multi-Language Support',
-      description: 'Works with Turkish and English policies seamlessly.',
-    },
-    {
-      icon: Clock,
-      title: 'Renewal Tracking',
-      description: 'Never miss a renewal with automated reminders.',
-    },
-    {
-      icon: Lock,
-      title: 'Bank-Level Security',
-      description: 'Your documents are encrypted and protected.',
-    },
-    {
-      icon: BarChart3,
-      title: 'Market Benchmarks',
-      description: 'Compare your coverage against market standards.',
-    },
+    { icon: Shield, title: t.landing.benefitAnalysisTitle, description: t.landing.benefitAnalysisDesc },
+    { icon: Zap, title: t.landing.benefitInstantTitle, description: t.landing.benefitInstantDesc },
+    { icon: Globe, title: t.landing.benefitMultiLangTitle, description: t.landing.benefitMultiLangDesc },
+    { icon: Clock, title: t.landing.benefitRenewalTitle, description: t.landing.benefitRenewalDesc },
+    { icon: Lock, title: t.landing.benefitSecurityTitle, description: t.landing.benefitSecurityDesc },
+    { icon: BarChart3, title: t.landing.benefitBenchmarkTitle, description: t.landing.benefitBenchmarkDesc },
   ]
 
   return (
@@ -39,10 +18,10 @@ export function Benefits() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl md:text-5xl mb-6 tracking-tight">
-            Why choose <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">InsurAI</span>
+            {t.landing.benefits.split('InsurAI')[0]}<span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">InsurAI</span>
           </h2>
           <p className="text-xl text-gray-600">
-            The most powerful insurance analysis platform for Turkish market professionals.
+            {t.landing.benefitsSectionDesc}
           </p>
         </div>
 

@@ -50,6 +50,16 @@ export interface ExtractedPolicyData {
     premium: number
     coverages: number
   }
+
+  // Proxy metadata (set by provider, consumed by policy-extractor for logging)
+  _proxyMeta?: {
+    requestId?: string
+    route?: string
+    provider?: string
+    fallback?: boolean
+    fallbackReason?: string
+    fallbackChain?: Array<{ provider: string; success: boolean; duration_ms?: number; error?: string; error_code?: string }>
+  }
 }
 
 export interface ExtractedCoverage {

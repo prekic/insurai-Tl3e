@@ -1,4 +1,5 @@
 import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isProxyConfigured, type AIProvider } from './config'
+import { getAIConfig } from '@/lib/config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { isPDFFile, extractTextFromPDFWithRetry } from './pdf-parser'
 import {
@@ -102,6 +103,43 @@ export interface ExtractionOptions {
   providers?: AIProvider[]
   /** Optional logger for tracking processing stages with actual data */
   logger?: ProcessingLogger
+}
+
+/**
+ * Default confidence scoring weights (used when DB config unavailable).
+ */
+const DEFAULT_CONFIDENCE_WEIGHTS = {
+  policyNumber: 0.20,
+  provider: 0.15,
+  dates: 0.20,
+  premium: 0.20,
+  coverages: 0.25,
+}
+
+/**
+ * Recalculate overall confidence using weighted formula.
+ * Weights are configurable via Admin Settings > AI > Confidence Scoring Weights.
+ * This ensures consistent scoring regardless of AI model behavior.
+ */
+function recalculateOverallConfidence(
+  confidence: { overall?: number; policyNumber?: number; provider?: number; dates?: number; premium?: number; coverages?: number } | undefined | null,
+  fallback: number,
+  weights = DEFAULT_CONFIDENCE_WEIGHTS,
+): number {
+  if (!confidence) return fallback
+
+  const pn = confidence.policyNumber
+  const pr = confidence.provider
+  const dt = confidence.dates
+  const pm = confidence.premium
+  const cv = confidence.coverages
+
+  // If any per-field scores are missing, use the AI-reported overall
+  if (pn == null || pr == null || dt == null || pm == null || cv == null) {
+    return fallback
+  }
+
+  return pn * weights.policyNumber + pr * weights.provider + dt * weights.dates + pm * weights.premium + cv * weights.coverages
 }
 
 /**
@@ -578,10 +616,20 @@ export async function extractPolicyFromDocument(
   const useMultiProvider = useConsensus && configuredProviders.length > 1 && !isProxyConfigured()
   const provider = primaryProvider || configuredProviders[0]
 
+  // Set extraction mode for observability
+  if (useMultiProvider) {
+    logger?.setExtractionMode('consensus')
+  } else if (isProxyConfigured()) {
+    logger?.setExtractionMode('proxy')
+  } else {
+    logger?.setExtractionMode('direct')
+  }
+
   logger?.startStage('ai_extraction', {
     text_length: processedText.length,
     provider: useMultiProvider ? 'consensus' : provider,
     multi_provider: useMultiProvider,
+    extraction_mode: isProxyConfigured() ? 'proxy' : 'direct',
   })
   logger?.setAIProvider(provider)
 
@@ -620,9 +668,45 @@ export async function extractPolicyFromDocument(
       })
     }
 
-    // Log AI extraction success
-    const confidenceOverall = extractedData.confidence?.overall ?? 0.7
-    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall)
+    // Record proxy metadata for observability (route, fallback, request ID)
+    if (extractedData._proxyMeta) {
+      const meta = extractedData._proxyMeta
+      if (meta.requestId) logger?.setRequestId(meta.requestId)
+      if (meta.route) logger?.setExtractionRoute(meta.route)
+      if (meta.provider) logger?.setAIProvider(meta.provider)
+      if (meta.fallback !== undefined || meta.fallbackChain) {
+        logger?.setFallbackInfo({
+          fallback_used: !!meta.fallback,
+          chain: meta.fallbackChain || [
+            { provider: meta.provider || provider, success: true },
+          ],
+        })
+      }
+      // Clean up metadata before further processing
+      delete extractedData._proxyMeta
+    }
+
+    // Recalculate overall confidence using admin-configurable weighted formula.
+    // Weights are loaded from DB config; falls back to hardcoded defaults.
+    const rawOverall = extractedData.confidence?.overall ?? 0.7
+    let confidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS
+    try {
+      const aiCfg = await getAIConfig()
+      confidenceWeights = {
+        policyNumber: aiCfg.confidenceWeightPolicyNumber,
+        provider: aiCfg.confidenceWeightProvider,
+        dates: aiCfg.confidenceWeightDates,
+        premium: aiCfg.confidenceWeightPremium,
+        coverages: aiCfg.confidenceWeightCoverages,
+      }
+    } catch {
+      // DB unavailable — use hardcoded defaults
+    }
+    const confidenceOverall = recalculateOverallConfidence(extractedData.confidence, rawOverall, confidenceWeights)
+    if (extractedData.confidence) {
+      extractedData.confidence.overall = confidenceOverall
+    }
+    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall, '(AI reported:', rawOverall, ')')
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {

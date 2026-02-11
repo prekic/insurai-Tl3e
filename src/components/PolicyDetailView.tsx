@@ -131,6 +131,190 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 }
 
 /**
+ * Common coverage name translations (English → Turkish)
+ * Used as fallback when AI extraction sets nameTr to the same English value as name
+ */
+const COVERAGE_NAME_TR: Record<string, string> = {
+  // Main coverages
+  'Comprehensive Coverage': 'Kapsamlı Teminat',
+  'Collision': 'Çarpma/Çarpışma',
+  'Collision Damage': 'Çarpma/Çarpışma',
+  'Collision Coverage': 'Çarpma/Çarpışma Teminatı',
+  'Theft': 'Hırsızlık',
+  'Theft Protection': 'Hırsızlık Koruması',
+  'Fire': 'Yangın',
+  'Fire Coverage': 'Yangın Teminatı',
+  'Natural Disasters': 'Doğal Afetler',
+  'Natural Disaster': 'Doğal Afet',
+  'Flood': 'Sel/Su Baskını',
+  'Storm/Flood': 'Fırtına/Sel',
+  'Earthquake': 'Deprem',
+  'Hail': 'Dolu',
+  'Storm': 'Fırtına',
+  'Water Damage': 'Su Hasarı',
+  // Liability
+  'Extended Liability': 'Genişletilmiş Mali Sorumluluk',
+  'Extended Third Party Liability': 'İhtiyari Mali Sorumluluk',
+  'Extended Liability Moral Compensation': 'Genişletilmiş Sorumluluk Manevi Tazminat',
+  'Increased Liability': 'Artan Mali Sorumluluk',
+  'Third Party Liability': 'Üçüncü Şahıs Mali Sorumluluk',
+  'Third Party Property Damage': 'Üçüncü Şahıs Maddi Hasar',
+  'Third Party Bodily Injury': 'Üçüncü Şahıs Bedeni Hasar',
+  'Moral Damages': 'Manevi Tazminat',
+  'Liability': 'Sorumluluk',
+  // Personal accident
+  'Personal Accident': 'Ferdi Kaza',
+  'Personal Accident Death': 'Ferdi Kaza - Vefat',
+  'Personal Accident - Death': 'Ferdi Kaza - Vefat',
+  'Personal Accident - Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
+  'Personal Accident Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
+  'Personal Accident - Medical Expenses': 'Ferdi Kaza - Tedavi Masrafları',
+  'Driver Personal Accident': 'Sürücü Ferdi Kaza',
+  'Seat Personal Accident': 'Koltuk Ferdi Kaza',
+  'Seat PA - Death': 'Koltuk Ferdi Kaza - Vefat',
+  'Seat PA - Permanent Disability': 'Koltuk Ferdi Kaza - Sürekli Sakatlık',
+  'Seat PA - Medical': 'Koltuk Ferdi Kaza - Tedavi',
+  'Accidental Death': 'Kaza Sonucu Vefat',
+  'Permanent Disability': 'Sürekli Sakatlık',
+  'Death Benefit': 'Vefat Teminatı',
+  'Critical Illness': 'Kritik Hastalık',
+  // Supplementary
+  'Personal Belongings': 'Kişisel Eşya',
+  'Personal Effects': 'Kişisel Eşya',
+  'Glass Coverage': 'Cam Kırılması',
+  'Glass Breakage': 'Cam Kırılması',
+  'Windscreen': 'Ön Cam',
+  'Key Loss': 'Anahtar Kaybı',
+  'Key Replacement': 'Anahtar Değişimi',
+  'Wrong Fuel': 'Hatalı Akaryakıt',
+  'Tire Damage': 'Lastik Hasarı',
+  'Contents': 'Eşya',
+  'Rent Loss': 'Kira Kaybı',
+  // Assistance
+  'Road Assistance': 'Yol Yardım',
+  'Roadside Assistance': 'Yol Yardım',
+  'Roadside Assist': 'Yol Yardım',
+  'Towing': 'Çekici Hizmeti',
+  'Towing Service': 'Çekici Hizmeti',
+  'Replacement Vehicle': 'İkame Araç',
+  'Rental Car': 'Kiralık Araç',
+  'Anadolu Service': 'Anadolu Servis',
+  'Mini Repair Service': 'Mini Onarım Hizmeti',
+  'Mini Repair': 'Mini Onarım',
+  // Legal
+  'Legal Protection': 'Hukuksal Koruma',
+  'Legal Expenses': 'Hukuki Masraflar',
+  'Bail Advance': 'Kefalet Avansı',
+  // Health
+  'Hospitalization': 'Yatarak Tedavi',
+  'Outpatient': 'Ayakta Tedavi',
+  'Surgery': 'Ameliyat',
+  'Prescription Drugs': 'İlaç',
+  'Maternity': 'Doğum',
+  'Dental': 'Diş',
+  'Optical': 'Göz',
+  'Emergency Abroad': 'Yurtdışı Acil',
+  'Medical Expenses': 'Tedavi Masrafları',
+  'Emergency Treatment': 'Acil Tedavi',
+  'Hospitalization Daily Benefit': 'Günlük Hastane Yardımı',
+  // Business / Property
+  'Building Damage': 'Bina Hasarı',
+  'Business Interruption': 'İş Durması',
+  'Equipment': 'Makine Kırılması',
+  'Employee Injury': 'İşçi Kazası',
+  'Cyber': 'Siber',
+  // Cargo / Nakliyat
+  'Cargo Damage - All Risks (ICC-A)': 'Emtia Hasarı - Tüm Riskler',
+  'Loading/Unloading Damage': 'Yükleme/Boşaltma Hasarı',
+  'Natural Perils': 'Doğal Afetler',
+  'Storage Risk': 'Depoda Bekleme Riski',
+  'General Average': 'Müşterek Avarya',
+  'War and Strikes (optional)': 'Savaş ve Grev (isteğe bağlı)',
+  'Carrier Liability (CMR)': 'Taşıyıcı Sorumluluğu (CMR)',
+  // Special values
+  'Market Value': 'Rayiç Değer',
+  'Vehicle Value': 'Araç Bedeli',
+  'Agreed Value': 'Mutabakatlı Değer',
+}
+
+/**
+ * Get locale-aware coverage name
+ * Returns nameTr for Turkish locale, with fallback translation map
+ * when AI extraction sets nameTr to the same English value as name
+ */
+function getLocalizedCoverageName(coverage: { name: string; nameTr?: string }, locale: string): string {
+  if (locale === 'tr') {
+    // If nameTr exists and differs from name, it's a real Turkish translation
+    if (coverage.nameTr && coverage.nameTr !== coverage.name) return coverage.nameTr
+    // Fallback: look up English name in translation map
+    const mapped = COVERAGE_NAME_TR[coverage.name]
+    if (mapped) return mapped
+    // Case-insensitive fallback
+    const lowerName = coverage.name.toLowerCase()
+    for (const [en, tr] of Object.entries(COVERAGE_NAME_TR)) {
+      if (en.toLowerCase() === lowerName) return tr
+    }
+    // Return nameTr (even if same as name) or name
+    return coverage.nameTr || coverage.name
+  }
+  return coverage.name
+}
+
+/**
+ * Translate AI insight text to Turkish when locale is TR
+ * Handles known insight patterns generated by policy-extractor.ts
+ */
+function translateInsight(insight: string, locale: string): string {
+  if (locale !== 'tr') return insight
+
+  // Extract emoji prefix if present (✓ ⚠ 💡 ❌ etc.)
+  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌]\s*)/u)
+  const prefix = prefixMatch ? prefixMatch[1] : ''
+  const text = prefix ? insight.slice(prefix.length).trim() : insight
+
+  // Known exact translations
+  const TRANSLATIONS: Record<string, string> = {
+    'Comprehensive coverage with multiple protection areas': 'Birçok koruma alanıyla kapsamlı teminat',
+    'High coverage limits for major risks': 'Büyük riskler için yüksek teminat limitleri',
+    'Zero deductible on some coverages': 'Bazı teminatlarda sıfır muafiyet',
+    'Includes special endorsements for enhanced protection': 'Artırılmış koruma için özel klozlar içerir',
+    'Standard coverage for policy type': 'Poliçe türüne uygun standart teminat',
+    'Multiple exclusions may limit coverage in certain scenarios': 'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
+    'High deductibles may result in significant out-of-pocket costs': 'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
+    'Total coverage significantly below market average': 'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
+    'Consider adding DASK earthquake insurance if not included': 'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
+    'Review coverage limits annually to ensure adequate protection': 'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
+    'Premium is above 75th percentile - compare with other providers': 'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
+    'Coverage below market median - consider increasing limits': 'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
+  }
+
+  if (TRANSLATIONS[text]) {
+    return prefix ? `${prefix}${TRANSLATIONS[text]}` : TRANSLATIONS[text]
+  }
+
+  // Pattern matches for dynamic content
+  if (text.startsWith('Missing common coverage:')) {
+    const name = text.replace('Missing common coverage:', '').trim()
+    const translated = `Yaygın teminat eksik: ${name}`
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  if (text.startsWith('Invalid TC Kimlik:')) {
+    const value = text.replace('Invalid TC Kimlik:', '').trim()
+    const translated = `Geçersiz TC Kimlik: ${value}`
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
+  if (yoyMatch) {
+    const translated = `Piyasa primleri yıllık %${yoyMatch[1]} arttı - oranları erkenden sabitleyin`
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  return insight
+}
+
+/**
  * Collapsible coverage category for mobile-friendly display
  */
 function CollapsibleCoverageCategory({
@@ -190,7 +374,7 @@ function CollapsibleCoverageCategory({
                   <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <Check className="text-blue-600" size={12} />
                   </div>
-                  <p className="font-medium text-gray-900 text-sm truncate">{groupedCoverage.name}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(groupedCoverage, locale)}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-1 ml-8">
                   {groupedCoverage.subLimits.map((subLimit, j) => (
@@ -232,7 +416,7 @@ function CollapsibleCoverageCategory({
                       <X className="text-gray-400" size={12} />
                     </div>
                   )}
-                  <p className="font-medium text-gray-900 text-sm truncate">{coverage.name}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(coverage, locale)}</p>
                   {hasInfo && (
                     <Info size={12} className={`text-gray-400 flex-shrink-0 transition-colors ${isCoverageExpanded ? 'text-blue-500' : ''}`} />
                   )}
@@ -392,7 +576,7 @@ function CoveragesByCategory({
           <CollapsibleCoverageCategory
             key={categoryKey}
             categoryKey={categoryKey}
-            categoryLabel={categoryInfo.labelTr}
+            categoryLabel={locale === 'tr' ? categoryInfo.labelTr : categoryInfo.labelEn}
             CategoryIcon={CategoryIcon}
             coverages={categoryCoverages}
             locale={locale}
@@ -737,7 +921,7 @@ function RawExtractedTextSection({
 }
 
 import { usePolicies } from '@/lib/policy-context'
-import { useI18n } from '@/lib/i18n'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
 import { GradeBadge } from './evaluation/GradeBadge'
 import { StatusIndicator } from './evaluation/StatusIndicator'
@@ -757,7 +941,7 @@ export function PolicyDetailView() {
   const location = useLocation()
   const { id } = useParams<{ id: string }>()
   const { getPolicyById, fetchPolicyById } = usePolicies()
-  const { locale } = useI18n()
+  const { t, locale } = useTranslation()
 
   // Check for policy passed via location state (for trial results)
   const locationState = location.state as LocationState | null
@@ -808,7 +992,7 @@ export function PolicyDetailView() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Loading policy...</p>
+          <p className="text-gray-600">{t.common.loading}</p>
         </div>
       </div>
     )
@@ -818,9 +1002,9 @@ export function PolicyDetailView() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Policy not found</h2>
-          <p className="text-gray-600 mb-4">The policy you&apos;re looking for doesn&apos;t exist.</p>
-          <Button onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found'}</h2>
+          <p className="text-gray-600 mb-4">{locale === 'tr' ? 'Aradığınız poliçe mevcut değil.' : 'The policy you\'re looking for doesn\'t exist.'}</p>
+          <Button onClick={() => navigate('/dashboard')}>{locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard'}</Button>
         </div>
       </div>
     )
@@ -945,10 +1129,13 @@ export function PolicyDetailView() {
                     `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
                     '',
                     `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
-                    ...policy.coverages.map(c => `• ${c.nameTr || c.name}: ${c.isUnlimited ? 'Sınırsız' : formatCurrency(c.limit)}`),
+                    ...policy.coverages.map(c => `• ${getLocalizedCoverageName(c, locale)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`),
                     '',
                     `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
                     ...policy.exclusions.map(e => `• ${e}`),
+                    '',
+                    `=== ${locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS'} ===`,
+                    ...policy.aiInsights.map(i => `• ${translateInsight(i, locale)}`),
                   ].join('\n')
 
                   const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
@@ -1147,7 +1334,7 @@ export function PolicyDetailView() {
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
-                  <span className="truncate">AI Insights</span>
+                  <span className="truncate">{locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}</span>
                   <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 ml-auto">
                     {Math.round(policy.aiConfidence * 100)}%
                   </Badge>
@@ -1159,12 +1346,13 @@ export function PolicyDetailView() {
                     ? policy.aiInsights
                     : policy.aiInsights.slice(0, 3)
                   ).map((insight, i) => {
-                    // Strip any existing checkmark characters from the text
-                    const cleanInsight = insight.replace(/^[✓✔☑]\s*/g, '').trim()
+                    // Strip any existing prefix characters from the text
+                    const cleanInsight = insight.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                    const translatedInsight = translateInsight(cleanInsight, locale)
                     return (
                       <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
                         <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
-                        <span>{cleanInsight}</span>
+                        <span>{translatedInsight}</span>
                       </div>
                     )
                   })}
@@ -1394,15 +1582,15 @@ export function PolicyDetailView() {
               <CardContent className="pt-6">
                 <div className="text-center">
                   <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="mb-4">
-                    {policy.status === 'active' ? 'Active' : 'Expiring Soon'}
+                    {policy.status === 'active' ? (locale === 'tr' ? 'Aktif' : 'Active') : (locale === 'tr' ? 'Bitiyor' : 'Expiring Soon')}
                   </Badge>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Start Date</span>
+                      <span className="text-gray-500">{locale === 'tr' ? 'Başlangıç' : 'Start Date'}</span>
                       <span className="font-medium">{formatDate(policy.startDate)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">Expiry Date</span>
+                      <span className="text-gray-500">{locale === 'tr' ? 'Bitiş' : 'Expiry Date'}</span>
                       <span className="font-medium">{formatDate(policy.expiryDate)}</span>
                     </div>
                   </div>
@@ -1473,18 +1661,18 @@ export function PolicyDetailView() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-900">
                   <Sparkles className="text-purple-600" size={20} />
-                  AI Insights
+                  {locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-purple-600">Confidence:</span>
+                    <span className="text-purple-600">{locale === 'tr' ? 'Güven:' : 'Confidence:'}</span>
                     <span className="font-semibold text-purple-900">{Math.round(policy.aiConfidence * 100)}%</span>
                   </div>
                   {policy.aiInsights.map((insight, i) => (
                     <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
-                      {insight}
+                      {translateInsight(insight, locale)}
                     </div>
                   ))}
                 </div>

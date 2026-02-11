@@ -56,11 +56,11 @@ describe('Stats', () => {
   })
 
   describe('Styling', () => {
-    it('should have white background', () => {
+    it('should have gradient background', () => {
       const { container } = render(<Stats />)
 
       const section = container.querySelector('section')
-      expect(section).toHaveClass('bg-white')
+      expect(section).toHaveClass('bg-gradient-to-b')
     })
 
     it('should have border styling', () => {

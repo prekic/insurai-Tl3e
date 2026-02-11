@@ -1,21 +1,24 @@
 import { Briefcase, Users, Building2 } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function WhoItsFor() {
+  const { t } = useTranslation()
+
   const audiences = [
     {
       icon: Briefcase,
-      title: 'Insurance Brokers',
-      description: 'Quickly analyze and compare policies for your clients.',
+      title: t.landing.whoBrokersTitle,
+      description: t.landing.whoBrokersDesc,
     },
     {
       icon: Building2,
-      title: 'Corporate Risk Managers',
-      description: 'Manage complex policy portfolios with ease.',
+      title: t.landing.whoRiskTitle,
+      description: t.landing.whoRiskDesc,
     },
     {
       icon: Users,
-      title: 'Individual Policyholders',
-      description: 'Understand your coverage in plain language.',
+      title: t.landing.whoPolicyholdersTitle,
+      description: t.landing.whoPolicyholdersDesc,
     },
   ]
 
@@ -24,10 +27,10 @@ export function WhoItsFor() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-16">
           <h2 className="text-4xl md:text-5xl mb-6 tracking-tight">
-            Built for <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">insurance professionals</span>
+            {t.landing.whoTitle} <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{t.landing.whoHighlight}</span>
           </h2>
           <p className="text-xl text-gray-600">
-            Whether you&apos;re a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.
+            {t.landing.whoDesc}
           </p>
         </div>
 

@@ -1,21 +1,24 @@
 import { Briefcase, Building2, Users } from 'lucide-react'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 export function Testimonials() {
+  const { t } = useTranslation()
+
   const useCases = [
     {
       icon: Briefcase,
-      audience: 'Insurance Brokers',
-      scenario: 'Upload client policies, get instant coverage gap reports, and present side-by-side comparisons — all in minutes instead of hours.',
+      audience: t.landing.useCaseBrokers,
+      scenario: t.landing.useCaseBrokersDesc,
     },
     {
       icon: Building2,
-      audience: 'Corporate Risk Managers',
-      scenario: 'Analyze complex commercial policies against market benchmarks and identify under-insured areas before renewal season.',
+      audience: t.landing.useCaseRiskManagers,
+      scenario: t.landing.useCaseRiskManagersDesc,
     },
     {
       icon: Users,
-      audience: 'Individual Policyholders',
-      scenario: 'Upload your kasko or health policy and get a plain-language explanation of what is and isn&apos;t covered.',
+      audience: t.landing.useCasePolicyholders,
+      scenario: t.landing.useCasePolicyholdersDesc,
     },
   ]
 
@@ -24,10 +27,10 @@ export function Testimonials() {
       <div className="container mx-auto px-4">
         <div className="text-center max-w-3xl mx-auto mb-10 md:mb-16">
           <h2 className="text-3xl md:text-5xl mb-4 md:mb-6 tracking-tight">
-            What you can <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">do with InsurAI</span>
+            {t.landing.useCasesTitle} <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">{t.landing.useCasesHighlight}</span>
           </h2>
           <p className="text-lg md:text-xl text-gray-600">
-            Real use cases for insurance professionals and policyholders.
+            {t.landing.useCasesSubtitle}
           </p>
         </div>
 
