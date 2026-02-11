@@ -1,4 +1,4 @@
-import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle, Globe } from 'lucide-react'
+import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, ChevronDown, Settings, LogOut, LogIn, HelpCircle, Globe } from 'lucide-react'
 import { useState, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -148,7 +148,7 @@ export function Hero() {
                 )}
               </Link>
               <Link
-                to="/upload?autoOpen=true"
+                to="/compare"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
               >
                 <span>{t.nav.compare}</span>
@@ -165,9 +165,6 @@ export function Hero() {
 
             {/* Right side utilities */}
             <div className="hidden md:flex items-center gap-2">
-              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Search size={20} />
-              </button>
               {/* Language Picker */}
               <div className="relative">
                 <button
@@ -229,9 +226,6 @@ export function Hero() {
                   </>
                 )}
               </div>
-              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Bell size={20} />
-              </button>
               <button
                 onClick={() => navFileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
@@ -240,29 +234,44 @@ export function Hero() {
                 <span>{t.landing.uploadPolicyButton}</span>
               </button>
 
-              {/* Profile Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => { setShowLanguagePicker(false); setShowProfileMenu(!showProfileMenu) }}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              {/* Sign In - visible for anonymous users */}
+              {!user && (
+                <Link
+                  to="/auth"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-medium text-sm"
                 >
-                  <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-                    <User size={16} className="text-white" />
-                  </div>
-                  <ChevronDown size={16} className="text-gray-600" />
-                </button>
+                  <LogIn size={18} />
+                  <span>{t.auth.signIn}</span>
+                </Link>
+              )}
 
-                {showProfileMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900">
-                          {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t.landing.guest}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email || t.landing.notSignedIn}</p>
-                      </div>
-                      {user && (
+              {/* Profile Menu - only for logged-in users */}
+              {user && (
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowLanguagePicker(false); setShowProfileMenu(!showProfileMenu) }}
+                    className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
+                      <span className="text-white font-semibold text-sm">
+                        {user.user_metadata?.full_name
+                          ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                          : user.email?.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <ChevronDown size={16} className="text-gray-600" />
+                  </button>
+
+                  {showProfileMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                      <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="font-semibold text-gray-900">
+                            {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
                         <button
                           onClick={() => handleMenuClick('/account')}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
@@ -270,23 +279,21 @@ export function Hero() {
                           <User size={16} />
                           <span>{t.nav.myAccount}</span>
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleMenuClick('/settings')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <Settings size={16} />
-                        <span>{t.nav.settings}</span>
-                      </button>
-                      <button
-                        onClick={() => handleMenuClick('/help')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <HelpCircle size={16} />
-                        <span>{t.nav.helpCenter}</span>
-                      </button>
-                      <div className="border-t border-gray-100 mt-2 pt-2">
-                        {user ? (
+                        <button
+                          onClick={() => handleMenuClick('/settings')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <Settings size={16} />
+                          <span>{t.nav.settings}</span>
+                        </button>
+                        <button
+                          onClick={() => handleMenuClick('/help')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <HelpCircle size={16} />
+                          <span>{t.nav.helpCenter}</span>
+                        </button>
+                        <div className="border-t border-gray-100 mt-2 pt-2">
                           <button
                             onClick={handleSignOut}
                             className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
@@ -294,20 +301,12 @@ export function Hero() {
                             <LogOut size={16} />
                             <span>{t.auth.signOut}</span>
                           </button>
-                        ) : (
-                          <button
-                            onClick={() => handleMenuClick('/auth')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors text-left"
-                          >
-                            <LogIn size={16} />
-                            <span>{t.auth.signIn}</span>
-                          </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -329,7 +328,7 @@ export function Hero() {
                 {t.nav.dashboard}
               </button>
               <button
-                onClick={() => handleMenuClick('/upload?autoOpen=true')}
+                onClick={() => handleMenuClick('/compare')}
                 className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
               >
                 {t.nav.compare}
@@ -370,6 +369,22 @@ export function Hero() {
               >
                 {t.landing.uploadPolicyButton}
               </button>
+              {!user && (
+                <button
+                  onClick={() => handleMenuClick('/auth')}
+                  className="block w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-center font-medium hover:bg-gray-50 transition-colors"
+                >
+                  {t.auth.signIn}
+                </button>
+              )}
+              {user && (
+                <button
+                  onClick={handleSignOut}
+                  className="block w-full text-left px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                >
+                  {t.auth.signOut}
+                </button>
+              )}
             </div>
           )}
         </div>

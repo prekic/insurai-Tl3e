@@ -100,13 +100,7 @@ describe('GlobalNavigation', () => {
       expect(screen.getByRole('menuitem', { name: /chat/i })).toBeInTheDocument()
     })
 
-    it('should render search button', () => {
-      renderNavigation()
-
-      expect(screen.getByLabelText('Search policies')).toBeInTheDocument()
-    })
-
-    it('should render notifications button', () => {
+    it('should render notifications button for logged-in user', () => {
       renderNavigation()
 
       expect(screen.getByLabelText(/notifications/i)).toBeInTheDocument()
@@ -389,15 +383,16 @@ describe('GlobalNavigation - No User', () => {
     expect(screen.queryByText('2')).not.toBeInTheDocument()
   })
 
-  it('should navigate to auth when anonymous user clicks notification bell', async () => {
-    const user = userEvent.setup()
+  it('should hide notification bell for anonymous users', () => {
     renderNavigation()
 
-    await user.click(screen.getByLabelText('Notifications'))
+    expect(screen.queryByLabelText('Notifications')).not.toBeInTheDocument()
+  })
 
-    expect(mockNavigate).toHaveBeenCalledWith('/auth')
-    // Should NOT show notification dropdown
-    expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument()
+  it('should show Sign In button for anonymous users', () => {
+    renderNavigation()
+
+    expect(screen.getByText('Sign In')).toBeInTheDocument()
   })
 
   it('should show Sign In button in profile menu instead of Sign Out', async () => {

@@ -1,4 +1,4 @@
-import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn, Scale, Globe } from 'lucide-react'
+import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, ChevronDown, LogOut, LogIn, Scale, Globe } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -202,12 +202,6 @@ export function GlobalNavigation() {
 
           {/* Right Side */}
           <div className="flex items-center gap-2">
-            <button
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-              aria-label="Search policies"
-            >
-              <Search size={20} aria-hidden="true" />
-            </button>
             {/* Language Picker */}
             <div className="relative" ref={languageRef}>
               <button
@@ -270,48 +264,46 @@ export function GlobalNavigation() {
                 </>
               )}
             </div>
-            <div className="relative" ref={notificationRef}>
-              <button
-                onClick={() => {
-                  if (!user) {
-                    navigate('/auth')
-                    return
-                  }
-                  setShowProfileMenu(false)
-                  setShowLanguagePicker(false)
-                  setShowNotifications(!showNotifications)
-                }}
-                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-                aria-label="Notifications"
-                aria-expanded={showNotifications}
-                aria-haspopup="true"
-              >
-                <Bell size={20} aria-hidden="true" />
-              </button>
+            {user && (
+              <div className="relative" ref={notificationRef}>
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    setShowLanguagePicker(false)
+                    setShowNotifications(!showNotifications)
+                  }}
+                  className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                  aria-label="Notifications"
+                  aria-expanded={showNotifications}
+                  aria-haspopup="true"
+                >
+                  <Bell size={20} aria-hidden="true" />
+                </button>
 
-              {showNotifications && user && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowNotifications(false)}
-                    aria-hidden="true"
-                  />
-                  <div
-                    className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
-                    role="dialog"
-                    aria-label="Notifications"
-                  >
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                      <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
+                {showNotifications && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowNotifications(false)}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                      role="dialog"
+                      aria-label="Notifications"
+                    >
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
+                      </div>
+                      <div className="py-8 text-center text-sm text-gray-500">
+                        <Bell size={24} className="mx-auto mb-2 text-gray-300" />
+                        {t.nav.noNotifications}
+                      </div>
                     </div>
-                    <div className="py-8 text-center text-sm text-gray-500">
-                      <Bell size={24} className="mx-auto mb-2 text-gray-300" />
-                      {t.nav.noNotifications}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
+                  </>
+                )}
+              </div>
+            )}
             {/* Hidden file input for immediate upload */}
             <input
               ref={fileInputRef}
@@ -329,6 +321,17 @@ export function GlobalNavigation() {
               <Upload size={18} aria-hidden="true" />
               <span>{t.nav.upload}</span>
             </button>
+
+            {/* Sign In - visible for anonymous users */}
+            {!user && (
+              <Link
+                to="/auth"
+                className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-medium text-sm focus-ring"
+              >
+                <LogIn size={18} aria-hidden="true" />
+                <span>{t.auth.signIn}</span>
+              </Link>
+            )}
 
             {/* Profile Menu */}
             <div className="relative">
