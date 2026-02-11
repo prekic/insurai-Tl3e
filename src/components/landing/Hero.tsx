@@ -1,11 +1,12 @@
 import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle, Globe } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { UploadWidget } from './UploadWidget'
 import { SampleReportPreviewCompact } from './SampleReportPreview'
 import { StaggeredList, AnimatedButton, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
+import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
@@ -19,12 +20,35 @@ export function Hero() {
   const { user, signOut } = useAuth()
   const policyCount = policies.length
 
-  // Route to /try for anonymous users, /upload for logged-in users
-  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showLanguagePicker, setShowLanguagePicker] = useState(false)
+  const navFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle file selection from nav Upload button — opens file picker directly
+  const handleNavFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const { valid, errors } = validateFiles(files)
+    errors.forEach((err) => {
+      const errorInfo = getErrorMessage(err.code)
+      toast.error(errorInfo.title, {
+        description: err.details || errorInfo.description,
+        duration: 5000,
+      })
+    })
+
+    if (valid.length > 0) {
+      if (user) {
+        navigate('/upload', { state: { files: valid, autoProcess: true } })
+      } else {
+        navigate('/try', { state: { file: valid[0] } })
+      }
+    }
+
+    e.target.value = ''
+  }, [user, navigate])
 
   const handleMenuClick = (path: string) => {
     setShowProfileMenu(false)
@@ -198,13 +222,22 @@ export function Hero() {
               <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell size={20} />
               </button>
-              <Link
-                to={uploadPath}
+              {/* Hidden file input for nav Upload button */}
+              <input
+                ref={navFileInputRef}
+                type="file"
+                accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+                onChange={handleNavFileSelect}
+                className="hidden"
+                aria-hidden="true"
+              />
+              <button
+                onClick={() => navFileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
               >
                 <Upload size={18} />
                 <span>{t.landing.uploadPolicyButton}</span>
-              </Link>
+              </button>
 
               {/* Profile Menu */}
               <div className="relative">
@@ -331,7 +364,7 @@ export function Hero() {
                 </div>
               </div>
               <button
-                onClick={() => handleMenuClick(uploadPath)}
+                onClick={() => { setMobileMenuOpen(false); navFileInputRef.current?.click() }}
                 className="block w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-center"
               >
                 {t.landing.uploadPolicyButton}
