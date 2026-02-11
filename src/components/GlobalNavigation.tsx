@@ -5,10 +5,11 @@ import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
-import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useTranslation, useI18n } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
   const { t } = useTranslation()
+  const { locale, setLocale } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
@@ -205,6 +206,33 @@ export function GlobalNavigation() {
             >
               <Search size={20} aria-hidden="true" />
             </button>
+            {/* Language Switcher */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5" role="radiogroup" aria-label="Language">
+              <button
+                onClick={() => setLocale('tr')}
+                role="radio"
+                aria-checked={locale === 'tr'}
+                className={`px-2 py-1 text-xs font-medium rounded-md transition-all ${
+                  locale === 'tr'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                TR
+              </button>
+              <button
+                onClick={() => setLocale('en')}
+                role="radio"
+                aria-checked={locale === 'en'}
+                className={`px-2 py-1 text-xs font-medium rounded-md transition-all ${
+                  locale === 'en'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-900'
+                }`}
+              >
+                EN
+              </button>
+            </div>
             <div className="relative" ref={notificationRef}>
               <button
                 onClick={() => {
