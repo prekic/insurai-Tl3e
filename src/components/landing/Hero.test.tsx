@@ -277,6 +277,39 @@ describe('Hero', () => {
 
       expect(screen.getByTestId('comparison-mock')).toBeInTheDocument()
     })
+  })
 
-})
+  describe('Language Picker', () => {
+    it('should render a Globe icon language button in the nav bar', () => {
+      renderWithRouter(<Hero />)
+
+      const langButton = screen.getByRole('button', { name: 'Change language' })
+      expect(langButton).toBeInTheDocument()
+    })
+
+    it('should show Türkçe and English options when Globe is clicked', () => {
+      renderWithRouter(<Hero />)
+
+      const langButton = screen.getByRole('button', { name: 'Change language' })
+      fireEvent.click(langButton)
+
+      expect(screen.getByText('Türkçe')).toBeInTheDocument()
+      expect(screen.getByText('English')).toBeInTheDocument()
+    })
+
+    it('should render language switcher in mobile menu', () => {
+      renderWithRouter(<Hero />)
+
+      // Open mobile menu
+      const buttons = screen.getAllByRole('button')
+      const menuButton = buttons.find(btn => btn.classList.contains('md:hidden'))
+      if (menuButton) {
+        fireEvent.click(menuButton)
+      }
+
+      // Mobile menu has inline language switcher with radiogroup
+      const radiogroups = screen.getAllByRole('radiogroup', { name: 'Language' })
+      expect(radiogroups.length).toBeGreaterThan(0)
+    })
+  })
 })
