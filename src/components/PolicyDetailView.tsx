@@ -131,11 +131,132 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 }
 
 /**
+ * Common coverage name translations (English → Turkish)
+ * Used as fallback when AI extraction sets nameTr to the same English value as name
+ */
+const COVERAGE_NAME_TR: Record<string, string> = {
+  // Main coverages
+  'Comprehensive Coverage': 'Kapsamlı Teminat',
+  'Collision': 'Çarpma/Çarpışma',
+  'Collision Damage': 'Çarpma/Çarpışma',
+  'Collision Coverage': 'Çarpma/Çarpışma Teminatı',
+  'Theft': 'Hırsızlık',
+  'Theft Protection': 'Hırsızlık Koruması',
+  'Fire': 'Yangın',
+  'Fire Coverage': 'Yangın Teminatı',
+  'Natural Disasters': 'Doğal Afetler',
+  'Natural Disaster': 'Doğal Afet',
+  'Flood': 'Sel/Su Baskını',
+  'Storm/Flood': 'Fırtına/Sel',
+  'Earthquake': 'Deprem',
+  'Hail': 'Dolu',
+  'Storm': 'Fırtına',
+  'Water Damage': 'Su Hasarı',
+  // Liability
+  'Extended Liability': 'Genişletilmiş Mali Sorumluluk',
+  'Extended Third Party Liability': 'İhtiyari Mali Sorumluluk',
+  'Extended Liability Moral Compensation': 'Genişletilmiş Sorumluluk Manevi Tazminat',
+  'Increased Liability': 'Artan Mali Sorumluluk',
+  'Third Party Liability': 'Üçüncü Şahıs Mali Sorumluluk',
+  'Third Party Property Damage': 'Üçüncü Şahıs Maddi Hasar',
+  'Third Party Bodily Injury': 'Üçüncü Şahıs Bedeni Hasar',
+  'Moral Damages': 'Manevi Tazminat',
+  'Liability': 'Sorumluluk',
+  // Personal accident
+  'Personal Accident': 'Ferdi Kaza',
+  'Personal Accident Death': 'Ferdi Kaza - Vefat',
+  'Personal Accident - Death': 'Ferdi Kaza - Vefat',
+  'Personal Accident - Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
+  'Personal Accident Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
+  'Personal Accident - Medical Expenses': 'Ferdi Kaza - Tedavi Masrafları',
+  'Driver Personal Accident': 'Sürücü Ferdi Kaza',
+  'Seat Personal Accident': 'Koltuk Ferdi Kaza',
+  'Seat PA - Death': 'Koltuk Ferdi Kaza - Vefat',
+  'Seat PA - Permanent Disability': 'Koltuk Ferdi Kaza - Sürekli Sakatlık',
+  'Seat PA - Medical': 'Koltuk Ferdi Kaza - Tedavi',
+  'Accidental Death': 'Kaza Sonucu Vefat',
+  'Permanent Disability': 'Sürekli Sakatlık',
+  'Death Benefit': 'Vefat Teminatı',
+  'Critical Illness': 'Kritik Hastalık',
+  // Supplementary
+  'Personal Belongings': 'Kişisel Eşya',
+  'Personal Effects': 'Kişisel Eşya',
+  'Glass Coverage': 'Cam Kırılması',
+  'Glass Breakage': 'Cam Kırılması',
+  'Windscreen': 'Ön Cam',
+  'Key Loss': 'Anahtar Kaybı',
+  'Key Replacement': 'Anahtar Değişimi',
+  'Wrong Fuel': 'Hatalı Akaryakıt',
+  'Tire Damage': 'Lastik Hasarı',
+  'Contents': 'Eşya',
+  'Rent Loss': 'Kira Kaybı',
+  // Assistance
+  'Road Assistance': 'Yol Yardım',
+  'Roadside Assistance': 'Yol Yardım',
+  'Roadside Assist': 'Yol Yardım',
+  'Towing': 'Çekici Hizmeti',
+  'Towing Service': 'Çekici Hizmeti',
+  'Replacement Vehicle': 'İkame Araç',
+  'Rental Car': 'Kiralık Araç',
+  'Anadolu Service': 'Anadolu Servis',
+  'Mini Repair Service': 'Mini Onarım Hizmeti',
+  'Mini Repair': 'Mini Onarım',
+  // Legal
+  'Legal Protection': 'Hukuksal Koruma',
+  'Legal Expenses': 'Hukuki Masraflar',
+  'Bail Advance': 'Kefalet Avansı',
+  // Health
+  'Hospitalization': 'Yatarak Tedavi',
+  'Outpatient': 'Ayakta Tedavi',
+  'Surgery': 'Ameliyat',
+  'Prescription Drugs': 'İlaç',
+  'Maternity': 'Doğum',
+  'Dental': 'Diş',
+  'Optical': 'Göz',
+  'Emergency Abroad': 'Yurtdışı Acil',
+  'Medical Expenses': 'Tedavi Masrafları',
+  'Emergency Treatment': 'Acil Tedavi',
+  'Hospitalization Daily Benefit': 'Günlük Hastane Yardımı',
+  // Business / Property
+  'Building Damage': 'Bina Hasarı',
+  'Business Interruption': 'İş Durması',
+  'Equipment': 'Makine Kırılması',
+  'Employee Injury': 'İşçi Kazası',
+  'Cyber': 'Siber',
+  // Cargo / Nakliyat
+  'Cargo Damage - All Risks (ICC-A)': 'Emtia Hasarı - Tüm Riskler',
+  'Loading/Unloading Damage': 'Yükleme/Boşaltma Hasarı',
+  'Natural Perils': 'Doğal Afetler',
+  'Storage Risk': 'Depoda Bekleme Riski',
+  'General Average': 'Müşterek Avarya',
+  'War and Strikes (optional)': 'Savaş ve Grev (isteğe bağlı)',
+  'Carrier Liability (CMR)': 'Taşıyıcı Sorumluluğu (CMR)',
+  // Special values
+  'Market Value': 'Rayiç Değer',
+  'Vehicle Value': 'Araç Bedeli',
+  'Agreed Value': 'Mutabakatlı Değer',
+}
+
+/**
  * Get locale-aware coverage name
- * Returns nameTr for Turkish locale, falls back to name
+ * Returns nameTr for Turkish locale, with fallback translation map
+ * when AI extraction sets nameTr to the same English value as name
  */
 function getLocalizedCoverageName(coverage: { name: string; nameTr?: string }, locale: string): string {
-  if (locale === 'tr' && coverage.nameTr) return coverage.nameTr
+  if (locale === 'tr') {
+    // If nameTr exists and differs from name, it's a real Turkish translation
+    if (coverage.nameTr && coverage.nameTr !== coverage.name) return coverage.nameTr
+    // Fallback: look up English name in translation map
+    const mapped = COVERAGE_NAME_TR[coverage.name]
+    if (mapped) return mapped
+    // Case-insensitive fallback
+    const lowerName = coverage.name.toLowerCase()
+    for (const [en, tr] of Object.entries(COVERAGE_NAME_TR)) {
+      if (en.toLowerCase() === lowerName) return tr
+    }
+    // Return nameTr (even if same as name) or name
+    return coverage.nameTr || coverage.name
+  }
   return coverage.name
 }
 
