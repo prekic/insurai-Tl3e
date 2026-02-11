@@ -12,10 +12,10 @@ const mockSelect = vi.fn(() => ({ single: mockSingle }))
 const mockEq = vi.fn(() => ({ single: mockSingle, select: mockSelect }))
 const mockUpdate = vi.fn(() => ({ eq: mockEq }))
 const mockInsert = vi.fn(() => ({ select: mockSelect }))
-const mockDelete = vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) }))
+const _mockDelete = vi.fn(() => ({ eq: vi.fn(() => ({ error: null })) }))
 const mockSelectHead = vi.fn()
 
-const mockFrom = vi.fn((table: string) => {
+const mockFrom = vi.fn((_table: string) => {
   // Return different chains depending on the table usage
   return {
     select: vi.fn((cols?: string, opts?: { count?: string; head?: boolean }) => {

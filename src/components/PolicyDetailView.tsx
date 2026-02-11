@@ -268,7 +268,7 @@ function translateInsight(insight: string, locale: string): string {
   if (locale !== 'tr') return insight
 
   // Extract emoji prefix if present (✓ ⚠ 💡 ❌ etc.)
-  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌]\s*)/)
+  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌]\s*)/u)
   const prefix = prefixMatch ? prefixMatch[1] : ''
   const text = prefix ? insight.slice(prefix.length).trim() : insight
 
@@ -1347,7 +1347,7 @@ export function PolicyDetailView() {
                     : policy.aiInsights.slice(0, 3)
                   ).map((insight, i) => {
                     // Strip any existing prefix characters from the text
-                    const cleanInsight = insight.replace(/^[✓✔☑⚠💡❌]\s*/g, '').trim()
+                    const cleanInsight = insight.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
                     const translatedInsight = translateInsight(cleanInsight, locale)
                     return (
                       <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">

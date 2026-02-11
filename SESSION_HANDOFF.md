@@ -70,7 +70,8 @@ This session focused on **comprehensive i18n (internationalization)** for all us
 ## Commits This Session
 
 ```
-# Branch: claude/review-handoff-docs-E4fnT
+# Branch: claude/review-handoff-docs-E4fnT (7 commits)
+15443b6 docs: update project documentation for Feb 11 i18n session
 97b0660 fix: add EN→TR fallback translation map for coverage names
 9c5b910 fix: locale-aware coverage names and AI insights in PolicyDetailView
 a10f57e feat: i18n for TryAnalysis, PolicyDetailView, UserPreferencesPanel

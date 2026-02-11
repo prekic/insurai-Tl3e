@@ -3562,7 +3562,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v13)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v14)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
