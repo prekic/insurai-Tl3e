@@ -108,6 +108,16 @@ export function Hero() {
           </div>
         </div>
 
+        {/* Hidden file input — outside all responsive containers so it works on all breakpoints */}
+        <input
+          ref={navFileInputRef}
+          type="file"
+          accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+          onChange={handleNavFileSelect}
+          className="hidden"
+          aria-hidden="true"
+        />
+
         {/* Main navigation */}
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -222,15 +232,6 @@ export function Hero() {
               <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
                 <Bell size={20} />
               </button>
-              {/* Hidden file input for nav Upload button */}
-              <input
-                ref={navFileInputRef}
-                type="file"
-                accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
-                onChange={handleNavFileSelect}
-                className="hidden"
-                aria-hidden="true"
-              />
               <button
                 onClick={() => navFileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
