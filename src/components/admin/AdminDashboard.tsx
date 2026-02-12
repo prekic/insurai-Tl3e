@@ -28,6 +28,7 @@ import { AlertsTab } from './tabs/AlertsTab'
 import { ProcessingLogsTab } from './tabs/ProcessingLogsTab'
 import { NotificationsTab } from './tabs/NotificationsTab'
 import { BenchmarksTab } from './tabs/BenchmarksTab'
+import { TranslationsTab } from './tabs/TranslationsTab'
 
 // Icons
 import {
@@ -50,6 +51,7 @@ import {
   CheckCircle,
   XCircle,
   TrendingUp,
+  Languages,
 } from 'lucide-react'
 
 const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
@@ -64,6 +66,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'ocr_dashboard', label: 'OCR Analytics', icon: <Eye className="h-4 w-4" /> },
   { id: 'security', label: 'Security', icon: <Shield className="h-4 w-4" /> },
   { id: 'config', label: 'Configuration', icon: <Settings className="h-4 w-4" /> },
+  { id: 'translations', label: 'Translations', icon: <Languages className="h-4 w-4" /> },
   { id: 'benchmarks', label: 'Benchmarks', icon: <TrendingUp className="h-4 w-4" /> },
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'audit', label: 'Audit Log', icon: <ScrollText className="h-4 w-4" /> },
@@ -197,6 +200,8 @@ export function AdminDashboard() {
         return <SecurityTab />
       case 'config':
         return <SettingsTab />
+      case 'translations':
+        return <TranslationsTab />
       case 'benchmarks':
         return <BenchmarksTab />
       case 'analytics':

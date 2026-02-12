@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { UserPreferencesPanel } from '../UserPreferencesPanel'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+
+// Mock i18n context
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+}))
 
 // Mock useUserPreferences hook
 const mockUpdatePreference = vi.fn()
@@ -64,7 +70,7 @@ describe('UserPreferencesPanel', () => {
     hookReturn = { ...defaultHookReturn, isAuthenticated: false }
     render(<UserPreferencesPanel />)
 
-    expect(screen.getByText('Sign in to customize preferences')).toBeInTheDocument()
+    expect(screen.getByText(EN_TRANSLATIONS.preferences.signInRequired)).toBeInTheDocument()
   })
 
   it('should show loading skeleton when loading', () => {
@@ -104,7 +110,7 @@ describe('UserPreferencesPanel', () => {
 
   it('should show Save Preferences button', () => {
     render(<UserPreferencesPanel />)
-    expect(screen.getByText('Save Preferences')).toBeInTheDocument()
+    expect(screen.getByText(EN_TRANSLATIONS.common.save)).toBeInTheDocument()
   })
 
   it('should show error message', () => {
@@ -131,9 +137,9 @@ describe('UserPreferencesPanel', () => {
     render(<UserPreferencesPanel />)
 
     // Should show "1 customized" on the category header
-    expect(screen.getByText('1 customized')).toBeInTheDocument()
-    // Should show "customized" badge on the field
-    expect(screen.getByText('customized')).toBeInTheDocument()
+    expect(screen.getByText(`1 ${EN_TRANSLATIONS.preferences.modified}`)).toBeInTheDocument()
+    // Should show "modified" badge on the field
+    expect(screen.getByText(EN_TRANSLATIONS.preferences.modified)).toBeInTheDocument()
   })
 
   it('should show default value when preference is modified', () => {
@@ -145,7 +151,7 @@ describe('UserPreferencesPanel', () => {
 
     render(<UserPreferencesPanel />)
 
-    expect(screen.getByText('Default: 10')).toBeInTheDocument()
+    expect(screen.getByText(`${EN_TRANSLATIONS.preferences.defaultLabel}: 10`)).toBeInTheDocument()
   })
 
   it('should render boolean toggle for boolean fields', async () => {
@@ -169,7 +175,7 @@ describe('UserPreferencesPanel', () => {
 
     render(<UserPreferencesPanel />)
 
-    expect(screen.getByText('Reset Display Preferences to Defaults')).toBeInTheDocument()
+    expect(screen.getByText(EN_TRANSLATIONS.preferences.resetAll)).toBeInTheDocument()
   })
 
   it('should call savePreferences when save button is clicked', async () => {
@@ -182,7 +188,7 @@ describe('UserPreferencesPanel', () => {
 
     render(<UserPreferencesPanel />)
 
-    await user.click(screen.getByText('Save Preferences'))
+    await user.click(screen.getByText(EN_TRANSLATIONS.common.save))
     expect(mockSavePreferences).toHaveBeenCalled()
   })
 
@@ -196,6 +202,6 @@ describe('UserPreferencesPanel', () => {
 
     render(<UserPreferencesPanel />)
 
-    expect(screen.getByText('Saving...')).toBeInTheDocument()
+    expect(screen.getByText(EN_TRANSLATIONS.preferences.saving)).toBeInTheDocument()
   })
 })

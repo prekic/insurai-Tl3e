@@ -20,6 +20,7 @@ import {
   type AnalyzedExclusion,
 } from '@/lib/knowledge/kasko-knowledge'
 import { getShortCompanyName } from '@/lib/insurance-display'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -131,183 +132,72 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 }
 
 /**
- * Common coverage name translations (English → Turkish)
- * Used as fallback when AI extraction sets nameTr to the same English value as name
- */
-const COVERAGE_NAME_TR: Record<string, string> = {
-  // Main coverages
-  'Comprehensive Coverage': 'Kapsamlı Teminat',
-  'Collision': 'Çarpma/Çarpışma',
-  'Collision Damage': 'Çarpma/Çarpışma',
-  'Collision Coverage': 'Çarpma/Çarpışma Teminatı',
-  'Theft': 'Hırsızlık',
-  'Theft Protection': 'Hırsızlık Koruması',
-  'Fire': 'Yangın',
-  'Fire Coverage': 'Yangın Teminatı',
-  'Natural Disasters': 'Doğal Afetler',
-  'Natural Disaster': 'Doğal Afet',
-  'Flood': 'Sel/Su Baskını',
-  'Storm/Flood': 'Fırtına/Sel',
-  'Earthquake': 'Deprem',
-  'Hail': 'Dolu',
-  'Storm': 'Fırtına',
-  'Water Damage': 'Su Hasarı',
-  // Liability
-  'Extended Liability': 'Genişletilmiş Mali Sorumluluk',
-  'Extended Third Party Liability': 'İhtiyari Mali Sorumluluk',
-  'Extended Liability Moral Compensation': 'Genişletilmiş Sorumluluk Manevi Tazminat',
-  'Increased Liability': 'Artan Mali Sorumluluk',
-  'Third Party Liability': 'Üçüncü Şahıs Mali Sorumluluk',
-  'Third Party Property Damage': 'Üçüncü Şahıs Maddi Hasar',
-  'Third Party Bodily Injury': 'Üçüncü Şahıs Bedeni Hasar',
-  'Moral Damages': 'Manevi Tazminat',
-  'Liability': 'Sorumluluk',
-  // Personal accident
-  'Personal Accident': 'Ferdi Kaza',
-  'Personal Accident Death': 'Ferdi Kaza - Vefat',
-  'Personal Accident - Death': 'Ferdi Kaza - Vefat',
-  'Personal Accident - Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
-  'Personal Accident Permanent Disability': 'Ferdi Kaza - Sürekli Sakatlık',
-  'Personal Accident - Medical Expenses': 'Ferdi Kaza - Tedavi Masrafları',
-  'Driver Personal Accident': 'Sürücü Ferdi Kaza',
-  'Seat Personal Accident': 'Koltuk Ferdi Kaza',
-  'Seat PA - Death': 'Koltuk Ferdi Kaza - Vefat',
-  'Seat PA - Permanent Disability': 'Koltuk Ferdi Kaza - Sürekli Sakatlık',
-  'Seat PA - Medical': 'Koltuk Ferdi Kaza - Tedavi',
-  'Accidental Death': 'Kaza Sonucu Vefat',
-  'Permanent Disability': 'Sürekli Sakatlık',
-  'Death Benefit': 'Vefat Teminatı',
-  'Critical Illness': 'Kritik Hastalık',
-  // Supplementary
-  'Personal Belongings': 'Kişisel Eşya',
-  'Personal Effects': 'Kişisel Eşya',
-  'Glass Coverage': 'Cam Kırılması',
-  'Glass Breakage': 'Cam Kırılması',
-  'Windscreen': 'Ön Cam',
-  'Key Loss': 'Anahtar Kaybı',
-  'Key Replacement': 'Anahtar Değişimi',
-  'Wrong Fuel': 'Hatalı Akaryakıt',
-  'Tire Damage': 'Lastik Hasarı',
-  'Contents': 'Eşya',
-  'Rent Loss': 'Kira Kaybı',
-  // Assistance
-  'Road Assistance': 'Yol Yardım',
-  'Roadside Assistance': 'Yol Yardım',
-  'Roadside Assist': 'Yol Yardım',
-  'Towing': 'Çekici Hizmeti',
-  'Towing Service': 'Çekici Hizmeti',
-  'Replacement Vehicle': 'İkame Araç',
-  'Rental Car': 'Kiralık Araç',
-  'Anadolu Service': 'Anadolu Servis',
-  'Mini Repair Service': 'Mini Onarım Hizmeti',
-  'Mini Repair': 'Mini Onarım',
-  // Legal
-  'Legal Protection': 'Hukuksal Koruma',
-  'Legal Expenses': 'Hukuki Masraflar',
-  'Bail Advance': 'Kefalet Avansı',
-  // Health
-  'Hospitalization': 'Yatarak Tedavi',
-  'Outpatient': 'Ayakta Tedavi',
-  'Surgery': 'Ameliyat',
-  'Prescription Drugs': 'İlaç',
-  'Maternity': 'Doğum',
-  'Dental': 'Diş',
-  'Optical': 'Göz',
-  'Emergency Abroad': 'Yurtdışı Acil',
-  'Medical Expenses': 'Tedavi Masrafları',
-  'Emergency Treatment': 'Acil Tedavi',
-  'Hospitalization Daily Benefit': 'Günlük Hastane Yardımı',
-  // Business / Property
-  'Building Damage': 'Bina Hasarı',
-  'Business Interruption': 'İş Durması',
-  'Equipment': 'Makine Kırılması',
-  'Employee Injury': 'İşçi Kazası',
-  'Cyber': 'Siber',
-  // Cargo / Nakliyat
-  'Cargo Damage - All Risks (ICC-A)': 'Emtia Hasarı - Tüm Riskler',
-  'Loading/Unloading Damage': 'Yükleme/Boşaltma Hasarı',
-  'Natural Perils': 'Doğal Afetler',
-  'Storage Risk': 'Depoda Bekleme Riski',
-  'General Average': 'Müşterek Avarya',
-  'War and Strikes (optional)': 'Savaş ve Grev (isteğe bağlı)',
-  'Carrier Liability (CMR)': 'Taşıyıcı Sorumluluğu (CMR)',
-  // Special values
-  'Market Value': 'Rayiç Değer',
-  'Vehicle Value': 'Araç Bedeli',
-  'Agreed Value': 'Mutabakatlı Değer',
-}
-
-/**
  * Get locale-aware coverage name
+ * Uses the i18n coverageNames map from the translation system.
  * Returns nameTr for Turkish locale, with fallback translation map
  * when AI extraction sets nameTr to the same English value as name
  */
-function getLocalizedCoverageName(coverage: { name: string; nameTr?: string }, locale: string): string {
-  if (locale === 'tr') {
-    // If nameTr exists and differs from name, it's a real Turkish translation
-    if (coverage.nameTr && coverage.nameTr !== coverage.name) return coverage.nameTr
-    // Fallback: look up English name in translation map
-    const mapped = COVERAGE_NAME_TR[coverage.name]
-    if (mapped) return mapped
-    // Case-insensitive fallback
-    const lowerName = coverage.name.toLowerCase()
-    for (const [en, tr] of Object.entries(COVERAGE_NAME_TR)) {
-      if (en.toLowerCase() === lowerName) return tr
-    }
-    // Return nameTr (even if same as name) or name
-    return coverage.nameTr || coverage.name
+function getLocalizedCoverageName(
+  coverage: { name: string; nameTr?: string },
+  locale: string,
+  coverageNames: Record<string, string>,
+): string {
+  if (locale === 'en') return coverage.name
+
+  // If nameTr exists and differs from name, it's a real translation from AI
+  if (coverage.nameTr && coverage.nameTr !== coverage.name) return coverage.nameTr
+  // Fallback: look up English name in the i18n coverage names map
+  const mapped = coverageNames[coverage.name]
+  if (mapped && mapped !== coverage.name) return mapped
+  // Case-insensitive fallback
+  const lowerName = coverage.name.toLowerCase()
+  for (const [en, translated] of Object.entries(coverageNames)) {
+    if (en.toLowerCase() === lowerName && translated !== en) return translated
   }
-  return coverage.name
+  // Return nameTr (even if same as name) or name
+  return coverage.nameTr || coverage.name
 }
 
 /**
- * Translate AI insight text to Turkish when locale is TR
+ * Translate AI insight text using the i18n insight translations map.
  * Handles known insight patterns generated by policy-extractor.ts
  */
-function translateInsight(insight: string, locale: string): string {
-  if (locale !== 'tr') return insight
+function translateInsight(
+  insight: string,
+  locale: string,
+  insightTranslations: Record<string, string>,
+): string {
+  if (locale === 'en') return insight
 
   // Extract emoji prefix if present (✓ ⚠ 💡 ❌ etc.)
   const prefixMatch = insight.match(/^([✓✔☑⚠💡❌]\s*)/u)
   const prefix = prefixMatch ? prefixMatch[1] : ''
   const text = prefix ? insight.slice(prefix.length).trim() : insight
 
-  // Known exact translations
-  const TRANSLATIONS: Record<string, string> = {
-    'Comprehensive coverage with multiple protection areas': 'Birçok koruma alanıyla kapsamlı teminat',
-    'High coverage limits for major risks': 'Büyük riskler için yüksek teminat limitleri',
-    'Zero deductible on some coverages': 'Bazı teminatlarda sıfır muafiyet',
-    'Includes special endorsements for enhanced protection': 'Artırılmış koruma için özel klozlar içerir',
-    'Standard coverage for policy type': 'Poliçe türüne uygun standart teminat',
-    'Multiple exclusions may limit coverage in certain scenarios': 'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
-    'High deductibles may result in significant out-of-pocket costs': 'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
-    'Total coverage significantly below market average': 'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
-    'Consider adding DASK earthquake insurance if not included': 'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
-    'Review coverage limits annually to ensure adequate protection': 'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
-    'Premium is above 75th percentile - compare with other providers': 'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
-    'Coverage below market median - consider increasing limits': 'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
+  // Known exact translations from i18n system
+  if (insightTranslations[text] && insightTranslations[text] !== text) {
+    return prefix ? `${prefix}${insightTranslations[text]}` : insightTranslations[text]
   }
 
-  if (TRANSLATIONS[text]) {
-    return prefix ? `${prefix}${TRANSLATIONS[text]}` : TRANSLATIONS[text]
-  }
-
-  // Pattern matches for dynamic content
+  // Pattern matches for dynamic content using i18n templates
   if (text.startsWith('Missing common coverage:')) {
     const name = text.replace('Missing common coverage:', '').trim()
-    const translated = `Yaygın teminat eksik: ${name}`
+    const template = insightTranslations['missingCoverage'] || 'Missing common coverage: {name}'
+    const translated = template.replace('{name}', name)
     return prefix ? `${prefix}${translated}` : translated
   }
 
   if (text.startsWith('Invalid TC Kimlik:')) {
     const value = text.replace('Invalid TC Kimlik:', '').trim()
-    const translated = `Geçersiz TC Kimlik: ${value}`
+    const template = insightTranslations['invalidTcKimlik'] || 'Invalid TC Kimlik: {value}'
+    const translated = template.replace('{value}', value)
     return prefix ? `${prefix}${translated}` : translated
   }
 
   const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
   if (yoyMatch) {
-    const translated = `Piyasa primleri yıllık %${yoyMatch[1]} arttı - oranları erkenden sabitleyin`
+    const template = insightTranslations['marketPremiumsYoY'] || 'Market premiums increased {percent}% YoY - lock in rates early'
+    const translated = template.replace('{percent}', yoyMatch[1])
     return prefix ? `${prefix}${translated}` : translated
   }
 
@@ -323,10 +213,12 @@ function CollapsibleCoverageCategory({
   CategoryIcon,
   coverages,
   locale,
+  coverageNames,
   defaultExpanded = false,
 }: {
   categoryKey: string // Used for React key prop
   categoryLabel: string
+  coverageNames: Record<string, string>
   CategoryIcon: React.ElementType
   coverages: GroupedCoverage[]
   locale: string
@@ -374,7 +266,7 @@ function CollapsibleCoverageCategory({
                   <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <Check className="text-blue-600" size={12} />
                   </div>
-                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(groupedCoverage, locale)}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(groupedCoverage, locale, coverageNames)}</p>
                 </div>
                 <div className="grid grid-cols-1 gap-1 ml-8">
                   {groupedCoverage.subLimits.map((subLimit, j) => (
@@ -416,7 +308,7 @@ function CollapsibleCoverageCategory({
                       <X className="text-gray-400" size={12} />
                     </div>
                   )}
-                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(coverage, locale)}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(coverage, locale, coverageNames)}</p>
                   {hasInfo && (
                     <Info size={12} className={`text-gray-400 flex-shrink-0 transition-colors ${isCoverageExpanded ? 'text-blue-500' : ''}`} />
                   )}
@@ -477,6 +369,7 @@ function CoveragesByCategory({
   policyType: string
   locale: string
 }) {
+  const { t } = useTranslation()
   // Filter and prepare coverages
   const filteredCoverages = coverages.filter(coverage => {
     // Always keep coverages with limits, unlimited flag, or market value flag
@@ -580,6 +473,7 @@ function CoveragesByCategory({
             CategoryIcon={CategoryIcon}
             coverages={categoryCoverages}
             locale={locale}
+            coverageNames={t.coverageNames}
             defaultExpanded={index === 0} // First category expanded by default
           />
         )
@@ -921,7 +815,6 @@ function RawExtractedTextSection({
 }
 
 import { usePolicies } from '@/lib/policy-context'
-import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
 import { GradeBadge } from './evaluation/GradeBadge'
 import { StatusIndicator } from './evaluation/StatusIndicator'
@@ -1129,13 +1022,13 @@ export function PolicyDetailView() {
                     `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
                     '',
                     `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
-                    ...policy.coverages.map(c => `• ${getLocalizedCoverageName(c, locale)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`),
+                    ...policy.coverages.map(c => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`),
                     '',
                     `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
                     ...policy.exclusions.map(e => `• ${e}`),
                     '',
                     `=== ${locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS'} ===`,
-                    ...policy.aiInsights.map(i => `• ${translateInsight(i, locale)}`),
+                    ...policy.aiInsights.map(i => `• ${translateInsight(i, locale, t.insightTranslations)}`),
                   ].join('\n')
 
                   const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
@@ -1348,7 +1241,7 @@ export function PolicyDetailView() {
                   ).map((insight, i) => {
                     // Strip any existing prefix characters from the text
                     const cleanInsight = insight.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
-                    const translatedInsight = translateInsight(cleanInsight, locale)
+                    const translatedInsight = translateInsight(cleanInsight, locale, t.insightTranslations)
                     return (
                       <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
                         <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
@@ -1672,7 +1565,7 @@ export function PolicyDetailView() {
                   </div>
                   {policy.aiInsights.map((insight, i) => (
                     <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
-                      {translateInsight(insight, locale)}
+                      {translateInsight(insight, locale, t.insightTranslations)}
                     </div>
                   ))}
                 </div>

@@ -3,7 +3,8 @@
 import type { TranslationDictionary } from './translations'
 
 const CACHE_KEY_PREFIX = 'insurai_i18n_'
-const CACHE_VERSION = 1
+const CACHE_VERSION_PREFIX = 'insurai_i18n_ver_'
+const CACHE_SCHEMA_VERSION = 2 // Increment when cache structure changes
 
 interface CacheEntry {
   version: number
@@ -22,7 +23,7 @@ export function getCachedTranslations(locale: string): TranslationDictionary | n
     const entry: CacheEntry = JSON.parse(cached)
 
     // Check version compatibility
-    if (entry.version !== CACHE_VERSION) {
+    if (entry.version !== CACHE_SCHEMA_VERSION) {
       localStorage.removeItem(key)
       return null
     }
@@ -39,7 +40,7 @@ export function setCachedTranslations(locale: string, translations: TranslationD
   try {
     const key = `${CACHE_KEY_PREFIX}${locale}`
     const entry: CacheEntry = {
-      version: CACHE_VERSION,
+      version: CACHE_SCHEMA_VERSION,
       timestamp: Date.now(),
       translations,
     }
@@ -87,6 +88,24 @@ export function getCachedLocales(): string[] {
   } catch (error) {
     console.error('Error getting cached locales:', error)
     return []
+  }
+}
+
+// Get cached translation version for a locale (for API cache invalidation)
+export function getCachedVersion(locale: string): string | null {
+  try {
+    return localStorage.getItem(`${CACHE_VERSION_PREFIX}${locale}`)
+  } catch {
+    return null
+  }
+}
+
+// Set cached translation version for a locale
+export function setCachedVersion(locale: string, version: string): void {
+  try {
+    localStorage.setItem(`${CACHE_VERSION_PREFIX}${locale}`, version)
+  } catch {
+    // Ignore storage errors
   }
 }
 

@@ -27,6 +27,7 @@ import emailRoutes from './routes/email.js'
 import settingsRoutes from './routes/settings.js'
 import webhookRoutes from './routes/webhooks.js'
 import driftRoutes from './routes/drift.js'
+import translationRoutes from './routes/translations.js'
 import {
   generalLimiter,
   healthLimiter,
@@ -317,6 +318,9 @@ app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)
 
 // Email notification routes
 app.use('/api/email', emailRoutes)
+
+// Translation routes (public GET + admin CRUD)
+app.use('/api/translations', translationRoutes)
 
 // 404 handler for API routes only
 app.use('/api', (_req, res) => {

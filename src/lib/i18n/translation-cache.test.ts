@@ -110,7 +110,7 @@ describe('Translation Cache', () => {
       } as TranslationDictionary
 
       localStorageData['insurai_i18n_en'] = JSON.stringify({
-        version: 1,
+        version: 2,
         timestamp: Date.now(),
         translations,
       })
@@ -153,7 +153,7 @@ describe('Translation Cache', () => {
 
       const stored = JSON.parse(localStorageData['insurai_i18n_tr'])
       expect(stored.translations).toEqual(translations)
-      expect(stored.version).toBe(1)
+      expect(stored.version).toBe(2)
       expect(stored.timestamp).toBeDefined()
     })
   })

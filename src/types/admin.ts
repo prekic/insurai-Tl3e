@@ -821,6 +821,7 @@ export type AdminSection =
   | 'ocr_dashboard'
   | 'security'
   | 'config'
+  | 'translations'
   | 'benchmarks'
   | 'analytics'
   | 'audit'
