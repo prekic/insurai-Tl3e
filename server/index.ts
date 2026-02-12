@@ -179,10 +179,23 @@ app.use(
 if (IS_PRODUCTION) {
   const distPath = path.join(__dirname, '..', 'dist')
 
-  // Serve static assets
+  // Hashed assets (/assets/*) — cache aggressively (1 year), filenames change on each build
+  app.use('/assets', express.static(path.join(distPath, 'assets'), {
+    maxAge: '365d',
+    immutable: true,
+    etag: false,
+  }))
+
+  // Non-hashed files (index.html, sw.js, manifest.json, icons) — never cache
+  // index.html must always be fresh because it references hashed chunk filenames
   app.use(express.static(distPath, {
-    maxAge: '1d',
+    maxAge: 0,
     etag: true,
+    setHeaders: (res, filePath) => {
+      if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+      }
+    },
   }))
 }
 
