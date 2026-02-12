@@ -551,8 +551,25 @@ export interface TranslationDictionary {
   help: {
     title: string
     searchHelp: string
+    searchPlaceholder: string
     gettingStarted: string
+    gettingStartedDesc: string
+    policyAnalysis: string
+    policyAnalysisDesc: string
     faq: string
+    faqDesc: string
+    troubleshooting: string
+    troubleshootingDesc: string
+    articlesCount: string
+    popularArticles: string
+    article1: string
+    article2: string
+    article3: string
+    article4: string
+    article5: string
+    stillNeedHelp: string
+    stillNeedHelpDesc: string
+    chatWithAI: string
     contactSupport: string
     documentation: string
     chatWithUs: string
@@ -638,6 +655,7 @@ export interface TranslationDictionary {
     welcomeBack: string
     createYourAccount: string
     namePlaceholder: string
+    emailPlaceholder: string
     authNotConfigured: string
     authNotConfiguredDesc: string
     continueToDemo: string
@@ -794,6 +812,36 @@ export interface TranslationDictionary {
     notAvailable: string
     on: string
     off: string
+  }
+
+  // Shared Result
+  shared: {
+    analysisNotFound: string
+    analysisNotFoundDesc: string
+    tryFreeAnalysis: string
+    backToHome: string
+    linkExpired: string
+    linkExpiredDesc: string
+    sharedAnalysis: string
+    expiresIn: string
+    expiringSoon: string
+    tryYourOwn: string
+    policyAnalysis: string
+    policySummary: string
+    keyDetails: string
+    policyNumber: string
+    insured: string
+    premium: string
+    coverage: string
+    coveragesCount: string
+    moreCoverages: string
+    keyExclusions: string
+    aiInsights: string
+    wantToAnalyze: string
+    wantToAnalyzeDesc: string
+    tryFree: string
+    kvkkCompliant: string
+    dataSecure: string
   }
 }
 
@@ -1316,8 +1364,25 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   help: {
     title: 'Help Center',
     searchHelp: 'Search help articles...',
+    searchPlaceholder: 'Search for help...',
     gettingStarted: 'Getting Started',
+    gettingStartedDesc: 'Learn the basics of using InsurAI',
+    policyAnalysis: 'Policy Analysis',
+    policyAnalysisDesc: 'Understanding AI-powered analysis',
     faq: 'FAQ',
+    faqDesc: 'Frequently asked questions',
+    troubleshooting: 'Troubleshooting',
+    troubleshootingDesc: 'Solve common issues',
+    articlesCount: '{count} articles',
+    popularArticles: 'Popular Articles',
+    article1: 'How to upload and analyze a policy',
+    article2: 'Understanding coverage comparisons',
+    article3: 'Setting up renewal reminders',
+    article4: 'Exporting analysis reports',
+    article5: 'Managing your policy portfolio',
+    stillNeedHelp: 'Still need help?',
+    stillNeedHelpDesc: 'Chat with our AI assistant or contact support',
+    chatWithAI: 'Chat with AI',
     contactSupport: 'Contact Support',
     documentation: 'Documentation',
     chatWithUs: 'Chat with us',
@@ -1398,6 +1463,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     welcomeBack: 'Welcome back',
     createYourAccount: 'Create your account',
     namePlaceholder: 'John Doe',
+    emailPlaceholder: 'you@example.com',
     authNotConfigured: 'Authentication Not Configured',
     authNotConfiguredDesc: 'Supabase credentials are not set. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.',
     continueToDemo: 'Continue to Demo',
@@ -1547,6 +1613,35 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     notAvailable: 'N/A',
     on: 'On',
     off: 'Off',
+  },
+
+  shared: {
+    analysisNotFound: 'Analysis Not Found',
+    analysisNotFoundDesc: 'This shared link is not available. The analysis may have been removed or the link is incorrect.',
+    tryFreeAnalysis: 'Try Free Analysis',
+    backToHome: 'Back to Home',
+    linkExpired: 'Link Expired',
+    linkExpiredDesc: 'This shared analysis has expired. Analysis results are available for 24 hours.',
+    sharedAnalysis: 'Shared Analysis',
+    expiresIn: 'Expires in {time}',
+    expiringSoon: 'Expiring soon',
+    tryYourOwn: 'Try Your Own',
+    policyAnalysis: 'Policy Analysis',
+    policySummary: 'Policy Summary',
+    keyDetails: 'Key Details',
+    policyNumber: 'Policy Number',
+    insured: 'Insured',
+    premium: 'Premium',
+    coverage: 'Coverage',
+    coveragesCount: 'Coverages ({count})',
+    moreCoverages: '+{count} more coverages',
+    keyExclusions: 'Key Exclusions',
+    aiInsights: 'AI Insights',
+    wantToAnalyze: 'Want to analyze your own policy?',
+    wantToAnalyzeDesc: 'Get instant AI-powered analysis of your insurance policies.',
+    tryFree: 'Try Free',
+    kvkkCompliant: 'KVKK Compliant',
+    dataSecure: 'Your data is secure',
   },
 }
 
@@ -2069,9 +2164,26 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
   help: {
     title: 'Yardım Merkezi',
     searchHelp: 'Yardım makalelerinde ara...',
-    gettingStarted: 'Başlarken',
+    searchPlaceholder: 'Yardım ara...',
+    gettingStarted: 'Başlangıç',
+    gettingStartedDesc: 'InsurAI kullanımının temellerini öğrenin',
+    policyAnalysis: 'Poliçe Analizi',
+    policyAnalysisDesc: 'AI destekli analizi anlama',
     faq: 'SSS',
-    contactSupport: 'Destek ile İletişim',
+    faqDesc: 'Sıkça sorulan sorular',
+    troubleshooting: 'Sorun Giderme',
+    troubleshootingDesc: 'Yaygın sorunları çözün',
+    articlesCount: '{count} makale',
+    popularArticles: 'Popüler Makaleler',
+    article1: 'Poliçe nasıl yüklenir ve analiz edilir',
+    article2: 'Teminat karşılaştırmalarını anlama',
+    article3: 'Yenileme hatırlatıcıları ayarlama',
+    article4: 'Analiz raporlarını dışa aktarma',
+    article5: 'Poliçe portföyünüzü yönetme',
+    stillNeedHelp: 'Hâlâ yardıma mı ihtiyacınız var?',
+    stillNeedHelpDesc: 'AI asistanımızla sohbet edin veya destekle iletişime geçin',
+    chatWithAI: 'AI ile Sohbet',
+    contactSupport: 'Destek İletişim',
     documentation: 'Dokümantasyon',
     chatWithUs: 'Bizimle sohbet edin',
   },
@@ -2151,6 +2263,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     welcomeBack: 'Tekrar hoş geldiniz',
     createYourAccount: 'Hesabınızı oluşturun',
     namePlaceholder: 'Ahmet Yılmaz',
+    emailPlaceholder: 'siz@ornek.com',
     authNotConfigured: 'Kimlik Doğrulama Yapılandırılmamış',
     authNotConfiguredDesc: 'Supabase bilgileri ayarlanmamış. Lütfen .env dosyanızda VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini yapılandırın.',
     continueToDemo: 'Demoya Devam Et',
@@ -2300,6 +2413,35 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     notAvailable: 'Mevcut Değil',
     on: 'Açık',
     off: 'Kapalı',
+  },
+
+  shared: {
+    analysisNotFound: 'Analiz Bulunamadı',
+    analysisNotFoundDesc: 'Bu paylaşılan bağlantı mevcut değil. Analiz kaldırılmış veya bağlantı hatalı olabilir.',
+    tryFreeAnalysis: 'Ücretsiz Analiz Dene',
+    backToHome: 'Ana Sayfaya Dön',
+    linkExpired: 'Bağlantı Süresi Dolmuş',
+    linkExpiredDesc: 'Bu paylaşılan analizin süresi dolmuş. Analiz sonuçları 24 saat boyunca geçerlidir.',
+    sharedAnalysis: 'Paylaşılan Analiz',
+    expiresIn: '{time} içinde sona eriyor',
+    expiringSoon: 'Yakında sona eriyor',
+    tryYourOwn: 'Kendiniz Deneyin',
+    policyAnalysis: 'Poliçe Analizi',
+    policySummary: 'Poliçe Özeti',
+    keyDetails: 'Temel Bilgiler',
+    policyNumber: 'Poliçe Numarası',
+    insured: 'Sigortalı',
+    premium: 'Prim',
+    coverage: 'Teminat',
+    coveragesCount: 'Teminatlar ({count})',
+    moreCoverages: '+{count} teminat daha',
+    keyExclusions: 'Önemli İstisnalar',
+    aiInsights: 'AI İçgörüleri',
+    wantToAnalyze: 'Kendi poliçenizi analiz etmek ister misiniz?',
+    wantToAnalyzeDesc: 'Sigorta poliçelerinizin anında AI destekli analizini alın.',
+    tryFree: 'Ücretsiz Dene',
+    kvkkCompliant: 'KVKK Uyumlu',
+    dataSecure: 'Verileriniz güvende',
   },
 }
 
