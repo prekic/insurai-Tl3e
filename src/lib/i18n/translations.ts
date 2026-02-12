@@ -330,7 +330,17 @@ export interface TranslationDictionary {
     business: string
     subject: string
     viewDetails: string
+    hideDetails: string
     perYear: string
+    coverageDetails: string
+    exclusions: string
+    specialConditions: string
+    included: string
+    notIncluded: string
+    insuredPerson: string
+    location: string
+    period: string
+    confidence: string
   }
 
   // Upload
@@ -1154,7 +1164,17 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     business: 'Business',
     subject: 'Subject',
     viewDetails: 'View Details',
+    hideDetails: 'Hide Details',
     perYear: '/yr',
+    coverageDetails: 'Coverage Details',
+    exclusions: 'Exclusions',
+    specialConditions: 'Special Conditions',
+    included: 'Included',
+    notIncluded: 'Not Included',
+    insuredPerson: 'Insured',
+    location: 'Location',
+    period: 'Period',
+    confidence: 'AI Confidence',
   },
 
   upload: {
@@ -1758,6 +1778,16 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     'Review coverage limits annually to ensure adequate protection': 'Review coverage limits annually to ensure adequate protection',
     'Premium is above 75th percentile - compare with other providers': 'Premium is above 75th percentile - compare with other providers',
     'Coverage below market median - consider increasing limits': 'Coverage below market median - consider increasing limits',
+    'Premium is 10% below market average for this coverage level': 'Premium is 10% below market average for this coverage level',
+    'Natural disaster deductible is higher than typical': 'Natural disaster deductible is higher than typical',
+    'Glass coverage included at no additional cost': 'Glass coverage included at no additional cost',
+    'Standard mandatory coverage - no gaps detected': 'Standard mandatory coverage - no gaps detected',
+    'Premium is at market average': 'Premium is at market average',
+    'Contents coverage may be insufficient for high-value items': 'Contents coverage may be insufficient for high-value items',
+    'Consider supplemental earthquake coverage': 'Consider supplemental earthquake coverage',
+    'Policy expiring in 45 days - renewal recommended': 'Policy expiring in 45 days - renewal recommended',
+    'Dental coverage is below average for this tier': 'Dental coverage is below average for this tier',
+    'Good maternity benefits included': 'Good maternity benefits included',
     'missingCoverage': 'Missing common coverage: {name}',
     'invalidTcKimlik': 'Invalid TC Kimlik: {value}',
     'marketPremiumsYoY': 'Market premiums increased {percent}% YoY - lock in rates early',
@@ -2067,7 +2097,17 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     business: 'İşyeri',
     subject: 'Konu',
     viewDetails: 'Detayları Görüntüle',
+    hideDetails: 'Detayları Gizle',
     perYear: '/yıl',
+    coverageDetails: 'Teminat Detayları',
+    exclusions: 'İstisnalar',
+    specialConditions: 'Özel Koşullar',
+    included: 'Dahil',
+    notIncluded: 'Dahil Değil',
+    insuredPerson: 'Sigortalı',
+    location: 'Konum',
+    period: 'Dönem',
+    confidence: 'AI Güven Skoru',
   },
 
   upload: {
@@ -2671,6 +2711,16 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     'Review coverage limits annually to ensure adequate protection': 'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
     'Premium is above 75th percentile - compare with other providers': 'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
     'Coverage below market median - consider increasing limits': 'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
+    'Premium is 10% below market average for this coverage level': 'Prim bu teminat seviyesi için piyasa ortalamasının %10 altında',
+    'Natural disaster deductible is higher than typical': 'Doğal afet muafiyeti normalden yüksek',
+    'Glass coverage included at no additional cost': 'Cam teminatı ek ücret olmadan dahil',
+    'Standard mandatory coverage - no gaps detected': 'Standart zorunlu teminat - eksik tespit edilmedi',
+    'Premium is at market average': 'Prim piyasa ortalamasında',
+    'Contents coverage may be insufficient for high-value items': 'Eşya teminatı yüksek değerli eşyalar için yetersiz olabilir',
+    'Consider supplemental earthquake coverage': 'Ek deprem teminatı düşünün',
+    'Policy expiring in 45 days - renewal recommended': 'Poliçe 45 gün içinde sona eriyor - yenileme önerilir',
+    'Dental coverage is below average for this tier': 'Diş teminatı bu seviye için ortalamanın altında',
+    'Good maternity benefits included': 'İyi doğum yardımları dahil',
     'missingCoverage': 'Yaygın teminat eksik: {name}',
     'invalidTcKimlik': 'Geçersiz TC Kimlik: {value}',
     'marketPremiumsYoY': 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin',
