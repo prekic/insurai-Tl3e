@@ -252,6 +252,7 @@ export interface TranslationDictionary {
     uploadTryAgain: string
     uploadNoValidFiles: string
     uploadFailedDesc: string
+    uploadMaxSize: string
 
     // CompareSection (CTA)
     ctaTitle: string
@@ -271,6 +272,15 @@ export interface TranslationDictionary {
     compareIncluded: string
     compareExcluded: string
     compareOptional: string
+    comparePolicyA: string
+    comparePolicyB: string
+    compareInsurerA: string
+    compareInsurerB: string
+
+    // ComparisonMock - premiums
+    comparisonPerYear: string
+    comparisonPremiumA: string
+    comparisonPremiumB: string
 
     // WhoItsFor
     whoTitle: string
@@ -1007,6 +1017,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Try again',
     uploadNoValidFiles: 'No valid files selected. Please check file type and size.',
     uploadFailedDesc: 'There was a problem uploading your files. Please try again.',
+    uploadMaxSize: 'up to {size}MB',
 
     // CompareSection (CTA)
     ctaTitle: 'Ready to understand your policies?',
@@ -1026,6 +1037,15 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     compareIncluded: 'Included',
     compareExcluded: 'Excluded',
     compareOptional: 'Optional',
+    comparePolicyA: 'Policy A',
+    comparePolicyB: 'Policy B',
+    compareInsurerA: 'Insurer ABC',
+    compareInsurerB: 'Insurer XYZ',
+
+    // ComparisonMock - premiums
+    comparisonPerYear: '/yr',
+    comparisonPremiumA: '₺4,200/yr',
+    comparisonPremiumB: '₺3,800/yr',
 
     // WhoItsFor
     whoTitle: 'Built for',
@@ -1744,6 +1764,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Tekrar dene',
     uploadNoValidFiles: 'Geçerli dosya seçilmedi. Dosya türünü ve boyutunu kontrol edin.',
     uploadFailedDesc: 'Dosyalarınız yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.',
+    uploadMaxSize: 'en fazla {size}MB',
 
     // CompareSection (CTA)
     ctaTitle: 'Poliçelerinizi anlamaya hazır mısınız?',
@@ -1763,6 +1784,15 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     compareIncluded: 'Dahil',
     compareExcluded: 'Hariç',
     compareOptional: 'İsteğe Bağlı',
+    comparePolicyA: 'Poliçe A',
+    comparePolicyB: 'Poliçe B',
+    compareInsurerA: 'Sigortacı ABC',
+    compareInsurerB: 'Sigortacı XYZ',
+
+    // ComparisonMock - primler
+    comparisonPerYear: '/yıl',
+    comparisonPremiumA: '₺4.200/yıl',
+    comparisonPremiumB: '₺3.800/yıl',
 
     // WhoItsFor
     whoTitle: 'Sigorta profesyonelleri',
