@@ -464,7 +464,7 @@ router.post('/admin/cache/invalidate', authenticateAdmin, async (req: Request, r
  * Body: { sourceLocale?: string } (default: 'en')
  */
 router.post('/admin/:locale/ai-translate', authenticateAdmin, async (req: Request, res: Response) => {
-  const { locale } = req.params
+  const locale = req.params.locale as string
   const { sourceLocale = 'en' } = req.body || {}
 
   if (locale === sourceLocale) {
@@ -556,7 +556,7 @@ Return the translations as JSON:`
           continue
         }
 
-        const aiResult = await apiResponse.json()
+        const aiResult = (await apiResponse.json()) as { success?: boolean; response?: string }
         if (!aiResult.success || !aiResult.response) {
           log.warn('AI translation returned no response')
           totalFailed += batch.length
