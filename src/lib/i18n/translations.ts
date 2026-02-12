@@ -329,6 +329,8 @@ export interface TranslationDictionary {
     address: string
     business: string
     subject: string
+    viewDetails: string
+    perYear: string
   }
 
   // Upload
@@ -635,6 +637,10 @@ export interface TranslationDictionary {
     checkEmail: string
     welcomeBack: string
     createYourAccount: string
+    namePlaceholder: string
+    authNotConfigured: string
+    authNotConfiguredDesc: string
+    continueToDemo: string
   }
 
   // AI Insights
@@ -1093,6 +1099,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     address: 'Address',
     business: 'Business',
     subject: 'Subject',
+    viewDetails: 'View Details',
+    perYear: '/yr',
   },
 
   upload: {
@@ -1389,6 +1397,10 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     checkEmail: 'Check your email to confirm your account.',
     welcomeBack: 'Welcome back',
     createYourAccount: 'Create your account',
+    namePlaceholder: 'John Doe',
+    authNotConfigured: 'Authentication Not Configured',
+    authNotConfiguredDesc: 'Supabase credentials are not set. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.',
+    continueToDemo: 'Continue to Demo',
   },
 
   insights: {
@@ -1840,6 +1852,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     address: 'Adres',
     business: 'İşyeri',
     subject: 'Konu',
+    viewDetails: 'Detayları Görüntüle',
+    perYear: '/yıl',
   },
 
   upload: {
@@ -2136,6 +2150,10 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     checkEmail: 'Hesabınızı onaylamak için e-postanızı kontrol edin.',
     welcomeBack: 'Tekrar hoş geldiniz',
     createYourAccount: 'Hesabınızı oluşturun',
+    namePlaceholder: 'Ahmet Yılmaz',
+    authNotConfigured: 'Kimlik Doğrulama Yapılandırılmamış',
+    authNotConfiguredDesc: 'Supabase bilgileri ayarlanmamış. Lütfen .env dosyanızda VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini yapılandırın.',
+    continueToDemo: 'Demoya Devam Et',
   },
 
   insights: {
