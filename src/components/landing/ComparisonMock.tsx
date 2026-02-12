@@ -5,8 +5,8 @@ export function ComparisonMock() {
   const { t } = useTranslation()
 
   const policies = [
-    { name: 'Kasko A', provider: 'Allianz', premium: '₺4,200/yr', coverage: '₺500,000' },
-    { name: 'Kasko B', provider: 'AXA', premium: '₺3,800/yr', coverage: '₺450,000' },
+    { name: 'Kasko A', provider: 'Allianz', premium: t.landing.comparisonPremiumA, coverage: '₺500,000' },
+    { name: 'Kasko B', provider: 'AXA', premium: t.landing.comparisonPremiumB, coverage: '₺450,000' },
   ]
 
   const features = [

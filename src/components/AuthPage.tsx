@@ -88,17 +88,16 @@ export function AuthPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
           <Shield className="h-16 w-16 text-amber-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-900 mb-2">
-            Authentication Not Configured
+            {t.auth.authNotConfigured}
           </h2>
           <p className="text-slate-600 mb-6">
-            Supabase credentials are not set. Please configure VITE_SUPABASE_URL and
-            VITE_SUPABASE_ANON_KEY in your .env file.
+            {t.auth.authNotConfiguredDesc}
           </p>
           <button
             onClick={() => navigate('/dashboard')}
             className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Continue to Demo
+            {t.auth.continueToDemo}
           </button>
         </div>
       </div>
@@ -162,7 +161,7 @@ export function AuthPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="John Doe"
+                    placeholder={t.auth.namePlaceholder}
                   />
                 </div>
               </motion.div>
@@ -181,7 +180,7 @@ export function AuthPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                placeholder="you@example.com"
+                placeholder={t.auth.emailPlaceholder}
                 required
               />
             </div>

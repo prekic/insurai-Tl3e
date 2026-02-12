@@ -5,8 +5,8 @@ export function PolicyComparisonSection() {
   const { t } = useTranslation()
 
   const policies = [
-    { name: 'Policy A', provider: 'Insurer ABC' },
-    { name: 'Policy B', provider: 'Insurer XYZ' },
+    { name: t.landing.comparePolicyA, provider: t.landing.compareInsurerA },
+    { name: t.landing.comparePolicyB, provider: t.landing.compareInsurerB },
   ]
 
   const comparisonRows = [

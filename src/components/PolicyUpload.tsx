@@ -21,6 +21,7 @@ import {
 } from '@/lib/policy-upload-check'
 import { createProcessingLogger } from '@/lib/processing-logger'
 import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 /**
  * Convert AnalyzedPolicy to Supabase PolicyInsert format
@@ -118,6 +119,7 @@ export function PolicyUpload() {
   const backendReady = health.status === 'healthy'
   // In production (SaaS), hide technical details from end users
   const IS_PRODUCTION = import.meta.env.PROD
+  const { t } = useTranslation()
 
   // Track if we're in autoOpen mode (to show minimal UI until dialog opens)
   const isAutoOpen = searchParams.get('autoOpen') === 'true'
@@ -184,8 +186,8 @@ export function PolicyUpload() {
 
   const handleRunDiagnostics = async () => {
     setIsRunningDiagnostics(true)
-    toast.info('Running diagnostics...', {
-      description: 'Testing API key validity with each provider',
+    toast.info(t.upload.diagnosticsRunning, {
+      description: t.upload.diagnosticsTestingProviders,
     })
 
     const result = await runDiagnostics()
@@ -193,18 +195,18 @@ export function PolicyUpload() {
 
     if (result) {
       if (result.summary.anyProviderValid) {
-        toast.success('Diagnostics complete', {
+        toast.success(t.upload.diagnosticsComplete, {
           description: result.summary.recommendation,
         })
       } else {
-        toast.error('Diagnostics failed', {
+        toast.error(t.upload.diagnosticsFailed, {
           description: result.summary.recommendation,
           duration: 10000,
         })
       }
     } else {
-      toast.error('Could not run diagnostics', {
-        description: 'Backend server may not be reachable',
+      toast.error(t.upload.diagnosticsUnreachable, {
+        description: t.upload.diagnosticsUnreachableDesc,
       })
     }
   }
@@ -243,8 +245,8 @@ export function PolicyUpload() {
 
     // Show success toast if some files were valid
     if (errors.length > 0 && valid.length > 0) {
-      toast.info(`${valid.length} file(s) accepted`, {
-        description: `${errors.length} file(s) were rejected due to validation errors.`,
+      toast.info(`${valid.length} ${t.upload.filesAccepted}`, {
+        description: `${errors.length} ${t.upload.filesRejected}`,
       })
     }
 
@@ -409,9 +411,9 @@ export function PolicyUpload() {
 
         const displayName = sanitizeFileName(file.name)
         toast.warning(
-          conflictResult.type === 'exactDuplicate' ? 'Duplicate detected' : 'Amendment detected',
+          conflictResult.type === 'exactDuplicate' ? t.upload.duplicateDetected : t.upload.amendmentDetected,
           {
-            description: `${displayName} matches an existing policy. Please choose how to proceed.`,
+            description: `${displayName} ${t.upload.matchesExisting}`,
           }
         )
         return // Don't proceed with normal save
@@ -500,18 +502,18 @@ export function PolicyUpload() {
 
       // Get the file name for the toast
       const displayName = sanitizeFileName(file.name)
-      const storageNote = savedToCloud ? ' (saved to cloud)' : ''
+      const storageNote = savedToCloud ? ` ${t.upload.savedToCloud}` : ''
       const aiNote = source === 'ai'
-        ? ` (${Math.round(extractedData.confidence.overall * 100)}% confidence)`
-        : ' (demo mode)'
+        ? ` (${Math.round(extractedData.confidence.overall * 100)}% ${t.upload.confidence})`
+        : ` ${t.upload.demoMode}`
 
       if (isLowConfidence) {
-        toast.warning('Analysis complete — low confidence', {
-          description: `${displayName} has been analyzed${aiNote}${storageNote}. Some data may be inaccurate — please verify.`,
+        toast.warning(t.upload.analysisCompleteLowConfidence, {
+          description: `${displayName} — ${aiNote}${storageNote}. ${t.upload.verifyData}`,
         })
       } else {
-        toast.success('Analysis complete', {
-          description: `${displayName} has been analyzed${aiNote}${storageNote}.`,
+        toast.success(t.upload.analysisComplete, {
+          description: `${displayName} — ${aiNote}${storageNote}.`,
         })
       }
     } catch (error) {
@@ -527,55 +529,55 @@ export function PolicyUpload() {
       // In production (SaaS), hide technical details like .env references
       const IS_PRODUCTION = import.meta.env.PROD
       let userMessage = errorMessage
-      let userTitle = 'Analysis Failed'
+      let userTitle = t.upload.errorAnalysisFailed
       let troubleshootingTip = ''
 
       if (errorMessage.includes('not configured') || errorMessage.includes('NO_AI_CONFIG')) {
-        userTitle = 'AI Not Configured'
-        userMessage = 'The AI service is not available.'
+        userTitle = t.upload.errorAiNotConfigured
+        userMessage = t.upload.errorAiUnavailable
         troubleshootingTip = IS_PRODUCTION
-          ? 'Please contact support if this issue persists.'
+          ? t.upload.errorContactSupport
           : 'Ensure the backend server is running with OPENAI_API_KEY or ANTHROPIC_API_KEY in .env'
       } else if (errorMessage.includes('PDF_TIMEOUT') || errorMessage.includes('timed out') || errorMessage.includes('took too long')) {
-        userTitle = 'PDF Processing Timeout'
-        userMessage = 'The PDF took too long to process.'
-        troubleshootingTip = 'The file may be too large or complex. Try a smaller file or retry.'
+        userTitle = t.upload.errorPdfTimeout
+        userMessage = t.upload.errorPdfTimeoutMsg
+        troubleshootingTip = t.upload.errorPdfTimeoutTip
       } else if (errorMessage.includes('PDF_WORKER_ERROR') || errorMessage.includes('worker failed')) {
-        userTitle = 'PDF Processing Error'
-        userMessage = 'The PDF processor encountered an error.'
-        troubleshootingTip = 'This is usually temporary. Please try again.'
+        userTitle = t.upload.errorPdfWorker
+        userMessage = t.upload.errorPdfWorkerMsg
+        troubleshootingTip = t.upload.errorPdfWorkerTip
       } else if (errorMessage.includes('FILE_READ_ERROR') || errorMessage.includes('Could not read')) {
-        userTitle = 'File Read Error'
-        userMessage = 'Could not read the uploaded file.'
-        troubleshootingTip = 'The file may have been moved or is corrupted. Please select the file again.'
+        userTitle = t.upload.errorFileRead
+        userMessage = t.upload.errorFileReadMsg
+        troubleshootingTip = t.upload.errorFileReadTip
       } else if (errorMessage.includes('PDF_PARSE_ERROR') || errorMessage.includes('PDF processing')) {
-        userTitle = 'PDF Processing Error'
-        userMessage = 'Could not read the PDF file.'
-        troubleshootingTip = 'The file may be corrupted, password-protected, or in an unsupported format.'
+        userTitle = t.upload.errorPdfParse
+        userMessage = t.upload.errorPdfParseMsg
+        troubleshootingTip = t.upload.errorPdfParseTip
       } else if (errorMessage.includes('rate limit') || errorMessage.includes('429')) {
-        userTitle = 'Rate Limit Exceeded'
-        userMessage = 'Too many requests to the AI service.'
-        troubleshootingTip = 'Please wait a few minutes before trying again.'
+        userTitle = t.upload.errorRateLimit
+        userMessage = t.upload.errorRateLimitMsg
+        troubleshootingTip = t.upload.errorRateLimitTip
       } else if (errorMessage.includes('proxy') || errorMessage.includes('network') || errorMessage.includes('fetch')) {
-        userTitle = 'Network Error'
-        userMessage = 'Could not connect to the backend server.'
+        userTitle = t.upload.errorNetwork
+        userMessage = t.upload.errorNetworkMsg
         troubleshootingTip = IS_PRODUCTION
-          ? 'Please check your internet connection and try again.'
+          ? t.upload.errorNetworkTip
           : 'Check that the backend is running on port 4001 (npm run dev:server)'
       } else if (errorMessage.includes('PROVIDER_NOT_CONFIGURED') || errorMessage.includes('503')) {
-        userTitle = 'AI Provider Not Ready'
-        userMessage = 'The AI provider is not configured on the server.'
+        userTitle = t.upload.errorProviderNotReady
+        userMessage = t.upload.errorProviderNotReadyMsg
         troubleshootingTip = IS_PRODUCTION
-          ? 'Please contact support if this issue persists.'
+          ? t.upload.errorContactSupport
           : 'Add OPENAI_API_KEY or ANTHROPIC_API_KEY to the server .env file and restart.'
       } else if (errorMessage.includes('LOW_CONFIDENCE')) {
-        userTitle = 'Low Extraction Confidence'
-        userMessage = 'The AI could not reliably extract data from this document.'
-        troubleshootingTip = 'The PDF may be scanned or have poor text quality. Try a clearer document.'
+        userTitle = t.upload.errorLowConfidence
+        userMessage = t.upload.errorLowConfidenceMsg
+        troubleshootingTip = t.upload.errorLowConfidenceTip
       } else if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-        userTitle = 'Request Timeout'
-        userMessage = 'The request took too long to complete.'
-        troubleshootingTip = 'The document may be too large or the AI service is slow. Try again later.'
+        userTitle = t.upload.errorRequestTimeout
+        userMessage = t.upload.errorRequestTimeoutMsg
+        troubleshootingTip = t.upload.errorRequestTimeoutTip
       }
 
       const fullErrorMessage = troubleshootingTip
@@ -594,7 +596,7 @@ export function PolicyUpload() {
         description: fullErrorMessage,
         duration: 8000,
         action: {
-          label: 'Retry',
+          label: t.common.retry,
           onClick: () => retryFile(fileId),
         },
       })
@@ -615,8 +617,8 @@ export function PolicyUpload() {
       )
     )
 
-    toast.info('Retrying...', {
-      description: 'Attempting to process the file again.',
+    toast.info(t.upload.retrying, {
+      description: t.upload.retryingDesc,
     })
 
     await processFileAsync(fileId, fileToRetry.file)
@@ -633,8 +635,8 @@ export function PolicyUpload() {
 
   const removeFile = (fileId: string) => {
     setFiles((prev) => prev.filter((f) => f.id !== fileId))
-    toast.info('File removed', {
-      description: 'The file has been removed from the upload queue.',
+    toast.info(t.upload.fileRemoved, {
+      description: t.upload.fileRemovedDesc,
     })
   }
 
@@ -644,8 +646,8 @@ export function PolicyUpload() {
       .map((f) => f.policy)
 
     if (analyzedPolicies.length === 0) {
-      toast.error('No policies to analyze', {
-        description: 'Please wait for at least one policy to complete processing.',
+      toast.error(t.upload.noPolicies, {
+        description: t.upload.noPoliciesDesc,
       })
       return
     }
@@ -662,8 +664,8 @@ export function PolicyUpload() {
   }
 
   const useSamplePolicies = () => {
-    toast.success('Sample policies loaded', {
-      description: `${samplePolicies.length} sample Turkish insurance policies have been loaded.`,
+    toast.success(t.upload.samplePoliciesLoaded, {
+      description: `${samplePolicies.length} ${t.upload.samplePoliciesLoadedDesc}`,
     })
     addPolicies(samplePolicies)
     navigate('/dashboard')
@@ -711,8 +713,8 @@ export function PolicyUpload() {
     setFiles((prev) => prev.filter((f) => f.id !== fileId))
     closeConflictDialog()
 
-    toast.info('Upload skipped', {
-      description: 'The policy was not saved as it already exists.',
+    toast.info(t.upload.uploadSkipped, {
+      description: t.upload.uploadSkippedDesc,
     })
   }
 
@@ -743,12 +745,12 @@ export function PolicyUpload() {
       )
 
       closeConflictDialog()
-      toast.success('Policy updated', {
-        description: 'The existing policy has been updated with the new data.',
+      toast.success(t.upload.policyUpdated, {
+        description: t.upload.policyUpdatedDesc,
       })
     } catch (error) {
       setConflictDialog((prev) => ({ ...prev, isLoading: false }))
-      toast.error('Update failed', {
+      toast.error(t.upload.updateFailed, {
         description: error instanceof Error ? error.message : 'Failed to update policy',
       })
     }
@@ -788,12 +790,12 @@ export function PolicyUpload() {
       )
 
       closeConflictDialog()
-      toast.success('Policy saved', {
-        description: 'The policy has been saved as a separate record.',
+      toast.success(t.upload.policySaved, {
+        description: t.upload.policySavedDesc,
       })
     } catch (error) {
       setConflictDialog((prev) => ({ ...prev, isLoading: false }))
-      toast.error('Save failed', {
+      toast.error(t.upload.saveFailed, {
         description: error instanceof Error ? error.message : 'Failed to save policy',
       })
     }
@@ -826,12 +828,12 @@ export function PolicyUpload() {
       )
 
       closeConflictDialog()
-      toast.success('Amendment tracked', {
+      toast.success(t.upload.amendmentTracked, {
         description: `Policy updated to version ${result.versionNumber}. ${result.changes.length} change(s) recorded.`,
       })
     } catch (error) {
       setConflictDialog((prev) => ({ ...prev, isLoading: false }))
-      toast.error('Amendment failed', {
+      toast.error(t.upload.amendmentFailed, {
         description: error instanceof Error ? error.message : 'Failed to track amendment',
       })
     }
@@ -846,10 +848,10 @@ export function PolicyUpload() {
     // The PolicyDetailView can be enhanced to support editing
     closeConflictDialog()
 
-    toast.info('Edit Mode', {
-      description: 'Editing the extracted data before saving. Navigate to the policy to make changes.',
+    toast.info(t.upload.editMode, {
+      description: t.upload.editModeDesc,
       action: {
-        label: 'View Policy',
+        label: t.upload.viewPolicyBtn,
         onClick: () => navigate(`/policy/${newPolicy.id}?edit=true`),
       },
       duration: 10000,
@@ -864,7 +866,7 @@ export function PolicyUpload() {
           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <Upload className="text-white" size={32} />
           </div>
-          <p className="text-gray-600">Opening file selector...</p>
+          <p className="text-gray-600">{t.upload.openingFileSelector}</p>
           {/* Hidden file input for autoOpen mode */}
           <input
             ref={fileInputRef}
@@ -892,8 +894,8 @@ export function PolicyUpload() {
             <ArrowLeft size={24} />
           </button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Upload Policies</h1>
-            <p className="text-gray-600">Upload your insurance documents for AI analysis</p>
+            <h1 className="text-3xl font-bold text-gray-900">{t.upload.title}</h1>
+            <p className="text-gray-600">{t.upload.subtitle}</p>
           </div>
         </div>
 
@@ -904,11 +906,11 @@ export function PolicyUpload() {
               <ServerCrash className="text-red-600 mt-0.5 flex-shrink-0" size={20} />
               <div className="flex-1">
                 <p className="font-semibold text-red-800">
-                  {IS_PRODUCTION ? 'Service Temporarily Unavailable' : 'Backend Server Unavailable'}
+                  {IS_PRODUCTION ? t.upload.serviceUnavailable : 'Backend Server Unavailable'}
                 </p>
                 <p className="text-sm text-red-600 mt-1">
                   {IS_PRODUCTION
-                    ? 'We are experiencing technical difficulties. Please try again later.'
+                    ? t.upload.technicalDifficulties
                     : health.error}
                 </p>
                 {!IS_PRODUCTION && (
@@ -981,7 +983,7 @@ export function PolicyUpload() {
                     className="text-red-600 border-red-300 hover:bg-red-100"
                   >
                     <RefreshCw size={14} className="mr-2" />
-                    {IS_PRODUCTION ? 'Try Again' : 'Retry Connection'}
+                    {IS_PRODUCTION ? t.upload.tryAgainBtn : 'Retry Connection'}
                   </Button>
                   {/* Only show Run Diagnostics button in development */}
                   {!IS_PRODUCTION && (
@@ -1022,9 +1024,9 @@ export function PolicyUpload() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={20} />
               <div className="flex-1">
-                <p className="font-semibold text-amber-800">Service Configuration Issue</p>
+                <p className="font-semibold text-amber-800">{t.upload.serviceConfigIssue}</p>
                 <p className="text-sm text-amber-600 mt-1">
-                  The AI service is not properly configured. Please contact support.
+                  {t.upload.serviceNotConfigured}
                 </p>
               </div>
             </div>
@@ -1036,14 +1038,14 @@ export function PolicyUpload() {
           {health.status === 'checking' && (
             <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
               <Server size={16} className="animate-pulse" />
-              <span>Checking backend server...</span>
+              <span>{t.upload.checkingBackend}</span>
             </div>
           )}
           {backendReady && (
             <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
               <Cpu size={16} />
               <span>
-                AI extraction enabled
+                {t.upload.aiExtractionEnabled}
                 {health.providers.openai && health.providers.anthropic
                   ? ' (OpenAI + Claude)'
                   : health.providers.openai
@@ -1057,13 +1059,13 @@ export function PolicyUpload() {
           {!backendReady && health.status !== 'checking' && !isAIConfigured() && (
             <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
               <Zap size={16} />
-              <span>Demo mode - upload will use sample data</span>
+              <span>{t.upload.demoModeStatus}</span>
             </div>
           )}
           {useSupabase && (
             <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
               <Cloud size={16} />
-              <span>Cloud storage enabled</span>
+              <span>{t.upload.cloudStorageEnabled}</span>
             </div>
           )}
         </div>
@@ -1084,12 +1086,12 @@ export function PolicyUpload() {
               <Upload className="text-white" size={40} />
             </div>
             <div>
-              <p className="text-xl font-semibold text-gray-900">Drop your policies here</p>
-              <p className="text-gray-500 mt-1">or click to browse your files</p>
+              <p className="text-xl font-semibold text-gray-900">{t.upload.dropHere}</p>
+              <p className="text-gray-500 mt-1">{t.upload.orClickBrowse}</p>
             </div>
             <div className="text-sm text-gray-400 space-y-1">
-              <p>Supported: {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}</p>
-              <p>Maximum size: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file</p>
+              <p>{t.upload.supportedFormats}: {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}</p>
+              <p>{t.upload.maxSize}: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file</p>
             </div>
             <input
               ref={fileInputRef}
@@ -1110,8 +1112,8 @@ export function PolicyUpload() {
                 <Sparkles className="text-white" size={24} />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">Try with Sample Policies</h3>
-                <p className="text-sm text-gray-600">See how InsurAI analyzes Turkish insurance policies</p>
+                <h3 className="font-semibold text-gray-900">{t.upload.useSamples}</h3>
+                <p className="text-sm text-gray-600">{t.upload.useSamplesDescription}</p>
               </div>
             </div>
             <Button onClick={useSamplePolicies} variant="outline">
@@ -1130,10 +1132,10 @@ export function PolicyUpload() {
                 </div>
                 <div>
                   <p className="font-semibold text-red-800">
-                    {errorCount} file{errorCount !== 1 ? 's' : ''} failed to process
+                    {errorCount} {t.upload.filesFailedCount}
                   </p>
                   <p className="text-sm text-red-600">
-                    Click retry to try again or remove the files
+                    {t.upload.clickRetryOrRemove}
                   </p>
                 </div>
               </div>
@@ -1143,7 +1145,7 @@ export function PolicyUpload() {
                 className="text-red-600 border-red-300 hover:bg-red-100"
               >
                 <RefreshCw size={16} className="mr-2" />
-                Retry All
+                {t.upload.retryAll}
               </Button>
             </div>
           </div>
@@ -1155,17 +1157,17 @@ export function PolicyUpload() {
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900">
-                  Uploaded Files ({completedCount}/{files.length} analyzed)
+                  {t.upload.uploadedFiles} ({completedCount}/{files.length} {t.upload.analyzed})
                 </h3>
                 {processingCount > 0 && (
                   <p className="text-sm text-gray-500">
-                    {processingCount} file{processingCount !== 1 ? 's' : ''} processing...
+                    {processingCount} {t.upload.processingFiles}
                   </p>
                 )}
               </div>
               {completedCount > 0 && (
                 <Button onClick={handleAnalyzeAll}>
-                  View Analysis ({completedCount})
+                  {t.upload.viewAnalysis} ({completedCount})
                 </Button>
               )}
             </div>
@@ -1201,21 +1203,21 @@ export function PolicyUpload() {
                               style={{ width: `${uploadedFile.progress}%` }}
                             />
                           </div>
-                          <span className="text-gray-500">Uploading...</span>
+                          <span className="text-gray-500">{t.upload.uploadingStatus}</span>
                         </>
                       )}
                       {uploadedFile.status === 'analyzing' && (
                         <span className="text-purple-600 flex items-center gap-1">
                           <Sparkles size={14} className="animate-pulse" />
-                          AI analyzing...
+                          {t.upload.aiAnalyzingStatus}
                         </span>
                       )}
                       {uploadedFile.status === 'complete' && uploadedFile.awaitingResolution && (
                         <span className="text-amber-600 flex items-center gap-1">
                           <AlertTriangle size={14} />
                           {uploadedFile.conflict?.type === 'exactDuplicate'
-                            ? 'Duplicate detected - awaiting resolution'
-                            : 'Amendment detected - awaiting resolution'}
+                            ? t.upload.duplicateAwaiting
+                            : t.upload.amendmentAwaiting}
                         </span>
                       )}
                       {uploadedFile.status === 'complete' && !uploadedFile.awaitingResolution && (
@@ -1223,7 +1225,7 @@ export function PolicyUpload() {
                           {uploadedFile.lowConfidence ? <AlertTriangle size={14} /> : <Check size={14} />}
                           {uploadedFile.extractionSource === 'ai' ? (
                             <>
-                              {uploadedFile.lowConfidence ? 'Low confidence' : 'AI extracted'}
+                              {uploadedFile.lowConfidence ? t.upload.lowConfidenceStatus : t.upload.aiExtractedStatus}
                               {uploadedFile.aiConfidence !== undefined && (
                                 <span className="text-gray-500 ml-1">
                                   ({Math.round(uploadedFile.aiConfidence * 100)}%)
@@ -1231,14 +1233,14 @@ export function PolicyUpload() {
                               )}
                             </>
                           ) : (
-                            'Demo data'
+                            t.upload.demoDataStatus
                           )}
                         </span>
                       )}
                       {uploadedFile.status === 'error' && (
                         <span className="text-red-600 flex items-center gap-1">
                           <AlertTriangle size={14} />
-                          {uploadedFile.error || 'Processing failed'}
+                          {uploadedFile.error || t.upload.failed}
                         </span>
                       )}
                     </div>
@@ -1273,7 +1275,7 @@ export function PolicyUpload() {
                         className="px-3 py-1.5 text-sm font-medium text-amber-700 bg-amber-100 hover:bg-amber-200 rounded-lg transition-colors"
                         aria-label="Resolve conflict"
                       >
-                        Resolve
+                        {t.upload.resolveBtn}
                       </button>
                     )}
                     {uploadedFile.status === 'complete' && uploadedFile.policy && !uploadedFile.awaitingResolution && (

@@ -1,28 +1,54 @@
-import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, Search, Bell, ChevronDown, Settings, LogOut, LogIn, HelpCircle } from 'lucide-react'
-import { useState } from 'react'
+import { Shield, ShieldCheck, Menu, X, Sparkles, ArrowRight, Lock, Upload, User, ChevronDown, Settings, LogOut, LogIn, HelpCircle, Globe } from 'lucide-react'
+import { useState, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { UploadWidget } from './UploadWidget'
 import { SampleReportPreviewCompact } from './SampleReportPreview'
 import { StaggeredList, AnimatedButton, ScaleOnHover } from '../animations/AnimatedComponents'
 import { ComparisonMock, ComparisonMockMobile } from './ComparisonMock'
-import { LanguageToggle } from './LanguageToggle'
+import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
+
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useTranslation, useI18n } from '@/lib/i18n/i18n-context'
 
 export function Hero() {
   const { t } = useTranslation()
+  const { locale, setLocale } = useI18n()
   const navigate = useNavigate()
   const { policies } = usePolicies()
   const { user, signOut } = useAuth()
   const policyCount = policies.length
 
-  // Route to /try for anonymous users, /upload for logged-in users
-  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
-
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false)
+  const navFileInputRef = useRef<HTMLInputElement>(null)
+
+  // Handle file selection from nav Upload button — opens file picker directly
+  const handleNavFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const { valid, errors } = validateFiles(files)
+    errors.forEach((err) => {
+      const errorInfo = getErrorMessage(err.code)
+      toast.error(errorInfo.title, {
+        description: err.details || errorInfo.description,
+        duration: 5000,
+      })
+    })
+
+    if (valid.length > 0) {
+      if (user) {
+        navigate('/upload', { state: { files: valid, autoProcess: true } })
+      } else {
+        navigate('/try', { state: { file: valid[0] } })
+      }
+    }
+
+    e.target.value = ''
+  }, [user, navigate])
 
   const handleMenuClick = (path: string) => {
     setShowProfileMenu(false)
@@ -82,6 +108,16 @@ export function Hero() {
           </div>
         </div>
 
+        {/* Hidden file input — outside all responsive containers so it works on all breakpoints */}
+        <input
+          ref={navFileInputRef}
+          type="file"
+          accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+          onChange={handleNavFileSelect}
+          className="hidden"
+          aria-hidden="true"
+        />
+
         {/* Main navigation */}
         <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
@@ -112,7 +148,7 @@ export function Hero() {
                 )}
               </Link>
               <Link
-                to="/upload?autoOpen=true"
+                to="/compare"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-all"
               >
                 <span>{t.nav.compare}</span>
@@ -129,43 +165,113 @@ export function Hero() {
 
             {/* Right side utilities */}
             <div className="hidden md:flex items-center gap-2">
-              <button className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Search size={20} />
-              </button>
-              <button className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                <Bell size={20} />
-              </button>
-              <Link
-                to={uploadPath}
+              {/* Language Picker */}
+              <div className="relative">
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    setShowLanguagePicker(!showLanguagePicker)
+                  }}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showLanguagePicker
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  }`}
+                  aria-label="Change language"
+                  aria-expanded={showLanguagePicker}
+                  aria-haspopup="true"
+                >
+                  <Globe size={20} aria-hidden="true" />
+                </button>
+
+                {showLanguagePicker && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowLanguagePicker(false)}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                      role="radiogroup"
+                      aria-label="Language"
+                    >
+                      <button
+                        onClick={() => { setLocale('tr'); setShowLanguagePicker(false) }}
+                        role="radio"
+                        aria-checked={locale === 'tr'}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                          locale === 'tr'
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base">🇹🇷</span>
+                        <span>Türkçe</span>
+                      </button>
+                      <button
+                        onClick={() => { setLocale('en'); setShowLanguagePicker(false) }}
+                        role="radio"
+                        aria-checked={locale === 'en'}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                          locale === 'en'
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base">🇬🇧</span>
+                        <span>English</span>
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => navFileInputRef.current?.click()}
                 className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all font-medium text-sm ml-2"
               >
                 <Upload size={18} />
                 <span>{t.landing.uploadPolicyButton}</span>
-              </Link>
+              </button>
 
-              {/* Profile Menu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              {/* Sign In - visible for anonymous users */}
+              {!user && (
+                <Link
+                  to="/auth"
+                  className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-medium text-sm"
                 >
-                  <div className="w-8 h-8 bg-slate-700 rounded-lg flex items-center justify-center">
-                    <User size={16} className="text-white" />
-                  </div>
-                  <ChevronDown size={16} className="text-gray-600" />
-                </button>
+                  <LogIn size={18} />
+                  <span>{t.auth.signIn}</span>
+                </Link>
+              )}
 
-                {showProfileMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
-                    <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
-                      <div className="px-4 py-3 border-b border-gray-100">
-                        <p className="font-semibold text-gray-900">
-                          {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t.landing.guest}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email || t.landing.notSignedIn}</p>
-                      </div>
-                      {user && (
+              {/* Profile Menu - only for logged-in users */}
+              {user && (
+                <div className="relative">
+                  <button
+                    onClick={() => { setShowLanguagePicker(false); setShowProfileMenu(!showProfileMenu) }}
+                    className="flex items-center gap-2 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  >
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
+                      <span className="text-white font-semibold text-sm">
+                        {user.user_metadata?.full_name
+                          ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()
+                          : user.email?.slice(0, 2).toUpperCase()}
+                      </span>
+                    </div>
+                    <ChevronDown size={16} className="text-gray-600" />
+                  </button>
+
+                  {showProfileMenu && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setShowProfileMenu(false)} />
+                      <div className="absolute right-0 mt-2 w-56 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50">
+                        <div className="px-4 py-3 border-b border-gray-100">
+                          <p className="font-semibold text-gray-900">
+                            {user.user_metadata?.full_name || user.email?.split('@')[0]}
+                          </p>
+                          <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        </div>
                         <button
                           onClick={() => handleMenuClick('/account')}
                           className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
@@ -173,23 +279,21 @@ export function Hero() {
                           <User size={16} />
                           <span>{t.nav.myAccount}</span>
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleMenuClick('/settings')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <Settings size={16} />
-                        <span>{t.nav.settings}</span>
-                      </button>
-                      <button
-                        onClick={() => handleMenuClick('/help')}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
-                      >
-                        <HelpCircle size={16} />
-                        <span>{t.nav.helpCenter}</span>
-                      </button>
-                      <div className="border-t border-gray-100 mt-2 pt-2">
-                        {user ? (
+                        <button
+                          onClick={() => handleMenuClick('/settings')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <Settings size={16} />
+                          <span>{t.nav.settings}</span>
+                        </button>
+                        <button
+                          onClick={() => handleMenuClick('/help')}
+                          className="w-full flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <HelpCircle size={16} />
+                          <span>{t.nav.helpCenter}</span>
+                        </button>
+                        <div className="border-t border-gray-100 mt-2 pt-2">
                           <button
                             onClick={handleSignOut}
                             className="w-full flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors text-left"
@@ -197,20 +301,12 @@ export function Hero() {
                             <LogOut size={16} />
                             <span>{t.auth.signOut}</span>
                           </button>
-                        ) : (
-                          <button
-                            onClick={() => handleMenuClick('/auth')}
-                            className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 hover:bg-blue-50 transition-colors text-left"
-                          >
-                            <LogIn size={16} />
-                            <span>{t.auth.signIn}</span>
-                          </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Mobile menu button */}
@@ -232,17 +328,63 @@ export function Hero() {
                 {t.nav.dashboard}
               </button>
               <button
-                onClick={() => handleMenuClick('/upload?autoOpen=true')}
+                onClick={() => handleMenuClick('/compare')}
                 className="block w-full text-left px-4 py-2.5 text-gray-700 hover:bg-gray-50 rounded-xl transition-colors"
               >
                 {t.nav.compare}
               </button>
+              {/* Mobile Language Switcher */}
+              <div className="flex items-center gap-3 px-4 py-2.5">
+                <Globe size={18} className="text-gray-500" aria-hidden="true" />
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5" role="radiogroup" aria-label="Language">
+                  <button
+                    onClick={() => setLocale('tr')}
+                    role="radio"
+                    aria-checked={locale === 'tr'}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      locale === 'tr'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    Türkçe
+                  </button>
+                  <button
+                    onClick={() => setLocale('en')}
+                    role="radio"
+                    aria-checked={locale === 'en'}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      locale === 'en'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    English
+                  </button>
+                </div>
+              </div>
               <button
-                onClick={() => handleMenuClick(uploadPath)}
+                onClick={() => { setMobileMenuOpen(false); navFileInputRef.current?.click() }}
                 className="block w-full px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl text-center"
               >
                 {t.landing.uploadPolicyButton}
               </button>
+              {!user && (
+                <button
+                  onClick={() => handleMenuClick('/auth')}
+                  className="block w-full px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl text-center font-medium hover:bg-gray-50 transition-colors"
+                >
+                  {t.auth.signIn}
+                </button>
+              )}
+              {user && (
+                <button
+                  onClick={handleSignOut}
+                  className="block w-full text-left px-4 py-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                >
+                  {t.auth.signOut}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -355,9 +497,6 @@ export function Hero() {
 
           {/* Right Column - Comparison Mock */}
           <div className="hidden lg:block relative">
-            <div className="absolute -top-4 -right-4 z-10">
-              <LanguageToggle />
-            </div>
             <div className="relative">
               <ComparisonMock />
               <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 to-purple-400/10 rounded-3xl blur-2xl -z-10" />
@@ -367,9 +506,6 @@ export function Hero() {
 
         {/* Mobile Comparison Mock */}
         <div className="lg:hidden mt-12">
-          <div className="mb-4 flex justify-center">
-            <LanguageToggle />
-          </div>
           <ComparisonMockMobile />
         </div>
       </div>

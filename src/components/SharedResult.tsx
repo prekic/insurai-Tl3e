@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { getTrialResult, getShareId, getTrialTimeRemaining, formatTimeRemaining } from '@/lib/free-trial'
+import { useI18n } from '@/lib/i18n'
 import type { AnalyzedPolicy } from '@/types/policy'
 
 type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
@@ -27,6 +28,7 @@ type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
 export function SharedResult() {
   const { shareId } = useParams<{ shareId: string }>()
   const navigate = useNavigate()
+  const { t } = useI18n()
   const [state, setState] = useState<ViewState>('loading')
   const [policy, setPolicy] = useState<AnalyzedPolicy | null>(null)
   const [fileName, setFileName] = useState<string>('')
@@ -87,10 +89,10 @@ export function SharedResult() {
               <FileText className="text-gray-400" size={32} />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Analysis Not Found
+              {t.shared.analysisNotFound}
             </h1>
             <p className="text-gray-600 mb-6">
-              This shared link is not available. The analysis may have been removed or the link is incorrect.
+              {t.shared.analysisNotFoundDesc}
             </p>
             <div className="space-y-3">
               <Button
@@ -98,10 +100,10 @@ export function SharedResult() {
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600"
               >
                 <Sparkles size={18} className="mr-2" />
-                Try Free Analysis
+                {t.shared.tryFreeAnalysis}
               </Button>
               <Button variant="outline" onClick={() => navigate('/')}>
-                Back to Home
+                {t.shared.backToHome}
               </Button>
             </div>
           </div>
@@ -119,10 +121,10 @@ export function SharedResult() {
               <Clock className="text-amber-600" size={32} />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Link Expired
+              {t.shared.linkExpired}
             </h1>
             <p className="text-gray-600 mb-6">
-              This shared analysis has expired. Analysis results are available for 24 hours.
+              {t.shared.linkExpiredDesc}
             </p>
             <div className="space-y-3">
               <Button
@@ -130,10 +132,10 @@ export function SharedResult() {
                 className="w-full bg-gradient-to-r from-blue-600 to-indigo-600"
               >
                 <Sparkles size={18} className="mr-2" />
-                Try Free Analysis
+                {t.shared.tryFreeAnalysis}
               </Button>
               <Button variant="outline" onClick={() => navigate('/')}>
-                Back to Home
+                {t.shared.backToHome}
               </Button>
             </div>
           </div>
@@ -153,11 +155,11 @@ export function SharedResult() {
           <div className="flex items-center gap-3">
             <FileText className="text-blue-600" size={20} />
             <div>
-              <p className="font-medium text-blue-900">Shared Analysis</p>
+              <p className="font-medium text-blue-900">{t.shared.sharedAnalysis}</p>
               <p className="text-sm text-blue-700">
                 {timeRemaining > 0
-                  ? `Expires in ${formatTimeRemaining(timeRemaining)}`
-                  : 'Expiring soon'}
+                  ? t.shared.expiresIn.replace('{time}', formatTimeRemaining(timeRemaining))
+                  : t.shared.expiringSoon}
               </p>
             </div>
           </div>
@@ -166,7 +168,7 @@ export function SharedResult() {
             size="sm"
             className="bg-blue-600 hover:bg-blue-700"
           >
-            Try Your Own
+            {t.shared.tryYourOwn}
           </Button>
         </div>
 
@@ -178,7 +180,7 @@ export function SharedResult() {
             </div>
             <div className="flex-1">
               <h1 className="text-xl font-bold text-gray-900">
-                Policy Analysis
+                {t.shared.policyAnalysis}
               </h1>
               <p className="text-gray-600 text-sm mt-1">
                 {fileName} • {policy.typeTr || policy.type} • {policy.provider}
@@ -190,7 +192,7 @@ export function SharedResult() {
         {/* Policy Summary */}
         <div className="bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden mb-6">
           <div className="bg-gradient-to-r from-slate-800 to-slate-900 p-6">
-            <h2 className="text-white font-semibold text-lg">Policy Summary</h2>
+            <h2 className="text-white font-semibold text-lg">{t.shared.policySummary}</h2>
             <p className="text-slate-300 text-sm">
               {policy.typeTr || policy.type} • {policy.provider}
             </p>
@@ -200,21 +202,21 @@ export function SharedResult() {
             {/* Key Details */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="text-sm text-gray-500">Policy Number</div>
+                <div className="text-sm text-gray-500">{t.shared.policyNumber}</div>
                 <div className="font-semibold text-gray-900">{policy.policyNumber}</div>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="text-sm text-gray-500">Insured</div>
+                <div className="text-sm text-gray-500">{t.shared.insured}</div>
                 <div className="font-semibold text-gray-900">{policy.insuredPerson || 'N/A'}</div>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="text-sm text-gray-500">Premium</div>
+                <div className="text-sm text-gray-500">{t.shared.premium}</div>
                 <div className="font-semibold text-gray-900">
                   ₺{policy.premium?.toLocaleString('tr-TR') || 'N/A'}
                 </div>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
-                <div className="text-sm text-gray-500">Coverage</div>
+                <div className="text-sm text-gray-500">{t.shared.coverage}</div>
                 <div className="font-semibold text-gray-900">
                   {policy.coverages?.some(c => c.isMarketValue)
                     ? 'Rayiç Değer'
@@ -227,7 +229,7 @@ export function SharedResult() {
             {policy.coverages && policy.coverages.length > 0 && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  Coverages ({policy.coverages.length})
+                  {t.shared.coveragesCount.replace('{count}', String(policy.coverages.length))}
                 </h3>
                 <div className="space-y-2">
                   {policy.coverages.slice(0, 5).map((cov, i) => (
@@ -246,7 +248,7 @@ export function SharedResult() {
                   ))}
                   {policy.coverages.length > 5 && (
                     <p className="text-sm text-gray-500 text-center py-2">
-                      +{policy.coverages.length - 5} more coverages
+                      {t.shared.moreCoverages.replace('{count}', String(policy.coverages.length - 5))}
                     </p>
                   )}
                 </div>
@@ -257,7 +259,7 @@ export function SharedResult() {
             {policy.exclusions && policy.exclusions.length > 0 && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  Key Exclusions
+                  {t.shared.keyExclusions}
                 </h3>
                 <div className="space-y-2">
                   {policy.exclusions.slice(0, 3).map((exc, i) => (
@@ -275,7 +277,7 @@ export function SharedResult() {
               <div className="p-4 bg-blue-50 rounded-xl">
                 <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                   <Sparkles size={16} />
-                  AI Insights
+                  {t.shared.aiInsights}
                 </h3>
                 <div className="space-y-2">
                   {policy.aiInsights.slice(0, 3).map((insight, i) => (
@@ -295,10 +297,10 @@ export function SharedResult() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
               <h3 className="text-white font-bold text-lg mb-1">
-                Want to analyze your own policy?
+                {t.shared.wantToAnalyze}
               </h3>
               <p className="text-blue-100 text-sm">
-                Get instant AI-powered analysis of your insurance policies.
+                {t.shared.wantToAnalyzeDesc}
               </p>
             </div>
             <Button
@@ -306,7 +308,7 @@ export function SharedResult() {
               className="bg-white text-blue-600 hover:bg-blue-50 whitespace-nowrap"
             >
               <Sparkles size={18} className="mr-2" />
-              Try Free
+              {t.shared.tryFree}
               <ArrowRight size={18} className="ml-2" />
             </Button>
           </div>
@@ -316,11 +318,11 @@ export function SharedResult() {
         <div className="flex flex-wrap justify-center gap-4 text-sm text-gray-500">
           <div className="flex items-center gap-1.5">
             <Shield size={14} className="text-emerald-600" />
-            <span>KVKK Compliant</span>
+            <span>{t.shared.kvkkCompliant}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <Lock size={14} className="text-blue-600" />
-            <span>Your data is secure</span>
+            <span>{t.shared.dataSecure}</span>
           </div>
         </div>
       </div>

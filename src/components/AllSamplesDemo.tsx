@@ -1,26 +1,21 @@
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Eye, FileText } from 'lucide-react'
+import { Eye, FileText } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { samplePolicies } from '@/data/sample-policies'
 import { formatCurrency } from '@/lib/utils'
+import { useI18n } from '@/lib/i18n'
 
 export function AllSamplesDemo() {
-  const navigate = useNavigate()
+  const { t } = useI18n()
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button onClick={() => navigate(-1)} className="p-2 hover:bg-white rounded-lg transition-colors">
-            <ArrowLeft size={24} />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Sample Policies Collection</h1>
-            <p className="text-gray-600">Explore Turkish insurance policy samples analyzed by InsurAI</p>
-          </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">{t.landing.samplePoliciesTitle}</h1>
+          <p className="text-gray-600 mt-1">{t.landing.samplePoliciesDesc}</p>
         </div>
 
         {/* Policy Grid */}
@@ -37,7 +32,7 @@ export function AllSamplesDemo() {
                     </div>
                   </div>
                   <Badge variant={policy.status === 'active' ? 'success' : 'warning'}>
-                    {policy.status}
+                    {policy.status === 'active' ? t.policy.active : policy.status === 'expiring' ? t.policy.expiring : policy.status === 'expired' ? t.policy.expired : t.policy.pending}
                   </Badge>
                 </div>
               </CardHeader>
@@ -50,17 +45,17 @@ export function AllSamplesDemo() {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-500">Coverage</p>
+                      <p className="text-sm text-gray-500">{t.policy.coverage}</p>
                       <p className="font-semibold text-gray-900">{formatCurrency(policy.coverage)}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-500">Premium</p>
-                      <p className="font-semibold text-gray-900">{formatCurrency(policy.premium)}/yr</p>
+                      <p className="text-sm text-gray-500">{t.policy.premium}</p>
+                      <p className="font-semibold text-gray-900">{formatCurrency(policy.premium)}{t.policy.perYear}</p>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-gray-100">
-                    <p className="text-sm text-gray-500 mb-2">AI Insights</p>
+                    <p className="text-sm text-gray-500 mb-2">{t.insights.aiInsights}</p>
                     <div className="space-y-1">
                       {policy.aiInsights.slice(0, 2).map((insight, i) => (
                         <p key={i} className="text-sm text-gray-600">• {insight}</p>
@@ -70,7 +65,7 @@ export function AllSamplesDemo() {
 
                   <Button variant="outline" className="w-full gap-2">
                     <Eye size={16} />
-                    View Details
+                    {t.policy.viewDetails}
                   </Button>
                 </div>
               </CardContent>

@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**
 - **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 11, 2026
+- **Last Updated**: February 12, 2026
 
 ---
 
@@ -155,10 +155,15 @@ insurai/
 | `src/components/PolicyDetailView.tsx` | Detailed policy view with share/download |
 | `src/components/PolicyDiffViewer.tsx` | Visual diff for policy changes |
 | `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
-| `src/components/GlobalNavigation.tsx` | Main nav with auth state |
+| `src/components/GlobalNavigation.tsx` | **UPDATED** Main nav with Globe language picker, auth state, direct upload |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
 | `src/components/TryAnalysis.tsx` | **NEW** Anonymous free trial analysis (Jan 30, 2026) |
+| `src/components/AuthPage.tsx` | **UPDATED** Login/signup with full i18n (Feb 12, 2026) |
+| `src/components/AllSamplesDemo.tsx` | **UPDATED** Sample policies grid with full i18n (Feb 12, 2026) |
+| `src/components/HelpCenter.tsx` | **UPDATED** Help center with full i18n (Feb 12, 2026) |
+| `src/components/SharedResult.tsx` | **UPDATED** Shared analysis viewer with full i18n (Feb 12, 2026) |
 | `src/components/landing/UploadWidget.tsx` | **UPDATED** Landing page upload with file handoff |
+| `src/components/landing/StickyMobileCTA.tsx` | **NEW** Floating mobile CTA with i18n (Feb 12, 2026) |
 
 ### Admin Components (Updated Jan 25, 2026)
 | File | Purpose |
@@ -3193,6 +3198,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   2. **CTA + Comparison** (`6694321`): CompareSection, StickyMobileCTA, PolicyComparisonSection, WhoItsFor + 64 language consistency tests
   3. **Core components** (`a10f57e`): TryAnalysis, PolicyDetailView, UserPreferencesPanel
   4. **Coverage names + AI insights** (`9c5b910`, `97b0660`): Locale-aware coverage name display, AI insight translation
+  5. **Auth-gated components** (`c4779bb`, `523b136`): PolicyChat, PolicyUpload — full i18n with test mock updates
 - **Translation Architecture**:
   - `src/lib/i18n/translations.ts` — Central `TranslationDictionary` with `EN_TRANSLATIONS` and `TR_TRANSLATIONS`
   - `src/lib/i18n/i18n-context.tsx` — React context with `useTranslation()` hook returning `{ t, locale, isLoading }`
@@ -3219,7 +3225,43 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - 14 landing components — All strings → `t.landing.*`
   - `src/components/GlobalNavigation.tsx` — All nav strings → `t.nav.*`, `t.landing.*`
   - `src/lib/i18n/__tests__/language-consistency.test.ts` — 64 tests for translation parity
-- **Commits**: `0e14e55`, `da6744e`, `6694321`, `a10f57e`, `9c5b910`, `97b0660`
+- **Commits**: `0e14e55`, `da6744e`, `6694321`, `a10f57e`, `9c5b910`, `97b0660`, `c4779bb`, `523b136`
+
+### 91. Navigation Bar Overhaul — Globe Language Picker & Consistency (Feb 12, 2026)
+- **Feature**: Unified navigation experience across all pages with Globe-icon language switcher
+- **Changes**:
+  1. **Globe Language Picker**: Added to both GlobalNavigation (app pages) and Hero (landing page) — TR/EN radio buttons with flag labels
+  2. **Landing Page Nav**: Upload button opens file picker directly instead of navigating to `/upload`; Sign In link for anonymous users; mobile hamburger menu with inline TR/EN toggle
+  3. **Nav Bar Consistency**: Removed redundant ArrowLeft back buttons from AllSamplesDemo and HelpCenter — GlobalNavigation provides navigation above all non-landing pages
+  4. **Dead Button Cleanup**: Removed non-functional Settings/Bell/QuestionMark buttons from Hero nav
+- **Navigation Architecture**:
+  - `Hero.tsx` nav: Landing page only (`/`) — includes logo, nav links, Globe picker, user menu/Sign In
+  - `GlobalNavigation.tsx`: All app pages (controlled by `hideNavigation` in App.tsx) — includes logo, nav links, Globe picker, notifications, profile dropdown
+  - `hideNavigation` excludes: `/`, `/auth`, `/admin/*`, `/unsubscribe`
+  - Pages showing GlobalNavigation should NOT have their own back arrows (PolicyDashboard pattern = title only)
+- **Files Changed**:
+  - `src/components/GlobalNavigation.tsx` — Added Globe language picker, direct file upload from nav
+  - `src/components/landing/Hero.tsx` — Added Globe picker, Sign In link, mobile language toggle, dead button removal
+  - `src/components/landing/StickyMobileCTA.tsx` — i18n integration
+  - `src/components/AllSamplesDemo.tsx` — Removed ArrowLeft, added i18n
+  - `src/components/HelpCenter.tsx` — Removed ArrowLeft, full i18n rewrite
+- **Commits**: `679b448`, `7819465`, `7d7f062`, `ec91a9d`, `33acfc2`, `3dabff7`, `d892f95`, `fe457f7`
+
+### 92. i18n for Auth, Help, Shared Result, and Sample Policies Pages (Feb 12, 2026)
+- **Feature**: Full i18n integration for 4 additional pages that had hardcoded English strings
+- **Pages Updated**:
+  1. **AuthPage.tsx** — Login/signup form: name placeholder ("John Doe" → `t.auth.namePlaceholder`), email placeholder ("you@example.com" → `t.auth.emailPlaceholder` / "siz@ornek.com"), error messages, OAuth buttons
+  2. **AllSamplesDemo.tsx** — Sample policies grid: title, description, coverage/premium labels, status badges, "View Details" button
+  3. **HelpCenter.tsx** — Full rewrite: 4 help categories with descriptions, 5 popular articles, search placeholder, contact support section (24 translation keys)
+  4. **SharedResult.tsx** — All states (not found, expired, found): policy summary labels, coverage display, exclusions, AI insights, CTA section (26 translation keys)
+- **New Translation Sections Added**:
+  - `auth`: Added `emailPlaceholder`, `namePlaceholder`, `authNotConfigured`, `authNotConfiguredDesc`, `continueToDemo`
+  - `help`: Expanded from 7 → 24 keys (added `searchPlaceholder`, `gettingStartedDesc`, `policyAnalysis`, `policyAnalysisDesc`, `faqDesc`, `troubleshooting`, `troubleshootingDesc`, `articlesCount`, `popularArticles`, `article1-5`, `stillNeedHelp`, `stillNeedHelpDesc`, `chatWithAI`)
+  - `shared`: New section with 26 keys for shared analysis viewer
+  - `policy`: Added `viewDetails`, `perYear`
+- **Dynamic String Pattern**: `t.help.articlesCount.replace('{count}', String(count))`
+- **Files Changed**: `translations.ts` (+644 lines across all sessions), `AuthPage.tsx`, `AllSamplesDemo.tsx`, `HelpCenter.tsx`, `SharedResult.tsx`
+- **Commits**: `71c7b10`, `9c26d69`, `f12b95f`
 
 ---
 
@@ -3562,7 +3604,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v14)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v18)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
@@ -3664,6 +3706,17 @@ connectSrc: [
 - When adding new insight strings in `generateStrengths()`, `generateGapsAsync()`, or `generateRecommendationsAsync()`, also add the translation to `translateInsight()` in PolicyDetailView.tsx
 - The i18n mock pattern for tests: `vi.mock('@/lib/i18n/i18n-context', () => ({ useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }) }))`
 - Test assertions should use `EN_TRANSLATIONS.section.key` instead of hardcoded strings to stay in sync with translation changes
+- When adding new translation sections to `translations.ts`, check for existing sections with the same key — duplicates cause `TS2300: Duplicate identifier` errors. Merge into the existing section instead.
+- Dynamic translation strings use `{placeholder}` syntax: `t.help.articlesCount.replace('{count}', String(count))`
+
+**Navigation Architecture (Dual Nav Systems):**
+- **Landing page** (`/`): Uses Hero.tsx's built-in nav bar (logo, nav links, Globe picker, Sign In/user menu)
+- **App pages** (all other routes): Uses GlobalNavigation.tsx (logo, nav links, Globe picker, notifications, profile dropdown)
+- `hideNavigation` in `App.tsx` controls which pages hide GlobalNavigation: `/`, `/auth`, `/admin/*`, `/unsubscribe`
+- Pages rendered with GlobalNavigation should NOT have their own ArrowLeft back button or redundant nav — use title only (PolicyDashboard pattern)
+- Both nav bars have their own Globe language picker — changes persist via `localStorage('insurai_locale')`
+- Upload button in nav opens file picker directly (no navigation to `/upload`) — validated file is passed via React Router state
+- Some pages still have redundant ArrowLeft buttons (MyAccount, Settings, ComparePolicies, PolicyUpload) — these should be cleaned up for consistency
 
 ---
 
@@ -3713,4 +3766,4 @@ npm run build:analyze
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 6,000+ tests, all passing (185+ test files)
-**Last Updated**: February 11, 2026
+**Last Updated**: February 12, 2026

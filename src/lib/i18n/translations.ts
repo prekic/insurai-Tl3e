@@ -252,6 +252,7 @@ export interface TranslationDictionary {
     uploadTryAgain: string
     uploadNoValidFiles: string
     uploadFailedDesc: string
+    uploadMaxSize: string
 
     // CompareSection (CTA)
     ctaTitle: string
@@ -271,6 +272,15 @@ export interface TranslationDictionary {
     compareIncluded: string
     compareExcluded: string
     compareOptional: string
+    comparePolicyA: string
+    comparePolicyB: string
+    compareInsurerA: string
+    compareInsurerB: string
+
+    // ComparisonMock - premiums
+    comparisonPerYear: string
+    comparisonPremiumA: string
+    comparisonPremiumB: string
 
     // WhoItsFor
     whoTitle: string
@@ -319,6 +329,8 @@ export interface TranslationDictionary {
     address: string
     business: string
     subject: string
+    viewDetails: string
+    perYear: string
   }
 
   // Upload
@@ -338,6 +350,107 @@ export interface TranslationDictionary {
     useSamples: string
     useSamplesDescription: string
     uploadPolicy: string
+    // Toast messages
+    filesAccepted: string
+    filesRejected: string
+    diagnosticsRunning: string
+    diagnosticsTestingProviders: string
+    diagnosticsComplete: string
+    diagnosticsFailed: string
+    diagnosticsUnreachable: string
+    diagnosticsUnreachableDesc: string
+    retrying: string
+    retryingDesc: string
+    fileRemoved: string
+    fileRemovedDesc: string
+    noPolicies: string
+    noPoliciesDesc: string
+    samplePoliciesLoaded: string
+    samplePoliciesLoadedDesc: string
+    // Analysis complete
+    analysisComplete: string
+    analysisCompleteLowConfidence: string
+    verifyData: string
+    savedToCloud: string
+    demoMode: string
+    confidence: string
+    // Conflict resolution
+    duplicateDetected: string
+    amendmentDetected: string
+    matchesExisting: string
+    uploadSkipped: string
+    uploadSkippedDesc: string
+    policyUpdated: string
+    policyUpdatedDesc: string
+    updateFailed: string
+    policySaved: string
+    policySavedDesc: string
+    saveFailed: string
+    amendmentTracked: string
+    amendmentFailed: string
+    editMode: string
+    editModeDesc: string
+    viewPolicyBtn: string
+    // Error titles and messages
+    errorAnalysisFailed: string
+    errorAiNotConfigured: string
+    errorAiUnavailable: string
+    errorContactSupport: string
+    errorPdfTimeout: string
+    errorPdfTimeoutMsg: string
+    errorPdfTimeoutTip: string
+    errorPdfWorker: string
+    errorPdfWorkerMsg: string
+    errorPdfWorkerTip: string
+    errorFileRead: string
+    errorFileReadMsg: string
+    errorFileReadTip: string
+    errorPdfParse: string
+    errorPdfParseMsg: string
+    errorPdfParseTip: string
+    errorRateLimit: string
+    errorRateLimitMsg: string
+    errorRateLimitTip: string
+    errorNetwork: string
+    errorNetworkMsg: string
+    errorNetworkTip: string
+    errorProviderNotReady: string
+    errorProviderNotReadyMsg: string
+    errorProviderNotReadyTip: string
+    errorLowConfidence: string
+    errorLowConfidenceMsg: string
+    errorLowConfidenceTip: string
+    errorRequestTimeout: string
+    errorRequestTimeoutMsg: string
+    errorRequestTimeoutTip: string
+    // Status badges
+    checkingBackend: string
+    aiExtractionEnabled: string
+    demoModeStatus: string
+    cloudStorageEnabled: string
+    // Production banners
+    serviceUnavailable: string
+    technicalDifficulties: string
+    serviceConfigIssue: string
+    serviceNotConfigured: string
+    tryAgainBtn: string
+    // JSX labels
+    openingFileSelector: string
+    filesFailedCount: string
+    clickRetryOrRemove: string
+    retryAll: string
+    uploadedFiles: string
+    analyzed: string
+    processingFiles: string
+    viewAnalysis: string
+    uploadingStatus: string
+    aiAnalyzingStatus: string
+    duplicateAwaiting: string
+    amendmentAwaiting: string
+    lowConfidenceStatus: string
+    aiExtractedStatus: string
+    demoDataStatus: string
+    resolveBtn: string
   }
 
   // Chat
@@ -347,9 +460,56 @@ export interface TranslationDictionary {
     askAboutPolicies: string
     send: string
     sending: string
+    connectionIssue: string
     connectionError: string
     retryMessage: string
     welcomeMessage: string
+    // Message actions
+    copyToClipboard: string
+    copied: string
+    copy: string
+    copiedToClipboard: string
+    failedToCopy: string
+    helpful: string
+    notHelpful: string
+    viewPolicy: string
+    // Provider
+    aiProvider: string
+    switchedTo: string
+    providerOpenAI: string
+    providerOpenAIDescription: string
+    providerClaude: string
+    providerClaudeDescription: string
+    // Quick actions
+    comparePolicies: string
+    findGaps: string
+    whatsMyDeductible: string
+    explainKasko: string
+    whenExpire: string
+    // History
+    conversationHistory: string
+    noConversations: string
+    newChat: string
+    loadingHistory: string
+    loadConversationFailed: string
+    messages: string
+    // Greeting
+    greeting: string
+    greetingWithCount: string
+    // Errors
+    aiThinking: string
+    connectionBanner: string
+    dismiss: string
+    messageFailed: string
+    messageFailedDesc: string
+    errorProcessRequest: string
+    // Context
+    referencing: string
+    referencedPolicies: string
+    more: string
+    // Feedback
+    thanksFeedback: string
+    willImprove: string
   }
 
   // Settings
@@ -391,8 +551,25 @@ export interface TranslationDictionary {
   help: {
     title: string
     searchHelp: string
+    searchPlaceholder: string
     gettingStarted: string
+    gettingStartedDesc: string
+    policyAnalysis: string
+    policyAnalysisDesc: string
     faq: string
+    faqDesc: string
+    troubleshooting: string
+    troubleshootingDesc: string
+    articlesCount: string
+    popularArticles: string
+    article1: string
+    article2: string
+    article3: string
+    article4: string
+    article5: string
+    stillNeedHelp: string
+    stillNeedHelpDesc: string
+    chatWithAI: string
     contactSupport: string
     documentation: string
     chatWithUs: string
@@ -477,6 +654,11 @@ export interface TranslationDictionary {
     checkEmail: string
     welcomeBack: string
     createYourAccount: string
+    namePlaceholder: string
+    emailPlaceholder: string
+    authNotConfigured: string
+    authNotConfiguredDesc: string
+    continueToDemo: string
   }
 
   // AI Insights
@@ -630,6 +812,36 @@ export interface TranslationDictionary {
     notAvailable: string
     on: string
     off: string
+  }
+
+  // Shared Result
+  shared: {
+    analysisNotFound: string
+    analysisNotFoundDesc: string
+    tryFreeAnalysis: string
+    backToHome: string
+    linkExpired: string
+    linkExpiredDesc: string
+    sharedAnalysis: string
+    expiresIn: string
+    expiringSoon: string
+    tryYourOwn: string
+    policyAnalysis: string
+    policySummary: string
+    keyDetails: string
+    policyNumber: string
+    insured: string
+    premium: string
+    coverage: string
+    coveragesCount: string
+    moreCoverages: string
+    keyExclusions: string
+    aiInsights: string
+    wantToAnalyze: string
+    wantToAnalyzeDesc: string
+    tryFree: string
+    kvkkCompliant: string
+    dataSecure: string
   }
 }
 
@@ -859,6 +1071,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Try again',
     uploadNoValidFiles: 'No valid files selected. Please check file type and size.',
     uploadFailedDesc: 'There was a problem uploading your files. Please try again.',
+    uploadMaxSize: 'up to {size}MB',
 
     // CompareSection (CTA)
     ctaTitle: 'Ready to understand your policies?',
@@ -878,6 +1091,15 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     compareIncluded: 'Included',
     compareExcluded: 'Excluded',
     compareOptional: 'Optional',
+    comparePolicyA: 'Policy A',
+    comparePolicyB: 'Policy B',
+    compareInsurerA: 'Insurer ABC',
+    compareInsurerB: 'Insurer XYZ',
+
+    // ComparisonMock - premiums
+    comparisonPerYear: '/yr',
+    comparisonPremiumA: '₺4,200/yr',
+    comparisonPremiumB: '₺3,800/yr',
 
     // WhoItsFor
     whoTitle: 'Built for',
@@ -925,14 +1147,16 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     address: 'Address',
     business: 'Business',
     subject: 'Subject',
+    viewDetails: 'View Details',
+    perYear: '/yr',
   },
 
   upload: {
     title: 'Upload Policies',
     subtitle: 'Upload your insurance documents for AI analysis',
     dropHere: 'Drop your policies here',
-    orClickBrowse: 'or click to browse',
-    supportedFormats: 'Supported formats',
+    orClickBrowse: 'or click to browse your files',
+    supportedFormats: 'Supported',
     maxSize: 'Maximum size',
     uploading: 'Uploading...',
     analyzing: 'AI analyzing...',
@@ -943,6 +1167,107 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     useSamples: 'Try with Sample Policies',
     useSamplesDescription: 'See how InsurAI analyzes Turkish insurance policies',
     uploadPolicy: 'Upload Policy',
+    // Toast messages
+    filesAccepted: 'file(s) accepted',
+    filesRejected: 'file(s) were rejected due to validation errors.',
+    diagnosticsRunning: 'Running diagnostics...',
+    diagnosticsTestingProviders: 'Testing API key validity with each provider',
+    diagnosticsComplete: 'Diagnostics complete',
+    diagnosticsFailed: 'Diagnostics failed',
+    diagnosticsUnreachable: 'Could not run diagnostics',
+    diagnosticsUnreachableDesc: 'Backend server may not be reachable',
+    retrying: 'Retrying...',
+    retryingDesc: 'Attempting to process the file again.',
+    fileRemoved: 'File removed',
+    fileRemovedDesc: 'The file has been removed from the upload queue.',
+    noPolicies: 'No policies to analyze',
+    noPoliciesDesc: 'Please wait for at least one policy to complete processing.',
+    samplePoliciesLoaded: 'Sample policies loaded',
+    samplePoliciesLoadedDesc: 'sample Turkish insurance policies have been loaded.',
+    // Analysis complete
+    analysisComplete: 'Analysis complete',
+    analysisCompleteLowConfidence: 'Analysis complete — low confidence',
+    verifyData: 'Some data may be inaccurate — please verify.',
+    savedToCloud: '(saved to cloud)',
+    demoMode: '(demo mode)',
+    confidence: 'confidence',
+    // Conflict resolution
+    duplicateDetected: 'Duplicate detected',
+    amendmentDetected: 'Amendment detected',
+    matchesExisting: 'matches an existing policy. Please choose how to proceed.',
+    uploadSkipped: 'Upload skipped',
+    uploadSkippedDesc: 'The policy was not saved as it already exists.',
+    policyUpdated: 'Policy updated',
+    policyUpdatedDesc: 'The existing policy has been updated with the new data.',
+    updateFailed: 'Update failed',
+    policySaved: 'Policy saved',
+    policySavedDesc: 'The policy has been saved as a separate record.',
+    saveFailed: 'Save failed',
+    amendmentTracked: 'Amendment tracked',
+    amendmentFailed: 'Amendment failed',
+    editMode: 'Edit Mode',
+    editModeDesc: 'Editing the extracted data before saving. Navigate to the policy to make changes.',
+    viewPolicyBtn: 'View Policy',
+    // Error titles and messages
+    errorAnalysisFailed: 'Analysis Failed',
+    errorAiNotConfigured: 'AI Not Configured',
+    errorAiUnavailable: 'The AI service is not available.',
+    errorContactSupport: 'Please contact support if this issue persists.',
+    errorPdfTimeout: 'PDF Processing Timeout',
+    errorPdfTimeoutMsg: 'The PDF took too long to process.',
+    errorPdfTimeoutTip: 'The file may be too large or complex. Try a smaller file or retry.',
+    errorPdfWorker: 'PDF Processing Error',
+    errorPdfWorkerMsg: 'The PDF processor encountered an error.',
+    errorPdfWorkerTip: 'This is usually temporary. Please try again.',
+    errorFileRead: 'File Read Error',
+    errorFileReadMsg: 'Could not read the uploaded file.',
+    errorFileReadTip: 'The file may have been moved or is corrupted. Please select the file again.',
+    errorPdfParse: 'PDF Processing Error',
+    errorPdfParseMsg: 'Could not read the PDF file.',
+    errorPdfParseTip: 'The file may be corrupted, password-protected, or in an unsupported format.',
+    errorRateLimit: 'Rate Limit Exceeded',
+    errorRateLimitMsg: 'Too many requests to the AI service.',
+    errorRateLimitTip: 'Please wait a few minutes before trying again.',
+    errorNetwork: 'Network Error',
+    errorNetworkMsg: 'Could not connect to the backend server.',
+    errorNetworkTip: 'Please check your internet connection and try again.',
+    errorProviderNotReady: 'AI Provider Not Ready',
+    errorProviderNotReadyMsg: 'The AI provider is not configured on the server.',
+    errorProviderNotReadyTip: 'Please contact support if this issue persists.',
+    errorLowConfidence: 'Low Extraction Confidence',
+    errorLowConfidenceMsg: 'The AI could not reliably extract data from this document.',
+    errorLowConfidenceTip: 'The PDF may be scanned or have poor text quality. Try a clearer document.',
+    errorRequestTimeout: 'Request Timeout',
+    errorRequestTimeoutMsg: 'The request took too long to complete.',
+    errorRequestTimeoutTip: 'The document may be too large or the AI service is slow. Try again later.',
+    // Status badges
+    checkingBackend: 'Checking backend server...',
+    aiExtractionEnabled: 'AI extraction enabled',
+    demoModeStatus: 'Demo mode - upload will use sample data',
+    cloudStorageEnabled: 'Cloud storage enabled',
+    // Production banners
+    serviceUnavailable: 'Service Temporarily Unavailable',
+    technicalDifficulties: 'We are experiencing technical difficulties. Please try again later.',
+    serviceConfigIssue: 'Service Configuration Issue',
+    serviceNotConfigured: 'The AI service is not properly configured. Please contact support.',
+    tryAgainBtn: 'Try Again',
+    // JSX labels
+    openingFileSelector: 'Opening file selector...',
+    filesFailedCount: 'file(s) failed to process',
+    clickRetryOrRemove: 'Click retry to try again or remove the files',
+    retryAll: 'Retry All',
+    uploadedFiles: 'Uploaded Files',
+    analyzed: 'analyzed',
+    processingFiles: 'file(s) processing...',
+    viewAnalysis: 'View Analysis',
+    uploadingStatus: 'Uploading...',
+    aiAnalyzingStatus: 'AI analyzing...',
+    duplicateAwaiting: 'Duplicate detected - awaiting resolution',
+    amendmentAwaiting: 'Amendment detected - awaiting resolution',
+    lowConfidenceStatus: 'Low confidence',
+    aiExtractedStatus: 'AI extracted',
+    demoDataStatus: 'Demo data',
+    resolveBtn: 'Resolve',
   },
 
   chat: {
@@ -951,9 +1276,56 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     askAboutPolicies: 'Ask about your policies...',
     send: 'Send',
     sending: 'Sending...',
+    connectionIssue: 'Connection issue',
     connectionError: 'Having trouble connecting to the AI assistant',
     retryMessage: 'Retry',
     welcomeMessage: "Hello! I'm your AI insurance assistant. I can help you understand your policies. Ask me anything about your coverage, compare policies, or get recommendations.",
+    // Message actions
+    copyToClipboard: 'Copy to clipboard',
+    copied: 'Copied',
+    copy: 'Copy',
+    copiedToClipboard: 'Copied to clipboard',
+    failedToCopy: 'Failed to copy',
+    helpful: 'Helpful',
+    notHelpful: 'Not helpful',
+    viewPolicy: 'View Policy',
+    // Provider
+    aiProvider: 'AI Provider',
+    switchedTo: 'Switched to',
+    providerOpenAI: 'GPT-4o Mini',
+    providerOpenAIDescription: 'Fast and cost-effective',
+    providerClaude: 'Claude Haiku',
+    providerClaudeDescription: 'Nuanced understanding',
+    // Quick actions
+    comparePolicies: 'Compare my policies',
+    findGaps: 'Find coverage gaps',
+    whatsMyDeductible: "What's my deductible?",
+    explainKasko: 'Explain my Kasko coverage',
+    whenExpire: 'When do policies expire?',
+    // History
+    conversationHistory: 'Conversation History',
+    noConversations: 'No conversations yet',
+    newChat: 'New Chat',
+    loadingHistory: 'Loading...',
+    loadConversationFailed: 'Failed to load conversation',
+    messages: 'messages',
+    // Greeting
+    greeting: 'Hello! How can I help you with your insurance policies today?',
+    greetingWithCount: "Hello! I'm your AI insurance assistant. I can help you understand your {count} uploaded policies. Ask me anything about your coverage, compare policies, or get recommendations.",
+    // Errors
+    aiThinking: 'AI is thinking',
+    connectionBanner: 'Having trouble connecting to the AI assistant',
+    dismiss: 'Dismiss',
+    messageFailed: 'Message failed',
+    messageFailedDesc: 'There was a problem connecting to the AI assistant.',
+    errorProcessRequest: "Sorry, I couldn't process your request. Please try again.",
+    // Context
+    referencing: 'Referencing:',
+    referencedPolicies: 'Referenced Policies:',
+    more: 'more',
+    // Feedback
+    thanksFeedback: 'Thanks for the feedback!',
+    willImprove: "We'll try to improve",
   },
 
   settings: {
@@ -992,8 +1364,25 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   help: {
     title: 'Help Center',
     searchHelp: 'Search help articles...',
+    searchPlaceholder: 'Search for help...',
     gettingStarted: 'Getting Started',
+    gettingStartedDesc: 'Learn the basics of using InsurAI',
+    policyAnalysis: 'Policy Analysis',
+    policyAnalysisDesc: 'Understanding AI-powered analysis',
     faq: 'FAQ',
+    faqDesc: 'Frequently asked questions',
+    troubleshooting: 'Troubleshooting',
+    troubleshootingDesc: 'Solve common issues',
+    articlesCount: '{count} articles',
+    popularArticles: 'Popular Articles',
+    article1: 'How to upload and analyze a policy',
+    article2: 'Understanding coverage comparisons',
+    article3: 'Setting up renewal reminders',
+    article4: 'Exporting analysis reports',
+    article5: 'Managing your policy portfolio',
+    stillNeedHelp: 'Still need help?',
+    stillNeedHelpDesc: 'Chat with our AI assistant or contact support',
+    chatWithAI: 'Chat with AI',
     contactSupport: 'Contact Support',
     documentation: 'Documentation',
     chatWithUs: 'Chat with us',
@@ -1073,6 +1462,11 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     checkEmail: 'Check your email to confirm your account.',
     welcomeBack: 'Welcome back',
     createYourAccount: 'Create your account',
+    namePlaceholder: 'John Doe',
+    emailPlaceholder: 'you@example.com',
+    authNotConfigured: 'Authentication Not Configured',
+    authNotConfiguredDesc: 'Supabase credentials are not set. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.',
+    continueToDemo: 'Continue to Demo',
   },
 
   insights: {
@@ -1219,6 +1613,35 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     notAvailable: 'N/A',
     on: 'On',
     off: 'Off',
+  },
+
+  shared: {
+    analysisNotFound: 'Analysis Not Found',
+    analysisNotFoundDesc: 'This shared link is not available. The analysis may have been removed or the link is incorrect.',
+    tryFreeAnalysis: 'Try Free Analysis',
+    backToHome: 'Back to Home',
+    linkExpired: 'Link Expired',
+    linkExpiredDesc: 'This shared analysis has expired. Analysis results are available for 24 hours.',
+    sharedAnalysis: 'Shared Analysis',
+    expiresIn: 'Expires in {time}',
+    expiringSoon: 'Expiring soon',
+    tryYourOwn: 'Try Your Own',
+    policyAnalysis: 'Policy Analysis',
+    policySummary: 'Policy Summary',
+    keyDetails: 'Key Details',
+    policyNumber: 'Policy Number',
+    insured: 'Insured',
+    premium: 'Premium',
+    coverage: 'Coverage',
+    coveragesCount: 'Coverages ({count})',
+    moreCoverages: '+{count} more coverages',
+    keyExclusions: 'Key Exclusions',
+    aiInsights: 'AI Insights',
+    wantToAnalyze: 'Want to analyze your own policy?',
+    wantToAnalyzeDesc: 'Get instant AI-powered analysis of your insurance policies.',
+    tryFree: 'Try Free',
+    kvkkCompliant: 'KVKK Compliant',
+    dataSecure: 'Your data is secure',
   },
 }
 
@@ -1448,6 +1871,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     uploadTryAgain: 'Tekrar dene',
     uploadNoValidFiles: 'Geçerli dosya seçilmedi. Dosya türünü ve boyutunu kontrol edin.',
     uploadFailedDesc: 'Dosyalarınız yüklenirken bir sorun oluştu. Lütfen tekrar deneyin.',
+    uploadMaxSize: 'en fazla {size}MB',
 
     // CompareSection (CTA)
     ctaTitle: 'Poliçelerinizi anlamaya hazır mısınız?',
@@ -1467,6 +1891,15 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     compareIncluded: 'Dahil',
     compareExcluded: 'Hariç',
     compareOptional: 'İsteğe Bağlı',
+    comparePolicyA: 'Poliçe A',
+    comparePolicyB: 'Poliçe B',
+    compareInsurerA: 'Sigortacı ABC',
+    compareInsurerB: 'Sigortacı XYZ',
+
+    // ComparisonMock - primler
+    comparisonPerYear: '/yıl',
+    comparisonPremiumA: '₺4.200/yıl',
+    comparisonPremiumB: '₺3.800/yıl',
 
     // WhoItsFor
     whoTitle: 'Sigorta profesyonelleri',
@@ -1514,6 +1947,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     address: 'Adres',
     business: 'İşyeri',
     subject: 'Konu',
+    viewDetails: 'Detayları Görüntüle',
+    perYear: '/yıl',
   },
 
   upload: {
@@ -1521,7 +1956,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     subtitle: 'Sigorta belgelerinizi AI analizi için yükleyin',
     dropHere: 'Poliçelerinizi buraya bırakın',
     orClickBrowse: 'veya göz atmak için tıklayın',
-    supportedFormats: 'Desteklenen formatlar',
+    supportedFormats: 'Desteklenen',
     maxSize: 'Maksimum boyut',
     uploading: 'Yükleniyor...',
     analyzing: 'AI analiz ediyor...',
@@ -1532,6 +1967,107 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     useSamples: 'Örnek Poliçelerle Dene',
     useSamplesDescription: "InsurAI'ın Türk sigorta poliçelerini nasıl analiz ettiğini görün",
     uploadPolicy: 'Poliçe Yükle',
+    // Toast mesajları
+    filesAccepted: 'dosya kabul edildi',
+    filesRejected: 'dosya doğrulama hataları nedeniyle reddedildi.',
+    diagnosticsRunning: 'Tanılama çalıştırılıyor...',
+    diagnosticsTestingProviders: 'Her sağlayıcı ile API anahtarı geçerliliği test ediliyor',
+    diagnosticsComplete: 'Tanılama tamamlandı',
+    diagnosticsFailed: 'Tanılama başarısız',
+    diagnosticsUnreachable: 'Tanılama çalıştırılamadı',
+    diagnosticsUnreachableDesc: 'Arka uç sunucuya erişilemiyor olabilir',
+    retrying: 'Tekrar deneniyor...',
+    retryingDesc: 'Dosya yeniden işlenmeye çalışılıyor.',
+    fileRemoved: 'Dosya kaldırıldı',
+    fileRemovedDesc: 'Dosya yükleme kuyruğundan kaldırıldı.',
+    noPolicies: 'Analiz edilecek poliçe yok',
+    noPoliciesDesc: 'Lütfen en az bir poliçenin işlenmesini bekleyin.',
+    samplePoliciesLoaded: 'Örnek poliçeler yüklendi',
+    samplePoliciesLoadedDesc: 'örnek Türk sigorta poliçesi yüklendi.',
+    // Analiz tamamlandı
+    analysisComplete: 'Analiz tamamlandı',
+    analysisCompleteLowConfidence: 'Analiz tamamlandı — düşük güvenilirlik',
+    verifyData: 'Bazı veriler hatalı olabilir — lütfen doğrulayın.',
+    savedToCloud: '(buluta kaydedildi)',
+    demoMode: '(demo modu)',
+    confidence: 'güvenilirlik',
+    // Çakışma çözümü
+    duplicateDetected: 'Kopya tespit edildi',
+    amendmentDetected: 'Değişiklik tespit edildi',
+    matchesExisting: 'mevcut bir poliçeyle eşleşiyor. Lütfen nasıl devam edileceğini seçin.',
+    uploadSkipped: 'Yükleme atlandı',
+    uploadSkippedDesc: 'Poliçe zaten mevcut olduğu için kaydedilmedi.',
+    policyUpdated: 'Poliçe güncellendi',
+    policyUpdatedDesc: 'Mevcut poliçe yeni verilerle güncellendi.',
+    updateFailed: 'Güncelleme başarısız',
+    policySaved: 'Poliçe kaydedildi',
+    policySavedDesc: 'Poliçe ayrı bir kayıt olarak kaydedildi.',
+    saveFailed: 'Kaydetme başarısız',
+    amendmentTracked: 'Değişiklik kaydedildi',
+    amendmentFailed: 'Değişiklik kaydedilemedi',
+    editMode: 'Düzenleme Modu',
+    editModeDesc: 'Kaydetmeden önce çıkarılan verileri düzenleyin. Değişiklik yapmak için poliçeye gidin.',
+    viewPolicyBtn: 'Poliçeyi Görüntüle',
+    // Hata başlıkları ve mesajları
+    errorAnalysisFailed: 'Analiz Başarısız',
+    errorAiNotConfigured: 'AI Yapılandırılmadı',
+    errorAiUnavailable: 'AI servisi kullanılamıyor.',
+    errorContactSupport: 'Bu sorun devam ederse lütfen destek ile iletişime geçin.',
+    errorPdfTimeout: 'PDF İşleme Zaman Aşımı',
+    errorPdfTimeoutMsg: 'PDF işlenmesi çok uzun sürdü.',
+    errorPdfTimeoutTip: 'Dosya çok büyük veya karmaşık olabilir. Daha küçük bir dosya deneyin veya tekrar deneyin.',
+    errorPdfWorker: 'PDF İşleme Hatası',
+    errorPdfWorkerMsg: 'PDF işlemcisi bir hatayla karşılaştı.',
+    errorPdfWorkerTip: 'Bu genellikle geçicidir. Lütfen tekrar deneyin.',
+    errorFileRead: 'Dosya Okuma Hatası',
+    errorFileReadMsg: 'Yüklenen dosya okunamadı.',
+    errorFileReadTip: 'Dosya taşınmış veya bozulmuş olabilir. Lütfen dosyayı tekrar seçin.',
+    errorPdfParse: 'PDF İşleme Hatası',
+    errorPdfParseMsg: 'PDF dosyası okunamadı.',
+    errorPdfParseTip: 'Dosya bozuk, şifreli veya desteklenmeyen bir formatta olabilir.',
+    errorRateLimit: 'İstek Limiti Aşıldı',
+    errorRateLimitMsg: 'AI servisine çok fazla istek gönderildi.',
+    errorRateLimitTip: 'Lütfen tekrar denemeden önce birkaç dakika bekleyin.',
+    errorNetwork: 'Ağ Hatası',
+    errorNetworkMsg: 'Arka uç sunucuya bağlanılamadı.',
+    errorNetworkTip: 'Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
+    errorProviderNotReady: 'AI Sağlayıcı Hazır Değil',
+    errorProviderNotReadyMsg: 'AI sağlayıcı sunucuda yapılandırılmamış.',
+    errorProviderNotReadyTip: 'Bu sorun devam ederse lütfen destek ile iletişime geçin.',
+    errorLowConfidence: 'Düşük Çıkarım Güvenilirliği',
+    errorLowConfidenceMsg: 'AI bu belgeden güvenilir şekilde veri çıkaramadı.',
+    errorLowConfidenceTip: 'PDF taranmış veya düşük metin kalitesine sahip olabilir. Daha net bir belge deneyin.',
+    errorRequestTimeout: 'İstek Zaman Aşımı',
+    errorRequestTimeoutMsg: 'İstek tamamlanması çok uzun sürdü.',
+    errorRequestTimeoutTip: 'Belge çok büyük veya AI servisi yavaş olabilir. Daha sonra tekrar deneyin.',
+    // Durum rozetleri
+    checkingBackend: 'Arka uç sunucu kontrol ediliyor...',
+    aiExtractionEnabled: 'AI çıkarım etkin',
+    demoModeStatus: 'Demo modu - yükleme örnek veri kullanacak',
+    cloudStorageEnabled: 'Bulut depolama etkin',
+    // Üretim bannerları
+    serviceUnavailable: 'Servis Geçici Olarak Kullanılamıyor',
+    technicalDifficulties: 'Teknik zorluklar yaşıyoruz. Lütfen daha sonra tekrar deneyin.',
+    serviceConfigIssue: 'Servis Yapılandırma Sorunu',
+    serviceNotConfigured: 'AI servisi düzgün yapılandırılmamış. Lütfen destek ile iletişime geçin.',
+    tryAgainBtn: 'Tekrar Dene',
+    // JSX etiketleri
+    openingFileSelector: 'Dosya seçici açılıyor...',
+    filesFailedCount: 'dosya işlenemedi',
+    clickRetryOrRemove: 'Tekrar denemek veya dosyaları kaldırmak için tıklayın',
+    retryAll: 'Tümünü Tekrar Dene',
+    uploadedFiles: 'Yüklenen Dosyalar',
+    analyzed: 'analiz edildi',
+    processingFiles: 'dosya işleniyor...',
+    viewAnalysis: 'Analizi Görüntüle',
+    uploadingStatus: 'Yükleniyor...',
+    aiAnalyzingStatus: 'AI analiz ediyor...',
+    duplicateAwaiting: 'Kopya tespit edildi - çözüm bekleniyor',
+    amendmentAwaiting: 'Değişiklik tespit edildi - çözüm bekleniyor',
+    lowConfidenceStatus: 'Düşük güvenilirlik',
+    aiExtractedStatus: 'AI çıkarıldı',
+    demoDataStatus: 'Demo verisi',
+    resolveBtn: 'Çöz',
   },
 
   chat: {
@@ -1540,9 +2076,56 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     askAboutPolicies: 'Poliçeleriniz hakkında sorun...',
     send: 'Gönder',
     sending: 'Gönderiliyor...',
+    connectionIssue: 'Bağlantı sorunu',
     connectionError: 'AI asistanına bağlanırken sorun yaşanıyor',
     retryMessage: 'Tekrar Dene',
     welcomeMessage: 'Merhaba! Ben AI sigorta asistanınızım. Poliçelerinizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
+    // Mesaj işlemleri
+    copyToClipboard: 'Panoya kopyala',
+    copied: 'Kopyalandı',
+    copy: 'Kopyala',
+    copiedToClipboard: 'Panoya kopyalandı',
+    failedToCopy: 'Kopyalama başarısız',
+    helpful: 'Faydalı',
+    notHelpful: 'Faydalı değil',
+    viewPolicy: 'Poliçeyi Görüntüle',
+    // Sağlayıcı
+    aiProvider: 'AI Sağlayıcı',
+    switchedTo: 'Değiştirildi:',
+    providerOpenAI: 'GPT-4o Mini',
+    providerOpenAIDescription: 'Hızlı ve uygun maliyetli',
+    providerClaude: 'Claude Haiku',
+    providerClaudeDescription: 'Detaylı anlayış',
+    // Hızlı işlemler
+    comparePolicies: 'Poliçelerimi karşılaştır',
+    findGaps: 'Teminat boşluklarını bul',
+    whatsMyDeductible: 'Muafiyetim ne kadar?',
+    explainKasko: 'Kasko teminatımı açıkla',
+    whenExpire: 'Poliçeler ne zaman bitiyor?',
+    // Geçmiş
+    conversationHistory: 'Konuşma Geçmişi',
+    noConversations: 'Henüz konuşma yok',
+    newChat: 'Yeni Sohbet',
+    loadingHistory: 'Yükleniyor...',
+    loadConversationFailed: 'Konuşma yüklenemedi',
+    messages: 'mesaj',
+    // Karşılama
+    greeting: 'Merhaba! Bugün sigorta poliçeleriniz hakkında nasıl yardımcı olabilirim?',
+    greetingWithCount: 'Merhaba! Ben AI sigorta asistanınızım. {count} yüklü poliçenizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
+    // Hatalar
+    aiThinking: 'AI düşünüyor',
+    connectionBanner: 'AI asistanına bağlanırken sorun yaşanıyor',
+    dismiss: 'Kapat',
+    messageFailed: 'Mesaj gönderilemedi',
+    messageFailedDesc: 'AI asistanına bağlanırken bir sorun oluştu.',
+    errorProcessRequest: 'Üzgünüm, isteğinizi işleyemedim. Lütfen tekrar deneyin.',
+    // Bağlam
+    referencing: 'Referans:',
+    referencedPolicies: 'Referans Verilen Poliçeler:',
+    more: 'daha',
+    // Geri bildirim
+    thanksFeedback: 'Geri bildiriminiz için teşekkürler!',
+    willImprove: 'İyileştirmeye çalışacağız',
   },
 
   settings: {
@@ -1581,9 +2164,26 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
   help: {
     title: 'Yardım Merkezi',
     searchHelp: 'Yardım makalelerinde ara...',
-    gettingStarted: 'Başlarken',
+    searchPlaceholder: 'Yardım ara...',
+    gettingStarted: 'Başlangıç',
+    gettingStartedDesc: 'InsurAI kullanımının temellerini öğrenin',
+    policyAnalysis: 'Poliçe Analizi',
+    policyAnalysisDesc: 'AI destekli analizi anlama',
     faq: 'SSS',
-    contactSupport: 'Destek ile İletişim',
+    faqDesc: 'Sıkça sorulan sorular',
+    troubleshooting: 'Sorun Giderme',
+    troubleshootingDesc: 'Yaygın sorunları çözün',
+    articlesCount: '{count} makale',
+    popularArticles: 'Popüler Makaleler',
+    article1: 'Poliçe nasıl yüklenir ve analiz edilir',
+    article2: 'Teminat karşılaştırmalarını anlama',
+    article3: 'Yenileme hatırlatıcıları ayarlama',
+    article4: 'Analiz raporlarını dışa aktarma',
+    article5: 'Poliçe portföyünüzü yönetme',
+    stillNeedHelp: 'Hâlâ yardıma mı ihtiyacınız var?',
+    stillNeedHelpDesc: 'AI asistanımızla sohbet edin veya destekle iletişime geçin',
+    chatWithAI: 'AI ile Sohbet',
+    contactSupport: 'Destek İletişim',
     documentation: 'Dokümantasyon',
     chatWithUs: 'Bizimle sohbet edin',
   },
@@ -1662,6 +2262,11 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     checkEmail: 'Hesabınızı onaylamak için e-postanızı kontrol edin.',
     welcomeBack: 'Tekrar hoş geldiniz',
     createYourAccount: 'Hesabınızı oluşturun',
+    namePlaceholder: 'Ahmet Yılmaz',
+    emailPlaceholder: 'siz@ornek.com',
+    authNotConfigured: 'Kimlik Doğrulama Yapılandırılmamış',
+    authNotConfiguredDesc: 'Supabase bilgileri ayarlanmamış. Lütfen .env dosyanızda VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini yapılandırın.',
+    continueToDemo: 'Demoya Devam Et',
   },
 
   insights: {
@@ -1808,6 +2413,35 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     notAvailable: 'Mevcut Değil',
     on: 'Açık',
     off: 'Kapalı',
+  },
+
+  shared: {
+    analysisNotFound: 'Analiz Bulunamadı',
+    analysisNotFoundDesc: 'Bu paylaşılan bağlantı mevcut değil. Analiz kaldırılmış veya bağlantı hatalı olabilir.',
+    tryFreeAnalysis: 'Ücretsiz Analiz Dene',
+    backToHome: 'Ana Sayfaya Dön',
+    linkExpired: 'Bağlantı Süresi Dolmuş',
+    linkExpiredDesc: 'Bu paylaşılan analizin süresi dolmuş. Analiz sonuçları 24 saat boyunca geçerlidir.',
+    sharedAnalysis: 'Paylaşılan Analiz',
+    expiresIn: '{time} içinde sona eriyor',
+    expiringSoon: 'Yakında sona eriyor',
+    tryYourOwn: 'Kendiniz Deneyin',
+    policyAnalysis: 'Poliçe Analizi',
+    policySummary: 'Poliçe Özeti',
+    keyDetails: 'Temel Bilgiler',
+    policyNumber: 'Poliçe Numarası',
+    insured: 'Sigortalı',
+    premium: 'Prim',
+    coverage: 'Teminat',
+    coveragesCount: 'Teminatlar ({count})',
+    moreCoverages: '+{count} teminat daha',
+    keyExclusions: 'Önemli İstisnalar',
+    aiInsights: 'AI İçgörüleri',
+    wantToAnalyze: 'Kendi poliçenizi analiz etmek ister misiniz?',
+    wantToAnalyzeDesc: 'Sigorta poliçelerinizin anında AI destekli analizini alın.',
+    tryFree: 'Ücretsiz Dene',
+    kvkkCompliant: 'KVKK Uyumlu',
+    dataSecure: 'Verileriniz güvende',
   },
 }
 

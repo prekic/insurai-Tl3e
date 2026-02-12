@@ -53,9 +53,6 @@ vi.mock('./ComparisonMock', () => ({
   ComparisonMockMobile: () => <div data-testid="comparison-mock-mobile">Comparison Mock Mobile</div>,
 }))
 
-vi.mock('./LanguageToggle', () => ({
-  LanguageToggle: () => <div data-testid="language-toggle">Language Toggle</div>,
-}))
 
 vi.mock('../animations/AnimatedComponents', () => ({
   StaggeredList: ({ children }: { children: React.ReactNode[] }) => <div>{children}</div>,
@@ -280,12 +277,39 @@ describe('Hero', () => {
 
       expect(screen.getByTestId('comparison-mock')).toBeInTheDocument()
     })
+  })
 
-    it('should render language toggle', () => {
+  describe('Language Picker', () => {
+    it('should render a Globe icon language button in the nav bar', () => {
       renderWithRouter(<Hero />)
 
-      const toggles = screen.getAllByTestId('language-toggle')
-      expect(toggles.length).toBeGreaterThan(0)
+      const langButton = screen.getByRole('button', { name: 'Change language' })
+      expect(langButton).toBeInTheDocument()
+    })
+
+    it('should show Türkçe and English options when Globe is clicked', () => {
+      renderWithRouter(<Hero />)
+
+      const langButton = screen.getByRole('button', { name: 'Change language' })
+      fireEvent.click(langButton)
+
+      expect(screen.getByText('Türkçe')).toBeInTheDocument()
+      expect(screen.getByText('English')).toBeInTheDocument()
+    })
+
+    it('should render language switcher in mobile menu', () => {
+      renderWithRouter(<Hero />)
+
+      // Open mobile menu
+      const buttons = screen.getAllByRole('button')
+      const menuButton = buttons.find(btn => btn.classList.contains('md:hidden'))
+      if (menuButton) {
+        fireEvent.click(menuButton)
+      }
+
+      // Mobile menu has inline language switcher with radiogroup
+      const radiogroups = screen.getAllByRole('radiogroup', { name: 'Language' })
+      expect(radiogroups.length).toBeGreaterThan(0)
     })
   })
 })

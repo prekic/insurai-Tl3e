@@ -1,8 +1,10 @@
 import { Upload } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
 /**
  * StickyMobileCTA - A floating CTA button that appears on mobile
@@ -15,9 +17,7 @@ export function StickyMobileCTA() {
   const { user } = useAuth()
   const { t } = useTranslation()
   const [isVisible, setIsVisible] = useState(false)
-
-  // Route to /try for anonymous users, /upload for logged-in users
-  const uploadPath = user ? '/upload?autoOpen=true' : '/try'
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     // Show the sticky CTA after scrolling 600px (approximately past the hero)
@@ -38,8 +38,32 @@ export function StickyMobileCTA() {
     }
   }, [])
 
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    const { valid, errors } = validateFiles(files)
+    errors.forEach((err) => {
+      const errorInfo = getErrorMessage(err.code)
+      toast.error(errorInfo.title, {
+        description: err.details || errorInfo.description,
+        duration: 5000,
+      })
+    })
+
+    if (valid.length > 0) {
+      if (user) {
+        navigate('/upload', { state: { files: valid, autoProcess: true } })
+      } else {
+        navigate('/try', { state: { file: valid[0] } })
+      }
+    }
+
+    e.target.value = ''
+  }, [user, navigate])
+
   const handleClick = () => {
-    navigate(uploadPath)
+    fileInputRef.current?.click()
   }
 
   // Only render on mobile (md breakpoint hides it via CSS)
@@ -56,6 +80,14 @@ export function StickyMobileCTA() {
         }
       `}
     >
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+        onChange={handleFileSelect}
+        className="hidden"
+        aria-hidden="true"
+      />
       <button
         onClick={handleClick}
         className="

@@ -1,14 +1,15 @@
-import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, Search, ChevronDown, LogOut, LogIn, Scale } from 'lucide-react'
+import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, ChevronDown, LogOut, LogIn, Scale, Globe } from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
-import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useTranslation, useI18n } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
   const { t } = useTranslation()
+  const { locale, setLocale } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
@@ -17,9 +18,11 @@ export function GlobalNavigation() {
 
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [showNotifications, setShowNotifications] = useState(false)
+  const [showLanguagePicker, setShowLanguagePicker] = useState(false)
   const profileMenuRef = useRef<HTMLDivElement>(null)
   const profileButtonRef = useRef<HTMLButtonElement>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+  const languageRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file upload directly from navigation
@@ -199,53 +202,108 @@ export function GlobalNavigation() {
 
           {/* Right Side */}
           <div className="flex items-center gap-2">
-            <button
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-              aria-label="Search policies"
-            >
-              <Search size={20} aria-hidden="true" />
-            </button>
-            <div className="relative" ref={notificationRef}>
+            {/* Language Picker */}
+            <div className="relative" ref={languageRef}>
               <button
                 onClick={() => {
-                  if (!user) {
-                    navigate('/auth')
-                    return
-                  }
                   setShowProfileMenu(false)
-                  setShowNotifications(!showNotifications)
+                  setShowNotifications(false)
+                  setShowLanguagePicker(!showLanguagePicker)
                 }}
-                className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
-                aria-label="Notifications"
-                aria-expanded={showNotifications}
+                className={`p-2 rounded-lg transition-colors focus-ring ${
+                  showLanguagePicker
+                    ? 'text-blue-600 bg-blue-50'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+                aria-label="Change language"
+                aria-expanded={showLanguagePicker}
                 aria-haspopup="true"
               >
-                <Bell size={20} aria-hidden="true" />
+                <Globe size={20} aria-hidden="true" />
               </button>
 
-              {showNotifications && user && (
+              {showLanguagePicker && (
                 <>
                   <div
                     className="fixed inset-0 z-40"
-                    onClick={() => setShowNotifications(false)}
+                    onClick={() => setShowLanguagePicker(false)}
                     aria-hidden="true"
                   />
                   <div
-                    className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
-                    role="dialog"
-                    aria-label="Notifications"
+                    className="absolute right-0 mt-2 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                    role="radiogroup"
+                    aria-label="Language"
                   >
-                    <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                      <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
-                    </div>
-                    <div className="py-8 text-center text-sm text-gray-500">
-                      <Bell size={24} className="mx-auto mb-2 text-gray-300" />
-                      {t.nav.noNotifications}
-                    </div>
+                    <button
+                      onClick={() => { setLocale('tr'); setShowLanguagePicker(false) }}
+                      role="radio"
+                      aria-checked={locale === 'tr'}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        locale === 'tr'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-base">🇹🇷</span>
+                      <span>Türkçe</span>
+                    </button>
+                    <button
+                      onClick={() => { setLocale('en'); setShowLanguagePicker(false) }}
+                      role="radio"
+                      aria-checked={locale === 'en'}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                        locale === 'en'
+                          ? 'bg-blue-50 text-blue-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="text-base">🇬🇧</span>
+                      <span>English</span>
+                    </button>
                   </div>
                 </>
               )}
             </div>
+            {user && (
+              <div className="relative" ref={notificationRef}>
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false)
+                    setShowLanguagePicker(false)
+                    setShowNotifications(!showNotifications)
+                  }}
+                  className="relative p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors focus-ring"
+                  aria-label="Notifications"
+                  aria-expanded={showNotifications}
+                  aria-haspopup="true"
+                >
+                  <Bell size={20} aria-hidden="true" />
+                </button>
+
+                {showNotifications && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-40"
+                      onClick={() => setShowNotifications(false)}
+                      aria-hidden="true"
+                    />
+                    <div
+                      className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200"
+                      role="dialog"
+                      aria-label="Notifications"
+                    >
+                      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                        <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
+                      </div>
+                      <div className="py-8 text-center text-sm text-gray-500">
+                        <Bell size={24} className="mx-auto mb-2 text-gray-300" />
+                        {t.nav.noNotifications}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             {/* Hidden file input for immediate upload */}
             <input
               ref={fileInputRef}
@@ -264,12 +322,24 @@ export function GlobalNavigation() {
               <span>{t.nav.upload}</span>
             </button>
 
+            {/* Sign In - visible for anonymous users */}
+            {!user && (
+              <Link
+                to="/auth"
+                className="hidden md:flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 hover:border-gray-400 transition-all font-medium text-sm focus-ring"
+              >
+                <LogIn size={18} aria-hidden="true" />
+                <span>{t.auth.signIn}</span>
+              </Link>
+            )}
+
             {/* Profile Menu */}
             <div className="relative">
               <button
                 ref={profileButtonRef}
                 onClick={() => {
                   setShowNotifications(false)
+                  setShowLanguagePicker(false)
                   setShowProfileMenu(!showProfileMenu)
                 }}
                 className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
