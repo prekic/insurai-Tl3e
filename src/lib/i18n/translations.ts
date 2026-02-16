@@ -542,6 +542,61 @@ export interface TranslationDictionary {
     twoFactor: string
     adminPanel: string
     adminDescription: string
+    aiConfiguration: string
+    openaiLabel: string
+    claudeLabel: string
+    googleCloudLabel: string
+    configured: string
+    notConfigured: string
+    getKey: string
+    openaiDescription: string
+    claudeDescription: string
+    googleCloudDescription: string
+    extraction: string
+    consensus: string
+    ocr: string
+    on: string
+    off: string
+    demo: string
+    apiKeysPrivacy: string
+    languageInfo: string
+    dataExport: string
+    exportCSV: string
+    exportPDF: string
+    exportDescription: string
+    storageCloud: string
+    storageLocal: string
+    storageLabel: string
+    clearAllData: string
+    accountSection: string
+    signedIn: string
+    openaiKeySaved: string
+    openaiKeySavedDesc: string
+    openaiKeyRemoved: string
+    claudeKeySaved: string
+    claudeKeySavedDesc: string
+    claudeKeyRemoved: string
+    googleKeySaved: string
+    googleKeySavedDesc: string
+    googleKeyRemoved: string
+    noPoliciesExport: string
+    policiesExported: string
+    policiesExportedDesc: string
+    pdfGenerated: string
+    pdfGeneratedDesc: string
+    allDataCleared: string
+    allDataClearedDesc: string
+    languageChanged: string
+    removeOpenaiTitle: string
+    removeOpenaiDesc: string
+    removeClaudeTitle: string
+    removeClaudeDesc: string
+    removeGoogleTitle: string
+    removeGoogleDesc: string
+    removeKey: string
+    save: string
+    cancel: string
+    edit: string
   }
 
   // Account
@@ -555,6 +610,34 @@ export interface TranslationDictionary {
     role: string
     memberSince: string
     editProfile: string
+    location: string
+    namePlaceholder: string
+    emailPlaceholder: string
+    phonePlaceholder: string
+    locationPlaceholder: string
+    companyPlaceholder: string
+    yourName: string
+    addCompany: string
+    cloudSynced: string
+    localOnly: string
+    saving: string
+    changePhoto: string
+    usageStatistics: string
+    policiesAnalyzed: string
+    comparisons: string
+    savedReports: string
+    cloudStorage: string
+    localStorage: string
+    dataSynced: string
+    signInToSync: string
+    signIn: string
+    profileUpdated: string
+    profileUpdatedDesc: string
+    profileSavedLocally: string
+    profileSavedLocallyDesc: string
+    failedToLoad: string
+    failedToSave: string
+    tryAgain: string
   }
 
   // Help
@@ -717,6 +800,28 @@ export interface TranslationDictionary {
     betterValue: string
     worseValue: string
     sameValue: string
+    subtitle: string
+    clearAll: string
+    selectedCount: string
+    policiesNoLongerExist: string
+    policiesDeletedOrMoved: string
+    selectPoliciesToCompare: string
+    uploadFirst: string
+    uploadPolicy: string
+    selectMinTwo: string
+    comparisonError: string
+    categoryWinners: string
+    metricsComparison: string
+    coverageMatrix: string
+    keyDifferences: string
+    major: string
+    moderate: string
+    minor: string
+    tradeoffs: string
+    aiRecommendation: string
+    recommendedChoice: string
+    improvementSuggestions: string
+    recommendation: string
   }
 
   // Insurance Terms
@@ -1373,6 +1478,61 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     twoFactor: 'Two-Factor Authentication',
     adminPanel: 'Admin Panel',
     adminDescription: 'Manage users, API keys, and system settings',
+    aiConfiguration: 'AI Configuration',
+    openaiLabel: 'OpenAI API Key (GPT-4)',
+    claudeLabel: 'Claude API Key (Anthropic)',
+    googleCloudLabel: 'Google Cloud API Key (OCR)',
+    configured: 'Configured',
+    notConfigured: 'Not configured',
+    getKey: 'Get key',
+    openaiDescription: 'Primary AI for document extraction.',
+    claudeDescription: 'Backup AI for multi-model consensus.',
+    googleCloudDescription: 'For scanned document OCR.',
+    extraction: 'Extraction',
+    consensus: 'Consensus',
+    ocr: 'OCR',
+    on: 'On',
+    off: 'Off',
+    demo: 'Demo',
+    apiKeysPrivacy: 'API keys are stored locally and never sent to our servers.',
+    languageInfo: 'Any language can be used. AI translates new languages automatically.',
+    dataExport: 'Data & Export',
+    exportCSV: 'Export to Excel (CSV)',
+    exportPDF: 'Export to PDF',
+    exportDescription: 'Export your {count} policies to Excel or PDF format for backup or sharing.',
+    storageCloud: 'Cloud (Supabase)',
+    storageLocal: 'Local Browser',
+    storageLabel: 'Storage',
+    clearAllData: 'Clear All Data',
+    accountSection: 'Account',
+    signedIn: 'Signed in',
+    openaiKeySaved: 'OpenAI API key saved',
+    openaiKeySavedDesc: 'AI-powered extraction is now enabled.',
+    openaiKeyRemoved: 'OpenAI API key removed',
+    claudeKeySaved: 'Claude API key saved',
+    claudeKeySavedDesc: 'Multi-model consensus is now available.',
+    claudeKeyRemoved: 'Claude API key removed',
+    googleKeySaved: 'Google Cloud API key saved',
+    googleKeySavedDesc: 'OCR for scanned documents is now enabled.',
+    googleKeyRemoved: 'Google Cloud API key removed',
+    noPoliciesExport: 'No policies to export',
+    policiesExported: 'Policies exported',
+    policiesExportedDesc: '{count} policies exported to CSV',
+    pdfGenerated: 'PDF report generated',
+    pdfGeneratedDesc: 'Print dialog will open to save as PDF',
+    allDataCleared: 'All data cleared',
+    allDataClearedDesc: 'Your policies have been removed.',
+    languageChanged: 'Language changed to {name}',
+    removeOpenaiTitle: 'Remove OpenAI API Key',
+    removeOpenaiDesc: 'Are you sure you want to remove the OpenAI API key? AI-powered extraction will be disabled until you add a new key.',
+    removeClaudeTitle: 'Remove Claude API Key',
+    removeClaudeDesc: 'Are you sure you want to remove the Claude API key? Multi-model consensus will be disabled until you add a new key.',
+    removeGoogleTitle: 'Remove Google Cloud API Key',
+    removeGoogleDesc: 'Are you sure you want to remove the Google Cloud API key? OCR for scanned documents will be disabled until you add a new key.',
+    removeKey: 'Remove Key',
+    save: 'Save',
+    cancel: 'Cancel',
+    edit: 'Edit',
   },
 
   account: {
@@ -1385,6 +1545,34 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     role: 'Role',
     memberSince: 'Member since',
     editProfile: 'Edit Profile',
+    location: 'Location',
+    namePlaceholder: 'Your name',
+    emailPlaceholder: 'you@example.com',
+    phonePlaceholder: '+90 5XX XXX XX XX',
+    locationPlaceholder: 'City, Country',
+    companyPlaceholder: 'Add company',
+    yourName: 'Your Name',
+    addCompany: 'Add Company',
+    cloudSynced: 'Cloud synced',
+    localOnly: 'Local only',
+    saving: 'Saving...',
+    changePhoto: 'Change Photo',
+    usageStatistics: 'Usage Statistics',
+    policiesAnalyzed: 'Policies Analyzed',
+    comparisons: 'Comparisons',
+    savedReports: 'Saved Reports',
+    cloudStorage: 'Cloud Storage',
+    localStorage: 'Local Storage',
+    dataSynced: 'Your data is synced across all devices',
+    signInToSync: 'Sign in to sync your data across devices',
+    signIn: 'Sign In',
+    profileUpdated: 'Profile updated',
+    profileUpdatedDesc: 'Your changes have been saved to the cloud.',
+    profileSavedLocally: 'Profile saved locally',
+    profileSavedLocallyDesc: 'Sign in to sync across devices.',
+    failedToLoad: 'Failed to load profile',
+    failedToSave: 'Failed to save profile',
+    tryAgain: 'Please try again.',
   },
 
   help: {
@@ -1527,7 +1715,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
   comparison: {
     title: 'Policy Comparison',
     compareWith: 'Compare with',
-    selectPolicies: 'Select policies to compare',
+    selectPolicies: 'Select Policies',
     differences: 'Differences',
     similarities: 'Similarities',
     coverageComparison: 'Coverage Comparison',
@@ -1538,6 +1726,28 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     betterValue: 'Better value',
     worseValue: 'Lower value',
     sameValue: 'Same value',
+    subtitle: 'Compare your policies side by side',
+    clearAll: 'Clear All',
+    selectedCount: '{count} / 4 selected (min 2)',
+    policiesNoLongerExist: '{count} policy(ies) no longer exist',
+    policiesDeletedOrMoved: 'These policies may have been deleted or moved.',
+    selectPoliciesToCompare: 'Select Policies to Compare',
+    uploadFirst: 'Upload policies first to compare them',
+    uploadPolicy: 'Upload Policy',
+    selectMinTwo: 'Select at least 2 policies to compare',
+    comparisonError: 'Comparison error',
+    categoryWinners: 'Category Winners',
+    metricsComparison: 'Metrics Comparison',
+    coverageMatrix: 'Coverage Matrix',
+    keyDifferences: 'Key Differences',
+    major: 'Major',
+    moderate: 'Moderate',
+    minor: 'Minor',
+    tradeoffs: 'Tradeoffs',
+    aiRecommendation: 'AI Recommendation',
+    recommendedChoice: 'Recommended choice',
+    improvementSuggestions: 'Improvement Suggestions',
+    recommendation: 'Recommendation:',
   },
 
   insurance: {
@@ -2306,6 +2516,61 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     twoFactor: 'İki Faktörlü Kimlik Doğrulama',
     adminPanel: 'Yönetici Paneli',
     adminDescription: 'Kullanıcıları, API anahtarlarını ve sistem ayarlarını yönetin',
+    aiConfiguration: 'AI Yapılandırması',
+    openaiLabel: 'OpenAI API Anahtarı (GPT-4)',
+    claudeLabel: 'Claude API Anahtarı (Anthropic)',
+    googleCloudLabel: 'Google Cloud API Anahtarı (OCR)',
+    configured: 'Yapılandırıldı',
+    notConfigured: 'Yapılandırılmadı',
+    getKey: 'Anahtar al',
+    openaiDescription: 'Belge çıkarma için birincil AI.',
+    claudeDescription: 'Çoklu model uzlaşması için yedek AI.',
+    googleCloudDescription: 'Taranmış belgeler için OCR.',
+    extraction: 'Çıkarma',
+    consensus: 'Uzlaşma',
+    ocr: 'OCR',
+    on: 'Açık',
+    off: 'Kapalı',
+    demo: 'Demo',
+    apiKeysPrivacy: 'API anahtarları yerel olarak saklanır ve sunucularımıza gönderilmez.',
+    languageInfo: 'Herhangi bir dil kullanılabilir. AI yeni dilleri otomatik çevirir.',
+    dataExport: 'Veri ve Dışa Aktarma',
+    exportCSV: 'Excel\'e Aktar (CSV)',
+    exportPDF: 'PDF\'e Aktar',
+    exportDescription: '{count} poliçenizi yedekleme veya paylaşım için Excel veya PDF formatında dışa aktarın.',
+    storageCloud: 'Bulut (Supabase)',
+    storageLocal: 'Yerel Tarayıcı',
+    storageLabel: 'Depolama',
+    clearAllData: 'Tüm Verileri Temizle',
+    accountSection: 'Hesap',
+    signedIn: 'Giriş yapıldı',
+    openaiKeySaved: 'OpenAI API anahtarı kaydedildi',
+    openaiKeySavedDesc: 'AI destekli çıkarma artık etkin.',
+    openaiKeyRemoved: 'OpenAI API anahtarı kaldırıldı',
+    claudeKeySaved: 'Claude API anahtarı kaydedildi',
+    claudeKeySavedDesc: 'Çoklu model uzlaşması artık kullanılabilir.',
+    claudeKeyRemoved: 'Claude API anahtarı kaldırıldı',
+    googleKeySaved: 'Google Cloud API anahtarı kaydedildi',
+    googleKeySavedDesc: 'Taranmış belgeler için OCR artık etkin.',
+    googleKeyRemoved: 'Google Cloud API anahtarı kaldırıldı',
+    noPoliciesExport: 'Dışa aktarılacak poliçe yok',
+    policiesExported: 'Poliçeler dışa aktarıldı',
+    policiesExportedDesc: '{count} poliçe CSV olarak dışa aktarıldı',
+    pdfGenerated: 'PDF raporu oluşturuldu',
+    pdfGeneratedDesc: 'PDF olarak kaydetmek için yazdırma iletişim kutusu açılacak',
+    allDataCleared: 'Tüm veriler temizlendi',
+    allDataClearedDesc: 'Poliçeleriniz kaldırıldı.',
+    languageChanged: 'Dil {name} olarak değiştirildi',
+    removeOpenaiTitle: 'OpenAI API Anahtarını Kaldır',
+    removeOpenaiDesc: 'OpenAI API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar AI destekli çıkarma devre dışı kalacak.',
+    removeClaudeTitle: 'Claude API Anahtarını Kaldır',
+    removeClaudeDesc: 'Claude API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar çoklu model uzlaşması devre dışı kalacak.',
+    removeGoogleTitle: 'Google Cloud API Anahtarını Kaldır',
+    removeGoogleDesc: 'Google Cloud API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar OCR devre dışı kalacak.',
+    removeKey: 'Anahtarı Kaldır',
+    save: 'Kaydet',
+    cancel: 'İptal',
+    edit: 'Düzenle',
   },
 
   account: {
@@ -2318,6 +2583,34 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     role: 'Rol',
     memberSince: 'Üyelik tarihi',
     editProfile: 'Profili Düzenle',
+    location: 'Konum',
+    namePlaceholder: 'Adınız',
+    emailPlaceholder: 'siz@ornek.com',
+    phonePlaceholder: '+90 5XX XXX XX XX',
+    locationPlaceholder: 'Şehir, Ülke',
+    companyPlaceholder: 'Şirket ekle',
+    yourName: 'Adınız',
+    addCompany: 'Şirket Ekle',
+    cloudSynced: 'Bulut senkronize',
+    localOnly: 'Yalnızca yerel',
+    saving: 'Kaydediliyor...',
+    changePhoto: 'Fotoğraf Değiştir',
+    usageStatistics: 'Kullanım İstatistikleri',
+    policiesAnalyzed: 'Analiz Edilen Poliçeler',
+    comparisons: 'Karşılaştırmalar',
+    savedReports: 'Kayıtlı Raporlar',
+    cloudStorage: 'Bulut Depolama',
+    localStorage: 'Yerel Depolama',
+    dataSynced: 'Verileriniz tüm cihazlarınızda senkronize edilir',
+    signInToSync: 'Verilerinizi cihazlar arasında senkronize etmek için giriş yapın',
+    signIn: 'Giriş Yap',
+    profileUpdated: 'Profil güncellendi',
+    profileUpdatedDesc: 'Değişiklikleriniz buluta kaydedildi.',
+    profileSavedLocally: 'Profil yerel olarak kaydedildi',
+    profileSavedLocallyDesc: 'Cihazlar arasında senkronize etmek için giriş yapın.',
+    failedToLoad: 'Profil yüklenemedi',
+    failedToSave: 'Profil kaydedilemedi',
+    tryAgain: 'Lütfen tekrar deneyin.',
   },
 
   help: {
@@ -2460,7 +2753,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
   comparison: {
     title: 'Poliçe Karşılaştırması',
     compareWith: 'Şununla karşılaştır',
-    selectPolicies: 'Karşılaştırmak için poliçe seçin',
+    selectPolicies: 'Poliçe Seç',
     differences: 'Farklılıklar',
     similarities: 'Benzerlikler',
     coverageComparison: 'Teminat Karşılaştırması',
@@ -2471,6 +2764,28 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     betterValue: 'Daha iyi değer',
     worseValue: 'Daha düşük değer',
     sameValue: 'Aynı değer',
+    subtitle: 'Poliçelerinizi yan yana karşılaştırın',
+    clearAll: 'Tümünü Temizle',
+    selectedCount: '{count} / 4 seçildi (min 2)',
+    policiesNoLongerExist: '{count} poliçe artık mevcut değil',
+    policiesDeletedOrMoved: 'Bu poliçeler silinmiş veya taşınmış olabilir.',
+    selectPoliciesToCompare: 'Karşılaştırmak İçin Poliçe Seçin',
+    uploadFirst: 'Karşılaştırmak için önce poliçe yükleyin',
+    uploadPolicy: 'Poliçe Yükle',
+    selectMinTwo: 'Karşılaştırmak için en az 2 poliçe seçin',
+    comparisonError: 'Karşılaştırma hatası',
+    categoryWinners: 'Kategori Kazananları',
+    metricsComparison: 'Metrik Karşılaştırması',
+    coverageMatrix: 'Teminat Matrisi',
+    keyDifferences: 'Temel Farklılıklar',
+    major: 'Büyük',
+    moderate: 'Orta',
+    minor: 'Küçük',
+    tradeoffs: 'Değiş Tokuşlar',
+    aiRecommendation: 'AI Önerisi',
+    recommendedChoice: 'Önerilen seçim',
+    improvementSuggestions: 'İyileştirme Önerileri',
+    recommendation: 'Öneri:',
   },
 
   insurance: {

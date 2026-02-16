@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   User,
   Mail,
   Phone,
@@ -21,6 +20,7 @@ import { Button } from './ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Input } from './ui/input'
 import { Badge } from './ui/badge'
+import { useI18n } from '@/lib/i18n'
 import { useAuth } from '@/lib/supabase/auth-context'
 import {
   isSupabaseConfigured,
@@ -43,6 +43,7 @@ interface LocalProfile {
 
 export function MyAccount() {
   const navigate = useNavigate()
+  const { t, locale } = useI18n()
   const { user, isConfigured: authConfigured } = useAuth()
 
   const [isEditing, setIsEditing] = useState(false)
@@ -108,7 +109,7 @@ export function MyAccount() {
           setStats(userStats)
         } catch (error) {
           console.error('Failed to load profile:', error)
-          toast.error('Failed to load profile')
+          toast.error(t.account.failedToLoad)
         }
       } else {
         // Load from localStorage for guest users
@@ -154,14 +155,14 @@ export function MyAccount() {
           location: profile.location || undefined,
           company: profile.company || undefined,
         })
-        toast.success('Profile updated', {
-          description: 'Your changes have been saved to the cloud.',
+        toast.success(t.account.profileUpdated, {
+          description: t.account.profileUpdatedDesc,
         })
       } else {
         // Save to localStorage
         localStorage.setItem(LOCAL_PROFILE_KEY, JSON.stringify(profile))
-        toast.success('Profile saved locally', {
-          description: 'Sign in to sync across devices.',
+        toast.success(t.account.profileSavedLocally, {
+          description: t.account.profileSavedLocallyDesc,
         })
       }
 
@@ -169,8 +170,8 @@ export function MyAccount() {
       setIsEditing(false)
     } catch (error) {
       console.error('Failed to save profile:', error)
-      toast.error('Failed to save profile', {
-        description: error instanceof Error ? error.message : 'Please try again.',
+      toast.error(t.account.failedToSave, {
+        description: error instanceof Error ? error.message : t.account.tryAgain,
       })
     } finally {
       setIsSaving(false)
@@ -205,14 +206,7 @@ export function MyAccount() {
       <div className="max-w-3xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white rounded-lg transition-colors"
-            aria-label="Go back"
-          >
-            <ArrowLeft size={24} />
-          </button>
-          <h1 className="text-3xl font-bold text-gray-900">My Account</h1>
+          <h1 className="text-3xl font-bold text-gray-900">{t.account.title}</h1>
         </div>
 
         <div className="space-y-6">
@@ -226,25 +220,25 @@ export function MyAccount() {
                   </div>
                   <button
                     className="absolute -bottom-2 -right-2 w-8 h-8 bg-white border border-gray-200 rounded-lg flex items-center justify-center shadow-sm hover:shadow-md transition-shadow"
-                    aria-label="Change photo"
+                    aria-label={t.account.changePhoto}
                   >
                     <Camera size={16} className="text-gray-600" />
                   </button>
                 </div>
                 <div className="flex-1 text-center md:text-left">
                   <h2 className="text-2xl font-bold text-gray-900">
-                    {profile.name || 'Your Name'}
+                    {profile.name || t.account.yourName}
                   </h2>
-                  <p className="text-gray-600">{profile.company || 'Add your company'}</p>
+                  <p className="text-gray-600">{profile.company || t.account.addCompany}</p>
                   <Badge variant="secondary" className="mt-2">
-                    {useSupabase ? 'Cloud Synced' : 'Local Only'}
+                    {useSupabase ? t.account.cloudSynced : t.account.localOnly}
                   </Badge>
                 </div>
                 {isEditing ? (
                   <div className="flex gap-2">
                     <Button variant="outline" onClick={handleCancel} disabled={isSaving}>
                       <X size={18} className="mr-1" />
-                      Cancel
+                      {t.common.cancel}
                     </Button>
                     <Button onClick={handleSave} disabled={isSaving}>
                       {isSaving ? (
@@ -252,13 +246,13 @@ export function MyAccount() {
                       ) : (
                         <Save size={18} className="mr-1" />
                       )}
-                      {isSaving ? 'Saving...' : 'Save'}
+                      {isSaving ? t.account.saving : t.common.save}
                     </Button>
                   </div>
                 ) : (
                   <Button variant="outline" onClick={handleEdit} className="gap-2">
                     <Edit2 size={18} />
-                    Edit Profile
+                    {t.account.editProfile}
                   </Button>
                 )}
               </div>
@@ -268,20 +262,20 @@ export function MyAccount() {
           {/* Profile Details */}
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle>{t.account.personalInfo}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                     <User size={14} className="inline mr-1" />
-                    Full Name
+                    {t.account.fullName}
                   </label>
                   {isEditing ? (
                     <Input
                       value={profile.name}
                       onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))}
-                      placeholder="Enter your name"
+                      placeholder={t.account.namePlaceholder}
                     />
                   ) : (
                     <p className="font-medium text-gray-900">{profile.name || '—'}</p>
@@ -290,7 +284,7 @@ export function MyAccount() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                     <Mail size={14} className="inline mr-1" />
-                    Email
+                    {t.account.email}
                   </label>
                   {isEditing ? (
                     <Input
@@ -298,7 +292,7 @@ export function MyAccount() {
                       value={profile.email}
                       disabled={useSupabase} // Can't change email when using Supabase
                       onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))}
-                      placeholder="your@email.com"
+                      placeholder={t.account.emailPlaceholder}
                       className={useSupabase ? 'bg-gray-100' : ''}
                     />
                   ) : (
@@ -308,14 +302,14 @@ export function MyAccount() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                     <Phone size={14} className="inline mr-1" />
-                    Phone
+                    {t.account.phone}
                   </label>
                   {isEditing ? (
                     <Input
                       type="tel"
                       value={profile.phone}
                       onChange={(e) => setProfile((p) => ({ ...p, phone: e.target.value }))}
-                      placeholder="+90 5XX XXX XXXX"
+                      placeholder={t.account.phonePlaceholder}
                     />
                   ) : (
                     <p className="font-medium text-gray-900">{profile.phone || '—'}</p>
@@ -324,13 +318,13 @@ export function MyAccount() {
                 <div>
                   <label className="block text-sm text-gray-500 mb-1">
                     <MapPin size={14} className="inline mr-1" />
-                    Location
+                    {t.account.location}
                   </label>
                   {isEditing ? (
                     <Input
                       value={profile.location}
                       onChange={(e) => setProfile((p) => ({ ...p, location: e.target.value }))}
-                      placeholder="Istanbul, Turkey"
+                      placeholder={t.account.locationPlaceholder}
                     />
                   ) : (
                     <p className="font-medium text-gray-900">{profile.location || '—'}</p>
@@ -339,13 +333,13 @@ export function MyAccount() {
                 <div className="md:col-span-2">
                   <label className="block text-sm text-gray-500 mb-1">
                     <Building size={14} className="inline mr-1" />
-                    Company
+                    {t.account.company}
                   </label>
                   {isEditing ? (
                     <Input
                       value={profile.company}
                       onChange={(e) => setProfile((p) => ({ ...p, company: e.target.value }))}
-                      placeholder="Your company name"
+                      placeholder={t.account.companyPlaceholder}
                     />
                   ) : (
                     <p className="font-medium text-gray-900">{profile.company || '—'}</p>
@@ -357,8 +351,8 @@ export function MyAccount() {
                   <div className="flex items-center gap-2 text-sm text-gray-500">
                     <Calendar size={14} />
                     <span>
-                      Member since{' '}
-                      {new Date(memberSince).toLocaleDateString('en-US', {
+                      {t.account.memberSince}{' '}
+                      {new Date(memberSince).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
                         month: 'long',
                         year: 'numeric',
                       })}
@@ -372,24 +366,24 @@ export function MyAccount() {
           {/* Usage Stats */}
           <Card>
             <CardHeader>
-              <CardTitle>Usage Statistics</CardTitle>
+              <CardTitle>{t.account.usageStatistics}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 bg-blue-50 rounded-xl">
                   <FileText className="mx-auto mb-2 text-blue-600" size={24} />
                   <p className="text-2xl font-bold text-gray-900">{stats.policiesAnalyzed}</p>
-                  <p className="text-sm text-gray-600">Policies Analyzed</p>
+                  <p className="text-sm text-gray-600">{t.account.policiesAnalyzed}</p>
                 </div>
                 <div className="text-center p-4 bg-purple-50 rounded-xl">
                   <CreditCard className="mx-auto mb-2 text-purple-600" size={24} />
                   <p className="text-2xl font-bold text-gray-900">{stats.comparisons}</p>
-                  <p className="text-sm text-gray-600">Comparisons</p>
+                  <p className="text-sm text-gray-600">{t.account.comparisons}</p>
                 </div>
                 <div className="text-center p-4 bg-green-50 rounded-xl">
                   <FileText className="mx-auto mb-2 text-green-600" size={24} />
                   <p className="text-2xl font-bold text-gray-900">{stats.savedReports}</p>
-                  <p className="text-sm text-gray-600">Saved Reports</p>
+                  <p className="text-sm text-gray-600">{t.account.savedReports}</p>
                 </div>
               </div>
             </CardContent>
@@ -401,16 +395,16 @@ export function MyAccount() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    {useSupabase ? 'Cloud Storage' : 'Local Storage'}
+                    {useSupabase ? t.account.cloudStorage : t.account.localStorage}
                   </h3>
                   <p className="text-gray-600">
                     {useSupabase
-                      ? 'Your data is synced across all devices'
-                      : 'Sign in to sync your data across devices'}
+                      ? t.account.dataSynced
+                      : t.account.signInToSync}
                   </p>
                 </div>
                 {!useSupabase && (
-                  <Button onClick={() => navigate('/auth/sign-in')}>Sign In</Button>
+                  <Button onClick={() => navigate('/auth/sign-in')}>{t.account.signIn}</Button>
                 )}
               </div>
             </CardContent>
