@@ -1206,7 +1206,456 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
 })
 
 // =============================================================================
-// CATEGORY-BASED SETTINGS ROUTES
+// SETTINGS HISTORY ROUTES (must be before /:category catch-all)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/history
+ * Get audit history for all settings (paginated)
+ */
+router.get('/history', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
+  const offset = parseInt(req.query.offset as string) || 0
+  const category = req.query.category as string | undefined
+
+  try {
+    let query = supabase
+      .from('settings_audit_log')
+      .select(
+        `
+        id,
+        setting_id,
+        category,
+        key,
+        previous_value,
+        new_value,
+        changed_by,
+        changed_at,
+        reason,
+        ip_address,
+        user_agent
+      `,
+        { count: 'exact' }
+      )
+      .order('changed_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
+    if (category) {
+      query = query.eq('category', category)
+    }
+
+    const { data, error, count } = await query
+
+    if (error) {
+      log.error('Error fetching settings history', { error: String(error) })
+      return res.status(500).json({ success: false, error: 'Failed to fetch history' })
+    }
+
+    // Try to get admin user emails for the changed_by UUIDs
+    const changedByIds = [...new Set((data || []).map((entry) => entry.changed_by).filter(Boolean))]
+    let adminUsers: Record<string, string> = {}
+
+    if (changedByIds.length > 0) {
+      const { data: users } = await supabase
+        .from('admin_users')
+        .select('id, email')
+        .in('id', changedByIds)
+
+      if (users) {
+        adminUsers = users.reduce(
+          (acc, user) => {
+            acc[user.id] = user.email
+            return acc
+          },
+          {} as Record<string, string>
+        )
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        history: (data || []).map((entry) => ({
+          id: entry.id,
+          settingId: entry.setting_id,
+          category: entry.category,
+          key: entry.key,
+          previousValue: entry.previous_value,
+          newValue: entry.new_value,
+          changedBy: entry.changed_by,
+          changedByEmail: adminUsers[entry.changed_by] || 'Unknown',
+          changedAt: entry.changed_at,
+          reason: entry.reason,
+          ipAddress: entry.ip_address,
+          userAgent: entry.user_agent,
+        })),
+        pagination: {
+          total: count || 0,
+          limit,
+          offset,
+          hasMore: (count || 0) > offset + limit,
+        },
+      },
+    })
+  } catch (error) {
+    log.error('Unhandled exception fetching settings history', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// REGIONAL FACTORS ROUTES (must be before /:category catch-all)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/regional-factors
+ * List all regional factors
+ */
+router.get('/regional-factors', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear()
+
+  try {
+    const { data, error } = await supabase
+      .from('regional_factors')
+      .select('*')
+      .eq('year', year)
+      .eq('is_active', true)
+      .order('region_code')
+
+    if (error) {
+      log.error('Error fetching regional factors', { error: String(error) })
+      return res.status(500).json({ success: false, error: 'Failed to fetch regional factors' })
+    }
+
+    return res.json({
+      success: true,
+      data: (data || []).map((factor) => ({
+        id: factor.id,
+        regionCode: factor.region_code,
+        regionName: factor.region_name,
+        regionNameTr: factor.region_name_tr,
+        policyType: factor.policy_type,
+        riskFactor: factor.risk_factor,
+        year: factor.year,
+        source: factor.source,
+        notes: factor.notes,
+      })),
+    })
+  } catch (error) {
+    log.error('Unhandled exception listing regional factors', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/regional-factors/:id
+ * Update a regional factor
+ */
+router.put('/regional-factors/:id', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const { id } = req.params
+
+  const parseResult = updateRegionalFactorSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const { riskFactor, notes } = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  try {
+    const { data, error } = await supabase
+      .from('regional_factors')
+      .update({
+        risk_factor: riskFactor,
+        notes,
+        updated_by: adminUserId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Regional factor not found' })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: data.id,
+        regionCode: data.region_code,
+        riskFactor: data.risk_factor,
+        updatedAt: data.updated_at,
+      },
+    })
+  } catch (error) {
+    log.error('Unhandled exception updating regional factor', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// INSURANCE PROVIDERS ROUTES (must be before /:category catch-all)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/providers
+ * List all insurance providers
+ */
+router.get('/providers', async (_req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('insurance_providers')
+      .select('*')
+      .order('market_share', { ascending: false })
+
+    if (error) {
+      log.error('Error fetching providers', { error: String(error) })
+      return res.status(500).json({ success: false, error: 'Failed to fetch providers' })
+    }
+
+    return res.json({
+      success: true,
+      data: (data || []).map((provider) => ({
+        id: provider.id,
+        code: provider.code,
+        name: provider.name,
+        nameTr: provider.name_tr,
+        marketShare: provider.market_share,
+        customerRating: provider.customer_rating,
+        establishedYear: provider.established_year,
+        headquarters: provider.headquarters,
+        website: provider.website,
+        logoUrl: provider.logo_url,
+        specialties: provider.specialties,
+        isActive: provider.is_active,
+      })),
+    })
+  } catch (error) {
+    log.error('Unhandled exception listing providers', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/providers/:id
+ * Update an insurance provider
+ */
+router.put('/providers/:id', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const { id } = req.params
+
+  const parseResult = updateProviderSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const updates = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  try {
+    const updateData: Record<string, unknown> = {
+      updated_by: adminUserId,
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updates.marketShare !== undefined) updateData.market_share = updates.marketShare
+    if (updates.customerRating !== undefined) updateData.customer_rating = updates.customerRating
+    if (updates.isActive !== undefined) updateData.is_active = updates.isActive
+
+    const { data, error } = await supabase
+      .from('insurance_providers')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Provider not found' })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: data.id,
+        code: data.code,
+        name: data.name,
+        marketShare: data.market_share,
+        customerRating: data.customer_rating,
+        isActive: data.is_active,
+        updatedAt: data.updated_at,
+      },
+    })
+  } catch (error) {
+    log.error('Unhandled exception updating provider', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// MARKET BENCHMARKS ROUTES (must be before /:category catch-all)
+// =============================================================================
+
+/**
+ * GET /api/admin/settings/benchmarks
+ * List all market benchmarks
+ */
+router.get('/benchmarks', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const policyType = req.query.policyType as string | undefined
+  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear()
+
+  try {
+    let query = supabase
+      .from('market_benchmarks')
+      .select('*')
+      .eq('year', year)
+      .eq('is_active', true)
+      .order('policy_type')
+      .order('coverage_type')
+
+    if (policyType) {
+      query = query.eq('policy_type', policyType)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      log.error('Error fetching benchmarks', { error: String(error) })
+      return res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
+    }
+
+    return res.json({
+      success: true,
+      data: (data || []).map((benchmark) => ({
+        id: benchmark.id,
+        policyType: benchmark.policy_type,
+        coverageType: benchmark.coverage_type,
+        coverageNameTr: benchmark.coverage_name_tr,
+        regionCode: benchmark.region_code,
+        year: benchmark.year,
+        minLimit: benchmark.min_limit,
+        typicalLimit: benchmark.typical_limit,
+        maxLimit: benchmark.max_limit,
+        minDeductible: benchmark.min_deductible,
+        typicalDeductible: benchmark.typical_deductible,
+        maxDeductible: benchmark.max_deductible,
+        inclusionRate: benchmark.inclusion_rate,
+        importance: benchmark.importance,
+        source: benchmark.source,
+      })),
+    })
+  } catch (error) {
+    log.error('Unhandled exception listing benchmarks', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+/**
+ * PUT /api/admin/settings/benchmarks/:id
+ * Update a market benchmark
+ */
+router.put('/benchmarks/:id', async (req: Request, res: Response) => {
+  const supabase = getSupabaseAdmin()
+  if (!supabase) {
+    return res.status(503).json({ success: false, error: 'Database not configured' })
+  }
+
+  const { id } = req.params
+
+  const parseResult = updateBenchmarkSchema.safeParse(req.body)
+  if (!parseResult.success) {
+    return res.status(400).json({
+      success: false,
+      error: 'Invalid request body',
+      details: parseResult.error.issues,
+    })
+  }
+
+  const updates = parseResult.data
+  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
+
+  try {
+    const updateData: Record<string, unknown> = {
+      created_by: adminUserId, // Note: using created_by as there's no updated_by in benchmarks
+      updated_at: new Date().toISOString(),
+    }
+
+    if (updates.minLimit !== undefined) updateData.min_limit = updates.minLimit
+    if (updates.typicalLimit !== undefined) updateData.typical_limit = updates.typicalLimit
+    if (updates.maxLimit !== undefined) updateData.max_limit = updates.maxLimit
+    if (updates.typicalDeductible !== undefined)
+      updateData.typical_deductible = updates.typicalDeductible
+    if (updates.inclusionRate !== undefined) updateData.inclusion_rate = updates.inclusionRate
+    if (updates.importance !== undefined) updateData.importance = updates.importance
+
+    const { data, error } = await supabase
+      .from('market_benchmarks')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error || !data) {
+      return res.status(404).json({ success: false, error: 'Benchmark not found' })
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        id: data.id,
+        policyType: data.policy_type,
+        coverageType: data.coverage_type,
+        typicalLimit: data.typical_limit,
+        inclusionRate: data.inclusion_rate,
+        importance: data.importance,
+        updatedAt: data.updated_at,
+      },
+    })
+  } catch (error) {
+    log.error('Unhandled exception updating benchmark', { error: String(error) })
+    return res.status(500).json({ success: false, error: 'Internal server error' })
+  }
+})
+
+// =============================================================================
+// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)
 // =============================================================================
 
 /**
@@ -1434,499 +1883,6 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
     })
   } catch (error) {
     log.error('Unhandled exception updating setting', { category, key, error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * GET /api/admin/settings/history
- * Get audit history for all settings (paginated)
- */
-router.get('/history', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 200)
-  const offset = parseInt(req.query.offset as string) || 0
-  const category = req.query.category as string | undefined
-
-  try {
-    let query = supabase
-      .from('settings_audit_log')
-      .select(
-        `
-        id,
-        setting_id,
-        category,
-        key,
-        previous_value,
-        new_value,
-        changed_by,
-        changed_at,
-        reason,
-        ip_address,
-        user_agent
-      `,
-        { count: 'exact' }
-      )
-      .order('changed_at', { ascending: false })
-      .range(offset, offset + limit - 1)
-
-    if (category) {
-      query = query.eq('category', category)
-    }
-
-    const { data, error, count } = await query
-
-    if (error) {
-      log.error('Error fetching settings history', { error: String(error) })
-      return res.status(500).json({ success: false, error: 'Failed to fetch history' })
-    }
-
-    // Try to get admin user emails for the changed_by UUIDs
-    const changedByIds = [...new Set((data || []).map((entry) => entry.changed_by).filter(Boolean))]
-    let adminUsers: Record<string, string> = {}
-
-    if (changedByIds.length > 0) {
-      const { data: users } = await supabase
-        .from('admin_users')
-        .select('id, email')
-        .in('id', changedByIds)
-
-      if (users) {
-        adminUsers = users.reduce(
-          (acc, user) => {
-            acc[user.id] = user.email
-            return acc
-          },
-          {} as Record<string, string>
-        )
-      }
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        history: (data || []).map((entry) => ({
-          id: entry.id,
-          settingId: entry.setting_id,
-          category: entry.category,
-          key: entry.key,
-          previousValue: entry.previous_value,
-          newValue: entry.new_value,
-          changedBy: entry.changed_by,
-          changedByEmail: adminUsers[entry.changed_by] || 'Unknown',
-          changedAt: entry.changed_at,
-          reason: entry.reason,
-          ipAddress: entry.ip_address,
-          userAgent: entry.user_agent,
-        })),
-        pagination: {
-          total: count || 0,
-          limit,
-          offset,
-          hasMore: (count || 0) > offset + limit,
-        },
-      },
-    })
-  } catch (error) {
-    log.error('Unhandled exception fetching settings history', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * GET /api/admin/settings/:category/:key/history
- * Get audit history for a specific setting
- */
-router.get('/:category/:key/history', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const { category, key } = req.params
-  const limit = Math.min(parseInt(req.query.limit as string) || 50, 100)
-
-  try {
-    const { data, error } = await supabase
-      .from('settings_audit_log')
-      .select('*')
-      .eq('category', category)
-      .eq('key', key)
-      .order('changed_at', { ascending: false })
-      .limit(limit)
-
-    if (error) {
-      log.error('Error fetching setting history', { category, key, error: String(error) })
-      return res.status(500).json({ success: false, error: 'Failed to fetch history' })
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        category,
-        key,
-        history: (data || []).map((entry) => ({
-          id: entry.id,
-          previousValue: entry.previous_value,
-          newValue: entry.new_value,
-          changedBy: entry.changed_by,
-          changedAt: entry.changed_at,
-          reason: entry.reason,
-        })),
-      },
-    })
-  } catch (error) {
-    log.error('Unhandled exception fetching setting history', { category, key, error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-// =============================================================================
-// REGIONAL FACTORS ROUTES
-// =============================================================================
-
-/**
- * GET /api/admin/settings/regional-factors
- * List all regional factors
- */
-router.get('/regional-factors', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear()
-
-  try {
-    const { data, error } = await supabase
-      .from('regional_factors')
-      .select('*')
-      .eq('year', year)
-      .eq('is_active', true)
-      .order('region_code')
-
-    if (error) {
-      log.error('Error fetching regional factors', { error: String(error) })
-      return res.status(500).json({ success: false, error: 'Failed to fetch regional factors' })
-    }
-
-    return res.json({
-      success: true,
-      data: (data || []).map((factor) => ({
-        id: factor.id,
-        regionCode: factor.region_code,
-        regionName: factor.region_name,
-        regionNameTr: factor.region_name_tr,
-        policyType: factor.policy_type,
-        riskFactor: factor.risk_factor,
-        year: factor.year,
-        source: factor.source,
-        notes: factor.notes,
-      })),
-    })
-  } catch (error) {
-    log.error('Unhandled exception listing regional factors', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * PUT /api/admin/settings/regional-factors/:id
- * Update a regional factor
- */
-router.put('/regional-factors/:id', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const { id } = req.params
-
-  const parseResult = updateRegionalFactorSchema.safeParse(req.body)
-  if (!parseResult.success) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body',
-      details: parseResult.error.issues,
-    })
-  }
-
-  const { riskFactor, notes } = parseResult.data
-  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
-
-  try {
-    const { data, error } = await supabase
-      .from('regional_factors')
-      .update({
-        risk_factor: riskFactor,
-        notes,
-        updated_by: adminUserId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !data) {
-      return res.status(404).json({ success: false, error: 'Regional factor not found' })
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        id: data.id,
-        regionCode: data.region_code,
-        riskFactor: data.risk_factor,
-        updatedAt: data.updated_at,
-      },
-    })
-  } catch (error) {
-    log.error('Unhandled exception updating regional factor', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-// =============================================================================
-// INSURANCE PROVIDERS ROUTES
-// =============================================================================
-
-/**
- * GET /api/admin/settings/providers
- * List all insurance providers
- */
-router.get('/providers', async (_req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('insurance_providers')
-      .select('*')
-      .order('market_share', { ascending: false })
-
-    if (error) {
-      log.error('Error fetching providers', { error: String(error) })
-      return res.status(500).json({ success: false, error: 'Failed to fetch providers' })
-    }
-
-    return res.json({
-      success: true,
-      data: (data || []).map((provider) => ({
-        id: provider.id,
-        code: provider.code,
-        name: provider.name,
-        nameTr: provider.name_tr,
-        marketShare: provider.market_share,
-        customerRating: provider.customer_rating,
-        establishedYear: provider.established_year,
-        headquarters: provider.headquarters,
-        website: provider.website,
-        logoUrl: provider.logo_url,
-        specialties: provider.specialties,
-        isActive: provider.is_active,
-      })),
-    })
-  } catch (error) {
-    log.error('Unhandled exception listing providers', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * PUT /api/admin/settings/providers/:id
- * Update an insurance provider
- */
-router.put('/providers/:id', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const { id } = req.params
-
-  const parseResult = updateProviderSchema.safeParse(req.body)
-  if (!parseResult.success) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body',
-      details: parseResult.error.issues,
-    })
-  }
-
-  const updates = parseResult.data
-  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
-
-  try {
-    const updateData: Record<string, unknown> = {
-      updated_by: adminUserId,
-      updated_at: new Date().toISOString(),
-    }
-
-    if (updates.marketShare !== undefined) updateData.market_share = updates.marketShare
-    if (updates.customerRating !== undefined) updateData.customer_rating = updates.customerRating
-    if (updates.isActive !== undefined) updateData.is_active = updates.isActive
-
-    const { data, error } = await supabase
-      .from('insurance_providers')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !data) {
-      return res.status(404).json({ success: false, error: 'Provider not found' })
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        id: data.id,
-        code: data.code,
-        name: data.name,
-        marketShare: data.market_share,
-        customerRating: data.customer_rating,
-        isActive: data.is_active,
-        updatedAt: data.updated_at,
-      },
-    })
-  } catch (error) {
-    log.error('Unhandled exception updating provider', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-// =============================================================================
-// MARKET BENCHMARKS ROUTES
-// =============================================================================
-
-/**
- * GET /api/admin/settings/benchmarks
- * List all market benchmarks
- */
-router.get('/benchmarks', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const policyType = req.query.policyType as string | undefined
-  const year = req.query.year ? parseInt(req.query.year as string) : new Date().getFullYear()
-
-  try {
-    let query = supabase
-      .from('market_benchmarks')
-      .select('*')
-      .eq('year', year)
-      .eq('is_active', true)
-      .order('policy_type')
-      .order('coverage_type')
-
-    if (policyType) {
-      query = query.eq('policy_type', policyType)
-    }
-
-    const { data, error } = await query
-
-    if (error) {
-      log.error('Error fetching benchmarks', { error: String(error) })
-      return res.status(500).json({ success: false, error: 'Failed to fetch benchmarks' })
-    }
-
-    return res.json({
-      success: true,
-      data: (data || []).map((benchmark) => ({
-        id: benchmark.id,
-        policyType: benchmark.policy_type,
-        coverageType: benchmark.coverage_type,
-        coverageNameTr: benchmark.coverage_name_tr,
-        regionCode: benchmark.region_code,
-        year: benchmark.year,
-        minLimit: benchmark.min_limit,
-        typicalLimit: benchmark.typical_limit,
-        maxLimit: benchmark.max_limit,
-        minDeductible: benchmark.min_deductible,
-        typicalDeductible: benchmark.typical_deductible,
-        maxDeductible: benchmark.max_deductible,
-        inclusionRate: benchmark.inclusion_rate,
-        importance: benchmark.importance,
-        source: benchmark.source,
-      })),
-    })
-  } catch (error) {
-    log.error('Unhandled exception listing benchmarks', { error: String(error) })
-    return res.status(500).json({ success: false, error: 'Internal server error' })
-  }
-})
-
-/**
- * PUT /api/admin/settings/benchmarks/:id
- * Update a market benchmark
- */
-router.put('/benchmarks/:id', async (req: Request, res: Response) => {
-  const supabase = getSupabaseAdmin()
-  if (!supabase) {
-    return res.status(503).json({ success: false, error: 'Database not configured' })
-  }
-
-  const { id } = req.params
-
-  const parseResult = updateBenchmarkSchema.safeParse(req.body)
-  if (!parseResult.success) {
-    return res.status(400).json({
-      success: false,
-      error: 'Invalid request body',
-      details: parseResult.error.issues,
-    })
-  }
-
-  const updates = parseResult.data
-  const adminUserId = (req as Request & { adminUser?: { id: string } }).adminUser?.id
-
-  try {
-    const updateData: Record<string, unknown> = {
-      created_by: adminUserId, // Note: using created_by as there's no updated_by in benchmarks
-      updated_at: new Date().toISOString(),
-    }
-
-    if (updates.minLimit !== undefined) updateData.min_limit = updates.minLimit
-    if (updates.typicalLimit !== undefined) updateData.typical_limit = updates.typicalLimit
-    if (updates.maxLimit !== undefined) updateData.max_limit = updates.maxLimit
-    if (updates.typicalDeductible !== undefined)
-      updateData.typical_deductible = updates.typicalDeductible
-    if (updates.inclusionRate !== undefined) updateData.inclusion_rate = updates.inclusionRate
-    if (updates.importance !== undefined) updateData.importance = updates.importance
-
-    const { data, error } = await supabase
-      .from('market_benchmarks')
-      .update(updateData)
-      .eq('id', id)
-      .select()
-      .single()
-
-    if (error || !data) {
-      return res.status(404).json({ success: false, error: 'Benchmark not found' })
-    }
-
-    return res.json({
-      success: true,
-      data: {
-        id: data.id,
-        policyType: data.policy_type,
-        coverageType: data.coverage_type,
-        typicalLimit: data.typical_limit,
-        inclusionRate: data.inclusion_rate,
-        importance: data.importance,
-        updatedAt: data.updated_at,
-      },
-    })
-  } catch (error) {
-    log.error('Unhandled exception updating benchmark', { error: String(error) })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
