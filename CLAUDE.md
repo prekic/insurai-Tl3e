@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**
 - **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 12, 2026
+- **Last Updated**: February 16, 2026
 
 ---
 
@@ -3263,6 +3263,39 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `translations.ts` (+644 lines across all sessions), `AuthPage.tsx`, `AllSamplesDemo.tsx`, `HelpCenter.tsx`, `SharedResult.tsx`
 - **Commits**: `71c7b10`, `9c26d69`, `f12b95f`
 
+### 93. Sample Policy Cards Expandable Detail View (Feb 16, 2026)
+- **Problem**: Sample policy cards on `/samples` page had non-functional "View Details" button, AI insights not translated to Turkish, no way to see full policy details
+- **Solution**:
+  - Added expandable detail view showing coverages (with limits/deductibles), exclusions, special conditions, AI confidence bar, insured person, location, period
+  - Added `translateInsight()` function using `t.insightTranslations` map for AI insight translation
+  - Coverage names display locale-aware (`nameTr` for Turkish, `name` for English)
+  - Toggle button switches between "View Details"/"Hide Details" with icons
+  - Added 10 new Turkish translations for sample-specific AI insights
+  - Added 9 new `policy` translation keys: `hideDetails`, `coverageDetails`, `exclusions`, `specialConditions`, `included`, `notIncluded`, `insuredPerson`, `location`, `period`, `confidence`
+- **Files Changed**: `src/components/AllSamplesDemo.tsx`, `src/lib/i18n/translations.ts`
+- **Commit**: `6b8b691`
+
+### 94. Admin Settings Routes Unreachable — Express Route Ordering Bug (Fixed Feb 16, 2026)
+- **Problem**: Admin Settings History panel showed "No history records found" despite records existing in database. Also affected `/regional-factors`, `/providers`, and `/benchmarks` endpoints.
+- **Root Cause**: Classic Express route ordering bug — `/history`, `/regional-factors`, `/providers`, `/benchmarks` routes were defined AFTER `/:category` catch-all in `server/routes/settings.ts`. Express matched `history` as a `:category` parameter, queried `app_settings WHERE category = 'history'`, and returned empty results.
+- **Solution**: Moved all specific named routes (`/history`, `/regional-factors*`, `/providers*`, `/benchmarks*`) before the `/:category` and `/:category/:key` catch-all routes
+- **Route Order (Correct)**:
+  ```
+  /                          (list all settings)
+  /performance               (metrics)
+  /export, /import           (backup/restore)
+  /batch                     (batch update)
+  /feature-flags             (feature flag management)
+  /history                   ← MOVED before catch-all
+  /regional-factors          ← MOVED before catch-all
+  /providers                 ← MOVED before catch-all
+  /benchmarks                ← MOVED before catch-all
+  /:category                 (catch-all — LAST)
+  /:category/:key            (catch-all — LAST)
+  ```
+- **File Changed**: `server/routes/settings.ts`
+- **Commit**: `4a58731`
+
 ---
 
 ## Turkish Market Considerations
@@ -3717,6 +3750,12 @@ connectSrc: [
 - Both nav bars have their own Globe language picker — changes persist via `localStorage('insurai_locale')`
 - Upload button in nav opens file picker directly (no navigation to `/upload`) — validated file is passed via React Router state
 - Some pages still have redundant ArrowLeft buttons (MyAccount, Settings, ComparePolicies, PolicyUpload) — these should be cleaned up for consistency
+
+**Express Route Ordering in `server/routes/settings.ts`:**
+- All specific named routes (e.g., `/history`, `/regional-factors`, `/providers`, `/benchmarks`) MUST be defined BEFORE `/:category` catch-all route
+- Express matches routes in order — if `/:category` comes first, it will match `history` as a category name and return empty results
+- When adding new settings sub-routes, always place them before the `// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)` comment
+- This was the root cause of the admin Settings History panel showing "No history records found" (Fixed Feb 16, 2026)
 
 ---
 
