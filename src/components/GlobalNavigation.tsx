@@ -5,11 +5,11 @@ import { toast } from 'sonner'
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
-import { useTranslation, useI18n } from '@/lib/i18n/i18n-context'
+import { useTranslation, useLanguageSelector } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
   const { t } = useTranslation()
-  const { locale, setLocale } = useI18n()
+  const { currentLocale: locale, locales: availableLocales, setLocale } = useLanguageSelector()
   const location = useLocation()
   const navigate = useNavigate()
   const { policies } = usePolicies()
@@ -234,32 +234,22 @@ export function GlobalNavigation() {
                     role="radiogroup"
                     aria-label="Language"
                   >
-                    <button
-                      onClick={() => { setLocale('tr'); setShowLanguagePicker(false) }}
-                      role="radio"
-                      aria-checked={locale === 'tr'}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                        locale === 'tr'
-                          ? 'bg-blue-50 text-blue-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-base">🇹🇷</span>
-                      <span>Türkçe</span>
-                    </button>
-                    <button
-                      onClick={() => { setLocale('en'); setShowLanguagePicker(false) }}
-                      role="radio"
-                      aria-checked={locale === 'en'}
-                      className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                        locale === 'en'
-                          ? 'bg-blue-50 text-blue-700 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className="text-base">🇬🇧</span>
-                      <span>English</span>
-                    </button>
+                    {availableLocales.map((l) => (
+                      <button
+                        key={l.code}
+                        onClick={() => { setLocale(l.code); setShowLanguagePicker(false) }}
+                        role="radio"
+                        aria-checked={locale === l.code}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                          locale === l.code
+                            ? 'bg-blue-50 text-blue-700 font-medium'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="text-base">{l.flag}</span>
+                        <span>{l.nativeName}</span>
+                      </button>
+                    ))}
                   </div>
                 </>
               )}

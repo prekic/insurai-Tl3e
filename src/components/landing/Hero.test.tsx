@@ -14,6 +14,14 @@ import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
 vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
   useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
+  useLanguageSelector: () => ({
+    currentLocale: 'en',
+    locales: [
+      { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', isActive: true },
+      { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', isActive: false },
+    ],
+    setLocale: vi.fn(),
+  }),
 }))
 
 // Mock dependencies

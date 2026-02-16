@@ -1,10 +1,16 @@
-// AI Translation Service
-// In production, this would connect to an AI translation API (OpenAI, Claude, etc.)
-// For now, it simulates AI translation with a realistic delay
+// Translation Service
+// Loads translations from DB API with preloaded fallback for EN/TR.
+// Three-tier loading: preloaded → localStorage cache → API fetch → fallback
 
 import type { TranslationDictionary } from './translations'
 import { EN_TRANSLATIONS, PRELOADED_TRANSLATIONS, COMMON_LOCALES } from './translations'
-import { getCachedTranslations, setCachedTranslations } from './translation-cache'
+import {
+  getCachedTranslations,
+  setCachedTranslations,
+  getCachedVersion,
+  setCachedVersion,
+} from './translation-cache'
+import env from '../env'
 
 // Translation status for UI feedback
 export type TranslationStatus = 'idle' | 'loading' | 'translating' | 'complete' | 'error'
@@ -15,107 +21,172 @@ export interface TranslationProgress {
   message: string
 }
 
-// Deep clone an object
-function deepClone<T>(obj: T): T {
-  return JSON.parse(JSON.stringify(obj))
+// Locale info returned by the API
+export interface APILocale {
+  code: string
+  name: string
+  nativeName: string
+  flag: string
+  isRtl: boolean
+  isActive: boolean
+  isDefault: boolean
+  displayOrder: number
 }
 
-// Simulate AI translation of a single string
-async function simulateAITranslation(text: string, targetLocale: string): Promise<string> {
-  // In production, this would call an AI API
-  // For demonstration, we'll add locale-specific prefixes to show it's "translated"
+// In-memory cache for API-loaded locales (refreshed on each call)
+let apiLocalesCache: { locales: APILocale[]; version: string; timestamp: number } | null = null
+const API_LOCALE_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
-  // Simulate network delay (100-300ms per string)
-  await new Promise((resolve) => setTimeout(resolve, 50 + Math.random() * 100))
+// =============================================================================
+// API COMMUNICATION
+// =============================================================================
 
-  // For common locales, return realistic-looking translations
-  // In production, this would be actual AI translation
-  const locale = targetLocale.toLowerCase()
+function getApiBaseUrl(): string {
+  return env.proxyUrl || ''
+}
 
-  // Simple simulation: for unknown languages, we'll just prefix the text
-  // In production, AI would provide real translations
-  if (locale === 'en') return text
-
-  // These are just placeholders - real AI would translate properly
-  const prefixes: Record<string, string> = {
-    de: '[DE] ',
-    fr: '[FR] ',
-    es: '[ES] ',
-    ar: '[AR] ',
-    zh: '[ZH] ',
-    ja: '[JA] ',
-    ko: '[KO] ',
-    ru: '[RU] ',
-    pt: '[PT] ',
-    it: '[IT] ',
-    nl: '[NL] ',
-    pl: '[PL] ',
-    hi: '[HI] ',
+/**
+ * Fetch available locales and translation version from the API.
+ */
+export async function fetchAvailableLocales(): Promise<{ locales: APILocale[]; version: string }> {
+  // Use cache if fresh
+  if (apiLocalesCache && Date.now() - apiLocalesCache.timestamp < API_LOCALE_CACHE_TTL) {
+    return { locales: apiLocalesCache.locales, version: apiLocalesCache.version }
   }
 
-  // For demo purposes, prepend locale code for non-preloaded languages
-  // In production, this would be actual AI-generated translation
-  return `${prefixes[locale] || `[${locale.toUpperCase()}] `}${text}`
-}
+  try {
+    const baseUrl = getApiBaseUrl()
+    const response = await fetch(`${baseUrl}/api/translations/locales`)
 
-// Recursively translate all strings in an object
-async function translateObject(
-  obj: Record<string, unknown>,
-  targetLocale: string,
-  onProgress?: (progress: number) => void
-): Promise<Record<string, unknown>> {
-  const result: Record<string, unknown> = {}
-  const entries = Object.entries(obj)
-  let processed = 0
-
-  for (const [key, value] of entries) {
-    if (typeof value === 'string') {
-      result[key] = await simulateAITranslation(value, targetLocale)
-    } else if (typeof value === 'object' && value !== null) {
-      result[key] = await translateObject(
-        value as Record<string, unknown>,
-        targetLocale,
-        onProgress
-      )
-    } else {
-      result[key] = value
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`)
     }
 
-    processed++
-    if (onProgress) {
-      onProgress((processed / entries.length) * 100)
+    const data = await response.json()
+    if (data.success && data.locales) {
+      apiLocalesCache = {
+        locales: data.locales,
+        version: data.translationVersion || '0',
+        timestamp: Date.now(),
+      }
+      return { locales: data.locales, version: data.translationVersion || '0' }
     }
+  } catch {
+    // API unavailable - return empty, fall back to preloaded
   }
 
-  return result
+  return { locales: [], version: '0' }
 }
 
-// Main translation function
+/**
+ * Fetch translations for a locale from the API.
+ */
+async function fetchTranslationsFromAPI(locale: string): Promise<{
+  translations: TranslationDictionary | null
+  version: string
+}> {
+  try {
+    const baseUrl = getApiBaseUrl()
+    const response = await fetch(`${baseUrl}/api/translations/${locale}`)
+
+    if (!response.ok) {
+      return { translations: null, version: '0' }
+    }
+
+    const data = await response.json()
+    if (data.success && data.translations) {
+      return {
+        translations: data.translations as TranslationDictionary,
+        version: data.version || '0',
+      }
+    }
+  } catch {
+    // API unavailable
+  }
+
+  return { translations: null, version: '0' }
+}
+
+// =============================================================================
+// MAIN TRANSLATION FUNCTION
+// =============================================================================
+
+/**
+ * Get translations for a locale.
+ *
+ * Loading strategy (in order):
+ * 1. Preloaded translations (EN/TR) — instant, no network
+ * 2. localStorage cache — fast, check version freshness
+ * 3. API fetch — network call to /api/translations/:locale
+ * 4. Fallback to EN_TRANSLATIONS — always available
+ *
+ * For preloaded locales (EN/TR), still checks API for updates
+ * in the background so admin edits propagate.
+ */
 export async function getTranslations(
   locale: string,
   onProgress?: (progress: TranslationProgress) => void
 ): Promise<TranslationDictionary> {
   const normalizedLocale = locale.toLowerCase().split('-')[0]
 
-  // Report initial status
   onProgress?.({
     status: 'loading',
     progress: 0,
     message: 'Loading translations...',
   })
 
-  // 1. Check if we have preloaded translations for this locale
-  if (PRELOADED_TRANSLATIONS[normalizedLocale]) {
+  // 1. Check preloaded translations (instant fallback for EN/TR)
+  const preloaded = PRELOADED_TRANSLATIONS[normalizedLocale]
+
+  // 2. Check localStorage cache
+  const cached = getCachedTranslations(normalizedLocale)
+  const cachedVersion = getCachedVersion(normalizedLocale)
+
+  // 3. Try API fetch — check if we need to refresh
+  try {
+    const { version: currentVersion } = await fetchAvailableLocales()
+
+    // If cache version matches API version, use cache
+    if (cached && cachedVersion === currentVersion) {
+      onProgress?.({
+        status: 'complete',
+        progress: 100,
+        message: 'Translations loaded from cache',
+      })
+      return cached
+    }
+
+    // Cache is stale or missing — fetch from API
     onProgress?.({
-      status: 'complete',
-      progress: 100,
-      message: 'Translations loaded',
+      status: 'loading',
+      progress: 50,
+      message: 'Fetching latest translations...',
     })
-    return PRELOADED_TRANSLATIONS[normalizedLocale]
+
+    const { translations: apiTranslations, version: apiVersion } = await fetchTranslationsFromAPI(normalizedLocale)
+
+    if (apiTranslations) {
+      // Merge with preloaded to ensure no missing keys
+      const merged = preloaded
+        ? mergeTranslations(preloaded, apiTranslations)
+        : apiTranslations
+
+      // Update cache
+      setCachedTranslations(normalizedLocale, merged)
+      setCachedVersion(normalizedLocale, apiVersion)
+
+      onProgress?.({
+        status: 'complete',
+        progress: 100,
+        message: 'Translations loaded',
+      })
+      return merged
+    }
+  } catch {
+    // API fetch failed — use cached or preloaded
   }
 
-  // 2. Check if we have cached translations
-  const cached = getCachedTranslations(normalizedLocale)
+  // 4. Fallback chain: cache → preloaded → EN
   if (cached) {
     onProgress?.({
       status: 'complete',
@@ -125,53 +196,62 @@ export async function getTranslations(
     return cached
   }
 
-  // 3. Translate using AI
-  onProgress?.({
-    status: 'translating',
-    progress: 0,
-    message: `Translating to ${getLocaleName(normalizedLocale)}...`,
-  })
-
-  try {
-    // Clone the English translations as our base
-    const baseTranslations = deepClone(EN_TRANSLATIONS)
-
-    // Translate all strings
-    const translated = (await translateObject(
-      baseTranslations as unknown as Record<string, unknown>,
-      normalizedLocale,
-      (progress) => {
-        onProgress?.({
-          status: 'translating',
-          progress,
-          message: `Translating... ${Math.round(progress)}%`,
-        })
-      }
-    )) as unknown as TranslationDictionary
-
-    // Cache the translations for future use
-    setCachedTranslations(normalizedLocale, translated)
-
+  if (preloaded) {
     onProgress?.({
       status: 'complete',
       progress: 100,
-      message: 'Translation complete',
+      message: 'Translations loaded',
     })
-
-    return translated
-  } catch (error) {
-    console.error(`Translation error for ${locale}:`, error)
-
-    onProgress?.({
-      status: 'error',
-      progress: 0,
-      message: 'Translation failed. Using English.',
-    })
-
-    // Fallback to English
-    return EN_TRANSLATIONS
+    return preloaded
   }
+
+  onProgress?.({
+    status: 'error',
+    progress: 0,
+    message: 'Translation not available. Using English.',
+  })
+
+  return EN_TRANSLATIONS
 }
+
+/**
+ * Merge preloaded translations with API translations.
+ * API values override preloaded for any key that exists in both.
+ * Preloaded keys fill gaps where API has no entry.
+ */
+function mergeTranslations(
+  base: TranslationDictionary,
+  override: TranslationDictionary
+): TranslationDictionary {
+  const result: Record<string, Record<string, string>> = {}
+  const baseRec = base as unknown as Record<string, Record<string, string>>
+  const overrideRec = override as unknown as Record<string, Record<string, string>>
+
+  // Start with all base sections
+  for (const section of Object.keys(baseRec)) {
+    const baseSection = baseRec[section]
+    const overrideSection = overrideRec?.[section]
+
+    if (overrideSection) {
+      result[section] = { ...baseSection, ...overrideSection }
+    } else {
+      result[section] = { ...baseSection }
+    }
+  }
+
+  // Add any new sections from override that don't exist in base
+  for (const section of Object.keys(overrideRec)) {
+    if (!(section in result)) {
+      result[section] = { ...overrideRec[section] }
+    }
+  }
+
+  return result as unknown as TranslationDictionary
+}
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
 
 // Get display name for a locale
 export function getLocaleName(locale: string): string {
@@ -180,12 +260,27 @@ export function getLocaleName(locale: string): string {
   if (common) {
     return common.nativeName
   }
+
+  // Check API locales cache
+  if (apiLocalesCache) {
+    const apiLocale = apiLocalesCache.locales.find(l => l.code === normalized)
+    if (apiLocale) return apiLocale.nativeName
+  }
+
   return locale.toUpperCase()
 }
 
 // Check if a locale uses RTL (right-to-left) direction
 export function isRTLLocale(locale: string): boolean {
   const normalized = locale.toLowerCase().split('-')[0]
+
+  // Check API locales cache first
+  if (apiLocalesCache) {
+    const apiLocale = apiLocalesCache.locales.find(l => l.code === normalized)
+    if (apiLocale) return apiLocale.isRtl
+  }
+
+  // Fallback to known RTL locales
   const rtlLocales = ['ar', 'he', 'fa', 'ur']
   return rtlLocales.includes(normalized)
 }
@@ -195,12 +290,15 @@ export function getLocaleInfo(locale: string) {
   const normalized = locale.toLowerCase().split('-')[0]
   const common = COMMON_LOCALES[normalized as keyof typeof COMMON_LOCALES]
 
+  // Check API locales cache
+  const apiLocale = apiLocalesCache?.locales.find(l => l.code === normalized)
+
   return {
     code: normalized,
-    name: common?.name || locale,
-    nativeName: common?.nativeName || locale,
-    flag: common?.flag || '🌐',
-    rtl: isRTLLocale(normalized),
+    name: apiLocale?.name || common?.name || locale,
+    nativeName: apiLocale?.nativeName || common?.nativeName || locale,
+    flag: apiLocale?.flag || common?.flag || '🌐',
+    rtl: apiLocale?.isRtl || isRTLLocale(normalized),
     isPreloaded: !!PRELOADED_TRANSLATIONS[normalized],
     isCached: !!getCachedTranslations(normalized),
   }
@@ -214,6 +312,14 @@ export async function translateString(
 ): Promise<string> {
   if (targetLocale === sourceLocale) return text
 
-  // In production, this would cache individual strings too
-  return simulateAITranslation(text, targetLocale)
+  // For now, return the text as-is. Dynamic string translation
+  // can be implemented via a dedicated API endpoint in the future.
+  return text
+}
+
+/**
+ * Invalidate the locales cache so next call refetches from API.
+ */
+export function invalidateLocalesCache(): void {
+  apiLocalesCache = null
 }

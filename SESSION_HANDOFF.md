@@ -1,4 +1,4 @@
-# Session Handoff - February 12, 2026
+# Session Handoff - February 16, 2026
 
 ## Current Status
 
@@ -9,90 +9,83 @@
 | **ESLint Errors** | ✅ 0 errors |
 | **ESLint Warnings** | ⚠️ 46 warnings (all `no-non-null-assertion`) |
 | **Tests** | ✅ 6,000+ passing (185+ test files), 0 failures |
-| **Branch** | `claude/review-handoff-docs-Bdwy3` |
+| **Branch** | `claude/review-handoff-docs-uvfRj` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Live — extraction pipeline fully operational |
 | **All 3 AI Providers** | ✅ OpenAI, Anthropic, Google Vision — all valid |
 | **Tech Stack** | React 19, Express 5, Vite 7, Vitest 4, TypeScript 5.9 |
-| **SW Cache Version** | v18 |
+| **SW Cache Version** | v19 |
 
 ---
 
 ## Session Summary
 
-This session focused on **navigation bar overhaul** and **extended i18n coverage** for pages that were still displaying hardcoded English strings when Turkish locale was selected.
+This session focused on **fixing the AllSamplesDemo detail view**, **fixing an Express route ordering bug** in admin settings, and **documenting undocumented commits** from the current branch (database-driven i18n, stale HTML cache fix).
 
-### Work Completed (14 code commits + 1 docs commit)
+### Work Completed (7 commits on this branch, 2 code + 1 docs this session)
 
-1. **PolicyChat + PolicyUpload i18n** — Full i18n conversion for these two auth-gated components
-2. **Globe Language Picker** — Added to both GlobalNavigation and Hero nav bars with TR/EN radio buttons
-3. **Landing Page Nav Cleanup** — Removed dead Settings/Bell/QuestionMark buttons, added Sign In link for anonymous users, Upload button now opens file picker directly
-4. **Navigation Consistency** — Removed redundant ArrowLeft back buttons from AllSamplesDemo and HelpCenter; pages under GlobalNavigation use title-only pattern
-5. **AuthPage i18n** — Translated form placeholders (John Doe → namePlaceholder, you@example.com → emailPlaceholder), error messages, OAuth buttons
-6. **AllSamplesDemo i18n** — Sample policies grid: all labels, status badges, coverage/premium formatting
-7. **HelpCenter i18n** — Full rewrite: 4 categories, 5 articles, search, contact section (24 new keys)
-8. **SharedResult i18n** — All states: not found, expired, found with policy details (26 new keys)
+**This Session (Feb 16):**
+1. **Admin Settings Route Ordering Fix** — `/history`, `/regional-factors`, `/providers`, `/benchmarks` routes were unreachable because they were defined after `/:category` catch-all. Moved all named routes before the parameterized catch-all.
 
----
-
-## Features Completed This Session
-
-### 1. Globe Language Picker (✅)
-- Added to GlobalNavigation.tsx and Hero.tsx
-- TR/EN radio buttons with flag labels
-- Mobile: inline toggle in hamburger menu
-- Desktop: dropdown from Globe icon
-- **Commits**: `679b448`, `7819465`, `7d7f062`, `ec91a9d`, `33acfc2`
-
-### 2. Nav Bar Consistency Overhaul (✅)
-- Upload button opens file picker directly (no navigation)
-- Dead buttons removed from Hero nav
-- Sign In link added for anonymous users
-- ArrowLeft back buttons removed from AllSamplesDemo, HelpCenter
-- **Commits**: `3dabff7`, `d892f95`, `fe457f7`
-
-### 3. PolicyChat + PolicyUpload i18n (✅)
-- Both components fully converted to `useTranslation()` hook
-- Test files updated with i18n mock pattern
-- **Commits**: `c4779bb`, `523b136`
-
-### 4. Landing Page Translation Fixes (✅)
-- UploadWidget.tsx, ComparisonMock.tsx, PolicyComparisonSection.tsx — remaining hardcoded English strings translated
-- **Commit**: `71c7b10`
-
-### 5. AuthPage + AllSamplesDemo i18n (✅)
-- AuthPage: 5 new translation keys (emailPlaceholder, namePlaceholder, authNotConfigured, authNotConfiguredDesc, continueToDemo)
-- AllSamplesDemo: useI18n hook added, 7 hardcoded strings replaced, redundant back arrow removed
-- **Commit**: `9c26d69`
-
-### 6. HelpCenter + SharedResult i18n (✅)
-- HelpCenter: removed ArrowLeft, full i18n with 24 keys (categories, articles, search, contact)
-- SharedResult: full i18n with 26 keys (all states: not found, expired, found)
-- Fixed duplicate TR `help` section in translations.ts
-- **Commit**: `f12b95f`
+**Previously Undocumented on This Branch (Feb 12):**
+2. **Database-Driven i18n Translation System** — Major feature: 685+ keys × 2 languages moved from hardcoded to DB-managed with admin UI, API, caching, AI-assisted bulk translate. 3 new migrations, 363 new tests.
+3. **Stale HTML Cache Fix** — Split static serving: hashed assets get `immutable` cache, `index.html` gets `no-cache`. Prevents 404s on JS/CSS after deployment.
+4. **SW Cache v19** — Force cache invalidation after translation system deployment.
+5. **Sample Policy Cards — Expandable Detail View + i18n** — "View Details" button now expands cards to show coverages, exclusions, AI confidence bar. AI insights translated to Turkish.
 
 ---
 
-## Commits This Session
+## Features Completed on This Branch
+
+### 1. Database-Driven i18n Translation System (✅) — Feb 12
+- 7-phase implementation: DB schema → Server API → Client pipeline → Admin UI → Dynamic languages → AI bulk translate → Migration
+- 5 new database tables, 3 new migrations (`017`, `018`, `019`)
+- `TranslationService` with CRUD, caching, Zod validation
+- Admin `TranslationsTab` with inline editing, coverage stats, import/export
+- Client pipeline: API fetch → version-aware localStorage cache → preloaded fallback
+- AI-assisted bulk translation endpoint (batched OpenAI processing)
+- 363 translation-specific tests
+- **New files**: `server/services/translation-service.ts`, `server/routes/translations.ts`, `src/components/admin/tabs/TranslationsTab.tsx`
+- **Commits**: `08bcfef`, `716f2e0`
+
+### 2. Stale HTML Cache Fix (✅) — Feb 12
+- Split `express.static` into two layers: hashed assets get `immutable` (1 year), `index.html` gets `no-cache`
+- Prevents 404 errors on JS/CSS after Railway deployment
+- **Commit**: `2c4b057`
+
+### 3. Service Worker Cache v19 (✅) — Feb 12
+- Force cache invalidation after translation system deployment
+- **Commit**: `7277e9c`
+
+### 4. Sample Policy Cards — Expandable Detail View (✅) — Feb 12
+- "View Details" button toggles expanded state with full policy info
+- Shows: insured person, location, period, deductible, AI confidence bar
+- Coverage table: locale-aware names (TR/EN), limits, per-coverage deductibles
+- Exclusions list (red), special conditions (amber)
+- All AI insights translated via `insightTranslations` map
+- 10 new sample-specific Turkish translations, 9 new translation keys
+- **Commit**: `6b8b691`
+
+### 5. Admin Settings Routes Fix (✅) — Feb 16
+- Root cause: Express route ordering bug — `/:category` catch-all intercepted `/history`, `/regional-factors`, `/providers`, `/benchmarks`
+- Fix: Moved all specific named routes before `/:category` catch-all
+- Also fixes: regional factors, insurance providers, and market benchmarks admin endpoints
+- **Commit**: `4a58731`
+
+---
+
+## All Commits on This Branch
 
 ```
-# Branch: claude/review-handoff-docs-Bdwy3 (14 code + 1 docs)
-aad113e docs: update project documentation for Feb 12 nav+i18n session
-f12b95f fix: i18n consistency — translate email placeholder, HelpCenter, SharedResult; remove redundant back arrows
-9c26d69 fix: translate AuthPage and AllSamplesDemo to support TR/EN
-71c7b10 fix: translate remaining hardcoded English strings on landing page
-fe457f7 fix: nav bar consistency — remove dead buttons, add Sign In, fix routing
-d892f95 fix: mobile Upload button opens file picker directly
-3dabff7 fix: nav Upload button opens file picker directly instead of navigating
-33acfc2 fix: add Globe language picker to landing page nav bar
-ec91a9d add Globe icon language picker to nav bar
-5cfcf75 bump service worker cache to v15
-7d7f062 remove floating LanguageToggle from landing page Hero
-7819465 refactor: move language switcher into profile dropdown menu
-679b448 feat: add language switcher (TR/EN) to global navigation bar
-523b136 fix: add i18n mocks to PolicyChat/PolicyUpload tests, fix duplicate text
-c4779bb feat: i18n for PolicyUpload and PolicyChat components
+# Branch: claude/review-handoff-docs-uvfRj (7 total: 5 code + 1 docs + 1 merge-base)
+c5adda7 docs: update project documentation for Feb 16 session
+4a58731 fix: settings history/regional-factors/providers/benchmarks routes unreachable   ← Feb 16
+6b8b691 fix: make sample policy cards clickable with detail view and i18n                ← Feb 12
+2c4b057 fix: prevent stale HTML cache causing 404 on hashed assets                      ← Feb 12
+7277e9c chore: bump service worker cache to v19 for clean deployment                     ← Feb 12
+716f2e0 fix: resolve Express 5 TypeScript errors in translations route                   ← Feb 12
+08bcfef feat: database-driven i18n translation system with admin management              ← Feb 12
 ```
 
 ---
@@ -102,7 +95,7 @@ c4779bb feat: i18n for PolicyUpload and PolicyChat components
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
 | Coverage `nameTr` = `name` (English) | Medium | **Mitigated** | Fallback translation map handles display; root cause in `policy-extractor.ts:1242` still sets both to same value |
-| AI insights always in English | Medium | **Mitigated** | `translateInsight()` handles 15 known patterns at display time; new insight strings need manual translation entries |
+| AI insights always in English | Medium | **Mitigated** | `translateInsight()` handles 25+ known patterns at display time; new insight strings need manual translation entries |
 | Pages with redundant ArrowLeft buttons | Low | **Open** | MyAccount, Settings, ComparePolicies, PolicyUpload still have own back arrows — should be removed for consistency with GlobalNavigation |
 | Pages still needing i18n | Low | **Open** | MyAccount (~18 strings), Settings (~28 strings), ComparePolicies (~15 strings), UnsubscribePage (hardcoded Turkish only) |
 | `translation-service.test.ts` timeout | Low | Pre-existing | 1 test times out (non-preloaded locale translation) — does not affect functionality |
@@ -113,75 +106,34 @@ c4779bb feat: i18n for PolicyUpload and PolicyChat components
 
 ---
 
+## Bugs Fixed This Session
+
+### 1. AllSamplesDemo Cards Not Clickable
+- **Symptom**: "View Details" button had no onClick handler, no detail view
+- **Fix**: Added expandable card state with toggle, full coverage/exclusion/conditions display
+- **File**: `src/components/AllSamplesDemo.tsx`
+
+### 2. AI Insights Not Translated on Sample Policies
+- **Symptom**: AI insights showed in English when Turkish locale selected
+- **Fix**: Added `translateInsight()` function and 10 new Turkish translations for sample-specific insights
+- **Files**: `src/components/AllSamplesDemo.tsx`, `src/lib/i18n/translations.ts`
+
+### 3. Admin Settings History Shows "No Records"
+- **Symptom**: Settings History tab in admin dashboard always showed empty
+- **Root Cause**: Express route ordering — `/:category` matched before `/history`
+- **Fix**: Moved `/history` and other named routes before `/:category` catch-all
+- **File**: `server/routes/settings.ts`
+
+---
+
 ## Gotchas Discovered This Session
 
 | Gotcha | Details |
 |--------|---------|
-| Duplicate translation sections | When adding new keys to `translations.ts`, check if the section already exists first — duplicates cause `TS2300: Duplicate identifier` TypeScript errors. Merge into existing section. |
-| Dual navigation systems | Landing page (`/`) uses Hero.tsx nav; all other pages use GlobalNavigation.tsx. Both have separate Globe pickers but share the same `localStorage('insurai_locale')` key. |
-| `hideNavigation` in App.tsx | `const hideNavigation = isLandingPage \|\| isAuthPage \|\| isAdminPage \|\| isUnsubscribePage` — if GlobalNavigation renders above a page, that page should NOT have its own ArrowLeft back button. |
-| Nav Upload file picker | Upload button in nav bars opens `<input type="file">` directly, validates PDF, then passes file via React Router state to either `/upload` (logged in) or `/try` (anonymous). |
-| SW cache must be bumped | After any frontend change, bump `CACHE_VERSION` in `public/sw.js` (currently v18) — otherwise users see stale content. |
-| `useI18n` vs `useTranslation` | `useI18n()` returns `{ t, locale, setLocale }` (for components that change locale). `useTranslation()` returns `{ t, locale, isLoading }` (for components that only read). Both from `@/lib/i18n`. |
-
----
-
-## Architecture Notes
-
-### Navigation Architecture
-```
-App.tsx
-  ├─ hideNavigation: true for /, /auth, /admin/*, /unsubscribe
-  │    └─ Hero.tsx renders its OWN nav bar (landing page only)
-  │
-  └─ hideNavigation: false for all other routes
-       └─ GlobalNavigation.tsx renders ABOVE the page content
-            ├─ Logo + nav links (hidden on mobile: hidden md:flex)
-            ├─ Globe language picker (TR/EN radio buttons)
-            ├─ Notification bell
-            └─ Profile dropdown (avatar, settings, sign out)
-
-Language Picker (Globe icon):
-  ├─ GlobalNavigation: Dropdown with radio buttons, closes on selection
-  ├─ Hero (desktop): Same dropdown pattern
-  └─ Hero (mobile hamburger): Inline toggle buttons (TR | EN)
-
-File Upload from Nav:
-  ├─ Hidden <input type="file" accept=".pdf"> ref
-  ├─ Click handler validates: single file, PDF, <20MB
-  ├─ Logged in → navigate('/upload', { state: { files: [file], autoProcess: true } })
-  └─ Anonymous → navigate('/try', { state: { file } })
-```
-
-### i18n Architecture (Updated)
-```
-translations.ts sections:
-  ├─ nav (11 keys) — Dashboard, Compare, Chat, Upload, MyAccount, etc.
-  ├─ common (12 keys) — Loading, Error, Save, Cancel, etc.
-  ├─ landing (50+ keys) — Hero, Benefits, Stats, FAQ, Footer, etc.
-  ├─ auth (20+ keys) — SignIn, SignUp, form labels, placeholders, errors
-  ├─ policy (15+ keys) — Active, Expiring, Coverage, Premium, ViewDetails
-  ├─ insights (5 keys) — Title, AI Insights, Show More/Less
-  ├─ evaluation (10+ keys) — Score labels
-  ├─ comparison (10+ keys) — Comparison labels
-  ├─ insurance (8 keys) — Policy type names
-  ├─ coverageCategories (6 keys) — Main, Liability, Supplementary, etc.
-  ├─ tryAnalysis (35 keys) — Free trial flow
-  ├─ preferences (18 keys) — User preferences panel
-  ├─ help (24 keys) — Help center categories, articles, contact
-  ├─ shared (26 keys) — Shared analysis viewer states
-  ├─ errors (8 keys) — File validation, network errors
-  └─ upload (10+ keys) — Upload flow messages
-```
-
-### Key i18n Files
-| File | Purpose |
-|------|---------|
-| `src/lib/i18n/translations.ts` | TranslationDictionary type + EN/TR translations (2400+ lines) |
-| `src/lib/i18n/i18n-context.tsx` | React context, useTranslation/useI18n hooks, I18nProvider |
-| `src/lib/i18n/translation-service.ts` | AI-powered translation for non-preloaded locales |
-| `src/lib/i18n/__tests__/language-consistency.test.ts` | 64 tests for translation parity and consistency |
-| `src/components/PolicyDetailView.tsx` | `COVERAGE_NAME_TR` map, `getLocalizedCoverageName()`, `translateInsight()` |
+| Express route ordering in settings.ts | Named routes (`/history`, `/regional-factors`, `/providers`, `/benchmarks`) MUST be defined BEFORE `/:category` catch-all. Express matches in registration order — `/:category` captures "history" as a category. Always add new named routes above the `// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)` comment. |
+| Sample policy AI insights not in insightTranslations | The AI insights in `src/data/sample-policies.ts` are different from those in `insightTranslations`. Both sets need to be in the translation map for Turkish display. |
+| Translation system has 3 new migrations | `017`, `018`, `019` must be applied to Supabase before the translation API and admin UI will work. The client falls back to preloaded translations if DB is unavailable, so the app won't break without them. |
+| Static asset caching requires two express.static layers | Don't serve all static files with the same `maxAge`. Hashed assets (`/assets/*`) get `immutable`, everything else gets `no-cache`. See `server/index.ts`. |
 
 ---
 
@@ -195,32 +147,39 @@ translations.ts sections:
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
 ### Pending Deployment
-- All commits on `claude/review-handoff-docs-Bdwy3` not yet deployed to production
-- Changes are frontend-only (nav bar + i18n) — no server-side risk
-- No new environment variables introduced this session
-- No new database migrations required
+- 6 code commits on `claude/review-handoff-docs-uvfRj` not yet deployed to production
+- Changes include frontend (AllSamplesDemo, i18n) and server-side (translation API, route ordering, cache headers)
+- **Server changes**:
+  - Route ordering fix will fix admin Settings History, regional factors, providers, and benchmarks panels
+  - Translation API endpoints added (`/api/translations/*`)
+  - Static asset caching split (immutable for hashed, no-cache for HTML)
+- **New database migrations required**: `017_translation_system.sql`, `018_seed_translations.sql`, `019_seed_coverage_insight_translations.sql`
+- No new environment variables introduced
 
 ### Post-Deployment Verification
-1. Visit landing page — Globe icon visible in nav, TR/EN toggle works
-2. Switch to TR locale — all landing, auth, help, sample policies pages should be Turkish
-3. Click hamburger menu on mobile — inline TR/EN toggle visible
-4. Navigate to `/samples` — no back arrow, uses GlobalNavigation
-5. Navigate to `/help` — no back arrow, categories and articles in Turkish
-6. Open `/share/:id` with a valid share link — all labels in Turkish
-7. Visit `/auth` — placeholders and buttons in Turkish
-8. Switch to EN locale — everything reverts to English
-9. Upload a PDF from nav bar Upload button — file picker opens, routes correctly
+1. **Apply migrations** — Run `017`, `018`, `019` against Supabase
+2. Visit `/samples` — click "View Details" on any sample policy card, verify expansion works
+3. Switch to TR locale — verify AI insights translate to Turkish on expanded cards
+4. Admin Dashboard → Settings → History tab — verify history records now appear (was broken by route ordering)
+5. Admin Dashboard → Settings → verify regional factors, providers, benchmarks endpoints work
+6. Admin Dashboard → Translations tab — verify translation management UI loads
+7. Test translation API: `curl .../api/translations/tr` — should return full TR translation bundle
+8. Check static asset caching: `curl -I .../assets/index-xxx.js` should show `Cache-Control: max-age=31536000, immutable`
+9. Check HTML caching: `curl -I .../` should show `Cache-Control: no-cache, must-revalidate`
 
 ### Database Migrations
-- ✅ All migrations up to `015_config_drift_baselines.sql` applied
-- No new migrations this session
+- ✅ All migrations up to `015_config_drift_baselines.sql` applied in production
+- **NEW**: 3 migration files need to be applied:
+  - `017_translation_system.sql` — Creates 5 tables for DB-driven i18n
+  - `018_seed_translations.sql` — Seeds 685+ translation keys × 2 languages (TR/EN)
+  - `019_seed_coverage_insight_translations.sql` — Seeds coverage name + AI insight translations
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Deploy latest commits** — Frontend-only nav bar + i18n changes, low deployment risk
+1. **Deploy latest commits** — Includes server-side route fix + frontend sample detail view
 2. **i18n for remaining pages** — MyAccount (~18 strings), Settings (~28 strings), ComparePolicies (~15 strings) still have hardcoded English
 3. **Remove redundant ArrowLeft buttons** — MyAccount, Settings, ComparePolicies, PolicyUpload have own back arrows that conflict with GlobalNavigation
 
@@ -263,6 +222,12 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 ## Previous Session Context
 
+**February 12, 2026** (`claude/review-handoff-docs-Bdwy3`):
+- Globe Language Picker added to both nav bars
+- Nav bar consistency overhaul (dead button removal, Sign In link, direct upload)
+- i18n for auth, help, shared result, sample policies pages
+- Database-driven i18n translation system
+
 **February 11, 2026** (`claude/review-handoff-docs-E4fnT`):
 - Comprehensive i18n for landing, navigation, core components
 - Coverage name locale fix with 90+ entry COVERAGE_NAME_TR map
@@ -285,7 +250,7 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 ---
 
-**Last Updated**: February 12, 2026
-**Branch**: `claude/review-handoff-docs-Bdwy3`
+**Last Updated**: February 16, 2026
+**Branch**: `claude/review-handoff-docs-uvfRj`
 **ESLint Status**: 0 errors, 46 warnings
-**Next Session Focus**: Deploy nav+i18n, i18n remaining auth-gated pages (MyAccount, Settings, ComparePolicies), remove redundant ArrowLeft buttons
+**Next Session Focus**: Deploy route fix + sample detail view, i18n remaining auth-gated pages (MyAccount, Settings, ComparePolicies), remove redundant ArrowLeft buttons

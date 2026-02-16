@@ -10,11 +10,11 @@ import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 
 import { usePolicies } from '@/lib/policy-context'
 import { useAuth } from '@/lib/supabase/auth-context'
-import { useTranslation, useI18n } from '@/lib/i18n/i18n-context'
+import { useTranslation, useLanguageSelector } from '@/lib/i18n/i18n-context'
 
 export function Hero() {
   const { t } = useTranslation()
-  const { locale, setLocale } = useI18n()
+  const { currentLocale: locale, locales: availableLocales, setLocale } = useLanguageSelector()
   const navigate = useNavigate()
   const { policies } = usePolicies()
   const { user, signOut } = useAuth()
@@ -196,32 +196,22 @@ export function Hero() {
                       role="radiogroup"
                       aria-label="Language"
                     >
-                      <button
-                        onClick={() => { setLocale('tr'); setShowLanguagePicker(false) }}
-                        role="radio"
-                        aria-checked={locale === 'tr'}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                          locale === 'tr'
-                            ? 'bg-blue-50 text-blue-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <span className="text-base">🇹🇷</span>
-                        <span>Türkçe</span>
-                      </button>
-                      <button
-                        onClick={() => { setLocale('en'); setShowLanguagePicker(false) }}
-                        role="radio"
-                        aria-checked={locale === 'en'}
-                        className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
-                          locale === 'en'
-                            ? 'bg-blue-50 text-blue-700 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <span className="text-base">🇬🇧</span>
-                        <span>English</span>
-                      </button>
+                      {availableLocales.map((l) => (
+                        <button
+                          key={l.code}
+                          onClick={() => { setLocale(l.code); setShowLanguagePicker(false) }}
+                          role="radio"
+                          aria-checked={locale === l.code}
+                          className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                            locale === l.code
+                              ? 'bg-blue-50 text-blue-700 font-medium'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span className="text-base">{l.flag}</span>
+                          <span>{l.nativeName}</span>
+                        </button>
+                      ))}
                     </div>
                   </>
                 )}
@@ -336,31 +326,22 @@ export function Hero() {
               {/* Mobile Language Switcher */}
               <div className="flex items-center gap-3 px-4 py-2.5">
                 <Globe size={18} className="text-gray-500" aria-hidden="true" />
-                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5" role="radiogroup" aria-label="Language">
-                  <button
-                    onClick={() => setLocale('tr')}
-                    role="radio"
-                    aria-checked={locale === 'tr'}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                      locale === 'tr'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    Türkçe
-                  </button>
-                  <button
-                    onClick={() => setLocale('en')}
-                    role="radio"
-                    aria-checked={locale === 'en'}
-                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
-                      locale === 'en'
-                        ? 'bg-white text-blue-600 shadow-sm'
-                        : 'text-gray-500 hover:text-gray-900'
-                    }`}
-                  >
-                    English
-                  </button>
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 flex-wrap" role="radiogroup" aria-label="Language">
+                  {availableLocales.map((l) => (
+                    <button
+                      key={l.code}
+                      onClick={() => setLocale(l.code)}
+                      role="radio"
+                      aria-checked={locale === l.code}
+                      className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                        locale === l.code
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-900'
+                      }`}
+                    >
+                      {l.nativeName}
+                    </button>
+                  ))}
                 </div>
               </div>
               <button

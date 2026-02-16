@@ -9,14 +9,27 @@ import {
   ReactNode,
 } from 'react'
 import type { TranslationDictionary } from './translations'
-import { EN_TRANSLATIONS, COMMON_LOCALES, type CommonLocale } from './translations'
-import { getBestLocale, setStoredLocale } from './translation-cache'
+import { EN_TRANSLATIONS, COMMON_LOCALES } from './translations'
+import { getBestLocale, setStoredLocale, clearCachedTranslations } from './translation-cache'
 import {
   getTranslations,
   getLocaleInfo,
   isRTLLocale,
+  fetchAvailableLocales,
+  invalidateLocalesCache,
   type TranslationProgress,
+  type APILocale,
 } from './translation-service'
+
+// Locale info for UI display
+export interface LocaleOption {
+  code: string
+  name: string
+  nativeName: string
+  flag: string
+  isRtl?: boolean
+  isActive: boolean
+}
 
 // Context value interface
 interface I18nContextValue {
@@ -44,8 +57,14 @@ interface I18nContextValue {
   // Is RTL language
   isRTL: boolean
 
-  // Available common locales
+  // Available common locales (legacy — use dynamicLocales for DB-driven locales)
   availableLocales: typeof COMMON_LOCALES
+
+  // DB-driven available locales (loaded from API)
+  dynamicLocales: LocaleOption[]
+
+  // Force-refresh translations from API (clears cache)
+  refreshTranslations: () => Promise<void>
 }
 
 // Create context with default values
@@ -59,6 +78,8 @@ const I18nContext = createContext<I18nContextValue>({
   localeInfo: getLocaleInfo('en'),
   isRTL: false,
   availableLocales: COMMON_LOCALES,
+  dynamicLocales: [],
+  refreshTranslations: async () => {},
 })
 
 // Provider component
@@ -72,11 +93,43 @@ export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderPro
   const [locale, setLocaleState] = useState(() => getBestLocale(defaultLocale))
   const [translations, setTranslations] = useState<TranslationDictionary>(EN_TRANSLATIONS)
   const [isLoading, setIsLoading] = useState(true)
+  const [dynamicLocales, setDynamicLocales] = useState<LocaleOption[]>([])
   const [progress, setProgress] = useState<TranslationProgress>({
     status: 'idle',
     progress: 0,
     message: '',
   })
+
+  // Load available locales from API
+  const loadAvailableLocales = useCallback(async () => {
+    try {
+      const { locales: apiLocales } = await fetchAvailableLocales()
+      if (apiLocales.length > 0) {
+        setDynamicLocales(
+          apiLocales.map((l: APILocale) => ({
+            code: l.code,
+            name: l.name,
+            nativeName: l.nativeName,
+            flag: l.flag,
+            isRtl: l.isRtl,
+            isActive: l.code === locale,
+          }))
+        )
+      } else {
+        // Fall back to hardcoded COMMON_LOCALES for EN/TR
+        setDynamicLocales([
+          { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', isActive: locale === 'en' },
+          { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', isActive: locale === 'tr' },
+        ])
+      }
+    } catch {
+      // API unavailable — use hardcoded fallback
+      setDynamicLocales([
+        { code: 'en', name: 'English', nativeName: 'English', flag: '🇬🇧', isActive: locale === 'en' },
+        { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷', isActive: locale === 'tr' },
+      ])
+    }
+  }, [locale])
 
   // Load translations for current locale
   const loadTranslations = useCallback(async (targetLocale: string) => {
@@ -111,6 +164,14 @@ export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderPro
     [locale, loadTranslations]
   )
 
+  // Force-refresh: clear cache and reload from API
+  const refreshTranslations = useCallback(async () => {
+    clearCachedTranslations(locale)
+    invalidateLocalesCache()
+    await loadTranslations(locale)
+    await loadAvailableLocales()
+  }, [locale, loadTranslations, loadAvailableLocales])
+
   // Nested key translation function
   const translate = useCallback(
     (key: string, fallback?: string): string => {
@@ -130,9 +191,10 @@ export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderPro
     [translations]
   )
 
-  // Load initial translations
+  // Load initial translations and available locales
   useEffect(() => {
     loadTranslations(locale)
+    loadAvailableLocales()
 
     // Set initial document attributes
     document.documentElement.dir = isRTLLocale(locale) ? 'rtl' : 'ltr'
@@ -149,6 +211,8 @@ export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderPro
     localeInfo: getLocaleInfo(locale),
     isRTL: isRTLLocale(locale),
     availableLocales: COMMON_LOCALES,
+    dynamicLocales,
+    refreshTranslations,
   }
 
   return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>
@@ -171,15 +235,28 @@ export function useTranslation() {
   return { t, translate, locale, isLoading }
 }
 
+// Language selector locale shape
+interface LanguageSelectorLocale {
+  code: string
+  name?: string
+  nativeName: string
+  flag: string
+  isActive: boolean
+  isRtl?: boolean
+}
+
 // Language selector component props helper
 export function useLanguageSelector() {
-  const { locale, setLocale, availableLocales, isLoading, progress } = useI18n()
+  const { locale, setLocale, availableLocales, dynamicLocales, isLoading, progress } = useI18n()
 
-  const locales = Object.entries(availableLocales).map(([code, info]) => ({
-    code: code as CommonLocale,
-    ...info,
-    isActive: code === locale,
-  }))
+  // Prefer dynamic locales from API, fall back to hardcoded COMMON_LOCALES
+  const locales: LanguageSelectorLocale[] = dynamicLocales.length > 0
+    ? dynamicLocales.map(l => ({ ...l, isActive: l.code === locale }))
+    : Object.entries(availableLocales).map(([code, info]) => ({
+        code,
+        ...info,
+        isActive: code === locale,
+      }))
 
   return {
     currentLocale: locale,

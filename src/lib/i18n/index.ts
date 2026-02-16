@@ -2,7 +2,7 @@
 // Export all i18n functionality from a single entry point
 
 // Context and hooks
-export { I18nProvider, useI18n, useTranslation, useLanguageSelector } from './i18n-context'
+export { I18nProvider, useI18n, useTranslation, useLanguageSelector, type LocaleOption } from './i18n-context'
 
 // Types and translations
 export type { TranslationDictionary, SupportedLocale, CommonLocale } from './translations'
@@ -15,8 +15,11 @@ export {
   isRTLLocale,
   getLocaleInfo,
   translateString,
+  fetchAvailableLocales,
+  invalidateLocalesCache,
   type TranslationStatus,
   type TranslationProgress,
+  type APILocale,
 } from './translation-service'
 
 // Cache utilities
@@ -26,6 +29,8 @@ export {
   clearCachedTranslations,
   clearAllCachedTranslations,
   getCachedLocales,
+  getCachedVersion,
+  setCachedVersion,
   getStoredLocale,
   setStoredLocale,
   detectBrowserLocale,

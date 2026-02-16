@@ -42,14 +42,7 @@ describe('HelpCenter', () => {
       expect(buttons.length).toBeGreaterThan(0)
     })
 
-    it('should navigate back when back button is clicked', () => {
-      renderWithRouter(<HelpCenter />)
-
-      const backButton = screen.getAllByRole('button')[0]
-      fireEvent.click(backButton)
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
-    })
+    // Back button was removed — GlobalNavigation handles navigation (Known Issue #91)
   })
 
   describe('Search Functionality', () => {

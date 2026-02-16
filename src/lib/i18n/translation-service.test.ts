@@ -18,7 +18,17 @@ import {
 vi.mock('./translation-cache', () => ({
   getCachedTranslations: vi.fn(() => null),
   setCachedTranslations: vi.fn(),
+  getCachedVersion: vi.fn(() => null),
+  setCachedVersion: vi.fn(),
 }))
+
+// Mock the env module
+vi.mock('../env', () => ({
+  getEnv: () => ({ proxyUrl: '' }),
+}))
+
+// Mock global fetch
+vi.stubGlobal('fetch', vi.fn(() => Promise.reject(new Error('Network unavailable'))))
 
 describe('Translation Service', () => {
   beforeEach(() => {
@@ -122,32 +132,31 @@ describe('Translation Service', () => {
       expect(result).toBe('Hello')
     })
 
-    it('should return translated text for different locale', async () => {
+    it('should return text as-is for different locale (dynamic translation via API)', async () => {
       const result = await translateString('Hello', 'de', 'en')
-      expect(result).toContain('[DE]')
-      expect(result).toContain('Hello')
+      expect(result).toBe('Hello')
     })
 
-    it('should add locale prefix for known locales', async () => {
+    it('should return text as-is when no API translation available', async () => {
       const result = await translateString('Test', 'fr', 'en')
-      expect(result).toBe('[FR] Test')
+      expect(result).toBe('Test')
     })
 
-    it('should add uppercase prefix for unknown locales', async () => {
+    it('should return text as-is for unknown locales', async () => {
       const result = await translateString('Test', 'xyz', 'en')
-      expect(result).toBe('[XYZ] Test')
+      expect(result).toBe('Test')
     })
 
     it('should handle empty strings', async () => {
       const result = await translateString('', 'de', 'en')
-      expect(result).toBe('[DE] ')
+      expect(result).toBe('')
     })
 
-    it('should translate to various locales', async () => {
-      expect(await translateString('Test', 'es', 'en')).toBe('[ES] Test')
-      expect(await translateString('Test', 'ja', 'en')).toBe('[JA] Test')
-      expect(await translateString('Test', 'ko', 'en')).toBe('[KO] Test')
-      expect(await translateString('Test', 'zh', 'en')).toBe('[ZH] Test')
+    it('should return text as-is for various locales without API', async () => {
+      expect(await translateString('Test', 'es', 'en')).toBe('Test')
+      expect(await translateString('Test', 'ja', 'en')).toBe('Test')
+      expect(await translateString('Test', 'ko', 'en')).toBe('Test')
+      expect(await translateString('Test', 'zh', 'en')).toBe('Test')
     })
   })
 
@@ -195,17 +204,18 @@ describe('Translation Service', () => {
       expect(translations).toBeDefined()
     })
 
-    it('should translate non-preloaded locales', async () => {
+    it('should handle non-preloaded locales via API fallback', async () => {
       const progressUpdates: TranslationProgress[] = []
       const translations = await getTranslations('de', (progress) => {
         progressUpdates.push(progress)
       })
 
       expect(translations).toBeDefined()
-      // Should have translating status at some point
-      const hasTranslatingStatus = progressUpdates.some((p) => p.status === 'translating')
-      expect(hasTranslatingStatus).toBe(true)
-    }, 30000) // Longer timeout for translation simulation
+      // With API unavailable (mocked fetch rejects), should fall back to EN_TRANSLATIONS
+      // and report error status
+      const lastStatus = progressUpdates[progressUpdates.length - 1]?.status
+      expect(['complete', 'error']).toContain(lastStatus)
+    })
 
     it('should include all translation keys', async () => {
       const translations = await getTranslations('en')

@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**
 - **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 12, 2026
+- **Last Updated**: February 16, 2026
 
 ---
 
@@ -262,6 +262,19 @@ insurai/
 | `supabase/migrations/013_seed_configuration_defaults.sql` | Seeds all hardcoded values |
 | `supabase/migrations/014_settings_webhooks.sql` | **NEW** Webhook configuration tables |
 | `supabase/migrations/015_config_drift_baselines.sql` | **NEW** Drift baseline snapshot tables |
+| `supabase/migrations/017_translation_system.sql` | **NEW** Database-driven i18n tables |
+| `supabase/migrations/018_seed_translations.sql` | **NEW** Seeds 685+ translation keys × 2 languages |
+| `supabase/migrations/019_seed_coverage_insight_translations.sql` | **NEW** Coverage names + AI insight translations |
+
+### Database-Driven i18n System (Added Feb 12, 2026)
+| File | Purpose |
+|------|---------|
+| `server/services/translation-service.ts` | TranslationService with CRUD, caching, bulk operations |
+| `server/routes/translations.ts` | Translation API endpoints (CRUD, export/import, AI-assisted bulk translate) |
+| `src/lib/i18n/translation-service.ts` | Client-side translation loading (API fetch + localStorage cache) |
+| `src/lib/i18n/i18n-context.tsx` | **UPDATED** React context with DB-backed translation loading pipeline |
+| `src/lib/i18n/translations.ts` | Preloaded fallback translations (EN/TR) |
+| `src/components/admin/tabs/TranslationsTab.tsx` | **NEW** Admin UI for inline translation editing, coverage stats, import/export |
 
 ### Configuration
 | File | Purpose |
@@ -686,6 +699,11 @@ xl: 1280px  /* Large desktop */
 | `insurance_providers` | **NEW** Turkish insurance provider directory |
 | `regional_factors` | **NEW** Regional risk adjustment factors |
 | `feature_flags` | **NEW** Feature flag configuration for gradual rollouts |
+| `translation_locales` | **NEW** Supported locale definitions (tr, en, etc.) |
+| `translation_keys` | **NEW** Translation key registry with namespaces |
+| `translations` | **NEW** Actual translation strings per locale per key |
+| `translation_audit_log` | **NEW** Audit trail for translation changes |
+| `translation_metadata` | **NEW** Translation system metadata (versions, stats) |
 
 ### Policy Table Schema
 ```sql
@@ -723,6 +741,11 @@ Located in `supabase/migrations/`:
 - `006_seed_prompts.sql` - Seeds 16 AI prompts (extraction, chat, OCR, analysis)
 - `012_configuration_system.sql` - **NEW** Configuration system tables (app_settings, user_preferences, market_benchmarks, insurance_providers, regional_factors, feature_flags)
 - `013_seed_configuration_defaults.sql` - **NEW** Seeds all hardcoded values as database defaults
+- `014_settings_webhooks.sql` - **NEW** Webhook configuration tables
+- `015_config_drift_baselines.sql` - **NEW** Drift baseline snapshot tables
+- `017_translation_system.sql` - **NEW** Database-driven i18n (5 tables: locales, keys, translations, audit, metadata)
+- `018_seed_translations.sql` - **NEW** Seeds 685+ translation keys × 2 languages
+- `019_seed_coverage_insight_translations.sql` - **NEW** Coverage names + AI insight translations
 
 ### Row Level Security (RLS)
 ```sql
@@ -3263,6 +3286,70 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `translations.ts` (+644 lines across all sessions), `AuthPage.tsx`, `AllSamplesDemo.tsx`, `HelpCenter.tsx`, `SharedResult.tsx`
 - **Commits**: `71c7b10`, `9c26d69`, `f12b95f`
 
+### 93. Database-Driven i18n Translation System (Added Feb 12, 2026)
+- **Feature**: Transforms hardcoded i18n system (685+ keys × 2 languages) into a database-driven, admin-managed translation system
+- **Architecture** (7 phases):
+  1. **Database schema**: 5 tables (`translation_locales`, `translation_keys`, `translations`, `translation_audit_log`, `translation_metadata`)
+  2. **Server API**: `TranslationService` with CRUD, caching, Zod validation (`server/services/translation-service.ts`)
+  3. **Client pipeline**: API fetch → version-aware localStorage cache → preloaded fallback (`src/lib/i18n/translation-service.ts`)
+  4. **Admin UI**: TranslationsTab with inline editing, coverage stats, import/export (`src/components/admin/tabs/TranslationsTab.tsx`)
+  5. **Dynamic languages**: `useLanguageSelector` hook for Globe pickers to show DB-defined locales
+  6. **AI-assisted bulk translation**: Batched OpenAI processing endpoint for translating missing keys
+  7. **Migration**: Coverage names (90 entries) and AI insight translations (15 entries) moved from `PolicyDetailView` into i18n system
+- **Database Migrations**: `017_translation_system.sql`, `018_seed_translations.sql`, `019_seed_coverage_insight_translations.sql`
+- **Tests**: 363 translation-specific tests
+- **New Files**: 9 (service, routes, tests, migrations, admin UI)
+- **Modified Files**: 18 (i18n context, translations, components, tests)
+- **Commits**: `08bcfef`, `716f2e0`
+
+### 94. Stale HTML Cache Causing 404 on Hashed Assets (Fixed Feb 12, 2026)
+- **Problem**: After Railway deployment, browsers loaded cached `index.html` referencing old chunk filenames (Vite generates new content hashes), causing 404 errors on JS/CSS assets
+- **Root Cause**: `express.static` served `index.html` with `maxAge='1d'`, so browsers cached HTML for 24 hours
+- **Solution**: Split static serving into two layers:
+  - `/assets/*` (hashed filenames): `Cache-Control: max-age=31536000, immutable` (1 year, safe because filenames change on content change)
+  - Everything else (`index.html`, `sw.js`): `Cache-Control: no-cache, must-revalidate` (always fetch fresh)
+- **File Changed**: `server/index.ts`
+- **Commit**: `2c4b057`
+
+### 95. Service Worker Cache v19 (Feb 12, 2026)
+- **Change**: Bumped service worker cache version from v18 to v19
+- **Purpose**: Force cache invalidation after translation system deployment
+- **File Changed**: `public/sw.js`
+- **Commit**: `7277e9c`
+
+### 96. Sample Policy Cards Expandable Detail View (Feb 16, 2026)
+- **Problem**: Sample policy cards on `/samples` page had non-functional "View Details" button, AI insights not translated to Turkish, no way to see full policy details
+- **Solution**:
+  - Added expandable detail view showing coverages (with limits/deductibles), exclusions, special conditions, AI confidence bar, insured person, location, period
+  - Added `translateInsight()` function using `t.insightTranslations` map for AI insight translation
+  - Coverage names display locale-aware (`nameTr` for Turkish, `name` for English)
+  - Toggle button switches between "View Details"/"Hide Details" with icons
+  - Added 10 new Turkish translations for sample-specific AI insights
+  - Added 9 new `policy` translation keys: `hideDetails`, `coverageDetails`, `exclusions`, `specialConditions`, `included`, `notIncluded`, `insuredPerson`, `location`, `period`, `confidence`
+- **Files Changed**: `src/components/AllSamplesDemo.tsx`, `src/lib/i18n/translations.ts`
+- **Commit**: `6b8b691`
+
+### 97. Admin Settings Routes Unreachable — Express Route Ordering Bug (Fixed Feb 16, 2026)
+- **Problem**: Admin Settings History panel showed "No history records found" despite records existing in database. Also affected `/regional-factors`, `/providers`, and `/benchmarks` endpoints.
+- **Root Cause**: Classic Express route ordering bug — `/history`, `/regional-factors`, `/providers`, `/benchmarks` routes were defined AFTER `/:category` catch-all in `server/routes/settings.ts`. Express matched `history` as a `:category` parameter, queried `app_settings WHERE category = 'history'`, and returned empty results.
+- **Solution**: Moved all specific named routes (`/history`, `/regional-factors*`, `/providers*`, `/benchmarks*`) before the `/:category` and `/:category/:key` catch-all routes
+- **Route Order (Correct)**:
+  ```
+  /                          (list all settings)
+  /performance               (metrics)
+  /export, /import           (backup/restore)
+  /batch                     (batch update)
+  /feature-flags             (feature flag management)
+  /history                   ← MOVED before catch-all
+  /regional-factors          ← MOVED before catch-all
+  /providers                 ← MOVED before catch-all
+  /benchmarks                ← MOVED before catch-all
+  /:category                 (catch-all — LAST)
+  /:category/:key            (catch-all — LAST)
+  ```
+- **File Changed**: `server/routes/settings.ts`
+- **Commit**: `4a58731`
+
 ---
 
 ## Turkish Market Considerations
@@ -3604,9 +3691,15 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v18)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v19)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
+
+**Static Asset Caching (server/index.ts):**
+- Hashed assets (`/assets/*`): served with `max-age=31536000, immutable` — safe because Vite changes filenames on content change
+- Non-hashed files (`index.html`, `sw.js`): served with `no-cache, must-revalidate` — always fresh
+- This two-layer approach prevents stale HTML from referencing old chunk filenames after deployment
+- See Known Issue #94 for the original bug and fix
 
 **Vite Bundle Chunking (manualChunks):**
 - **DO NOT** use aggressive catch-all chunking like `if (id.includes('node_modules')) return 'vendor-common'`
@@ -3717,6 +3810,12 @@ connectSrc: [
 - Both nav bars have their own Globe language picker — changes persist via `localStorage('insurai_locale')`
 - Upload button in nav opens file picker directly (no navigation to `/upload`) — validated file is passed via React Router state
 - Some pages still have redundant ArrowLeft buttons (MyAccount, Settings, ComparePolicies, PolicyUpload) — these should be cleaned up for consistency
+
+**Express Route Ordering in `server/routes/settings.ts`:**
+- All specific named routes (e.g., `/history`, `/regional-factors`, `/providers`, `/benchmarks`) MUST be defined BEFORE `/:category` catch-all route
+- Express matches routes in order — if `/:category` comes first, it will match `history` as a category name and return empty results
+- When adding new settings sub-routes, always place them before the `// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)` comment
+- This was the root cause of the admin Settings History panel showing "No history records found" (Fixed Feb 16, 2026)
 
 ---
 
