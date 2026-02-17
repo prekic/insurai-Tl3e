@@ -64,6 +64,8 @@ export interface ExtractedPolicyData {
 
 export interface ExtractedCoverage {
   name: string
+  /** Turkish name for the coverage (AI-provided or mapped at extraction time) */
+  nameTr?: string | null
   limit: number | null
   deductible: number | null
   description: string | null
@@ -132,7 +134,8 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Coverage name/type' },
+            name: { type: 'string', description: 'Coverage name/type in English' },
+            nameTr: { type: ['string', 'null'], description: 'Coverage name in Turkish. For Turkish policies, provide the original Turkish name (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For English policies, set to null.' },
             limit: { type: ['number', 'null'], description: 'Coverage limit amount. Use null for Sınırsız or Rayiç Değer.' },
             deductible: { type: ['number', 'null'], description: 'Deductible amount' },
             description: { type: ['string', 'null'], description: 'Brief description' },
@@ -144,7 +147,7 @@ export const EXTRACTION_JSON_SCHEMA = {
               description: 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
           },
-          required: ['name', 'isUnlimited', 'isMarketValue'],
+          required: ['name', 'nameTr', 'isUnlimited', 'isMarketValue'],
           additionalProperties: false,
         },
         description: 'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
@@ -303,6 +306,11 @@ Your task is to extract structured information from insurance policy documents.
    - Main coverage (Ana Teminat)
    - Additional coverages (Ek Teminatlar)
    - Optional protections
+
+   **Coverage Names (name + nameTr)**:
+   - name: Always provide the English coverage name (e.g., "Collision", "Theft", "Fire")
+   - nameTr: For Turkish policies, provide the original Turkish name from the document (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For non-Turkish policies, set to null.
+   - Common Turkish coverage names: Çarpma/Çarpışma (Collision), Hırsızlık (Theft), Yangın (Fire), Doğal Afetler (Natural Disasters), Cam Kırılması (Glass), Ferdi Kaza (Personal Accident), Yol Yardım (Roadside Assistance), İkame Araç (Replacement Vehicle), Mali Sorumluluk (Liability), Manevi Tazminat (Moral Damages)
 
    **CRITICAL - Special Coverage Values**:
    - "Sınırsız" (Unlimited): Set isUnlimited=true and limit=null

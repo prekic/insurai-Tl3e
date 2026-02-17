@@ -132,10 +132,11 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 }
 
 /**
- * Get locale-aware coverage name
- * Uses the i18n coverageNames map from the translation system.
- * Returns nameTr for Turkish locale, with fallback translation map
- * when AI extraction sets nameTr to the same English value as name
+ * Get locale-aware coverage name.
+ * Since nameTr is now resolved at extraction time (via AI + canonical map),
+ * this function simply picks the right field based on locale.
+ * The coverageNames map serves as a secondary fallback for policies
+ * extracted before the extraction-time fix.
  */
 function getLocalizedCoverageName(
   coverage: { name: string; nameTr?: string },
@@ -144,17 +145,11 @@ function getLocalizedCoverageName(
 ): string {
   if (locale === 'en') return coverage.name
 
-  // If nameTr exists and differs from name, it's a real translation from AI
+  // nameTr is set at extraction time — use it if it's a real translation
   if (coverage.nameTr && coverage.nameTr !== coverage.name) return coverage.nameTr
-  // Fallback: look up English name in the i18n coverage names map
+  // Fallback for legacy policies: look up in i18n map
   const mapped = coverageNames[coverage.name]
   if (mapped && mapped !== coverage.name) return mapped
-  // Case-insensitive fallback
-  const lowerName = coverage.name.toLowerCase()
-  for (const [en, translated] of Object.entries(coverageNames)) {
-    if (en.toLowerCase() === lowerName && translated !== en) return translated
-  }
-  // Return nameTr (even if same as name) or name
   return coverage.nameTr || coverage.name
 }
 
