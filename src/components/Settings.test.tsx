@@ -571,7 +571,7 @@ describe('Settings - Export Functionality', () => {
   })
 
   it('should show error toast when exporting CSV with no policies', async () => {
-    const { toast } = await import('sonner')
+    const { toast: _toast } = await import('sonner')
 
     vi.doMock('@/lib/policy-context', () => ({
       usePolicies: () => ({

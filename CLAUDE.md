@@ -10,8 +10,8 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**
-- **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 16, 2026
+- **Production Readiness**: ~9.5/10 (6,200+ tests, 0 lint errors, 20 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 17, 2026
 
 ---
 
@@ -19,7 +19,7 @@
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Frontend | React + TypeScript | 19.1 / 5.9.3 |
+| Frontend | React + TypeScript | 19.2 / 5.9.3 |
 | Styling | Tailwind CSS | v4 |
 | Routing | React Router | v7 |
 | Build | Vite | v7 |
@@ -1217,7 +1217,7 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 9, 2026)
-- **Total**: 6,000+ tests across 185+ test files
+- **Total**: 6,200+ tests across 190 test files
 - **Passing**: 100% (0 failures)
 - **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
 - **Note**: Includes 275 tests for critical modules (admin-auth, email, cost-control, free-trial), 21 user-profile functional tests, 14 E2E extraction flow tests
@@ -3865,5 +3865,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6,000+ tests, all passing (185+ test files)
-**Last Updated**: February 12, 2026
+**Tests**: 6,200+ tests, all passing (190 test files)
+**Last Updated**: February 17, 2026
