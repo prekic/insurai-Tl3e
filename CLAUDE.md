@@ -2343,7 +2343,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/components/TryAnalysis.tsx` - Accept file from state, add timeout, progress updates
   - `src/components/TryAnalysis.test.tsx` - **NEW** 19 tests for timeout and file handling
   - `src/components/landing/UploadWidget.test.tsx` - **NEW** 13 tests for file handoff
-- **Note**: Railway logs revealed Anthropic API billing issue causing fallback to OpenAI, adding latency. The 90-second timeout accommodates Document AI OCR (~50s) + AI extraction with fallback.
+- **Note**: Anthropic API billing issue previously caused fallback to OpenAI, adding latency. **Resolved as of Feb 17, 2026** — `/api/ai/diagnose` confirms `anthropic: { valid: true }`. The 90-second timeout accommodates Document AI OCR (~50s) + AI extraction.
 
 ### 34. Session-Based Free Trial for Anonymous Users (Added Jan 30, 2026)
 - **Feature**: Anonymous users can now analyze one policy per session without signup
@@ -3708,12 +3708,13 @@ connectSrc: [
 - Let Vite/Rollup handle interdependent modules automatically
 - See Known Issue #51-52 for details on the failed optimization attempt
 
-**AI Provider Fallback and Billing:**
-- If Anthropic API billing issue occurs ("credit balance too low"), system auto-falls back to OpenAI
-- Fallback adds latency (extra API round-trip after failure)
-- Admin notifications created for billing issues
-- Check Railway logs for `[AI] Anthropic failed, falling back to OpenAI`
-- 90-second timeout in TryAnalysis.tsx accommodates Document AI OCR (~50s) + AI fallback
+**AI Provider Fallback and Billing (Resolved Feb 17, 2026):**
+- Anthropic billing issue previously caused fallback to OpenAI — **now resolved**, all 3 providers healthy
+- The fallback mechanism still exists and works correctly if billing issues recur
+- If Anthropic fails for any reason (billing, rate limit, overloaded), system auto-falls back to OpenAI
+- Admin notifications created for billing/rate-limit issues
+- Verify provider health: `curl /api/ai/diagnose` — check `anthropic.valid` and `anthropic.errorCode`
+- 90-second timeout in TryAnalysis.tsx accommodates Document AI OCR (~50s) + AI extraction
 
 **Free Trial File Handoff:**
 - Files uploaded on landing page must be passed via React Router state
