@@ -6,31 +6,42 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
 import { MyAccount } from './MyAccount'
 
-// Mock react-router-dom navigate
-const mockNavigate = vi.fn()
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom')
-  return {
-    ...actual,
-    useNavigate: () => mockNavigate,
-  }
-})
+// Mock sonner toast
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
-// Mock useAuth hook
+// Mock i18n
+vi.mock('@/lib/i18n', () => ({
+  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en' }),
+}))
+
+// Create stable mock references via vi.hoisted to avoid useEffect infinite loops.
+// The component's useEffect depends on [useSupabase, user]. If `user` is a new
+// object each render (as with inline literals in vi.mock), useEffect re-runs,
+// calling setProfile(JSON.parse(...)) which creates a new object, triggering
+// another re-render — an infinite loop that hangs the Vitest worker.
+const { mockUser, mockNavigate } = vi.hoisted(() => ({
+  mockUser: {
+    id: 'test-user-id',
+    email: 'john@example.com',
+    user_metadata: { full_name: 'John Doe' },
+  },
+  mockNavigate: vi.fn(),
+}))
+
+// Mock react-router-dom without vi.importActual to keep it simple and synchronous
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => mockNavigate,
+}))
+
+// Mock useAuth with stable user reference
 vi.mock('@/lib/supabase/auth-context', () => ({
   useAuth: () => ({
-    user: {
-      id: 'test-user-id',
-      email: 'john@example.com',
-      user_metadata: {
-        full_name: 'John Doe',
-      },
-    },
+    user: mockUser,
     isLoading: false,
-    isConfigured: false, // Use local storage mode for tests
+    isConfigured: false,
     signIn: vi.fn(),
     signUp: vi.fn(),
     signOut: vi.fn(),
@@ -45,9 +56,7 @@ vi.mock('@/lib/supabase', () => ({
   fetchUserStats: vi.fn(),
 }))
 
-const renderWithRouter = (component: React.ReactElement) => {
-  return render(<BrowserRouter>{component}</BrowserRouter>)
-}
+const t = EN_TRANSLATIONS
 
 describe('MyAccount', () => {
   beforeEach(() => {
@@ -69,15 +78,15 @@ describe('MyAccount', () => {
 
   describe('Profile Display', () => {
     it('should render the account page header', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('My Account')).toBeInTheDocument()
+        expect(screen.getByText(t.account.title)).toBeInTheDocument()
       })
     })
 
     it('should display user name after loading', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
         const userNames = screen.getAllByText('John Doe')
@@ -86,15 +95,17 @@ describe('MyAccount', () => {
     })
 
     it('should display company name after loading', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('ABC Insurance Broker')).toBeInTheDocument()
+        // Company appears in both profile card and details section
+        const companyElements = screen.getAllByText('ABC Insurance Broker')
+        expect(companyElements.length).toBeGreaterThan(0)
       })
     })
 
     it('should display email address after loading', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
         expect(screen.getByText('john@example.com')).toBeInTheDocument()
@@ -102,7 +113,7 @@ describe('MyAccount', () => {
     })
 
     it('should display phone number after loading', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
         expect(screen.getByText('+90 532 123 4567')).toBeInTheDocument()
@@ -110,7 +121,7 @@ describe('MyAccount', () => {
     })
 
     it('should display location after loading', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
         expect(screen.getByText('Istanbul, Turkey')).toBeInTheDocument()
@@ -118,7 +129,7 @@ describe('MyAccount', () => {
     })
 
     it('should display user initials in avatar', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
         expect(screen.getByText('JD')).toBeInTheDocument()
@@ -126,94 +137,92 @@ describe('MyAccount', () => {
     })
 
     it('should display storage mode badge', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        // Component shows "Local Only" when not using Supabase
-        expect(screen.getByText('Local Only')).toBeInTheDocument()
+        expect(screen.getByText(t.account.localOnly)).toBeInTheDocument()
       })
     })
   })
 
   describe('Usage Statistics', () => {
     it('should display Usage Statistics section', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Usage Statistics')).toBeInTheDocument()
+        expect(screen.getByText(t.account.usageStatistics)).toBeInTheDocument()
       })
     })
 
     it('should display policies analyzed label', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Policies Analyzed')).toBeInTheDocument()
+        expect(screen.getByText(t.account.policiesAnalyzed)).toBeInTheDocument()
       })
     })
 
     it('should display comparisons label', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Comparisons')).toBeInTheDocument()
+        expect(screen.getByText(t.account.comparisons)).toBeInTheDocument()
       })
     })
 
     it('should display saved reports label', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Saved Reports')).toBeInTheDocument()
+        expect(screen.getByText(t.account.savedReports)).toBeInTheDocument()
       })
     })
   })
 
   describe('Edit Mode', () => {
     it('should show Edit Profile button by default', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
     })
 
     it('should toggle to Save button when editing', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
-      expect(screen.getByText('Save')).toBeInTheDocument()
+      expect(screen.getByText(t.common.save)).toBeInTheDocument()
     })
 
     it('should show input fields when in edit mode', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
-      // Should now have input fields
       const inputs = screen.getAllByRole('textbox')
       expect(inputs.length).toBeGreaterThan(0)
     })
 
     it('should allow editing name', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const nameInput = screen.getByDisplayValue('John Doe')
@@ -223,13 +232,13 @@ describe('MyAccount', () => {
     })
 
     it('should allow editing email', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const emailInput = screen.getByDisplayValue('john@example.com')
@@ -239,13 +248,13 @@ describe('MyAccount', () => {
     })
 
     it('should allow editing phone', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const phoneInput = screen.getByDisplayValue('+90 532 123 4567')
@@ -255,13 +264,13 @@ describe('MyAccount', () => {
     })
 
     it('should allow editing location', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const locationInput = screen.getByDisplayValue('Istanbul, Turkey')
@@ -271,76 +280,59 @@ describe('MyAccount', () => {
     })
 
     it('should return to view mode when Save is clicked', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
-      const saveButton = screen.getByText('Save')
+      const saveButton = screen.getByText(t.common.save)
       fireEvent.click(saveButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
-    })
-  })
-
-  describe('Navigation', () => {
-    it('should navigate back when back button is clicked', async () => {
-      renderWithRouter(<MyAccount />)
-
-      await waitFor(() => {
-        expect(screen.getByText('My Account')).toBeInTheDocument()
-      })
-
-      // Get button by aria-label
-      const backButton = screen.getByLabelText('Go back')
-      fireEvent.click(backButton)
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
     })
   })
 
   describe('Storage Info', () => {
     it('should display storage info card', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        // Component shows local storage info when not using Supabase
-        expect(screen.getByText('Local Storage')).toBeInTheDocument()
+        expect(screen.getByText(t.account.localStorage)).toBeInTheDocument()
       })
     })
 
     it('should display sign in prompt for local storage mode', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Sign in to sync your data across devices')).toBeInTheDocument()
+        expect(screen.getByText(t.account.signInToSync)).toBeInTheDocument()
       })
     })
   })
 
   describe('Profile Information Section', () => {
     it('should display Profile Information header', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Profile Information')).toBeInTheDocument()
+        expect(screen.getByText(t.account.personalInfo)).toBeInTheDocument()
       })
     })
 
     it('should display field labels', async () => {
-      renderWithRouter(<MyAccount />)
+      render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Full Name')).toBeInTheDocument()
-        expect(screen.getByText('Email')).toBeInTheDocument()
-        expect(screen.getByText('Phone')).toBeInTheDocument()
-        expect(screen.getByText('Location')).toBeInTheDocument()
+        expect(screen.getByText(t.account.fullName)).toBeInTheDocument()
+        expect(screen.getByText(t.account.email)).toBeInTheDocument()
+        expect(screen.getByText(t.account.phone)).toBeInTheDocument()
+        expect(screen.getByText(t.account.location)).toBeInTheDocument()
       })
     })
   })

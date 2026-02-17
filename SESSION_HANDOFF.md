@@ -1,4 +1,4 @@
-# Session Handoff - February 16, 2026
+# Session Handoff - February 17, 2026
 
 ## Current Status
 
@@ -7,85 +7,72 @@
 | **Build** | ✅ Passing (both frontend and server) |
 | **TypeCheck** | ✅ 0 errors |
 | **ESLint Errors** | ✅ 0 errors |
-| **ESLint Warnings** | ⚠️ 46 warnings (all `no-non-null-assertion`) |
-| **Tests** | ✅ 6,000+ passing (185+ test files), 0 failures |
-| **Branch** | `claude/review-handoff-docs-uvfRj` |
+| **ESLint Warnings** | ⚠️ 20 warnings (all `no-non-null-assertion`) |
+| **Tests** | ✅ 6,252 passing (190 test files), 24 skipped, 0 failures |
+| **Branch** | `claude/review-handoff-docs-CYZzv` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | ✅ Live — extraction pipeline fully operational |
-| **All 3 AI Providers** | ✅ OpenAI, Anthropic, Google Vision — all valid |
-| **Tech Stack** | React 19, Express 5, Vite 7, Vitest 4, TypeScript 5.9 |
+| **All 3 AI Providers** | ✅ OpenAI (2276ms), Anthropic (987ms), Google Vision (191ms) — all valid |
+| **Anthropic Billing** | ✅ **Resolved** — was falling back to OpenAI, now direct |
+| **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
 | **SW Cache Version** | v19 |
 
 ---
 
 ## Session Summary
 
-This session focused on **fixing the AllSamplesDemo detail view**, **fixing an Express route ordering bug** in admin settings, and **documenting undocumented commits** from the current branch (database-driven i18n, stale HTML cache fix).
+This session focused on **documentation review and cleanup** for handoff readiness. Verified all 3 AI providers are healthy (Anthropic billing issue resolved), fixed 2 ESLint errors, updated stale CLAUDE.md metadata, and documented all undocumented commits from the prior session.
 
-### Work Completed (7 commits on this branch, 2 code + 1 docs this session)
+### Work Completed This Session (2 commits)
 
-**This Session (Feb 16):**
-1. **Admin Settings Route Ordering Fix** — `/history`, `/regional-factors`, `/providers`, `/benchmarks` routes were unreachable because they were defined after `/:category` catch-all. Moved all named routes before the parameterized catch-all.
+1. **Marked Anthropic billing issue as resolved** — Updated CLAUDE.md Known Issue #33 and Common Gotchas: `anthropic: { valid: true, latencyMs: 987 }` confirmed via `/api/ai/diagnose`
+2. **Fixed 2 ESLint errors + updated stale metadata** — Constant binary expression in `translation-routes.test.ts`, unused `toast` in `Settings.test.tsx`; updated test counts (6,200+/190), React version (19.2), ESLint warnings (20), Last Updated dates
 
-**Previously Undocumented on This Branch (Feb 12):**
-2. **Database-Driven i18n Translation System** — Major feature: 685+ keys × 2 languages moved from hardcoded to DB-managed with admin UI, API, caching, AI-assisted bulk translate. 3 new migrations, 363 new tests.
-3. **Stale HTML Cache Fix** — Split static serving: hashed assets get `immutable` cache, `index.html` gets `no-cache`. Prevents 404s on JS/CSS after deployment.
-4. **SW Cache v19** — Force cache invalidation after translation system deployment.
-5. **Sample Policy Cards — Expandable Detail View + i18n** — "View Details" button now expands cards to show coverages, exclusions, AI confidence bar. AI insights translated to Turkish.
+### Also Documented (from prior session, not yet in CLAUDE.md)
+
+3. **i18n for MyAccount, Settings, ComparePolicies** — ~100 new TR/EN translation entries, redundant ArrowLeft buttons removed
+4. **Coverage nameTr fixed at extraction time** — New `src/lib/i18n/coverage-names.ts` as canonical EN→TR map; `convertToAnalyzedPolicy()` now resolves nameTr properly
+5. **PolicyUpload ArrowLeft removed** — Follows GlobalNavigation pattern
+6. **JSONB version increment fix** — Translation system DB trigger fixed (`value::text` → `value #>> '{}'`)
 
 ---
 
 ## Features Completed on This Branch
 
-### 1. Database-Driven i18n Translation System (✅) — Feb 12
-- 7-phase implementation: DB schema → Server API → Client pipeline → Admin UI → Dynamic languages → AI bulk translate → Migration
-- 5 new database tables, 3 new migrations (`017`, `018`, `019`)
-- `TranslationService` with CRUD, caching, Zod validation
-- Admin `TranslationsTab` with inline editing, coverage stats, import/export
-- Client pipeline: API fetch → version-aware localStorage cache → preloaded fallback
-- AI-assisted bulk translation endpoint (batched OpenAI processing)
-- 363 translation-specific tests
-- **New files**: `server/services/translation-service.ts`, `server/routes/translations.ts`, `src/components/admin/tabs/TranslationsTab.tsx`
-- **Commits**: `08bcfef`, `716f2e0`
+### From Prior Session (Feb 16-17, already merged to this branch)
 
-### 2. Stale HTML Cache Fix (✅) — Feb 12
-- Split `express.static` into two layers: hashed assets get `immutable` (1 year), `index.html` gets `no-cache`
-- Prevents 404 errors on JS/CSS after Railway deployment
-- **Commit**: `2c4b057`
+| # | Feature | Status | Commit |
+|---|---------|--------|--------|
+| 1 | i18n for MyAccount, Settings, ComparePolicies | ✅ | `3af8b77` |
+| 2 | Coverage nameTr at extraction time | ✅ | `fc1fe9e` |
+| 3 | PolicyUpload ArrowLeft removal | ✅ | `90b11df` |
+| 4 | JSONB version increment fix in translation trigger | ✅ | `05f0f9c` |
+| 5 | Vitest 4 compatibility fixes (4 test files) | ✅ | `74c544f` |
+| 6 | MyAccount test i18n updates | ✅ | `581b060` |
 
-### 3. Service Worker Cache v19 (✅) — Feb 12
-- Force cache invalidation after translation system deployment
-- **Commit**: `7277e9c`
+### This Session (Feb 17)
 
-### 4. Sample Policy Cards — Expandable Detail View (✅) — Feb 12
-- "View Details" button toggles expanded state with full policy info
-- Shows: insured person, location, period, deductible, AI confidence bar
-- Coverage table: locale-aware names (TR/EN), limits, per-coverage deductibles
-- Exclusions list (red), special conditions (amber)
-- All AI insights translated via `insightTranslations` map
-- 10 new sample-specific Turkish translations, 9 new translation keys
-- **Commit**: `6b8b691`
-
-### 5. Admin Settings Routes Fix (✅) — Feb 16
-- Root cause: Express route ordering bug — `/:category` catch-all intercepted `/history`, `/regional-factors`, `/providers`, `/benchmarks`
-- Fix: Moved all specific named routes before `/:category` catch-all
-- Also fixes: regional factors, insurance providers, and market benchmarks admin endpoints
-- **Commit**: `4a58731`
+| # | Feature | Status | Commit |
+|---|---------|--------|--------|
+| 7 | Anthropic billing status update in docs | ✅ | `0dd926a` |
+| 8 | ESLint error fixes + metadata refresh | ✅ | `b9e498d` |
 
 ---
 
 ## All Commits on This Branch
 
 ```
-# Branch: claude/review-handoff-docs-uvfRj (7 total: 5 code + 1 docs + 1 merge-base)
-c5adda7 docs: update project documentation for Feb 16 session
-4a58731 fix: settings history/regional-factors/providers/benchmarks routes unreachable   ← Feb 16
-6b8b691 fix: make sample policy cards clickable with detail view and i18n                ← Feb 12
-2c4b057 fix: prevent stale HTML cache causing 404 on hashed assets                      ← Feb 12
-7277e9c chore: bump service worker cache to v19 for clean deployment                     ← Feb 12
-716f2e0 fix: resolve Express 5 TypeScript errors in translations route                   ← Feb 12
-08bcfef feat: database-driven i18n translation system with admin management              ← Feb 12
+# Branch: claude/review-handoff-docs-CYZzv (9 commits: 6 code + 3 docs)
+2e0d40f docs: update project documentation for Feb 17 session                    ← Feb 17 (this session)
+b9e498d fix: resolve 2 ESLint errors and update CLAUDE.md metadata              ← Feb 17 (this session)
+0dd926a docs: mark Anthropic billing issue as resolved (Feb 17, 2026)            ← Feb 17 (this session)
+fc1fe9e Fix coverage nameTr at extraction time instead of display-time fallback  ← Feb 17
+90b11df Remove redundant ArrowLeft back button from PolicyUpload                 ← Feb 17
+581b060 fix: update MyAccount tests for i18n integration                         ← Feb 17
+74c544f fix: resolve 4 failing test files for Vitest 4 compatibility             ← Feb 17
+3af8b77 feat: i18n for MyAccount, Settings, and ComparePolicies pages            ← Feb 16
+05f0f9c fix: correct JSONB version increment in translation trigger              ← Feb 16
 ```
 
 ---
@@ -94,35 +81,23 @@ c5adda7 docs: update project documentation for Feb 16 session
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Coverage `nameTr` = `name` (English) | Medium | **Mitigated** | Fallback translation map handles display; root cause in `policy-extractor.ts:1242` still sets both to same value |
 | AI insights always in English | Medium | **Mitigated** | `translateInsight()` handles 25+ known patterns at display time; new insight strings need manual translation entries |
-| Pages with redundant ArrowLeft buttons | Low | **Open** | MyAccount, Settings, ComparePolicies, PolicyUpload still have own back arrows — should be removed for consistency with GlobalNavigation |
-| Pages still needing i18n | Low | **Open** | MyAccount (~18 strings), Settings (~28 strings), ComparePolicies (~15 strings), UnsubscribePage (hardcoded Turkish only) |
+| UnsubscribePage i18n | Low | **Open** | Currently hardcoded Turkish only |
 | `translation-service.test.ts` timeout | Low | Pre-existing | 1 test times out (non-preloaded locale translation) — does not affect functionality |
 | `useLazySection` test failures | Low | Pre-existing | 11 tests fail in isolated runs — pre-existing, not related to i18n |
-| Anthropic billing | Medium | Open | Falls back to OpenAI, adds latency |
-| 46 ESLint warnings | Low | Deferred | All `no-non-null-assertion` — intentional in guarded code |
+| 20 ESLint warnings | Low | Deferred | All `no-non-null-assertion` — intentional in guarded code paths |
 | Railway cold start | Low | Expected | First request may take 5-10s after idle |
 
----
+### Resolved This Session
 
-## Bugs Fixed This Session
-
-### 1. AllSamplesDemo Cards Not Clickable
-- **Symptom**: "View Details" button had no onClick handler, no detail view
-- **Fix**: Added expandable card state with toggle, full coverage/exclusion/conditions display
-- **File**: `src/components/AllSamplesDemo.tsx`
-
-### 2. AI Insights Not Translated on Sample Policies
-- **Symptom**: AI insights showed in English when Turkish locale selected
-- **Fix**: Added `translateInsight()` function and 10 new Turkish translations for sample-specific insights
-- **Files**: `src/components/AllSamplesDemo.tsx`, `src/lib/i18n/translations.ts`
-
-### 3. Admin Settings History Shows "No Records"
-- **Symptom**: Settings History tab in admin dashboard always showed empty
-- **Root Cause**: Express route ordering — `/:category` matched before `/history`
-- **Fix**: Moved `/history` and other named routes before `/:category` catch-all
-- **File**: `server/routes/settings.ts`
+| Issue | Was | Now |
+|-------|-----|-----|
+| Anthropic billing | Falling back to OpenAI, adding latency | ✅ Resolved — direct Anthropic, 987ms |
+| Coverage `nameTr` = `name` (English) | 90+ entry display-time fallback map | ✅ Fixed at extraction time via `coverage-names.ts` |
+| Redundant ArrowLeft buttons | MyAccount, Settings, ComparePolicies, PolicyUpload | ✅ All removed |
+| Pages needing i18n | MyAccount, Settings, ComparePolicies | ✅ All completed |
+| 46 ESLint warnings | 46 warnings | ✅ Reduced to 20 |
+| 2 ESLint errors | Constant expression + unused var | ✅ Fixed |
 
 ---
 
@@ -130,10 +105,9 @@ c5adda7 docs: update project documentation for Feb 16 session
 
 | Gotcha | Details |
 |--------|---------|
-| Express route ordering in settings.ts | Named routes (`/history`, `/regional-factors`, `/providers`, `/benchmarks`) MUST be defined BEFORE `/:category` catch-all. Express matches in registration order — `/:category` captures "history" as a category. Always add new named routes above the `// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)` comment. |
-| Sample policy AI insights not in insightTranslations | The AI insights in `src/data/sample-policies.ts` are different from those in `insightTranslations`. Both sets need to be in the translation map for Turkish display. |
-| Translation system has 3 new migrations | `017`, `018`, `019` must be applied to Supabase before the translation API and admin UI will work. The client falls back to preloaded translations if DB is unavailable, so the app won't break without them. |
-| Static asset caching requires two express.static layers | Don't serve all static files with the same `maxAge`. Hashed assets (`/assets/*`) get `immutable`, everything else gets `no-cache`. See `server/index.ts`. |
+| ESLint constant binary expression | `'true' === 'true'` is flagged because result is always `true`. Fix: assign to a typed `string \| undefined` variable first, then compare. |
+| `value::text` vs `value #>> '{}'` in PostgreSQL | `jsonb_value::text` produces quoted string `"1"`, not `1`. Use `#>> '{}'` to extract as plain text for integer casting. |
+| Coverage nameTr duplication was pervasive | The English-only `nameTr` issue affected every extracted policy. The fix required a new canonical map file, schema changes, and extractor updates — not just a display fix. |
 
 ---
 
@@ -147,54 +121,45 @@ c5adda7 docs: update project documentation for Feb 16 session
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
 ### Pending Deployment
-- 6 code commits on `claude/review-handoff-docs-uvfRj` not yet deployed to production
-- Changes include frontend (AllSamplesDemo, i18n) and server-side (translation API, route ordering, cache headers)
-- **Server changes**:
-  - Route ordering fix will fix admin Settings History, regional factors, providers, and benchmarks panels
-  - Translation API endpoints added (`/api/translations/*`)
-  - Static asset caching split (immutable for hashed, no-cache for HTML)
-- **New database migrations required**: `017_translation_system.sql`, `018_seed_translations.sql`, `019_seed_coverage_insight_translations.sql`
+- 9 commits on `claude/review-handoff-docs-CYZzv` — must be **merged to main** first, then deployed
+- **Merge command**: `git checkout main && git merge claude/review-handoff-docs-CYZzv && git push`
+- Changes include:
+  - **Frontend**: i18n for 3 more pages, coverage nameTr fix, ArrowLeft cleanup
+  - **Server**: Translation trigger JSONB fix
+  - **New file**: `src/lib/i18n/coverage-names.ts`
 - No new environment variables introduced
+- No new database migrations (trigger fix is in existing `017_translation_system.sql` — only matters if migration hasn't been applied yet)
 
 ### Post-Deployment Verification
-1. **Apply migrations** — Run `017`, `018`, `019` against Supabase
-2. Visit `/samples` — click "View Details" on any sample policy card, verify expansion works
-3. Switch to TR locale — verify AI insights translate to Turkish on expanded cards
-4. Admin Dashboard → Settings → History tab — verify history records now appear (was broken by route ordering)
-5. Admin Dashboard → Settings → verify regional factors, providers, benchmarks endpoints work
-6. Admin Dashboard → Translations tab — verify translation management UI loads
-7. Test translation API: `curl .../api/translations/tr` — should return full TR translation bundle
-8. Check static asset caching: `curl -I .../assets/index-xxx.js` should show `Cache-Control: max-age=31536000, immutable`
-9. Check HTML caching: `curl -I .../` should show `Cache-Control: no-cache, must-revalidate`
+1. Visit MyAccount, Settings, ComparePolicies — verify all strings translate correctly in TR/EN
+2. Upload a new PDF — verify extracted coverage names have proper Turkish `nameTr` values
+3. Switch locale to TR — coverage names should display in Turkish without falling back to English
+4. Verify no ArrowLeft back buttons appear on any app page (GlobalNavigation handles nav)
+5. Check AI providers: `curl .../api/ai/diagnose` — all 3 should show `valid: true`
 
-### Database Migrations
+### Database Migrations Status
 - ✅ All migrations up to `015_config_drift_baselines.sql` applied in production
-- **NEW**: 3 migration files need to be applied:
-  - `017_translation_system.sql` — Creates 5 tables for DB-driven i18n
-  - `018_seed_translations.sql` — Seeds 685+ translation keys × 2 languages (TR/EN)
-  - `019_seed_coverage_insight_translations.sql` — Seeds coverage name + AI insight translations
+- **Pending**: `017`, `018`, `019` (translation system) — need to be applied for DB-driven i18n to work. App falls back to preloaded translations if not applied.
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Deploy latest commits** — Includes server-side route fix + frontend sample detail view
-2. **i18n for remaining pages** — MyAccount (~18 strings), Settings (~28 strings), ComparePolicies (~15 strings) still have hardcoded English
-3. **Remove redundant ArrowLeft buttons** — MyAccount, Settings, ComparePolicies, PolicyUpload have own back arrows that conflict with GlobalNavigation
+1. **Merge branch and deploy** — Merge `claude/review-handoff-docs-CYZzv` to main, push, deploy (9 commits: i18n, coverage nameTr fix, ESLint cleanup)
+2. **Apply translation migrations** — `017`, `018`, `019` to Supabase for DB-driven i18n
+3. **Smoke test production** — Verify all 3 AI providers, extraction pipeline, i18n
 
 ### Medium Priority
-4. **Fix coverage `nameTr` at extraction time** — Modify `policy-extractor.ts` to set `nameTr` differently from `name`
-5. **Smoke test i18n on mobile** — Verify all pages render correctly in Turkish on actual mobile devices
-6. **Investigate Anthropic billing** — Currently falling back to OpenAI, adding latency
-7. **Performance baseline** — Run config performance monitor in production
+4. **UnsubscribePage i18n** — Last page with hardcoded Turkish strings
+5. **Server-side insight translation** — Generate AI insights in both EN/TR at extraction time (currently translated at display time)
+6. **Performance baseline** — Run config performance monitor in production, validate 5-minute cache TTL
+7. **Improve test coverage** — Currently 49.6% statements; target 60%+
 
 ### Low Priority
-8. **Consider server-side insight translation** — Generate insights in both EN/TR at extraction time
-9. **UnsubscribePage i18n** — Currently hardcoded Turkish only, should support EN too
-10. **Reduce ESLint warnings** — 46 `no-non-null-assertion` warnings
-11. **Improve test coverage** — Currently 49.6% statements; target 60%+
-12. **Real user testimonials** — Replace use-case scenarios with actual user quotes when available
+8. **Reduce ESLint warnings** — 20 remaining `no-non-null-assertion` (requires refactoring guarded code paths)
+9. **Real user testimonials** — Replace use-case scenarios with actual user quotes when available
+10. **Lighthouse audit** — Run full Lighthouse CI against production, tune for performance score >0.9
 
 ---
 
@@ -204,29 +169,36 @@ c5adda7 docs: update project documentation for Feb 16 session
 # Full validation
 npm run validate  # typecheck + lint + test
 
-# Run i18n tests specifically
-npx vitest run src/lib/i18n/
-npx vitest run src/lib/i18n/__tests__/language-consistency.test.ts
+# Run all tests
+npx vitest --run
 
-# Run all landing page tests
-npx vitest run src/components/landing/
+# ESLint check (should show 0 errors, 20 warnings)
+npx eslint src/ server/
 
 # TypeScript check
 npx tsc --noEmit
 
 # Check AI providers
 curl https://insurai-production.up.railway.app/api/ai/diagnose
+
+# Check admin diagnostics
+curl https://insurai-production.up.railway.app/api/admin/diagnostics
 ```
 
 ---
 
 ## Previous Session Context
 
+**February 16, 2026** (`claude/review-handoff-docs-uvfRj`):
+- Admin settings route ordering fix (Express catch-all bug)
+- Sample policy cards expandable detail view + i18n
+- Documentation of DB i18n system and stale HTML cache fix
+
 **February 12, 2026** (`claude/review-handoff-docs-Bdwy3`):
 - Globe Language Picker added to both nav bars
 - Nav bar consistency overhaul (dead button removal, Sign In link, direct upload)
 - i18n for auth, help, shared result, sample policies pages
-- Database-driven i18n translation system
+- Database-driven i18n translation system (5 tables, 685+ keys, 363 tests)
 
 **February 11, 2026** (`claude/review-handoff-docs-E4fnT`):
 - Comprehensive i18n for landing, navigation, core components
@@ -250,7 +222,7 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 ---
 
-**Last Updated**: February 16, 2026
-**Branch**: `claude/review-handoff-docs-uvfRj`
-**ESLint Status**: 0 errors, 46 warnings
-**Next Session Focus**: Deploy route fix + sample detail view, i18n remaining auth-gated pages (MyAccount, Settings, ComparePolicies), remove redundant ArrowLeft buttons
+**Last Updated**: February 17, 2026
+**Branch**: `claude/review-handoff-docs-CYZzv`
+**ESLint Status**: 0 errors, 20 warnings
+**Next Session Focus**: Deploy + apply translation migrations, UnsubscribePage i18n, production smoke test

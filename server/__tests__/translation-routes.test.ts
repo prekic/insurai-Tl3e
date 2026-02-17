@@ -530,9 +530,12 @@ describe('Translation Routes - Validation Schemas', () => {
     })
 
     it('should detect dryRun flag', () => {
-      expect('true' === 'true').toBe(true)
-      expect('false' === 'true').toBe(false)
-      expect(undefined === 'true').toBe(false)
+      const trueStr: string | undefined = 'true'
+      const falseStr: string | undefined = 'false'
+      const undefStr: string | undefined = undefined
+      expect(trueStr === 'true').toBe(true)
+      expect(falseStr === 'true').toBe(false)
+      expect(undefStr === 'true').toBe(false)
     })
   })
 

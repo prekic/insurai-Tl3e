@@ -181,7 +181,7 @@ CREATE OR REPLACE FUNCTION increment_translation_version()
 RETURNS TRIGGER AS $$
 BEGIN
   UPDATE public.translation_metadata
-  SET value = to_jsonb((value::text::int + 1)::text),
+  SET value = to_jsonb(((value #>> '{}')::int + 1)::text),
       updated_at = NOW()
   WHERE key = 'version';
   RETURN NEW;

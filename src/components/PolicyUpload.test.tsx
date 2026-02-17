@@ -177,22 +177,6 @@ describe('PolicyUpload', () => {
       expect(screen.getByText('Use Samples')).toBeInTheDocument()
     })
 
-    it('should show back button', () => {
-      renderPolicyUpload()
-
-      expect(screen.getByLabelText('Go back')).toBeInTheDocument()
-    })
-  })
-
-  describe('Navigation', () => {
-    it('should navigate back when back button is clicked', async () => {
-      const user = userEvent.setup()
-      renderPolicyUpload()
-
-      await user.click(screen.getByLabelText('Go back'))
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
-    })
   })
 
   describe('Sample Policies', () => {
@@ -514,6 +498,12 @@ describe('PolicyUpload File Status Display', () => {
   })
 
   it('should display analyzing status with AI indicator', async () => {
+    // Make extraction hang so the analyzing state is visible
+    let resolveExtraction: (value: unknown) => void
+    mockExtractPolicy.mockImplementationOnce(() => new Promise((resolve) => {
+      resolveExtraction = resolve
+    }))
+
     renderPolicyUpload()
 
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
@@ -524,6 +514,14 @@ describe('PolicyUpload File Status Display', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/ai analyzing/i)).toBeInTheDocument()
+    })
+
+    // Resolve extraction to avoid unhandled promise rejection
+    resolveExtraction!({
+      success: true,
+      policy: { id: 'test-1', policyNumber: 'POL-001', provider: 'Test', type: 'home', typeTr: 'Konut', coverage: 100000, premium: 1000, deductible: 0, startDate: '2024-01-01', expiryDate: '2025-01-01', status: 'active', insuredPerson: 'Test', documentType: 'policy', uploadDate: '2024-01-01', logo: '', fileName: 'test.pdf', coverages: [], exclusions: [], specialConditions: [], insuranceLine: 'Property', aiConfidence: 0.95, aiInsights: [], monthlyPremium: 83 },
+      source: 'fallback',
+      extractedData: { confidence: { overall: 0.95 } },
     })
   })
 

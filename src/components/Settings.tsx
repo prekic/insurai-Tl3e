@@ -1,7 +1,6 @@
 import { useState, useId, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft,
   Moon,
   Sun,
   Bell,
@@ -103,9 +102,16 @@ interface APIKeyInputProps {
   onSave: () => void
   onClear: () => void
   isConfigured: boolean
+  translations: {
+    configured: string
+    notConfigured: string
+    save: string
+    cancel: string
+    edit: string
+  }
 }
 
-function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isConfigured }: APIKeyInputProps) {
+function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isConfigured, translations }: APIKeyInputProps) {
   const [showKey, setShowKey] = useState(false)
   const [isEditing, setIsEditing] = useState(!isConfigured)
 
@@ -118,7 +124,7 @@ function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isC
         {isConfigured && (
           <span className="flex items-center gap-1 text-xs text-green-600">
             <Check size={12} />
-            Configured
+            {translations.configured}
           </span>
         )}
       </div>
@@ -149,21 +155,21 @@ function APIKeyInput({ label, value, onChange, placeholder, onSave, onClear, isC
             }}
             disabled={!value.trim()}
           >
-            Save
+            {translations.save}
           </Button>
           {isConfigured && (
             <Button size="sm" variant="ghost" onClick={() => setIsEditing(false)}>
-              Cancel
+              {translations.cancel}
             </Button>
           )}
         </div>
       ) : (
         <div className="flex items-center gap-2">
           <div className="flex-1 px-3 py-2 bg-gray-100 rounded-lg font-mono text-sm text-gray-600 truncate">
-            {maskedValue || 'Not configured'}
+            {maskedValue || translations.notConfigured}
           </div>
           <Button size="sm" variant="outline" onClick={() => setIsEditing(true)}>
-            Edit
+            {translations.edit}
           </Button>
           {isConfigured && (
             <Button
@@ -302,8 +308,8 @@ export function Settings() {
   const handleLanguageChange = async (locale: string) => {
     try {
       await setLocale(locale)
-      toast.success(t.success.settingsSaved, {
-        description: `Language changed to ${locales.find((l) => l.code === locale)?.nativeName}`,
+      toast.success(t.settings.languageChanged, {
+        description: locales.find((l) => l.code === locale)?.nativeName,
       })
     } catch (error) {
       console.error('Failed to change language:', error)
@@ -315,8 +321,8 @@ export function Settings() {
     if (openaiKey.trim()) {
       localStorage.setItem(API_KEY_STORAGE.OPENAI, openaiKey.trim())
       setOpenaiConfigured(true)
-      toast.success('OpenAI API key saved', {
-        description: 'AI-powered extraction is now enabled.',
+      toast.success(t.settings.openaiKeySaved, {
+        description: t.settings.openaiKeySavedDesc,
       })
     }
   }
@@ -329,7 +335,7 @@ export function Settings() {
     localStorage.removeItem(API_KEY_STORAGE.OPENAI)
     setOpenaiKey('')
     setOpenaiConfigured(false)
-    toast.success('OpenAI API key removed')
+    toast.success(t.settings.openaiKeyRemoved)
     setShowRemoveApiKeyDialog(null)
   }
 
@@ -337,8 +343,8 @@ export function Settings() {
     if (anthropicKey.trim()) {
       localStorage.setItem(API_KEY_STORAGE.ANTHROPIC, anthropicKey.trim())
       setAnthropicConfigured(true)
-      toast.success('Claude API key saved', {
-        description: 'Multi-model consensus is now available.',
+      toast.success(t.settings.claudeKeySaved, {
+        description: t.settings.claudeKeySavedDesc,
       })
     }
   }
@@ -351,7 +357,7 @@ export function Settings() {
     localStorage.removeItem(API_KEY_STORAGE.ANTHROPIC)
     setAnthropicKey('')
     setAnthropicConfigured(false)
-    toast.success('Claude API key removed')
+    toast.success(t.settings.claudeKeyRemoved)
     setShowRemoveApiKeyDialog(null)
   }
 
@@ -359,8 +365,8 @@ export function Settings() {
     if (googleCloudKey.trim()) {
       localStorage.setItem(API_KEY_STORAGE.GOOGLE_CLOUD, googleCloudKey.trim())
       setGoogleCloudConfigured(true)
-      toast.success('Google Cloud API key saved', {
-        description: 'OCR for scanned documents is now enabled.',
+      toast.success(t.settings.googleKeySaved, {
+        description: t.settings.googleKeySavedDesc,
       })
     }
   }
@@ -373,29 +379,29 @@ export function Settings() {
     localStorage.removeItem(API_KEY_STORAGE.GOOGLE_CLOUD)
     setGoogleCloudKey('')
     setGoogleCloudConfigured(false)
-    toast.success('Google Cloud API key removed')
+    toast.success(t.settings.googleKeyRemoved)
     setShowRemoveApiKeyDialog(null)
   }
 
   const handleExportCSV = () => {
     if (policies.length === 0) {
-      toast.error('No policies to export')
+      toast.error(t.settings.noPoliciesExport)
       return
     }
     exportToCSV(policies, 'insurai-policies')
-    toast.success('Policies exported', {
-      description: `${policies.length} policies exported to CSV`,
+    toast.success(t.settings.policiesExported, {
+      description: t.settings.policiesExportedDesc.replace('{count}', String(policies.length)),
     })
   }
 
   const handleExportPDF = () => {
     if (policies.length === 0) {
-      toast.error('No policies to export')
+      toast.error(t.settings.noPoliciesExport)
       return
     }
     exportPoliciesToPDF(policies, 'Insurance Portfolio Report')
-    toast.success('PDF report generated', {
-      description: 'Print dialog will open to save as PDF',
+    toast.success(t.settings.pdfGenerated, {
+      description: t.settings.pdfGeneratedDesc,
     })
   }
 
@@ -405,8 +411,8 @@ export function Settings() {
 
   const confirmClearData = async () => {
     await clearAllPolicies()
-    toast.success('All data cleared', {
-      description: 'Your policies have been removed.',
+    toast.success(t.settings.allDataCleared, {
+      description: t.settings.allDataClearedDesc,
     })
     setShowClearDataDialog(false)
   }
@@ -429,13 +435,6 @@ export function Settings() {
       <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6 sm:mb-8">
-          <button
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-white rounded-lg transition-colors focus-ring"
-            aria-label={t.common.back}
-          >
-            <ArrowLeft size={24} aria-hidden="true" />
-          </button>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{t.settings.title}</h1>
         </div>
 
@@ -445,30 +444,31 @@ export function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Cpu className="text-purple-500" size={20} aria-hidden="true" />
-                AI Configuration
+                {t.settings.aiConfiguration}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* OpenAI */}
               <div className="space-y-2">
                 <APIKeyInput
-                  label="OpenAI API Key (GPT-4)"
+                  label={t.settings.openaiLabel}
                   value={openaiKey}
                   onChange={setOpenaiKey}
                   placeholder="sk-proj-..."
                   onSave={handleSaveOpenAIKey}
                   onClear={handleClearOpenAIKey}
                   isConfigured={openaiConfigured}
+                  translations={t.settings}
                 />
                 <p className="text-xs text-gray-500">
-                  Primary AI for document extraction.{' '}
+                  {t.settings.openaiDescription}{' '}
                   <a
                     href="https://platform.openai.com/api-keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    Get key
+                    {t.settings.getKey}
                   </a>
                 </p>
               </div>
@@ -476,23 +476,24 @@ export function Settings() {
               {/* Anthropic */}
               <div className="space-y-2">
                 <APIKeyInput
-                  label="Claude API Key (Anthropic)"
+                  label={t.settings.claudeLabel}
                   value={anthropicKey}
                   onChange={setAnthropicKey}
                   placeholder="sk-ant-..."
                   onSave={handleSaveAnthropicKey}
                   onClear={handleClearAnthropicKey}
                   isConfigured={anthropicConfigured}
+                  translations={t.settings}
                 />
                 <p className="text-xs text-gray-500">
-                  Backup AI for multi-model consensus.{' '}
+                  {t.settings.claudeDescription}{' '}
                   <a
                     href="https://console.anthropic.com/settings/keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    Get key
+                    {t.settings.getKey}
                   </a>
                 </p>
               </div>
@@ -500,23 +501,24 @@ export function Settings() {
               {/* Google Cloud */}
               <div className="space-y-2">
                 <APIKeyInput
-                  label="Google Cloud API Key (OCR)"
+                  label={t.settings.googleCloudLabel}
                   value={googleCloudKey}
                   onChange={setGoogleCloudKey}
                   placeholder="AIza..."
                   onSave={handleSaveGoogleCloudKey}
                   onClear={handleClearGoogleCloudKey}
                   isConfigured={googleCloudConfigured}
+                  translations={t.settings}
                 />
                 <p className="text-xs text-gray-500">
-                  For scanned document OCR.{' '}
+                  {t.settings.googleCloudDescription}{' '}
                   <a
                     href="https://console.cloud.google.com/apis/credentials"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-blue-600 hover:underline"
                   >
-                    Get key
+                    {t.settings.getKey}
                   </a>
                 </p>
               </div>
@@ -526,25 +528,25 @@ export function Settings() {
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${openaiConfigured || anthropicConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
                   <span className="text-xs text-gray-700">
-                    Extraction: <strong>{openaiConfigured || anthropicConfigured ? 'On' : 'Demo'}</strong>
+                    {t.settings.extraction}: <strong>{openaiConfigured || anthropicConfigured ? t.settings.on : t.settings.demo}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${openaiConfigured && anthropicConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
                   <span className="text-xs text-gray-700">
-                    Consensus: <strong>{openaiConfigured && anthropicConfigured ? 'On' : 'Off'}</strong>
+                    {t.settings.consensus}: <strong>{openaiConfigured && anthropicConfigured ? t.settings.on : t.settings.off}</strong>
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className={`w-2 h-2 rounded-full ${googleCloudConfigured ? 'bg-green-500' : 'bg-gray-400'}`} />
                   <span className="text-xs text-gray-700">
-                    OCR: <strong>{googleCloudConfigured ? 'On' : 'Off'}</strong>
+                    {t.settings.ocr}: <strong>{googleCloudConfigured ? t.settings.on : t.settings.off}</strong>
                   </span>
                 </div>
               </div>
 
               <p className="text-xs text-gray-500">
-                API keys are stored locally and never sent to our servers.
+                {t.settings.apiKeysPrivacy}
               </p>
             </CardContent>
           </Card>
@@ -554,7 +556,7 @@ export function Settings() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Download className="text-indigo-500" size={20} aria-hidden="true" />
-                Data & Export
+                {t.settings.dataExport}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -562,16 +564,16 @@ export function Settings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button variant="outline" className="justify-start gap-2" onClick={handleExportCSV}>
                   <FileSpreadsheet size={18} className="text-green-600" />
-                  Export to Excel (CSV)
+                  {t.settings.exportCSV}
                 </Button>
                 <Button variant="outline" className="justify-start gap-2" onClick={handleExportPDF}>
                   <FileText size={18} className="text-red-600" />
-                  Export to PDF
+                  {t.settings.exportPDF}
                 </Button>
               </div>
 
               <p className="text-xs text-gray-500">
-                Export your {policies.length} policies to Excel or PDF format for backup or sharing.
+                {t.settings.exportDescription.replace('{count}', String(policies.length))}
               </p>
 
               {/* Storage info */}
@@ -579,7 +581,7 @@ export function Settings() {
                 <div className="flex items-center gap-2">
                   <Database size={16} className="text-gray-500" />
                   <span className="text-sm text-gray-700">
-                    Storage: <strong>{isSupabaseConfigured() ? 'Cloud (Supabase)' : 'Local Browser'}</strong>
+                    {t.settings.storageLabel}: <strong>{isSupabaseConfigured() ? t.settings.storageCloud : t.settings.storageLocal}</strong>
                   </span>
                 </div>
                 <Button
@@ -589,7 +591,7 @@ export function Settings() {
                   onClick={handleClearData}
                 >
                   <Trash2 size={14} className="mr-1" />
-                  Clear All Data
+                  {t.settings.clearAllData}
                 </Button>
               </div>
             </CardContent>
@@ -723,7 +725,7 @@ export function Settings() {
 
               {/* Info text */}
               <p className="mt-4 text-xs text-gray-500 text-center">
-                Any language can be used. AI translates new languages automatically.
+                {t.settings.languageInfo}
               </p>
             </CardContent>
           </Card>
@@ -760,7 +762,7 @@ export function Settings() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertCircle className="text-gray-500" size={20} aria-hidden="true" />
-                  Account
+                  {t.settings.accountSection}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -770,7 +772,7 @@ export function Settings() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-900 truncate">{user.email}</p>
-                    <p className="text-xs text-gray-500">Signed in</p>
+                    <p className="text-xs text-gray-500">{t.settings.signedIn}</p>
                   </div>
                 </div>
               </CardContent>
@@ -808,9 +810,9 @@ export function Settings() {
         isOpen={showRemoveApiKeyDialog === 'openai'}
         onClose={() => setShowRemoveApiKeyDialog(null)}
         onConfirm={confirmClearOpenAIKey}
-        title="Remove OpenAI API Key"
-        description="Are you sure you want to remove the OpenAI API key? AI-powered extraction will be disabled until you add a new key."
-        confirmText="Remove Key"
+        title={t.settings.removeOpenaiTitle}
+        description={t.settings.removeOpenaiDesc}
+        confirmText={t.settings.removeKey}
         variant="warning"
       />
 
@@ -818,9 +820,9 @@ export function Settings() {
         isOpen={showRemoveApiKeyDialog === 'anthropic'}
         onClose={() => setShowRemoveApiKeyDialog(null)}
         onConfirm={confirmClearAnthropicKey}
-        title="Remove Claude API Key"
-        description="Are you sure you want to remove the Claude API key? Multi-model consensus will be disabled until you add a new key."
-        confirmText="Remove Key"
+        title={t.settings.removeClaudeTitle}
+        description={t.settings.removeClaudeDesc}
+        confirmText={t.settings.removeKey}
         variant="warning"
       />
 
@@ -828,9 +830,9 @@ export function Settings() {
         isOpen={showRemoveApiKeyDialog === 'google'}
         onClose={() => setShowRemoveApiKeyDialog(null)}
         onConfirm={confirmClearGoogleCloudKey}
-        title="Remove Google Cloud API Key"
-        description="Are you sure you want to remove the Google Cloud API key? OCR for scanned documents will be disabled until you add a new key."
-        confirmText="Remove Key"
+        title={t.settings.removeGoogleTitle}
+        description={t.settings.removeGoogleDesc}
+        confirmText={t.settings.removeKey}
         variant="warning"
       />
     </div>

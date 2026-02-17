@@ -25,11 +25,13 @@ describe('useLazySection', () => {
     mockDisconnect.mockClear()
     mockUnobserve.mockClear()
 
-    mockIntersectionObserver.mockImplementation((_callback) => ({
-      observe: mockObserve,
-      disconnect: mockDisconnect,
-      unobserve: mockUnobserve,
-    }))
+    mockIntersectionObserver.mockImplementation(function (_callback) {
+      return {
+        observe: mockObserve,
+        disconnect: mockDisconnect,
+        unobserve: mockUnobserve,
+      }
+    })
 
     vi.stubGlobal('IntersectionObserver', mockIntersectionObserver)
   })
@@ -126,11 +128,13 @@ describe('LazySection', () => {
     mockObserve.mockClear()
     mockDisconnect.mockClear()
 
-    mockIntersectionObserver.mockImplementation((_callback) => ({
-      observe: mockObserve,
-      disconnect: mockDisconnect,
-      unobserve: mockUnobserve,
-    }))
+    mockIntersectionObserver.mockImplementation(function (_callback) {
+      return {
+        observe: mockObserve,
+        disconnect: mockDisconnect,
+        unobserve: mockUnobserve,
+      }
+    })
 
     vi.stubGlobal('IntersectionObserver', mockIntersectionObserver)
   })
@@ -179,10 +183,10 @@ describe('LazySection when in view', () => {
   beforeEach(() => {
     let observerCallback: ((entries: { isIntersecting: boolean }[]) => void) | null = null
 
-    mockIntersectionObserver.mockImplementation((callback) => {
+    mockIntersectionObserver.mockImplementation(function (callback) {
       observerCallback = callback
       return {
-        observe: () => {
+        observe: function () {
           // Immediately trigger as intersecting
           if (observerCallback) {
             observerCallback([{ isIntersecting: true }])

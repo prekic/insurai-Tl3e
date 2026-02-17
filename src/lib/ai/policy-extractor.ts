@@ -32,6 +32,7 @@ import {
   mergeExtractionResults,
   type ValidationResult,
 } from '@/lib/extraction'
+import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
 
 export interface ExtractionResult {
   success: true
@@ -1235,11 +1236,17 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
 
   // Convert coverages with Turkish names and enhanced metadata
   // Handle cases where AI returns description instead of name, or both are missing
+  // Resolution order for nameTr:
+  //   1. AI-provided nameTr (if different from name)
+  //   2. Lookup in canonical coverage names map
+  //   3. Fall back to English name
   const coverages: Coverage[] = data.coverages.map((c) => {
     const coverageName = c.name || c.description || 'Unnamed Coverage'
+    const aiNameTr = c.nameTr && c.nameTr !== coverageName ? c.nameTr : null
+    const mappedNameTr = lookupCoverageNameTr(coverageName)
     return {
       name: coverageName,
-      nameTr: coverageName, // AI extracts in original language
+      nameTr: aiNameTr ?? mappedNameTr ?? coverageName,
       limit: c.limit ?? 0,
       deductible: c.deductible ?? 0,
       included: true,
@@ -1853,18 +1860,22 @@ export function comprehensiveToAnalyzedPolicy(
     }
   }
 
-  // Convert coverages
-  const coverages: Coverage[] = data.coverages.map(c => ({
-    name: c.name,
-    nameTr: c.nameTr,
-    limit: c.limit ?? 0,
-    deductible: c.deductible ?? 0,
-    included: true,
-    isUnlimited: c.isUnlimited,
-    isMarketValue: c.isMarketValue,
-    category: c.category,
-    importance: c.category === 'main' ? 'critical' : c.category === 'liability' ? 'standard' : 'minor',
-  }))
+  // Convert coverages — resolve nameTr via AI value, then canonical map fallback
+  const coverages: Coverage[] = data.coverages.map(c => {
+    const aiNameTr = c.nameTr && c.nameTr !== c.name ? c.nameTr : null
+    const mappedNameTr = lookupCoverageNameTr(c.name)
+    return {
+      name: c.name,
+      nameTr: aiNameTr ?? mappedNameTr ?? c.name,
+      limit: c.limit ?? 0,
+      deductible: c.deductible ?? 0,
+      included: true,
+      isUnlimited: c.isUnlimited,
+      isMarketValue: c.isMarketValue,
+      category: c.category,
+      importance: c.category === 'main' ? 'critical' : c.category === 'liability' ? 'standard' : 'minor',
+    }
+  })
 
   // Calculate main coverage
   const totalCoverage = calculateMainCoverage('kasko', coverages)

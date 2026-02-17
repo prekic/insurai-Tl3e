@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowLeft, Plus, X, AlertTriangle, Lightbulb, Scale, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, AlertTriangle, Lightbulb, Scale, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from './ui/button'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
@@ -106,7 +106,7 @@ export function ComparePolicies() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center" dir={isRTL ? 'rtl' : 'ltr'}>
         <div className="animate-pulse text-gray-500">
-          {locale === 'tr' ? 'Yükleniyor...' : 'Loading...'}
+          {t.common.loading}
         </div>
       </div>
     )
@@ -117,30 +117,19 @@ export function ComparePolicies() {
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => navigate('/dashboard')}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              aria-label={t.common.back}
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">
-                {locale === 'tr' ? 'Poliçe Karşılaştırma' : 'Compare Policies'}
-              </h1>
-              <p className="text-gray-600">
-                {locale === 'tr'
-                  ? 'Poliçelerinizi yan yana karşılaştırın'
-                  : 'Compare your policies side by side'}
-              </p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {t.comparison.title}
+            </h1>
+            <p className="text-gray-600">
+              {t.comparison.subtitle}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {selectedPolicies.length > 0 && (
               <Button variant="outline" onClick={clearAll} className="gap-2">
                 <X className="w-4 h-4" />
-                {locale === 'tr' ? 'Temizle' : 'Clear All'}
+                {t.comparison.clearAll}
               </Button>
             )}
             <Button
@@ -149,7 +138,7 @@ export function ComparePolicies() {
               className="gap-2"
             >
               {showSelector ? <ChevronUp className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-              {locale === 'tr' ? 'Poliçe Seç' : 'Select Policies'}
+              {t.comparison.selectPolicies}
               {selectedPolicies.length > 0 && (
                 <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded">
                   {selectedPolicies.length}/4
@@ -165,14 +154,10 @@ export function ComparePolicies() {
             <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-amber-800">
-                {locale === 'tr'
-                  ? `${invalidIds.length} poliçe artık mevcut değil`
-                  : `${invalidIds.length} policy(ies) no longer exist`}
+                {t.comparison.policiesNoLongerExist.replace('{count}', String(invalidIds.length))}
               </p>
               <p className="text-sm text-amber-700 mt-1">
-                {locale === 'tr'
-                  ? 'Bu poliçeler silinmiş veya taşınmış olabilir.'
-                  : 'These policies may have been deleted or moved.'}
+                {t.comparison.policiesDeletedOrMoved}
               </p>
             </div>
           </div>
@@ -183,12 +168,10 @@ export function ComparePolicies() {
           <div className="mb-8 bg-white rounded-2xl border border-gray-200 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
-                {locale === 'tr' ? 'Karşılaştırılacak Poliçeleri Seçin' : 'Select Policies to Compare'}
+                {t.comparison.selectPoliciesToCompare}
               </h2>
               <span className="text-sm text-gray-500">
-                {locale === 'tr'
-                  ? `${selectedPolicies.length} / 4 seçili (min 2)`
-                  : `${selectedPolicies.length} / 4 selected (min 2)`}
+                {t.comparison.selectedCount.replace('{count}', String(selectedPolicies.length))}
               </span>
             </div>
 
@@ -196,12 +179,10 @@ export function ComparePolicies() {
               <div className="text-center py-8">
                 <Scale className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                 <p className="text-gray-600 mb-4">
-                  {locale === 'tr'
-                    ? 'Karşılaştırmak için önce poliçe yükleyin'
-                    : 'Upload policies first to compare them'}
+                  {t.comparison.uploadFirst}
                 </p>
                 <Button onClick={() => navigate('/upload?autoOpen=true')}>
-                  {locale === 'tr' ? 'Poliçe Yükle' : 'Upload Policy'}
+                  {t.comparison.uploadPolicy}
                 </Button>
               </div>
             ) : (
@@ -239,7 +220,7 @@ export function ComparePolicies() {
                   <button
                     onClick={() => removePolicy(policy.id)}
                     className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
-                    aria-label={`${locale === 'tr' ? 'Kaldır' : 'Remove'} ${policy.provider}`}
+                    aria-label={`${t.comparison.removePolicy} ${policy.provider}`}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -251,7 +232,7 @@ export function ComparePolicies() {
                   className="flex items-center gap-2 px-3 py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
                 >
                   <Plus className="w-4 h-4" />
-                  {locale === 'tr' ? 'Poliçe Ekle' : 'Add Policy'}
+                  {t.comparison.addPolicy}
                 </button>
               )}
             </div>
@@ -263,7 +244,7 @@ export function ComparePolicies() {
           <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-xl text-center">
             <Scale className="w-12 h-12 text-blue-400 mx-auto mb-4" />
             <p className="text-blue-800 font-medium">
-              {locale === 'tr' ? 'Karşılaştırmak için en az 2 poliçe seçin' : validationMessage}
+              {t.comparison.selectMinTwo}
             </p>
           </div>
         )}
@@ -274,7 +255,7 @@ export function ComparePolicies() {
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium text-red-800">
-                {locale === 'tr' ? 'Karşılaştırma hatası' : 'Comparison error'}
+                {t.comparison.comparisonError}
               </p>
               <p className="text-sm text-red-700 mt-1">{error.message}</p>
             </div>
@@ -287,14 +268,14 @@ export function ComparePolicies() {
             {/* Winners Summary */}
             <section className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                {locale === 'tr' ? 'Kategori Kazananları' : 'Category Winners'}
+                {t.comparison.categoryWinners}
               </h2>
               <ComparisonSummary comparison={comparison} />
             </section>
 
             {/* Comparison Table */}
             <CollapsibleSection
-              title={locale === 'tr' ? 'Metrik Karşılaştırması' : 'Metrics Comparison'}
+              title={t.comparison.metricsComparison}
               expanded={expandedSections.metrics}
               onToggle={() => toggleSection('metrics')}
             >
@@ -303,7 +284,7 @@ export function ComparePolicies() {
 
             {/* Coverage Matrix */}
             <CollapsibleSection
-              title={locale === 'tr' ? 'Teminat Matrisi' : 'Coverage Matrix'}
+              title={t.comparison.coverageMatrix}
               expanded={expandedSections.coverage}
               onToggle={() => toggleSection('coverage')}
             >
@@ -314,13 +295,13 @@ export function ComparePolicies() {
             {/* Key Differences */}
             {comparison.analysis.keyDifferences.length > 0 && (
               <CollapsibleSection
-                title={locale === 'tr' ? 'Temel Farklar' : 'Key Differences'}
+                title={t.comparison.keyDifferences}
                 expanded={expandedSections.differences}
                 onToggle={() => toggleSection('differences')}
               >
                 <div className="space-y-3">
                   {comparison.analysis.keyDifferences.map((diff, index) => (
-                    <DifferenceCard key={index} difference={diff} locale={locale} />
+                    <DifferenceCard key={index} difference={diff} locale={locale} t={t} />
                   ))}
                 </div>
               </CollapsibleSection>
@@ -331,11 +312,11 @@ export function ComparePolicies() {
               <section className="bg-white rounded-2xl border border-gray-200 p-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
                   <Scale className="w-5 h-5 text-gray-600" />
-                  {locale === 'tr' ? 'Ödünleşimler' : 'Tradeoffs'}
+                  {t.comparison.tradeoffs}
                 </h2>
                 <div className="space-y-4">
                   {comparison.analysis.tradeoffs.map((tradeoff, index) => (
-                    <TradeoffCard key={index} tradeoff={tradeoff} policies={comparison.policies} locale={locale} />
+                    <TradeoffCard key={index} tradeoff={tradeoff} policies={comparison.policies} locale={locale} t={t} />
                   ))}
                 </div>
               </section>
@@ -343,7 +324,7 @@ export function ComparePolicies() {
 
             {/* AI Recommendation */}
             <CollapsibleSection
-              title={locale === 'tr' ? 'AI Önerisi' : 'AI Recommendation'}
+              title={t.comparison.aiRecommendation}
               expanded={expandedSections.recommendation}
               onToggle={() => toggleSection('recommendation')}
               icon={<Lightbulb className="w-5 h-5 text-amber-500" />}
@@ -365,7 +346,7 @@ export function ComparePolicies() {
                           <div>
                             <p className="font-semibold text-gray-900">{winner.label || winner.policy.provider}</p>
                             <p className="text-sm text-gray-600">
-                              {locale === 'tr' ? 'Önerilen seçim' : 'Recommended choice'}
+                              {t.comparison.recommendedChoice}
                             </p>
                           </div>
                           <div className="ml-auto flex items-center gap-2">
@@ -386,7 +367,7 @@ export function ComparePolicies() {
                 return (
                   <div className="mt-6">
                     <h3 className="text-sm font-semibold text-gray-700 mb-3">
-                      {locale === 'tr' ? 'İyileştirme Önerileri' : 'Improvement Suggestions'}
+                      {t.comparison.improvementSuggestions}
                     </h3>
                     <RecommendationList
                       recommendations={winner.evaluation.recommendations}
@@ -447,9 +428,10 @@ interface DifferenceCardProps {
     favoredPolicy: string
   }
   locale: string
+  t: { comparison: { major: string; moderate: string; minor: string } }
 }
 
-function DifferenceCard({ difference, locale }: DifferenceCardProps) {
+function DifferenceCard({ difference, locale, t }: DifferenceCardProps) {
   const significanceStyles = {
     major: 'border-l-red-500 bg-red-50',
     moderate: 'border-l-amber-500 bg-amber-50',
@@ -475,9 +457,7 @@ function DifferenceCard({ difference, locale }: DifferenceCardProps) {
             difference.significance === 'minor' && 'bg-blue-100 text-blue-700'
           )}
         >
-          {locale === 'tr'
-            ? { major: 'Önemli', moderate: 'Orta', minor: 'Küçük' }[difference.significance]
-            : { major: 'Major', moderate: 'Moderate', minor: 'Minor' }[difference.significance]}
+          {t.comparison[difference.significance]}
         </span>
       </div>
     </div>
@@ -494,9 +474,10 @@ interface TradeoffCardProps {
   }
   policies: { policy: { id: string; logo: string; provider: string }; label?: string }[]
   locale: string
+  t: { comparison: { recommendation: string } }
 }
 
-function TradeoffCard({ tradeoff, policies, locale }: TradeoffCardProps) {
+function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
   const getPolicy = (id: string) => policies.find(p => p.policy.id === id)
   const policy1 = getPolicy(tradeoff.option1.policyId)
   const policy2 = getPolicy(tradeoff.option2.policyId)
@@ -532,7 +513,7 @@ function TradeoffCard({ tradeoff, policies, locale }: TradeoffCardProps) {
         </div>
       </div>
       <p className="text-sm text-gray-700 pt-3 border-t border-gray-200">
-        <strong>{locale === 'tr' ? 'Öneri:' : 'Recommendation:'}</strong>{' '}
+        <strong>{t.comparison.recommendation}</strong>{' '}
         {locale === 'tr' ? tradeoff.recommendationTR : tradeoff.recommendation}
       </p>
     </div>

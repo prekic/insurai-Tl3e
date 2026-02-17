@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**
-- **Production Readiness**: ~9.5/10 (6,000+ tests, 0 lint errors, 46 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 16, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**
+- **Production Readiness**: ~9.5/10 (6,200+ tests, 0 lint errors, 20 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 17, 2026
 
 ---
 
@@ -19,7 +19,7 @@
 
 | Layer | Technology | Version |
 |-------|------------|---------|
-| Frontend | React + TypeScript | 19.1 / 5.9.3 |
+| Frontend | React + TypeScript | 19.2 / 5.9.3 |
 | Styling | Tailwind CSS | v4 |
 | Routing | React Router | v7 |
 | Build | Vite | v7 |
@@ -273,6 +273,7 @@ insurai/
 | `server/routes/translations.ts` | Translation API endpoints (CRUD, export/import, AI-assisted bulk translate) |
 | `src/lib/i18n/translation-service.ts` | Client-side translation loading (API fetch + localStorage cache) |
 | `src/lib/i18n/i18n-context.tsx` | **UPDATED** React context with DB-backed translation loading pipeline |
+| `src/lib/i18n/coverage-names.ts` | **NEW** Canonical EN→TR coverage name map (90+ entries) |
 | `src/lib/i18n/translations.ts` | Preloaded fallback translations (EN/TR) |
 | `src/components/admin/tabs/TranslationsTab.tsx` | **NEW** Admin UI for inline translation editing, coverage stats, import/export |
 
@@ -1217,7 +1218,7 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 9, 2026)
-- **Total**: 6,000+ tests across 185+ test files
+- **Total**: 6,200+ tests across 190 test files
 - **Passing**: 100% (0 failures)
 - **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
 - **Note**: Includes 275 tests for critical modules (admin-auth, email, cost-control, free-trial), 21 user-profile functional tests, 14 E2E extraction flow tests
@@ -2343,7 +2344,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/components/TryAnalysis.tsx` - Accept file from state, add timeout, progress updates
   - `src/components/TryAnalysis.test.tsx` - **NEW** 19 tests for timeout and file handling
   - `src/components/landing/UploadWidget.test.tsx` - **NEW** 13 tests for file handoff
-- **Note**: Railway logs revealed Anthropic API billing issue causing fallback to OpenAI, adding latency. The 90-second timeout accommodates Document AI OCR (~50s) + AI extraction with fallback.
+- **Note**: Anthropic API billing issue previously caused fallback to OpenAI, adding latency. **Resolved as of Feb 17, 2026** — `/api/ai/diagnose` confirms `anthropic: { valid: true }`. The 90-second timeout accommodates Document AI OCR (~50s) + AI extraction.
 
 ### 34. Session-Based Free Trial for Anonymous Users (Added Jan 30, 2026)
 - **Feature**: Anonymous users can now analyze one policy per session without signup
@@ -3350,6 +3351,52 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File Changed**: `server/routes/settings.ts`
 - **Commit**: `4a58731`
 
+### 98. i18n for MyAccount, Settings, and ComparePolicies (Feb 17, 2026)
+- **Feature**: Full i18n integration for 3 remaining app pages with hardcoded English strings
+- **Pages Updated**:
+  - `MyAccount.tsx` — Profile fields, subscription info, account actions
+  - `Settings.tsx` — All setting categories (appearance, notifications, AI config, export, security)
+  - `ComparePolicies.tsx` — Comparison table headers, empty states, metric labels
+- **Redundant ArrowLeft buttons removed** from all 3 pages (GlobalNavigation provides nav)
+- **~100 new TR/EN translation entries** added to `translations.ts`
+- **Test updates**: Settings.test.tsx updated for i18n mock pattern
+- **Files Changed**: `MyAccount.tsx`, `Settings.tsx`, `ComparePolicies.tsx`, `translations.ts`, `Settings.test.tsx`
+- **Commits**: `3af8b77`, `581b060`, `74c544f`
+
+### 99. Coverage nameTr Fixed at Extraction Time (Feb 17, 2026)
+- **Problem**: AI extraction set both `name` and `nameTr` to the same English value, requiring a 90+ entry display-time fallback map in `PolicyDetailView.tsx`
+- **Root Cause**: `convertToAnalyzedPolicy()` in `policy-extractor.ts` copied English name to `nameTr` without translation
+- **Solution**: Created canonical `src/lib/i18n/coverage-names.ts` as single source of truth for EN→TR coverage name mapping (167 lines, 90+ entries)
+  - `convertToAnalyzedPolicy()` now resolves `nameTr` at extraction: AI-provided → canonical map lookup → English fallback
+  - `PolicyDetailView.getLocalizedCoverageName()` simplified to field selection with legacy fallback
+  - Duplicate coverage maps removed from `translations.ts` (replaced with shared import)
+  - `ExtractedCoverage` interface updated with `nameTr` field
+  - OpenAI JSON schema updated to request `nameTr` from AI
+- **Key File**: `src/lib/i18n/coverage-names.ts` — canonical EN→TR coverage name map
+- **Files Changed**: `coverage-names.ts` (new), `policy-extractor.ts`, `PolicyDetailView.tsx`, `extraction-schema.ts`, `translations.ts`
+- **Commit**: `fc1fe9e`
+
+### 100. Redundant ArrowLeft Back Button Removed from PolicyUpload (Feb 17, 2026)
+- **Problem**: PolicyUpload had its own back arrow, conflicting with GlobalNavigation
+- **Solution**: Removed ArrowLeft button and 2 associated tests, following PolicyDashboard pattern (title only)
+- **Files Changed**: `PolicyUpload.tsx`, `PolicyUpload.test.tsx`
+- **Commit**: `90b11df`
+
+### 101. JSONB Version Increment Fix in Translation Trigger (Feb 17, 2026)
+- **Problem**: Translation system DB trigger failed to increment version counter
+- **Root Cause**: `value::text` produces quoted string `"1"` which fails integer cast
+- **Solution**: Use `value #>> '{}'` to extract plain text without JSON quotes
+- **File Changed**: `supabase/migrations/017_translation_system.sql`
+- **Commit**: `05f0f9c`
+
+### 102. ESLint Errors in Test Files (Fixed Feb 17, 2026)
+- **Problem**: 2 ESLint errors introduced in recent test changes
+  - `server/__tests__/translation-routes.test.ts:535` — constant binary expression (`'true' === 'true'`)
+  - `src/components/Settings.test.tsx:574` — unused `toast` variable
+- **Solution**: Used typed variables for dryRun comparison; prefixed unused import with `_`
+- **Result**: ESLint now at 0 errors, 20 warnings (down from 46 warnings)
+- **Commit**: `b9e498d`
+
 ---
 
 ## Turkish Market Considerations
@@ -3708,12 +3755,13 @@ connectSrc: [
 - Let Vite/Rollup handle interdependent modules automatically
 - See Known Issue #51-52 for details on the failed optimization attempt
 
-**AI Provider Fallback and Billing:**
-- If Anthropic API billing issue occurs ("credit balance too low"), system auto-falls back to OpenAI
-- Fallback adds latency (extra API round-trip after failure)
-- Admin notifications created for billing issues
-- Check Railway logs for `[AI] Anthropic failed, falling back to OpenAI`
-- 90-second timeout in TryAnalysis.tsx accommodates Document AI OCR (~50s) + AI fallback
+**AI Provider Fallback and Billing (Resolved Feb 17, 2026):**
+- Anthropic billing issue previously caused fallback to OpenAI — **now resolved**, all 3 providers healthy
+- The fallback mechanism still exists and works correctly if billing issues recur
+- If Anthropic fails for any reason (billing, rate limit, overloaded), system auto-falls back to OpenAI
+- Admin notifications created for billing/rate-limit issues
+- Verify provider health: `curl /api/ai/diagnose` — check `anthropic.valid` and `anthropic.errorCode`
+- 90-second timeout in TryAnalysis.tsx accommodates Document AI OCR (~50s) + AI extraction
 
 **Free Trial File Handoff:**
 - Files uploaded on landing page must be passed via React Router state
@@ -3791,10 +3839,10 @@ connectSrc: [
 - Test files referencing deleted exports will cause import errors — update test files when removing exports
 
 **i18n and Coverage Name Translation:**
-- `policy-extractor.ts` line 1242 sets `nameTr: coverageName` — both `name` and `nameTr` are the SAME English value from AI extraction
-- Simply checking `coverage.nameTr` is NOT enough — you must also check that `nameTr !== name` to know if it's a real Turkish translation
-- `PolicyDetailView.tsx` has a 90+ entry `COVERAGE_NAME_TR` fallback map for translating English coverage names to Turkish at display time
-- For new coverage names from AI, add entries to `COVERAGE_NAME_TR` in `PolicyDetailView.tsx`
+- Coverage `nameTr` is now resolved at extraction time in `policy-extractor.ts` (Feb 17, 2026 fix)
+- Canonical EN→TR coverage name map lives in `src/lib/i18n/coverage-names.ts` (90+ entries, single source of truth)
+- For new coverage names from AI, add entries to `COVERAGE_NAME_MAP` in `coverage-names.ts`
+- `PolicyDetailView.getLocalizedCoverageName()` now just picks the right field (name vs nameTr by locale) with legacy fallback for old extractions
 - AI-generated insights (aiInsights array) are always in English — `translateInsight()` provides runtime Turkish translation
 - When adding new insight strings in `generateStrengths()`, `generateGapsAsync()`, or `generateRecommendationsAsync()`, also add the translation to `translateInsight()` in PolicyDetailView.tsx
 - The i18n mock pattern for tests: `vi.mock('@/lib/i18n/i18n-context', () => ({ useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }) }))`
@@ -3809,7 +3857,7 @@ connectSrc: [
 - Pages rendered with GlobalNavigation should NOT have their own ArrowLeft back button or redundant nav — use title only (PolicyDashboard pattern)
 - Both nav bars have their own Globe language picker — changes persist via `localStorage('insurai_locale')`
 - Upload button in nav opens file picker directly (no navigation to `/upload`) — validated file is passed via React Router state
-- Some pages still have redundant ArrowLeft buttons (MyAccount, Settings, ComparePolicies, PolicyUpload) — these should be cleaned up for consistency
+- Redundant ArrowLeft buttons have been removed from MyAccount, Settings, ComparePolicies, and PolicyUpload (Feb 17, 2026)
 
 **Express Route Ordering in `server/routes/settings.ts`:**
 - All specific named routes (e.g., `/history`, `/regional-factors`, `/providers`, `/benchmarks`) MUST be defined BEFORE `/:category` catch-all route
@@ -3864,5 +3912,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6,000+ tests, all passing (185+ test files)
-**Last Updated**: February 12, 2026
+**Tests**: 6,200+ tests, all passing (190 test files)
+**Last Updated**: February 17, 2026

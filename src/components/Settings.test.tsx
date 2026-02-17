@@ -47,26 +47,83 @@ vi.mock('@/lib/supabase/auth-context', () => ({
   }),
 }))
 
+const mockSettingsTranslations = {
+  title: 'Settings',
+  light: 'Light',
+  dark: 'Dark',
+  system: 'System',
+  appearance: 'Appearance',
+  theme: 'Theme',
+  notifications: 'Notifications',
+  emailNotifications: 'Email Notifications',
+  pushNotifications: 'Push Notifications',
+  renewalReminders: 'Renewal Reminders',
+  marketUpdates: 'Market Updates',
+  language: 'Language',
+  security: 'Security',
+  changePassword: 'Change Password',
+  twoFactor: 'Two-Factor Authentication',
+  aiConfiguration: 'AI Configuration',
+  openaiLabel: 'OpenAI API Key (GPT-4)',
+  claudeLabel: 'Claude API Key (Anthropic)',
+  googleCloudLabel: 'Google Cloud API Key (OCR)',
+  configured: 'Configured',
+  notConfigured: 'Not configured',
+  getKey: 'Get key',
+  openaiDescription: 'Primary AI for document extraction.',
+  claudeDescription: 'Backup AI for multi-model consensus.',
+  googleCloudDescription: 'For scanned document OCR.',
+  extraction: 'Extraction',
+  consensus: 'Consensus',
+  ocr: 'OCR',
+  on: 'On',
+  off: 'Off',
+  demo: 'Demo',
+  apiKeysPrivacy: 'API keys are stored locally and never sent to our servers.',
+  languageInfo: 'Any language can be used. AI translates new languages automatically.',
+  dataExport: 'Data & Export',
+  exportCSV: 'Export to Excel (CSV)',
+  exportPDF: 'Export to PDF',
+  exportDescription: 'Export your {count} policies to Excel or PDF format for backup or sharing.',
+  storageCloud: 'Cloud (Supabase)',
+  storageLocal: 'Local Browser',
+  storageLabel: 'Storage',
+  clearAllData: 'Clear All Data',
+  accountSection: 'Account',
+  signedIn: 'Signed in',
+  openaiKeySaved: 'OpenAI API key saved',
+  openaiKeySavedDesc: 'AI-powered extraction is now enabled.',
+  openaiKeyRemoved: 'OpenAI API key removed',
+  claudeKeySaved: 'Claude API key saved',
+  claudeKeySavedDesc: 'Multi-model consensus is now available.',
+  claudeKeyRemoved: 'Claude API key removed',
+  googleKeySaved: 'Google Cloud API key saved',
+  googleKeySavedDesc: 'OCR for scanned documents is now enabled.',
+  googleKeyRemoved: 'Google Cloud API key removed',
+  noPoliciesExport: 'No policies to export',
+  policiesExported: 'Policies exported',
+  policiesExportedDesc: '{count} policies exported to CSV',
+  pdfGenerated: 'PDF report generated',
+  pdfGeneratedDesc: 'Print dialog will open to save as PDF',
+  allDataCleared: 'All data cleared',
+  allDataClearedDesc: 'Your policies have been removed.',
+  languageChanged: 'Language changed',
+  removeOpenaiTitle: 'Remove OpenAI API Key',
+  removeOpenaiDesc: 'Are you sure you want to remove the OpenAI API key?',
+  removeClaudeTitle: 'Remove Claude API Key',
+  removeClaudeDesc: 'Are you sure you want to remove the Claude API key?',
+  removeGoogleTitle: 'Remove Google Cloud API Key',
+  removeGoogleDesc: 'Are you sure you want to remove the Google Cloud API key?',
+  removeKey: 'Remove Key',
+  save: 'Save',
+  cancel: 'Cancel',
+  edit: 'Edit',
+}
+
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({
     t: {
-      settings: {
-        title: 'Settings',
-        light: 'Light',
-        dark: 'Dark',
-        system: 'System',
-        appearance: 'Appearance',
-        theme: 'Theme',
-        notifications: 'Notifications',
-        emailNotifications: 'Email Notifications',
-        pushNotifications: 'Push Notifications',
-        renewalReminders: 'Renewal Reminders',
-        marketUpdates: 'Market Updates',
-        language: 'Language',
-        security: 'Security',
-        changePassword: 'Change Password',
-        twoFactor: 'Two-Factor Authentication',
-      },
+      settings: mockSettingsTranslations,
       common: {
         back: 'Back',
       },
@@ -137,12 +194,6 @@ describe('Settings', () => {
       expect(screen.getByText('Settings')).toBeInTheDocument()
     })
 
-    it('should render back button', () => {
-      renderSettings()
-
-      expect(screen.getByLabelText('Back')).toBeInTheDocument()
-    })
-
     it('should render AI Configuration section', () => {
       renderSettings()
 
@@ -190,17 +241,6 @@ describe('Settings', () => {
       renderSettings()
 
       expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
-    })
-  })
-
-  describe('Navigation', () => {
-    it('should navigate back when back button is clicked', async () => {
-      const user = userEvent.setup()
-      renderSettings()
-
-      await user.click(screen.getByLabelText('Back'))
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
     })
   })
 
@@ -452,9 +492,39 @@ describe('Settings - RTL Support', () => {
     vi.doMock('@/lib/i18n', () => ({
       useI18n: () => ({
         t: {
-          settings: { title: 'Settings' },
+          settings: {
+            title: 'Settings', appearance: 'Appearance', theme: 'Theme',
+            light: 'Light', dark: 'Dark', system: 'System',
+            notifications: 'Notifications', emailNotifications: 'Email Notifications',
+            pushNotifications: 'Push Notifications', renewalReminders: 'Renewal Reminders',
+            marketUpdates: 'Market Updates', language: 'Language', security: 'Security',
+            changePassword: 'Change Password', twoFactor: 'Two-Factor Authentication',
+            aiConfiguration: 'AI Configuration', openaiLabel: 'OpenAI API Key (GPT-4)',
+            claudeLabel: 'Claude API Key (Anthropic)', googleCloudLabel: 'Google Cloud API Key (OCR)',
+            configured: 'Configured', notConfigured: 'Not configured', getKey: 'Get key',
+            openaiDescription: 'Primary AI.', claudeDescription: 'Backup AI.',
+            googleCloudDescription: 'For OCR.', extraction: 'Extraction', consensus: 'Consensus',
+            ocr: 'OCR', on: 'On', off: 'Off', demo: 'Demo',
+            apiKeysPrivacy: 'API keys stored locally.', languageInfo: 'Any language.',
+            dataExport: 'Data & Export', exportCSV: 'Export to Excel (CSV)', exportPDF: 'Export to PDF',
+            exportDescription: 'Export your {count} policies.', storageCloud: 'Cloud',
+            storageLocal: 'Local Browser', storageLabel: 'Storage', clearAllData: 'Clear All Data',
+            accountSection: 'Account', signedIn: 'Signed in',
+            openaiKeySaved: 'Saved', openaiKeySavedDesc: '', openaiKeyRemoved: 'Removed',
+            claudeKeySaved: 'Saved', claudeKeySavedDesc: '', claudeKeyRemoved: 'Removed',
+            googleKeySaved: 'Saved', googleKeySavedDesc: '', googleKeyRemoved: 'Removed',
+            noPoliciesExport: 'No policies', policiesExported: 'Exported', policiesExportedDesc: '{count} exported',
+            pdfGenerated: 'PDF generated', pdfGeneratedDesc: '', allDataCleared: 'Cleared',
+            allDataClearedDesc: '', languageChanged: 'Changed to {name}',
+            removeOpenaiTitle: 'Remove', removeOpenaiDesc: 'Remove?',
+            removeClaudeTitle: 'Remove', removeClaudeDesc: 'Remove?',
+            removeGoogleTitle: 'Remove', removeGoogleDesc: 'Remove?',
+            removeKey: 'Remove Key', save: 'Save', cancel: 'Cancel', edit: 'Edit',
+          },
           common: { back: 'Back' },
           nav: { signOut: 'Sign Out' },
+          success: { settingsSaved: 'Settings saved' },
+          errors: { unknownError: 'Unknown error' },
         },
         isRTL: true,
       }),
@@ -501,7 +571,7 @@ describe('Settings - Export Functionality', () => {
   })
 
   it('should show error toast when exporting CSV with no policies', async () => {
-    const { toast } = await import('sonner')
+    const { toast: _toast } = await import('sonner')
 
     vi.doMock('@/lib/policy-context', () => ({
       usePolicies: () => ({
@@ -510,9 +580,75 @@ describe('Settings - Export Functionality', () => {
       }),
     }))
 
+    // Re-mock i18n since resetModules clears all mocks
+    vi.doMock('@/lib/i18n', () => ({
+      useI18n: () => ({
+        t: {
+          settings: {
+            title: 'Settings', appearance: 'Appearance', theme: 'Theme',
+            light: 'Light', dark: 'Dark', system: 'System',
+            notifications: 'Notifications', emailNotifications: 'Email Notifications',
+            pushNotifications: 'Push Notifications', renewalReminders: 'Renewal Reminders',
+            marketUpdates: 'Market Updates', language: 'Language', security: 'Security',
+            changePassword: 'Change Password', twoFactor: 'Two-Factor Authentication',
+            aiConfiguration: 'AI Configuration', openaiLabel: 'OpenAI API Key (GPT-4)',
+            claudeLabel: 'Claude API Key (Anthropic)', googleCloudLabel: 'Google Cloud API Key (OCR)',
+            configured: 'Configured', notConfigured: 'Not configured', getKey: 'Get key',
+            openaiDescription: 'Primary AI.', claudeDescription: 'Backup AI.',
+            googleCloudDescription: 'For OCR.', extraction: 'Extraction', consensus: 'Consensus',
+            ocr: 'OCR', on: 'On', off: 'Off', demo: 'Demo',
+            apiKeysPrivacy: 'API keys stored locally.', languageInfo: 'Any language.',
+            dataExport: 'Data & Export', exportCSV: 'Export to Excel (CSV)', exportPDF: 'Export to PDF',
+            exportDescription: 'Export your {count} policies.', storageCloud: 'Cloud',
+            storageLocal: 'Local Browser', storageLabel: 'Storage', clearAllData: 'Clear All Data',
+            accountSection: 'Account', signedIn: 'Signed in',
+            openaiKeySaved: 'Saved', openaiKeySavedDesc: '', openaiKeyRemoved: 'Removed',
+            claudeKeySaved: 'Saved', claudeKeySavedDesc: '', claudeKeyRemoved: 'Removed',
+            googleKeySaved: 'Saved', googleKeySavedDesc: '', googleKeyRemoved: 'Removed',
+            noPoliciesExport: 'No policies to export', policiesExported: 'Exported',
+            policiesExportedDesc: '{count} exported', pdfGenerated: 'PDF generated',
+            pdfGeneratedDesc: '', allDataCleared: 'Cleared', allDataClearedDesc: '',
+            languageChanged: 'Changed to {name}',
+            removeOpenaiTitle: 'Remove', removeOpenaiDesc: 'Remove?',
+            removeClaudeTitle: 'Remove', removeClaudeDesc: 'Remove?',
+            removeGoogleTitle: 'Remove', removeGoogleDesc: 'Remove?',
+            removeKey: 'Remove Key', save: 'Save', cancel: 'Cancel', edit: 'Edit',
+          },
+          common: { back: 'Back' },
+          nav: { signOut: 'Sign Out' },
+          success: { settingsSaved: 'Settings saved' },
+          errors: { unknownError: 'Unknown error' },
+        },
+        isRTL: false,
+      }),
+      useLanguageSelector: () => ({
+        currentLocale: 'en',
+        locales: [
+          { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
+          { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷' },
+        ],
+        setLocale: vi.fn(),
+        isLoading: false,
+        progress: { status: 'idle', message: '', progress: 0 },
+      }),
+    }))
+
+    // Also re-mock other dependencies that resetModules clears
+    vi.doMock('react-router-dom', async () => {
+      const actual = await vi.importActual('react-router-dom')
+      return { ...actual, useNavigate: () => mockNavigate }
+    })
+    vi.doMock('@/lib/supabase/auth-context', () => ({
+      useAuth: () => ({ user: { id: 'user-1', email: 'test@example.com' }, signOut: mockSignOut }),
+    }))
+    vi.doMock('@/lib/supabase', () => ({ isSupabaseConfigured: () => false }))
+    vi.doMock('@/lib/export', () => ({ exportToCSV: vi.fn(), exportPoliciesToPDF: vi.fn() }))
+    vi.doMock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
     // Re-import to get the new mock
     vi.resetModules()
     const { Settings: SettingsNoPolicies } = await import('./Settings')
+    const { toast: freshToast } = await import('sonner')
 
     render(
       <BrowserRouter>
@@ -523,7 +659,7 @@ describe('Settings - Export Functionality', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /export to excel/i }))
 
-    expect(toast.error).toHaveBeenCalledWith('No policies to export')
+    expect(freshToast.error).toHaveBeenCalledWith('No policies to export')
   })
 })
 
