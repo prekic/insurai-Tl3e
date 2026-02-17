@@ -66,11 +66,11 @@ global.document = {
   },
 } as unknown as Document
 
-// Mock Blob
-global.Blob = vi.fn((content, options) => ({
-  content,
-  options,
-})) as unknown as typeof Blob
+// Mock Blob - must use function() syntax for Vitest 4 constructor support
+global.Blob = vi.fn(function (this: Record<string, unknown>, content: unknown, options: unknown) {
+  this.content = content
+  this.options = options
+}) as unknown as typeof Blob
 
 const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy => ({
   id: 'policy-1',
