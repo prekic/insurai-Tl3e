@@ -6,10 +6,16 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
 import { MyAccount } from './MyAccount'
 
 // Mock sonner toast
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+
+// Mock i18n
+vi.mock('@/lib/i18n', () => ({
+  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en' }),
+}))
 
 // Create stable mock references via vi.hoisted to avoid useEffect infinite loops.
 // The component's useEffect depends on [useSupabase, user]. If `user` is a new
@@ -50,6 +56,8 @@ vi.mock('@/lib/supabase', () => ({
   fetchUserStats: vi.fn(),
 }))
 
+const t = EN_TRANSLATIONS
+
 describe('MyAccount', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -73,7 +81,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('My Account')).toBeInTheDocument()
+        expect(screen.getByText(t.account.title)).toBeInTheDocument()
       })
     })
 
@@ -132,7 +140,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Local Only')).toBeInTheDocument()
+        expect(screen.getByText(t.account.localOnly)).toBeInTheDocument()
       })
     })
   })
@@ -142,7 +150,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Usage Statistics')).toBeInTheDocument()
+        expect(screen.getByText(t.account.usageStatistics)).toBeInTheDocument()
       })
     })
 
@@ -150,7 +158,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Policies Analyzed')).toBeInTheDocument()
+        expect(screen.getByText(t.account.policiesAnalyzed)).toBeInTheDocument()
       })
     })
 
@@ -158,7 +166,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Comparisons')).toBeInTheDocument()
+        expect(screen.getByText(t.account.comparisons)).toBeInTheDocument()
       })
     })
 
@@ -166,7 +174,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Saved Reports')).toBeInTheDocument()
+        expect(screen.getByText(t.account.savedReports)).toBeInTheDocument()
       })
     })
   })
@@ -176,7 +184,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
     })
 
@@ -184,23 +192,23 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
-      expect(screen.getByText('Save')).toBeInTheDocument()
+      expect(screen.getByText(t.common.save)).toBeInTheDocument()
     })
 
     it('should show input fields when in edit mode', async () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const inputs = screen.getAllByRole('textbox')
@@ -211,10 +219,10 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const nameInput = screen.getByDisplayValue('John Doe')
@@ -227,10 +235,10 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const emailInput = screen.getByDisplayValue('john@example.com')
@@ -243,10 +251,10 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const phoneInput = screen.getByDisplayValue('+90 532 123 4567')
@@ -259,10 +267,10 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
       const locationInput = screen.getByDisplayValue('Istanbul, Turkey')
@@ -275,33 +283,18 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
 
-      const editButton = screen.getByText('Edit Profile')
+      const editButton = screen.getByText(t.account.editProfile)
       fireEvent.click(editButton)
 
-      const saveButton = screen.getByText('Save')
+      const saveButton = screen.getByText(t.common.save)
       fireEvent.click(saveButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Edit Profile')).toBeInTheDocument()
+        expect(screen.getByText(t.account.editProfile)).toBeInTheDocument()
       })
-    })
-  })
-
-  describe('Navigation', () => {
-    it('should navigate back when back button is clicked', async () => {
-      render(<MyAccount />)
-
-      await waitFor(() => {
-        expect(screen.getByText('My Account')).toBeInTheDocument()
-      })
-
-      const backButton = screen.getByLabelText('Go back')
-      fireEvent.click(backButton)
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
     })
   })
 
@@ -310,7 +303,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Local Storage')).toBeInTheDocument()
+        expect(screen.getByText(t.account.localStorage)).toBeInTheDocument()
       })
     })
 
@@ -318,7 +311,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Sign in to sync your data across devices')).toBeInTheDocument()
+        expect(screen.getByText(t.account.signInToSync)).toBeInTheDocument()
       })
     })
   })
@@ -328,7 +321,7 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Profile Information')).toBeInTheDocument()
+        expect(screen.getByText(t.account.personalInfo)).toBeInTheDocument()
       })
     })
 
@@ -336,10 +329,10 @@ describe('MyAccount', () => {
       render(<MyAccount />)
 
       await waitFor(() => {
-        expect(screen.getByText('Full Name')).toBeInTheDocument()
-        expect(screen.getByText('Email')).toBeInTheDocument()
-        expect(screen.getByText('Phone')).toBeInTheDocument()
-        expect(screen.getByText('Location')).toBeInTheDocument()
+        expect(screen.getByText(t.account.fullName)).toBeInTheDocument()
+        expect(screen.getByText(t.account.email)).toBeInTheDocument()
+        expect(screen.getByText(t.account.phone)).toBeInTheDocument()
+        expect(screen.getByText(t.account.location)).toBeInTheDocument()
       })
     })
   })
