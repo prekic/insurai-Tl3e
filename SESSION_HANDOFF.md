@@ -63,7 +63,8 @@ This session focused on **documentation review and cleanup** for handoff readine
 ## All Commits on This Branch
 
 ```
-# Branch: claude/review-handoff-docs-CYZzv (8 code + docs commits)
+# Branch: claude/review-handoff-docs-CYZzv (9 commits: 6 code + 3 docs)
+2e0d40f docs: update project documentation for Feb 17 session                    ← Feb 17 (this session)
 b9e498d fix: resolve 2 ESLint errors and update CLAUDE.md metadata              ← Feb 17 (this session)
 0dd926a docs: mark Anthropic billing issue as resolved (Feb 17, 2026)            ← Feb 17 (this session)
 fc1fe9e Fix coverage nameTr at extraction time instead of display-time fallback  ← Feb 17
@@ -120,13 +121,14 @@ fc1fe9e Fix coverage nameTr at extraction time instead of display-time fallback 
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
 ### Pending Deployment
-- 8 commits on `claude/review-handoff-docs-CYZzv` not yet deployed to production
+- 9 commits on `claude/review-handoff-docs-CYZzv` — must be **merged to main** first, then deployed
+- **Merge command**: `git checkout main && git merge claude/review-handoff-docs-CYZzv && git push`
 - Changes include:
   - **Frontend**: i18n for 3 more pages, coverage nameTr fix, ArrowLeft cleanup
   - **Server**: Translation trigger JSONB fix
   - **New file**: `src/lib/i18n/coverage-names.ts`
 - No new environment variables introduced
-- No new database migrations (trigger fix is in existing `017_translation_system.sql`)
+- No new database migrations (trigger fix is in existing `017_translation_system.sql` — only matters if migration hasn't been applied yet)
 
 ### Post-Deployment Verification
 1. Visit MyAccount, Settings, ComparePolicies — verify all strings translate correctly in TR/EN
@@ -144,7 +146,7 @@ fc1fe9e Fix coverage nameTr at extraction time instead of display-time fallback 
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Deploy latest commits** — 8 commits with i18n, coverage nameTr fix, ESLint cleanup
+1. **Merge branch and deploy** — Merge `claude/review-handoff-docs-CYZzv` to main, push, deploy (9 commits: i18n, coverage nameTr fix, ESLint cleanup)
 2. **Apply translation migrations** — `017`, `018`, `019` to Supabase for DB-driven i18n
 3. **Smoke test production** — Verify all 3 AI providers, extraction pipeline, i18n
 
