@@ -272,14 +272,101 @@ Expected response:
 
 ---
 
+## 3a. Smoke Test Results (February 17, 2026)
+
+### AI Provider Health (`/api/ai/diagnose`)
+
+| Provider | Configured | Valid | Latency | Auth Method |
+|----------|-----------|-------|---------|-------------|
+| OpenAI | Yes | Yes | 1,166ms | API key |
+| Anthropic | Yes | Yes | 798ms | API key |
+| Google | Yes | Yes | 159ms | OAuth |
+
+**Summary**: `extractionReady: true`, `ocrReady: true` — all providers fully operational.
+
+### Extraction Pipeline (`/api/ai/providers`)
+
+| Capability | Status |
+|-----------|--------|
+| OpenAI extraction | Available |
+| Anthropic extraction | Available |
+| Google Vision OCR | Available |
+| Document AI | Available |
+
+### Server Health & Security Headers
+
+| Check | Result |
+|-------|--------|
+| `/api/health` status | `"ok"` |
+| Database connectivity | `true` |
+| HSTS header | `max-age=31536000; includeSubDomains` |
+| CSP header | Full policy present (script-src, connect-src, etc.) |
+| X-Content-Type-Options | `nosniff` |
+| Referrer-Policy | `no-referrer` |
+| Asset caching (`/assets/*`) | `max-age=31536000, immutable` |
+| HTML caching (`/`) | `no-cache, no-store, must-revalidate` |
+
+### i18n & Translation System
+
+| Check | Result |
+|-------|--------|
+| `/api/translations/locales` | 2 locales (EN default, TR active) |
+| `/api/translations/en` | 790 keys across 24 sections |
+| `/api/translations/tr` | 790 keys across 24 sections |
+| Translation version | v2 |
+| Coverage name translations | 90 entries in `coverageNames` section |
+| AI insight translations | 15 entries in `insightTranslations` section |
+| `insurai_locale` in JS bundle | Present (locale persistence) |
+| `/api/translations/` in JS bundle | Present (DB-backed loading) |
+
+### Admin Diagnostics (`/api/admin/diagnostics`)
+
+| Config Item | Status |
+|-------------|--------|
+| JWT Secret | Set (128 chars) |
+| Supabase URL | Set |
+| VITE Supabase URL | Set |
+| Service Role Key | Set |
+| Supabase client | Initialized |
+| OpenAI key | Set |
+| Anthropic key | Set |
+| Google API key | Set |
+| GCP Service Account | Set |
+| Node environment | `production` |
+
+### Translation Section Breakdown
+
+| Section | Keys | Section | Keys |
+|---------|------|---------|------|
+| a11y | 7 | insights | 7 |
+| account | 9 | insurance | 23 |
+| auth | 29 | landing | 189 |
+| chat | 47 | nav | 13 |
+| common | 24 | policy | 35 |
+| comparison | 13 | preferences | 18 |
+| coverageCategories | 9 | settings | 18 |
+| coverageNames | 90 | shared | 26 |
+| dashboard | 13 | success | 5 |
+| errors | 12 | tryAnalysis | 39 |
+| evaluation | 16 | upload | 109 |
+| help | 24 | insightTranslations | 15 |
+
+**Total**: 790 keys × 2 locales = 1,580 translation strings
+
+---
+
 ## 4. Final Go/No-Go Checklist
 
 ### Must Have (Blockers)
-- [ ] All critical user flows pass
-- [ ] Health check returns healthy
-- [ ] Anthropic credits topped up
-- [ ] No console errors on key pages
-- [ ] Mobile responsive works
+- [x] Health check returns healthy
+- [x] Anthropic credits topped up (valid: true, 798ms latency)
+- [x] All 3 AI providers operational
+- [x] Database connected and translation data seeded
+- [x] Security headers present (HSTS, CSP, nosniff)
+- [x] Asset caching correct (immutable for hashed, no-cache for HTML)
+- [ ] All critical user flows pass (manual browser testing needed)
+- [ ] No console errors on key pages (manual browser testing needed)
+- [ ] Mobile responsive works (manual browser testing needed)
 
 ### Should Have (Launch Day Fixes)
 - [ ] All secondary flows pass
@@ -344,4 +431,4 @@ If critical issues are found post-launch:
 ---
 
 *Document owner: Erdem*
-*Last updated: January 30, 2026*
+*Last updated: February 17, 2026*
