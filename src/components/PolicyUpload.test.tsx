@@ -177,22 +177,6 @@ describe('PolicyUpload', () => {
       expect(screen.getByText('Use Samples')).toBeInTheDocument()
     })
 
-    it('should show back button', () => {
-      renderPolicyUpload()
-
-      expect(screen.getByLabelText('Go back')).toBeInTheDocument()
-    })
-  })
-
-  describe('Navigation', () => {
-    it('should navigate back when back button is clicked', async () => {
-      const user = userEvent.setup()
-      renderPolicyUpload()
-
-      await user.click(screen.getByLabelText('Go back'))
-
-      expect(mockNavigate).toHaveBeenCalledWith(-1)
-    })
   })
 
   describe('Sample Policies', () => {
