@@ -226,3 +226,4 @@ marimo/_lsp/
 __marimo__/
 gcp-service-account.json
 .gcp-credentials-temp.json
+coverage-temp/
