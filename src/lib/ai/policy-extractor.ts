@@ -33,6 +33,7 @@ import {
   type ValidationResult,
 } from '@/lib/extraction'
 import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
+import { TR_TRANSLATIONS } from '@/lib/i18n/translations'
 
 export interface ExtractionResult {
   success: true
@@ -1053,6 +1054,8 @@ export async function extractPolicyFromDocument(
       ]
       if (validationInsights.length > 0 && policy.aiInsights) {
         policy.aiInsights = [...validationInsights, ...policy.aiInsights]
+        // Re-translate after prepending validation insights
+        policy.aiInsightsTr = translateInsightsToTr(policy.aiInsights)
       }
     }
 
@@ -1361,6 +1364,9 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
     // Gap analysis is optional, continue without it
   }
 
+  // Translate final aiInsights to Turkish (after all modifications like validation warnings)
+  basePolicy.aiInsightsTr = translateInsightsToTr(basePolicy.aiInsights)
+
   return basePolicy
 }
 
@@ -1435,8 +1441,59 @@ function createEmptyExtractedData(): ExtractedPolicyData {
 }
 
 /**
- * Generate all AI insights including currency validation warnings
+ * Translate an English insight string to Turkish at extraction time.
+ * Mirrors the display-time translateInsight() logic in PolicyDetailView
+ * but runs once at extraction so the result is persisted.
  */
+function translateInsightToTr(insight: string): string {
+  const trMap = TR_TRANSLATIONS.insightTranslations
+
+  // Extract emoji prefix if present (✓ ⚠ 💡 ❌ 🔍 etc.)
+  // eslint-disable-next-line no-misleading-character-class
+  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌🔍\uFE0F]\s*)/u)
+  const prefix = prefixMatch ? prefixMatch[1] : ''
+  const text = prefix ? insight.slice(prefix.length).trim() : insight
+
+  // Exact match from translation map
+  if (trMap[text] && trMap[text] !== text) {
+    return prefix ? `${prefix}${trMap[text]}` : trMap[text]
+  }
+
+  // Dynamic pattern: "Missing common coverage: X"
+  if (text.startsWith('Missing common coverage:')) {
+    const name = text.replace('Missing common coverage:', '').trim()
+    const template = trMap['missingCoverage'] || 'Yaygın teminat eksik: {name}'
+    const translated = template.replace('{name}', name)
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  // Dynamic pattern: "Invalid TC Kimlik: X"
+  if (text.startsWith('Invalid TC Kimlik:')) {
+    const value = text.replace('Invalid TC Kimlik:', '').trim()
+    const template = trMap['invalidTcKimlik'] || 'Geçersiz TC Kimlik: {value}'
+    const translated = template.replace('{value}', value)
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  // Dynamic pattern: "Market premiums increased N% YoY..."
+  const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
+  if (yoyMatch) {
+    const template = trMap['marketPremiumsYoY'] || 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin'
+    const translated = template.replace('{percent}', yoyMatch[1])
+    return prefix ? `${prefix}${translated}` : translated
+  }
+
+  // No translation found — return original
+  return insight
+}
+
+/**
+ * Translate an array of English insight strings to Turkish.
+ */
+function translateInsightsToTr(insights: string[]): string[] {
+  return insights.map(translateInsightToTr)
+}
+
 /**
  * Generate AI insights (async, DB-backed benchmarks)
  */
@@ -1929,6 +1986,9 @@ export function comprehensiveToAnalyzedPolicy(
       usage: data.vehicle.usageType,
     } : undefined,
   }
+
+  // Translate insights to Turkish at extraction time
+  policy.aiInsightsTr = translateInsightsToTr(policy.aiInsights)
 
   return policy
 }

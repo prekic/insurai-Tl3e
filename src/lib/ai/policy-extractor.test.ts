@@ -1046,6 +1046,10 @@ describe('Policy Conversion', () => {
     if (result.success) {
       expect(result.policy.aiInsights).toBeDefined()
       expect(Array.isArray(result.policy.aiInsights)).toBe(true)
+      // aiInsightsTr should be populated at extraction time
+      expect(result.policy.aiInsightsTr).toBeDefined()
+      expect(Array.isArray(result.policy.aiInsightsTr)).toBe(true)
+      expect(result.policy.aiInsightsTr!.length).toBe(result.policy.aiInsights.length)
     }
   })
 })
