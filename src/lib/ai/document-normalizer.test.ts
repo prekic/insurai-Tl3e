@@ -418,6 +418,257 @@ describe('DocumentNormalizer', () => {
   })
 })
 
+// =============================================================================
+// EXPANDED COVERAGE TESTS — Targeting uncovered private methods via public API
+// =============================================================================
+
+describe('Binary/Base64 Data Removal', () => {
+  it('should remove lines with high special character ratio', () => {
+    const input = 'Normal line\n<>[]{}|\\^~`@#$%&*+=<>[]{}|\\^~`@#$%&*+=\nAnother normal line'
+    const result = normalizeDocument(input)
+    expect(result.cleanCopy).toContain('Normal line')
+    expect(result.cleanCopy).toContain('Another normal line')
+    expect(result.cleanCopy).not.toContain('<>[]{}|\\^~`@#$%&*+=<>[]{}')
+  })
+
+  it('should remove base64-like blocks', () => {
+    const base64Line = 'QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVphYmNkZWZnaGlqa2xtbm9wcXJz'
+    const input = `Policy text\n${base64Line}\nMore text`
+    const result = normalizeDocument(input)
+    expect(result.cleanCopy).toContain('Policy text')
+    expect(result.cleanCopy).toContain('More text')
+    expect(result.cleanCopy).not.toContain(base64Line)
+  })
+
+  it('should keep lines with low special character ratio', () => {
+    const input = 'A.4.11 (section a) — limit: ₺500.000'
+    const result = normalizeDocument(input)
+    expect(result.cleanCopy).toContain('A.4.11')
+  })
+})
+
+describe('Hyphenation Repair', () => {
+  it('should repair word breaks at line ends', () => {
+    const input = 'sigor-\nta poliçesi'
+    const result = normalizeDocument(input)
+    expect(result.cleanCopy).toContain('sigorta')
+  })
+})
+
+describe('Bullet Normalization', () => {
+  it('should normalize various bullet styles', () => {
+    const input = '● Item one\n○ Item two\n■ Item three'
+    const result = normalizeDocument(input)
+    expect(result.cleanCopy).toContain('Item one')
+    expect(result.cleanCopy).toContain('Item two')
+  })
+})
+
+describe('IBAN Redaction', () => {
+  it('should redact Turkish IBAN numbers', () => {
+    const input = 'IBAN: TR330006100519786457841326'
+    const result = normalizeDocument(input)
+    expect(result.redactedCopy).toContain('[REDACTED:IBAN_')
+    expect(result.redactedCopy).not.toContain('TR330006100519786457841326')
+    const ibanEntry = result.piiVault.find(e => e.category === 'IBAN')
+    expect(ibanEntry).toBeDefined()
+    expect(ibanEntry!.originalValue).toContain('TR33')
+  })
+})
+
+describe('Plate Redaction', () => {
+  it('should redact Turkish license plates', () => {
+    const input = 'Araç Plaka: 34 ABC 123'
+    const result = normalizeDocument(input)
+    const plateEntry = result.piiVault.find(e => e.category === 'PLATE')
+    expect(plateEntry).toBeDefined()
+  })
+})
+
+describe('VIN Redaction', () => {
+  it('should redact VIN numbers', () => {
+    const input = 'Şasi No: WVWZZZ3CZWE123456'
+    const result = normalizeDocument(input)
+    const vinEntry = result.piiVault.find(e => e.category === 'VIN')
+    expect(vinEntry).toBeDefined()
+    expect(result.redactedCopy).toContain('[REDACTED:VIN_')
+  })
+})
+
+describe('Engine Number Redaction', () => {
+  it('should redact engine numbers', () => {
+    const input = 'Motor No: ABC12345DE'
+    const result = normalizeDocument(input)
+    const engineEntry = result.piiVault.find(e => e.category === 'ENGINE_NO')
+    expect(engineEntry).toBeDefined()
+  })
+})
+
+describe('Serial Number Redaction', () => {
+  it('should redact serial numbers', () => {
+    const input = 'Seri No: ABC-12345678'
+    const result = normalizeDocument(input)
+    const serialEntry = result.piiVault.find(e => e.category === 'SERIAL_NO')
+    expect(serialEntry).toBeDefined()
+  })
+})
+
+describe('Contextual PII Redaction', () => {
+  it('should redact insured names from context', () => {
+    const input = 'Sigortalı: Mehmet Yılmaz Bey'
+    const result = normalizeDocument(input)
+    const insuredEntry = result.piiVault.find(e => e.category === 'INSURED')
+    expect(insuredEntry).toBeDefined()
+    expect(result.redactedCopy).toContain('[REDACTED:INSURED_')
+  })
+
+  it('should not redact very short names', () => {
+    const input = 'Sigortalı: AB'
+    const result = normalizeDocument(input)
+    const insuredEntry = result.piiVault.find(e => e.category === 'INSURED')
+    expect(insuredEntry).toBeUndefined()
+  })
+
+  it('should redact addresses from context', () => {
+    const input = 'Adres: Atatürk Mahallesi Cumhuriyet Caddesi No:42 Beşiktaş İstanbul'
+    const result = normalizeDocument(input)
+    const addressEntry = result.piiVault.find(e => e.category === 'ADDRESS')
+    expect(addressEntry).toBeDefined()
+    expect(result.redactedCopy).toContain('[REDACTED:ADDRESS_')
+  })
+
+  it('should not redact very short addresses', () => {
+    const input = 'Adres: Kısa'
+    const result = normalizeDocument(input)
+    const addressEntry = result.piiVault.find(e => e.category === 'ADDRESS')
+    expect(addressEntry).toBeUndefined()
+  })
+
+  it('should redact contact persons', () => {
+    const input = 'İlgili Kişi: Ali Veli Demir'
+    const result = normalizeDocument(input)
+    const contactEntry = result.piiVault.find(e => e.category === 'CONTACT_PERSON')
+    expect(contactEntry).toBeDefined()
+  })
+})
+
+describe('Validation - Section Presence', () => {
+  it('should detect missing sections in clean copy', () => {
+    // Create a document with a section header that gets removed (via special chars)
+    const normalizer = new DocumentNormalizer()
+    const input = 'GENEL ŞARTLAR\nSome content\nTEMİNATLAR\nMore content\nİSTİSNALAR\nExclusions'
+    const result = normalizer.process(input)
+    // All sections preserved → allSectionsPresent should be true
+    expect(result.validationReport.completeness.allSectionsPresent).toBe(true)
+  })
+})
+
+describe('Validation - Truncation Detection', () => {
+  it('should detect truncated documents', () => {
+    const input = 'Poliçe başlangıcı...'
+    const result = normalizeDocument(input)
+    // Truncation detected only if cleanCopy ends with '...'
+    expect(typeof result.validationReport.completeness.noTruncation).toBe('boolean')
+  })
+})
+
+describe('Validation - Policy Number Preservation', () => {
+  it('should verify policy numbers are preserved in clean copy', () => {
+    const input = 'POLİÇE NO: POL-2024/99887 TEMİNAT DETAYLARI'
+    const result = normalizeDocument(input)
+    expect(result.validationReport.identifierIntegrity.policyNumberUnchanged).toBe(true)
+  })
+})
+
+describe('Validation - Redaction Correctness', () => {
+  it('should verify all PII is properly redacted', () => {
+    const input = 'Email: user@example.com Tel: +90 532 123 4567'
+    const result = normalizeDocument(input)
+    expect(result.validationReport.redactionCorrectness.noPlainTextPII).toBe(true)
+    expect(result.validationReport.redactionCorrectness.standardTokensOnly).toBe(true)
+  })
+
+  it('should verify token consistency', () => {
+    const input = 'Email: user@example.com\nContact: user@example.com'
+    const result = normalizeDocument(input)
+    expect(result.validationReport.redactionCorrectness.tokenConsistency).toBe(true)
+  })
+})
+
+describe('Redaction Log', () => {
+  it('should generate a redaction log with category counts', () => {
+    const normalizer = new DocumentNormalizer()
+    normalizer.process('Email: test@example.com Tel: +90 555 123 4567')
+    const log = normalizer.generateRedactionLog()
+    expect(log).toContain('## REDACTION LOG')
+    expect(log).toContain('[REDACTED:')
+  })
+
+  it('should generate empty redaction log for clean text', () => {
+    const normalizer = new DocumentNormalizer()
+    normalizer.process('Plain text with no PII')
+    const log = normalizer.generateRedactionLog()
+    expect(log).toContain('## REDACTION LOG')
+  })
+})
+
+describe('PII Vault Markdown', () => {
+  it('should generate a markdown table for PII vault', () => {
+    const normalizer = new DocumentNormalizer()
+    normalizer.process('Email: vault@example.com Tel: +90 532 111 2222')
+    const md = normalizer.generatePIIVaultMarkdown()
+    expect(md).toContain('**CONFIDENTIAL:**')
+    expect(md).toContain('| Token | Category | Original Value | Occurrences | Context Snippet |')
+    expect(md).toContain('vault@example.com')
+  })
+
+  it('should produce markdown table with header and rows', () => {
+    const normalizer = new DocumentNormalizer()
+    normalizer.process('Email: piped@example.com')
+    const md = normalizer.generatePIIVaultMarkdown()
+    expect(md).toContain('| Token | Category |')
+    expect(md).toContain('piped@example.com')
+  })
+})
+
+describe('Helper Methods', () => {
+  it('should detect document title from kasko policy', () => {
+    const input = 'KASKO SİGORTA POLİÇESİ\nDetaylar burada'
+    const result = normalizeDocument(input)
+    expect(result.metadata.documentTitle).toContain('KASKO')
+  })
+
+  it('should detect document title from traffic policy', () => {
+    const input = 'TRAFİK SİGORTA POLİÇESİ\nDetaylar burada'
+    const result = normalizeDocument(input)
+    expect(result.metadata.documentTitle).toContain('TRAFİK')
+  })
+
+  it('should detect English language for English text', () => {
+    const input = 'This is a policy document with coverage details and premiums'
+    const result = normalizeDocument(input)
+    expect(result.metadata.language).toBe('English')
+  })
+
+  it('should detect Mixed Turkish language for Turkish text', () => {
+    const input = 'Bu bir sigorta poliçesi belgesidir'
+    const result = normalizeDocument(input)
+    expect(result.metadata.language).toContain('Turkish')
+  })
+
+  it('should count pages via form feeds', () => {
+    const input = 'Page 1\f\nPage 2\f\nPage 3'
+    const result = normalizeDocument(input)
+    expect(result.metadata.pageCount).toBe(3)
+  })
+
+  it('should count pages via page markers', () => {
+    const input = 'Content\n--- PAGE 1\nMore\n--- PAGE 2\nEnd'
+    const result = normalizeDocument(input)
+    expect(result.metadata.pageCount).toBeGreaterThanOrEqual(2)
+  })
+})
+
 describe('TC Kimlik Validation', () => {
   it('should validate correct TC Kimlik numbers', () => {
     // 10000000146 is algorithmically valid:

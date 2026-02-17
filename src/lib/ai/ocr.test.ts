@@ -45,7 +45,15 @@ vi.stubGlobal('fetch', mockFetch)
 vi.stubGlobal('btoa', (str: string) => Buffer.from(str, 'binary').toString('base64'))
 
 // Import after mocking
-import { isLikelyScannedPDF, performOCR, performMultiPageOCR } from './ocr'
+import {
+  isLikelyScannedPDF,
+  performOCR,
+  performMultiPageOCR,
+  isDocumentAIConfigured,
+  extractFormFieldMap,
+  findFormField,
+  TURKISH_FORM_FIELD_PATTERNS,
+} from './ocr'
 
 // Helper to create mock File with arrayBuffer support (jsdom doesn't have File.arrayBuffer)
 function createMockFile(content: string = 'test content', name: string = 'test.pdf'): File {
@@ -964,6 +972,265 @@ describe('OCR Module', () => {
       if (result.success) {
         expect(result.data.isScanned).toBe(true)
       }
+    })
+
+    it('should use proxy for multi-page OCR when configured', async () => {
+      mockIsProxyConfigured.mockReturnValue(true)
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+      mockIsOCRConfigured.mockReturnValue(true)
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          data: { text: 'Proxy OCR text', confidence: 0.88 },
+        }),
+      })
+
+      const pages = [createMockBlob(), createMockBlob()]
+      const result = await performMultiPageOCR(pages)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toContain('Proxy OCR text')
+        expect(result.data.pageCount).toBe(2)
+      }
+
+      // Should have called proxy URL
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:4001/api/ai/ocr',
+        expect.objectContaining({ method: 'POST' })
+      )
+    })
+
+    it('should handle proxy returning non-ok response', async () => {
+      mockIsProxyConfigured.mockReturnValue(true)
+      mockGetProxyUrl.mockReturnValue('http://localhost:4001')
+      mockIsOCRConfigured.mockReturnValue(true)
+
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 500,
+        json: async () => ({}),
+      })
+
+      const pages = [createMockBlob()]
+      const result = await performMultiPageOCR(pages)
+
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.text).toBe('')
+        expect(result.data.confidence).toBe(0)
+      }
+    })
+
+    it('should handle fetch error in multi-page OCR', async () => {
+      mockIsProxyConfigured.mockReturnValue(false)
+      mockGetProxyUrl.mockReturnValue(null)
+      mockIsOCRConfigured.mockReturnValue(true)
+      mockGetGoogleCloudApiKey.mockReturnValue('test-api-key')
+
+      mockFetch.mockRejectedValue(new Error('Network error'))
+
+      const pages = [createMockBlob()]
+      const result = await performMultiPageOCR(pages)
+
+      expect(result.success).toBe(false)
+      if (!result.success) {
+        expect(result.error.code).toBe('OCR_FAILED')
+        expect(result.error.message).toContain('Network error')
+      }
+    })
+  })
+
+  describe('isDocumentAIConfigured', () => {
+    it('should return true when proxy is configured', () => {
+      mockIsProxyConfigured.mockReturnValue(true)
+      expect(isDocumentAIConfigured()).toBe(true)
+    })
+
+    it('should return false when proxy is not configured', () => {
+      mockIsProxyConfigured.mockReturnValue(false)
+      expect(isDocumentAIConfigured()).toBe(false)
+    })
+  })
+
+  describe('isLikelyScannedPDF', () => {
+    it('should return true for very low text density', () => {
+      expect(isLikelyScannedPDF('short text', 5)).toBe(true)
+    })
+
+    it('should return false for text-heavy PDFs', () => {
+      const longText = 'A'.repeat(5000) // 5000 chars, 1 page
+      expect(isLikelyScannedPDF(longText, 1)).toBe(false)
+    })
+
+    it('should return true when avg chars per page is below 200', () => {
+      const text = 'A'.repeat(399) // 399 chars / 2 pages = 199.5
+      expect(isLikelyScannedPDF(text, 2)).toBe(true)
+    })
+
+    it('should return false when avg chars per page is 200 or more', () => {
+      const text = 'A'.repeat(400) // 400 chars / 2 pages = 200
+      expect(isLikelyScannedPDF(text, 2)).toBe(false)
+    })
+
+    it('should handle empty text', () => {
+      expect(isLikelyScannedPDF('', 1)).toBe(true)
+    })
+
+    it('should handle zero pages (edge case)', () => {
+      // pageCount is clamped to Math.max(1, pageCount) internally
+      expect(isLikelyScannedPDF('A'.repeat(100), 0)).toBe(true)
+    })
+  })
+
+  describe('extractFormFieldMap', () => {
+    it('should convert form fields to key-value map', () => {
+      const fields: FormField[] = [
+        { name: 'Policy Number', value: 'POL-001', confidence: 0.9 },
+        { name: 'Premium', value: '₺5,000', confidence: 0.85 },
+      ]
+
+      const map = extractFormFieldMap(fields)
+      expect(map['policy number']).toBe('POL-001')
+      expect(map['premium']).toBe('₺5,000')
+    })
+
+    it('should normalize field names to lowercase', () => {
+      const fields: FormField[] = [
+        { name: 'POLİÇE NO', value: '12345', confidence: 0.9 },
+      ]
+
+      const map = extractFormFieldMap(fields)
+      expect(map['poli̇çe no']).toBeDefined()
+    })
+
+    it('should trim field names and values', () => {
+      const fields: FormField[] = [
+        { name: '  Name  ', value: '  John Doe  ', confidence: 0.9 },
+      ]
+
+      const map = extractFormFieldMap(fields)
+      expect(map['name']).toBe('John Doe')
+    })
+
+    it('should skip fields with low confidence (<=0.5)', () => {
+      const fields: FormField[] = [
+        { name: 'Low', value: 'value', confidence: 0.5 },
+        { name: 'High', value: 'value', confidence: 0.51 },
+      ]
+
+      const map = extractFormFieldMap(fields)
+      expect(map['low']).toBeUndefined()
+      expect(map['high']).toBe('value')
+    })
+
+    it('should skip fields with empty name or value', () => {
+      const fields: FormField[] = [
+        { name: '', value: 'value', confidence: 0.9 },
+        { name: 'name', value: '', confidence: 0.9 },
+      ]
+
+      const map = extractFormFieldMap(fields)
+      expect(Object.keys(map)).toHaveLength(0)
+    })
+
+    it('should return empty map for empty fields array', () => {
+      expect(extractFormFieldMap([])).toEqual({})
+    })
+  })
+
+  describe('findFormField', () => {
+    const sampleFields: FormField[] = [
+      { name: 'Poliçe No', value: 'POL-001', confidence: 0.9 },
+      { name: 'Sigortalı Ad Soyad', value: 'Ali Veli', confidence: 0.85 },
+      { name: 'Prim Tutarı', value: '₺5,000', confidence: 0.88 },
+      { name: 'Başlangıç Tarihi', value: '01.01.2026', confidence: 0.92 },
+    ]
+
+    it('should find field by string pattern', () => {
+      const field = findFormField(sampleFields, ['poliçe no'])
+      expect(field).toBeDefined()
+      expect(field?.value).toBe('POL-001')
+    })
+
+    it('should find field by regex pattern', () => {
+      const field = findFormField(sampleFields, [/poli[çc]e\s*n/i])
+      expect(field).toBeDefined()
+      expect(field?.value).toBe('POL-001')
+    })
+
+    it('should return first match from multiple patterns', () => {
+      const field = findFormField(sampleFields, ['nonexistent', 'sigortalı'])
+      expect(field).toBeDefined()
+      expect(field?.value).toBe('Ali Veli')
+    })
+
+    it('should return undefined when no patterns match', () => {
+      const field = findFormField(sampleFields, ['vehicle', 'şasi no'])
+      expect(field).toBeUndefined()
+    })
+
+    it('should be case-insensitive for string patterns', () => {
+      // 'PRIM' lowercased to 'prim' should match 'prim tutarı' via includes()
+      const field = findFormField(sampleFields, ['PRIM'])
+      expect(field).toBeDefined()
+      expect(field?.value).toBe('₺5,000')
+    })
+
+    it('should handle empty patterns array', () => {
+      const field = findFormField(sampleFields, [])
+      expect(field).toBeUndefined()
+    })
+
+    it('should handle empty fields array', () => {
+      const field = findFormField([], ['poliçe no'])
+      expect(field).toBeUndefined()
+    })
+  })
+
+  describe('TURKISH_FORM_FIELD_PATTERNS', () => {
+    it('should have patterns for all key insurance fields', () => {
+      expect(TURKISH_FORM_FIELD_PATTERNS.policyNumber).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.tcKimlik).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.insuredName).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.startDate).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.endDate).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.premium).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.vehiclePlate).toBeDefined()
+      expect(TURKISH_FORM_FIELD_PATTERNS.vin).toBeDefined()
+    })
+
+    it('should include both string and regex patterns', () => {
+      const patterns = TURKISH_FORM_FIELD_PATTERNS.policyNumber
+      const hasString = patterns.some(p => typeof p === 'string')
+      const hasRegex = patterns.some(p => p instanceof RegExp)
+      expect(hasString).toBe(true)
+      expect(hasRegex).toBe(true)
+    })
+
+    it('should work with findFormField for policy number', () => {
+      const fields: FormField[] = [
+        { name: 'Poliçe Numarası', value: 'POL-001', confidence: 0.9 },
+      ]
+      const field = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.policyNumber)
+      expect(field?.value).toBe('POL-001')
+    })
+
+    it('should work with findFormField for TC Kimlik', () => {
+      const fields: FormField[] = [
+        { name: 'T.C. Kimlik No', value: '12345678901', confidence: 0.9 },
+      ]
+      const field = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.tcKimlik)
+      expect(field?.value).toBe('12345678901')
+    })
+
+    it('should work with findFormField for premium', () => {
+      const fields: FormField[] = [
+        { name: 'Toplam Prim', value: '₺5,000', confidence: 0.9 },
+      ]
+      const field = findFormField(fields, TURKISH_FORM_FIELD_PATTERNS.premium)
+      expect(field?.value).toBe('₺5,000')
     })
   })
 })

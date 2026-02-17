@@ -491,6 +491,25 @@ describe('AI OCR Cleaner', () => {
       // Should detect with normalized spaces
       expect(result.validation.valid).toBe(true)
     })
+
+    it('should report missing critical data when AI removes policy number', async () => {
+      // AI response does NOT contain the original policy number
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: 'Cleaned text without the number' } }],
+        }),
+      })
+
+      const result = await cleanTurkishOCRWithAI('Poliçe No: 1680600025 Sigorta', {
+        primaryProvider: { name: 'openai', apiKey: 'test' },
+      })
+
+      // validation.missing should contain the removed policy number
+      expect(result.validation.valid).toBe(false)
+      expect(result.validation.missing.length).toBeGreaterThan(0)
+      expect(result.validation.missing).toContain('1680600025')
+    })
   })
 
   describe('timeout handling', () => {

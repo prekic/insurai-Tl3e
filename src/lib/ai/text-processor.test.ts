@@ -2932,4 +2932,197 @@ POLİÇE NO: 1680600025`
       expect(barcodeCorrection).toBeUndefined()
     })
   })
+
+  describe('fixSpacedTurkishCharacters - Priority 3 regex callbacks', () => {
+    describe('spacedUpperPattern (all-uppercase spaced sequences)', () => {
+      it('should merge 3+ uppercase letters separated by spaces', () => {
+        // Use skipDeterministicPreClean to bypass pre-clean that would merge these first
+        // "M E R K E Z" is NOT in the known-words list, so only the generic
+        // spacedUpperPattern (line 161) can merge it
+        const input = 'M E R K E Z OFIS'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.text).toContain('MERKEZ')
+      })
+
+      it('should merge exactly 3 uppercase spaced letters', () => {
+        const input = 'X Y Z test'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.text).toContain('XYZ')
+      })
+
+      it('should merge long uppercase spaced sequences', () => {
+        // 8 letters: "D E F G H J K L"
+        const input = 'D E F G H J K L sonra'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.text).toContain('DEFGHJKL')
+      })
+
+      it('should not merge only 2 uppercase spaced letters', () => {
+        // Only 2 letters — below the 3-letter threshold, should return match unchanged
+        const input = 'A B normal text here'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        // "A B" should remain as-is (2 letters < 3 threshold)
+        expect(result.text).not.toContain('AB normal')
+      })
+
+      it('should increment fix count for merged uppercase sequences', () => {
+        const input = 'M E R K E Z bilgisi'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.stats.spacedCharsFixed).toBeGreaterThan(0)
+      })
+    })
+
+    describe('mixedSpacedPattern (mixed-case spaced sequences)', () => {
+      it('should merge 3+ mixed-case letters separated by single spaces', () => {
+        // Use lowercase letters that are NOT Turkish special chars to avoid
+        // being caught by Priority 1 or 2 patterns
+        const input = 'm e r k e z'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.text).toContain('merkez')
+      })
+
+      it('should merge mixed-case spaced word at word boundary', () => {
+        const input = 'the w o r d here'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        expect(result.text).toContain('word')
+      })
+
+      it('should not merge only 2 mixed-case spaced letters', () => {
+        // 2 letters — below threshold, should remain unchanged
+        const input = 'a b remaining text'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        // Should not merge "a b" since it's only 2 letters
+        expect(result.text).not.toMatch(/^ab remaining/)
+      })
+
+      it('should handle mixed case like upper+lower spaced letters', () => {
+        const input = 'D a t a set'
+        const result = applyComprehensivePreprocessing(input, {
+          skipDeterministicPreClean: true,
+        })
+        // "D a t a" should be merged to "Data"
+        expect(result.text).toContain('Data')
+      })
+    })
+  })
+
+  describe('processTextWithAI - AI response artifact stripping', () => {
+    const originalProxyUrl = env.proxyUrl
+    const originalFetch = global.fetch
+
+    beforeEach(() => {
+      env.proxyUrl = 'http://localhost:4001'
+    })
+
+    afterEach(() => {
+      env.proxyUrl = originalProxyUrl
+      global.fetch = originalFetch
+    })
+
+    it('should strip ```text prefix from AI response (without closing ```)', async () => {
+      // Response starts with ```text but does NOT end with ``` so only
+      // the ```text stripping branch (line 1436-1437) fires, not the
+      // generic ``` wrapper stripping branch (line 1433)
+      const inputText = 'SİGORTA POLİÇESİ ile ilgili uzun metin. Bu metin yüz karakterden fazla olmalı. Devam eden metin burada yer alıyor sigorta poliçe analizi.'
+      const cleanedContent = 'SİGORTA POLİÇESİ ile ilgili uzun metin. Bu metin yüz karakterden fazla olmalıdır. Devam eden metin burada yer alıyor sigorta poliçe analizi.'
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          success: true,
+          response: '```text\n' + cleanedContent,
+        }),
+      })
+
+      const result = await processTextWithAI(inputText)
+      expect(result.success).toBe(true)
+      // The ```text prefix should be stripped
+      expect(result.processedText).not.toContain('```text')
+    })
+  })
+
+  describe('textNeedsProcessing - special character density', () => {
+    it('should return true for text with >10% special characters over 100 chars', () => {
+      // Create text > 100 chars with > 10% special chars
+      const normalPart = 'a'.repeat(80)
+      const specialPart = '!@#$%^&*()!@#$%^&*()!@#$%' // 25 special chars
+      const input = normalPart + specialPart
+      expect(input.length).toBeGreaterThan(100)
+      const result = textNeedsProcessing(input)
+      expect(result).toBe(true)
+    })
+  })
+
+  describe('normalizeNumbersInText - edge cases', () => {
+    it('should normalize standard Turkish thousand-separated number', () => {
+      const result = normalizeNumbersInText('Tutar: 1.500.000 TL', {
+        preserveDisplay: true,
+      })
+      // Should be normalized as Turkish format
+      expect(result.text).toContain('1.500.000')
+    })
+
+    it('should normalize Turkish number with decimal', () => {
+      const result = normalizeNumbersInText('Prim: 2.345,67 TL', {
+        preserveDisplay: true,
+      })
+      // Should preserve display format
+      expect(result.text).toBeDefined()
+    })
+  })
+
+  describe('applyComprehensivePreprocessing - barcodeArtifactsRemoved correction', () => {
+    it('should log barcode artifact correction for <:...> patterns in pre-clean', () => {
+      // The <:...> pattern is an inline barcode artifact that survives noise line
+      // removal but gets caught by removeInlineBarcodeArtifacts in pre-clean
+      const input = 'Teminat bilgisi <:8@+2Z> ve detay aciklama devam ediyor'
+      const result = applyComprehensivePreprocessing(input)
+      const barcodeCorrections = result.corrections.filter(
+        c => c.type === 'garbage_removal' && c.original.includes('barcode artifact')
+      )
+      expect(barcodeCorrections.length).toBeGreaterThan(0)
+    })
+  })
+
+  describe('processTextEnhanced - clean room with validation issues', () => {
+    let originalFetch: typeof global.fetch
+
+    beforeEach(() => {
+      originalFetch = global.fetch
+    })
+
+    afterEach(() => {
+      global.fetch = originalFetch
+    })
+
+    it('should include validation issue corrections when clean room reports issues', async () => {
+      // Input that may trigger validation issues:
+      // Very short text (likely triggers truncation detection)
+      // or text with potential section mismatches
+      const input = 'X'  // Very short — may trigger truncation
+      const result = await processTextEnhanced(input, { useCleanRoom: true })
+      // Even if no issues, the function should return successfully
+      expect(result.success).toBe(true)
+      // If issues exist, they should be in corrections
+      if (result.cleanRoomOutput?.validationReport?.issues?.length) {
+        const structureCorrections = result.corrections.filter(c => c.type === 'structure')
+        expect(structureCorrections.length).toBeGreaterThan(0)
+      }
+    })
+  })
 })

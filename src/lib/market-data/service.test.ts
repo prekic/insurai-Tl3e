@@ -5,8 +5,17 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { MarketDataService, generateMarketComparisonData } from './service'
+import { MarketDataService, generateMarketComparisonData, generateMarketComparisonDataAsync } from './service'
 import type { AnalyzedPolicy, PolicyType } from '@/types/policy'
+import {
+  calculatePremiumPercentile as _calcPremPct,
+  calculateCoveragePercentile as _calcCovPct,
+  getRegionalFactor as _getRegFactor,
+} from '@/data/market-data/benchmarks'
+
+const mockedCalcPremPct = vi.mocked(_calcPremPct)
+const mockedCalcCovPct = vi.mocked(_calcCovPct)
+const mockedGetRegFactor = vi.mocked(_getRegFactor)
 
 // Mock dependencies
 vi.mock('@/data/market-data/benchmarks', () => ({
@@ -91,6 +100,58 @@ vi.mock('./gap-analyzer', () => ({
   generateGapInsights: vi.fn(() => [
     { type: 'info', category: 'coverage', message: 'Good coverage' },
   ]),
+}))
+
+const { mockMarketDataProvider } = vi.hoisted(() => {
+  const mock = {
+    getBenchmark: vi.fn(async (type: string) => {
+      const benchmarks: Record<string, unknown> = {
+        home: {
+          premiumRange: { min: 1000, max: 5000, average: 2500, median: 2200 },
+          coverageRange: { min: 100000, max: 1000000, average: 500000 },
+          commonCoverages: [
+            { name: 'Fire', nameTr: 'Yangın', inclusionRate: 95, typicalLimit: 200000 },
+            { name: 'Theft', nameTr: 'Hırsızlık', inclusionRate: 80, typicalLimit: 50000 },
+            { name: 'Flood', nameTr: 'Sel', inclusionRate: 40, typicalLimit: 100000 },
+          ],
+          trends: { premiumChangeYoY: 10 },
+        },
+        kasko: {
+          premiumRange: { min: 5000, max: 20000, average: 10000, median: 9000 },
+          coverageRange: { min: 200000, max: 2000000, average: 800000 },
+          commonCoverages: [
+            { name: 'Collision', nameTr: 'Çarpışma', inclusionRate: 98, typicalLimit: 500000 },
+          ],
+          trends: { premiumChangeYoY: 35 },
+        },
+      }
+      return benchmarks[type] || benchmarks.home
+    }),
+    calculatePremiumPercentile: vi.fn(async (premium: number, type: string) => {
+      const benchmarks: Record<string, number> = { home: 2500, kasko: 10000 }
+      const avg = benchmarks[type] || 5000
+      return Math.max(0, Math.min(100, 50 - ((premium - avg) / avg) * 50))
+    }),
+    calculateCoveragePercentile: vi.fn(async (coverage: number, type: string) => {
+      const benchmarks: Record<string, number> = { home: 500000, kasko: 800000 }
+      const avg = benchmarks[type] || 300000
+      return Math.max(0, Math.min(100, 50 + ((coverage - avg) / avg) * 50))
+    }),
+    getRegionalFactor: vi.fn(async () => 1.1),
+    findProviderByName: vi.fn((name: string) => {
+      if (name.toLowerCase().includes('axa')) {
+        return { id: 'axa', name: 'AXA Sigorta', nameTr: 'AXA Sigorta', marketShare: 10.5, rating: 4.5 }
+      }
+      return undefined
+    }),
+    getProviderRank: vi.fn(() => 2),
+    getProviderCount: vi.fn(() => 15),
+  }
+  return { mockMarketDataProvider: mock }
+})
+
+vi.mock('./market-data-provider', () => ({
+  marketDataProvider: mockMarketDataProvider,
 }))
 
 const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy => ({
@@ -408,11 +469,9 @@ describe('generateMarketComparisonData', () => {
 
 describe('Rating calculations', () => {
   it('should rate low premium appropriately', () => {
-    // Very low premium (high percentile after inversion)
     const policy = createMockPolicy({ premium: 1500 })
     const result = MarketDataService.getMarketComparison(policy)
 
-    // Any valid rating is acceptable
     expect(result.premiumRating).toBeDefined()
     expect(typeof result.premiumRating).toBe('string')
   })
@@ -425,11 +484,321 @@ describe('Rating calculations', () => {
   })
 
   it('should rate value ratio based on coverage/premium', () => {
-    // High coverage, low premium = good value
     const policy = createMockPolicy({ premium: 2000, coverage: 700000 })
     const result = MarketDataService.getMarketComparison(policy)
 
     expect(result.valueRating).toBeDefined()
     expect(typeof result.valueRating).toBe('string')
+  })
+})
+
+// ========================================================================
+// NEW TESTS: Async methods and uncovered branches
+// ========================================================================
+
+describe('MarketDataService Async Methods', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  describe('analyzePolicyBenchmarkAsync', () => {
+    it('should return benchmark result with async DB access', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.analyzePolicyBenchmarkAsync(policy)
+
+      expect(result).toHaveProperty('premiumPercentile')
+      expect(result).toHaveProperty('coveragePercentile')
+      expect(result).toHaveProperty('valueScore')
+      expect(result).toHaveProperty('region', 'marmara')
+      expect(result).toHaveProperty('insights')
+      expect(result.providerCount).toBe(15)
+    })
+
+    it('should use provided region instead of detecting', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.analyzePolicyBenchmarkAsync(policy, 'ege')
+
+      expect(result.region).toBe('ege')
+    })
+
+    it('should handle unknown provider', async () => {
+      const policy = createMockPolicy({ provider: 'Unknown Co' })
+      const result = await MarketDataService.analyzePolicyBenchmarkAsync(policy)
+
+      expect(result.providerRank).toBe(0)
+    })
+  })
+
+  describe('getMarketComparisonAsync', () => {
+    it('should return market comparison with async data', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.getMarketComparisonAsync(policy)
+
+      expect(result.policyType).toBe('home')
+      expect(result.userPremium).toBe(2500)
+      expect(result.marketAverage).toBe(2500)
+      expect(result.premiumRating).toBeDefined()
+      expect(result.coverageRating).toBeDefined()
+      expect(result.valueRating).toBeDefined()
+    })
+
+    it('should detect market trend from YoY change', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.getMarketComparisonAsync(policy)
+
+      // home has 10% YoY which is between -5 and 5 -> stable? No, 10 > 5 -> increasing
+      expect(result.marketTrend).toBe('increasing')
+    })
+
+    it('should handle unknown provider in async comparison', async () => {
+      const policy = createMockPolicy({ provider: 'NoName Insurance' })
+      const result = await MarketDataService.getMarketComparisonAsync(policy)
+
+      expect(result.providerMarketShare).toBe(0)
+      expect(result.providerRating).toBe(0)
+      expect(result.providerRank).toBe(0)
+    })
+  })
+
+  describe('analyzeGapsAsync', () => {
+    it('should call async gap analyzer', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.analyzeGapsAsync(policy)
+
+      expect(result).toHaveProperty('score', 75)
+    })
+
+    it('should pass region to gap analyzer', async () => {
+      const policy = createMockPolicy()
+      const result = await MarketDataService.analyzeGapsAsync(policy, 'karadeniz')
+
+      expect(result).toBeDefined()
+    })
+  })
+
+  describe('getBenchmarkDataAsync', () => {
+    it('should return benchmark from market data provider', async () => {
+      const result = await MarketDataService.getBenchmarkDataAsync('home')
+
+      expect(result).toHaveProperty('premiumRange')
+      expect(result).toHaveProperty('coverageRange')
+    })
+  })
+
+  describe('getRecommendedCoveragesAsync', () => {
+    it('should return filtered and sorted coverages', async () => {
+      const result = await MarketDataService.getRecommendedCoveragesAsync('home')
+
+      // Fire (95%) and Theft (80%) should be included, Flood (40%) should not
+      expect(result.length).toBe(2)
+      // Should be sorted by importance: critical first, then recommended
+      const importances = result.map(c => c.importance)
+      expect(importances).toContain('critical')
+      expect(importances).toContain('recommended')
+    })
+
+    it('should apply regional factor to limits', async () => {
+      const result = await MarketDataService.getRecommendedCoveragesAsync('home', 'marmara')
+
+      const fire = result.find(c => c.name === 'Fire')
+      expect(fire?.recommendedLimit).toBe(220000) // 200000 * 1.1
+    })
+  })
+})
+
+describe('generateMarketComparisonDataAsync', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return comparison data with async DB access', async () => {
+    const result = await generateMarketComparisonDataAsync(2500, 500000, 'home')
+
+    expect(result).toHaveProperty('averagePremium', 2500)
+    expect(result).toHaveProperty('averageCoverage', 500000)
+    expect(result).toHaveProperty('percentile')
+  })
+
+  it('should use location for region detection', async () => {
+    const result = await generateMarketComparisonDataAsync(2500, 500000, 'home', 'Istanbul')
+
+    expect(result.percentile).toBeDefined()
+  })
+})
+
+describe('generateBenchmarkInsights (via analyzePolicyBenchmark)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should produce positive premium insight when percentile < 25', () => {
+    // Very low premium => percentile < 25
+    mockedCalcPremPct.mockReturnValue(15) // bottom 25%
+
+    const policy = createMockPolicy({ premium: 1000 })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    const premiumInsight = result.insights.find(i => i.category === 'premium' && i.type === 'positive')
+    expect(premiumInsight).toBeDefined()
+    expect(premiumInsight?.message).toContain('bottom 25%')
+  })
+
+  it('should produce warning premium insight when percentile > 75', () => {
+    mockedCalcPremPct.mockReturnValue(85) // top 25%
+
+    const policy = createMockPolicy({ premium: 4500 })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    const premiumWarning = result.insights.find(i => i.category === 'premium' && i.type === 'warning')
+    expect(premiumWarning).toBeDefined()
+    expect(premiumWarning?.message).toContain('top 25%')
+  })
+
+  it('should produce warning coverage insight when percentile < 25', () => {
+    mockedCalcCovPct.mockReturnValue(10) // bottom 25%
+
+    const policy = createMockPolicy({ coverage: 100000 })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    const coverageWarning = result.insights.find(i => i.category === 'coverage' && i.type === 'warning')
+    expect(coverageWarning).toBeDefined()
+    expect(coverageWarning?.message).toContain('underinsured')
+  })
+
+  it('should produce positive coverage insight when percentile > 75', () => {
+    mockedCalcCovPct.mockReturnValue(90) // top 25%
+
+    const policy = createMockPolicy({ coverage: 900000 })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    const coveragePositive = result.insights.find(i => i.category === 'coverage' && i.type === 'positive')
+    expect(coveragePositive).toBeDefined()
+    expect(coveragePositive?.message).toContain('comprehensive')
+  })
+
+  it('should produce low value recommendation when value score < 30', () => {
+    // High premium, low coverage = bad value
+    const policy = createMockPolicy({ premium: 5000, coverage: 100000 })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    const valueRec = result.insights.find(i => i.type === 'recommendation' && i.category === 'premium')
+    expect(valueRec).toBeDefined()
+    expect(valueRec?.message).toContain('Below average value ratio')
+  })
+
+  it('should produce positive provider insight for high-rated provider', () => {
+    const policy = createMockPolicy({ provider: 'AXA Sigorta' })
+    const result = MarketDataService.analyzePolicyBenchmark(policy)
+
+    // AXA has rating 4.5 (>= 4.2) and marketShare 0.15
+    const providerInsight = result.insights.find(i => i.category === 'provider' && i.type === 'positive')
+    expect(providerInsight).toBeDefined()
+    expect(providerInsight?.message).toContain('excellent customer ratings')
+  })
+
+  it('should produce regional insight for high regional factor', () => {
+    mockedGetRegFactor.mockReturnValue(1.15) // > 1.1
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.analyzePolicyBenchmark(policy, 'marmara')
+
+    const regionalInsight = result.insights.find(i => i.category === 'regional')
+    expect(regionalInsight).toBeDefined()
+    expect(regionalInsight?.message).toContain('higher premiums')
+  })
+
+  it('should produce regional insight for low regional factor', () => {
+    mockedGetRegFactor.mockReturnValue(0.85) // < 0.9
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.analyzePolicyBenchmark(policy, 'dogu_anadolu')
+
+    const regionalInsight = result.insights.find(i => i.category === 'regional')
+    expect(regionalInsight).toBeDefined()
+    expect(regionalInsight?.message).toContain('lower premiums')
+  })
+})
+
+describe('Premium rating branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return "excellent" for percentile < 20', () => {
+    mockedCalcPremPct.mockReturnValue(10)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.premiumRating).toBe('excellent')
+  })
+
+  it('should return "good" for percentile 20-39', () => {
+    mockedCalcPremPct.mockReturnValue(30)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.premiumRating).toBe('good')
+  })
+
+  it('should return "average" for percentile 40-59', () => {
+    mockedCalcPremPct.mockReturnValue(50)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.premiumRating).toBe('average')
+  })
+
+  it('should return "above_average" for percentile 60-79', () => {
+    mockedCalcPremPct.mockReturnValue(70)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.premiumRating).toBe('above_average')
+  })
+
+  it('should return "expensive" for percentile >= 80', () => {
+    mockedCalcPremPct.mockReturnValue(90)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.premiumRating).toBe('expensive')
+  })
+})
+
+describe('Coverage rating branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return "comprehensive" for percentile > 75', () => {
+    mockedCalcCovPct.mockReturnValue(80)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.coverageRating).toBe('comprehensive')
+  })
+
+  it('should return "adequate" for percentile 51-75', () => {
+    mockedCalcCovPct.mockReturnValue(60)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.coverageRating).toBe('adequate')
+  })
+
+  it('should return "basic" for percentile 26-50', () => {
+    mockedCalcCovPct.mockReturnValue(35)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.coverageRating).toBe('basic')
+  })
+
+  it('should return "minimal" for percentile <= 25', () => {
+    mockedCalcCovPct.mockReturnValue(20)
+
+    const policy = createMockPolicy()
+    const result = MarketDataService.getMarketComparison(policy)
+    expect(result.coverageRating).toBe('minimal')
   })
 })
