@@ -26,7 +26,7 @@
  * - checkForDuplicate: skip self-match
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import {
   normalizeForOCR,
   levenshteinDistance,
@@ -52,14 +52,14 @@ import {
   normalizeDate,
   normalizeString,
   normalizePolicyNumber,
-  isNewPolicy,
-  isSessionNewPolicy,
+  isNewPolicy as _isNewPolicy,
+  isSessionNewPolicy as _isSessionNewPolicy,
   findDuplicatePolicies,
   checkForDuplicate,
   groupDuplicatePolicies,
   getSimilarityLabel,
-  createPolicyTimestamp,
-  ensurePolicyTimestamps,
+  createPolicyTimestamp as _createPolicyTimestamp,
+  ensurePolicyTimestamps as _ensurePolicyTimestamps,
 } from './policy-utils'
 import type { Policy } from '@/types/policy'
 

@@ -61,7 +61,7 @@ describe('AI Request Logging', () => {
   })
 
   it('startAIRequest includes optional fields', () => {
-    const id = startAIRequest({
+    const _id = startAIRequest({
       ...baseParams,
       systemPrompt: 'You are an assistant',
       conversationHistory: [{ role: 'user', content: 'hello' }],

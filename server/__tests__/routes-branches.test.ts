@@ -195,7 +195,7 @@ function makeOpenAIResponse(content: string, model = 'gpt-4o') {
   }
 }
 
-function makeAnthropicResponse(content: string, model = 'claude-sonnet-4-20250514') {
+function _makeAnthropicResponse(content: string, model = 'claude-sonnet-4-20250514') {
   return {
     content: [{ type: 'text', text: content }],
     usage: { input_tokens: 100, output_tokens: 50 },

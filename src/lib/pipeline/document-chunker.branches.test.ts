@@ -24,7 +24,7 @@ import {
   getChunkingStats,
   type DocumentChunk,
   type SanitizedChunk,
-  type ChunkingOptions,
+  type ChunkingOptions as _ChunkingOptions,
 } from './document-chunker'
 
 // ============================================================================

@@ -65,7 +65,7 @@ async function importFresh() {
   return await import('../middleware/rate-limit.js')
 }
 
-function mockReq(overrides: Partial<Request> = {}): Request {
+function _mockReq(overrides: Partial<Request> = {}): Request {
   return {
     headers: {},
     ip: '10.0.0.1',
@@ -75,7 +75,7 @@ function mockReq(overrides: Partial<Request> = {}): Request {
   } as unknown as Request
 }
 
-function mockRes(): Response {
+function _mockRes(): Response {
   const res = {
     getHeader: vi.fn().mockReturnValue(undefined),
     status: vi.fn().mockReturnThis(),

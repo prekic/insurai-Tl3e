@@ -90,7 +90,7 @@ import {
   getDashboardSummary,
   initializeDefaultAlertRules,
   type RequestMetric,
-  type SystemMetrics,
+  type SystemMetrics as _SystemMetrics,
   type AlertRule,
 } from '../middleware/monitoring.js'
 
@@ -675,9 +675,9 @@ describe('monitoring.ts branch coverage', () => {
         notificationChannels: [],
       })
 
-      const alertsBefore = getActiveAlerts().length
+      const _alertsBefore = getActiveAlerts().length
       recordRequest(makeMetric({ responseTime: 1000 }))
-      const alertsAfter = getActiveAlerts().length
+      const _alertsAfter = getActiveAlerts().length
       // Should not add alerts from disabled rule
       // (other default rules may trigger though)
     })

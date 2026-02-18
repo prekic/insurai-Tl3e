@@ -204,7 +204,7 @@ describe('admin-db branch coverage', () => {
       process.env.SUPABASE_URL = 'https://test.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'key'
       mockCreateClient.mockImplementation(() => {
-        throw 'string error' // eslint-disable-line no-throw-literal
+        throw 'string error'  
       })
       const mod = await freshImport()
       const result = mod.getClientWithError()

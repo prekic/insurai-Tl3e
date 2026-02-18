@@ -20,17 +20,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const {
   mockCreateClient,
-  mockFrom,
+  _mockFrom,
   mockSelect,
-  mockEq,
-  mockSingle,
+  _mockEq,
+  _mockSingle,
 } = vi.hoisted(() => {
-  const mockSingle = vi.fn()
-  const mockEq = vi.fn().mockReturnValue({ single: mockSingle })
-  const mockSelect = vi.fn().mockReturnValue({ eq: mockEq })
-  const mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
-  const mockCreateClient = vi.fn().mockReturnValue({ from: mockFrom })
-  return { mockCreateClient, mockFrom, mockSelect, mockEq, mockSingle }
+  const _mockSingle = vi.fn()
+  const _mockEq = vi.fn().mockReturnValue({ single: _mockSingle })
+  const mockSelect = vi.fn().mockReturnValue({ eq: _mockEq })
+  const _mockFrom = vi.fn().mockReturnValue({ select: mockSelect })
+  const mockCreateClient = vi.fn().mockReturnValue({ from: _mockFrom })
+  return { mockCreateClient, _mockFrom, mockSelect, _mockEq, _mockSingle }
 })
 
 vi.mock('@supabase/supabase-js', () => ({

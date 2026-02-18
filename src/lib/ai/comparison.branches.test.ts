@@ -104,13 +104,13 @@ function makePolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
 
 describe('comparePolicies', () => {
   let comparePolicies: typeof import('./comparison').comparePolicies
-  let generateComparisonReport: typeof import('./comparison').generateComparisonReport
+  let _generateComparisonReport: typeof import('./comparison').generateComparisonReport
 
   beforeEach(async () => {
     vi.clearAllMocks()
     const mod = await import('./comparison')
     comparePolicies = mod.comparePolicies
-    generateComparisonReport = mod.generateComparisonReport
+    _generateComparisonReport = mod.generateComparisonReport
   })
 
   it('throws when less than 2 policies', () => {

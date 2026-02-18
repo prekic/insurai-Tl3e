@@ -44,8 +44,7 @@ const mockRemove = vi.fn()
 const mockStorageFrom = vi.fn()
 
 function buildChain() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chain: Record<string, any> = {}
+  const chain: Record<string, unknown> = {}
   for (const name of ['select', 'insert', 'update', 'delete', 'eq', 'ilike', 'filter', 'or', 'order', 'limit', 'single']) {
     chain[name] = vi.fn(() => chain)
   }

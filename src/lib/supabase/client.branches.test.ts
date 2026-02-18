@@ -152,7 +152,7 @@ describe('URL validation in validateCredentials', () => {
     vi.stubEnv('VITE_SUPABASE_URL', 'not-a-valid-url')
     vi.stubEnv('VITE_SUPABASE_ANON_KEY', 'eyJhbGciOiJIUzI1NiJ9.test')
 
-    const { isSupabaseConfigured } = await import('./client')
+    const { isSupabaseConfigured: _isSupabaseConfigured } = await import('./client')
     // validateCredentials returns null for invalid URL, but isSupabaseConfigured checks the raw env
     // The supabase client will be a proxy
     expect(errorSpy).toHaveBeenCalledWith(

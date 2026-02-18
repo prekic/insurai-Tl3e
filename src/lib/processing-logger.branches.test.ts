@@ -18,7 +18,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  ProcessingLogger,
+  ProcessingLogger as _ProcessingLogger,
   createProcessingLogger,
   resumeProcessingLogger,
   serializeProcessingLog,

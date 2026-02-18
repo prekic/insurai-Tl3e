@@ -90,7 +90,7 @@ function setupChain(finalResult: { data: unknown; error: unknown; count?: number
 /**
  * Build a per-table chain map so different .from('table') calls return different results.
  */
-function setupMultiTableChains(
+function _setupMultiTableChains(
   tableResults: Record<string, { data: unknown; error: unknown; count?: number }>
 ) {
   const chains: Record<string, Record<string, unknown>> = {}

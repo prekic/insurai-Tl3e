@@ -122,7 +122,7 @@ describe('OCRDecisionEngine — Branch Coverage', () => {
       // Need >= threshold (200) chars/page and quickQuality.score > 0.5
       // but NOT >= threshold * 5 (1000) with isLikelyGood
       // Use 5 pages with total ~1500 chars -> 300 chars/page (>= 200 but < 1000)
-      const adequateText = 'Normal document text with enough content to pass quality checks. '.repeat(6)
+      const _adequateText = 'Normal document text with enough content to pass quality checks. '.repeat(6)
       // ~390 chars total, 5 pages -> 78 chars/page. Let's use 1 page with 300 chars
       const text300 = 'A'.repeat(250) + ' normal text with letters '
       const result = engine.quickAnalyze(text300, 1)

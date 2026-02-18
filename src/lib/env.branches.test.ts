@@ -492,7 +492,7 @@ describe('generateWarnings() branches', () => {
 describe('logEnvironmentStatus() branches', () => {
   it('logs brief status in production with no errors', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-    const groupSpy = vi.spyOn(console, 'group').mockImplementation(() => {})
+    vi.spyOn(console, 'group').mockImplementation(() => {})
 
     await importEnv({
       VITE_SUPABASE_URL: 'https://x.supabase.co',
@@ -514,7 +514,7 @@ describe('logEnvironmentStatus() branches', () => {
 
   it('logs full console.group output in development', async () => {
     const groupSpy = vi.spyOn(console, 'group').mockImplementation(() => {})
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
     const groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {})
 
     await importEnv({
@@ -530,7 +530,7 @@ describe('logEnvironmentStatus() branches', () => {
 
   it('logs full output in production when there are errors', async () => {
     const groupSpy = vi.spyOn(console, 'group').mockImplementation(() => {})
-    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
     const groupEndSpy = vi.spyOn(console, 'groupEnd').mockImplementation(() => {})
 
     // No AI configured = error warning, which triggers full output even in production

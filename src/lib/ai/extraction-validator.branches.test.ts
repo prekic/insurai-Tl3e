@@ -1599,7 +1599,7 @@ describe('formatValidationIssues — uncovered branches', () => {
       },
     })
     const result = validateExtraction(data)
-    const formatted = formatValidationIssues(result.issues, 'en')
+    const _formatted = formatValidationIssues(result.issues, 'en')
     // Low confidence is a warning, not info — let's use a different source of info
     // Use a kasko with premium above range to get an info issue
     const kaskoData = makePolicy({

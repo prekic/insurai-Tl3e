@@ -691,7 +691,7 @@ describe('evaluatePolicy', () => {
           makeCoverage({ name: 'Roadside Assistance' }),
         ],
       }))
-      const positiveRecs = result.recommendations.filter(r => r.title === 'Policy Well-Structured')
+      const _positiveRecs = result.recommendations.filter(r => r.title === 'Policy Well-Structured')
       // If all scores are good and no compliance issues, should have positive recommendation
       expect(result.recommendations.length).toBeGreaterThan(0)
     })

@@ -31,23 +31,23 @@ const {
   mockGetUnacknowledgedNotifications,
   mockGetNotifications,
   mockAcknowledgeNotification,
-  mockLogAdminAction,
+  _mockLogAdminAction,
   mockGetSupabaseWithError,
-  mockGetSystemMetrics,
-  mockRunHealthChecks,
-  mockGetDashboardSummary,
-  mockGetEndpointStats,
+  _mockGetSystemMetrics,
+  _mockRunHealthChecks,
+  _mockGetDashboardSummary,
+  _mockGetEndpointStats,
   mockGetTrends,
   mockGetRecentActivity,
-  mockGetAlertRules,
-  mockGetAlertRule,
+  _mockGetAlertRules,
+  _mockGetAlertRule,
   mockCreateAlertRule,
-  mockUpdateAlertRule,
-  mockDeleteAlertRule,
-  mockGetActiveAlerts,
+  _mockUpdateAlertRule,
+  _mockDeleteAlertRule,
+  _mockGetActiveAlerts,
   mockGetAlertHistory,
   mockAcknowledgeAlert,
-  mockResolveAlert,
+  _mockResolveAlert,
   sharedState,
 } = vi.hoisted(() => {
   const mockLogWarn = vi.fn()
@@ -62,23 +62,23 @@ const {
   const mockGetUnacknowledgedNotifications = vi.fn()
   const mockGetNotifications = vi.fn()
   const mockAcknowledgeNotification = vi.fn()
-  const mockLogAdminAction = vi.fn().mockResolvedValue(undefined)
+  const _mockLogAdminAction = vi.fn().mockResolvedValue(undefined)
   const mockGetSupabaseWithError = vi.fn()
-  const mockGetSystemMetrics = vi.fn()
-  const mockRunHealthChecks = vi.fn()
-  const mockGetDashboardSummary = vi.fn()
-  const mockGetEndpointStats = vi.fn()
+  const _mockGetSystemMetrics = vi.fn()
+  const _mockRunHealthChecks = vi.fn()
+  const _mockGetDashboardSummary = vi.fn()
+  const _mockGetEndpointStats = vi.fn()
   const mockGetTrends = vi.fn()
   const mockGetRecentActivity = vi.fn()
-  const mockGetAlertRules = vi.fn()
-  const mockGetAlertRule = vi.fn()
+  const _mockGetAlertRules = vi.fn()
+  const _mockGetAlertRule = vi.fn()
   const mockCreateAlertRule = vi.fn()
-  const mockUpdateAlertRule = vi.fn()
-  const mockDeleteAlertRule = vi.fn()
-  const mockGetActiveAlerts = vi.fn()
+  const _mockUpdateAlertRule = vi.fn()
+  const _mockDeleteAlertRule = vi.fn()
+  const _mockGetActiveAlerts = vi.fn()
   const mockGetAlertHistory = vi.fn()
   const mockAcknowledgeAlert = vi.fn()
-  const mockResolveAlert = vi.fn()
+  const _mockResolveAlert = vi.fn()
 
   const loggerChild = {
     debug: mockLogDebug,
@@ -100,7 +100,7 @@ const {
       return [passthrough]
     },
     requireRole: () => passthrough,
-    logAdminAction: mockLogAdminAction,
+    logAdminAction: _mockLogAdminAction,
     getSupabaseWithError: mockGetSupabaseWithError,
     qstr: (val: string | string[] | undefined) => {
       if (Array.isArray(val)) return val[0] ?? ''
@@ -121,21 +121,21 @@ const {
     MAX_ENTRIES: 10,
     serverStartTime: Date.now() - 60000,
     monitoring: {
-      getSystemMetrics: mockGetSystemMetrics,
-      runHealthChecks: mockRunHealthChecks,
-      getDashboardSummary: mockGetDashboardSummary,
-      getEndpointStats: mockGetEndpointStats,
+      getSystemMetrics: _mockGetSystemMetrics,
+      runHealthChecks: _mockRunHealthChecks,
+      getDashboardSummary: _mockGetDashboardSummary,
+      getEndpointStats: _mockGetEndpointStats,
       getTrends: mockGetTrends,
       getRecentActivity: mockGetRecentActivity,
-      getAlertRules: mockGetAlertRules,
-      getAlertRule: mockGetAlertRule,
+      getAlertRules: _mockGetAlertRules,
+      getAlertRule: _mockGetAlertRule,
       createAlertRule: mockCreateAlertRule,
-      updateAlertRule: mockUpdateAlertRule,
-      deleteAlertRule: mockDeleteAlertRule,
-      getActiveAlerts: mockGetActiveAlerts,
+      updateAlertRule: _mockUpdateAlertRule,
+      deleteAlertRule: _mockDeleteAlertRule,
+      getActiveAlerts: _mockGetActiveAlerts,
       getAlertHistory: mockGetAlertHistory,
       acknowledgeAlert: mockAcknowledgeAlert,
-      resolveAlert: mockResolveAlert,
+      resolveAlert: _mockResolveAlert,
     },
   }
 
@@ -152,23 +152,23 @@ const {
     mockGetUnacknowledgedNotifications,
     mockGetNotifications,
     mockAcknowledgeNotification,
-    mockLogAdminAction,
+    _mockLogAdminAction,
     mockGetSupabaseWithError,
-    mockGetSystemMetrics,
-    mockRunHealthChecks,
-    mockGetDashboardSummary,
-    mockGetEndpointStats,
+    _mockGetSystemMetrics,
+    _mockRunHealthChecks,
+    _mockGetDashboardSummary,
+    _mockGetEndpointStats,
     mockGetTrends,
     mockGetRecentActivity,
-    mockGetAlertRules,
-    mockGetAlertRule,
+    _mockGetAlertRules,
+    _mockGetAlertRule,
     mockCreateAlertRule,
-    mockUpdateAlertRule,
-    mockDeleteAlertRule,
-    mockGetActiveAlerts,
+    _mockUpdateAlertRule,
+    _mockDeleteAlertRule,
+    _mockGetActiveAlerts,
     mockGetAlertHistory,
     mockAcknowledgeAlert,
-    mockResolveAlert,
+    _mockResolveAlert,
     sharedState,
   }
 })
@@ -1146,7 +1146,7 @@ describe('Operations Route Branch Coverage', () => {
     })
 
     it('sets action to "enable" when enabled=true', async () => {
-      const auditCountBefore = sharedState.auditLogs.length
+      const _auditCountBefore = sharedState.auditLogs.length
 
       await request(app)
         .put('/feature-flags/dark_mode')

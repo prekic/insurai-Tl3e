@@ -370,7 +370,7 @@ describe('detectDateContradictions', () => {
       { name: 'Aralık', expected: '12' },
     ]
 
-    for (const { name, expected } of months) {
+    for (const { name, expected: _expected } of months) {
       const text = `BAŞLANGIÇ: 15 ${name} 2026 poliçe`
       const extraction = makeExtraction({ startDate: '2025-01-01' })
       const report = detectContradictions(extraction, text)

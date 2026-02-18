@@ -18,7 +18,7 @@ import {
   getInsuredSubject,
   getSubjectDisplay,
 } from './insurance-display'
-import type { AnalyzedPolicy, Coverage } from '@/types/policy'
+import type { AnalyzedPolicy, Coverage as _Coverage } from '@/types/policy'
 
 function makePolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
   return {

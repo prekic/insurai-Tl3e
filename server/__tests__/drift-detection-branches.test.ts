@@ -90,7 +90,7 @@ function setupChain(finalResult: { data: unknown; error: unknown }) {
  * Build per-table chain map so different .from('table') calls can return
  * different results.
  */
-function setupMultiTableChains(
+function _setupMultiTableChains(
   tableResults: Record<string, { data: unknown; error: unknown }>
 ) {
   const chains: Record<string, Record<string, unknown>> = {}
@@ -455,7 +455,6 @@ describe('drift-detection-service branches', () => {
     })
 
     it('skips deactivation when activate=false', async () => {
-      let callCount = 0
       const settingsChain: Record<string, unknown> = {}
       settingsChain.select = vi.fn().mockReturnValue(settingsChain)
       settingsChain.order = vi.fn().mockReturnValue(settingsChain)
@@ -476,7 +475,6 @@ describe('drift-detection-service branches', () => {
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'app_settings') return settingsChain
-        callCount++
         // Without activate=true, first call should be the insert, not deactivate
         return insertChain
       })
@@ -659,7 +657,6 @@ describe('drift-detection-service branches', () => {
         is_active: true, created_at: '2026-01-01',
       }
 
-      let callCount = 0
       const baselineChain: Record<string, unknown> = {}
       baselineChain.select = vi.fn().mockReturnValue(baselineChain)
       baselineChain.eq = vi.fn().mockReturnValue(baselineChain)
