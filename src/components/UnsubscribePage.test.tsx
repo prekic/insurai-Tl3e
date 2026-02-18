@@ -3,10 +3,16 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { UnsubscribePage } from './UnsubscribePage'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
 
 // Mock getEnvConfig
 vi.mock('@/lib/env', () => ({
   getEnvConfig: () => ({ apiProxyUrl: 'http://localhost:4001' }),
+}))
+
+// Mock i18n context with English translations
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
 }))
 
 // Mock fetch globally
@@ -38,30 +44,30 @@ describe('UnsubscribePage', () => {
     it('shows invalid state when email param is missing', () => {
       renderWithRouter('/unsubscribe?token=abc123')
 
-      expect(screen.getByText('Hata Olustu')).toBeInTheDocument()
-      expect(screen.getByText(/Gecersiz abonelikten cikma baglantisi/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleError)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.invalidLink)).toBeInTheDocument()
     })
 
     it('shows invalid state when token param is missing', () => {
       renderWithRouter('/unsubscribe?email=test@example.com')
 
-      expect(screen.getByText('Hata Olustu')).toBeInTheDocument()
-      expect(screen.getByText(/Gecersiz abonelikten cikma baglantisi/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleError)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.invalidLink)).toBeInTheDocument()
     })
 
     it('shows invalid state when both params are missing', () => {
       renderWithRouter('/unsubscribe')
 
-      expect(screen.getByText('Hata Olustu')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleError)).toBeInTheDocument()
     })
 
     it('shows confirmation state when both params are present', () => {
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken123')
 
-      expect(screen.getByText('Abonelikten Cik')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.title)).toBeInTheDocument()
       expect(screen.getByText('test@example.com')).toBeInTheDocument()
-      expect(screen.getByText('Emin misiniz?')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.areYouSure)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })).toBeInTheDocument()
     })
 
     it('displays the email address in confirm state', () => {
@@ -81,7 +87,7 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       expect(mockFetch).toHaveBeenCalledWith(
@@ -103,14 +109,14 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Abonelikten Cikildi')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleSuccess)).toBeInTheDocument()
       })
 
-      expect(screen.getByText(/Pazarlama e-postalarindan basariyla ciktiniz/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.successMessage)).toBeInTheDocument()
     })
 
     it('shows processing state while API call is in progress', async () => {
@@ -123,10 +129,10 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
-      expect(screen.getByText('Isleniyor...')).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.processing)).toBeInTheDocument()
 
       // Resolve the promise to clean up
       resolvePromise!({
@@ -149,11 +155,11 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=invalidtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Hata Olustu')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleError)).toBeInTheDocument()
       })
 
       expect(screen.getByText('Invalid unsubscribe token')).toBeInTheDocument()
@@ -166,14 +172,14 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Baglanti hatasi')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionError)).toBeInTheDocument()
       })
 
-      expect(screen.getByText(/Sunucuya ulasilamiyor/)).toBeInTheDocument()
+      expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionErrorDetails)).toBeInTheDocument()
     })
 
     it('allows retry after error', async () => {
@@ -192,19 +198,19 @@ describe('UnsubscribePage', () => {
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
       // First attempt
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Hata Olustu')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleError)).toBeInTheDocument()
       })
 
       // Retry
-      const retryButton = screen.getByRole('button', { name: /Tekrar Dene/i })
+      const retryButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.retry) })
       await user.click(retryButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Abonelikten Cikildi')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleSuccess)).toBeInTheDocument()
       })
 
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -215,7 +221,7 @@ describe('UnsubscribePage', () => {
     it('has link back to home page in confirm state', () => {
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const homeLink = screen.getByRole('link', { name: /Ana Sayfaya Don/i })
+      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
       expect(homeLink).toHaveAttribute('href', '/')
     })
 
@@ -228,14 +234,14 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Abonelikten Cikildi')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.titleSuccess)).toBeInTheDocument()
       })
 
-      const homeLink = screen.getByRole('link', { name: /Ana Sayfaya Don/i })
+      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
       expect(homeLink).toHaveAttribute('href', '/')
     })
 
@@ -245,14 +251,14 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test@example.com&token=validtoken')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Baglanti hatasi')).toBeInTheDocument()
+        expect(screen.getByText(EN_TRANSLATIONS.unsubscribe.connectionError)).toBeInTheDocument()
       })
 
-      const homeLink = screen.getByRole('link', { name: /Ana Sayfaya Don/i })
+      const homeLink = screen.getByRole('link', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.backToHome) })
       expect(homeLink).toHaveAttribute('href', '/')
     })
   })
@@ -273,7 +279,7 @@ describe('UnsubscribePage', () => {
 
       renderWithRouter('/unsubscribe?email=test%2Buser%40example.com&token=abc')
 
-      const unsubscribeButton = screen.getByRole('button', { name: /Evet, Aboneligimi Iptal Et/i })
+      const unsubscribeButton = screen.getByRole('button', { name: new RegExp(EN_TRANSLATIONS.unsubscribe.confirmButton) })
       await user.click(unsubscribeButton)
 
       expect(mockFetch).toHaveBeenCalledWith(

@@ -961,6 +961,32 @@ export interface TranslationDictionary {
     dataSecure: string
   }
 
+  // Unsubscribe page
+  unsubscribe: {
+    title: string
+    titleSuccess: string
+    titleError: string
+    invalidLink: string
+    invalidLinkDetails: string
+    areYouSure: string
+    willNotReceive: string
+    marketingEmails: string
+    specialOffers: string
+    productUpdates: string
+    willContinue: string
+    confirmButton: string
+    processing: string
+    successMessage: string
+    changeYourMind: string
+    retry: string
+    connectionError: string
+    connectionErrorDetails: string
+    unsubscribeFailed: string
+    pleaseTryLater: string
+    backToHome: string
+    footer: string
+  }
+
   // Coverage name translations (keyed by English name, value is locale-specific)
   coverageNames: Record<string, string>
 
@@ -1880,6 +1906,31 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     tryFree: 'Try Free',
     kvkkCompliant: 'KVKK Compliant',
     dataSecure: 'Your data is secure',
+  },
+
+  unsubscribe: {
+    title: 'Unsubscribe',
+    titleSuccess: 'Unsubscribed',
+    titleError: 'Error Occurred',
+    invalidLink: 'Invalid unsubscribe link',
+    invalidLinkDetails: 'Please try again from the link in your email.',
+    areYouSure: 'Are you sure?',
+    willNotReceive: 'By unsubscribing, you will no longer receive the following emails:',
+    marketingEmails: 'Marketing and promotional emails',
+    specialOffers: 'Special offers and campaigns',
+    productUpdates: 'Product updates',
+    willContinue: 'You will continue to receive important emails such as policy alerts and security notifications.',
+    confirmButton: 'Yes, Unsubscribe Me',
+    processing: 'Processing...',
+    successMessage: 'You have been successfully unsubscribed from marketing emails. You will no longer receive promotional emails.',
+    changeYourMind: 'If you change your mind, you can re-subscribe from your account settings.',
+    retry: 'Try Again',
+    connectionError: 'Connection error',
+    connectionErrorDetails: 'Cannot reach the server. Please check your internet connection.',
+    unsubscribeFailed: 'Unsubscribe failed',
+    pleaseTryLater: 'Please try again later.',
+    backToHome: 'Back to Home',
+    footer: 'InsurAI - Turkey\'s #1 Insurance Analysis Platform',
   },
 
   // Coverage name translations (English identity map — generated from shared module)
@@ -2827,6 +2878,31 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     tryFree: 'Ücretsiz Dene',
     kvkkCompliant: 'KVKK Uyumlu',
     dataSecure: 'Verileriniz güvende',
+  },
+
+  unsubscribe: {
+    title: 'Abonelikten Çık',
+    titleSuccess: 'Abonelikten Çıkıldı',
+    titleError: 'Hata Oluştu',
+    invalidLink: 'Geçersiz abonelikten çıkma bağlantısı',
+    invalidLinkDetails: 'E-postanızdaki bağlantıdan tekrar deneyin.',
+    areYouSure: 'Emin misiniz?',
+    willNotReceive: 'Abonelikten çıkarak artık aşağıdaki e-postaları almayacaksınız:',
+    marketingEmails: 'Pazarlama ve tanıtım e-postaları',
+    specialOffers: 'Özel teklifler ve kampanyalar',
+    productUpdates: 'Ürün güncellemeleri',
+    willContinue: 'Poliçe uyarıları ve güvenlik bildirimleri gibi önemli e-postaları almaya devam edeceksiniz.',
+    confirmButton: 'Evet, Aboneliğimi İptal Et',
+    processing: 'İşleniyor...',
+    successMessage: 'Pazarlama e-postalarından başarıyla çıktınız. Artık tanıtım e-postaları almayacaksınız.',
+    changeYourMind: 'Fikrinizi değiştirirseniz, hesap ayarlarınızdan tekrar abone olabilirsiniz.',
+    retry: 'Tekrar Dene',
+    connectionError: 'Bağlantı hatası',
+    connectionErrorDetails: 'Sunucuya ulaşılamıyor. Lütfen internet bağlantınızı kontrol edin.',
+    unsubscribeFailed: 'Abonelikten çıkma başarısız',
+    pleaseTryLater: 'Lütfen daha sonra tekrar deneyin.',
+    backToHome: 'Ana Sayfaya Dön',
+    footer: 'InsurAI - Türkiye\'nin #1 Sigorta Analiz Platformu',
   },
 
   // Coverage name translations (English → Turkish — from shared module)

@@ -219,5 +219,55 @@ The actual policy content starts here...
       // İ and Ç are valid Turkish corrections for I and C
       expect(result.isValid).toBe(true)
     })
+
+    it('should allow OCR confusion pair corrections', () => {
+      // O → Ö is a valid confusion pair
+      const original = 'OZEL SARTLAR'
+      const corrected = 'ÖZEL ŞARTLAR'
+      const result = validateOCRCorrection(original, corrected)
+      expect(result.isValid).toBe(true)
+    })
+
+    it('should validate corrections with known insurance terms', () => {
+      const original = 'TEMINAT KAPSAMI'
+      const corrected = 'TEMİNAT KAPSAMI'
+      const result = validateOCRCorrection(original, corrected)
+      expect(result.isValid).toBe(true)
+    })
+  })
+
+  describe('buildDocumentProcessingPrompt - additional branches', () => {
+    it('should add English language note', () => {
+      const prompt = buildDocumentProcessingPrompt('Test text', { language: 'en' })
+      expect(prompt).toContain('This document is in English')
+    })
+
+    it('should add mixed language note by default', () => {
+      const prompt = buildDocumentProcessingPrompt('Test text')
+      expect(prompt).toContain('mixed Turkish/English')
+    })
+  })
+
+  describe('parseDocumentProcessingResponse - additional branches', () => {
+    it('should handle Document Metadata at start of response (short initial text)', () => {
+      const response = '## 1. Document Metadata\n- Type: Kasko\n## 2. Coverage'
+      const result = parseDocumentProcessingResponse(response)
+      // metadataIndex < 100, so whole response becomes structured extraction
+      expect(result.structuredExtraction).toContain('Document Metadata')
+    })
+
+    it('should split on Document Metadata when initial text is long', () => {
+      const longText = 'A'.repeat(150) + '\n## 1. Document Metadata\n- Type: Traffic'
+      const result = parseDocumentProcessingResponse(longText)
+      expect(result.cleanedText).toBeTruthy()
+      expect(result.structuredExtraction).toContain('Document Metadata')
+    })
+
+    it('should return cleaned text for plain response without patterns', () => {
+      const response = 'This is just cleaned text with no structural patterns at all'
+      const result = parseDocumentProcessingResponse(response)
+      expect(result.cleanedText).toBe(response)
+      expect(result.structuredExtraction).toBeNull()
+    })
   })
 })

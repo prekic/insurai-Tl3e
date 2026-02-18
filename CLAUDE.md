@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**
-- **Production Readiness**: ~9.5/10 (6,200+ tests, 0 lint errors, 20 warnings, PWA support, server hardening, HSTS)
-- **Last Updated**: February 17, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **81.6% line coverage (9,541 tests across 222 files)**
+- **Production Readiness**: ~9.5/10 (9,500+ tests, 0 prod lint errors, 25 warnings, PWA support, server hardening, HSTS)
+- **Last Updated**: February 18, 2026
 
 ---
 
@@ -1217,11 +1217,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 9, 2026)
-- **Total**: 6,200+ tests across 190 test files
+### Test Counts (as of Feb 18, 2026)
+- **Total**: 9,541 tests across 222 test files (18 skipped)
 - **Passing**: 100% (0 failures)
-- **Coverage**: 49.6% statements, 77.2% branches, 71.0% functions
-- **Note**: Includes 275 tests for critical modules (admin-auth, email, cost-control, free-trial), 21 user-profile functional tests, 14 E2E extraction flow tests
+- **Coverage**: 80.4% statements, 70.2% branches, 79.5% functions, 81.6% lines
+- **Note**: Massive coverage push in Feb 18 session added ~3,300 tests across 50+ new/expanded test files. Includes comprehensive coverage for AI routes (112 tests), policy extractor, text processor, gap detection, privacy modules, regional benchmarking, market data, and admin services
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3397,6 +3397,54 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Result**: ESLint now at 0 errors, 20 warnings (down from 46 warnings)
 - **Commit**: `b9e498d`
 
+### 103. UnsubscribePage i18n (Added Feb 18, 2026)
+- **Feature**: Last page with hardcoded Turkish strings now uses the i18n translation system
+- **Problem**: UnsubscribePage.tsx had 22 hardcoded Turkish strings without locale support
+- **Solution**: Added `unsubscribe` section to `TranslationDictionary` with 22 TR/EN keys; component now uses `useTranslation()` hook
+- **Translations Added**: title, titleSuccess, titleError, invalidLink, areYouSure, willNotReceive, marketingEmails, specialOffers, productUpdates, willContinue, confirmButton, processing, successMessage, changeYourMind, retry, connectionError, connectionErrorDetails, unsubscribeFailed, pleaseTryLater, backToHome, footer
+- **Files Changed**: `src/components/UnsubscribePage.tsx`, `src/lib/i18n/translations.ts`
+- **Commit**: `525bd52`
+
+### 104. AI Insights Translated at Extraction Time — aiInsightsTr (Added Feb 18, 2026)
+- **Feature**: AI insights are now translated to Turkish at extraction time, persisted as `aiInsightsTr` array
+- **Problem**: AI insights (`policy.aiInsights`) were always English strings, requiring display-time translation with `translateInsight()` — brittle, couldn't handle new patterns, ran on every render
+- **Solution**:
+  - Added `aiInsightsTr?: string[]` field to `AnalyzedPolicy` interface in `src/types/policy.ts`
+  - Created `translateInsightToTr()` and `translateInsightsToTr()` in `policy-extractor.ts` — mirrors display-time logic but runs once at extraction
+  - Called at 3 points: `convertToAnalyzedPolicy()`, after validation insight prepend, and `comprehensiveToAnalyzedPolicy()`
+  - `PolicyDetailView` updated with `getLocalizedInsight()` that prefers `aiInsightsTr[i]` when locale is Turkish, falling back to legacy `translateInsightLegacy()` for old extractions
+  - Original `translateInsight()` renamed to `translateInsightLegacy()` for clarity
+- **Benefits**: Single translation at extraction → persisted with policy → no per-render cost, consistent across views
+- **Backward Compatible**: Policies extracted before this change still work via legacy fallback
+- **Files Changed**: `src/types/policy.ts`, `src/lib/ai/policy-extractor.ts`, `src/components/PolicyDetailView.tsx`
+- **Commit**: `b6f3d16`
+
+### 105. Massive Test Coverage Push — 49.6% → 81.6% Lines (Feb 18, 2026)
+- **Feature**: Comprehensive test coverage expansion adding ~3,300 tests across 50+ test files
+- **Before**: 6,252 tests (190 files), 49.6% statements, 77.2% branches
+- **After**: 9,541 tests (222 files), 80.4% statements, 70.2% branches, 81.6% lines
+- **Key New Test Files** (selected highlights):
+  - `server/__tests__/ai-routes-extended.test.ts` — 112 tests for all AI extraction/chat routes
+  - `server/__tests__/prompt-versioning.test.ts` — Prompt template versioning
+  - `server/__tests__/admin-db.test.ts` — Admin database operations
+  - `server/__tests__/admin-content-routes.test.ts` — Content management routes
+  - `server/__tests__/admin-cost-routes.test.ts` — Cost tracking routes
+  - `server/__tests__/admin-monitoring-routes.test.ts` — Monitoring routes
+  - `src/lib/ai/policy-extractor.test.ts` — Policy extraction logic
+  - `src/lib/ai/text-processor.test.ts` — Combined document processing pipeline
+  - `src/lib/ai/openai.test.ts` — OpenAI integration
+  - `src/lib/gap-detection/gap-detection-branches.test.ts` — Gap detection branches
+  - `src/lib/security/security-branches.test.ts` — Security module branches
+  - `src/lib/privacy/data-subject-rights.test.ts` — KVKK data subject rights
+  - `src/lib/knowledge/kasko-knowledge.test.ts` — Kasko knowledge base
+  - `src/lib/regional-benchmark/*.test.ts` — Regional benchmark branches
+  - `src/hooks/usePolicyEvaluation.test.ts` — Policy evaluation hook
+  - `src/hooks/usePolicyComparison.test.ts` — Policy comparison hook
+  - `src/components/PolicyCard.test.tsx` — Policy card component
+  - `src/components/ConflictResolutionDialog.test.tsx` — Conflict resolution UI
+- **ESLint Impact**: 33 new ESLint errors introduced (all in test files — unused mock variables); production code remains at 0 errors
+- **Commits**: `478fe4d`, `542f593`
+
 ---
 
 ## Turkish Market Considerations
@@ -3865,6 +3913,18 @@ connectSrc: [
 - When adding new settings sub-routes, always place them before the `// CATEGORY-BASED SETTINGS ROUTES (catch-all — MUST be last)` comment
 - This was the root cause of the admin Settings History panel showing "No history records found" (Fixed Feb 16, 2026)
 
+**AI Insight Translation Architecture (Feb 18, 2026):**
+- AI insights are now translated to Turkish at extraction time and persisted as `aiInsightsTr` on the `AnalyzedPolicy`
+- `getLocalizedInsight()` in PolicyDetailView prefers `aiInsightsTr[i]` for Turkish locale, with `translateInsightLegacy()` fallback for old policies
+- When adding new insight patterns in `generateStrengths()` / `generateGapsAsync()` / `generateRecommendationsAsync()`, also add the Turkish translation in `translateInsightToTr()` in `policy-extractor.ts`
+- The display-time translation in `PolicyDetailView.tsx` is now legacy-only — new insights should be covered by the extractor
+
+**ESLint in Test Files After Coverage Push:**
+- The Feb 18 coverage push introduced 33 ESLint errors — all in test files (unused mock variables like `mockSelect`, `mockInsert`, etc.)
+- Production code remains at 0 errors
+- These are low priority — the mock variables are defined for chained Supabase mock patterns but not all are used in every test file
+- Fix by prefixing unused mocks with `_` (e.g., `_mockSelect`) when addressed
+
 ---
 
 ## CI/CD
@@ -3912,5 +3972,5 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 6,200+ tests, all passing (190 test files)
-**Last Updated**: February 17, 2026
+**Tests**: 9,541 tests, all passing (222 test files), 81.6% line coverage
+**Last Updated**: February 18, 2026

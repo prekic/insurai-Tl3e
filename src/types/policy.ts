@@ -121,6 +121,7 @@ export interface DuplicatePolicy {
 export interface AnalyzedPolicy extends Policy {
   aiConfidence: number
   aiInsights: string[]
+  aiInsightsTr?: string[]
   marketComparison?: {
     averagePremium: number
     averageCoverage: number

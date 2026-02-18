@@ -3,6 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom'
 import { Mail, CheckCircle2, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react'
 import { Button } from './ui/button'
 import { getEnvConfig } from '@/lib/env'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 type UnsubscribeState = 'loading' | 'confirm' | 'processing' | 'success' | 'error' | 'invalid'
 
@@ -15,6 +16,7 @@ export function UnsubscribePage() {
   const [searchParams] = useSearchParams()
   const [state, setState] = useState<UnsubscribeState>('loading')
   const [error, setError] = useState<UnsubscribeError | null>(null)
+  const { t } = useTranslation()
 
   const email = searchParams.get('email')
   const token = searchParams.get('token')
@@ -24,13 +26,13 @@ export function UnsubscribePage() {
     if (!email || !token) {
       setState('invalid')
       setError({
-        message: 'Gecersiz abonelikten cikma baglantisi',
-        details: 'E-postanizdaki baglantidan tekrar deneyin.',
+        message: t.unsubscribe.invalidLink,
+        details: t.unsubscribe.invalidLinkDetails,
       })
     } else {
       setState('confirm')
     }
-  }, [email, token])
+  }, [email, token, t])
 
   const handleUnsubscribe = async () => {
     if (!email || !token) return
@@ -54,15 +56,15 @@ export function UnsubscribePage() {
       } else {
         setState('error')
         setError({
-          message: data.error || 'Abonelikten cikma basarisiz',
-          details: data.message || 'Lutfen daha sonra tekrar deneyin.',
+          message: data.error || t.unsubscribe.unsubscribeFailed,
+          details: data.message || t.unsubscribe.pleaseTryLater,
         })
       }
     } catch {
       setState('error')
       setError({
-        message: 'Baglanti hatasi',
-        details: 'Sunucuya ulasilamiyor. Lutfen internet baglantinizi kontrol edin.',
+        message: t.unsubscribe.connectionError,
+        details: t.unsubscribe.connectionErrorDetails,
       })
     }
   }
@@ -93,10 +95,10 @@ export function UnsubscribePage() {
 
             <h1 className="text-2xl font-bold text-gray-900 mb-2">
               {state === 'success'
-                ? 'Abonelikten Cikildi'
+                ? t.unsubscribe.titleSuccess
                 : state === 'error' || state === 'invalid'
-                  ? 'Hata Olustu'
-                  : 'Abonelikten Cik'}
+                  ? t.unsubscribe.titleError
+                  : t.unsubscribe.title}
             </h1>
 
             {email && state !== 'invalid' && (
@@ -117,22 +119,21 @@ export function UnsubscribePage() {
                 <div className="flex gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-amber-800 text-sm font-medium">Emin misiniz?</p>
+                    <p className="text-amber-800 text-sm font-medium">{t.unsubscribe.areYouSure}</p>
                     <p className="text-amber-700 text-sm mt-1">
-                      Abonelikten cikarken artik asagidaki e-postalari almayacaksiniz:
+                      {t.unsubscribe.willNotReceive}
                     </p>
                     <ul className="text-amber-700 text-sm mt-2 space-y-1 list-disc list-inside">
-                      <li>Pazarlama ve tanitim e-postalari</li>
-                      <li>Ozel teklifler ve kampanyalar</li>
-                      <li>Urun guncellemeleri</li>
+                      <li>{t.unsubscribe.marketingEmails}</li>
+                      <li>{t.unsubscribe.specialOffers}</li>
+                      <li>{t.unsubscribe.productUpdates}</li>
                     </ul>
                   </div>
                 </div>
               </div>
 
               <p className="text-gray-600 text-sm text-center">
-                Police uyarilari ve guvenlik bildirimleri gibi onemli e-postalari almaya devam
-                edeceksiniz.
+                {t.unsubscribe.willContinue}
               </p>
 
               <div className="flex flex-col gap-3">
@@ -142,12 +143,12 @@ export function UnsubscribePage() {
                   className="w-full"
                   size="lg"
                 >
-                  Evet, Aboneligimi Iptal Et
+                  {t.unsubscribe.confirmButton}
                 </Button>
                 <Link to="/" className="block">
                   <Button variant="outline" className="w-full" size="lg">
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Ana Sayfaya Don
+                    {t.unsubscribe.backToHome}
                   </Button>
                 </Link>
               </div>
@@ -157,7 +158,7 @@ export function UnsubscribePage() {
           {state === 'processing' && (
             <div className="flex flex-col items-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mb-4" />
-              <p className="text-gray-600">Isleniyor...</p>
+              <p className="text-gray-600">{t.unsubscribe.processing}</p>
             </div>
           )}
 
@@ -165,19 +166,18 @@ export function UnsubscribePage() {
             <div className="space-y-6">
               <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                 <p className="text-green-800 text-sm text-center">
-                  Pazarlama e-postalarindan basariyla ciktiniz. Artik tanitim e-postalari
-                  almayacaksiniz.
+                  {t.unsubscribe.successMessage}
                 </p>
               </div>
 
               <p className="text-gray-600 text-sm text-center">
-                Fikrinizi degistirirseniz, hesap ayarlarinizdan tekrar abone olabilirsiniz.
+                {t.unsubscribe.changeYourMind}
               </p>
 
               <Link to="/" className="block">
                 <Button variant="default" className="w-full" size="lg">
                   <ArrowLeft className="w-4 h-4 mr-2" />
-                  Ana Sayfaya Don
+                  {t.unsubscribe.backToHome}
                 </Button>
               </Link>
             </div>
@@ -193,13 +193,13 @@ export function UnsubscribePage() {
               <div className="flex flex-col gap-3">
                 {state === 'error' && (
                   <Button onClick={handleUnsubscribe} variant="default" className="w-full" size="lg">
-                    Tekrar Dene
+                    {t.unsubscribe.retry}
                   </Button>
                 )}
                 <Link to="/" className="block">
                   <Button variant="outline" className="w-full" size="lg">
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Ana Sayfaya Don
+                    {t.unsubscribe.backToHome}
                   </Button>
                 </Link>
               </div>
@@ -209,7 +209,7 @@ export function UnsubscribePage() {
 
         {/* Footer */}
         <p className="text-center text-gray-400 text-xs mt-6">
-          InsurAI - Turkiye&#39;nin #1 Sigorta Analiz Platformu
+          {t.unsubscribe.footer}
         </p>
       </div>
     </div>

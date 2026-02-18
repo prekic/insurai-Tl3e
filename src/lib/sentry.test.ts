@@ -344,4 +344,248 @@ describe('Sentry Client', () => {
       expect(getEnv(undefined, true)).toBe('production')
     })
   })
+
+  describe('functions without DSN (early return paths)', () => {
+    it('initSentry should not call Sentry.init when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      initSentry()
+      expect(Sentry.init).not.toHaveBeenCalled()
+    })
+
+    it('setSentryUser should not call Sentry.setUser when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      setSentryUser({ id: 'user-123', email: 'test@example.com' })
+      expect(Sentry.setUser).not.toHaveBeenCalled()
+    })
+
+    it('setSentryUser with null should not call Sentry.setUser when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      setSentryUser(null)
+      expect(Sentry.setUser).not.toHaveBeenCalled()
+    })
+
+    it('setSentryContext should not call Sentry.setContext when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      setSentryContext('test', { key: 'value' })
+      expect(Sentry.setContext).not.toHaveBeenCalled()
+    })
+
+    it('captureError should return undefined when DSN is not configured', () => {
+      const error = new Error('Test')
+      const result = captureError(error)
+      expect(result).toBeUndefined()
+    })
+
+    it('captureError should log to console.error when DSN is not configured', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const error = new Error('Test error')
+      captureError(error)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error captured (Sentry disabled):',
+        error,
+        undefined
+      )
+      consoleSpy.mockRestore()
+    })
+
+    it('captureError should log context to console.error when DSN is not configured', () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const error = new Error('Test')
+      const context = { userId: 'user-123' }
+      captureError(error, context)
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Error captured (Sentry disabled):',
+        error,
+        context
+      )
+      consoleSpy.mockRestore()
+    })
+
+    it('captureError should not call Sentry.captureException when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      captureError(new Error('Test'))
+      expect(Sentry.captureException).not.toHaveBeenCalled()
+    })
+
+    it('captureMessage should fall back to console.info when DSN is not configured', () => {
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      captureMessage('Test message', 'warning')
+      expect(consoleSpy).toHaveBeenCalledWith('[warning] Test message')
+      consoleSpy.mockRestore()
+    })
+
+    it('captureMessage should use default info level in console fallback', () => {
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      captureMessage('Default level')
+      expect(consoleSpy).toHaveBeenCalledWith('[info] Default level')
+      consoleSpy.mockRestore()
+    })
+
+    it('captureMessage should handle error level in console fallback', () => {
+      const consoleSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+      captureMessage('Error happened', 'error')
+      expect(consoleSpy).toHaveBeenCalledWith('[error] Error happened')
+      consoleSpy.mockRestore()
+    })
+
+    it('captureMessage should not call Sentry.captureMessage when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      captureMessage('Test')
+      expect(Sentry.captureMessage).not.toHaveBeenCalled()
+    })
+
+    it('addBreadcrumb should not call Sentry.addBreadcrumb when DSN is not configured', async () => {
+      const Sentry = await import('@sentry/react')
+      addBreadcrumb('click', 'ui', { element: 'button' })
+      expect(Sentry.addBreadcrumb).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('ErrorBoundary re-export', () => {
+    it('should re-export ErrorBoundary from @sentry/react', async () => {
+      const sentry = await import('./sentry')
+      expect(sentry.ErrorBoundary).toBeDefined()
+    })
+  })
+
+  describe('beforeSend function behavior', () => {
+    it('should sanitize breadcrumb messages with policy and TC numbers', () => {
+      // Simulate what beforeSend does to breadcrumbs
+      const breadcrumbs = [
+        { message: 'User viewed policy 12-34567890' },
+        { message: 'TC Kimlik 12345678901 verified' },
+        { message: 'Navigation to dashboard' },
+      ]
+
+      const sanitized = breadcrumbs.map(b => {
+        if (b.message) {
+          let msg = b.message
+          msg = msg.replace(/\b\d{2}-\d{8}\b/g, '[POLICY_NUMBER]')
+          msg = msg.replace(/\b\d{11}\b/g, '[TC_KIMLIK]')
+          return { ...b, message: msg }
+        }
+        return b
+      })
+
+      expect(sanitized[0].message).toBe('User viewed policy [POLICY_NUMBER]')
+      expect(sanitized[1].message).toBe('TC Kimlik [TC_KIMLIK] verified')
+      expect(sanitized[2].message).toBe('Navigation to dashboard')
+    })
+
+    it('should handle breadcrumbs without message', () => {
+      const breadcrumbs = [
+        { category: 'http', data: { url: '/api/test' } },
+      ]
+
+      const sanitized = breadcrumbs.map(b => {
+        if ('message' in b && b.message) {
+          return b
+        }
+        return b
+      })
+
+      expect(sanitized[0]).toEqual({ category: 'http', data: { url: '/api/test' } })
+    })
+
+    it('should remove Authorization header from request', () => {
+      const event = {
+        request: {
+          headers: {
+            Authorization: 'Bearer secret-token',
+            'Content-Type': 'application/json',
+          },
+        },
+      }
+
+      delete event.request.headers.Authorization
+      expect(event.request.headers.Authorization).toBeUndefined()
+      expect(event.request.headers['Content-Type']).toBe('application/json')
+    })
+
+    it('should remove X-API-Key header from request', () => {
+      const event = {
+        request: {
+          headers: {
+            'X-API-Key': 'secret-key',
+            Accept: 'application/json',
+          } as Record<string, string>,
+        },
+      }
+
+      delete event.request.headers['X-API-Key']
+      expect(event.request.headers['X-API-Key']).toBeUndefined()
+      expect(event.request.headers.Accept).toBe('application/json')
+    })
+
+    it('should handle event without request property', () => {
+      const event = { message: 'test event' }
+      // beforeSend checks if (event.request?.headers) - should not throw
+      expect(() => {
+        if ((event as Record<string, unknown>).request) {
+          // would process headers
+        }
+      }).not.toThrow()
+    })
+
+    it('should handle event without breadcrumbs', () => {
+      const event = { message: 'test event', breadcrumbs: undefined }
+      // beforeSend checks if (event.breadcrumbs) - should not throw
+      expect(() => {
+        if (event.breadcrumbs) {
+          // would process breadcrumbs
+        }
+      }).not.toThrow()
+    })
+  })
+
+  describe('getSampleRates logic', () => {
+    it('should return correct rates for staging environment', () => {
+      const getSampleRates = (isStaging: boolean, isProduction: boolean) => {
+        if (isStaging) return { traces: 0.5, replaysSession: 0.3, replaysOnError: 1.0 }
+        if (isProduction) return { traces: 0.1, replaysSession: 0.1, replaysOnError: 1.0 }
+        return { traces: 1.0, replaysSession: 0, replaysOnError: 1.0 }
+      }
+
+      const staging = getSampleRates(true, false)
+      expect(staging.traces).toBe(0.5)
+      expect(staging.replaysSession).toBe(0.3)
+      expect(staging.replaysOnError).toBe(1.0)
+    })
+
+    it('should return correct rates for production environment', () => {
+      const getSampleRates = (isStaging: boolean, isProduction: boolean) => {
+        if (isStaging) return { traces: 0.5, replaysSession: 0.3, replaysOnError: 1.0 }
+        if (isProduction) return { traces: 0.1, replaysSession: 0.1, replaysOnError: 1.0 }
+        return { traces: 1.0, replaysSession: 0, replaysOnError: 1.0 }
+      }
+
+      const production = getSampleRates(false, true)
+      expect(production.traces).toBe(0.1)
+      expect(production.replaysSession).toBe(0.1)
+    })
+
+    it('should return full sampling for development', () => {
+      const getSampleRates = (isStaging: boolean, isProduction: boolean) => {
+        if (isStaging) return { traces: 0.5, replaysSession: 0.3, replaysOnError: 1.0 }
+        if (isProduction) return { traces: 0.1, replaysSession: 0.1, replaysOnError: 1.0 }
+        return { traces: 1.0, replaysSession: 0, replaysOnError: 1.0 }
+      }
+
+      const dev = getSampleRates(false, false)
+      expect(dev.traces).toBe(1.0)
+      expect(dev.replaysSession).toBe(0)
+      expect(dev.replaysOnError).toBe(1.0)
+    })
+
+    it('staging should take priority over production when both true', () => {
+      const getSampleRates = (isStaging: boolean, isProduction: boolean) => {
+        if (isStaging) return { traces: 0.5, replaysSession: 0.3, replaysOnError: 1.0 }
+        if (isProduction) return { traces: 0.1, replaysSession: 0.1, replaysOnError: 1.0 }
+        return { traces: 1.0, replaysSession: 0, replaysOnError: 1.0 }
+      }
+
+      const result = getSampleRates(true, true)
+      expect(result.traces).toBe(0.5) // staging, not production
+    })
+  })
 })

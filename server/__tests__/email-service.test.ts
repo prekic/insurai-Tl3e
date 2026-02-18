@@ -253,35 +253,61 @@ describe('Email Service', () => {
 })
 
 describe('Email Preferences', () => {
-  // These would test the preference functions
-  // Skipped as they require database connection
+  let getEmailPreferences: typeof import('../services/email-service.js').getEmailPreferences
+  let updateEmailPreferences: typeof import('../services/email-service.js').updateEmailPreferences
+  let canSendEmail: typeof import('../services/email-service.js').canSendEmail
 
-  it.skip('should get default preferences for new user', async () => {
-    // Would test getEmailPreferences
+  beforeEach(async () => {
+    const mod = await import('../services/email-service.js')
+    getEmailPreferences = mod.getEmailPreferences
+    updateEmailPreferences = mod.updateEmailPreferences
+    canSendEmail = mod.canSendEmail
   })
 
-  it.skip('should update preferences', async () => {
-    // Would test updateEmailPreferences
+  it('should return default preferences when no Supabase', async () => {
+    const prefs = await getEmailPreferences('user-123')
+    expect(prefs).toEqual({
+      marketing: true,
+      policy_alerts: true,
+      expiration_reminders: true,
+      weekly_digest: false,
+    })
   })
 
-  it.skip('should check if email type is allowed', async () => {
-    // Would test canSendEmail
-  })
-})
-
-describe('Email Scheduler', () => {
-  // These would test the scheduler functions
-  // Skipped as they require database connection
-
-  it.skip('should process expiration reminders', async () => {
-    // Would test processExpirationReminders
+  it('should return false from updateEmailPreferences when no Supabase', async () => {
+    const result = await updateEmailPreferences('user-123', { marketing: false })
+    expect(result).toBe(false)
   })
 
-  it.skip('should not send duplicate reminders', async () => {
-    // Would test hasReminderBeenSent
+  it('should always allow welcome emails', async () => {
+    expect(await canSendEmail('user-123', 'welcome')).toBe(true)
   })
 
-  it.skip('should process expired notifications', async () => {
-    // Would test processExpiredNotifications
+  it('should always allow password_reset emails', async () => {
+    expect(await canSendEmail('user-123', 'password_reset')).toBe(true)
+  })
+
+  it('should always allow admin_alert emails', async () => {
+    expect(await canSendEmail('user-123', 'admin_alert')).toBe(true)
+  })
+
+  it('should check policy_alerts for policy_uploaded', async () => {
+    expect(await canSendEmail('user-123', 'policy_uploaded')).toBe(true)
+  })
+
+  it('should check policy_alerts for policy_expiring', async () => {
+    expect(await canSendEmail('user-123', 'policy_expiring')).toBe(true)
+  })
+
+  it('should check policy_alerts for policy_expired', async () => {
+    expect(await canSendEmail('user-123', 'policy_expired')).toBe(true)
+  })
+
+  it('should check marketing for trial_reminder', async () => {
+    expect(await canSendEmail('user-123', 'trial_reminder')).toBe(true)
+  })
+
+  it('should check marketing for trial_expired', async () => {
+    expect(await canSendEmail('user-123', 'trial_expired')).toBe(true)
   })
 })

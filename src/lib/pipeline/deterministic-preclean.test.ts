@@ -672,3 +672,27 @@ More normal text`
     expect(result.text).toContain('More normal text')
   })
 })
+
+// ============================================================================
+// despaceLeadingSplits coverage (via iterativeDespace)
+// ============================================================================
+
+describe('iterativeDespace - leading split patterns', () => {
+  it('should join uppercase letter + lowercase continuation ("M üşteri" → "Müşteri")', () => {
+    // despaceLeadingSplits pattern: single UPPERCASE letter + space + 2+ lowercase
+    const result = iterativeDespace('M üşteri bilgisi', 3)
+    expect(result.text).toContain('Müşteri')
+    expect(result.totalCount).toBeGreaterThan(0)
+  })
+
+  it('should join "D üzenleme" → "Düzenleme"', () => {
+    const result = iterativeDespace('D üzenleme tarihi', 3)
+    expect(result.text).toContain('Düzenleme')
+  })
+
+  it('should join "Ş asi" into single word', () => {
+    const result = iterativeDespace('Ş asi numarası', 3)
+    // Other passes may lowercase the Ş; just verify the space is removed
+    expect(result.text.toLowerCase()).toContain('şasi')
+  })
+})

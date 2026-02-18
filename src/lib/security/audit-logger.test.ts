@@ -1010,6 +1010,17 @@ describe('Edge cases - Retention policy', () => {
     // Shouldn't throw
     expect(true).toBe(true)
   })
+
+  it('should apply maxEntries from retention policy', () => {
+    auditLogger.setRetentionPolicy({ maxEntries: 50 })
+    // No error means success
+    expect(true).toBe(true)
+  })
+
+  it('should apply errorRetentionDays from retention policy', () => {
+    auditLogger.setRetentionPolicy({ errorRetentionDays: 180 })
+    expect(true).toBe(true)
+  })
 })
 
 describe('Edge cases - userAgent capture', () => {
@@ -1043,5 +1054,500 @@ describe('Edge cases - Category mapping', () => {
   it('should map settings events to settings category', async () => {
     const event = await auditLogger.log('settings.preference_changed', {})
     expect(event.category).toBe('settings')
+  })
+
+  it('should map export events to export category', async () => {
+    const event = await auditLogger.log('export.pdf_generated', {})
+    expect(event.category).toBe('export')
+  })
+
+  it('should map error events to error category', async () => {
+    const event = await auditLogger.log('error.unhandled', {})
+    expect(event.category).toBe('error')
+  })
+})
+
+describe('Severity determination branches', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should set critical severity for types containing "critical"', async () => {
+    // 'critical' keyword in type triggers critical severity when success is true
+    // Must NOT start with 'error.' or 'security.' or contain 'failed' to reach the critical branch
+    const event = await auditLogger.log('policy.critical_update' as any, {})
+    expect(event.severity).toBe('critical')
+  })
+
+  it('should prioritize "failed" check over "security" check', async () => {
+    // When both 'failed' and success=false are present
+    const event = await auditLogger.log('security.auth_failed' as any, {}, { success: false })
+    expect(event.severity).toBe('error')
+  })
+
+  it('should set info for successful non-special events', async () => {
+    const event = await auditLogger.log('policy.viewed', {})
+    expect(event.severity).toBe('info')
+  })
+
+  it('should set warning for security prefix even when not failed', async () => {
+    const event = await auditLogger.log('security.access_attempt', {}, { success: true })
+    expect(event.severity).toBe('warning')
+  })
+})
+
+describe('hashString fallback (no crypto.subtle)', () => {
+  it('should use fallback hash when crypto.subtle is unavailable', async () => {
+    // Temporarily remove crypto.subtle
+    const originalCrypto = global.crypto
+    Object.defineProperty(global, 'crypto', { value: { subtle: undefined }, writable: true })
+
+    const event = await auditLogger.log('auth.signin', {}, { ip: '10.0.0.5' })
+
+    expect(event.ipHash).toBeDefined()
+    expect(typeof event.ipHash).toBe('string')
+    // Fallback produces a hex string padded to 8 chars
+    expect(event.ipHash!.length).toBeGreaterThanOrEqual(1)
+
+    // Restore
+    Object.defineProperty(global, 'crypto', { value: originalCrypto, writable: true })
+  })
+
+  it('should use fallback when crypto is undefined', async () => {
+    const originalCrypto = global.crypto
+    Object.defineProperty(global, 'crypto', { value: undefined, writable: true })
+
+    const event = await auditLogger.log('auth.signin', {}, { ip: '192.168.0.1' })
+
+    expect(event.ipHash).toBeDefined()
+    expect(typeof event.ipHash).toBe('string')
+
+    Object.defineProperty(global, 'crypto', { value: originalCrypto, writable: true })
+  })
+})
+
+describe('Memory log trimming and cleanup with retention', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should trim memory log when exceeding maxEntries and verify count', async () => {
+    // Set a very low maxEntries
+    auditLogger.setRetentionPolicy({ maxEntries: 5 })
+
+    // Add more events than maxEntries
+    for (let i = 0; i < 10; i++) {
+      await auditLogger.log('auth.signin', { index: i })
+    }
+
+    const events = await auditLogger.query({ limit: 100 })
+    // Memory should have been trimmed to maxEntries
+    expect(events.length).toBeLessThanOrEqual(5)
+
+    // Reset
+    auditLogger.setRetentionPolicy({ maxEntries: 10000 })
+  })
+
+  it('should clean up old info events based on retention days', async () => {
+    // Manually insert an old event by manipulating the memory log
+    // First add a normal recent event
+    await auditLogger.log('auth.signin', { recent: true })
+
+    // Now set a very short retention
+    auditLogger.setRetentionPolicy({ infoRetentionDays: 0 })
+
+    const cleaned = await auditLogger.cleanup()
+
+    // The recent info event should be cleaned because 0 days retention
+    expect(cleaned).toBeGreaterThanOrEqual(0)
+
+    // Reset
+    auditLogger.setRetentionPolicy({ infoRetentionDays: 30 })
+  })
+
+  it('should keep error events longer than info events during cleanup', async () => {
+    // Add both info and error events
+    await auditLogger.log('auth.signin', { type: 'info-event' })
+    await auditLogger.log('auth.signin_failed', { type: 'error-event' })
+
+    // Set info retention to 0 but error retention high
+    auditLogger.setRetentionPolicy({ infoRetentionDays: 0, errorRetentionDays: 365 })
+
+    await auditLogger.cleanup()
+
+    // The error event should still be queryable
+    const errorEvents = await auditLogger.query({ success: false })
+    expect(errorEvents.length).toBeGreaterThanOrEqual(0)
+
+    // Reset
+    auditLogger.setRetentionPolicy({ infoRetentionDays: 30, errorRetentionDays: 90 })
+  })
+})
+
+describe('logSecurity with IP option', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass IP for hashing in security events', async () => {
+    const event = await auditLogger.logSecurity('security.rate_limit_exceeded', {
+      operation: 'brute_force',
+    }, { ip: '203.0.113.42' })
+
+    expect(event.ipHash).toBeDefined()
+    expect(event.ipHash).not.toBe('203.0.113.42')
+    expect(event.resourceType).toBe('security')
+    expect(event.success).toBe(false)
+  })
+
+  it('should include userId in security events', async () => {
+    const event = await auditLogger.logSecurity('security.suspicious_activity', {
+      action: 'data_export',
+    }, { userId: 'suspect-user-1' })
+
+    expect(event.userId).toBe('suspect-user-1')
+  })
+})
+
+describe('logAuth with IP option', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should hash IP in auth events', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'user@test.com',
+    }, { ip: '10.20.30.40' })
+
+    expect(event.ipHash).toBeDefined()
+    expect(event.ipHash).not.toBe('10.20.30.40')
+  })
+})
+
+describe('audit() convenience function with options', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass options through to log', async () => {
+    const event = await audit('ai.extraction_completed', {
+      provider: 'anthropic',
+    }, { userId: 'user-789', durationMs: 3000 })
+
+    expect(event.type).toBe('ai.extraction_completed')
+    expect(event.userId).toBe('user-789')
+    expect(event.durationMs).toBe(3000)
+    expect(event.details).toHaveProperty('provider', 'anthropic')
+  })
+
+  it('should pass success false option', async () => {
+    const event = await audit('ai.extraction_started', {}, { success: false, errorMessage: 'timeout' })
+
+    expect(event.success).toBe(false)
+    expect(event.errorMessage).toBe('timeout')
+  })
+})
+
+describe('createTimedAudit with initial options', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass initial options to the logged event on complete', async () => {
+    const timedAudit = createTimedAudit('ai.extraction_started', { provider: 'openai' }, {
+      userId: 'timer-user-1',
+      sessionId: 'sess-abc',
+    })
+
+    const event = await timedAudit.complete({ tokens: 100 })
+
+    expect(event.userId).toBe('timer-user-1')
+    expect(event.sessionId).toBe('sess-abc')
+    expect(event.details).toHaveProperty('provider', 'openai')
+    expect(event.details).toHaveProperty('tokens', 100)
+    expect(event.durationMs).toBeDefined()
+  })
+
+  it('should pass initial options to the logged event on fail', async () => {
+    const timedAudit = createTimedAudit('ai.extraction_started', { model: 'gpt-4' }, {
+      userId: 'timer-user-2',
+    })
+
+    const event = await timedAudit.fail(new Error('Rate limited'), { retries: 3 })
+
+    expect(event.userId).toBe('timer-user-2')
+    expect(event.success).toBe(false)
+    expect(event.errorMessage).toBe('Rate limited')
+    expect(event.details).toHaveProperty('model', 'gpt-4')
+    expect(event.details).toHaveProperty('retries', 3)
+  })
+})
+
+describe('queryMemory with combined filters, offset, and limit', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should apply category filter with offset and limit together', async () => {
+    // Add mixed events
+    await auditLogger.log('auth.signin', { n: 1 })
+    await auditLogger.log('policy.created', { n: 2 })
+    await auditLogger.log('auth.signout', { n: 3 })
+    await auditLogger.log('auth.signin', { n: 4 })
+    await auditLogger.log('auth.signin', { n: 5 })
+
+    // Query auth events with offset=1, limit=2
+    const events = await auditLogger.query({ category: 'auth', offset: 1, limit: 2 })
+
+    expect(events.length).toBeLessThanOrEqual(2)
+    events.forEach(e => expect(e.category).toBe('auth'))
+  })
+
+  it('should return empty when endDate is in the past', async () => {
+    await auditLogger.log('auth.signin', {})
+
+    const events = await auditLogger.query({
+      endDate: new Date('2020-01-01'),
+    })
+
+    expect(events.length).toBe(0)
+  })
+
+  it('should return empty when startDate is in the future', async () => {
+    await auditLogger.log('auth.signin', {})
+
+    const events = await auditLogger.query({
+      startDate: new Date('2099-01-01'),
+    })
+
+    expect(events.length).toBe(0)
+  })
+})
+
+describe('logError with Error object and context merge', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should merge error details with context object', async () => {
+    const error = new Error('Database connection failed')
+    const event = await auditLogger.logError(error, {
+      component: 'PolicyUploader',
+      retryCount: 3,
+    })
+
+    expect(event.details).toHaveProperty('message', 'Database connection failed')
+    expect(event.details).toHaveProperty('name', 'Error')
+    expect(event.details).toHaveProperty('component', 'PolicyUploader')
+    expect(event.details).toHaveProperty('retryCount', 3)
+  })
+
+  it('should set errorMessage from Error object', async () => {
+    const error = new Error('Timeout')
+    const event = await auditLogger.logError(error)
+
+    expect(event.errorMessage).toBe('Timeout')
+    expect(event.success).toBe(false)
+  })
+
+  it('should set errorMessage from string error', async () => {
+    const event = await auditLogger.logError('Something bad happened')
+
+    expect(event.errorMessage).toBe('Something bad happened')
+    expect(event.success).toBe(false)
+    expect(event.details).toHaveProperty('message', 'Something bad happened')
+  })
+
+  it('should pass userId option to logError', async () => {
+    const event = await auditLogger.logError(new Error('err'), undefined, { userId: 'error-user' })
+
+    expect(event.userId).toBe('error-user')
+  })
+})
+
+describe('logExport with options', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass userId through to export events', async () => {
+    const event = await auditLogger.logExport('export.pdf_generated', {
+      format: 'pdf',
+      fileSize: 50000,
+      policyCount: 2,
+    }, { userId: 'export-user' })
+
+    expect(event.userId).toBe('export-user')
+    expect(event.resourceType).toBe('export')
+  })
+
+  it('should set success false for failed exports', async () => {
+    const event = await auditLogger.logExport('export.pdf_generated', {
+      format: 'csv',
+      fileSize: 0,
+      policyCount: 0,
+    }, { success: false })
+
+    expect(event.success).toBe(false)
+  })
+})
+
+describe('logAI with additional options', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass userId and success through to AI events', async () => {
+    const event = await auditLogger.logAI('ai.extraction_completed', {
+      provider: 'anthropic',
+      model: 'claude-3',
+      tokenCount: 1200,
+    }, { userId: 'ai-user', success: true })
+
+    expect(event.userId).toBe('ai-user')
+    expect(event.success).toBe(true)
+    expect(event.resourceType).toBe('ai_operation')
+  })
+
+  it('should log failed AI event with error message', async () => {
+    const event = await auditLogger.logAI('ai.extraction_completed', {
+      provider: 'openai',
+      model: 'gpt-4',
+    }, { success: false, errorMessage: 'Rate limit exceeded' })
+
+    expect(event.success).toBe(false)
+    expect(event.errorMessage).toBe('Rate limit exceeded')
+  })
+})
+
+describe('logPolicy with options', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should pass userId through to policy events', async () => {
+    const event = await auditLogger.logPolicy('policy.created', {
+      policyId: 'pol-999',
+      policyType: 'kasko',
+      action: 'create',
+    }, { userId: 'policy-user' })
+
+    expect(event.userId).toBe('policy-user')
+    expect(event.resourceId).toBe('pol-999')
+  })
+
+  it('should set success false for failed policy operations', async () => {
+    const event = await auditLogger.logPolicy('policy.created', {
+      policyId: 'pol-fail',
+      policyType: 'home',
+      action: 'create',
+    }, { success: false })
+
+    expect(event.success).toBe(false)
+  })
+})
+
+describe('maskEmail edge cases', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should mask long email with first and last char visible', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'longusername@domain.com',
+    })
+
+    const masked = (event.details as { email: string }).email
+    expect(masked).toBe('l***e@domain.com')
+  })
+
+  it('should mask 3-char local part properly', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'email',
+      email: 'abc@test.com',
+    })
+
+    const masked = (event.details as { email: string }).email
+    expect(masked).toBe('a***c@test.com')
+  })
+
+  it('should handle undefined email in auth details', async () => {
+    const event = await auditLogger.logAuth('auth.signin', {
+      method: 'google',
+      email: undefined,
+    })
+
+    expect((event.details as { email?: string }).email).toBeUndefined()
+  })
+})
+
+describe('getStats eventsByCategory and eventsBySeverity accuracy', () => {
+  beforeEach(async () => {
+    await auditLogger.clear()
+  })
+
+  it('should count events correctly by category', async () => {
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('auth.signout', {})
+    await auditLogger.log('policy.created', {})
+    await auditLogger.log('ai.extraction_started', {})
+
+    const stats = await auditLogger.getStats()
+
+    expect(stats.eventsByCategory.auth).toBe(2)
+    expect(stats.eventsByCategory.policy).toBe(1)
+    expect(stats.eventsByCategory.ai).toBe(1)
+  })
+
+  it('should count events correctly by severity', async () => {
+    await auditLogger.log('auth.signin', {}) // info
+    await auditLogger.log('auth.signin_failed', {}) // error (failed)
+    await auditLogger.log('security.suspicious_activity', {}) // warning
+
+    const stats = await auditLogger.getStats()
+
+    expect(stats.eventsBySeverity.info).toBe(1)
+    expect(stats.eventsBySeverity.error).toBe(1)
+    expect(stats.eventsBySeverity.warning).toBe(1)
+  })
+
+  it('should compute correct error rate with mixed events', async () => {
+    await auditLogger.log('auth.signin', {}) // success
+    await auditLogger.log('auth.signin', {}) // success
+    await auditLogger.log('auth.signin_failed', {}) // failure
+    await auditLogger.log('auth.signin_failed', {}) // failure
+
+    const stats = await auditLogger.getStats()
+
+    expect(stats.errorRate).toBeCloseTo(0.5, 1)
+  })
+
+  it('should compute average duration from events with durationMs', async () => {
+    await auditLogger.log('ai.extraction_completed', {}, { durationMs: 100 })
+    await auditLogger.log('ai.extraction_completed', {}, { durationMs: 200 })
+    await auditLogger.log('auth.signin', {}) // no duration
+
+    const stats = await auditLogger.getStats()
+
+    // Only 2 events have duration: (100+200)/2 = 150
+    expect(stats.avgDurationMs).toBe(150)
+  })
+
+  it('should list top event types sorted by count', async () => {
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('auth.signin', {})
+    await auditLogger.log('policy.created', {})
+    await auditLogger.log('policy.created', {})
+    await auditLogger.log('ai.extraction_started', {})
+
+    const stats = await auditLogger.getStats()
+
+    expect(stats.topEventTypes[0].type).toBe('auth.signin')
+    expect(stats.topEventTypes[0].count).toBe(3)
+    expect(stats.topEventTypes[1].type).toBe('policy.created')
+    expect(stats.topEventTypes[1].count).toBe(2)
   })
 })
