@@ -843,7 +843,7 @@ describe('Admin Database Service', () => {
         }
         setMockResult(mockConfig)
 
-        const result = await setConfig('ai', 'temperature', 0.7, 'admin-1', 'Tuning')
+        const _result = await setConfig('ai', 'temperature', 0.7, 'admin-1', 'Tuning')
 
         // The result depends on whether the update chain succeeds
         // Since our mock chain always resolves with mockQueryResult which has error: null, it should pass
@@ -1409,7 +1409,7 @@ describe('Admin Database Service', () => {
         }
         setMockResult(mockTemplate)
 
-        const result = await updatePromptTemplate(
+        const _result = await updatePromptTemplate(
           'tmpl-1',
           { systemPrompt: 'New system prompt' } as Partial<unknown> as never,
           'admin-2'

@@ -269,7 +269,7 @@ describe('usePolicyComparison', () => {
 
     it('wraps non-Error thrown values in a generic Error', () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockImplementation(() => { throw 'string error' }) // eslint-disable-line no-throw-literal
+      mockComparePolicies.mockImplementation(() => { throw 'string error' })  
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
@@ -280,7 +280,7 @@ describe('usePolicyComparison', () => {
 
     it('wraps thrown null in a generic Error', () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockImplementation(() => { throw null }) // eslint-disable-line no-throw-literal
+      mockComparePolicies.mockImplementation(() => { throw null })  
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 

@@ -375,7 +375,7 @@ describe('usePolicyEvaluation', () => {
     it('wraps non-Error throws in a generic Error', async () => {
       const usePolicyEvaluation = await importHook()
       const policy = makePolicy()
-      mockEvaluatePolicy.mockImplementation(() => { throw 'string error' }) // eslint-disable-line no-throw-literal
+      mockEvaluatePolicy.mockImplementation(() => { throw 'string error' })  
 
       const { result } = renderHook(() =>
         usePolicyEvaluation(policy, { skipDatabaseConfig: true })

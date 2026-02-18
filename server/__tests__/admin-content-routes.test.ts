@@ -28,18 +28,18 @@ const {
   mockAcknowledgeNotification,
   // Supabase mocks
   mockFrom,
-  mockSelect,
-  mockInsert,
-  mockUpdate,
-  mockDelete,
-  mockEq,
-  mockSingle,
-  mockOrder,
-  mockContains,
-  mockRange,
-  mockGte,
-  mockLte,
-  mockIlike,
+  _mockSelect,
+  _mockInsert,
+  _mockUpdate,
+  _mockDelete,
+  _mockEq,
+  _mockSingle,
+  _mockOrder,
+  _mockContains,
+  _mockRange,
+  _mockGte,
+  _mockLte,
+  _mockIlike,
   // Admin auth mocks
   mockLogAdminAction,
   mockGetSupabaseWithError,
@@ -118,7 +118,7 @@ vi.mock('../services/admin-notification-service.js', () => ({
 function buildQueryChain(finalResult: { data: unknown; error: unknown; count?: number }) {
   const chain: Record<string, unknown> = {}
 
-  const self = () => chain
+  const _self = () => chain
 
   chain.select = vi.fn().mockReturnValue(chain)
   chain.insert = vi.fn().mockReturnValue(chain)
@@ -1003,7 +1003,7 @@ describe('Admin Content Routes', () => {
     })
 
     it('returns 500 when update fails', async () => {
-      const queryChain = buildQueryChain({ data: null, error: new Error('Update failed') })
+      const _queryChain = buildQueryChain({ data: null, error: new Error('Update failed') })
       // Make the non-.single() path return error
       const chain: Record<string, unknown> = {}
       chain.update = vi.fn().mockReturnValue(chain)
