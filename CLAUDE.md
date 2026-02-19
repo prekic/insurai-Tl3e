@@ -9,8 +9,8 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**
-- **Production Readiness**: ~9.5/10 (14,400+ tests, 0 lint errors, 47 warnings, PWA support, server hardening, HSTS)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**
+- **Production Readiness**: ~9.5/10 (14,500+ tests, 0 lint errors, 47 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
 - **Last Updated**: February 19, 2026
 
 ---
@@ -1219,10 +1219,10 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 19, 2026)
-- **Total**: 14,484 tests across 299 test files (18 skipped)
+- **Total**: 14,496 tests across 300 test files (18 skipped)
 - **Passing**: 100% (0 failures)
 - **Coverage**: ~85% statements, ~77% branches, ~83% functions, ~86% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Includes comprehensive coverage for AI routes (112 tests), policy extractor, text processor, gap detection, privacy modules, regional benchmarking, market data, admin services, OCR pipeline, PDF export, security modules, landing components, and all major React components
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Includes comprehensive coverage for AI routes (112 tests), policy extractor, text processor, gap detection, privacy modules, regional benchmarking, market data, admin services, OCR pipeline, PDF export, security modules, landing components, and all major React components. Plus 12 TTL validation tests added Feb 19.
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3468,6 +3468,42 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Translation Migration Script**: `scripts/apply-translation-migrations.sh` added (`290cadb`)
 - **Commits**: `3172796`, `290cadb`, `f544b8f`, `b31547b`, `e32131a`, `0856102`
 
+### 107. Lighthouse Optimization — Performance 76→99, CLS 0.506→0.005 (Feb 19, 2026)
+- **Problem**: Lighthouse audit revealed Performance 76/100 with CLS 0.506 (5× over budget) and Accessibility 95/100
+- **Root Causes** (4 CLS sources + 2 a11y issues):
+  1. **Service worker controllerchange reload**: `skipWaiting()` + `clients.claim()` fires `controllerchange` on first visit. Handler called `window.location.reload()`, causing full page reload mid-render (biggest CLS source)
+  2. **Empty #root spinner → full content**: `#root:empty::before` showed a centered 40px spinner, then React mounted the full landing page — massive layout shift
+  3. **Framer Motion y-axis animations**: `PageTransition`, `StaggeredList`, `FadeInWhenVisible` all used `y: 20` translateY, causing content to shift vertically on mount
+  4. **Lazy-loaded LandingPage**: Entry point was behind `React.lazy()` + `Suspense`, causing flash from `PageLoader` spinner to full content
+  5. **Accessibility**: `text-green-600` and `text-gray-400` on white background failed WCAG AA contrast
+- **Solutions**:
+  1. Track `hadControllerOnLoad` — only reload when existing controller is replaced, not on initial install (`src/lib/pwa/index.ts`)
+  2. App shell skeleton in `index.html` matching above-the-fold landing page dimensions (nav bar + hero content placeholders with pulse animation)
+  3. Changed all three animation components to opacity-only (`src/components/animations/AnimatedComponents.tsx`)
+  4. Eagerly import `LandingPage` instead of lazy-loading; removed `PageTransition` wrapper from `/` route (`src/App.tsx`)
+  5. `text-green-600` → `text-green-700`, `text-gray-400` → `text-gray-500` (`ComparisonMock.tsx`, `UploadWidget.tsx`)
+  6. Added `minHeight` to `useLazySection` wrapper to prevent CLS when content replaces placeholder
+- **Results**: Performance 99, Accessibility 100, Best Practices 93, SEO 100. FCP 0.8s, LCP 0.9s, TBT 0ms, CLS 0.005, SI 0.8s
+- **Files Changed**: `index.html`, `src/App.tsx`, `src/components/animations/AnimatedComponents.tsx`, `src/lib/pwa/index.ts`, `src/components/landing/ComparisonMock.tsx`, `src/components/landing/UploadWidget.tsx`, `src/hooks/useLazySection.tsx`
+- **Commit**: `1541896`
+
+### 108. Server-Side Config Performance Monitoring Wired (Feb 19, 2026)
+- **Problem**: Server-side config performance endpoint returned zero data — `recordServerConfigFetch` was defined and exported but never called from `config-service.ts`
+- **Solution**: Wired `recordServerConfigFetch()` into `getCategorySettings()` in `server/services/config-service.ts`
+- **Also Added**:
+  - Production performance baseline script (`scripts/config-perf-baseline.ts`) — measures Railway endpoint latencies
+  - 12-scenario TTL validation test suite (`src/lib/config/__tests__/ttl-validation.test.ts`) covering typical production, high cache + fast DB, slow DB, low hit rate, insufficient data, alert thresholds, per-category stats, production-realistic Supabase profile, TTL floor/ceiling
+- **Production Baseline Measurements**: Health ~800ms, AI providers ~400ms, AI diagnose ~3000ms, DB config fetch 20-100ms
+- **Commit**: `9cea16e`
+
+### 109. Flaky Test Hardening (Feb 19, 2026)
+- **Problem**: Two test files had intermittent failures under coverage instrumentation
+- **Fixes**:
+  - `vite.config.ts`: Added `testTimeout: 10000` (2× default) for coverage mode resilience
+  - `cost-tracking/tracker.test.ts`: Added floating-point tolerance to `projectedMonthEnd` assertion; use Set-based unique ID test
+  - `translation-service.test.ts`: Capture `Date.now()` before cache operations to avoid race; replace `restoreAllMocks` with `clearAllMocks` to prevent mock chain teardown
+- **Commit**: `7288efd`
+
 ---
 
 ## Turkish Market Considerations
@@ -3551,11 +3587,12 @@ new Intl.NumberFormat('tr-TR', {
 - Admin dashboard: Settings → Performance tab
 - Both client-side and server-side monitors with API endpoints
 
-### Lighthouse Targets
-- FCP: < 2000ms
-- LCP: < 2500ms
-- CLS: < 0.1
-- Performance score: > 0.8
+### Lighthouse Results (Feb 19, 2026)
+- **Performance**: 99/100 (FCP 0.8s, LCP 0.9s, TBT 0ms, CLS 0.005, SI 0.8s)
+- **Accessibility**: 100/100
+- **Best Practices**: 93/100 (test-environment artifacts — missing icons, localhost CSP, hidden source maps)
+- **SEO**: 100/100
+- **CLS Fix**: App shell skeleton in `index.html`, opacity-only animations, eager LandingPage import, SW controllerchange guard
 
 ---
 
@@ -3947,6 +3984,19 @@ connectSrc: [
 - **All 80 errors resolved** in commits `3172796`, `b31547b`, `0856102` — prefixed unused mocks with `_`
 - Current ESLint status: **0 errors, 47 warnings** (all `no-non-null-assertion` in production code)
 
+**CLS Prevention (Cumulative Layout Shift):**
+- The `index.html` contains an app shell skeleton inside `<div id="root">` that matches the above-the-fold landing page layout (nav bar + hero content placeholders). React replaces this on mount with zero layout shift.
+- **DO NOT** replace the app shell with a simple spinner — this was the root cause of CLS 0.506 (spinner centered at 40vh, then full page content rendered)
+- All Framer Motion entry animations (`PageTransition`, `StaggeredList`, `FadeInWhenVisible`) use **opacity-only** transitions — never `y` or `x` transforms, which cause layout shifts
+- `LandingPage` is eagerly imported (not lazy) because it's the entry point — lazy loading it behind `Suspense` caused a flash from `PageLoader` to full content
+- Service worker `controllerchange` handler tracks `hadControllerOnLoad` — only reloads when an existing SW is replaced, NOT on initial install (which caused full-page reload mid-render)
+- `useLazySection` uses `minHeight` on the wrapper div to reserve space before content loads
+
+**Flaky Test Patterns:**
+- `cost-tracking/tracker.test.ts`: `projectedMonthEnd` needs floating-point tolerance (`toBeCloseTo`), not exact equality
+- `translation-service.test.ts`: Cache expiry checks must capture `Date.now()` before the operation, not after. Use `clearAllMocks` instead of `restoreAllMocks` to avoid mock chain teardown issues
+- `vite.config.ts` has `testTimeout: 10000` (2× default) for resilience under coverage instrumentation
+
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
 - This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
@@ -4001,5 +4051,6 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 14,484 tests, all passing (299 test files), ~86% line coverage
+**Tests**: 14,496 tests, all passing (300 test files), ~86% line coverage
+**Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Last Updated**: February 19, 2026
