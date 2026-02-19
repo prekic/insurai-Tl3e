@@ -51,12 +51,57 @@ jobs:
           fail_ci_if_error: false
 
   # ==========================================================================
+  # E2E TESTS - Run Playwright against production build
+  # ==========================================================================
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Build frontend
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY || 'placeholder' }}
+        run: npm run build
+
+      - name: Run E2E tests against production build
+        run: |
+          npx serve dist -l 3000 &
+          npx wait-on http://localhost:3000 --timeout 30000
+          npx playwright test --project=chromium
+        env:
+          CI: true
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+  # ==========================================================================
   # BUILD - Create production build
   # ==========================================================================
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, e2e-tests]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
