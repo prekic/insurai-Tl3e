@@ -8,7 +8,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, act } from '@testing-library/react'
+import { render, waitFor, act } from '@testing-library/react'
 import { renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import type { TranslationDictionary } from './translations'

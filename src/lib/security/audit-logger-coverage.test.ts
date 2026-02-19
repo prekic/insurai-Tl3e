@@ -3,7 +3,7 @@
  * Targets: uncovered branches, functions, statements, and lines
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock indexedDB as undefined to force memory-only mode
 vi.stubGlobal('indexedDB', undefined)

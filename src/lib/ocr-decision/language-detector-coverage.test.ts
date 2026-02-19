@@ -317,7 +317,7 @@ describe('LanguageDetector coverage', () => {
       const settings = createMockOCRSettings({ fallback_locale: '' })
       const universal = createUniversalConfig()
       // Only universal config (skipped in scoring)
-      const configManager = createMockConfigManager({
+      const _configManager = createMockConfigManager({
         _universal: universal,
       }, settings)
       // This will fail at verifyConfiguration but shouldn't crash detect

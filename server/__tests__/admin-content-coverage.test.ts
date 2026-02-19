@@ -28,7 +28,7 @@ const {
   mockGetSupabaseWithError,
   mockAuthenticateAdmin,
   mockFrom,
-  mockQueryResult,
+  mockQueryResult: _mockQueryResult,
 } = vi.hoisted(() => ({
   mockListProcessingLogs: vi.fn(),
   mockGetProcessingStats: vi.fn(),
@@ -466,7 +466,7 @@ describe('Admin Content Routes', () => {
   // =========================================================================
   describe('GET /benchmarks', () => {
     it('returns all benchmarks', async () => {
-      const chain = setupSupabaseMock([{ id: 'b1', insurance_type: 'kasko' }])
+      const _chain = setupSupabaseMock([{ id: 'b1', insurance_type: 'kasko' }])
       const res = await request(app).get('/api/admin/benchmarks')
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)

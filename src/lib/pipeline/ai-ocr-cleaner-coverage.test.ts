@@ -12,7 +12,7 @@ import {
   getTurkishOCRCorrectionPrompt,
   buildTurkishOCRPrompt,
   type AIProviderConfig,
-  type AICleanerOptions,
+  type AICleanerOptions as _AICleanerOptions,
 } from './ai-ocr-cleaner'
 
 // Mock global fetch

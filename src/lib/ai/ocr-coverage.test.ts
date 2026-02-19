@@ -223,9 +223,9 @@ describe('ocr coverage', () => {
       vi.mocked(isProxyConfigured).mockReturnValue(true)
       vi.mocked(getProxyUrl).mockReturnValue('http://localhost:4001')
 
-      let callCount = 0
+      let _callCount = 0
       const mockFetch = vi.fn().mockImplementation((url: string) => {
-        callCount++
+        _callCount++
         if (url.includes('document-ai')) {
           return Promise.resolve({
             ok: false,

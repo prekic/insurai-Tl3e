@@ -18,7 +18,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import type { Request, Response, NextFunction } from 'express'
+import type { Request, Response } from 'express'
 
 // =============================================================================
 // HOISTED MOCKS
@@ -729,7 +729,7 @@ describe('Cost Control Coverage (DB paths)', () => {
       const chain = buildChain({ data: [], error: null })
       mockFrom.mockReturnValue(chain)
 
-      const middleware = mod.costControlMiddleware((req) => ({
+      const middleware = mod.costControlMiddleware((_req) => ({
         inputTokens: 100,
         model: 'gpt-4o-mini',
       }))
@@ -746,7 +746,7 @@ describe('Cost Control Coverage (DB paths)', () => {
       const chain = buildChain({ data: [], error: null })
       mockFrom.mockReturnValue(chain)
 
-      const middleware = mod.costControlMiddleware((req) => ({
+      const middleware = mod.costControlMiddleware((_req) => ({
         inputTokens: 1000,
         model: 'gpt-4o',
       }))
@@ -763,7 +763,7 @@ describe('Cost Control Coverage (DB paths)', () => {
       const chain = buildChain({ data: [], error: null })
       mockFrom.mockReturnValue(chain)
 
-      const middleware = mod.costControlMiddleware((req) => ({
+      const middleware = mod.costControlMiddleware((_req) => ({
         inputTokens: 100,
         model: 'claude-3-5-haiku',
       }))

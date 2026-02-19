@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi } from 'vitest'
-import type { AnalyzedPolicy, Coverage, PolicyType } from '@/types/policy'
+import type { AnalyzedPolicy, Coverage } from '@/types/policy'
 
 // Mock the market data provider and benchmarks
 vi.mock('./market-data-provider', () => ({

@@ -18,12 +18,12 @@ vi.stubGlobal('localStorage', {
 vi.stubGlobal('navigator', { userAgent: 'TestAgent' })
 
 const {
-  consentManager,
-  initializeConsentManager,
-  recordConsent,
-  hasConsent,
-  checkRequiredConsents,
-  getUserConsentStatus,
+  consentManager: _consentManager,
+  initializeConsentManager: _initializeConsentManager,
+  recordConsent: _recordConsent,
+  hasConsent: _hasConsent,
+  checkRequiredConsents: _checkRequiredConsents,
+  getUserConsentStatus: _getUserConsentStatus,
   getConsentRequirement,
   getAllConsentRequirements,
   CONSENT_REQUIREMENTS,

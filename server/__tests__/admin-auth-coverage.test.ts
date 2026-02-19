@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { Response, NextFunction } from 'express'
+import type { Response as _Response, NextFunction as _NextFunction } from 'express'
 
 // =============================================================================
 // HOISTED MOCKS

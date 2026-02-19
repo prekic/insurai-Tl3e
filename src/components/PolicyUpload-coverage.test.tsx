@@ -988,7 +988,6 @@ describe('PolicyUpload Coverage', () => {
     })
 
     it('shows partial acceptance toast when some files are invalid', async () => {
-      const fileInput = document.querySelector('input[type="file"]')
       // Need to render first
       renderUpload()
       const input = document.querySelector('input[type="file"]') as HTMLInputElement

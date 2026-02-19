@@ -4,7 +4,7 @@
  * Targets uncovered branches in ocr-stats.ts
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   recordExecution,
   getExecution,

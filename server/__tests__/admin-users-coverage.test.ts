@@ -8,7 +8,7 @@
  * - DELETE /users/:id: self-delete prevention, not found, success, error
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 

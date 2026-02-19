@@ -51,7 +51,7 @@ describe('tracker coverage', () => {
       vi.resetModules()
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
-      mod.trackFeature('ai_extraction' as 'ai_extraction')
+      mod.trackFeature('ai_extraction' as const)
       expect(true).toBe(true)
     })
 
@@ -59,7 +59,7 @@ describe('tracker coverage', () => {
       vi.resetModules()
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
-      mod.trackAction('upload_pdf' as 'upload_pdf')
+      mod.trackAction('upload_pdf' as const)
       expect(true).toBe(true)
     })
 
@@ -147,9 +147,9 @@ describe('tracker coverage', () => {
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()
-      expect(info.sessionId).toBeTruthy()
+      expect(info.id).toBeTruthy()
       expect(info.device).toBeTruthy()
-      expect(info.device.browser).toBeTruthy()
+      expect(info.device!.browser).toBeTruthy()
     })
 
     it('should flush to localStorage', async () => {
@@ -206,7 +206,7 @@ describe('tracker coverage', () => {
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()
-      expect(info.sessionId).toBeTruthy()
+      expect(info.id).toBeTruthy()
     })
 
     it('should reuse existing session', async () => {
@@ -215,7 +215,7 @@ describe('tracker coverage', () => {
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()
-      expect(info.sessionId).toBeTruthy()
+      expect(info.id).toBeTruthy()
     })
 
     it('should create new session when expired', async () => {
@@ -224,7 +224,7 @@ describe('tracker coverage', () => {
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()
-      expect(info.sessionId).toBeTruthy()
+      expect(info.id).toBeTruthy()
     })
 
     it('should handle corrupt session storage', async () => {
@@ -233,7 +233,7 @@ describe('tracker coverage', () => {
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()
-      expect(info.sessionId).toBeTruthy()
+      expect(info.id).toBeTruthy()
     })
   })
 
@@ -249,7 +249,7 @@ describe('tracker coverage', () => {
 
     it('should detect tablet (iPad)', async () => {
       vi.resetModules()
-      vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPad) AppleWebKit/537.36 Tablet', doNotTrack: '0' })
+      vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (iPad; Mobi) AppleWebKit/537.36 Tablet', doNotTrack: '0' })
       const mod = await import('./tracker')
       await mod.initializeAnalytics({ enabled: true, sampleRate: 1, flushInterval: 0 })
       const info = mod.analytics.getSessionInfo()

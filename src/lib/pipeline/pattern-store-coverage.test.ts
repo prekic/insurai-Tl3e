@@ -308,7 +308,7 @@ describe('pattern-store coverage', () => {
 
     it('falls back to literal match on regex error', () => {
       // Force a pattern that might fail as regex
-      const p = store.recordPattern('test(pattern')
+      const _p = store.recordPattern('test(pattern')
       // The escapeRegex should handle this, but if not, literal match catches it
       const results = store.findKnownPatterns('has test(pattern in it')
       expect(results.length).toBeGreaterThanOrEqual(1)
