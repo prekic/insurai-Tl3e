@@ -695,23 +695,20 @@ describe('costTracker.recordUsage', () => {
   })
 
   it('should generate unique IDs', async () => {
-    const record1 = await costTracker.recordUsage({
-      provider: 'openai',
-      model: 'gpt-4o',
-      operation: 'extraction',
-      inputTokens: 100,
-      outputTokens: 50,
-    })
+    // Generate multiple records and ensure all IDs are unique
+    const ids = new Set<string>()
+    for (let i = 0; i < 10; i++) {
+      const record = await costTracker.recordUsage({
+        provider: 'openai',
+        model: 'gpt-4o',
+        operation: 'extraction',
+        inputTokens: 100,
+        outputTokens: 50,
+      })
+      ids.add(record.id)
+    }
 
-    const record2 = await costTracker.recordUsage({
-      provider: 'openai',
-      model: 'gpt-4o',
-      operation: 'extraction',
-      inputTokens: 100,
-      outputTokens: 50,
-    })
-
-    expect(record1.id).not.toBe(record2.id)
+    expect(ids.size).toBe(10)
   })
 
   it('should default success to true', async () => {
@@ -1169,7 +1166,9 @@ describe('costTracker.getCurrentMonthStatus', () => {
 
     const status = await costTracker.getCurrentMonthStatus()
 
-    expect(status.projectedMonthEnd).toBeGreaterThanOrEqual(status.spent)
+    // projectedMonthEnd should be >= spent (with tolerance for floating-point rounding)
+    // On the last day of the month, both values are equal after rounding
+    expect(status.projectedMonthEnd).toBeGreaterThanOrEqual(status.spent - 0.01)
   })
 })
 

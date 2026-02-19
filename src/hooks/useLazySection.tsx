@@ -71,7 +71,7 @@ export function LazySection({ children, height = '400px', rootMargin = '200px' }
   const { ref, isInView } = useLazySection({ rootMargin })
 
   return (
-    <div ref={ref}>
+    <div ref={ref} style={{ minHeight: isInView ? undefined : height }}>
       {isInView ? children : <LazySectionPlaceholder height={height} />}
     </div>
   )

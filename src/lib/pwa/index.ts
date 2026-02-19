@@ -562,10 +562,22 @@ export function initializePWA(config: Partial<PWAConfig> = {}): void {
 
   // Listen for controller change (new service worker activated)
   if (isServiceWorkerSupported()) {
+    // Track whether a controller existed before this page load.
+    // On first visit, there is no controller yet — the SW installs, calls
+    // skipWaiting + clients.claim, which fires controllerchange. We must NOT
+    // reload on that initial claim because it causes a massive CLS hit.
+    // Only reload when an *existing* controller is replaced by a newer one.
+    let hadControllerOnLoad = Boolean(navigator.serviceWorker.controller)
+
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] New service worker activated, reloading page to get fresh assets')
-      // Reload to ensure new bundles are loaded
-      window.location.reload()
+      if (hadControllerOnLoad) {
+        console.log('[PWA] Service worker updated, reloading page to get fresh assets')
+        window.location.reload()
+      } else {
+        console.log('[PWA] Initial service worker activated (no reload needed)')
+        // Mark that we now have a controller, so future changes DO reload
+        hadControllerOnLoad = true
+      }
     })
 
     // Listen for messages from service worker

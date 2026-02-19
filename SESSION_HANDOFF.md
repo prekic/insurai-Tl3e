@@ -1,4 +1,4 @@
-# Session Handoff - February 19, 2026
+# Session Handoff - February 19, 2026 (Late Session)
 
 ## Current Status
 
@@ -8,9 +8,10 @@
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors (production + test files) |
 | **ESLint Warnings** | 47 warnings (all `no-non-null-assertion`) |
-| **Tests** | 14,484 passing (299 test files), 18 skipped, 0 failures |
+| **Tests** | 14,496 passing (300 test files), 18 skipped, 0 failures |
 | **Coverage** | ~85% statements, ~77% branches, ~83% functions, ~86% lines |
-| **Branch** | `claude/review-project-docs-LxcHs` |
+| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
+| **Branch** | `claude/review-handoff-docs-g8uKH` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | Live — extraction pipeline fully operational |
@@ -22,60 +23,64 @@
 
 ## Session Summary
 
-This session focused on **recovering and completing interrupted branch/coverage test work** from the previous session, plus fixing all ESLint errors in test files.
+This session focused on **Lighthouse performance optimization** (Performance 76→99, CLS 0.506→0.005), **server-side config monitoring wiring**, and **flaky test hardening**.
 
 ### Work Completed This Session (6 commits + docs)
 
 | # | Feature | Commit |
 |---|---------|--------|
-| 1 | Fix 33 ESLint errors in test files from Feb 18 session | `3172796` |
-| 2 | Translation migration runner script | `290cadb` |
-| 3 | 40 branch coverage test files — branches 70.2% → 77.0% | `f544b8f` |
-| 4 | Fix 47 ESLint errors in branch coverage test files | `b31547b` |
-| 5 | 36 additional branch coverage test files from previous session | `e32131a` |
-| 6 | Fix 29 ESLint errors + 7 test failures in coverage files | `0856102` |
-| 7 | Update CLAUDE.md and SESSION_HANDOFF.md | `558954c` |
+| 1 | Fix migration script path and update translation migration status (017-019 confirmed applied) | `ea96927` |
+| 2 | Migration 020 for unsubscribe translations + production smoke test | `8fce2c1` |
+| 3 | Harden flaky tests — timing tolerance and global test timeout | `7288efd` |
+| 4 | Wire server-side config performance monitoring + TTL validation tests | `9cea16e` |
+| 5 | Lighthouse: Performance 76→99, CLS 0.506→0.005, Accessibility 95→100 | `1541896` |
+| 6 | Documentation updates (CLAUDE.md + SESSION_HANDOFF.md) | `fbd5e07` |
 
 ---
 
 ## Key Technical Changes
 
-### 1. Massive Branch/Coverage Test Expansion (76 new test files)
+### 1. Lighthouse Optimization (commit `1541896`)
 
-| Metric | Before (Feb 18) | After (Feb 19) | Change |
-|--------|-----------------|-----------------|--------|
-| Tests | 9,541 | 14,484 | +4,943 |
-| Test files | 222 | 299 | +77 |
-| Branch coverage | ~70.2% | ~77% | +~7pp |
-| Statement coverage | ~80.4% | ~85% | +~5pp |
-| Line coverage | ~81.6% | ~86% | +~4pp |
+**Before → After:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Performance | 76 | 99 |
+| Accessibility | 95 | 100 |
+| Best Practices | 93 | 93 |
+| SEO | 100 | 100 |
+| CLS | 0.506 | 0.005 |
+| FCP | - | 0.8s |
+| LCP | - | 0.9s |
+| TBT | - | 0ms |
 
-**Categories of new test files:**
-- **Server tests (22 files)**: admin-auth, admin-content, admin-monitoring, admin-users, ai-ocr, cost-control, logger, rate-limit, config-service, drift-detection, monitoring, processing-log, prompt-service, email-service, webhook-service, translation-service, routes
-- **Component tests (8 files)**: AuthPage, MyAccount, PolicyChat, PolicyUpload, TryAnalysis, GradeBadge, WinnerBadge, Hero
-- **Library tests (46 files)**: AI subsystem (comparison, extraction-validator, document-ocr, OCR, claude provider, turkish-utils), analytics, env, gap-detection, i18n-context, insurance-display, market-data, OCR decision engine, pdf-export, pipeline (13 files), policy-evaluation, policy-utils, privacy, processing-logger, security (3 files), sentry, supabase, utils, types
+**Root causes fixed:**
+1. **Service worker reload on first visit** (biggest CLS source): `controllerchange` handler called `window.location.reload()` even on initial SW install. Fix: Track `hadControllerOnLoad`, only reload when existing controller replaced.
+2. **Empty #root spinner → full content**: Centered 40px spinner at 40vh swapped for full-page React content. Fix: App shell skeleton in `index.html` matching above-the-fold layout.
+3. **Framer Motion y-axis animations**: `PageTransition`, `StaggeredList`, `FadeInWhenVisible` used `y: 20` causing layout shifts. Fix: Opacity-only transitions.
+4. **Lazy-loaded LandingPage**: Entry point was behind `React.lazy()` + `Suspense`. Fix: Eager import.
+5. **WCAG AA contrast**: `text-green-600` and `text-gray-400` failed contrast. Fix: Upgraded to `-700` and `-500`.
 
-### 2. ESLint Error Cleanup (80 → 0)
+**Files changed:** `index.html`, `src/App.tsx`, `src/components/animations/AnimatedComponents.tsx`, `src/lib/pwa/index.ts`, `src/components/landing/ComparisonMock.tsx`, `src/components/landing/UploadWidget.tsx`, `src/hooks/useLazySection.tsx`
 
-Previous sessions introduced ESLint errors in test files (unused mock variables in Supabase chained mock patterns). This session resolved all of them:
+### 2. Server-Side Config Performance Monitoring (commit `9cea16e`)
 
-- `3172796`: Fixed 33 errors from Feb 18 coverage push (prefix unused mocks with `_`)
-- `b31547b`: Fixed 47 errors in new branch coverage files
-- `0856102`: Fixed 29 remaining errors + 7 test failures
+- Wired `recordServerConfigFetch()` into `getCategorySettings()` in `server/services/config-service.ts` — was defined but never called
+- Added production performance baseline script (`scripts/config-perf-baseline.ts`, 359 lines)
+  - Uses `BASE_URL` (default `localhost:4001`) and `ADMIN_TOKEN` env vars — only needed when running the script manually, not for the app itself
+- Added 12-scenario TTL validation test suite (`src/lib/config/__tests__/ttl-validation.test.ts`, 351 lines)
+- Validates 5-minute cache TTL against real production patterns (Supabase 20-100ms latency)
 
-**Current ESLint**: 0 errors, 47 warnings (all `no-non-null-assertion` in production code)
+### 3. Flaky Test Hardening (commit `7288efd`)
 
-### 3. Test Failure Fixes
+- `vite.config.ts`: Added `testTimeout: 10000` (2× default) for coverage mode resilience
+- `cost-tracking/tracker.test.ts`: Floating-point tolerance for projectedMonthEnd, Set-based unique ID test
+- `translation-service.test.ts`: Date.now() capture before cache ops, clearAllMocks instead of restoreAllMocks
 
-7 test failures in the new coverage files were identified and fixed:
-- **5 `info.sessionId` failures**: Test files used `info.sessionId` but actual property is `info.id` — fixed across admin-auth, admin-operations, admin-prompts coverage tests
-- **1 iPad UA detection failure**: iPad tablet detection regex requires `Mobi` in UserAgent — fixed UA string in rate-limit-coverage test
-- **1 flaky timing assertion**: `generateGapId()` could produce duplicate IDs within 1ms when test assertion checked uniqueness — replaced with format-based assertion
+### 4. Migration 020 + Production Smoke Test (commit `8fce2c1`)
 
-### 4. Translation Migration Runner Script
-
-- Added `scripts/run-translation-migrations.ts` for applying translation system DB migrations (`017`, `018`, `019`)
-- Commit: `290cadb`
+- Created `supabase/migrations/020_seed_unsubscribe_translations.sql` (22 keys × 2 locales)
+- Comprehensive production smoke test verified all endpoints, all 3 AI providers, translation system, aiInsightsTr pipeline
 
 ---
 
@@ -83,20 +88,20 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx — React 19 + Vitest concurrency race. All 299 files pass; warning only. |
+| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx — React 19 + Vitest concurrency race. All 300 files pass; warning only. |
 | 47 ESLint warnings | Low | Pre-existing | All `no-non-null-assertion` — intentional in guarded code paths |
-| `translation-service.test.ts` timeout | Low | Pre-existing | 1 test times out (non-preloaded locale) — doesn't affect functionality |
+| Best Practices 93/100 | Info | Not actionable | Test-environment artifacts: missing favicons in local serve, localhost CSP, hidden source maps (intentional security) |
 | Railway cold start | Low | Expected | First request may take 5-10s after idle |
-| `cost-tracking/tracker.test.ts` flaky under coverage | Low | Pre-existing | 1 assertion (`totalRequests`) occasionally fails under coverage instrumentation; passes in normal run |
 
 ### Resolved This Session
 
 | Issue | Was | Now |
 |-------|-----|-----|
-| 33 ESLint errors in test files (Feb 18) | Unused mock variables | All fixed (`3172796`) |
-| 47 ESLint errors in branch coverage files | Unused mock variables | All fixed (`b31547b`) |
-| 29 ESLint errors + 7 test failures | Mixed errors + wrong property names | All fixed (`0856102`) |
-| Low branch coverage (~70%) | Many modules had uncovered branches | ~77% with 76 new branch test files |
+| Lighthouse Performance 76 | CLS 0.506, unoptimized animations, SW reload | Performance 99, CLS 0.005 |
+| Lighthouse Accessibility 95 | Low contrast text colors | Accessibility 100 |
+| Server config perf returning empty | `recordServerConfigFetch` never called | Wired into getCategorySettings |
+| Flaky cost-tracking test | Exact float comparison failed intermittently | Uses floating-point tolerance |
+| Flaky translation-service test | Race condition on cache expiry check | Captures Date.now() before operation |
 
 ---
 
@@ -104,11 +109,13 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 
 | Gotcha | Details |
 |--------|---------|
-| `info.id` vs `info.sessionId` | Admin session objects use `info.id` not `info.sessionId`. Several test files incorrectly used the wrong property name — caught by running tests after committing. |
-| iPad UA detection requires `Mobi` | The `isTablet()` detection function checks for `Mobi` keyword in UserAgent — iPad UAs without it fall through to desktop classification. Tests must include it. |
-| `generateGapId()` timestamp collision | Gap IDs use `Date.now()` as a component, which can collide within 1ms in fast test execution. Assert format rather than uniqueness in tests. |
-| Vitest `performance.now()` in coverage mode | Under coverage instrumentation, `performance.now()` can return less precise values, causing timing-dependent assertions to fail. Use `toBeGreaterThanOrEqual(0)` instead of `toBeGreaterThan(0)`. |
-| Unhandled rejection from JSDOM teardown | When running the full 299-file suite, React's async `setState` can fire after JSDOM teardown, producing `window is not defined`. This is cosmetic — all tests pass. Run individual files with `npm test -- --run <file>` to verify. |
+| Service worker CLS on first visit | `skipWaiting()` + `clients.claim()` fires `controllerchange` on initial install, not just updates. If the handler calls `window.location.reload()`, it triggers a full-page reload mid-render — the biggest CLS source (0.5+). Track `hadControllerOnLoad` to distinguish first install from updates. |
+| App shell skeleton prevents CLS | A centered spinner inside an empty `#root` creates massive CLS when React mounts. Replace with a static HTML skeleton matching above-the-fold layout dimensions. React replaces the children on mount with zero shift. |
+| Framer Motion `y` animations cause CLS | Any `initial={{ y: 20 }}` or similar translateY in entry animations triggers Cumulative Layout Shift. Use opacity-only for page transitions: `initial={{ opacity: 0 }}` → `animate={{ opacity: 1 }}`. |
+| Lazy-loading the entry-point route hurts CLS | `React.lazy(() => import('./LandingPage'))` behind `Suspense` causes a flash from fallback → content. The entry-point component should be eagerly imported. |
+| Lighthouse can't access external HTTPS from sandboxed environments | Running `npx lighthouse https://example.com` fails with `ERR_INVALID_AUTH_CREDENTIALS` in sandboxed containers. Workaround: Build locally, serve with `npx serve`, test against `localhost`. |
+| `npx serve -s` adds 301 redirect penalty | `serve` redirects `/` → `/index.html` with a 301, adding ~1s to initial load. Not an issue in production (Express serves directly). |
+| `restoreAllMocks` vs `clearAllMocks` | `restoreAllMocks` in `afterEach` can tear down mock chains that other tests depend on. Use `clearAllMocks` when mocks need to persist across test lifecycle. |
 
 ---
 
@@ -122,46 +129,49 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
 ### Pending Deployment
-- 7 commits on `claude/review-project-docs-LxcHs` — merge to main, then deploy
-- **Via PR**: `gh pr create --base main --head claude/review-project-docs-LxcHs` (preferred — matches previous sessions)
-- **Via direct merge**: `git checkout main && git merge claude/review-project-docs-LxcHs && git push`
+- Commits on `claude/review-handoff-docs-g8uKH` need merge to main, then deploy
 - Changes include:
-  - **Tests only**: 76 new test files + ESLint fixes + test failure fixes
-  - **Script**: Translation migration runner
+  - **Lighthouse fixes**: App shell, animation changes, SW reload guard, contrast fixes
+  - **Config perf wiring**: Server-side monitoring now functional
+  - **Test hardening**: Flaky test fixes, global timeout
+  - **Migration 020**: Unsubscribe translations seed
+  - **New test file**: TTL validation (12 tests)
+  - **New script**: Config performance baseline
   - **Docs**: Updated CLAUDE.md and SESSION_HANDOFF.md
-- No new environment variables
-- No new database migrations
+- No new environment variables required
 - No breaking API changes
-- No frontend/server code changes — safe to deploy
+- Frontend changes require SW cache bump (already at v19)
 
 ### Post-Deployment Verification
-1. Run `npm test` — expect 14,484 passing, 18 skipped, 0 failures
+1. Run `npm test` — expect 14,496 passing, 18 skipped, 0 failures
 2. Run `npm run lint` — expect 0 errors, 47 warnings
 3. Run `npx tsc --noEmit` — expect 0 errors
 4. `curl .../api/ai/diagnose` — all 3 providers should show `valid: true`
+5. Check Lighthouse against production — expect Performance >95, CLS <0.01
 
 ### Database Migrations Status
-- All migrations up to `015_config_drift_baselines.sql` applied in production
-- **Pending**: `017`, `018`, `019` (translation system) — needed for DB-driven i18n. App falls back to preloaded translations if not applied.
+- All migrations up to `019` applied in production
+- **Pending**: `020` (unsubscribe page translations — 22 keys × 2 locales). App works without it (falls back to preloaded translations). Apply via Supabase SQL Editor or `scripts/apply-translation-migrations.sh`.
 
 ---
 
 ## Next Steps (Priority Order)
 
 ### High Priority
-1. **Merge branch and deploy** — Merge `claude/review-project-docs-LxcHs` to main, deploy to Railway
-2. **Apply translation migrations** — `017`, `018`, `019` to Supabase for DB-driven i18n
-3. **Production smoke test** — Verify extraction pipeline, aiInsightsTr, i18n after deployment
+1. **Merge branch and deploy** — Merge `claude/review-handoff-docs-g8uKH` to main, deploy to Railway
+2. **Apply migration 020** — Unsubscribe translations to production DB
+3. **Production Lighthouse verification** — Confirm Performance >95 on actual Railway deployment (local test showed 99)
 
 ### Medium Priority
 4. **Improve branch coverage further** — Currently ~77%; target 80%+ by covering remaining complex modules
-5. **Performance baseline** — Run config performance monitor in production, validate 5-minute cache TTL
-6. **Fix `cost-tracking/tracker.test.ts` flaky test** — Timing-dependent assertion under coverage mode
+5. **Config performance baseline in production** — Run `scripts/config-perf-baseline.ts` against Railway to validate 5-min TTL
+6. **End-to-end user flow testing** — Full Playwright suite against production
 
 ### Low Priority
 7. **Reduce ESLint warnings** — 47 remaining (`no-non-null-assertion` in guarded code paths)
 8. **Real user testimonials** — Replace use-case scenarios with actual user quotes when available
-9. **Lighthouse audit** — Run full Lighthouse CI against production, tune for performance score >0.9
+9. **Progressive Web App enhancements** — Offline support, push notifications
+10. **Performance monitoring dashboard** — Track real-user metrics over time
 
 ---
 
@@ -188,47 +198,40 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 # Check admin diagnostics
 curl https://insurai-production.up.railway.app/api/admin/diagnostics
+
+# Lighthouse (local)
+npm run build && npx serve -s dist & npx lighthouse http://localhost:3000 --output=json
 ```
 
 ---
 
 ## Previous Session Context
 
+**February 19, 2026 (Early)** (`claude/review-project-docs-LxcHs`):
+- Branch/coverage test push: 76 new test files, 14,484 total tests
+- Fixed 80 ESLint errors in test files
+- Translation migration runner script
+
 **February 18, 2026** (`claude/review-handoff-docs-XZodR`):
 - UnsubscribePage i18n — last page with hardcoded strings
 - AI insights translated at extraction time (aiInsightsTr)
 - Massive test coverage push: 49.6% → 81.6% line coverage (9,541 tests)
-- 33 ESLint errors introduced in test files (fixed in Feb 19 session)
 
 **February 17, 2026** (`claude/review-handoff-docs-CYZzv`):
 - Documentation review and cleanup for handoff readiness
 - Verified all 3 AI providers healthy (Anthropic billing resolved)
-- Fixed 2 ESLint errors, updated stale CLAUDE.md metadata
 
 **February 16, 2026** (`claude/review-handoff-docs-uvfRj`):
 - Admin settings route ordering fix (Express catch-all bug)
 - Sample policy cards expandable detail view + i18n
-- Documentation of DB i18n system and stale HTML cache fix
 
 **February 12, 2026** (`claude/review-handoff-docs-Bdwy3`):
-- Globe Language Picker added to both nav bars
-- Nav bar consistency overhaul (dead button removal, Sign In link, direct upload)
-- i18n for auth, help, shared result, sample policies pages
-- Database-driven i18n translation system (5 tables, 685+ keys, 363 tests)
-
-**February 11, 2026** (`claude/review-handoff-docs-E4fnT`):
-- Comprehensive i18n for landing, navigation, core components
-- Coverage name locale fix with 90+ entry COVERAGE_NAME_TR map
-- AI insight translation with translateInsight()
-
-**February 9, 2026** (`claude/review-handoff-docs-MAjiD`):
-- Market Data DB migration, user profile tests
-- Major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)
-- Mobile landing page UX overhaul, tiered confidence system
+- Globe Language Picker, nav bar consistency overhaul
+- Database-driven i18n translation system (5 tables, 685+ keys)
 
 ---
 
 **Last Updated**: February 19, 2026
-**Branch**: `claude/review-project-docs-LxcHs`
+**Branch**: `claude/review-handoff-docs-g8uKH`
 **ESLint Status**: 0 errors, 47 warnings
-**Next Session Focus**: Deploy, apply translation migrations, production smoke test
+**Next Session Focus**: Deploy, apply migration 020, production Lighthouse verification

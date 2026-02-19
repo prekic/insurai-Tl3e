@@ -172,7 +172,7 @@ export function UploadWidget({
             <p className="font-semibold text-gray-900">{t.landing.uploadDropHere}</p>
             <p className="text-sm text-gray-500 mt-1">{t.landing.uploadOrClick}</p>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} {t.landing.uploadMaxSize.replace('{size}', String(FILE_CONSTRAINTS.MAX_SIZE_MB))}
           </p>
           <input
