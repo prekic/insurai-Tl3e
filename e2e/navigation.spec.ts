@@ -51,8 +51,11 @@ test.describe('Navigation', () => {
       await page.goto('/')
 
       // Mobile menu button (hamburger) should be visible
-      const menuButton = page.locator('button[aria-label*="menu" i]').or(
-        page.locator('nav button').filter({ has: page.locator('svg.lucide-menu') })
+      // aria-label is "Open menu" / "Close menu" (or Turkish equivalents)
+      const menuButton = page.locator('button[aria-label="Open menu"]').or(
+        page.locator('button[aria-label="Close menu"]')
+      ).or(
+        page.locator('button[aria-label*="menü" i]')
       ).first()
       await expect(menuButton).toBeVisible()
     })
@@ -60,15 +63,20 @@ test.describe('Navigation', () => {
     test('should toggle mobile menu', async ({ page }) => {
       await page.setViewportSize({ width: 375, height: 667 })
       await page.goto('/')
+      await page.waitForLoadState('networkidle')
 
       // Find and click the mobile menu button (hamburger icon)
-      const menuButton = page.locator('button[aria-label*="menu" i]').or(
-        page.locator('nav button').filter({ has: page.locator('svg.lucide-menu') })
+      // aria-label is "Open menu" / "Close menu" (exact match to avoid Globe picker)
+      const menuButton = page.locator('button[aria-label="Open menu"]').or(
+        page.locator('button[aria-label="Close menu"]')
+      ).or(
+        page.locator('button[aria-label*="menü" i]')
       ).first()
       await menuButton.click()
 
-      // Mobile menu items should appear
-      await expect(page.getByText('Dashboard').first()).toBeVisible()
+      // Mobile menu items should appear — look for the mobile menu button specifically
+      const mobileMenuDashboard = page.getByRole('button', { name: /Dashboard|Panel/i })
+      await expect(mobileMenuDashboard.first()).toBeVisible()
     })
   })
 
