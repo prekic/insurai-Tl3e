@@ -74,7 +74,7 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 
 ### 4. Translation Migration Runner Script
 
-- Added `scripts/run-translation-migrations.ts` for applying translation system DB migrations (`017`, `018`, `019`)
+- Added `scripts/apply-translation-migrations.sh` for applying translation system DB migrations (`017`, `018`, `019`)
 - Commit: `290cadb`
 
 ---
@@ -142,7 +142,7 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 
 ### Database Migrations Status
 - All migrations up to `015_config_drift_baselines.sql` applied in production
-- **Pending**: `017`, `018`, `019` (translation system) — needed for DB-driven i18n. App falls back to preloaded translations if not applied.
+- **Applied**: `017`, `018`, `019` (translation system) — DB-driven i18n is fully operational with ~558 EN keys, ~500 TR keys across 19+ sections, translationVersion "2"
 
 ---
 

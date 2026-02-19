@@ -3464,7 +3464,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - **Types**: pdf-report coverage
 - **ESLint Resolution**: 33+47+29 ESLint errors from test files fixed across three commits (`3172796`, `b31547b`, `0856102`); total ESLint now 0 errors, 47 warnings
 - **Test Failures Fixed**: 7 test failures in coverage files (session ID property name, iPad UA detection, flaky timing assertion)
-- **Translation Migration Script**: `scripts/run-translation-migrations.ts` added (`290cadb`)
+- **Translation Migration Script**: `scripts/apply-translation-migrations.sh` added (`290cadb`)
 - **Commits**: `3172796`, `290cadb`, `f544b8f`, `b31547b`, `e32131a`, `0856102`
 
 ---
