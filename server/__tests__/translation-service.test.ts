@@ -110,7 +110,9 @@ describe('Translation Service', () => {
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    // Only clear mock call history; restoreAllMocks() is avoided because it
+    // can undo the vi.mock() setup and cause issues in subsequent tests
+    vi.clearAllMocks()
   })
 
   // =====================================================================
@@ -331,23 +333,27 @@ describe('Translation Service', () => {
       const CACHE_TTL_MS = 5 * 60 * 1000
       const cache = new Map<string, { data: unknown; timestamp: number }>()
 
-      cache.set('en', { data: { nav: { home: 'Home' } }, timestamp: Date.now() })
+      const now = Date.now()
+      cache.set('en', { data: { nav: { home: 'Home' } }, timestamp: now })
 
       const cached = cache.get('en')
       expect(cached).toBeTruthy()
-      expect(Date.now() - cached!.timestamp < CACHE_TTL_MS).toBe(true)
+      // Use the captured timestamp to avoid race between Date.now() calls
+      expect(now - cached!.timestamp < CACHE_TTL_MS).toBe(true)
     })
 
     it('should expire cache after TTL', () => {
       const CACHE_TTL_MS = 5 * 60 * 1000
       const cache = new Map<string, { data: unknown; timestamp: number }>()
 
-      // Set cache with old timestamp
-      cache.set('en', { data: { nav: { home: 'Home' } }, timestamp: Date.now() - CACHE_TTL_MS - 1000 })
+      const now = Date.now()
+      // Set cache with old timestamp (1 second past TTL)
+      const expiredTimestamp = now - CACHE_TTL_MS - 1000
+      cache.set('en', { data: { nav: { home: 'Home' } }, timestamp: expiredTimestamp })
 
       const cached = cache.get('en')
       expect(cached).toBeTruthy()
-      expect(Date.now() - cached!.timestamp < CACHE_TTL_MS).toBe(false)
+      expect(now - cached!.timestamp < CACHE_TTL_MS).toBe(false)
     })
 
     it('should invalidate specific locale cache', () => {

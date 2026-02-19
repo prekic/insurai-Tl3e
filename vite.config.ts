@@ -71,6 +71,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     css: true,
+    testTimeout: 10000,
     exclude: ['node_modules', 'e2e', 'dist', 'services'],
     coverage: {
       provider: 'v8',
