@@ -4108,14 +4108,42 @@ connectSrc: [
 - If this skeleton is modified, update the performance test in `src/__tests__/performance/performance.test.ts` which asserts on `.app-shell` and `@keyframes pulse`
 - The old spinner pattern (`#root:empty::before` + `@keyframes spin`) was replaced in the Lighthouse optimization session
 
+**CI E2E Tests — `E2E_BASE_URL` Pattern (Added Feb 20, 2026):**
+- Both `staging.yml` and `production.yml` E2E jobs build the frontend then serve it with `serve` on port 3000
+- `playwright.config.ts` checks `E2E_BASE_URL` env var — if set, it skips its built-in `webServer` block (which would start a Vite dev server)
+- **DO NOT** use `npm run test:e2e:fast` in CI — this starts a Vite dev server, not a production build
+- `serve` and `wait-on` are devDependencies — do not remove them from `package.json`
+- If E2E tests fail in CI but pass locally, check whether `E2E_BASE_URL` is set and the build step ran first
+- Optional secrets for real Supabase in CI build: `STAGING_SUPABASE_URL/ANON_KEY`, `PROD_SUPABASE_URL/ANON_KEY` — placeholder values used if secrets not configured
+
 ---
 
 ## CI/CD
 
-### GitHub Actions
-- `staging.yml` - Runs on staging/develop branches and PRs to main
-- Validates: typecheck, lint, tests
-- Uploads coverage to Codecov
+### GitHub Actions (Updated Feb 20, 2026)
+- **`staging.yml`** - Runs on staging/develop branches and PRs to main
+  - `validate`: typecheck + lint + unit tests, coverage uploaded to Codecov
+  - `e2e-tests`: Playwright Chromium against production build (`serve` + `wait-on`) — runs in **parallel** with `validate`
+  - `build`: gates on **both** `validate` and `e2e-tests` passing, then deploys
+- **`production.yml`** - Runs on main branch push
+  - Same `validate` + `e2e-tests` in parallel, then `build` deploys to Railway
+  - Post-deploy health check with Railway CLI rollback on failure
+- Both E2E jobs use `E2E_BASE_URL=http://localhost:3000` — `playwright.config.ts` reads this and skips its own dev server block
+
+### Playwright E2E in CI — Key Pattern
+```yaml
+- name: Run E2E tests against production build
+  run: |
+    npx serve dist -l 3000 &
+    npx wait-on http://localhost:3000 --timeout 30000
+    npx playwright test --project=chromium
+  env:
+    CI: true
+    E2E_BASE_URL: http://localhost:3000
+```
+- `serve` and `wait-on` are **devDependencies** (not `npx` cold downloads) for deterministic CI
+- Playwright report uploaded as artifact (`playwright-report/`, 7 days) on failure
+- Optional GitHub Secrets for real Supabase in E2E build: `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY` — placeholders used if not set
 
 ### Pre-commit Checks
 ```bash
