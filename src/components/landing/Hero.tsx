@@ -303,6 +303,8 @@ export function Hero() {
             <button
               className="md:hidden p-2 hover:bg-gray-100 rounded-xl transition-colors"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
             </button>

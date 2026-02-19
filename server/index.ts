@@ -6,6 +6,7 @@
  */
 
 import express from 'express'
+import compression from 'compression'
 import cors from 'cors'
 import helmet from 'helmet'
 import dotenv from 'dotenv'
@@ -99,6 +100,11 @@ function requestTimeout(timeoutMs: number) {
 
 // Apply default request timeout to all routes
 app.use(requestTimeout(SERVER_CONFIG.REQUEST_TIMEOUT))
+
+// Gzip/brotli compression — reduces transfer size for all text responses.
+// Railway's envoy proxy also compresses, but this ensures compression
+// regardless of deployment platform and improves local testing accuracy.
+app.use(compression())
 
 // Security middleware with CSP configuration
 app.use(
