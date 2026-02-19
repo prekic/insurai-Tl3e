@@ -95,7 +95,7 @@ test.describe('PolicyChat - Chat Interface', () => {
       // Quick buttons are i18n — try kasko or compare patterns
       const quickButton = page.getByRole('button', { name: /kasko|compare|karşılaştır|gap|boşluk/i }).first()
       if (await quickButton.count() > 0) {
-        const buttonText = await quickButton.textContent()
+        const _buttonText = await quickButton.textContent()
         await quickButton.click()
 
         // Input placeholder is i18n: "Ask about your policies..." or "Poliçeleriniz hakkında sorun..."
