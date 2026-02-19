@@ -213,7 +213,7 @@ jobs:
 
       # Option 1: Deploy to Railway
       - name: Deploy to Railway
-        if: secrets.RAILWAY_TOKEN != ''
+        if: ${{ secrets.RAILWAY_TOKEN != '' }}
         uses: bervProject/railway-deploy@main
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
@@ -235,7 +235,7 @@ jobs:
     if: always() && github.event_name == 'push'
     steps:
       - name: Send Slack notification
-        if: secrets.SLACK_WEBHOOK_URL != ''
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
         uses: 8398a7/action-slack@v3
         with:
           status: ${{ job.status }}
