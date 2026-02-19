@@ -265,6 +265,7 @@ insurai/
 | `supabase/migrations/017_translation_system.sql` | **NEW** Database-driven i18n tables |
 | `supabase/migrations/018_seed_translations.sql` | **NEW** Seeds 685+ translation keys × 2 languages |
 | `supabase/migrations/019_seed_coverage_insight_translations.sql` | **NEW** Coverage names + AI insight translations |
+| `supabase/migrations/020_seed_unsubscribe_translations.sql` | **NEW** Unsubscribe page translations (22 keys × 2 locales) |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |

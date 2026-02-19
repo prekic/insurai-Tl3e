@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Apply Translation System Migrations (017, 018, 019)
+# Apply Translation System Migrations (017, 018, 019, 020)
 #
 # Usage:
 #   # Option 1: Pass Supabase DB URL directly
@@ -22,6 +22,7 @@
 #        translation_audit_log, translation_metadata) + RLS policies + triggers
 #   018: Seeds 685+ translation keys x 2 locales (EN + TR) from translations.ts
 #   019: Seeds 90 coverage name translations + 15 AI insight translations
+#   020: Seeds 22 unsubscribe page translations x 2 locales
 #
 # Safe to re-run: All statements use IF NOT EXISTS / ON CONFLICT DO NOTHING
 # =============================================================================
@@ -56,6 +57,7 @@ MIGRATIONS=(
   "017_translation_system.sql"
   "018_seed_translations.sql"
   "019_seed_coverage_insight_translations.sql"
+  "020_seed_unsubscribe_translations.sql"
 )
 
 for migration in "${MIGRATIONS[@]}"; do
@@ -93,6 +95,7 @@ if [[ "$DRY_RUN" == true ]]; then
   echo "  017: Schema (5 tables, RLS policies, triggers, version tracker)"
   echo "  018: Seed 685+ keys x 2 locales = ~1,370 translations"
   echo "  019: Seed 90 coverage names + 15 AI insights = ~210 translations"
+  echo "  020: Seed 22 unsubscribe page keys x 2 locales = 44 translations"
   echo ""
   echo -e "${GREEN}All migrations validated. Run without --dry-run to apply.${NC}"
   exit 0

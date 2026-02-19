@@ -142,7 +142,8 @@ Previous sessions introduced ESLint errors in test files (unused mock variables 
 
 ### Database Migrations Status
 - All migrations up to `015_config_drift_baselines.sql` applied in production
-- **Applied**: `017`, `018`, `019` (translation system) — DB-driven i18n is fully operational with ~558 EN keys, ~500 TR keys across 19+ sections, translationVersion "2"
+- **Applied**: `017`, `018`, `019` (translation system) — DB-driven i18n is fully operational with ~558 EN keys, ~500 TR keys across 24+ sections, translationVersion "2"
+- **Pending**: `020` (unsubscribe page translations — 22 keys × 2 locales). App works without it (falls back to preloaded translations). Apply via Supabase SQL Editor or `scripts/apply-translation-migrations.sh`.
 
 ---
 
