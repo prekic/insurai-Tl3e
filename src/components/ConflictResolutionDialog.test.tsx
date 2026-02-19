@@ -566,7 +566,7 @@ describe('ConflictResolutionDialog', () => {
       />
     )
     // Close button is the X button in the header
-    const closeButton = screen.getAllByRole('button').find(b => !b.hasAttribute('disabled') && !b.textContent)
+    const _closeButton = screen.getAllByRole('button').find(b => !b.hasAttribute('disabled') && !b.textContent)
     // The close button has an X icon but no text label — find by testing
     defaultCallbacks.onClose.mockClear()
     // Click the backdrop

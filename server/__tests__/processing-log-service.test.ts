@@ -16,18 +16,18 @@ const {
   mockLogError,
   mockLogInfo,
   mockLogDebug,
-  mockSingle,
-  mockSelect,
-  mockInsert,
-  mockUpdate,
-  mockDelete,
-  mockEq,
-  mockOrder,
-  mockRange,
-  mockGte,
-  mockLte,
-  mockIlike,
-  mockLt,
+  _mockSingle,
+  _mockSelect,
+  _mockInsert,
+  _mockUpdate,
+  _mockDelete,
+  _mockEq,
+  _mockOrder,
+  _mockRange,
+  _mockGte,
+  _mockLte,
+  _mockIlike,
+  _mockLt,
   mockFrom,
 } = vi.hoisted(() => {
   const mockSingle = vi.fn()
@@ -415,7 +415,7 @@ describe('processing-log-service', () => {
   describe('listProcessingLogs', () => {
     it('returns logs with default pagination', async () => {
       const mockLogs = [{ id: 'log-001' }, { id: 'log-002' }]
-      const chain = setupChain({ data: mockLogs, error: null, count: 2 })
+      const _chain = setupChain({ data: mockLogs, error: null, count: 2 })
 
       const service = await importService()
       const result = await service.listProcessingLogs()

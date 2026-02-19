@@ -60,9 +60,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service-key'
 // Import after mocking
 import {
   // Types
-  type PromptTemplate,
-  type PromptVersion,
-  type ABTest,
+  type PromptTemplate as _PromptTemplate,
+  type PromptVersion as _PromptVersion,
+  type ABTest as _ABTest,
   type PromptCategory,
   // Templates
   getTemplates,
