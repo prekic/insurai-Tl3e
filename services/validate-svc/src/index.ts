@@ -604,8 +604,10 @@ export class Validator {
   }
 
   private checkDocumentCompleteness(): void {
-    const requiredFields = this.options.policyPack!.extractionTargets.filter(target => {
-      const validators = this.options.policyPack!.validators[target]
+    const policyPack = this.options.policyPack
+    if (!policyPack) return
+    const requiredFields = policyPack.extractionTargets.filter(target => {
+      const validators = policyPack.validators[target]
       return validators?.some(v => v.required || v.severity === 'critical')
     })
 
