@@ -12,6 +12,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { recordServerConfigFetch } from '../routes/settings.js'
 
 // =============================================================================
 // TYPES
@@ -240,15 +241,18 @@ function getClient(): SupabaseClient | null {
  */
 async function getCategorySettings(category: string): Promise<Record<string, unknown>> {
   const cacheKey = `category:${category}`
+  const start = performance.now()
 
   // Check cache first
   const cached = getFromCache<Record<string, unknown>>(cacheKey)
   if (cached !== null) {
+    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, true, true)
     return cached
   }
 
   const db = getClient()
   if (!db) {
+    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
     return {}
   }
 
@@ -259,6 +263,7 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
       .eq('category', category)
 
     if (error || !data) {
+      recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
       return {}
     }
 
@@ -272,8 +277,10 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
 
     // Cache the result
     setInCache(cacheKey, result)
+    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, true)
     return result
   } catch {
+    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
     return {}
   }
 }
