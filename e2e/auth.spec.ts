@@ -29,9 +29,9 @@ test.describe('Authentication', () => {
     test('should have working navigation links', async ({ page }) => {
       await page.goto('/')
 
-      // Verify dashboard link works
+      // Verify dashboard link works — unauthenticated users may be redirected to /auth
       await page.getByRole('link', { name: /dashboard/i }).first().click()
-      await expect(page).toHaveURL(/dashboard/)
+      await expect(page).toHaveURL(/dashboard|auth/)
     })
   })
 

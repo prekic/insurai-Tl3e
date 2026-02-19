@@ -212,7 +212,9 @@ test.describe.skip('Admin API Security', () => {
   })
 })
 
-test.describe('Health Check', () => {
+// Health check tests require a running Express backend.
+// Skipped in CI where only the static frontend is served.
+test.describe.skip('Health Check', () => {
   test('health endpoint should return 200', async ({ request }) => {
     const response = await request.get('/api/health')
 
