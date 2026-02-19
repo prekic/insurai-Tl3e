@@ -100,10 +100,10 @@ describe('Performance Optimizations', () => {
       const indexPath = path.resolve(__dirname, '../../../index.html')
       const indexContent = fs.readFileSync(indexPath, 'utf-8')
 
-      // Check for inline styles
+      // Check for inline styles (app shell skeleton for CLS prevention)
       expect(indexContent).toContain('<style>')
-      expect(indexContent).toContain('#root:empty::before')
-      expect(indexContent).toContain('@keyframes spin')
+      expect(indexContent).toContain('.app-shell')
+      expect(indexContent).toContain('@keyframes pulse')
     })
 
     it('has fallback font-family defined', async () => {

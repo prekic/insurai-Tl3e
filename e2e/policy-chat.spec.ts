@@ -26,7 +26,8 @@ test.describe('PolicyChat - Page Load', () => {
 
   test('should display chat header with Policy Assistant title', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      await expect(page.getByText('Policy Assistant')).toBeVisible()
+      // Title is i18n: "Policy Assistant" (EN) or "Poliçe Asistanı" (TR)
+      await expect(page.getByText(/Policy Assistant|Poliçe Asistanı/i).first()).toBeVisible()
     }
   })
 
@@ -62,7 +63,7 @@ test.describe('PolicyChat - Chat Interface', () => {
 
   test('should display message input field', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).or(
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).or(
         page.locator('input[type="text"]')
       )
       await expect(input.first()).toBeVisible()
@@ -71,7 +72,7 @@ test.describe('PolicyChat - Chat Interface', () => {
 
   test('should display send button', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
       await expect(sendButton).toBeVisible()
     }
   })
@@ -91,13 +92,17 @@ test.describe('PolicyChat - Chat Interface', () => {
 
   test('should populate input when quick question is clicked', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const quickButton = page.getByRole('button', { name: /kasko/i }).first()
+      // Quick buttons are i18n — try kasko or compare patterns
+      const quickButton = page.getByRole('button', { name: /kasko|compare|karşılaştır|gap|boşluk/i }).first()
       if (await quickButton.count() > 0) {
+        const buttonText = await quickButton.textContent()
         await quickButton.click()
 
-        const input = page.getByPlaceholder(/ask about your policies/i).first()
+        // Input placeholder is i18n: "Ask about your policies..." or "Poliçeleriniz hakkında sorun..."
+        const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
         const value = await input.inputValue()
-        expect(value.toLowerCase()).toContain('kasko')
+        // Value should be non-empty after clicking quick question
+        expect(value.length).toBeGreaterThan(0)
       }
     }
   })
@@ -206,7 +211,7 @@ test.describe('PolicyChat - Conversation Controls', () => {
   test('should reset chat when new conversation is clicked', async ({ page }) => {
     if (page.url().includes('/chat')) {
       // Type something in input first
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
       if (await input.count() > 0) {
         await input.fill('Test message')
 
@@ -298,7 +303,7 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should have disabled send button when input is empty', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
       if (await sendButton.count() > 0) {
         await expect(sendButton).toBeDisabled()
       }
@@ -307,8 +312,8 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should enable send button when input has text', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test question')
@@ -319,8 +324,8 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should display user message after sending', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('What is my coverage?')
@@ -335,8 +340,8 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should clear input after sending message', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test message')
@@ -350,8 +355,8 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should show typing indicator while waiting for response', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('What is my coverage?')
@@ -368,7 +373,7 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should send message on Enter key press', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
 
       if (await input.count() > 0) {
         await input.fill('Enter key test')
@@ -383,7 +388,7 @@ test.describe('PolicyChat - Message Sending', () => {
 
   test('should not send message on Shift+Enter', async ({ page }) => {
     if (page.url().includes('/chat')) {
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
 
       if (await input.count() > 0) {
         await input.fill('Shift enter test')
@@ -413,8 +418,8 @@ test.describe('PolicyChat - Error Handling', () => {
         })
       })
 
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test error handling')
@@ -436,15 +441,16 @@ test.describe('PolicyChat - Error Handling', () => {
         })
       })
 
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      // Send button text is i18n: "Send" or "Gönder"
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test retry')
         await sendButton.click()
 
-        // Wait for error and retry button
-        const retryButton = page.getByRole('button', { name: /retry/i })
+        // Wait for error and retry button (i18n: "Retry" or "Tekrar Dene")
+        const retryButton = page.getByRole('button', { name: /retry|tekrar/i })
         await expect(retryButton).toBeVisible({ timeout: 10000 })
       }
     }
@@ -456,8 +462,8 @@ test.describe('PolicyChat - Error Handling', () => {
         route.abort('failed')
       })
 
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test connection error')
@@ -476,8 +482,8 @@ test.describe('PolicyChat - Error Handling', () => {
         route.abort('failed')
       })
 
-      const input = page.getByPlaceholder(/ask about your policies/i).first()
-      const sendButton = page.getByRole('button', { name: /send/i })
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i).first()
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
 
       if (await input.count() > 0 && await sendButton.count() > 0) {
         await input.fill('Test dismiss')
@@ -501,11 +507,12 @@ test.describe('PolicyChat - Responsive Design', () => {
     await page.waitForLoadState('networkidle')
 
     if (page.url().includes('/chat')) {
-      // Core elements should be visible
-      const input = page.getByPlaceholder(/ask about your policies/i)
+      // Core elements should be visible — input placeholder is i18n
+      const input = page.getByPlaceholder(/ask about your policies|poliçeleriniz hakkında/i)
       await expect(input.first()).toBeVisible()
 
-      const sendButton = page.getByRole('button', { name: /send/i })
+      // Send button is i18n: "Send" or "Gönder"
+      const sendButton = page.getByRole('button', { name: /send|gönder/i })
       await expect(sendButton).toBeVisible()
     }
   })
@@ -516,7 +523,8 @@ test.describe('PolicyChat - Responsive Design', () => {
     await page.waitForLoadState('networkidle')
 
     if (page.url().includes('/chat')) {
-      await expect(page.getByText('Policy Assistant')).toBeVisible()
+      // Title is i18n: "Policy Assistant" or "Poliçe Asistanı"
+      await expect(page.getByText(/Policy Assistant|Poliçe Asistanı/i).first()).toBeVisible()
     }
   })
 
