@@ -89,8 +89,8 @@ const orderA = statusOrder[a.status] ?? 4
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| sortPolicies() `\|\| 4` status ordering bug | Low | Not yet fixed | Active policies sorted as lowest priority; use `?? 4` |
-| Migration 020 pending | Medium | Ready to apply | Unsubscribe translations not in DB; app uses fallback |
+| sortPolicies() `\|\| 4` status ordering bug | Low | **Fixed** | Changed `\|\| 4` to `?? 4` in PolicyDashboard.tsx (commit 3d9fc61) |
+| Migration 020 | Medium | **Applied** | Unsubscribe translations seeded in production Supabase (Feb 19, 2026) |
 | 33 E2E failures without backend | Low | Expected | API tests need Express server + Supabase credentials |
 | Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx |
 | 47 ESLint warnings | Low | Pre-existing | All `no-non-null-assertion` |
@@ -130,9 +130,9 @@ const orderA = statusOrder[a.status] ?? 4
 
 ## Next Steps (Priority Order)
 
-### High Priority
-1. **Apply migration 020** — Run SQL in Supabase SQL Editor (copy from `supabase/migrations/020_seed_unsubscribe_translations.sql`)
-2. **Fix sortPolicies() bug** — Change `|| 4` to `?? 4` in `PolicyDashboard.tsx`
+### High Priority (Completed)
+1. ~~**Apply migration 020**~~ — **Done** (applied in Supabase SQL Editor, Feb 19, 2026)
+2. ~~**Fix sortPolicies() bug**~~ — **Done** (commit 3d9fc61, `|| 4` → `?? 4`)
 
 ### Medium Priority
 3. **Cover remaining high-impact files** — settings.ts (379 branches), policy-extractor.ts (329 branches), ai-routes.ts (144 branches) still need branch tests (agents couldn't complete due to file size)
