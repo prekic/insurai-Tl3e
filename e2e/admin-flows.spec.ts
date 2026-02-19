@@ -59,9 +59,9 @@ test.describe('Settings Management', () => {
   test.describe('Settings API', () => {
     // Admin endpoints return 401 (auth required) when DB is configured,
     // or 503 (DB not configured) when Supabase is not available.
-    // Both are valid "access denied" responses.
+    // 404 is valid in CI where only the static frontend is served (no backend).
     const expectAuthOrUnavailable = (status: number) => {
-      expect([401, 403, 503]).toContain(status)
+      expect([401, 403, 404, 503]).toContain(status)
     }
 
     test('settings endpoint should require authentication', async ({ request }) => {
@@ -166,8 +166,9 @@ test.describe('Duplicate Detection Flow', () => {
 test.describe('Admin API Security', () => {
   // Admin endpoints return 401 (auth required) when DB is configured,
   // or 503 (DB not configured) when Supabase is not available.
+  // 404 is valid in CI where only the static frontend is served (no backend).
   const expectProtected = (status: number) => {
-    expect([401, 403, 503]).toContain(status)
+    expect([401, 403, 404, 503]).toContain(status)
   }
 
   test('admin prompts should require authentication', async ({ request }) => {
