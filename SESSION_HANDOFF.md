@@ -1,4 +1,4 @@
-# Session Handoff - February 19, 2026 (Branch Coverage Session)
+# Session Handoff - February 20, 2026 (Bug Fixes + CI Pipeline Session)
 
 ## Current Status
 
@@ -11,77 +11,94 @@
 | **Tests** | 14,960+ passing (304 test files), 0 production failures |
 | **E2E Tests** | 186/186 Chromium passed (production build) |
 | **Coverage** | ~90% statements, ~84% branches, ~88% functions, ~90% lines |
-| **Lighthouse** | CLS 0.000301 confirmed, Accessibility 98, BP 93, SEO 100 |
-| **Branch** | `claude/review-handoff-docs-RlxgV` |
+| **Lighthouse** | CLS 0.000301 confirmed, Accessibility 100, BP 93, SEO 100 |
+| **Branch** | `claude/review-handoff-g78sw` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | Live — extraction pipeline fully operational |
 | **All 3 AI Providers** | OpenAI (1182ms), Anthropic (650ms), Google Vision (158ms) — all valid |
 | **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
 | **SW Cache Version** | v19 |
+| **Migration 020** | Applied in production Supabase |
 
 ---
 
 ## Session Summary
 
-This session focused on **branch coverage improvement**, raising branch coverage from 81.17% to 83.69% (target was 83%+). Also hardened E2E tests for production build testing.
+This session completed all outstanding high-priority items from the previous handoff and set up the CI pipeline with Playwright E2E tests.
 
 ### Work Completed This Session
 
 | # | Task | Result |
 |---|------|--------|
-| 1 | **Branch coverage analysis** | Parsed `coverage-final.json` with Python to identify files with most uncovered branches. Top targets: settings.ts (379), PolicyDetailView (375), policy-extractor (329), ai routes (144), PolicyDashboard (101). |
-| 2 | **PolicyDetailView branch tests** | 172 tests covering helper functions (formatCoverageLimit, getCategoryIcon, getCoverageInfoText, getLocalizedCoverageName, translateInsightLegacy), sub-components, and main component states. |
-| 3 | **PolicyDashboard branch tests** | 102 tests covering all 6 sort fields with asc/desc, search filtering, status filter, stats calculation, duplicate banner, view mode toggle, compare selection bar. |
-| 4 | **Medium-impact component tests** | 123 tests for 7 components: EmailPreferences (17), GlobalNavigation (16), ScoreBreakdown (31), PolicyDiffViewer (10), Settings (16), ConflictResolutionDialog+DuplicateWarningBanner (21), useEmailPreferences (12). |
-| 5 | **Library module tests** | 67 tests for 5 modules: PolicyContext (9), Consensus extraction (16), Performance monitoring (7), Config Manager (14), Cache Storage (21). |
-| 6 | **Performance test fix** | Fixed stale assertion in `performance.test.ts` — changed `#root:empty::before`/`@keyframes spin` to `.app-shell`/`@keyframes pulse` after index.html app shell change. |
-| 7 | **E2E test hardening** | All 186 Playwright tests pass against production build (`npx serve dist`). |
+| 1 | **sortPolicies() bug fix** | Fixed `\|\| 4` → `?? 4` in `PolicyDashboard.tsx`. Updated 2 test assertions in `PolicyDashboard-branches.test.tsx` to match correct sort order. Commit `3d9fc61`. |
+| 2 | **Migration 020 applied** | User ran `020_seed_unsubscribe_translations.sql` in Supabase SQL Editor. 22 keys × 2 locales seeded. Translation version bumped to `"3"`. |
+| 3 | **CI pipeline with Playwright E2E** | Added `e2e-tests` job to `staging.yml` (was missing entirely). Fixed `e2e-tests` job in `production.yml` (was using dev server, now uses `serve` + `wait-on` against production build). Added `serve` and `wait-on` as devDependencies. Commit `68acec6`. |
 
 ---
 
-## Key Results
+## Commits This Session
 
-### Branch Coverage Improvement
-
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| Statements | 85.03% | 89.59% | +4.56% |
-| **Branches** | **81.17%** | **83.68%** | **+2.51%** |
-| Functions | 83.41% | 87.81% | +4.40% |
-| Lines | 86.11% | 90.34% | +4.23% |
-| Total Tests | 14,496 | 14,960 | +464 |
-| Test Files | 300 | 304 | +4 |
-
-### New Test Files
-
-| File | Tests | Lines | Targets |
-|------|-------|-------|---------|
-| `PolicyDetailView-branches.test.tsx` | 172 | 1,978 | Helper functions, sub-components, main component |
-| `PolicyDashboard-branches.test.tsx` | 102 | 1,616 | Sort, filter, stats, compare, empty states |
-| `medium-coverage-branches.test.tsx` | 123 | 1,402 | 7 components (EmailPrefs, GlobalNav, ScoreBreakdown, etc.) |
-| `library-branches.test.tsx` | 67 | 1,414 | PolicyContext, Consensus, PerfMon, ConfigMgr, Cache |
-| **Total** | **464** | **6,410** | |
+| Commit | Description |
+|--------|-------------|
+| `3d9fc61` | Fix sortPolicies() status ordering bug: `\|\| 4` → `?? 4` |
+| `5eb445d` | Update handoff: mark sortPolicies fix and migration 020 as done |
+| `68acec6` | Add Playwright E2E tests to CI pipeline |
 
 ---
 
-## Latent Bug Discovered
+## CI Pipeline — What Was Done
 
-### sortPolicies() Status Ordering Bug
+### staging.yml
+- **New `e2e-tests` job** added — builds frontend, serves on port 3000 via `serve`, waits with `wait-on`, runs `playwright test --project=chromium`
+- Runs **in parallel** with `validate` (no dependency between them)
+- `build` job now gates on **both** `validate` and `e2e-tests` passing
+- Playwright report uploaded as artifact on failure
 
-**File**: `src/components/PolicyDashboard.tsx`
+### production.yml
+- **Fixed `e2e-tests` job** — was calling `npm run test:e2e:fast` which starts a Vite dev server via `playwright.config.ts`. Now builds and serves the production build via `serve` + `wait-on`
+- Uses `E2E_BASE_URL=http://localhost:3000` so `playwright.config.ts` skips its built-in `webServer` block
+- Uses `PROD_SUPABASE_*` secrets (with placeholder fallbacks) for the build step
 
-**Problem**: `statusOrder[a.status] || 4` uses logical OR — but `active` status has order `0`, which is falsy, so `0 || 4` evaluates to `4`. This treats active policies as lowest sort priority instead of highest.
-
-**Fix**: Change `||` to `??` (nullish coalescing):
-```typescript
-// BEFORE (bug)
-const orderA = statusOrder[a.status] || 4
-// AFTER (correct)
-const orderA = statusOrder[a.status] ?? 4
+### Key pattern used in both workflows
+```yaml
+- name: Run E2E tests against production build
+  run: |
+    npx serve dist -l 3000 &
+    npx wait-on http://localhost:3000 --timeout 30000
+    npx playwright test --project=chromium
+  env:
+    CI: true
+    E2E_BASE_URL: http://localhost:3000
 ```
 
-**Severity**: Low (cosmetic — only affects sort order when sorting by status column)
+### Required GitHub Secrets
+For E2E jobs to build with real Supabase config (optional — placeholders used as fallback):
+- `STAGING_SUPABASE_URL` / `STAGING_SUPABASE_ANON_KEY` — for staging E2E build
+- `PROD_SUPABASE_URL` / `PROD_SUPABASE_ANON_KEY` — for production E2E build
+
+---
+
+## ⚠️ PERSISTENT TODO — Branch Coverage Gaps (DO NOT DELETE)
+
+These 3 files still need branch test coverage. **Do not remove this section until all 3 are covered.**
+
+| File | Uncovered Branches | Priority |
+|------|--------------------|----------|
+| `server/routes/settings.ts` | ~379 | High |
+| `src/lib/ai/policy-extractor.ts` | ~329 | High |
+| `server/routes/ai.ts` | ~144 | Medium |
+
+**Current branch coverage**: 83.69% — **target: 85%+**
+
+**Why not done**: Previous session agents hit `max_tokens` limit on Write tool calls — these files are too large for a single test file.
+
+**Strategy for next attempt**: Split each module into 2-3 focused test files by function group:
+- `settings.ts` → `settings-category-routes.test.ts` + `settings-feature-flags.test.ts` + `settings-history-perf.test.ts`
+- `policy-extractor.ts` → `extractor-conversion.test.ts` + `extractor-validation.test.ts` + `extractor-ocr.test.ts`
+- `ai.ts` → `ai-extraction-routes.test.ts` + `ai-chat-ocr-routes.test.ts`
+
+**Impact**: Covering settings.ts + policy-extractor.ts alone would add ~700 branches, pushing to ~87% branch coverage.
 
 ---
 
@@ -89,31 +106,13 @@ const orderA = statusOrder[a.status] ?? 4
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| sortPolicies() `\|\| 4` status ordering bug | Low | **Fixed** | Changed `\|\| 4` to `?? 4` in PolicyDashboard.tsx (commit 3d9fc61) |
-| Migration 020 | Medium | **Applied** | Unsubscribe translations seeded in production Supabase (Feb 19, 2026) |
-| 33 E2E failures without backend | Low | Expected | API tests need Express server + Supabase credentials |
-| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx |
-| 47 ESLint warnings | Low | Pre-existing | All `no-non-null-assertion` |
-| Local Lighthouse Performance 39-45 | Info | Expected | Sandbox CPU throttling; production is 99 |
-| 3 stuck test-gen agents | Info | Resolved by session end | settings.ts, policy-extractor.ts, ai-routes agents hit max_tokens Write loop |
-
----
-
-## Gotchas Discovered This Session
-
-### 1. App Shell Skeleton Assertion
-- `index.html` changed from spinner (`#root:empty::before` + `@keyframes spin`) to app shell (`.app-shell` + `@keyframes pulse`)
-- Performance test in `src/__tests__/performance/performance.test.ts` asserts on these CSS patterns
-- If the app shell is modified, update the performance test assertions accordingly
-
-### 2. Large Test File Generation via Agents
-- Task agents generating test files for modules with 300+ uncovered branches can exceed max_tokens (21,333) on Write tool calls
-- Files for settings.ts (379 branches), policy-extractor.ts (329 branches), and ai-routes.ts (144 branches) were too large to complete in one Write
-- **Workaround**: Split large modules into multiple smaller test files, or target specific function groups rather than entire files
-
-### 3. JSX in .ts Files
-- Library test files with React component tests (e.g., PolicyContext) need `.tsx` extension, not `.ts`
-- Generic arrow functions like `<T>` need trailing comma `<T,>` to disambiguate from JSX in `.tsx` files
+| sortPolicies() `\|\| 4` bug | Low | **Fixed** | `?? 4` in PolicyDashboard.tsx (commit `3d9fc61`) |
+| Migration 020 | Medium | **Applied** | Unsubscribe translations in production Supabase (Feb 20, 2026) |
+| Branch coverage gaps (3 files) | Medium | **Pending** | settings.ts (379), policy-extractor.ts (329), ai.ts (144) — see above |
+| 33 E2E failures without backend | Low | Expected | API tests need live Express server + Supabase credentials |
+| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx (React 19 + Vitest concurrency) |
+| 47 ESLint warnings | Low | Pre-existing | All `no-non-null-assertion` in production code |
+| Local Lighthouse Performance 39-45 | Info | Expected | Sandbox CPU throttling; production score is 99 |
 
 ---
 
@@ -126,22 +125,28 @@ const orderA = statusOrder[a.status] ?? 4
 - **Build**: `npm run build && npm run build:server`
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 
+### CI/CD (Updated This Session)
+- **staging.yml**: typecheck + lint + unit tests + **E2E Playwright (Chromium)** → build → deploy
+- **production.yml**: typecheck + lint + unit tests + **E2E Playwright (Chromium)** → build → deploy → health check
+- Playwright runs against production build served by `serve` on port 3000
+- Report artifact uploaded on failure (`playwright-report/`, 7 days retention)
+
 ---
 
 ## Next Steps (Priority Order)
 
-### High Priority (Completed)
-1. ~~**Apply migration 020**~~ — **Done** (applied in Supabase SQL Editor, Feb 19, 2026)
-2. ~~**Fix sortPolicies() bug**~~ — **Done** (commit 3d9fc61, `|| 4` → `?? 4`)
+### High Priority — Branch Coverage (PERSISTENT)
+1. **Cover `server/routes/settings.ts`** — ~379 uncovered branches. Split into 3 focused test files by route group (see strategy above)
+2. **Cover `src/lib/ai/policy-extractor.ts`** — ~329 uncovered branches. Split into 3 focused test files by function group
+3. **Cover `server/routes/ai.ts`** — ~144 uncovered branches. Split into 2 focused test files
 
 ### Medium Priority
-3. **Cover remaining high-impact files** — settings.ts (379 branches), policy-extractor.ts (329 branches), ai-routes.ts (144 branches) still need branch tests (agents couldn't complete due to file size)
-4. **Target 85%+ branch coverage** — Currently 83.69%; closing the remaining gap in settings.ts and policy-extractor.ts alone would add ~700 branches
-5. **Set up CI pipeline** — GitHub Actions with Playwright tests against staging
+4. **Target 85%+ branch coverage** — Currently 83.69%; items 1-2 above alone get there
+5. **Set up GitHub Secrets for CI E2E** — Add `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY` to GitHub repo settings if E2E should build with real Supabase config
 
 ### Low Priority
-6. **Reduce ESLint warnings** — 47 remaining (`no-non-null-assertion`)
-7. **Real user testimonials** — Replace use-case scenarios when available
+6. **Reduce ESLint warnings** — 47 remaining (`no-non-null-assertion`) — requires refactoring guarded assertions
+7. **Real user testimonials** — Replace use-case scenarios on landing page when real users provide quotes
 8. **PWA enhancements** — Offline support, push notifications
 
 ---
@@ -155,13 +160,10 @@ npm run validate  # typecheck + lint + test
 # Coverage report
 npx vitest run --coverage
 
-# E2E tests (needs dev server running)
-npm run dev  # terminal 1
-npx playwright test --project=chromium  # terminal 2
-
-# E2E against production build
-npx serve dist -l 3000  # terminal 1
-npx playwright test --project=chromium  # terminal 2
+# E2E tests against production build (mirrors CI)
+npm run build
+npx serve dist -l 3000 &
+E2E_BASE_URL=http://localhost:3000 npx playwright test --project=chromium
 
 # Check production health
 curl https://insurai-production.up.railway.app/api/health
@@ -172,11 +174,10 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 ## Previous Session Context
 
-**February 19, 2026 (Verification Session)** (`claude/review-handoff-docs-RlxgV`):
-- Migration 020 validation (ready to apply, SQL verified)
-- Production Lighthouse verification (CLS 0.000301 confirmed)
-- Config performance baseline against production
-- E2E user flow testing with Playwright (153/186 passed)
+**February 19, 2026 (Branch Coverage Session)** (`claude/review-handoff-docs-RlxgV`):
+- Branch coverage improvement 81.17% → 83.69% (+464 tests, 4 new files)
+- E2E test hardening: 186/186 Chromium pass against production build
+- Discovered sortPolicies() `|| 4` latent bug
 
 **February 19, 2026 (Late)** (`claude/review-handoff-docs-g8uKH`):
 - Lighthouse optimization: Performance 76→99, CLS 0.506→0.005
@@ -196,7 +197,7 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 
 ---
 
-**Last Updated**: February 19, 2026
-**Branch**: `claude/review-handoff-docs-RlxgV`
+**Last Updated**: February 20, 2026
+**Branch**: `claude/review-handoff-g78sw`
 **ESLint Status**: 0 errors, 47 warnings
-**Next Session Focus**: Fix sortPolicies bug, apply migration 020, cover settings.ts/policy-extractor.ts/ai-routes.ts branches
+**Next Session Focus**: Branch coverage for settings.ts / policy-extractor.ts / ai.ts (split into focused test files)

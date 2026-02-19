@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**
 - **Production Readiness**: ~9.5/10 (14,960+ tests, 0 lint errors, 47 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 19, 2026
+- **Last Updated**: February 20, 2026
 
 ---
 
@@ -3532,13 +3532,50 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/library-branches.test.tsx` — 67 tests: PolicyContext (9), Consensus extraction (16), Performance monitoring (7), Config Manager (14), Cache Storage (21)
 - **Other Fix**: `src/__tests__/performance/performance.test.ts` — updated stale assertion (`#root:empty::before` → `.app-shell`, `@keyframes spin` → `@keyframes pulse`) after index.html app shell skeleton change
 - **Results**: Branch coverage 81.17% → 83.69% (+447 branches). Total: 14,960 tests, 304 files, 0 failures
-- **Latent Bug Discovered**: `sortPolicies()` in `PolicyDashboard.tsx` uses `|| 4` for status order fallback — `active` status has order `0`, which is falsy, so it incorrectly falls back to `4`. Should use `?? 4`.
+- **Latent Bug Discovered**: `sortPolicies()` in `PolicyDashboard.tsx` uses `|| 4` for status order fallback — `active` status has order `0`, which is falsy, so it incorrectly falls back to `4`. Should use `?? 4`. **Fixed in commit `3d9fc61` (Feb 20, 2026).**
 - **Commit**: `da8f16c`
 
 ### 112. E2E Test Hardening for Production Build Testing (Feb 19, 2026)
 - **Feature**: Hardened all 186 Playwright E2E tests for reliable production build testing
 - **Tests**: 186/186 Chromium pass against production build (`npx serve dist`)
 - **Commit**: `497aeec`
+
+### 113. sortPolicies() Status Ordering Bugfix (Fixed Feb 20, 2026)
+- **Problem**: `statusOrder[a.status] || 4` treated `active` (order `0`, falsy) as `4` (lowest priority), making active policies sort last instead of first
+- **Fix**: Changed `|| 4` to `?? 4` (nullish coalescing) in `src/components/PolicyDashboard.tsx:118`
+- **Test Update**: 2 assertions in `PolicyDashboard-branches.test.tsx` updated to match correct sort order (active first ascending, active last descending)
+- **File Changed**: `src/components/PolicyDashboard.tsx`
+- **Commit**: `3d9fc61`
+
+### 114. Migration 020 — Unsubscribe Translations Seeded (Feb 20, 2026)
+- **Feature**: Seeded 22 unsubscribe translation keys × 2 locales (EN/TR) into production Supabase
+- **Previously**: UnsubscribePage used hardcoded fallback strings from `translations.ts`; admin Translations tab could not manage these keys
+- **Applied**: Manually via Supabase SQL Editor (migration is idempotent — `ON CONFLICT DO NOTHING`)
+- **Version bump**: `translation_metadata` version bumped to `"3"` so clients refetch
+- **Migration file**: `supabase/migrations/020_seed_unsubscribe_translations.sql`
+
+### 115. CI Pipeline — Playwright E2E Tests (Added Feb 20, 2026)
+- **Feature**: GitHub Actions CI now runs Playwright E2E tests (Chromium) against the production build in both staging and production workflows
+- **Changes**:
+  - `staging.yml`: Added new `e2e-tests` job running in parallel with `validate`; `build` now gates on both passing
+  - `production.yml`: Fixed existing `e2e-tests` job — was running `npm run test:e2e:fast` (dev server); now builds and serves via `serve` + `wait-on`
+  - Both jobs use `E2E_BASE_URL=http://localhost:3000` so `playwright.config.ts` skips its built-in webServer
+  - Playwright report uploaded as artifact on failure for debugging
+  - `serve` and `wait-on` added as devDependencies for deterministic CI (no `npx` cold install)
+- **Files Changed**: `.github/workflows/staging.yml`, `.github/workflows/production.yml`, `package.json`
+- **Commit**: `68acec6`
+
+### 116. Branch Coverage Gap — Pending for Future Sessions (Ongoing)
+- **Status**: INCOMPLETE — these 3 high-impact files still need branch test coverage
+- **Do NOT delete this entry until all 3 are covered**
+- **Files and uncovered branch counts**:
+  - `server/routes/settings.ts` — ~379 uncovered branches
+  - `src/lib/ai/policy-extractor.ts` — ~329 uncovered branches
+  - `server/routes/ai.ts` — ~144 uncovered branches
+- **Why not done**: Previous session agents hit `max_tokens` limit on Write tool calls — these files are too large to test in a single file
+- **Strategy**: Split into multiple focused test files per function group (2-3 files per module), not one giant file per module
+- **Impact**: Completing settings.ts + policy-extractor.ts alone would add ~700 branches, pushing coverage from 83.7% toward 87%+
+- **Current branch coverage**: 83.69% — target is 85%+
 
 ---
 
@@ -4061,11 +4098,10 @@ connectSrc: [
 - The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
 - Not introduced by any session; it's a known React 19 + Vitest concurrency issue
 
-**Latent Bug — sortPolicies() Status Ordering:**
-- `PolicyDashboard.tsx` `sortPolicies()` uses `statusOrder[a.status] || 4` as fallback
-- `active` status has order `0`, which is falsy, so `0 || 4` evaluates to `4` — treating active policies as lowest priority
-- Should use `statusOrder[a.status] ?? 4` (nullish coalescing) instead of `||` (logical OR)
-- Discovered during branch coverage testing; not yet fixed (cosmetic — only affects sort order within status column)
+**Latent Bug — sortPolicies() Status Ordering (FIXED Feb 20, 2026):**
+- `PolicyDashboard.tsx` `sortPolicies()` used `statusOrder[a.status] || 4` as fallback
+- `active` status has order `0`, which is falsy, so `0 || 4` evaluated to `4` — treating active policies as lowest priority
+- **Fixed**: Changed to `statusOrder[a.status] ?? 4` (nullish coalescing) — commit `3d9fc61`
 
 **App Shell Skeleton in index.html:**
 - `index.html` contains an app shell skeleton inside `<div id="root">` with CSS class `.app-shell` and `@keyframes pulse`
