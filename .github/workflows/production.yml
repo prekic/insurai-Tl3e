@@ -88,7 +88,7 @@ jobs:
 
       - name: Run E2E tests against production build
         run: |
-          npx serve dist -l 3000 &
+          npx serve dist -l 3000 --single &
           npx wait-on http://localhost:3000 --timeout 30000
           npx playwright test --project=chromium
         env:
