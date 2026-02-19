@@ -134,25 +134,29 @@
         margin: 0;
         padding: 0;
       }
-      /* Prevent layout shift from loading indicator */
-      #root:empty::before {
-        content: '';
-        display: block;
-        width: 40px;
-        height: 40px;
-        margin: 40vh auto;
-        border: 3px solid #e5e7eb;
-        border-top-color: #3b82f6;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-      }
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
+      /* Skeleton placeholder matching above-the-fold landing page to prevent CLS.
+         Uses min-height: 100vh so the <body> dimensions stay stable when React mounts. */
+      .app-shell { min-height: 100vh; background: #f8fafc; }
+      .app-shell-nav { height: 64px; background: #fff; border-bottom: 1px solid #e5e7eb; }
+      .app-shell-hero { max-width: 1280px; margin: 0 auto; padding: 40px 16px; }
+      .app-shell-pulse { background: #e5e7eb; border-radius: 8px; animation: pulse 1.5s ease-in-out infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Static shell placeholder — replaced instantly when React mounts.
+           Matches the above-the-fold landing page layout to minimize CLS. -->
+      <div class="app-shell">
+        <div class="app-shell-nav"></div>
+        <div class="app-shell-hero">
+          <div class="app-shell-pulse" style="width:60%;height:48px;margin-bottom:16px"></div>
+          <div class="app-shell-pulse" style="width:80%;height:24px;margin-bottom:12px"></div>
+          <div class="app-shell-pulse" style="width:40%;height:24px;margin-bottom:32px"></div>
+          <div class="app-shell-pulse" style="width:200px;height:48px;border-radius:12px"></div>
+        </div>
+      </div>
+    </div>
     <!-- Defer module script to not block parsing -->
     <script type="module" src="/src/main.tsx"></script>
   </body>

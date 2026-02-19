@@ -104,7 +104,7 @@ export function ComparisonMockMobile() {
       <div className="p-4 space-y-3">
         {[
           { label: t.landing.comparisonBestCoverage, value: 'Allianz Kasko', color: 'text-blue-600' },
-          { label: t.landing.comparisonLowestPremium, value: 'AXA Kasko', color: 'text-green-600' },
+          { label: t.landing.comparisonLowestPremium, value: 'AXA Kasko', color: 'text-green-700' },
           { label: t.landing.comparisonAiPick, value: 'Allianz Kasko', color: 'text-purple-600' },
         ].map((item, i) => (
           <div key={i} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
@@ -115,7 +115,7 @@ export function ComparisonMockMobile() {
       </div>
 
       <div className="px-4 pb-4">
-        <p className="text-xs text-gray-400 text-center">{t.landing.comparisonDisclaimer}</p>
+        <p className="text-xs text-gray-500 text-center">{t.landing.comparisonDisclaimer}</p>
       </div>
     </div>
   )

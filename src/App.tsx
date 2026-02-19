@@ -12,10 +12,10 @@ import { PageTransition } from './components/animations/AnimatedComponents'
 import { PageLoader } from './components/PageLoader'
 import { ProtectedRoute } from './components/ProtectedRoute'
 
+// LandingPage loaded eagerly — it's the entry point, must render without Suspense CLS
+import { LandingPage } from './components/LandingPage'
+
 // Lazy-loaded route components for code splitting
-const LandingPage = lazy(() =>
-  import('./components/LandingPage').then((m) => ({ default: m.LandingPage }))
-)
 const PolicyUpload = lazy(() =>
   import('./components/PolicyUpload').then((m) => ({ default: m.PolicyUpload }))
 )
@@ -155,11 +155,7 @@ function AppContent() {
             <Routes location={location} key={location.pathname}>
               <Route
                 path="/"
-                element={
-                  <PageTransition>
-                    <LandingPage />
-                  </PageTransition>
-                }
+                element={<LandingPage />}
               />
               <Route
                 path="/auth"

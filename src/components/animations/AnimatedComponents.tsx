@@ -8,9 +8,9 @@ interface PageTransitionProps {
 export function PageTransition({ children }: PageTransitionProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
       transition={{ duration: 0.3 }}
       className="w-full max-w-[100vw] overflow-x-hidden"
     >
@@ -30,8 +30,8 @@ export function StaggeredList({ children, staggerDelay = 0.1 }: StaggeredListPro
       {children.map((child, index) => (
         <motion.div
           key={index}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: index * staggerDelay, duration: 0.4 }}
         >
           {child}
@@ -128,8 +128,8 @@ interface FadeInWhenVisibleProps {
 export function FadeInWhenVisible({ children }: FadeInWhenVisibleProps) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0 }}
+      whileInView={{ opacity: 1 }}
       viewport={{ once: true, margin: "-100px" }}
       transition={{ duration: 0.5 }}
     >
