@@ -115,7 +115,7 @@ export function PolicyDashboard() {
           break
         case 'status': {
           const statusOrder = { active: 0, expiring: 1, expired: 2, pending: 3 }
-          comparison = (statusOrder[a.status as keyof typeof statusOrder] || 4) - (statusOrder[b.status as keyof typeof statusOrder] || 4)
+          comparison = (statusOrder[a.status as keyof typeof statusOrder] ?? 4) - (statusOrder[b.status as keyof typeof statusOrder] ?? 4)
           break
         }
       }

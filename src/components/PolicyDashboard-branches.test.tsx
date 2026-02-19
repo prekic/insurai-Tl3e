@@ -581,15 +581,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       await user.click(statusSortBtn)
 
       rows = screen.getAllByRole('row').slice(1)
-      // Note: component uses `statusOrder[status] || 4` which treats active(0) as falsy → 4
-      // Actual order: expiring(1) < expired(2) < active(4)
-      // p3=expiring(POL-003), p2=expired(POL-002), p1=active(POL-001)
-      expect(rows[0].textContent).toContain('POL-003') // expiring (order 1)
-      expect(rows[1].textContent).toContain('POL-002') // expired (order 2)
-      expect(rows[2].textContent).toContain('POL-001') // active (order 4 due to 0||4)
+      // Correct order with ?? 4: active(0) < expiring(1) < expired(2)
+      // p1=active(POL-001), p3=expiring(POL-003), p2=expired(POL-002)
+      expect(rows[0].textContent).toContain('POL-001') // active (order 0)
+      expect(rows[1].textContent).toContain('POL-003') // expiring (order 1)
+      expect(rows[2].textContent).toContain('POL-002') // expired (order 2)
     })
 
-    it('sorts by status descending — active first (due to 0||4 fallback)', async () => {
+    it('sorts by status descending — expired first, active last', async () => {
       const user = userEvent.setup()
       renderDashboard()
 
@@ -600,10 +599,10 @@ describe('PolicyDashboard Branch Coverage', () => {
       await user.click(statusSortBtn) // desc
 
       const rows = screen.getAllByRole('row').slice(1)
-      // Descending reverses: active(4) > expired(2) > expiring(1)
-      expect(rows[0].textContent).toContain('POL-001') // active (order 4 due to 0||4)
-      expect(rows[1].textContent).toContain('POL-002') // expired (order 2)
-      expect(rows[2].textContent).toContain('POL-003') // expiring (order 1)
+      // Descending reverses: expired(2) > expiring(1) > active(0)
+      expect(rows[0].textContent).toContain('POL-002') // expired (order 2)
+      expect(rows[1].textContent).toContain('POL-003') // expiring (order 1)
+      expect(rows[2].textContent).toContain('POL-001') // active (order 0)
     })
 
     it('handles unknown status in sort ordering (falls back to 4)', async () => {
