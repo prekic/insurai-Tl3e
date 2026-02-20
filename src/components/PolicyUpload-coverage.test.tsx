@@ -1036,10 +1036,12 @@ describe('PolicyUpload Coverage', () => {
       const f2 = new File(['%PDF'], 'f2.pdf', { type: 'application/pdf' })
       Object.defineProperty(input, 'files', { value: [f1, f2], configurable: true })
       await act(async () => { fireEvent.change(input) })
-      // Wait for extraction errors to be processed
+      // Wait for extraction errors to be processed.
+      // processFileAsync has a 500ms upload animation before calling extractPolicy,
+      // and files are processed sequentially, so 2 files need ~1200ms — above the 1s default.
       await waitFor(() => {
         expect(mockExtractPolicy).toHaveBeenCalledTimes(2)
-      })
+      }, { timeout: 4000 })
       // Now "Retry All" should appear
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.upload.retryAll)).toBeInTheDocument()
