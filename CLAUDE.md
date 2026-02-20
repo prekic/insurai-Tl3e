@@ -9,8 +9,8 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**
-- **Production Readiness**: ~9.5/10 (14,960+ tests, 0 lint errors, 47 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**
+- **Production Readiness**: ~9.5/10 (14,960+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
 - **Last Updated**: February 20, 2026
 
 ---
@@ -3577,6 +3577,23 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Impact**: Completing settings.ts + policy-extractor.ts alone would add ~700 branches, pushing coverage from 83.7% toward 87%+
 - **Current branch coverage**: 83.69% — target is 85%+
 
+### 117. No-Non-Null-Assertion Warnings Eliminated (Fixed Feb 20, 2026)
+- **Problem**: Codebase had 47 `@typescript-eslint/no-non-null-assertion` warnings across 10+ files in `services/`, `packages/`, `server/`, and `src/`
+- **Root Cause**: Two patterns account for almost all warnings:
+  1. **`let x: T` assigned inside async callback** — TypeScript cannot narrow a `let` variable assigned inside `await runStage(..., async () => { x = ... })` because the assignment happens in a callback, not on the main flow. Fix: `let x!: T` (TypeScript's definite-assignment assertion — not flagged by ESLint's `no-non-null-assertion` rule).
+  2. **Optional property narrowed by `if` then referenced inside a closure** — TypeScript narrows `if (filters.startDate)` in the outer block but does NOT propagate that narrowing inside `.filter()` / `.map()` callbacks. Fix: `const startDate = filters.startDate` inside the `if` block captures the narrowed `string` type in a `const`, which the closure then closes over safely.
+- **Files fixed across 3 commits** (`dd5b86b`, `742eca0`, `d0153e1`):
+  - `services/workflow/src/workflows/ocr-pipeline.ts` — 18 warnings (7 `let x!: T` declarations + 16 expression `!` removed)
+  - `src/lib/admin/operations-logger.ts` — 10 warnings (5 × `startDate`/`endDate` closure pattern)
+  - `services/validate-svc/src/index.ts` — 3 warnings (early-return guard + `?? 0` nullish coalescing)
+  - `services/render-svc/src/index.ts` — 1 warning (merged `has()` + `get()` into single `get()` + undefined check)
+  - `services/ocr-orch/src/index.ts` — 1 warning (`if (!adapter) continue` guard)
+  - `server/middleware/admin-auth.ts` — 1 warning (extract `const adminUser` before `.every()` callback)
+  - `packages/rule-packs/src/index.ts` — 2 warnings (`!locale!` → `!locale`; throw on missing fallback)
+  - `src/lib/policy-evaluation/comparator.ts` — 2 warnings (`?.` + `?? 0` after `.filter()` chain)
+  - `services/layout-svc/src/index.ts` — 1 warning (extract to `const regionChildren`; removed `eslint-disable-next-line` comment)
+- **Result**: ESLint now at **0 errors, 0 warnings** across entire codebase
+
 ---
 
 ## Turkish Market Considerations
@@ -4076,7 +4093,12 @@ connectSrc: [
 **ESLint in Test Files After Coverage Push (Resolved Feb 19, 2026):**
 - The Feb 18-19 coverage push introduced 33+47=80 ESLint errors — all in test files (unused mock variables like `mockSelect`, `mockInsert`, etc.)
 - **All 80 errors resolved** in commits `3172796`, `b31547b`, `0856102` — prefixed unused mocks with `_`
-- Current ESLint status: **0 errors, 47 warnings** (all `no-non-null-assertion` in production code)
+- Current ESLint status: **0 errors, 0 warnings** — all `no-non-null-assertion` warnings resolved in Feb 20 session (see Known Issue #117)
+
+**Two TypeScript Closure-Narrowing Patterns (no-non-null-assertion root causes):**
+- **Pattern 1 — `let` assigned in async callback**: TypeScript cannot narrow a `let x: T` variable that is assigned inside `await runStage(..., async () => { x = result })`. The assignment happens in a callback, not on the main control-flow path. Fix: declare with a **definite-assignment assertion**: `let x!: T`. This is NOT flagged by ESLint's `no-non-null-assertion` rule (which targets postfix expression `x!`, not declaration-level `let x!: T`).
+- **Pattern 2 — optional property in closure**: `if (filters.startDate) { results.filter(r => r.timestamp >= filters.startDate!) }` — TypeScript narrows `filters.startDate` to `string` in the `if` body, but does NOT propagate that narrowing inside the `.filter()` arrow function. Fix: capture in a `const` before the callback: `const startDate = filters.startDate` — the closure closes over `startDate: string`.
+- Both patterns appear throughout `services/` and `src/lib/` — use these fixes rather than `!` when you encounter them.
 
 **CLS Prevention (Cumulative Layout Shift):**
 - The `index.html` contains an app shell skeleton inside `<div id="root">` that matches the above-the-fold landing page layout (nav bar + hero content placeholders). React replaces this on mount with zero layout shift.
@@ -4185,4 +4207,4 @@ npm run build:analyze
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 14,960 tests, all passing (304 test files), ~90% line coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Last Updated**: February 19, 2026
+**Last Updated**: February 20, 2026
