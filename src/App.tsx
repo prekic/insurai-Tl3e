@@ -1,9 +1,10 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AnimatePresence } from 'framer-motion'
-import { Toaster } from 'sonner'
+import { Toaster, toast } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { I18nProvider, useI18n } from './lib/i18n'
+import { onSyncComplete } from './lib/pwa'
 import { PolicyProvider } from './lib/policy-context'
 import { AuthProvider } from './lib/supabase/auth-context'
 import { AdminAuthProvider } from './lib/admin/context'
@@ -131,6 +132,21 @@ function AppContent() {
   useEffect(() => {
     window.scrollTo(0, 0)
   }, [location.pathname])
+
+  // Show toast when background sync completes (e.g., offline-queued uploads replay)
+  useEffect(() => {
+    const unsubscribe = onSyncComplete(({ synced }) => {
+      if (synced > 0) {
+        const label = synced === 1 ? t.upload.analysisComplete : t.upload.analysisComplete
+        toast.success(label, {
+          description: synced === 1
+            ? t.upload.savedToCloud
+            : `${synced} ${t.upload.savedToCloud}`,
+        })
+      }
+    })
+    return unsubscribe
+  }, [t.upload.analysisComplete, t.upload.savedToCloud])
 
   return (
     <ErrorBoundary>

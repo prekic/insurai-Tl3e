@@ -40,6 +40,7 @@ import { getAIConfig } from '../services/config-service.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
+import { sendExtractionCompleteNotification } from '../services/notification-service.js'
 
 const router = Router()
 
@@ -498,6 +499,15 @@ router.post(
       }
 
       log.info('Extraction successful', { requestId, inputTokens, outputTokens, cost: cost.totalCost })
+
+      // Fire push notification if user is authenticated (non-blocking fire-and-forget)
+      const notifyUserIdOAI = req.headers['x-user-id'] as string | undefined
+      if (notifyUserIdOAI) {
+        const extractedOAI = parsedData as Record<string, unknown>
+        sendExtractionCompleteNotification(notifyUserIdOAI, String(extractedOAI.policyType || 'policy'), (extractedOAI.policyNumber as string | null | undefined) ?? null)
+          .catch((err) => log.warn('Push notification failed after OpenAI extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+      }
+
       res.json({
         success: true,
         data: parsedData,
@@ -680,6 +690,14 @@ router.post(
         model: response.model,
         cost: cost.totalCost,
       })
+
+      // Fire push notification if user is authenticated (non-blocking fire-and-forget)
+      const notifyUserIdANT = req.headers['x-user-id'] as string | undefined
+      if (notifyUserIdANT) {
+        const extractedANT = parsedData as Record<string, unknown>
+        sendExtractionCompleteNotification(notifyUserIdANT, String(extractedANT.policyType || 'policy'), (extractedANT.policyNumber as string | null | undefined) ?? null)
+          .catch((err) => log.warn('Push notification failed after Anthropic extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
       const errorDetails = {
@@ -860,6 +878,15 @@ router.post(
         }).catch((err) => log.warn('Failed to record Anthropic usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
 
         log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
+
+        // Fire push notification if user is authenticated (non-blocking fire-and-forget)
+        const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
+        if (notifyUserIdUNI_ANT) {
+          const extractedUNI_ANT = parsedData as Record<string, unknown>
+          sendExtractionCompleteNotification(notifyUserIdUNI_ANT, String(extractedUNI_ANT.policyType || 'policy'), (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null)
+            .catch((err) => log.warn('Push notification failed after unified/Anthropic extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        }
+
         return res.json({
           success: true,
           data: parsedData,
@@ -988,6 +1015,15 @@ router.post(
         const isFallback = !!anthropicClient
         const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
         log.info('OpenAI extraction successful', { requestId, fallback: isFallback, fallbackReason: storedFallbackReason, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
+
+        // Fire push notification if user is authenticated (non-blocking fire-and-forget)
+        const notifyUserIdUNI_OAI = req.headers['x-user-id'] as string | undefined
+        if (notifyUserIdUNI_OAI) {
+          const extractedUNI_OAI = parsedOpenAIData as Record<string, unknown>
+          sendExtractionCompleteNotification(notifyUserIdUNI_OAI, String(extractedUNI_OAI.policyType || 'policy'), (extractedUNI_OAI.policyNumber as string | null | undefined) ?? null)
+            .catch((err) => log.warn('Push notification failed after unified/OpenAI extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        }
+
         return res.json({
           success: true,
           data: parsedOpenAIData,

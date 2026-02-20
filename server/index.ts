@@ -29,6 +29,8 @@ import settingsRoutes from './routes/settings.js'
 import webhookRoutes from './routes/webhooks.js'
 import driftRoutes from './routes/drift.js'
 import translationRoutes from './routes/translations.js'
+import notificationRoutes from './routes/notifications.js'
+import { configureWebPush } from './services/notification-service.js'
 import {
   generalLimiter,
   healthLimiter,
@@ -341,6 +343,9 @@ app.use('/api/email', emailRoutes)
 // Translation routes (public GET + admin CRUD)
 app.use('/api/translations', translationRoutes)
 
+// Push notification subscription routes (Web Push API / VAPID)
+app.use('/api/notifications', notificationRoutes)
+
 // 404 handler for API routes only
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'Not found' })
@@ -401,6 +406,9 @@ if (missingEnv.length > 0) {
 if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
   log.warn('No AI provider configured (OPENAI_API_KEY or ANTHROPIC_API_KEY) — extraction will not work')
 }
+
+// Configure Web Push VAPID for browser push notifications
+configureWebPush()
 
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling

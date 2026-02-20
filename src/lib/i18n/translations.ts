@@ -423,6 +423,8 @@ export interface TranslationDictionary {
     errorRateLimit: string
     errorRateLimitMsg: string
     errorRateLimitTip: string
+    errorOffline: string
+    errorOfflineMsg: string
     errorNetwork: string
     errorNetworkMsg: string
     errorNetworkTip: string
@@ -987,6 +989,16 @@ export interface TranslationDictionary {
     footer: string
   }
 
+  // Push notification opt-in prompt
+  notifications: {
+    promptTitle: string
+    promptBody: string
+    enableButton: string
+    maybeLater: string
+    permissionDenied: string
+    permissionDeniedHint: string
+  }
+
   // Coverage name translations (keyed by English name, value is locale-specific)
   coverageNames: Record<string, string>
 
@@ -1387,6 +1399,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     errorRateLimit: 'Rate Limit Exceeded',
     errorRateLimitMsg: 'Too many requests to the AI service.',
     errorRateLimitTip: 'Please wait a few minutes before trying again.',
+    errorOffline: 'You\'re Offline',
+    errorOfflineMsg: 'Your policy will be analyzed when you reconnect to the internet.',
     errorNetwork: 'Network Error',
     errorNetworkMsg: 'Could not connect to the backend server.',
     errorNetworkTip: 'Please check your internet connection and try again.',
@@ -1933,6 +1947,16 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     footer: 'InsurAI - Turkey\'s #1 Insurance Analysis Platform',
   },
 
+  // Push notification opt-in prompt
+  notifications: {
+    promptTitle: 'Get notified when your analysis is ready',
+    promptBody: 'We\'ll send a browser notification when your policy extraction completes — even if you close this tab.',
+    enableButton: 'Enable notifications',
+    maybeLater: 'Maybe later',
+    permissionDenied: 'Notifications blocked',
+    permissionDeniedHint: 'To enable, click the lock icon in your browser address bar and allow notifications.',
+  },
+
   // Coverage name translations (English identity map — generated from shared module)
   coverageNames: buildCoverageNamesIdentityMap(),
 
@@ -2359,6 +2383,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     errorRateLimit: 'İstek Limiti Aşıldı',
     errorRateLimitMsg: 'AI servisine çok fazla istek gönderildi.',
     errorRateLimitTip: 'Lütfen tekrar denemeden önce birkaç dakika bekleyin.',
+    errorOffline: 'Çevrimdışısınız',
+    errorOfflineMsg: 'İnternete yeniden bağlandığınızda poliçeniz analiz edilecek.',
     errorNetwork: 'Ağ Hatası',
     errorNetworkMsg: 'Arka uç sunucuya bağlanılamadı.',
     errorNetworkTip: 'Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.',
@@ -2903,6 +2929,16 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     pleaseTryLater: 'Lütfen daha sonra tekrar deneyin.',
     backToHome: 'Ana Sayfaya Dön',
     footer: 'InsurAI - Türkiye\'nin #1 Sigorta Analiz Platformu',
+  },
+
+  // Push notification opt-in prompt
+  notifications: {
+    promptTitle: 'Analiziniz hazır olduğunda bildirim alın',
+    promptBody: 'Poliçe çıkarma işleminiz tamamlandığında, bu sekmeyi kapatsanız bile tarayıcı bildirimi göndereceğiz.',
+    enableButton: 'Bildirimleri etkinleştir',
+    maybeLater: 'Belki daha sonra',
+    permissionDenied: 'Bildirimler engellendi',
+    permissionDeniedHint: 'Etkinleştirmek için tarayıcı adres çubuğundaki kilit simgesine tıklayın ve bildirimlere izin verin.',
   },
 
   // Coverage name translations (English → Turkish — from shared module)
