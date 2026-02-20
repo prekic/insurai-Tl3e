@@ -12,13 +12,16 @@ import { renderHook, act, waitFor } from '@testing-library/react'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const { mockUser, mockSession } = vi.hoisted(() => ({
-  mockUser: { id: 'user-123' },
-  mockSession: { access_token: 'token-abc' },
+// Mutable auth state — avoids vi.doMock/vi.resetModules() bleed between tests
+const { mockAuthState } = vi.hoisted(() => ({
+  mockAuthState: {
+    user: { id: 'user-123' } as { id: string } | null,
+    session: { access_token: 'token-abc' } as { access_token: string } | null,
+  },
 }))
 
 vi.mock('@/lib/supabase/auth-context', () => ({
-  useAuth: () => ({ user: mockUser, session: mockSession }),
+  useAuth: () => ({ user: mockAuthState.user, session: mockAuthState.session }),
 }))
 
 const {
@@ -70,8 +73,9 @@ function setPushSupported(supported: boolean): void {
   } else {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (window as any).PushManager
+    // Use delete so `'Notification' in window` returns false (assigning undefined still returns true)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    ;(globalThis as any).Notification = undefined
+    delete (globalThis as any).Notification
   }
 }
 
@@ -82,6 +86,9 @@ function setPushSupported(supported: boolean): void {
 describe('usePushNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset mutable auth state to defaults
+    mockAuthState.user = { id: 'user-123' }
+    mockAuthState.session = { access_token: 'token-abc' }
     setPushSupported(true)
     // Default: no existing subscription
     mockGetPushSubscription.mockResolvedValue(null)
@@ -120,8 +127,9 @@ describe('usePushNotifications', () => {
     })
 
     it('is false when Notification is missing', async () => {
+      // Must delete (not assign undefined) so `'Notification' in window` returns false
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ;(globalThis as any).Notification = undefined
+      delete (globalThis as any).Notification
       const { result } = await renderHookWithImport()
       expect(result.current.isSupported).toBe(false)
     })
@@ -181,13 +189,11 @@ describe('usePushNotifications', () => {
     })
 
     it('is false when user is null (not logged in)', async () => {
-      vi.doMock('@/lib/supabase/auth-context', () => ({
-        useAuth: () => ({ user: null, session: null }),
-      }))
-      vi.resetModules()
+      // Use mutable auth state to avoid vi.doMock/vi.resetModules() contamination
+      mockAuthState.user = null
+      mockAuthState.session = null
 
-      const { usePushNotifications } = await import('./usePushNotifications')
-      const { result } = renderHook(() => usePushNotifications())
+      const { result } = await renderHookWithImport()
 
       await waitFor(() => {
         expect(result.current.isSubscribed).toBe(false)

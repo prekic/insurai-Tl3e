@@ -22,10 +22,8 @@ const log = logger.child('NotificationService')
 // VAPID Configuration
 // ---------------------------------------------------------------------------
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY
-const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:contact@insurai.com'
-
+// Read env vars at call time (not module load time) so tests can set them
+// after import without needing to re-import the module.
 let webPushConfigured = false
 
 /**
@@ -33,7 +31,11 @@ let webPushConfigured = false
  * If VAPID keys are not set, push notifications will be silently skipped.
  */
 export function configureWebPush(): void {
-  if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+  const publicKey = process.env.VAPID_PUBLIC_KEY
+  const privateKey = process.env.VAPID_PRIVATE_KEY
+  const subject = process.env.VAPID_SUBJECT || 'mailto:contact@insurai.com'
+
+  if (!publicKey || !privateKey) {
     log.warn('VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY not set — push notifications disabled', {
       hint: 'Generate keys: node -e "const wp=require(\'web-push\'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"'
     })
@@ -41,7 +43,7 @@ export function configureWebPush(): void {
   }
 
   try {
-    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+    webpush.setVapidDetails(subject, publicKey, privateKey)
     webPushConfigured = true
     log.info('Web push VAPID configured successfully')
   } catch (error) {
@@ -52,7 +54,7 @@ export function configureWebPush(): void {
 }
 
 export function getVapidPublicKey(): string | null {
-  return VAPID_PUBLIC_KEY ?? null
+  return process.env.VAPID_PUBLIC_KEY ?? null
 }
 
 export function isWebPushConfigured(): boolean {

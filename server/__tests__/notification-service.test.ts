@@ -26,6 +26,7 @@ vi.mock('web-push', () => ({
 const {
   mockFrom,
   mockSelect,
+  mockSelectEq,
   mockEq,
   mockIn,
   mockDelete,
@@ -41,7 +42,9 @@ const {
     then: mockThen,
     catch: mockCatch,
   })
-  const mockSelect = vi.fn()
+  // mockSelectEq: resolves the select().eq() chain (data query)
+  const mockSelectEq = vi.fn().mockResolvedValue({ data: null, error: null })
+  const mockSelect = vi.fn().mockReturnValue({ eq: mockSelectEq })
   const mockDelete = vi.fn().mockReturnValue({ eq: mockEq })
   const mockFrom = vi.fn().mockReturnValue({
     select: mockSelect,
@@ -51,6 +54,7 @@ const {
   return {
     mockFrom,
     mockSelect,
+    mockSelectEq,
     mockEq,
     mockIn,
     mockDelete,
@@ -100,6 +104,18 @@ describe('notification-service', () => {
   beforeEach(async () => {
     vi.resetModules()
     vi.clearAllMocks()
+
+    // Re-establish Supabase mock chain after clearAllMocks wipes implementations
+    mockSelectEq.mockResolvedValue({ data: null, error: null })
+    mockSelect.mockReturnValue({ eq: mockSelectEq })
+    const mockEqForDelete = mockEq
+    mockEqForDelete.mockReturnValue({ in: mockIn, then: mockThen, catch: mockCatch })
+    mockIn.mockReturnValue({ then: mockThen, catch: mockCatch })
+    mockThen.mockReturnThis()
+    mockCatch.mockReturnThis()
+    mockDelete.mockReturnValue({ eq: mockEq })
+    mockFrom.mockReturnValue({ select: mockSelect, delete: mockDelete })
+    mockCreateClient.mockReturnValue({ from: mockFrom })
 
     // Reset env
     delete process.env.VAPID_PUBLIC_KEY
@@ -182,9 +198,7 @@ describe('notification-service', () => {
 
     it('returns the key when VAPID_PUBLIC_KEY is set', () => {
       process.env.VAPID_PUBLIC_KEY = 'my-public-key'
-      // Re-import needed because the key is read at module load time
-      // (We check the value indirectly via a fresh import in this test)
-      expect(service.getVapidPublicKey()).toBeNull() // current module loaded without it
+      expect(service.getVapidPublicKey()).toEqual('my-public-key')
     })
   })
 
@@ -246,7 +260,7 @@ describe('notification-service', () => {
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
       service.configureWebPush()
 
-      mockSelect.mockResolvedValueOnce({
+      mockSelectEq.mockResolvedValueOnce({
         data: null,
         error: { message: 'DB error' },
       })
@@ -262,7 +276,7 @@ describe('notification-service', () => {
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
       service.configureWebPush()
 
-      mockSelect.mockResolvedValueOnce({ data: [], error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: [], error: null })
 
       const result = await service.sendPushNotification(userId, payload)
       expect(result).toBe(0)
@@ -277,7 +291,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(3)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
       mockSendNotification.mockResolvedValue(undefined) // all succeed
 
       const result = await service.sendPushNotification(userId, payload)
@@ -293,7 +307,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(1)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
       mockSendNotification.mockResolvedValue(undefined)
 
       await service.sendPushNotification(userId, payload)
@@ -312,7 +326,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(1)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
       const err410 = Object.assign(new Error('Gone'), { statusCode: 410 })
       mockSendNotification.mockRejectedValueOnce(err410)
 
@@ -334,7 +348,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(1)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
       const err404 = Object.assign(new Error('Not Found'), { statusCode: 404 })
       mockSendNotification.mockRejectedValueOnce(err404)
 
@@ -354,7 +368,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(1)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
       const err500 = Object.assign(new Error('Server Error'), { statusCode: 500 })
       mockSendNotification.mockRejectedValueOnce(err500)
 
@@ -372,7 +386,7 @@ describe('notification-service', () => {
       service.configureWebPush()
 
       const subs = makeSubscriptions(3)
-      mockSelect.mockResolvedValueOnce({ data: subs, error: null })
+      mockSelectEq.mockResolvedValueOnce({ data: subs, error: null })
 
       // First succeeds, second fails with 410, third succeeds
       mockSendNotification
@@ -398,7 +412,7 @@ describe('notification-service', () => {
       process.env.SUPABASE_URL = 'https://test.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
       service.configureWebPush()
-      mockSelect.mockResolvedValue({ data: makeSubscriptions(1), error: null })
+      mockSelectEq.mockResolvedValue({ data: makeSubscriptions(1), error: null })
       mockSendNotification.mockResolvedValue(undefined)
     })
 
@@ -458,7 +472,7 @@ describe('notification-service', () => {
       process.env.SUPABASE_URL = 'https://test.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key'
       service.configureWebPush()
-      mockSelect.mockResolvedValue({ data: makeSubscriptions(1), error: null })
+      mockSelectEq.mockResolvedValue({ data: makeSubscriptions(1), error: null })
       mockSendNotification.mockResolvedValue(undefined)
     })
 
