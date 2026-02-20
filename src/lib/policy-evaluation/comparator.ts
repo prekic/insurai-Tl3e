@@ -651,8 +651,8 @@ export function compareCoverage(policies: Policy[], coverageName: string): {
     .filter(r => r.coverage?.included)
     .map(r => ({
       policyId: r.policyId,
-      limit: r.coverage!.limit,
-      deductible: r.coverage!.deductible,
+      limit: r.coverage?.limit ?? 0,
+      deductible: r.coverage?.deductible ?? 0,
     }))
 
   const notAvailable = results
