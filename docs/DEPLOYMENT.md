@@ -1,6 +1,9 @@
-# InsurAI Deployment Guide
+# InsurAI Deployment Guide — Alternative Options
 
-This guide covers deploying InsurAI to various environments.
+> **⚠️ This is a legacy guide** for Docker-based and alternative platform deployments (Vercel, Fly.io, AWS).
+> For the **current Railway monorepo production deployment**, see [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md).
+
+This guide covers alternative ways to deploy InsurAI beyond the primary Railway setup.
 
 ## Table of Contents
 

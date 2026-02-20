@@ -3615,6 +3615,37 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/pipeline/ocr-stats.ts:648` — `no-non-null-assertion`: `groups.get(key)!.push()` → extract to `const group`, guard with `if (group)`
 - **Result**: ESLint **0 errors, 0 warnings** — consistent with CLAUDE.md claim from Known Issue #117
 
+### 119. PWA Push Notification Architecture (Added Feb 20, 2026)
+- **Feature**: Full browser push notification system using Web Push API (VAPID)
+- **Server Infrastructure**:
+  - `server/services/notification-service.ts` — VAPID configuration, `sendPushNotification()` (fire-and-forget, auto-removes 410/404 stale subscriptions), `sendExtractionCompleteNotification()`, `sendPolicyExpiryNotification()`
+  - `server/routes/notifications.ts` — 4 endpoints (public-key, status, subscribe, unsubscribe) with `authLimiter` rate limiting
+  - `server/index.ts` — registers `/api/notifications` router
+  - `supabase/migrations/021_push_subscriptions.sql` — `push_subscriptions` table with RLS + index
+- **Server Notification Triggers**: `server/routes/ai.ts` fires `sendExtractionCompleteNotification()` after all 4 extraction success paths (OpenAI standalone, Anthropic standalone, unified/OpenAI, unified/Anthropic) — non-blocking fire-and-forget with `log.warn` on failure
+- **Client Infrastructure**:
+  - `src/hooks/usePushNotifications.ts` — hook: `isSupported`, `permission`, `isSubscribed`, `isLoading`, `subscribe()`, `unsubscribe()`
+  - `src/components/notifications/PushNotificationPrompt.tsx` — soft banner (not modal); shown after first successful upload in PolicyUpload; 7-day localStorage cooldown (`insurai_push_dismissed_until`); permission denied state; uses `t.notifications.*` i18n
+- **Background Sync + SYNC_COMPLETE**: `onSyncComplete()` subscriber callback in `src/lib/pwa/index.ts`; `App.tsx` shows toast when synced > 0; `PolicyUpload.tsx` checks `navigator.onLine` at upload start and falls back to `registerBackgroundSync('sync-policies')` when offline
+- **VAPID Key Generation** (one-time, run on first deploy):
+  ```bash
+  node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+  ```
+- **New Env Vars** (add to Railway + `.env.example`):
+  ```bash
+  VAPID_PUBLIC_KEY=...   # base64url ECDH public key
+  VAPID_PRIVATE_KEY=...  # base64url ECDH private key
+  VAPID_SUBJECT=mailto:contact@insurai.com
+  ```
+- **Graceful Degradation**: If VAPID keys are not set, `configureWebPush()` logs a warning and `sendPushNotification()` returns 0 — no crash, no broken uploads
+- **Test Files** (5 new files):
+  - `server/__tests__/notification-routes.test.ts` — all 4 endpoints, auth, validation
+  - `server/__tests__/notification-service.test.ts` — VAPID config, send, 410/404 stale cleanup
+  - `src/hooks/usePushNotifications.test.ts` — hook states, subscribe/unsubscribe flows
+  - `src/components/notifications/PushNotificationPrompt.test.tsx` — UI states, localStorage cooldown, permission denied
+  - `src/lib/pwa/push-notifications.test.ts` — onSyncComplete callbacks, SW message dispatch
+- **SW Cache**: Bumped to v20 (offline queue wiring changes SW behavior)
+
 ---
 
 ## Turkish Market Considerations
