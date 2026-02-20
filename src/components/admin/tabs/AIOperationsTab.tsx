@@ -328,7 +328,7 @@ export function AIOperationsTab() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyToClipboard(request.systemPrompt!, `system-${request.id}`)}
+                              onClick={() => copyToClipboard(request.systemPrompt ?? '', `system-${request.id}`)}
                             >
                               {copiedId === `system-${request.id}` ? (
                                 <Check className="h-4 w-4 text-green-500" />
@@ -374,7 +374,7 @@ export function AIOperationsTab() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => copyToClipboard(request.response!, `response-${request.id}`)}
+                              onClick={() => copyToClipboard(request.response ?? '', `response-${request.id}`)}
                             >
                               {copiedId === `response-${request.id}` ? (
                                 <Check className="h-4 w-4 text-green-500" />

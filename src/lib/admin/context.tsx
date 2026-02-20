@@ -98,7 +98,8 @@ export function AdminAuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = useCallback(async () => {
     const result = await adminApi.getCurrentUser()
     if (result.success && result.data) {
-      setState(prev => ({ ...prev, user: result.data! }))
+      const userData = result.data
+      setState(prev => ({ ...prev, user: userData }))
     }
   }, [])
 

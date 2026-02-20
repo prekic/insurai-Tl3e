@@ -128,7 +128,7 @@ export function MyAccount() {
     }
 
     loadProfile()
-  }, [useSupabase, user])
+  }, [useSupabase, user, t])
 
   const handleEdit = () => {
     setOriginalProfile({ ...profile })

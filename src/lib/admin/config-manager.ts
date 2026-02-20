@@ -282,7 +282,8 @@ export function getConfig(key: string, category?: ConfigCategory): unknown {
   const id = category ? `config-${category}-${key}` : null
 
   if (id && configs.has(id)) {
-    return configs.get(id)!.value
+    const entry = configs.get(id)
+    return entry?.value
   }
 
   // Search by key alone

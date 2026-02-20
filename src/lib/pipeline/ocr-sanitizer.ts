@@ -42,7 +42,7 @@ const TURKISH_UPPER_CHARS = 'ABCÇDEFGĞHIİJKLMNOÖPRSŞTUÜVYZÂÎÛ'
 
 // Create a Set of codepoints for fast lookup (Unicode-safe)
 const TURKISH_UPPER_CODEPOINTS = new Set(
-  [...TURKISH_UPPER_CHARS].map(c => c.codePointAt(0)!)
+  [...TURKISH_UPPER_CHARS].map(c => c.codePointAt(0) ?? 0)
 )
 
 // Also include basic A-Z codepoints (65-90)
