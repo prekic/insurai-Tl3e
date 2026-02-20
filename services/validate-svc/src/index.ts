@@ -256,7 +256,8 @@ export class Validator {
   // ============================================================================
 
   private runPolicyValidators(): void {
-    const policy = this.options.policyPack!
+    if (!this.options.policyPack) return
+    const policy = this.options.policyPack
 
     for (const [fieldPath, validators] of Object.entries(policy.validators)) {
       const field = this.context.fields.get(fieldPath)
@@ -313,7 +314,7 @@ export class Validator {
             })
           } else {
             // Range validation
-            if (validator.min !== undefined && parseResult.value! < validator.min) {
+            if (validator.min !== undefined && (parseResult.value ?? 0) < validator.min) {
               this.addResult({
                 severity: validator.severity,
                 code: 'VALUE_TOO_LOW',
@@ -327,7 +328,7 @@ export class Validator {
               })
             }
 
-            if (validator.max !== undefined && parseResult.value! > validator.max) {
+            if (validator.max !== undefined && (parseResult.value ?? 0) > validator.max) {
               this.addResult({
                 severity: validator.severity,
                 code: 'VALUE_TOO_HIGH',

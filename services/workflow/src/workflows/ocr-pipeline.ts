@@ -175,7 +175,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 3: RENDER PAGES
     // =========================================================================
-    let pageCount: number
+    let pageCount = 0
 
     await runStage(state, 'render', 'RENDERING', async () => {
       const result = await renderPages({
@@ -193,7 +193,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     await runStage(state, 'preprocess', 'PREPROCESSING', async () => {
       await preprocessPages({
         docId: input.docId,
-        pageCount: pageCount!,
+        pageCount: pageCount,
         variants: ['A', 'B', 'C', 'D'] as PreprocessVariant[],
       })
     })
@@ -208,7 +208,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     await runStage(state, 'layout', 'LAYOUT_ANALYSIS', async () => {
       const result = await analyzeLayout({
         docId: input.docId,
-        pageCount: pageCount!,
+        pageCount: pageCount,
       })
       regions = result.regions
     })
