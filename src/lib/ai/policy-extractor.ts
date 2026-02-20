@@ -772,6 +772,7 @@ export async function extractPolicyFromDocument(
         backend: 'document-ai',
       })
       const formFieldMap = extractFormFieldMap(ocrFormFields)
+      const narrowedFormFields = ocrFormFields
 
       if (import.meta.env.DEV) {
         console.warn('[Document AI] Form field map:', formFieldMap)
@@ -783,7 +784,7 @@ export async function extractPolicyFromDocument(
         currentValue: string | number | null | undefined,
         minConfidence = 0.7
       ): string | undefined => {
-        const field = findFormField(ocrFormFields!, patterns)
+        const field = findFormField(narrowedFormFields, patterns)
         if (field && field.confidence >= minConfidence && field.value) {
           formFieldsUsed++
           return field.value

@@ -9,8 +9,8 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**
-- **Production Readiness**: ~9.5/10 (14,960+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**
+- **Production Readiness**: ~9.5/10 (15,316+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
 - **Last Updated**: February 20, 2026
 
 ---
@@ -1219,10 +1219,10 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 19, 2026)
-- **Total**: 14,960 tests across 304 test files (18 skipped)
+- **Total**: 15,316 tests across 312 test files (18 skipped)
 - **Passing**: 100% (0 failures)
-- **Coverage**: ~90% statements, ~84% branches, ~88% functions, ~90% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches (PolicyDetailView, PolicyDashboard, medium-impact components, library modules). Plus 12 TTL validation tests added Feb 19.
+- **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches).
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3565,17 +3565,14 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `.github/workflows/staging.yml`, `.github/workflows/production.yml`, `package.json`
 - **Commit**: `68acec6`
 
-### 116. Branch Coverage Gap — Pending for Future Sessions (Ongoing)
-- **Status**: INCOMPLETE — these 3 high-impact files still need branch test coverage
-- **Do NOT delete this entry until all 3 are covered**
-- **Files and uncovered branch counts**:
-  - `server/routes/settings.ts` — ~379 uncovered branches
-  - `src/lib/ai/policy-extractor.ts` — ~329 uncovered branches
-  - `server/routes/ai.ts` — ~144 uncovered branches
-- **Why not done**: Previous session agents hit `max_tokens` limit on Write tool calls — these files are too large to test in a single file
-- **Strategy**: Split into multiple focused test files per function group (2-3 files per module), not one giant file per module
-- **Impact**: Completing settings.ts + policy-extractor.ts alone would add ~700 branches, pushing coverage from 83.7% toward 87%+
-- **Current branch coverage**: 83.69% — target is 85%+
+### 116. Branch Coverage Gap — Resolved (Feb 20, 2026)
+- **Status**: ✅ RESOLVED — all 3 high-impact files now covered
+- **Files covered** (8 focused test files, 15,316 tests, 85.91% branches):
+  - `server/routes/settings.ts` — `settings-routes-export-import.test.ts`, `settings-routes-batch-update.test.ts`, `settings-routes-crud-operations.test.ts`
+  - `src/lib/ai/policy-extractor.ts` — `policy-extractor-conversion.test.ts`, `policy-extractor-validation.test.ts`, `policy-extractor-ocr.test.ts`
+  - `server/routes/ai.ts` — `ai-extraction-routes-branches.test.ts`, `ai-chat-ocr-diagnose-logs.test.ts`
+- **Branch coverage**: 83.69% → **85.91%** (target 85%+ ✓)
+- **Commit**: `aaf441b`
 
 ### 117. No-Non-Null-Assertion Warnings Eliminated (Fixed Feb 20, 2026)
 - **Problem**: Codebase had 47 `@typescript-eslint/no-non-null-assertion` warnings across 10+ files in `services/`, `packages/`, `server/`, and `src/`
@@ -3593,6 +3590,20 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/policy-evaluation/comparator.ts` — 2 warnings (`?.` + `?? 0` after `.filter()` chain)
   - `services/layout-svc/src/index.ts` — 1 warning (extract to `const regionChildren`; removed `eslint-disable-next-line` comment)
 - **Result**: ESLint now at **0 errors, 0 warnings** across entire codebase
+
+### 118. Residual ESLint Warnings Cleared — 9 Warnings in Branch (Fixed Feb 20, 2026)
+- **Problem**: 9 ESLint warnings persisted in `claude/review-handoff-docs-JGCWm` branch that were not covered by Known Issue #117 (those fixes targeted different files)
+- **Root Cause**: The warnings existed in files never touched by the prior no-non-null-assertion cleanup session; `react-hooks/exhaustive-deps` warnings were also new from i18n and settings work
+- **Files Fixed** (9 warnings → 0):
+  - `src/components/MyAccount.tsx:131` — `react-hooks/exhaustive-deps`: added `t` to useEffect deps (locale-aware error message)
+  - `src/components/admin/tabs/AIOperationsTab.tsx:331,377` — `no-non-null-assertion`: `request.systemPrompt!` and `request.response!` inside JSX conditionals → `?? ''`
+  - `src/components/admin/tabs/settings/AISettingsPanel.tsx:122` — `react-hooks/exhaustive-deps`: wrapped `getSettingByKey` with `useCallback([settings])`, added to effect deps
+  - `src/lib/admin/config-manager.ts:285` — `no-non-null-assertion`: `configs.get(id)!.value` → extract to `const entry`, use `entry?.value`
+  - `src/lib/admin/context.tsx:101` — `no-non-null-assertion`: `result.data!` inside guarded `if` → extract to `const userData`
+  - `src/lib/ai/policy-extractor.ts:786` — `no-non-null-assertion`: `ocrFormFields!` inside inner closure → capture narrowed value as `const narrowedFormFields`
+  - `src/lib/pipeline/ocr-sanitizer.ts:45` — `no-non-null-assertion`: `codePointAt(0)!` → `?? 0`
+  - `src/lib/pipeline/ocr-stats.ts:648` — `no-non-null-assertion`: `groups.get(key)!.push()` → extract to `const group`, guard with `if (group)`
+- **Result**: ESLint **0 errors, 0 warnings** — consistent with CLAUDE.md claim from Known Issue #117
 
 ---
 
@@ -4205,6 +4216,6 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 14,960 tests, all passing (304 test files), ~90% line coverage
+**Tests**: 15,316 tests, all passing (312 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Last Updated**: February 20, 2026

@@ -3,7 +3,7 @@
  * Configure AI providers, models, temperatures, and extraction settings
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,9 +98,9 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
   const [editReason, setEditReason] = useState<string>('')
   const [validationError, setValidationError] = useState<ValidationResult | null>(null)
 
-  const getSettingByKey = (key: string): SettingValue | undefined => {
+  const getSettingByKey = useCallback((key: string): SettingValue | undefined => {
     return settings.find((s) => s.key === key)
-  }
+  }, [settings])
 
   const handleEdit = (setting: SettingValue) => {
     setEditingKey(setting.key)
@@ -119,7 +119,7 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
         setValidationError(result.valid ? null : result)
       }
     }
-  }, [editingKey, editValue])
+  }, [editingKey, editValue, getSettingByKey])
 
   const handleSave = async (setting: SettingValue) => {
     // Final validation before save

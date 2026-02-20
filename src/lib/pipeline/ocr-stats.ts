@@ -645,7 +645,8 @@ function groupExecutionsByTime(
     if (!groups.has(key)) {
       groups.set(key, [])
     }
-    groups.get(key)!.push(exec)
+    const group = groups.get(key)
+    if (group) group.push(exec)
   }
 
   // Sort by key

@@ -1,4 +1,4 @@
-# Session Handoff — February 20, 2026 (Branch Coverage Push Session)
+# Session Handoff — February 20, 2026 (Branch Coverage + ESLint Cleanup)
 
 ## Current Status
 
@@ -7,7 +7,7 @@
 | **Build** | Passing (both frontend and server) |
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
-| **ESLint Warnings** | 9 warnings (pre-existing in branch, under --max-warnings 47 limit) |
+| **ESLint Warnings** | **0 warnings** ✓ (9 residual warnings cleared in follow-up — Known Issue #118) |
 | **Tests** | 15,316 passing (312 test files), 0 production failures |
 | **E2E Tests** | 186/186 Chromium passed (production build) |
 | **Coverage** | 91.67% statements, **85.91% branches ✓**, 88.77% functions, 92.5% lines |
@@ -48,7 +48,7 @@ This session pushed branch coverage from **83.69% → 85.91%** by creating 8 foc
 
 | Commit | Description | Files |
 |--------|-------------|-------|
-| *(pending push)* | Branch coverage push: 83.69% → 85.91% (8 new test files, 356 new tests) | 9 files |
+| `aaf441b` | Branch coverage push: 83.69% → 85.91% (8 new test files, ~407 new tests) | 9 files |
 
 ---
 
@@ -91,7 +91,7 @@ The persistent TODO from Known Issue #116 is now complete:
 | Local Lighthouse Performance 39-45 | Info | Expected | Sandbox CPU throttling; production score is 99 |
 | sortPolicies() `\|\| 4` bug | Low | **Fixed** | `?? 4` in PolicyDashboard.tsx — commit `3d9fc61` |
 | Migration 020 | Medium | **Applied** | Unsubscribe translations in production Supabase |
-| 47 ESLint warnings | Low | **Resolved** | All `no-non-null-assertion` — fixed in prior session (9 pre-existing remain in this branch) |
+| 9 residual ESLint warnings | Low | **✅ RESOLVED** | Cleared in follow-up session — 0 warnings confirmed (Known Issue #118) |
 
 ---
 
@@ -114,19 +114,22 @@ The persistent TODO from Known Issue #116 is now complete:
 
 ## Next Steps (Priority Order)
 
-### Medium Priority
-1. **Set up GitHub Secrets for CI E2E** — Add `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY` to GitHub repo settings for E2E builds with real Supabase config
-
 ### Low Priority
-2. **Real user testimonials** — Replace use-case scenario cards on landing page when real users provide quotes
-3. **PWA enhancements** — Offline support, push notifications
+1. **Real user testimonials** — Replace use-case scenario cards on landing page when real users provide quotes
+2. **PWA enhancements** — Offline support, push notifications
+
+### Completed in Follow-up Session (Feb 20, 2026)
+- ✅ **GitHub Secrets confirmed** — All 4 present: `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `PROD_SUPABASE_URL`, `PROD_SUPABASE_ANON_KEY`
+- ✅ **Known Issue #116 CLAUDE.md updated** — Entry changed from INCOMPLETE to RESOLVED with commit hash and coverage stats
+- ✅ **9 ESLint warnings cleared** — See Known Issue #118: `MyAccount.tsx`, `AIOperationsTab.tsx`, `AISettingsPanel.tsx`, `config-manager.ts`, `context.tsx`, `policy-extractor.ts`, `ocr-sanitizer.ts`, `ocr-stats.ts`
+- ✅ **SESSION_HANDOFF.md commit hash finalized** — `aaf441b` replacing `(pending push)`
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Full validation — should show 0 errors, 9 warnings (all pre-existing)
+# Full validation — should show 0 errors, 0 warnings
 npm run validate  # typecheck + lint + test
 
 # ESLint only (confirm 0 errors)
