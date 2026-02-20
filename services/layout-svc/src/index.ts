@@ -852,8 +852,8 @@ export class LayoutAnalyzer {
     // Assign child reading order within tables
     for (const region of regions) {
       if (region.children) {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-        const children = regions.filter(r => region.children!.includes(r.id))
+        const regionChildren = region.children
+        const children = regions.filter(r => regionChildren.includes(r.id))
         children.sort((a, b) => {
           const yDiff = a.bbox.y - b.bbox.y
           if (Math.abs(yDiff) > 10) return yDiff

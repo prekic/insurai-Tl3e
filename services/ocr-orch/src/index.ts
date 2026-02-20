@@ -1050,7 +1050,8 @@ export class OCROrchestrator {
     const tasks: Promise<OCRResult | null>[] = []
 
     for (const engine of availableEngines) {
-      const adapter = this.adapters.get(engine)!
+      const adapter = this.adapters.get(engine)
+      if (!adapter) continue
 
       for (const region of regions || [{ id: 'full', pageNo: 1, type: 'page' }]) {
         const imageUrl = this.getImageUrl(docId, region.pageNo, variant, region.bbox)

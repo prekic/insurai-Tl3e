@@ -210,10 +210,12 @@ export function getAIRequests(filters?: {
       results = results.filter((r) => r.userId === filters.userId)
     }
     if (filters.startDate) {
-      results = results.filter((r) => r.timestamp >= filters.startDate!)
+      const startDate = filters.startDate
+      results = results.filter((r) => r.timestamp >= startDate)
     }
     if (filters.endDate) {
-      results = results.filter((r) => r.timestamp <= filters.endDate!)
+      const endDate = filters.endDate
+      results = results.filter((r) => r.timestamp <= endDate)
     }
   }
 
@@ -318,10 +320,12 @@ export function getPolicyOperations(filters?: {
       results = results.filter((o) => o.status === filters.status)
     }
     if (filters.startDate) {
-      results = results.filter((o) => o.timestamp >= filters.startDate!)
+      const startDate = filters.startDate
+      results = results.filter((o) => o.timestamp >= startDate)
     }
     if (filters.endDate) {
-      results = results.filter((o) => o.timestamp <= filters.endDate!)
+      const endDate = filters.endDate
+      results = results.filter((o) => o.timestamp <= endDate)
     }
   }
 
@@ -383,10 +387,12 @@ export function getUserActivities(filters?: {
       results = results.filter((a) => a.action === filters.action)
     }
     if (filters.startDate) {
-      results = results.filter((a) => a.timestamp >= filters.startDate!)
+      const startDate = filters.startDate
+      results = results.filter((a) => a.timestamp >= startDate)
     }
     if (filters.endDate) {
-      results = results.filter((a) => a.timestamp <= filters.endDate!)
+      const endDate = filters.endDate
+      results = results.filter((a) => a.timestamp <= endDate)
     }
   }
 
@@ -465,10 +471,12 @@ export function getSecurityLogs(filters?: {
       results = results.filter((l) => l.resolved === filters.resolved)
     }
     if (filters.startDate) {
-      results = results.filter((l) => l.timestamp >= filters.startDate!)
+      const startDate = filters.startDate
+      results = results.filter((l) => l.timestamp >= startDate)
     }
     if (filters.endDate) {
-      results = results.filter((l) => l.timestamp <= filters.endDate!)
+      const endDate = filters.endDate
+      results = results.filter((l) => l.timestamp <= endDate)
     }
   }
 
@@ -552,10 +560,12 @@ export function getAuditLogs(filters?: {
       results = results.filter((l) => l.resourceId === filters.resourceId)
     }
     if (filters.startDate) {
-      results = results.filter((l) => l.timestamp >= filters.startDate!)
+      const startDate = filters.startDate
+      results = results.filter((l) => l.timestamp >= startDate)
     }
     if (filters.endDate) {
-      results = results.filter((l) => l.timestamp <= filters.endDate!)
+      const endDate = filters.endDate
+      results = results.filter((l) => l.timestamp <= endDate)
     }
   }
 

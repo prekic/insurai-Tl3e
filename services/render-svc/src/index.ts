@@ -132,8 +132,9 @@ export class PDFRenderer {
 
     // Check cache
     const cacheKey = this.getRegionCacheKey(docId, pageNo, regionId, dpi)
-    if (config.cache.enabled && this.renderingQueue.has(cacheKey)) {
-      return this.renderingQueue.get(cacheKey)!
+    const cached = this.renderingQueue.get(cacheKey)
+    if (config.cache.enabled && cached !== undefined) {
+      return cached
     }
 
     // Render region

@@ -522,8 +522,9 @@ export function requirePermission(...requiredPermissions: string[]) {
     }
 
     // Check specific permissions
+    const adminUser = req.adminUser
     const hasAllPermissions = requiredPermissions.every(
-      (perm) => req.adminUser!.permissions.includes(perm)
+      (perm) => adminUser.permissions.includes(perm)
     )
 
     if (!hasAllPermissions) {

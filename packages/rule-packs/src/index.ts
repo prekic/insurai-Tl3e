@@ -204,7 +204,7 @@ export function selectRulePacks(
   }
 
   // Auto-detect locale if not hinted
-  if (!locale!) {
+  if (!locale) {
     const detected = detectLocale(input.text)
     const detectedPack = registry.getLocalePack(detected.locale)
 
@@ -213,7 +213,9 @@ export function selectRulePacks(
       confidence = detected.confidence
       detectionMethod = 'auto'
     } else {
-      locale = registry.getLocalePack('fallback')!
+      const fallbackPack = registry.getLocalePack('fallback')
+      if (!fallbackPack) throw new Error('Fallback locale pack is not registered')
+      locale = fallbackPack
       confidence = 0.5
       detectionMethod = 'fallback'
     }
