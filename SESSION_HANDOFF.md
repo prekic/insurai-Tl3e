@@ -50,6 +50,7 @@ This session pushed branch coverage from **83.69% → 85.91%** by creating 8 foc
 |--------|-------------|-------|
 | `aaf441b` | Branch coverage push: 83.69% → 85.91% (8 new test files, ~407 new tests) | 9 files |
 | `922079f` | Fix 9 residual ESLint warnings + update CLAUDE.md/SESSION_HANDOFF.md (Known Issue #118) | 10 files |
+| `878b44a` | docs: finalize SESSION_HANDOFF.md — add 922079f to commits table, correct footer | 1 file |
 
 ---
 
@@ -88,7 +89,7 @@ The persistent TODO from Known Issue #116 is now complete:
 |-------|----------|--------|-------|
 | Branch coverage gaps (3 files) | Medium | **✅ RESOLVED** | 85.91% achieved — see above |
 | 33 E2E failures without backend | Low | Expected | API tests need live Express server + Supabase credentials |
-| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx (React 19 + Vitest concurrency) |
+| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx (React 19 + Vitest concurrency); all 312 files pass individually |
 | Local Lighthouse Performance 39-45 | Info | Expected | Sandbox CPU throttling; production score is 99 |
 | sortPolicies() `\|\| 4` bug | Low | **Fixed** | `?? 4` in PolicyDashboard.tsx — commit `3d9fc61` |
 | Migration 020 | Medium | **Applied** | Unsubscribe translations in production Supabase |

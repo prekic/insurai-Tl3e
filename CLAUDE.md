@@ -349,12 +349,22 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=AIza...
 NODE_ENV=development
 SENTRY_DSN=https://xxx@sentry.io/xxx
+
+# Server-side Supabase — REQUIRED for admin panel and service-role operations
+# (same URL as VITE_SUPABASE_URL, different key)
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbG...   # Service role key (NOT anon key) — from Supabase Project Settings → API
+
+# Admin auth — REQUIRED for admin login
+# Generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+ADMIN_JWT_SECRET=your-random-64-char-hex-secret
 ```
 
 **CRITICAL RULES**:
 1. API keys must NEVER have `VITE_` prefix - they stay server-side only
 2. Server uses `.env` file (not `.env.local`)
 3. In development, Vite proxy handles `/api/*` requests automatically
+4. `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` + `ADMIN_JWT_SECRET` are required to use the admin panel locally; without them admin login returns 500 (diagnose at `/api/admin/diagnostics`)
 
 ---
 
@@ -4127,7 +4137,7 @@ connectSrc: [
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
 - This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
-- All 304 test files pass; `PolicyUpload.test.tsx` passes when run individually
+- All 312 test files pass; `PolicyUpload.test.tsx` passes when run individually
 - The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
 - Not introduced by any session; it's a known React 19 + Vitest concurrency issue
 
