@@ -161,7 +161,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 2: DETECT LOCALE AND POLICY TYPE
     // =========================================================================
-    let detectionResult: { locale: string; policyType: string | null; confidence: number }
+    let detectionResult!: { locale: string; policyType: string | null; confidence: number }
 
     await runStage(state, 'ingest', 'INGESTED', async () => {
       detectionResult = await detectLocaleAndPolicyType({
@@ -203,7 +203,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 5: LAYOUT ANALYSIS
     // =========================================================================
-    let regions: Array<{ id: string; pageNo: number; type: string }>
+    let regions!: Array<{ id: string; pageNo: number; type: string }>
 
     await runStage(state, 'layout', 'LAYOUT_ANALYSIS', async () => {
       const result = await analyzeLayout({
@@ -219,13 +219,13 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // STAGE 6: ENSEMBLE OCR
     // =========================================================================
     const engines: OCREngine[] = input.hints?.forceEngines || ['abbyy', 'gcp_docai', 'azure_di']
-    let ocrResults: Array<{ engine: OCREngine; resultKey: string }>
+    let ocrResults!: Array<{ engine: OCREngine; resultKey: string }>
 
     await runStage(state, 'ocr', 'OCR_IN_PROGRESS', async () => {
       // Run OCR with all engines in parallel (handled by activity)
       ocrResults = await runOCR({
         docId: input.docId,
-        regions: regions!,
+        regions: regions,
         engines,
         variant: 'A', // Start with variant A
       })
@@ -236,14 +236,14 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 7: RECONCILE
     // =========================================================================
-    let reconcileResult: ReconcileResult
+    let reconcileResult!: ReconcileResult
     let targetedReOCRCount = 0
     const MAX_TARGETED_REOCR = 2
 
     await runStage(state, 'reconcile', 'RECONCILING', async () => {
       reconcileResult = await reconcileOCRResults({
         docId: input.docId,
-        ocrResultKeys: ocrResults!.map(r => r.resultKey),
+        ocrResultKeys: ocrResults.map(r => r.resultKey),
       })
 
       // Targeted re-OCR if needed
@@ -261,7 +261,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
         const variant = (['B', 'C', 'D'] as PreprocessVariant[])[targetedReOCRCount - 1] || 'B'
         const reOCRResults = await runOCR({
           docId: input.docId,
-          regions: regions!.filter(r => reconcileResult.targetedRegions.includes(r.id)),
+          regions: regions.filter(r => reconcileResult.targetedRegions.includes(r.id)),
           engines,
           variant,
         })
@@ -269,7 +269,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
         // Re-reconcile
         reconcileResult = await reconcileOCRResults({
           docId: input.docId,
-          ocrResultKeys: [...ocrResults!.map(r => r.resultKey), ...reOCRResults.map(r => r.resultKey)],
+          ocrResultKeys: [...ocrResults.map(r => r.resultKey), ...reOCRResults.map(r => r.resultKey)],
         })
       }
     })
@@ -284,8 +284,8 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     await runStage(state, 'normalize', 'NORMALIZING', async () => {
       _normalizeResult = await normalizeText({
         docId: input.docId,
-        locale: detectionResult!.locale,
-        policyType: detectionResult!.policyType,
+        locale: detectionResult.locale,
+        policyType: detectionResult.policyType,
       })
     })
 
@@ -294,13 +294,13 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 9: VALIDATE
     // =========================================================================
-    let validationResult: ValidationGateResult
+    let validationResult!: ValidationGateResult
 
     await runStage(state, 'validate', 'VALIDATING', async () => {
       validationResult = await validateDocument({
         docId: input.docId,
-        locale: detectionResult!.locale,
-        policyType: detectionResult!.policyType,
+        locale: detectionResult.locale,
+        policyType: detectionResult.policyType,
       })
 
       // Check for quarantine
@@ -319,13 +319,13 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 10: EXTRACT
     // =========================================================================
-    let extractionResult: ExtractionResult
+    let extractionResult!: ExtractionResult
 
     await runStage(state, 'extract', 'EXTRACTING', async () => {
       extractionResult = await extractFields({
         docId: input.docId,
-        locale: detectionResult!.locale,
-        policyType: detectionResult!.policyType,
+        locale: detectionResult.locale,
+        policyType: detectionResult.policyType,
       })
     })
 
@@ -334,7 +334,7 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
     // =========================================================================
     // STAGE 11: FINALIZE
     // =========================================================================
-    let auditBundle: { key: string; checksums: Record<string, string> }
+    let auditBundle!: { key: string; checksums: Record<string, string> }
 
     await runStage(state, 'finalize', 'COMPLETED', async () => {
       auditBundle = await generateAuditBundle({
@@ -345,15 +345,15 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
       await updateDocumentStatus({
         docId: input.docId,
         status: 'COMPLETED',
-        qualityScore: Math.round(validationResult!.overallConfidence * 100),
+        qualityScore: Math.round(validationResult.overallConfidence * 100),
       })
     })
 
     // Calculate quality score
     const qualityScore = Math.round(
-      (validationResult!.overallConfidence * 0.4 +
-        reconcileResult!.agreementRatio * 0.3 +
-        extractionResult!.completeness * 0.3) * 100
+      (validationResult.overallConfidence * 0.4 +
+        reconcileResult.agreementRatio * 0.3 +
+        extractionResult.completeness * 0.3) * 100
     )
 
     return {
@@ -362,8 +362,8 @@ export async function ocrPipelineWorkflow(input: OCRPipelineInput): Promise<OCRP
       qualityScore,
       finalTextKey: `s3://insurai/${input.tenantId}/${input.docId}/final/text.txt`,
       finalDocumentKey: `s3://insurai/${input.tenantId}/${input.docId}/final/document.json`,
-      auditBundleKey: auditBundle!.key,
-      extractedFieldsCount: extractionResult!.fields.length,
+      auditBundleKey: auditBundle.key,
+      extractedFieldsCount: extractionResult.fields.length,
       processingTimeMs: Date.now() - state.startTime,
     }
 
