@@ -3336,7 +3336,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Commit**: `2c4b057`
 
 ### 95. Service Worker Cache v19 (Feb 12, 2026)
-- **Change**: Bumped service worker cache version from v18 to v19
+- **Change**: Bumped service worker cache version from v18 to v19 (later bumped to v20 for push notifications)
 - **Purpose**: Force cache invalidation after translation system deployment
 - **File Changed**: `public/sw.js`
 - **Commit**: `7277e9c`
@@ -3751,7 +3751,7 @@ Verified production Railway deployment (`insurai-production.up.railway.app`) wit
 - **Production Deployment Verified**:
   - HTML: `Cache-Control: no-cache, no-store, must-revalidate` ✅
   - Hashed assets: `Cache-Control: max-age=31536000, immutable` ✅
-  - Service worker: `no-cache` ✅ (CACHE_VERSION v19)
+  - Service worker: `no-cache` ✅ (CACHE_VERSION v20)
   - App shell skeleton in `<div id="root">` ✅
   - HSTS header: `max-age=31536000; includeSubDomains` ✅
   - Opacity-only animations (no y/x CLS-causing transforms) ✅
@@ -4009,7 +4009,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v19)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v20)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
