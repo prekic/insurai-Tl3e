@@ -35,7 +35,7 @@ function getCurrentUserId(): string {
  * Implements caching for cost reduction (~60% savings on repeated documents)
  * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
-export async function extractWithOpenAI(documentText: string): Promise<ExtractedPolicyData> {
+export async function extractWithOpenAI(documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.openai.extractionModel
 
@@ -113,7 +113,7 @@ export async function extractWithOpenAI(documentText: string): Promise<Extracted
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
       console.warn('[OpenAI Extract] Using proxy, calling extractViaProxy...')
-      const proxyResult = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT)
+      const proxyResult = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT, notifyUserId)
 
       console.warn('[OpenAI Extract] Proxy response received:', {
         success: proxyResult.success,

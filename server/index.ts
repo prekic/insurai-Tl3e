@@ -30,6 +30,7 @@ import webhookRoutes from './routes/webhooks.js'
 import driftRoutes from './routes/drift.js'
 import translationRoutes from './routes/translations.js'
 import notificationRoutes from './routes/notifications.js'
+import internalRoutes from './routes/internal.js'
 import { configureWebPush } from './services/notification-service.js'
 import {
   generalLimiter,
@@ -345,6 +346,7 @@ app.use('/api/translations', translationRoutes)
 
 // Push notification subscription routes (Web Push API / VAPID)
 app.use('/api/notifications', notificationRoutes)
+app.use('/api/internal', internalRoutes)
 
 // 404 handler for API routes only
 app.use('/api', (_req, res) => {
