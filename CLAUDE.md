@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**
-- **Production Readiness**: ~9.5/10 (15,316+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 20, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**
+- **Production Readiness**: ~9.5/10 (15,428+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 21, 2026
 
 ---
 
@@ -195,6 +195,15 @@ insurai/
 | `server/middleware/validation.ts` | Zod schemas for request validation |
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `server/lib/sentry.ts` | Sentry error tracking setup |
+
+### Push Notifications (Added Feb 20-21, 2026)
+| File | Purpose |
+|------|---------|
+| `server/services/notification-service.ts` | **NEW** VAPID config, `sendPushNotification()` (auto-removes stale 410/404 subs), `sendExtractionCompleteNotification()`, `sendPolicyExpiryNotification()` |
+| `server/routes/notifications.ts` | **NEW** 4 endpoints: GET public-key, GET status, POST subscribe, DELETE unsubscribe |
+| `src/hooks/usePushNotifications.ts` | **NEW** React hook: `isSupported`, `permission`, `isSubscribed`, `subscribe()`, `unsubscribe()` |
+| `src/components/notifications/PushNotificationPrompt.tsx` | **NEW** Soft banner with 7-day localStorage cooldown, permission denied state, i18n |
+| `supabase/migrations/021_push_subscriptions.sql` | **NEW** `push_subscriptions` table with RLS (4 policies) + index |
 
 ### Admin Panel (Refactored Feb 7, 2026)
 | File | Purpose |
@@ -1228,11 +1237,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 19, 2026)
-- **Total**: 15,316 tests across 312 test files (18 skipped)
+### Test Counts (as of Feb 21, 2026)
+- **Total**: 15,428 tests across 317 test files (18 skipped)
 - **Passing**: 100% (0 failures)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files.
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -4177,10 +4186,27 @@ connectSrc: [
 **CLS Prevention (Cumulative Layout Shift):**
 - The `index.html` contains an app shell skeleton inside `<div id="root">` that matches the above-the-fold landing page layout (nav bar + hero content placeholders). React replaces this on mount with zero layout shift.
 - **DO NOT** replace the app shell with a simple spinner — this was the root cause of CLS 0.506 (spinner centered at 40vh, then full page content rendered)
-- All Framer Motion entry animations (`PageTransition`, `StaggeredList`, `FadeInWhenVisible`) use **opacity-only** transitions — never `y` or `x` transforms, which cause layout shifts
+- All animations (`PageTransition`, `StaggeredList`, `FadeInWhenVisible`) use **opacity-only** CSS `@keyframes fadeIn` — framer-motion was removed in Feb 21 session (see Known Issue #120); never add `y`/`x` transforms which cause layout shifts
 - `LandingPage` is eagerly imported (not lazy) because it's the entry point — lazy loading it behind `Suspense` caused a flash from `PageLoader` to full content
 - Service worker `controllerchange` handler tracks `hadControllerOnLoad` — only reloads when an existing SW is replaced, NOT on initial install (which caused full-page reload mid-render)
 - `useLazySection` uses `minHeight` on the wrapper div to reserve space before content loads
+
+**framer-motion Removed (Feb 21, 2026):**
+- `AnimatedComponents.tsx` no longer imports framer-motion — all 6 exported components now use pure CSS animations
+- `PageTransition` / `StaggeredList` / `FadeInWhenVisible`: use `style={{ animation: 'fadeIn ...' }}` and CSS `@keyframes fadeIn` (defined in `src/index.css`)
+- `AnimatedButton` / `ScaleOnHover`: use Tailwind `hover:scale-[1.02] transition-transform` utilities
+- `AnimatePresence` export: no-op wrapper `<>{children}</>` — preserved for import compatibility
+- `App.tsx`: no longer imports or uses `AnimatePresence`; removed `key={location.pathname}` from `<Routes>`
+- **Do NOT** re-add framer-motion imports to `AnimatedComponents.tsx` or `App.tsx` — it will balloon the main chunk by +115 KB raw (+38 KB gzip)
+- framer-motion is still a dependency (used in `AuthPage` lazy chunk) — do not remove it from `package.json`
+
+**Push Notifications — VAPID Keys Required (Feb 20-21, 2026):**
+- Push notifications require 3 env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- Generate once: `node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"`
+- **Graceful degradation**: If keys not set, `configureWebPush()` logs a warning and all send calls return 0 — no crash
+- **Migration 021 required**: `supabase/migrations/021_push_subscriptions.sql` must be applied to production Supabase before push subscriptions can be stored
+- `sendExtractionCompleteNotification()` fires fire-and-forget after all 4 extraction success paths in `server/routes/ai.ts`
+- `sendPolicyExpiryNotification()` is implemented in notification-service but has no scheduler yet — needs a cron job or Supabase Edge Function to trigger
 
 **Flaky Test Patterns:**
 - `cost-tracking/tracker.test.ts`: `projectedMonthEnd` needs floating-point tolerance (`toBeCloseTo`), not exact equality
@@ -4190,7 +4216,7 @@ connectSrc: [
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
 - This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
-- All 312 test files pass; `PolicyUpload.test.tsx` passes when run individually
+- All 317 test files pass; `PolicyUpload.test.tsx` passes when run individually
 - The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
 - Not introduced by any session; it's a known React 19 + Vitest concurrency issue
 
@@ -4279,6 +4305,6 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,316 tests, all passing (312 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,428 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Last Updated**: February 20, 2026
+**Last Updated**: February 21, 2026
