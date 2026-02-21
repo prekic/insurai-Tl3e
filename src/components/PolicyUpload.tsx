@@ -22,6 +22,8 @@ import {
 import { createProcessingLogger } from '@/lib/processing-logger'
 import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { PushNotificationPrompt } from './notifications/PushNotificationPrompt'
+import { registerBackgroundSync } from '@/lib/pwa'
 
 /**
  * Convert AnalyzedPolicy to Supabase PolicyInsert format
@@ -270,6 +272,24 @@ export function PolicyUpload() {
   addFilesRef.current = addFiles
 
   const processFileAsync = async (fileId: string, file: File) => {
+    // Offline guard — queue for background sync and bail early
+    if (!navigator.onLine) {
+      setFiles((prev) =>
+        prev.map((f) =>
+          f.id === fileId
+            ? { ...f, status: 'error', error: t.upload.errorOfflineMsg }
+            : f
+        )
+      )
+      toast.warning(t.upload.errorOffline, {
+        description: t.upload.errorOfflineMsg,
+        duration: 8000,
+      })
+      // Register background sync — when online, SW fires SYNC_COMPLETE to nudge user to retry
+      registerBackgroundSync('sync-policies').catch(() => undefined)
+      return
+    }
+
     // Create processing logger for tracking the document journey
     const logger = createProcessingLogger({
       filename: file.name,
@@ -1296,6 +1316,9 @@ export function PolicyUpload() {
           </div>
         )}
       </div>
+
+      {/* Push notification opt-in prompt — shown after first successful extraction */}
+      {completedCount > 0 && <PushNotificationPrompt />}
 
       {/* Conflict Resolution Dialog */}
       {conflictDialog.isOpen && conflictDialog.conflict && conflictDialog.newPolicy && (

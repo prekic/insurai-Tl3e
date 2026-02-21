@@ -64,17 +64,26 @@ export const DEFAULT_PWA_CONFIG: PWAConfig = {
   cacheStrategy: 'aggressive',
 }
 
+// Sync complete payload (sent by SW after background sync)
+export interface SyncCompletePayload {
+  synced: number
+  failed: number
+  success: boolean
+}
+
 // Event callbacks
 type OnlineCallback = (status: OnlineStatus) => void
 type SWStateCallback = (state: SWRegistrationState, registration?: ServiceWorkerRegistration) => void
 type InstallPromptCallback = (event: BeforeInstallPromptEvent) => void
 type UpdateCallback = (info: SWUpdateInfo) => void
+type SyncCompleteCallback = (payload: SyncCompletePayload) => void
 
 // Callback storage
 const onlineCallbacks: Set<OnlineCallback> = new Set()
 const swStateCallbacks: Set<SWStateCallback> = new Set()
 const installPromptCallbacks: Set<InstallPromptCallback> = new Set()
 const updateCallbacks: Set<UpdateCallback> = new Set()
+const syncCompleteCallbacks: Set<SyncCompleteCallback> = new Set()
 
 // Store install prompt event
 let deferredInstallPrompt: BeforeInstallPromptEvent | null = null
@@ -311,6 +320,15 @@ export function onInstallPrompt(callback: InstallPromptCallback): () => void {
 export function onUpdateAvailable(callback: UpdateCallback): () => void {
   updateCallbacks.add(callback)
   return () => updateCallbacks.delete(callback)
+}
+
+/**
+ * Subscribe to background sync completion
+ * Returns an unsubscribe function.
+ */
+export function onSyncComplete(callback: SyncCompleteCallback): () => void {
+  syncCompleteCallbacks.add(callback)
+  return () => syncCompleteCallbacks.delete(callback)
 }
 
 /**
@@ -583,7 +601,9 @@ export function initializePWA(config: Partial<PWAConfig> = {}): void {
     // Listen for messages from service worker
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data?.type === 'SYNC_COMPLETE') {
-        console.log('[PWA] Background sync complete:', event.data.payload)
+        const payload = event.data.payload as SyncCompletePayload
+        console.log('[PWA] Background sync complete:', payload)
+        syncCompleteCallbacks.forEach((cb) => cb(payload))
       }
     })
   }

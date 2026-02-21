@@ -403,12 +403,95 @@ docker run -p 4001:4001 --env-file .env insurai
 
 ---
 
+## 7. CI/CD Troubleshooting
+
+### E2E Tests: CI vs Local
+
+The Playwright E2E tests behave differently in CI vs local development:
+
+```bash
+# CI: tests against a production build served on port 3000
+E2E_BASE_URL=http://localhost:3000 npx playwright test --project=chromium
+
+# Local: tests against Vite dev server (started automatically by playwright.config.ts)
+npm run test:e2e
+```
+
+**Key rule:** If `E2E_BASE_URL` is set, `playwright.config.ts` skips its built-in `webServer` block (which would start a Vite dev server). This is how CI runs against the production build.
+
+**Never use `npm run test:e2e:fast` in CI** — it starts a Vite dev server, not a production build, which gives misleading results.
+
+### `tsc: not found` on Railway
+
+**Symptom:** Railway build fails with `sh: 1: tsc: not found`
+
+**Cause:** `npm ci` in production mode skips `devDependencies`, but TypeScript is needed for the build step.
+
+**Fix:** The `railway.json` `installCommand` must include `--include=dev`:
+```json
+{ "build": { "installCommand": "npm ci --include=dev" } }
+```
+
+### Staging Deploy Does Not Gate on E2E (By Design)
+
+The `staging.yml` workflow runs `validate` and `e2e-tests` in **parallel**. The `build` job gates on both. However, the Vercel frontend deploy and Railway backend deploy are separate steps that run after `build` — they don't individually re-check E2E results. This is intentional: the `build` gate is sufficient.
+
+### Manual Rollback
+
+If a production deployment goes wrong, use the manual rollback job in `production.yml`:
+
+1. Go to GitHub Actions → production workflow → Run workflow
+2. The rollback job uses Railway CLI to redeploy the previous version
+3. After rollback, verify health at `https://insurai-production.up.railway.app/api/health`
+
+```bash
+# Manual Railway CLI rollback (if GitHub Actions unavailable)
+railway rollback --environment production
+```
+
+### `serve` and `wait-on` Must Remain devDependencies
+
+The CI E2E job uses `serve` (to host the built frontend) and `wait-on` (to poll until the server is ready). These are listed as `devDependencies` for deterministic CI — do not remove them or move them to `optionalDependencies`.
+
+```yaml
+# In both staging.yml and production.yml:
+- name: Run E2E tests against production build
+  run: |
+    npx serve dist -l 3000 &
+    npx wait-on http://localhost:3000 --timeout 30000
+    npx playwright test --project=chromium
+  env:
+    E2E_BASE_URL: http://localhost:3000
+```
+
+### Missing Environment Variables at Startup
+
+The server logs warnings on startup if critical env vars are absent:
+
+```
+[WARN] Missing env vars: SUPABASE_URL, ADMIN_JWT_SECRET — some features will be degraded
+```
+
+Diagnose via the admin diagnostics endpoint (no auth required):
+```bash
+curl https://insurai-production.up.railway.app/api/admin/diagnostics
+```
+
+Returns which env vars are configured and any configuration issues.
+
+### Playwright Report on Failure
+
+If E2E tests fail in CI, the Playwright HTML report is uploaded as a GitHub Actions artifact (`playwright-report/`, retained 7 days). Download it to see screenshots and traces for failed tests.
+
+---
+
 ## Need Help?
 
 - **Supabase Issues**: [supabase.com/docs](https://supabase.com/docs)
 - **Sentry Issues**: [docs.sentry.io](https://docs.sentry.io)
-- **Deployment Issues**: Check server logs and Sentry errors
+- **Deployment Issues**: Check server logs at Railway dashboard, then Sentry errors
+- **Admin diagnostics**: `GET /api/admin/diagnostics` (no auth required) — check env var config
 
 ---
 
-*This guide was generated for InsurAI v0.1.0*
+*This guide was last updated: February 2026 (React 19, Express 5, Vite 7, Railway monorepo deployment)*

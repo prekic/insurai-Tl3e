@@ -1,5 +1,9 @@
-import { motion, AnimatePresence } from 'framer-motion'
-import { ReactNode, useEffect, useState } from 'react'
+// Animated components — CSS-only, no framer-motion dependency.
+// All animations are opacity-based to avoid CLS (Cumulative Layout Shift).
+// This keeps framer-motion out of the main entry chunk; AuthPage imports it
+// directly and is already lazy-loaded.
+
+import { ReactNode, useRef, useEffect, useState } from 'react'
 
 interface PageTransitionProps {
   children: ReactNode
@@ -7,15 +11,12 @@ interface PageTransitionProps {
 
 export function PageTransition({ children }: PageTransitionProps) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.3 }}
+    <div
       className="w-full max-w-[100vw] overflow-x-hidden"
+      style={{ animation: 'fadeIn 0.3s ease both' }}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
 
@@ -26,18 +27,16 @@ interface StaggeredListProps {
 
 export function StaggeredList({ children, staggerDelay = 0.1 }: StaggeredListProps) {
   return (
-    <motion.div className="space-y-6">
+    <div className="space-y-6">
       {children.map((child, index) => (
-        <motion.div
+        <div
           key={index}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: index * staggerDelay, duration: 0.4 }}
+          style={{ animation: `fadeIn 0.4s ease ${index * staggerDelay}s both` }}
         >
           {child}
-        </motion.div>
+        </div>
       ))}
-    </motion.div>
+    </div>
   )
 }
 
@@ -49,15 +48,12 @@ interface AnimatedButtonProps {
 
 export function AnimatedButton({ children, onClick, className }: AnimatedButtonProps) {
   return (
-    <motion.button
+    <button
       onClick={onClick}
-      className={className}
-      whileHover={{ scale: 1.02 }}
-      whileTap={{ scale: 0.98 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+      className={`${className ?? ''} transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98]`}
     >
       {children}
-    </motion.button>
+    </button>
   )
 }
 
@@ -67,12 +63,9 @@ interface ScaleOnHoverProps {
 
 export function ScaleOnHover({ children }: ScaleOnHoverProps) {
   return (
-    <motion.div
-      whileHover={{ scale: 1.05 }}
-      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-    >
+    <div className="transition-transform duration-200 hover:scale-105">
       {children}
-    </motion.div>
+    </div>
   )
 }
 
@@ -89,7 +82,7 @@ export function NumberCounter({
   decimals = 0,
   suffix = '',
   prefix = '',
-  className = ''
+  className = '',
 }: NumberCounterProps) {
   const [displayValue, setDisplayValue] = useState(0)
 
@@ -126,16 +119,35 @@ interface FadeInWhenVisibleProps {
 }
 
 export function FadeInWhenVisible({ children }: FadeInWhenVisibleProps) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [isVisible, setIsVisible] = useState(false)
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.disconnect()
+        }
+      },
+      { rootMargin: '-100px' }
+    )
+    if (ref.current) observer.observe(ref.current)
+    return () => observer.disconnect()
+  }, [])
+
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      whileInView={{ opacity: 1 }}
-      viewport={{ once: true, margin: "-100px" }}
-      transition={{ duration: 0.5 }}
+    <div
+      ref={ref}
+      style={isVisible ? { animation: 'fadeIn 0.5s ease both' } : { opacity: 0 }}
     >
       {children}
-    </motion.div>
+    </div>
   )
 }
 
-export { AnimatePresence }
+// No-op AnimatePresence — exit animations removed for performance.
+// Enter animations are handled by CSS (fadeIn keyframe in index.css).
+export function AnimatePresence({ children }: { children: ReactNode }) {
+  return <>{children}</>
+}

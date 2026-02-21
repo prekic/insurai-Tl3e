@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**
-- **Production Readiness**: ~9.5/10 (15,316+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 20, 2026
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**
+- **Production Readiness**: ~9.5/10 (15,428+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 21, 2026
 
 ---
 
@@ -196,6 +196,15 @@ insurai/
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `server/lib/sentry.ts` | Sentry error tracking setup |
 
+### Push Notifications (Added Feb 20-21, 2026)
+| File | Purpose |
+|------|---------|
+| `server/services/notification-service.ts` | **NEW** VAPID config, `sendPushNotification()` (auto-removes stale 410/404 subs), `sendExtractionCompleteNotification()`, `sendPolicyExpiryNotification()` |
+| `server/routes/notifications.ts` | **NEW** 4 endpoints: GET public-key, GET status, POST subscribe, DELETE unsubscribe |
+| `src/hooks/usePushNotifications.ts` | **NEW** React hook: `isSupported`, `permission`, `isSubscribed`, `subscribe()`, `unsubscribe()` |
+| `src/components/notifications/PushNotificationPrompt.tsx` | **NEW** Soft banner with 7-day localStorage cooldown, permission denied state, i18n |
+| `supabase/migrations/021_push_subscriptions.sql` | **NEW** `push_subscriptions` table with RLS (4 policies) + index |
+
 ### Admin Panel (Refactored Feb 7, 2026)
 | File | Purpose |
 |------|---------|
@@ -358,6 +367,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...   # Service role key (NOT anon key) — from
 # Admin auth — REQUIRED for admin login
 # Generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ADMIN_JWT_SECRET=your-random-64-char-hex-secret
+
+# Push Notifications (Web Push / VAPID) — OPTIONAL for local dev, REQUIRED in production
+# Generate once: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+VAPID_PUBLIC_KEY=your-vapid-public-key-here
+VAPID_PRIVATE_KEY=your-vapid-private-key-here
+VAPID_SUBJECT=mailto:contact@insurai.com
 ```
 
 **CRITICAL RULES**:
@@ -365,6 +380,7 @@ ADMIN_JWT_SECRET=your-random-64-char-hex-secret
 2. Server uses `.env` file (not `.env.local`)
 3. In development, Vite proxy handles `/api/*` requests automatically
 4. `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` + `ADMIN_JWT_SECRET` are required to use the admin panel locally; without them admin login returns 500 (diagnose at `/api/admin/diagnostics`)
+5. `VAPID_*` keys are optional locally but required in production for push notifications; without them notifications silently degrade (no crash, `log.warn` emitted)
 
 ---
 
@@ -1228,11 +1244,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 19, 2026)
-- **Total**: 15,316 tests across 312 test files (18 skipped)
+### Test Counts (as of Feb 21, 2026)
+- **Total**: 15,428 tests across 317 test files (18 skipped)
 - **Passing**: 100% (0 failures)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files.
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3336,7 +3352,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Commit**: `2c4b057`
 
 ### 95. Service Worker Cache v19 (Feb 12, 2026)
-- **Change**: Bumped service worker cache version from v18 to v19
+- **Change**: Bumped service worker cache version from v18 to v19 (later bumped to v20 for push notifications)
 - **Purpose**: Force cache invalidation after translation system deployment
 - **File Changed**: `public/sw.js`
 - **Commit**: `7277e9c`
@@ -3615,6 +3631,59 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/pipeline/ocr-stats.ts:648` — `no-non-null-assertion`: `groups.get(key)!.push()` → extract to `const group`, guard with `if (group)`
 - **Result**: ESLint **0 errors, 0 warnings** — consistent with CLAUDE.md claim from Known Issue #117
 
+### 119. PWA Push Notification Architecture (Added Feb 20, 2026)
+- **Feature**: Full browser push notification system using Web Push API (VAPID)
+- **Server Infrastructure**:
+  - `server/services/notification-service.ts` — VAPID configuration, `sendPushNotification()` (fire-and-forget, auto-removes 410/404 stale subscriptions), `sendExtractionCompleteNotification()`, `sendPolicyExpiryNotification()`
+  - `server/routes/notifications.ts` — 4 endpoints (public-key, status, subscribe, unsubscribe) with `authLimiter` rate limiting
+  - `server/index.ts` — registers `/api/notifications` router
+  - `supabase/migrations/021_push_subscriptions.sql` — `push_subscriptions` table with RLS + index
+- **Server Notification Triggers**: `server/routes/ai.ts` fires `sendExtractionCompleteNotification()` after all 4 extraction success paths (OpenAI standalone, Anthropic standalone, unified/OpenAI, unified/Anthropic) — non-blocking fire-and-forget with `log.warn` on failure
+- **Client Infrastructure**:
+  - `src/hooks/usePushNotifications.ts` — hook: `isSupported`, `permission`, `isSubscribed`, `isLoading`, `subscribe()`, `unsubscribe()`
+  - `src/components/notifications/PushNotificationPrompt.tsx` — soft banner (not modal); shown after first successful upload in PolicyUpload; 7-day localStorage cooldown (`insurai_push_dismissed_until`); permission denied state; uses `t.notifications.*` i18n
+- **Background Sync + SYNC_COMPLETE**: `onSyncComplete()` subscriber callback in `src/lib/pwa/index.ts`; `App.tsx` shows toast when synced > 0; `PolicyUpload.tsx` checks `navigator.onLine` at upload start and falls back to `registerBackgroundSync('sync-policies')` when offline
+- **VAPID Key Generation** (one-time, run on first deploy):
+  ```bash
+  node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+  ```
+- **New Env Vars** (add to Railway + `.env.example`):
+  ```bash
+  VAPID_PUBLIC_KEY=...   # base64url ECDH public key
+  VAPID_PRIVATE_KEY=...  # base64url ECDH private key
+  VAPID_SUBJECT=mailto:contact@insurai.com
+  ```
+- **Graceful Degradation**: If VAPID keys are not set, `configureWebPush()` logs a warning and `sendPushNotification()` returns 0 — no crash, no broken uploads
+- **Test Files** (5 new files):
+  - `server/__tests__/notification-routes.test.ts` — all 4 endpoints, auth, validation
+  - `server/__tests__/notification-service.test.ts` — VAPID config, send, 410/404 stale cleanup
+  - `src/hooks/usePushNotifications.test.ts` — hook states, subscribe/unsubscribe flows
+  - `src/components/notifications/PushNotificationPrompt.test.tsx` — UI states, localStorage cooldown, permission denied
+  - `src/lib/pwa/push-notifications.test.ts` — onSyncComplete callbacks, SW message dispatch
+- **SW Cache**: Bumped to v20 (offline queue wiring changes SW behavior)
+
+### 120. Mobile Bundle Optimization — framer-motion Removed from Main Chunk (Feb 21, 2026)
+- **Problem**: Lighthouse mobile score 71/100 from sandbox throttling, but real cause was 1,030 KB main chunk (320 KB gzip) blocking FCP/LCP on slower connections.
+- **Root Causes** (two eager imports pulling framer-motion into main bundle):
+  1. `App.tsx`: `import { AnimatePresence } from 'framer-motion'` — direct eager import
+  2. `AnimatedComponents.tsx`: `import { motion, AnimatePresence } from 'framer-motion'` — imported by LandingPage→Hero chain
+- **Solution**: Replaced framer-motion with pure CSS animations — identical visual result since all animations were already opacity-only (changed in Known Issue #107 CLS fix):
+  - `AnimatedComponents.tsx` — rewrote all 7 components using CSS `animation: fadeIn` and Tailwind transition classes:
+    - `PageTransition`: `style={{ animation: 'fadeIn 0.3s ease both' }}`
+    - `StaggeredList`: CSS `animation-delay: ${index * delay}s` per child
+    - `AnimatedButton`: Tailwind `hover:scale-[1.02] active:scale-[0.98] transition-transform`
+    - `ScaleOnHover`: Tailwind `hover:scale-105 transition-transform`
+    - `FadeInWhenVisible`: `IntersectionObserver` hook + CSS animation (no `motion.div`)
+    - `NumberCounter`: unchanged (already had no framer-motion)
+    - `AnimatePresence`: no-op wrapper `<>{children}</>`
+  - `App.tsx` — removed `import { AnimatePresence } from 'framer-motion'` and `AnimatePresence` wrapper; removed `key={location.pathname}` from `<Routes>` (was needed only for exit animation timing)
+  - `src/index.css` — added `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`
+- **Result**: Main chunk **1,030 KB → 915 KB (−115 KB raw, −38 KB gzip)**. framer-motion moved to `AuthPage` lazy chunk (only loads on /auth navigation).
+- **Also Fixed**: 2 pre-existing lint errors in push notification test files (`loadingDuring` → `_loadingDuring`; empty `const {} =` → bare `await import()`); 18 unused `eslint-disable` warnings auto-fixed.
+- **Zero CLS impact**: All framer-motion animations were already opacity-only (no `y`/`x` transforms). CSS `@keyframes fadeIn` is identical in appearance.
+- **Remaining**: Main chunk is still 282 KB gzip. Further wins possible from splitting EN translations (~8-12 KB) or other lazy-loading, but framer-motion was the dominant contributor.
+- **Files Changed**: `src/components/animations/AnimatedComponents.tsx`, `src/App.tsx`, `src/index.css`
+
 ---
 
 ## Turkish Market Considerations
@@ -3720,7 +3789,7 @@ Verified production Railway deployment (`insurai-production.up.railway.app`) wit
 - **Production Deployment Verified**:
   - HTML: `Cache-Control: no-cache, no-store, must-revalidate` ✅
   - Hashed assets: `Cache-Control: max-age=31536000, immutable` ✅
-  - Service worker: `no-cache` ✅ (CACHE_VERSION v19)
+  - Service worker: `no-cache` ✅ (CACHE_VERSION v20)
   - App shell skeleton in `<div id="root">` ✅
   - HSTS header: `max-age=31536000; includeSubDomains` ✅
   - Opacity-only animations (no y/x CLS-causing transforms) ✅
@@ -3840,6 +3909,13 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
 
 # Admin JWT (generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
 ADMIN_JWT_SECRET=your-random-secret
+
+# Push Notifications (Web Push / VAPID) — REQUIRED for push notifications to work
+# Generate once: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+# Without these, push notifications silently degrade (log.warn, return 0) — no crash
+VAPID_PUBLIC_KEY=...      # base64url ECDH public key from generateVAPIDKeys()
+VAPID_PRIVATE_KEY=...     # base64url ECDH private key (keep secret)
+VAPID_SUBJECT=mailto:contact@insurai.com
 
 # Build-time (embedded in JS bundle)
 VITE_SUPABASE_URL=https://xxx.supabase.co
@@ -3978,7 +4054,7 @@ connectSrc: [
 
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
-- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v19)
+- Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v20)
 - Users may need to hard refresh (Ctrl+Shift+R) or clear site data
 - Page auto-reloads on `controllerchange` event (see `src/lib/pwa/index.ts`)
 
@@ -4124,10 +4200,27 @@ connectSrc: [
 **CLS Prevention (Cumulative Layout Shift):**
 - The `index.html` contains an app shell skeleton inside `<div id="root">` that matches the above-the-fold landing page layout (nav bar + hero content placeholders). React replaces this on mount with zero layout shift.
 - **DO NOT** replace the app shell with a simple spinner — this was the root cause of CLS 0.506 (spinner centered at 40vh, then full page content rendered)
-- All Framer Motion entry animations (`PageTransition`, `StaggeredList`, `FadeInWhenVisible`) use **opacity-only** transitions — never `y` or `x` transforms, which cause layout shifts
+- All animations (`PageTransition`, `StaggeredList`, `FadeInWhenVisible`) use **opacity-only** CSS `@keyframes fadeIn` — framer-motion was removed in Feb 21 session (see Known Issue #120); never add `y`/`x` transforms which cause layout shifts
 - `LandingPage` is eagerly imported (not lazy) because it's the entry point — lazy loading it behind `Suspense` caused a flash from `PageLoader` to full content
 - Service worker `controllerchange` handler tracks `hadControllerOnLoad` — only reloads when an existing SW is replaced, NOT on initial install (which caused full-page reload mid-render)
 - `useLazySection` uses `minHeight` on the wrapper div to reserve space before content loads
+
+**framer-motion Removed (Feb 21, 2026):**
+- `AnimatedComponents.tsx` no longer imports framer-motion — all 6 exported components now use pure CSS animations
+- `PageTransition` / `StaggeredList` / `FadeInWhenVisible`: use `style={{ animation: 'fadeIn ...' }}` and CSS `@keyframes fadeIn` (defined in `src/index.css`)
+- `AnimatedButton` / `ScaleOnHover`: use Tailwind `hover:scale-[1.02] transition-transform` utilities
+- `AnimatePresence` export: no-op wrapper `<>{children}</>` — preserved for import compatibility
+- `App.tsx`: no longer imports or uses `AnimatePresence`; removed `key={location.pathname}` from `<Routes>`
+- **Do NOT** re-add framer-motion imports to `AnimatedComponents.tsx` or `App.tsx` — it will balloon the main chunk by +115 KB raw (+38 KB gzip)
+- framer-motion is still a dependency (used in `AuthPage` lazy chunk) — do not remove it from `package.json`
+
+**Push Notifications — VAPID Keys Required (Feb 20-21, 2026):**
+- Push notifications require 3 env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- Generate once: `node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"`
+- **Graceful degradation**: If keys not set, `configureWebPush()` logs a warning and all send calls return 0 — no crash
+- **Migration 021 required**: `supabase/migrations/021_push_subscriptions.sql` must be applied to production Supabase before push subscriptions can be stored
+- `sendExtractionCompleteNotification()` fires fire-and-forget after all 4 extraction success paths in `server/routes/ai.ts`
+- `sendPolicyExpiryNotification()` is implemented in notification-service but has no scheduler yet — needs a cron job or Supabase Edge Function to trigger
 
 **Flaky Test Patterns:**
 - `cost-tracking/tracker.test.ts`: `projectedMonthEnd` needs floating-point tolerance (`toBeCloseTo`), not exact equality
@@ -4137,7 +4230,7 @@ connectSrc: [
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
 - This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
-- All 312 test files pass; `PolicyUpload.test.tsx` passes when run individually
+- All 317 test files pass; `PolicyUpload.test.tsx` passes when run individually
 - The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
 - Not introduced by any session; it's a known React 19 + Vitest concurrency issue
 
@@ -4226,6 +4319,6 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,316 tests, all passing (312 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,428 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Last Updated**: February 20, 2026
+**Last Updated**: February 21, 2026
