@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**
 - **Production Readiness**: ~9.5/10 (15,428+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 21, 2026
+- **Last Updated**: February 21, 2026 (policy expiry scheduler session)
 
 ---
 
@@ -3684,6 +3684,38 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Remaining**: Main chunk is still 282 KB gzip. Further wins possible from splitting EN translations (~8-12 KB) or other lazy-loading, but framer-motion was the dominant contributor.
 - **Files Changed**: `src/components/animations/AnimatedComponents.tsx`, `src/App.tsx`, `src/index.css`
 
+### 121. Policy Expiry Push Notification Scheduler (Added Feb 21, 2026)
+- **Feature**: Daily GitHub Actions cron that fires push notifications to users whose policies expire in exactly 7, 14, or 30 days
+- **Previous state**: `sendPolicyExpiryNotification()` existed in `notification-service.ts` but was never called — no scheduler
+- **Also fixed**: `extractViaProxy()` was not forwarding `x-user-id` header, so `sendExtractionCompleteNotification()` was silently skipped on client-side extraction paths
+- **Files Created**:
+  - `server/routes/internal.ts` — `POST /api/internal/cron/notify-expiring` endpoint
+  - `.github/workflows/notify-expiring.yml` — daily cron workflow (08:00 UTC / 11:00 Istanbul)
+- **Files Modified**:
+  - `server/index.ts` — registers `/api/internal` router
+  - `src/lib/ai/policy-extractor.ts` — threads `userId` through extraction options
+  - `src/lib/ai/config.ts` — `extractViaProxy()` conditionally adds `x-user-id` header
+  - `src/lib/ai/providers/openai.ts` + `claude.ts` — accept and forward `notifyUserId`
+  - `src/components/PolicyUpload.tsx` — passes `user?.id` in extraction options
+- **Auth**: `Authorization: Bearer <CRON_SECRET>` with `crypto.timingSafeEqual` (timing-attack safe)
+- **Idempotent**: each policy matches exactly one window per day (expires in exactly N days) — safe to run multiple times
+- **Graceful degradation**: skips with `log.warn` if VAPID or Supabase not configured; never crashes
+- **Response format**:
+  ```json
+  { "success": true, "totalSent": 0, "totalErrors": 0,
+    "windows": { "7": { "found": 0, "sent": 0, "errors": 0 }, "14": {...}, "30": {...} } }
+  ```
+- **Required secrets**:
+  - `CRON_SECRET` in Railway Variables AND GitHub Secrets (generate: `openssl rand -hex 32`)
+  - `PRODUCTION_SERVER_URL` in GitHub Secrets (optional — defaults to Railway URL)
+- **Manual test**: GitHub Actions → Policy Expiry Notifications → Run workflow; or curl directly:
+  ```bash
+  SECRET="your-secret"; curl -s -X POST \
+    -H "Authorization: Bearer $SECRET" \
+    https://insurai-production.up.railway.app/api/internal/cron/notify-expiring | python3 -m json.tool
+  ```
+- **Activation**: workflow only runs after branch is merged to `main` (GitHub Actions only reads workflows from default branch)
+
 ---
 
 ## Turkish Market Considerations
@@ -4214,6 +4246,19 @@ connectSrc: [
 - **Do NOT** re-add framer-motion imports to `AnimatedComponents.tsx` or `App.tsx` — it will balloon the main chunk by +115 KB raw (+38 KB gzip)
 - framer-motion is still a dependency (used in `AuthPage` lazy chunk) — do not remove it from `package.json`
 
+**Internal Cron Endpoint — CRON_SECRET must be set in both places:**
+- `CRON_SECRET` must be set in **Railway Variables** (so the server accepts it) AND **GitHub Secrets** (so the workflow can send it)
+- Generate with `openssl rand -hex 32` — same value in both places
+- The endpoint uses `crypto.timingSafeEqual` — any mismatch (wrong secret, extra whitespace) returns `401 Unauthorized`
+- Test auth independently: a bare `curl -X POST <url>` (no header) must return `401`; with correct `Bearer` token must return `200`
+- `PRODUCTION_SERVER_URL` GitHub Secret is optional — workflow defaults to `https://insurai-production.up.railway.app`
+
+**GitHub Actions — Workflow Only Runs from Default Branch:**
+- Workflow YAML files added to a feature branch do NOT appear in the Actions UI until merged to `main`
+- After committing `.github/workflows/notify-expiring.yml` to a branch, the "Policy Expiry Notifications" workflow is invisible in Actions → only shows up after merging
+- To test before merging: call the endpoint directly with curl (see Known Issue #121 for command)
+- `workflow_dispatch:` block allows manual trigger from Actions UI once merged
+
 **Push Notifications — VAPID Keys Required (Feb 20-21, 2026):**
 - Push notifications require 3 env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - Generate once: `node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"`
@@ -4321,4 +4366,4 @@ npm run build:analyze
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 15,428 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Last Updated**: February 21, 2026
+**Last Updated**: February 21, 2026 (policy expiry scheduler session)

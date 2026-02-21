@@ -1,111 +1,107 @@
-# Session Handoff — February 21, 2026 (framer-motion Bundle Optimization)
+# Session Handoff — February 21, 2026 (Policy Expiry Scheduler)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | Passing (both frontend and server) |
+| **Build** | Passing |
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings ✓ |
-| **Tests** | 15,428 passing (317 test files), 0 failures ✓ verified |
+| **Tests** | 15,428 passing (317 test files), 0 failures ✓ |
 | **E2E Tests** | 186/186 Chromium passed (production build) |
-| **Coverage** | 91.67% statements, 85.91% branches ✓, 88.77% functions, 92.5% lines |
+| **Coverage** | 91.67% statements, 85.91% branches, 88.77% functions, 92.5% lines |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100, CLS 0 |
-| **Branch** | `claude/review-handoff-docs-zo57L` |
+| **Branch** | `claude/review-handoff-status-ywsrB` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
-| **Deployment** | Live — extraction pipeline fully operational |
-| **All 3 AI Providers** | OpenAI ✓, Anthropic ✓, Google Vision ✓ — all valid |
+| **Deployment** | Live — extraction pipeline fully operational, all 3 AI providers healthy |
 | **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
 | **SW Cache Version** | v20 |
-| **Main Bundle Size** | 915 KB raw / 282 KB gzip (−115 KB raw vs prior session) |
-| **Migration 021** | Added (push_subscriptions table) — **apply to production Supabase** |
+| **Main Bundle Size** | 915 KB raw / 282 KB gzip |
 
 ---
 
 ## Session Summary
 
-This session removed **framer-motion from the main entry chunk** by replacing all animated components with pure CSS `@keyframes fadeIn` and Tailwind transitions. Zero visual regression — all animations were already opacity-only from the Feb 19 Lighthouse CLS fix. Main entry chunk: 1,030 KB → 915 KB (−115 KB raw, −38 KB gzip).
+Two pieces of work this session:
 
-Also fixed pre-existing lint errors in two push notification test files inherited from the prior session.
+1. **Policy expiry notification scheduler** — implemented the missing cron infrastructure for `sendPolicyExpiryNotification()` which existed in the notification service but had no trigger. Created a secure internal Express endpoint and a daily GitHub Actions workflow.
 
-### Work Completed This Session
+2. **Extraction push notification fix** — discovered that `sendExtractionCompleteNotification()` was being silently skipped on client-side extraction paths because `extractViaProxy()` never forwarded the `x-user-id` header to the server. Threaded `userId` through the full extraction call chain.
 
-| # | Task | Files Changed |
-|---|------|--------------|
-| 1 | **Remove framer-motion from main chunk** | `AnimatedComponents.tsx`, `App.tsx`, `src/index.css` |
-| 2 | **CSS animation implementation** | All 6 `AnimatedComponents` exports rewritten with CSS + Tailwind |
-| 3 | **Fix pre-existing lint errors in push tests** | `usePushNotifications.test.ts`, `push-notifications.test.ts` |
-| 4 | **CLAUDE.md updated** | Known Issue #120, gotchas, test counts, Quick Reference |
+Both changes were verified against production (endpoint tested live, returned `success: true`).
 
 ---
 
-## All Commits on This Branch (since merge `029e2cf`)
+## Work Completed This Session
 
-### Bundle Optimization — Feb 21, 2026
+| # | Task | Commits | Files Changed |
+|---|------|---------|---------------|
+| 1 | **Policy expiry scheduler endpoint** | `0268d38` | `server/routes/internal.ts` (new), `server/index.ts` |
+| 2 | **Daily GitHub Actions cron** | `0268d38` | `.github/workflows/notify-expiring.yml` (new) |
+| 3 | **Fix x-user-id header in extractViaProxy** | `10d24fd` | `src/lib/ai/config.ts`, `policy-extractor.ts`, `providers/openai.ts`, `providers/claude.ts`, `PolicyUpload.tsx` |
+| 4 | **CLAUDE.md + SESSION_HANDOFF.md** | this commit | Known Issue #121, gotchas, deployment notes |
+
+---
+
+## All Commits This Session (since branch creation)
 
 | Commit | Description |
 |--------|-------------|
-| `6a4a4ca` | docs: update CLAUDE.md and SESSION_HANDOFF.md for Feb 21 session |
-| `a1a71ab` | perf: remove framer-motion from main chunk, replace with CSS animations |
-
-### PWA Push Notifications — Feb 20, 2026
-
-| Commit | Description |
-|--------|-------------|
-| `905fc6b` | docs: update CLAUDE.md service worker version refs to v20 |
-| `62da79e` | fix: resolve 3 TypeScript errors in notification service |
-| `2639021` | fix: use existing update_updated_at_column() in migration 021 |
-| `ff0a998` | docs: mark test suite verified (15,428/317) after notification test fixes |
-| `bb1d91b` | fix: resolve 26 failing notification tests (service + hook) |
-| `bd0ce27` | docs: update SESSION_HANDOFF.md for PWA push notifications session |
-| `f047972` | docs: CLAUDE.md #119, deployment guides, VAPID env vars, SW cache v20 |
-| `d34c60c` | test: add push notification test suite (5 files, ~165 tests) |
-| `499b86f` | feat: add PWA push notifications (server + client infrastructure) |
+| `0268d38` | feat: policy expiry push notification scheduler |
+| `10d24fd` | fix: wire x-user-id header through extraction pipeline for push notifications |
 
 ---
 
-## What Changed in AnimatedComponents.tsx
+## Architecture: Internal Cron Endpoint
 
-All 6 exports are now framer-motion-free:
+```
+GitHub Actions (daily 08:00 UTC)
+        │
+        │  POST /api/internal/cron/notify-expiring
+        │  Authorization: Bearer <CRON_SECRET>
+        ▼
+server/routes/internal.ts
+        │
+        ├─ crypto.timingSafeEqual(secret, token)  — auth guard
+        │
+        ├─ Supabase query: policies WHERE expiry_date = today+7  → sendPolicyExpiryNotification()
+        ├─ Supabase query: policies WHERE expiry_date = today+14 → sendPolicyExpiryNotification()
+        └─ Supabase query: policies WHERE expiry_date = today+30 → sendPolicyExpiryNotification()
+                                  │
+                                  └─ web-push → user's browser
+```
 
-| Component | Implementation |
-|-----------|----------------|
-| `PageTransition` | `style={{ animation: 'fadeIn 0.3s ease both' }}` |
-| `StaggeredList` | Wraps children with inline `animation-delay: ${i * delay}s, fadeIn` |
-| `AnimatedButton` | Tailwind `hover:scale-[1.02] active:scale-[0.98] transition-transform` |
-| `ScaleOnHover` | Tailwind `hover:scale-105 transition-transform` |
-| `FadeInWhenVisible` | `IntersectionObserver` hook + CSS `animation: fadeIn` on intersect |
-| `AnimatePresence` | No-op wrapper `<>{children}</>` — preserved for import compatibility |
-
-`@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }` lives in `src/index.css`.
+**Notification windows**: 7, 14, 30 days before expiry
+**Status filter**: only `active` and `expiring` policies
+**Idempotent**: each policy matches exactly one window per day
 
 ---
 
-## PWA Push Notifications — Architecture & Files (Feb 20, Known Issue #119)
+## Architecture: Extraction Push Notification Fix
 
-Full browser push notification system using Web Push API (VAPID):
+```
+Before fix:
+PolicyUpload → extractPolicyFromDocument() → extractViaProxy()
+                                                   │
+                                                   │ POST /api/ai/extract/openai
+                                                   │ (no x-user-id header)
+                                                   ▼
+                                             server receives undefined userId
+                                             → sendExtractionCompleteNotification() skipped
 
-**Files Created:**
-| File | Purpose |
-|------|---------|
-| `server/services/notification-service.ts` | VAPID config, send, stale subscription cleanup |
-| `server/routes/notifications.ts` | 4 endpoints (public-key, status, subscribe, unsubscribe) |
-| `supabase/migrations/021_push_subscriptions.sql` | push_subscriptions table with RLS |
-| `src/hooks/usePushNotifications.ts` | React hook: isSupported, permission, subscribe/unsubscribe |
-| `src/components/notifications/PushNotificationPrompt.tsx` | Soft banner, 7-day cooldown, i18n |
-| `server/__tests__/notification-routes.test.ts` | 21 tests |
-| `server/__tests__/notification-service.test.ts` | 29 tests |
-| `src/hooks/usePushNotifications.test.ts` | 24 tests |
-| `src/components/notifications/PushNotificationPrompt.test.tsx` | 27 tests |
-| `src/lib/pwa/push-notifications.test.ts` | 11 tests |
-
-**Wiring:**
-- `server/routes/ai.ts` — fire-and-forget `sendExtractionCompleteNotification()` after all 4 extraction success paths
-- `src/components/PolicyUpload.tsx` — shows prompt after first successful upload; offline BG sync fallback
-- `src/App.tsx` — SYNC_COMPLETE toast (i18n), PushNotificationPrompt import
-- `src/lib/pwa/index.ts` — `onSyncComplete()` subscriber callback system
+After fix:
+PolicyUpload (user.id) → extractPolicyFromDocument({ userId }) → extractWithProvider({ notifyUserId })
+                                                                        │
+                                   openai.ts / claude.ts pass notifyUserId to extractViaProxy()
+                                                                        │
+                                                              extractViaProxy adds
+                                                              'x-user-id': userId header
+                                                                        ▼
+                                                              server reads x-user-id ✓
+                                                              sendExtractionCompleteNotification() fires ✓
+```
 
 ---
 
@@ -113,9 +109,9 @@ Full browser push notification system using Web Push API (VAPID):
 
 | Issue | Severity | Status | Notes |
 |-------|----------|--------|-------|
-| Migration 021 not applied to production | Medium | **Pending** | `push_subscriptions` table must be applied to production Supabase before push notifications work |
+| Migration 021 not applied to production | Medium | **Pending** | `push_subscriptions` table — apply in Supabase SQL Editor before push notifications work |
 | VAPID keys not set in Railway | Medium | **Pending** | Graceful degradation: `log.warn` + return 0. No crash, no broken uploads. |
-| Policy expiry push notif — no scheduler | Low | Pending | `sendPolicyExpiryNotification()` implemented but no cron/edge function triggers it |
+| Policy expiry scheduler not yet merged | Low | **Pending** | Branch `claude/review-handoff-status-ywsrB` must be merged to `main` for daily cron to activate |
 | Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx (React 19 + Vitest concurrency); all files pass individually |
 
 ---
@@ -130,67 +126,76 @@ Full browser push notification system using Web Push API (VAPID):
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 - **SW Cache**: v20
 
-### Action Required Before Push Notifications Work
-1. **Apply migration 021** — Run `supabase/migrations/021_push_subscriptions.sql` in production Supabase SQL Editor (idempotent — safe to re-run)
-2. **Set VAPID keys in Railway** — Generate keypair, add 3 env vars:
+### New Environment Variables Required
+
+**Railway Variables** (server-side):
+```
+CRON_SECRET=<generate with: openssl rand -hex 32>
+```
+
+**GitHub Secrets** (for the cron workflow):
+```
+CRON_SECRET=<same value as Railway>
+PRODUCTION_SERVER_URL=https://insurai-production.up.railway.app  (optional, this is the default)
+```
+
+### Action Required to Fully Activate Push Notifications
+
+1. **Apply migration 021** — `supabase/migrations/021_push_subscriptions.sql` in Supabase SQL Editor
+2. **Set VAPID keys in Railway** — generate with:
    ```bash
-   # Generate once:
    node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
-
-   # Set in Railway:
-   VAPID_PUBLIC_KEY=<base64url public key>
-   VAPID_PRIVATE_KEY=<base64url private key>
-   VAPID_SUBJECT=mailto:contact@insurai.com
    ```
-3. **Smoke test** — Subscribe in browser → trigger extraction → confirm notification arrives
+   Then set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT=mailto:contact@insurai.com`
+3. **Set CRON_SECRET** in Railway + GitHub Secrets (see above)
+4. **Merge `claude/review-handoff-status-ywsrB` → `main`** to activate the daily schedule
+5. **Smoke test** — Subscribe in browser → trigger extraction → confirm notification arrives
 
-### CI/CD (Unchanged)
-- **staging.yml**: typecheck + lint + unit tests + E2E Playwright (Chromium, in parallel) → build → deploy
-- **production.yml**: same pattern + post-deploy health check with Railway CLI rollback
-- E2E jobs use `E2E_BASE_URL=http://localhost:3000` (production build served by `serve`)
+---
+
+## CI/CD
+
+- **staging.yml**: typecheck + lint + unit tests + E2E Playwright (parallel) → build → deploy
+- **production.yml**: same + post-deploy health check with Railway CLI rollback
+- **notify-expiring.yml**: daily at 08:00 UTC — only active after merge to `main`
+- E2E jobs use `E2E_BASE_URL=http://localhost:3000` (production build via `serve`)
 
 ---
 
 ## Next Steps (Priority Order)
 
-### High Priority (push notifications activation)
-1. **Apply migration 021** to production Supabase
-2. **Set VAPID keys** in Railway environment variables
-3. **Smoke test** the full push notification flow in production
+### High Priority — Activate push notifications end-to-end
+1. **Merge `claude/review-handoff-status-ywsrB` → `main`** to activate the daily expiry cron
+2. **Apply migration 021** to production Supabase (`push_subscriptions` table)
+3. **Set VAPID keys** in Railway environment variables
+4. **Smoke test** the full push notification flow (subscribe → extract → notification arrives)
 
-### Medium Priority (bundle optimization follow-on)
-4. **Split EN translations** from main chunk — `src/lib/i18n/translations.ts` is ~8-12 KB gzip; could be lazy-loaded per locale with dynamic import. Currently the only remaining large item in main chunk after framer-motion removal.
+### Medium Priority
+5. **Split EN translations from main chunk** — `src/lib/i18n/translations.ts` is ~8-12 KB gzip; could be lazy-loaded per locale with dynamic import. Only remaining notable item in main chunk after framer-motion removal.
 
 ### Low Priority
-5. **Policy expiry push notifications** — Add a Supabase Edge Function or scheduled job that calls `sendPolicyExpiryNotification()` N days before expiry
-6. **Real user testimonials** — Replace use-case scenario cards when real users provide quotes
+6. **Real user testimonials** — replace use-case scenario cards when real users provide quotes
+7. **Policy expiry cron — Supabase Edge Function alternative** — if GitHub Actions reliability is a concern, a Supabase Edge Function with `pg_cron` is a serverless alternative
 
 ---
 
 ## Verification Commands
 
 ```bash
-# Full validation — should show 0 errors, 0 warnings, 15,428 tests
-npm run validate  # typecheck + lint + test
+# Full validation
+npm run validate  # typecheck + lint + test (expect 0 errors, 0 warnings, 15,428 tests)
 
-# ESLint only (confirm 0 errors, 0 warnings)
-npm run lint
+# Test the cron endpoint (replace with your actual secret)
+SECRET="your-cron-secret"
+curl -s -X POST \
+  -H "Authorization: Bearer $SECRET" \
+  https://insurai-production.up.railway.app/api/internal/cron/notify-expiring | python3 -m json.tool
 
-# Run animation component tests
-npm test -- --run src/components/animations
-
-# Run push notification tests
-npm test -- --run server/__tests__/notification-routes.test.ts
-npm test -- --run server/__tests__/notification-service.test.ts
-npm test -- --run src/hooks/usePushNotifications.test.ts
-
-# Bundle size analysis (confirm framer-motion not in main chunk)
-npm run build:analyze  # opens stats.html
-
-# E2E tests against production build (mirrors CI)
-npm run build
-npx serve dist -l 3000 &
-E2E_BASE_URL=http://localhost:3000 npx playwright test --project=chromium
+# Verify endpoint rejects unauthenticated requests
+curl -s -o /dev/null -w "%{http_code}\n" \
+  -X POST \
+  https://insurai-production.up.railway.app/api/internal/cron/notify-expiring
+# Must print: 401
 
 # Production health
 curl https://insurai-production.up.railway.app/api/health
@@ -202,29 +207,28 @@ curl https://insurai-production.up.railway.app/api/notifications/public-key
 
 ## Previous Session Context
 
+**February 21, 2026 (framer-motion Bundle Optimization)** (`claude/review-handoff-docs-zo57L`):
+- Removed framer-motion from main chunk → −115 KB raw / −38 KB gzip
+- Main chunk: 1,030 KB → 915 KB raw / 282 KB gzip
+
 **February 20, 2026 (PWA Push Notifications)** (`claude/review-handoff-docs-zo57L`):
-- Added full PWA push notification system (server + client + tests)
-- 15,428 tests (317 files) — includes 5 new push notification test files
-- Migration 021 added but not yet applied to production Supabase
+- Full server + client push notification infrastructure
+- 15,428 tests (317 files) including 5 notification test files
+- Migration 021 added (not yet applied to production Supabase)
 
 **February 20, 2026 (Branch Coverage Gap — Known Issue #116)** (`claude/review-handoff-docs-JGCWm`):
-- Branch coverage 83.69% → 85.91% (+8 focused test files)
-- 9 residual ESLint warnings cleared (Known Issue #118)
-- Migration 020 applied in production Supabase
+- Branch coverage 83.69% → 85.91%
+- 9 residual ESLint warnings cleared
 
-**February 20, 2026 (No-Non-Null-Assertion warnings)** (`claude/review-handoff-docs-1183a`):
-- Eliminated all 47 `no-non-null-assertion` ESLint warnings → 0 warnings
-
-**February 20, 2026 (CI Pipeline Session)**:
-- sortPolicies() `|| 4` → `?? 4` bugfix
-- CI pipeline with Playwright E2E tests (staging.yml + production.yml)
+**February 20, 2026 (No-Non-Null-Assertion)** (`claude/review-handoff-docs-1183a`):
+- Eliminated all 47 `no-non-null-assertion` warnings → 0 warnings total
 
 ---
 
 **Last Updated**: February 21, 2026
-**Branch**: `claude/review-handoff-docs-zo57L`
+**Branch**: `claude/review-handoff-status-ywsrB`
 **ESLint Status**: 0 errors, 0 warnings ✓
 **Tests**: 15,428 passing (317 files), 0 failures ✓
 **Coverage**: 85.91% branches ✓, 91.67% statements
-**Bundle**: Main chunk 915 KB raw / 282 KB gzip (framer-motion in auth-only lazy chunk)
-**Next Session Focus**: Apply migration 021 + set VAPID keys in Railway to activate push notifications
+**Bundle**: 915 KB raw / 282 KB gzip main chunk
+**Next Session Focus**: Merge branch → apply migration 021 → set VAPID keys → smoke test push notifications end-to-end
