@@ -99,7 +99,7 @@ describe('onSyncComplete', () => {
 
 describe('SyncCompletePayload', () => {
   it('has synced (number), failed (number), success (boolean)', async () => {
-    const { } = await import('./index')
+    await import('./index')
 
     // Type exercise: create a payload and check runtime shape
     const payload: import('./index').SyncCompletePayload = {

@@ -1,6 +1,5 @@
 import { useEffect, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
-import { AnimatePresence } from 'framer-motion'
 import { Toaster, toast } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { I18nProvider, useI18n } from './lib/i18n'
@@ -167,8 +166,7 @@ function AppContent() {
 
       <main id="main-content" tabIndex={-1} className="w-full max-w-[100vw] overflow-x-hidden">
         <Suspense fallback={<PageLoader />}>
-          <AnimatePresence mode="wait">
-            <Routes location={location} key={location.pathname}>
+            <Routes location={location}>
               <Route
                 path="/"
                 element={<LandingPage />}
@@ -326,7 +324,6 @@ function AppContent() {
                 }
               />
             </Routes>
-          </AnimatePresence>
         </Suspense>
       </main>
     </ErrorBoundary>

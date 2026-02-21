@@ -3646,6 +3646,28 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/pwa/push-notifications.test.ts` — onSyncComplete callbacks, SW message dispatch
 - **SW Cache**: Bumped to v20 (offline queue wiring changes SW behavior)
 
+### 120. Mobile Bundle Optimization — framer-motion Removed from Main Chunk (Feb 21, 2026)
+- **Problem**: Lighthouse mobile score 71/100 from sandbox throttling, but real cause was 1,030 KB main chunk (320 KB gzip) blocking FCP/LCP on slower connections.
+- **Root Causes** (two eager imports pulling framer-motion into main bundle):
+  1. `App.tsx`: `import { AnimatePresence } from 'framer-motion'` — direct eager import
+  2. `AnimatedComponents.tsx`: `import { motion, AnimatePresence } from 'framer-motion'` — imported by LandingPage→Hero chain
+- **Solution**: Replaced framer-motion with pure CSS animations — identical visual result since all animations were already opacity-only (changed in Known Issue #107 CLS fix):
+  - `AnimatedComponents.tsx` — rewrote all 7 components using CSS `animation: fadeIn` and Tailwind transition classes:
+    - `PageTransition`: `style={{ animation: 'fadeIn 0.3s ease both' }}`
+    - `StaggeredList`: CSS `animation-delay: ${index * delay}s` per child
+    - `AnimatedButton`: Tailwind `hover:scale-[1.02] active:scale-[0.98] transition-transform`
+    - `ScaleOnHover`: Tailwind `hover:scale-105 transition-transform`
+    - `FadeInWhenVisible`: `IntersectionObserver` hook + CSS animation (no `motion.div`)
+    - `NumberCounter`: unchanged (already had no framer-motion)
+    - `AnimatePresence`: no-op wrapper `<>{children}</>`
+  - `App.tsx` — removed `import { AnimatePresence } from 'framer-motion'` and `AnimatePresence` wrapper; removed `key={location.pathname}` from `<Routes>` (was needed only for exit animation timing)
+  - `src/index.css` — added `@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }`
+- **Result**: Main chunk **1,030 KB → 915 KB (−115 KB raw, −38 KB gzip)**. framer-motion moved to `AuthPage` lazy chunk (only loads on /auth navigation).
+- **Also Fixed**: 2 pre-existing lint errors in push notification test files (`loadingDuring` → `_loadingDuring`; empty `const {} =` → bare `await import()`); 18 unused `eslint-disable` warnings auto-fixed.
+- **Zero CLS impact**: All framer-motion animations were already opacity-only (no `y`/`x` transforms). CSS `@keyframes fadeIn` is identical in appearance.
+- **Remaining**: Main chunk is still 282 KB gzip. Further wins possible from splitting EN translations (~8-12 KB) or other lazy-loading, but framer-motion was the dominant contributor.
+- **Files Changed**: `src/components/animations/AnimatedComponents.tsx`, `src/App.tsx`, `src/index.css`
+
 ---
 
 ## Turkish Market Considerations

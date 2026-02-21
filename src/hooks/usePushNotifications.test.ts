@@ -65,16 +65,16 @@ function setPushSupported(supported: boolean): void {
       writable: true,
       configurable: true,
     })
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     ;(globalThis as any).Notification = {
       permission: 'default',
       requestPermission: vi.fn().mockResolvedValue('granted'),
     }
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     delete (window as any).PushManager
     // Use delete so `'Notification' in window` returns false (assigning undefined still returns true)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     delete (globalThis as any).Notification
   }
 }
@@ -100,7 +100,7 @@ describe('usePushNotifications', () => {
   })
 
   afterEach(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     ;(globalThis as any).Notification = originalNotification
   })
 
@@ -120,7 +120,7 @@ describe('usePushNotifications', () => {
     })
 
     it('is false when PushManager is missing', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
       expect(result.current.isSupported).toBe(false)
@@ -128,7 +128,7 @@ describe('usePushNotifications', () => {
 
     it('is false when Notification is missing', async () => {
       // Must delete (not assign undefined) so `'Notification' in window` returns false
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       delete (globalThis as any).Notification
       const { result } = await renderHookWithImport()
       expect(result.current.isSupported).toBe(false)
@@ -140,7 +140,7 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('permission', () => {
     it('reflects Notification.permission on mount', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { ...originalNotification, permission: 'granted', requestPermission: vi.fn() }
       const { result } = await renderHookWithImport()
       expect(result.current.permission).toBe('granted')
@@ -206,7 +206,7 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('subscribe', () => {
     it('returns false when push is not supported', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
 
@@ -218,7 +218,7 @@ describe('usePushNotifications', () => {
     })
 
     it('requests notification permission', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       const mockRequest = vi.fn().mockResolvedValue('denied')
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: mockRequest }
 
@@ -232,7 +232,7 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when permission is denied', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('denied') }
 
       const { result } = await renderHookWithImport()
@@ -246,7 +246,7 @@ describe('usePushNotifications', () => {
     })
 
     it('fetches VAPID public key from server', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch
         .mockResolvedValueOnce({
@@ -274,7 +274,7 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when VAPID key fetch fails', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch.mockResolvedValueOnce({ ok: false })
 
@@ -289,7 +289,7 @@ describe('usePushNotifications', () => {
     })
 
     it('calls subscribeToPush with the VAPID key', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch
         .mockResolvedValueOnce({
@@ -315,7 +315,7 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false when subscribeToPush returns null', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -334,7 +334,7 @@ describe('usePushNotifications', () => {
     })
 
     it('posts subscription to server', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch
         .mockResolvedValueOnce({
@@ -364,7 +364,7 @@ describe('usePushNotifications', () => {
     })
 
     it('returns true on successful subscription', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch
         .mockResolvedValueOnce({
@@ -392,7 +392,7 @@ describe('usePushNotifications', () => {
     })
 
     it('returns false and unsubscribes from SW when server registration fails', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('granted') }
       mockFetch
         .mockResolvedValueOnce({
@@ -418,17 +418,15 @@ describe('usePushNotifications', () => {
     })
 
     it('sets isLoading during the operation', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(globalThis as any).Notification = { permission: 'default', requestPermission: vi.fn().mockResolvedValue('denied') }
 
       const { result } = await renderHookWithImport()
 
       expect(result.current.isLoading).toBe(false)
       // isLoading becomes true during subscribe and false after
-      let loadingDuring = false
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let _loadingDuring = false
       ;(globalThis as any).Notification.requestPermission = vi.fn().mockImplementation(async () => {
-        loadingDuring = result.current.isLoading
+        _loadingDuring = result.current.isLoading
         return 'denied'
       })
 
@@ -445,7 +443,7 @@ describe('usePushNotifications', () => {
   // -------------------------------------------------------------------------
   describe('unsubscribe', () => {
     it('returns false when push is not supported', async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       
       delete (window as any).PushManager
       const { result } = await renderHookWithImport()
 
