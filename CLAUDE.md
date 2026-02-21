@@ -367,6 +367,12 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...   # Service role key (NOT anon key) — from
 # Admin auth — REQUIRED for admin login
 # Generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 ADMIN_JWT_SECRET=your-random-64-char-hex-secret
+
+# Push Notifications (Web Push / VAPID) — OPTIONAL for local dev, REQUIRED in production
+# Generate once: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+VAPID_PUBLIC_KEY=your-vapid-public-key-here
+VAPID_PRIVATE_KEY=your-vapid-private-key-here
+VAPID_SUBJECT=mailto:contact@insurai.com
 ```
 
 **CRITICAL RULES**:
@@ -374,6 +380,7 @@ ADMIN_JWT_SECRET=your-random-64-char-hex-secret
 2. Server uses `.env` file (not `.env.local`)
 3. In development, Vite proxy handles `/api/*` requests automatically
 4. `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` + `ADMIN_JWT_SECRET` are required to use the admin panel locally; without them admin login returns 500 (diagnose at `/api/admin/diagnostics`)
+5. `VAPID_*` keys are optional locally but required in production for push notifications; without them notifications silently degrade (no crash, `log.warn` emitted)
 
 ---
 
@@ -3902,6 +3909,13 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbG...
 
 # Admin JWT (generate with: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
 ADMIN_JWT_SECRET=your-random-secret
+
+# Push Notifications (Web Push / VAPID) — REQUIRED for push notifications to work
+# Generate once: node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"
+# Without these, push notifications silently degrade (log.warn, return 0) — no crash
+VAPID_PUBLIC_KEY=...      # base64url ECDH public key from generateVAPIDKeys()
+VAPID_PRIVATE_KEY=...     # base64url ECDH private key (keep secret)
+VAPID_SUBJECT=mailto:contact@insurai.com
 
 # Build-time (embedded in JS bundle)
 VITE_SUPABASE_URL=https://xxx.supabase.co

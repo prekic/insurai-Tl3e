@@ -41,11 +41,28 @@ Also fixed pre-existing lint errors in two push notification test files inherite
 
 ---
 
-## Commits This Session
+## All Commits on This Branch (since merge `029e2cf`)
 
-| Commit | Description | Files |
-|--------|-------------|-------|
-| `a1a71ab` | perf: remove framer-motion from main chunk, replace with CSS animations | 6 files |
+### Bundle Optimization — Feb 21, 2026
+
+| Commit | Description |
+|--------|-------------|
+| `6a4a4ca` | docs: update CLAUDE.md and SESSION_HANDOFF.md for Feb 21 session |
+| `a1a71ab` | perf: remove framer-motion from main chunk, replace with CSS animations |
+
+### PWA Push Notifications — Feb 20, 2026
+
+| Commit | Description |
+|--------|-------------|
+| `905fc6b` | docs: update CLAUDE.md service worker version refs to v20 |
+| `62da79e` | fix: resolve 3 TypeScript errors in notification service |
+| `2639021` | fix: use existing update_updated_at_column() in migration 021 |
+| `ff0a998` | docs: mark test suite verified (15,428/317) after notification test fixes |
+| `bb1d91b` | fix: resolve 26 failing notification tests (service + hook) |
+| `bd0ce27` | docs: update SESSION_HANDOFF.md for PWA push notifications session |
+| `f047972` | docs: CLAUDE.md #119, deployment guides, VAPID env vars, SW cache v20 |
+| `d34c60c` | test: add push notification test suite (5 files, ~165 tests) |
+| `499b86f` | feat: add PWA push notifications (server + client infrastructure) |
 
 ---
 
@@ -66,11 +83,7 @@ All 6 exports are now framer-motion-free:
 
 ---
 
-## Prior Session Work (Inherited into This Branch)
-
-The following was completed in the prior session (`claude/review-handoff-docs-zo57L`, Feb 20):
-
-### PWA Push Notifications (Known Issue #119)
+## PWA Push Notifications — Architecture & Files (Feb 20, Known Issue #119)
 
 Full browser push notification system using Web Push API (VAPID):
 
