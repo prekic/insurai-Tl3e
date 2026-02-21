@@ -15,10 +15,10 @@ CREATE TABLE IF NOT EXISTS public.push_subscriptions (
   UNIQUE(user_id, endpoint)
 );
 
--- Automatic updated_at trigger (follows existing pattern in project)
+-- Automatic updated_at trigger (uses update_updated_at_column from migration 012)
 CREATE OR REPLACE TRIGGER set_push_subscriptions_updated_at
   BEFORE UPDATE ON public.push_subscriptions
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Row Level Security
 ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
