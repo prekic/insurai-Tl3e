@@ -157,18 +157,18 @@ export async function sendPushNotification(
 
   // Clean up stale subscriptions (non-blocking)
   if (staleEndpoints.length > 0) {
-    db.from('push_subscriptions')
-      .delete()
-      .eq('user_id', userId)
-      .in('endpoint', staleEndpoints)
-      .then(() => {
-        log.info('Removed stale push subscriptions', { userId, count: staleEndpoints.length })
+    Promise.resolve(
+      db.from('push_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+        .in('endpoint', staleEndpoints)
+    ).then(() => {
+      log.info('Removed stale push subscriptions', { userId, count: staleEndpoints.length })
+    }).catch((err: unknown) => {
+      log.warn('Failed to remove stale push subscriptions', {
+        userId, error: err instanceof Error ? err.message : String(err)
       })
-      .catch((err) => {
-        log.warn('Failed to remove stale push subscriptions', {
-          userId, error: err instanceof Error ? err.message : String(err)
-        })
-      })
+    })
   }
 
   return successCount

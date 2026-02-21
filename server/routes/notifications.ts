@@ -95,7 +95,7 @@ router.get('/status', async (req: Request, res: Response) => {
   }
 
   try {
-    const { data, error, count } = await db
+    const { error, count } = await db
       .from('push_subscriptions')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
