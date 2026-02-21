@@ -105,6 +105,8 @@ export interface ExtractionOptions {
   providers?: AIProvider[]
   /** Optional logger for tracking processing stages with actual data */
   logger?: ProcessingLogger
+  /** Authenticated user's Supabase UUID — forwarded as x-user-id to trigger push notifications */
+  userId?: string
 }
 
 /**
@@ -274,6 +276,7 @@ export async function extractPolicyFromDocument(
     primaryProvider,
     providers,
     logger,  // Optional processing logger for tracking stages
+    userId,  // Authenticated user ID for push notification targeting
   } = options
 
   // Validate file type
@@ -660,7 +663,7 @@ export async function extractPolicyFromDocument(
     } else {
       // Use single provider (use processed text for better extraction)
       console.warn('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
-      extractedData = await extractWithProvider(provider, processedText)
+      extractedData = await extractWithProvider(provider, processedText, userId)
       console.warn('[PolicyExtractor] extractWithProvider returned:', {
         hasData: !!extractedData,
         policyNumber: extractedData?.policyNumber,
@@ -1174,12 +1177,12 @@ export async function extractPolicyFromDocument(
 /**
  * Extract using a specific provider
  */
-async function extractWithProvider(provider: AIProvider, documentText: string): Promise<ExtractedPolicyData> {
+async function extractWithProvider(provider: AIProvider, documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
   switch (provider) {
     case 'openai':
-      return extractWithOpenAI(documentText)
+      return extractWithOpenAI(documentText, notifyUserId)
     case 'anthropic':
-      return extractWithClaude(documentText)
+      return extractWithClaude(documentText, notifyUserId)
     default:
       throw new Error(`Unknown provider: ${provider}`)
   }

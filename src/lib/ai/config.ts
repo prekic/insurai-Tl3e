@@ -240,7 +240,8 @@ export function getGoogleCloudApiKey(): string | null {
 export async function extractViaProxy(
   _provider: 'openai' | 'anthropic',
   documentText: string,
-  systemPrompt: string
+  systemPrompt: string,
+  userId?: string
 ): Promise<{
   success: boolean
   data?: Record<string, unknown>
@@ -263,9 +264,11 @@ export async function extractViaProxy(
     console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`)
 
     // Use unified endpoint with automatic fallback
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+    if (userId) headers['x-user-id'] = userId
     const response = await fetch(`${proxyUrl}/api/ai/extract`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({
         documentText,
         systemPrompt,

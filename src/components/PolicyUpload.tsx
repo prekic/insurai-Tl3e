@@ -359,6 +359,7 @@ export function PolicyUpload() {
       const result = await extractPolicyFromDocument(file, {
         useFallback: false,
         logger,  // Pass logger to track extraction stages
+        userId: user?.id,  // Forward user ID so server can send push notification on completion
       })
 
       if (!result.success) {

@@ -70,7 +70,7 @@ function getCurrentUserId(): string {
  * Implements caching for cost reduction (~60% savings on repeated documents)
  * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
-export async function extractWithClaude(documentText: string): Promise<ExtractedPolicyData> {
+export async function extractWithClaude(documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.anthropic.extractionModel
 
@@ -147,7 +147,7 @@ export async function extractWithClaude(documentText: string): Promise<Extracted
   try {
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
-      const proxyResult = await extractViaProxy('anthropic', userMessage, EXTRACTION_SYSTEM_PROMPT)
+      const proxyResult = await extractViaProxy('anthropic', userMessage, EXTRACTION_SYSTEM_PROMPT, notifyUserId)
 
       if (!proxyResult.success || !proxyResult.data) {
         throw new Error(proxyResult.error || 'Claude extraction via proxy failed')
