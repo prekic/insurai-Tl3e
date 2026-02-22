@@ -4,9 +4,14 @@
  * Tests for the FAQ accordion section
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FAQ } from './FAQ'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
+
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+}))
 
 describe('FAQ', () => {
   describe('Rendering', () => {

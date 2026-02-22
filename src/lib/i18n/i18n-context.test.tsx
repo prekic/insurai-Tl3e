@@ -476,8 +476,9 @@ describe('i18n Context', () => {
       )
 
       await waitFor(() => {
-        // Should fallback to EN_TRANSLATIONS
-        expect(screen.getByTestId('loading')).toHaveTextContent('Loading...')
+        // Falls back to SKELETON_TRANSLATIONS (empty strings) on error
+        // because the context default is SKELETON, not EN_TRANSLATIONS
+        expect(screen.getByTestId('loading')).toHaveTextContent('')
       })
 
       expect(consoleSpy).toHaveBeenCalled()

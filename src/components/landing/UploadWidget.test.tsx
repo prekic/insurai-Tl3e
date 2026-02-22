@@ -3,6 +3,11 @@ import { render, screen, waitFor, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { UploadWidget } from './UploadWidget'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
+
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+}))
 
 // Hoisted mocks - must be hoisted before vi.mock calls
 const { mockToast, mockUser, mockValidateFiles } = vi.hoisted(() => ({

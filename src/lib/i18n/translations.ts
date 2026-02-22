@@ -1006,10 +1006,11 @@ export interface TranslationDictionary {
   insightTranslations: Record<string, string>
 }
 
-// Backward-compatible re-exports — translation data lives in split files for lazy loading.
-// Rollup tree-shakes these out of any bundle that only imports types or COMMON_LOCALES.
-export { EN_TRANSLATIONS } from './translations-en'
-export { TR_TRANSLATIONS } from './translations-tr'
-
-// PRELOADED_TRANSLATIONS is no longer a static object — use getTranslations() from
-// translation-service.ts which dynamically loads locale data on demand.
+// Translation data lives in split files for lazy loading:
+//   EN_TRANSLATIONS → './translations-en'  (async chunk, lazy-loaded)
+//   TR_TRANSLATIONS → './translations-tr'  (async chunk, lazy-loaded)
+//
+// Import directly from those files when needed. Do NOT import from this file
+// expecting translation objects — only types and COMMON_LOCALES are exported here.
+//
+// For the initial app state, import SKELETON_TRANSLATIONS from './translations-skeleton'.

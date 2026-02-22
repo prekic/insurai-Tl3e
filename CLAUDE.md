@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry push notification scheduler (daily cron, 7/14/30-day windows, production-verified)**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry push notification scheduler (daily cron, 7/14/30-day windows, production-verified)**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**
 - **Production Readiness**: ~9.5/10 (15,427+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 22, 2026 (TR translations lazy-load + push notification end-to-end verification)
+- **Last Updated**: February 22, 2026 (EN translations lazy-load — completes lazy-i18n; both EN + TR are now async Vite chunks)
 
 ---
 
@@ -3685,7 +3685,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Result**: Main chunk **1,030 KB → 915 KB (−115 KB raw, −38 KB gzip)**. framer-motion moved to `AuthPage` lazy chunk (only loads on /auth navigation).
 - **Also Fixed**: 2 pre-existing lint errors in push notification test files (`loadingDuring` → `_loadingDuring`; empty `const {} =` → bare `await import()`); 18 unused `eslint-disable` warnings auto-fixed.
 - **Zero CLS impact**: All framer-motion animations were already opacity-only (no `y`/`x` transforms). CSS `@keyframes fadeIn` is identical in appearance.
-- **Remaining**: Main chunk reduced to ~268 KB gzip after TR translations lazy-load (see Known Issue #123). Further wins possible from splitting EN translations or other lazy-loading, but diminishing returns from here.
+- **Remaining**: Main chunk reduced to ~268 KB gzip after TR lazy-load (#123) and ~259 KB gzip after EN lazy-load (#124). Both EN and TR translations are now async chunks — the lazy-i18n story is complete. Supabase client (~50 KB gzip) is the next largest independent candidate if further splitting is desired.
 - **Files Changed**: `src/components/animations/AnimatedComponents.tsx`, `src/App.tsx`, `src/index.css`
 
 ### 121. Policy Expiry Push Notification Scheduler (Added Feb 21, 2026)
@@ -3745,6 +3745,42 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Gotcha — importing TR translations directly**: If a file must import `TR_TRANSLATIONS` at module load time (not lazily), import from `./translations-tr` directly. Do NOT import from `./translations.ts` expecting TR — it no longer re-exports TR_TRANSLATIONS eagerly.
 - **Files Changed**: `translations.ts`, `translations-en.ts` (new), `translations-tr.ts` (new), `translation-service.ts`, `i18n-context.tsx`, `policy-extractor.ts`, `index.ts`, 5 test files
 - **Commits**: `45b742a`
+
+### 124. EN Translations Lazy-Loaded as Async Vite Chunk — Completes Lazy-i18n (Added Feb 22, 2026)
+- **Feature**: English translations split out of the main bundle into a separate async Vite chunk, completing the lazy-i18n story where both EN and TR are now loaded on demand
+- **Problem**: After Known Issue #123 (TR split), `EN_TRANSLATIONS` was still statically imported in `i18n-context.tsx` as the initial React state, keeping ~12 KB gzip in the main bundle
+- **Solution**:
+  - Added `src/lib/i18n/translations-skeleton.ts` — all-empty-string `TranslationDictionary` (923 lines) used as the synchronous initial state in `i18n-context.tsx` before any locale loads
+  - `i18n-context.tsx` — replaced `EN_TRANSLATIONS` initial state with `SKELETON_TRANSLATIONS`
+  - `translations.ts` / `index.ts` — removed remaining static EN re-exports (the barrel re-export was the only thing pulling `translations-en.ts` into the main chunk via the i18n index)
+  - `translation-service.ts` — final fallback (unknown locale, no cache, API down) now dynamically imports `EN_TRANSLATIONS` instead of returning `SKELETON_TRANSLATIONS`, preserving user-facing behaviour while keeping EN out of the main bundle
+- **Result**: Main bundle saves ~8.7 KB gzip (both EN and TR translations are now async chunks). Load sequence:
+  1. App starts → context initialises with `SKELETON_TRANSLATIONS` (all empty strings, synchronous)
+  2. `translation-service.ts` runs `getPreloadedTranslations()` for the user's locale
+  3. For `'tr'`: `await import('./translations-tr')` → TR async chunk fetched
+  4. For `'en'`: `await import('./translations-en')` → EN async chunk fetched
+  5. Context updates → components re-render with real strings
+- **Architecture after this change**:
+  ```
+  main chunk (~259 KB gzip)  [was 268 KB after #123]
+    └── translations-skeleton.ts (empty strings — no cost)
+  async chunk: translations-en-*.js (~12 KB gzip)
+    └── translations-en.ts (EN — lazy via dynamic import)
+  async chunk: translations-tr-*.js (13.77 KB gzip)
+    └── translations-tr.ts (TR — lazy via dynamic import)
+  ```
+- **Test fixes required** (37 files):
+  - 9 landing/component test files that use `useTranslation()` — needed `vi.mock('@/lib/i18n/i18n-context')` because context default is now `SKELETON` (empty strings) not `EN_TRANSLATIONS`
+  - 19 component test files — `EN_TRANSLATIONS` import path updated from `translations` to `translations-en`
+  - 2 i18n-context test files — error-fallback assertion updated from `'Home'`/`'Loading...'` to `''` (skeleton empty strings)
+  - `translations.test.ts` — replaced `PRELOADED_TRANSLATIONS` checks with named export presence checks
+- **Key distinction — two different fallback levels**:
+  - `i18n-context.tsx` error catch path: `setTranslations(SKELETON_TRANSLATIONS)` — when the entire `getTranslations()` call rejects, context holds empty strings (acceptable degradation; SKELETON is synchronously available)
+  - `translation-service.ts` final fallback: dynamically imports `EN_TRANSLATIONS` — when locale is unknown/unsupported, users get real English content, not empty strings
+- **Gotcha — components now render with empty strings briefly on first load**: Unlike before where EN was always available immediately, components may show empty strings for 1 render cycle until the async EN/TR chunk loads. This is invisible in practice (< 50ms on fast connections) but test assertions that fire synchronously may see `''` instead of expected English strings — add `await waitFor(...)` to fix.
+- **New file**: `src/lib/i18n/translations-skeleton.ts` — do NOT add translation content here; it must stay all-empty-string so it has no bundle cost
+- **Files Changed**: `translations-skeleton.ts` (new), `translations.ts`, `index.ts`, `translation-service.ts`, `i18n-context.tsx`, 32 test files
+- **Commits**: `469b100` (feature), `efbb38f` (docs)
 
 ---
 
@@ -4276,13 +4312,17 @@ connectSrc: [
 - **Do NOT** re-add framer-motion imports to `AnimatedComponents.tsx` or `App.tsx` — it will balloon the main chunk by +115 KB raw (+38 KB gzip)
 - framer-motion is still a dependency (used in `AuthPage` lazy chunk) — do not remove it from `package.json`
 
-**TR Translations Split — Import Path Gotcha (Feb 22, 2026):**
-- `TR_TRANSLATIONS` now lives in `src/lib/i18n/translations-tr.ts`, NOT `translations.ts`
-- `EN_TRANSLATIONS` now lives in `src/lib/i18n/translations-en.ts`, NOT `translations.ts`
+**EN + TR Translations Split — Import Path Gotcha (Feb 22, 2026):**
+- Both `EN_TRANSLATIONS` and `TR_TRANSLATIONS` are now in their own files and lazy-loaded as async Vite chunks
+- `TR_TRANSLATIONS` lives in `src/lib/i18n/translations-tr.ts`, NOT `translations.ts`
+- `EN_TRANSLATIONS` lives in `src/lib/i18n/translations-en.ts`, NOT `translations.ts`
 - `translations.ts` only re-exports the `TranslationDictionary` interface and `COMMON_LOCALES` — do NOT expect to import translation objects from it
 - If a new file needs TR translations at load time: `import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'`
+- If a new file needs EN translations at load time: `import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'`
 - If a new test mocks TR translations: add `vi.mock('@/lib/i18n/translations-tr', () => ({ TR_TRANSLATIONS: EN_TRANSLATIONS }))` (use EN as stand-in, tests run in English)
-- The lazy-load in `translation-service.ts` is `await import('./translations-tr')` — Vite/Rollup will keep it in the async chunk only if no eager import elsewhere pulls it into the main chunk
+- If a component test uses `useTranslation()` hook, add `vi.mock('@/lib/i18n/i18n-context', () => ({ useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }) }))` — the context default is now `SKELETON_TRANSLATIONS` (empty strings), not EN
+- The lazy-loads in `translation-service.ts` are `await import('./translations-en')` and `await import('./translations-tr')` — Vite/Rollup keeps them in async chunks only if no eager import elsewhere pulls them into the main chunk
+- `src/lib/i18n/translations-skeleton.ts` — do NOT add translation content here; it must stay all-empty-string to have zero bundle cost (it IS in the main chunk)
 
 **Internal Cron Endpoint — CRON_SECRET must be set in both places:**
 - `CRON_SECRET` must be set in **Railway Variables** (so the server accepts it) AND **GitHub Secrets** (so the workflow can send it)
@@ -4404,4 +4444,5 @@ npm run build:analyze
 **Branch**: Develop on feature branches, merge to main via PR
 **Tests**: 15,427 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Last Updated**: February 22, 2026 (push notification end-to-end verification)
+**Bundle**: ~259 KB gzip main chunk + 12 KB gzip EN chunk + 14 KB gzip TR chunk (both async)
+**Last Updated**: February 22, 2026 (EN translations lazy-load — completes lazy-i18n)

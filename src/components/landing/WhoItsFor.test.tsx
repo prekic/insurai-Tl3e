@@ -7,7 +7,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { WhoItsFor } from './WhoItsFor'
-import { EN_TRANSLATIONS, TR_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
+import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
 
 // Mock i18n context - default to English
 const mockTranslations = { current: EN_TRANSLATIONS }
