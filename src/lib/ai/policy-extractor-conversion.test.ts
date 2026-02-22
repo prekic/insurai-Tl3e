@@ -29,11 +29,13 @@ vi.mock('@/lib/i18n/coverage-names', () => ({
   lookupCoverageNameTr: vi.fn().mockReturnValue(null),
 }))
 
-vi.mock('@/lib/i18n/translations', () => ({
+vi.mock('@/lib/i18n/translations-tr', () => ({
   TR_TRANSLATIONS: {
     insightTranslations: {},
   },
 }))
+
+vi.mock('@/lib/i18n/translations', () => ({}))
 
 // Mocks for all other deep imports pulled in by policy-extractor
 vi.mock('./pdf-parser', () => ({

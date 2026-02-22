@@ -6,7 +6,9 @@ export { I18nProvider, useI18n, useTranslation, useLanguageSelector, type Locale
 
 // Types and translations
 export type { TranslationDictionary, SupportedLocale, CommonLocale } from './translations'
-export { COMMON_LOCALES, EN_TRANSLATIONS, TR_TRANSLATIONS, PRELOADED_TRANSLATIONS } from './translations'
+export { COMMON_LOCALES } from './translations'
+export { EN_TRANSLATIONS } from './translations-en'
+export { TR_TRANSLATIONS } from './translations-tr'
 
 // Translation service
 export {

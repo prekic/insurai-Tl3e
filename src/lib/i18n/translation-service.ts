@@ -3,7 +3,8 @@
 // Three-tier loading: preloaded → localStorage cache → API fetch → fallback
 
 import type { TranslationDictionary } from './translations'
-import { EN_TRANSLATIONS, PRELOADED_TRANSLATIONS, COMMON_LOCALES } from './translations'
+import { COMMON_LOCALES } from './translations'
+import { EN_TRANSLATIONS } from './translations-en'
 import {
   getCachedTranslations,
   setCachedTranslations,
@@ -108,6 +109,30 @@ async function fetchTranslationsFromAPI(locale: string): Promise<{
 }
 
 // =============================================================================
+// PRELOADED TRANSLATIONS — LAZY LOADED PER LOCALE
+// =============================================================================
+
+/**
+ * Dynamically import preloaded translations for a locale.
+ * Each locale is a separate chunk so only the needed locale is fetched.
+ */
+async function getPreloadedTranslations(locale: string): Promise<TranslationDictionary | null> {
+  try {
+    if (locale === 'en') {
+      // EN is also eagerly imported above, so this resolves from module cache instantly
+      return EN_TRANSLATIONS
+    }
+    if (locale === 'tr') {
+      const { TR_TRANSLATIONS } = await import('./translations-tr')
+      return TR_TRANSLATIONS
+    }
+  } catch {
+    // Dynamic import failed
+  }
+  return null
+}
+
+// =============================================================================
 // MAIN TRANSLATION FUNCTION
 // =============================================================================
 
@@ -115,7 +140,7 @@ async function fetchTranslationsFromAPI(locale: string): Promise<{
  * Get translations for a locale.
  *
  * Loading strategy (in order):
- * 1. Preloaded translations (EN/TR) — instant, no network
+ * 1. Preloaded translations (EN/TR) — lazy-loaded per locale chunk
  * 2. localStorage cache — fast, check version freshness
  * 3. API fetch — network call to /api/translations/:locale
  * 4. Fallback to EN_TRANSLATIONS — always available
@@ -135,8 +160,8 @@ export async function getTranslations(
     message: 'Loading translations...',
   })
 
-  // 1. Check preloaded translations (instant fallback for EN/TR)
-  const preloaded = PRELOADED_TRANSLATIONS[normalizedLocale]
+  // 1. Check preloaded translations (lazy-loaded chunk per locale)
+  const preloaded = await getPreloadedTranslations(normalizedLocale)
 
   // 2. Check localStorage cache
   const cached = getCachedTranslations(normalizedLocale)
@@ -299,7 +324,7 @@ export function getLocaleInfo(locale: string) {
     nativeName: apiLocale?.nativeName || common?.nativeName || locale,
     flag: apiLocale?.flag || common?.flag || '🌐',
     rtl: apiLocale?.isRtl || isRTLLocale(normalized),
-    isPreloaded: !!PRELOADED_TRANSLATIONS[normalized],
+    isPreloaded: normalized === 'en' || normalized === 'tr',
     isCached: !!getCachedTranslations(normalized),
   }
 }

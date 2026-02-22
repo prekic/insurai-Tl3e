@@ -180,9 +180,11 @@ vi.mock('@/lib/i18n/coverage-names', () => ({
   lookupCoverageNameTr: vi.fn().mockReturnValue(null),
 }))
 
-vi.mock('@/lib/i18n/translations', () => ({
+vi.mock('@/lib/i18n/translations-tr', () => ({
   TR_TRANSLATIONS: { insightTranslations: {} },
 }))
+
+vi.mock('@/lib/i18n/translations', () => ({}))
 
 vi.mock('@/data/sample-policies', () => ({
   samplePolicies: [],
