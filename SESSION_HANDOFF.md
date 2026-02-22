@@ -41,8 +41,8 @@ Two pieces of work this session:
 | 2 | **Push notification production verification** | (verified live) | — |
 | 3 | **CLAUDE.md — push notification documented as verified** | `04f9012` | `CLAUDE.md` |
 | 4 | **Known Issue #122 — migration 021 applied to production** | `074658e` | `CLAUDE.md` |
-| 5 | **Known Issue #123 — TR translations lazy-load** | this session | `CLAUDE.md` |
-| 6 | **SESSION_HANDOFF.md update** | this commit | `SESSION_HANDOFF.md` |
+| 5 | **Known Issue #123 — TR translations lazy-load** | `14ec28c` | `CLAUDE.md` |
+| 6 | **SESSION_HANDOFF.md update** | `14ec28c` | `SESSION_HANDOFF.md` |
 
 ---
 
@@ -80,7 +80,7 @@ async chunk: translations-tr-*.js (13.77 KB gzip)
 | `45b742a` | feat(i18n): lazy-load TR translations as async Vite chunk (~14 KB gzip saved from main bundle) |
 | `04f9012` | docs: update CLAUDE.md — push notification system production-verified |
 | `074658e` | docs: add Known Issue #122 — migration 021 applied to production |
-| this commit | docs: update CLAUDE.md #123 + SESSION_HANDOFF.md |
+| `14ec28c` | docs: update CLAUDE.md #123 + SESSION_HANDOFF.md |
 
 ---
 
@@ -110,26 +110,44 @@ All previously-pending items from last session are **resolved**:
 - **SW Cache**: v20
 
 ### Environment Variables — All Confirmed Set
+
+**Build-time (baked into JS bundle at `npm run build` — must be set in Railway before build):**
 ```
-# AI Providers (all healthy)
+VITE_SUPABASE_URL=https://xxx.supabase.co       # required
+VITE_SUPABASE_ANON_KEY=eyJ...                   # required
+VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX             # optional — GA4 analytics
+VITE_SENTRY_DSN=https://xxx@sentry.io/xxx       # optional — frontend error tracking
+```
+
+**Runtime (read by Node.js server at startup — never exposed to browser):**
+```
+# AI Providers (all healthy as of Feb 22)
 OPENAI_API_KEY
 ANTHROPIC_API_KEY
-GOOGLE_CLOUD_API_KEY + GCP_SERVICE_ACCOUNT_BASE64
+GOOGLE_CLOUD_API_KEY
+GCP_SERVICE_ACCOUNT_BASE64   # base64-encoded service account JSON for Document AI
 
-# Supabase
-SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
+# Supabase (server-side — service role, NOT anon key)
+SUPABASE_URL
+SUPABASE_SERVICE_ROLE_KEY
 
-# Admin
-ADMIN_JWT_SECRET
+# Admin auth
+ADMIN_JWT_SECRET             # generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
 
-# Push Notifications (confirmed working)
-VAPID_PUBLIC_KEY + VAPID_PRIVATE_KEY + VAPID_SUBJECT
+# Push Notifications (confirmed working Feb 22)
+VAPID_PUBLIC_KEY
+VAPID_PRIVATE_KEY
+VAPID_SUBJECT=mailto:contact@insurai.com
 
-# Cron (confirmed working)
-CRON_SECRET (also in GitHub Secrets)
+# Cron (confirmed working Feb 22)
+CRON_SECRET                  # also required in GitHub Secrets for notify-expiring.yml workflow
+```
 
-# Analytics (optional)
-VITE_GA_MEASUREMENT_ID
+**Optional overrides (server-side):**
+```
+LOG_LEVEL=warn               # default: info; set warn to reduce noise in Railway logs
+UNSUBSCRIBE_SECRET=xxx       # falls back to ADMIN_JWT_SECRET if not set
+PRODUCTION_SERVER_URL=https://insurai-production.up.railway.app  # GitHub Secret for cron workflow
 ```
 
 ---
