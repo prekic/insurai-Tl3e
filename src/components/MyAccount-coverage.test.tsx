@@ -38,6 +38,11 @@ let mockFetchProfileResult: Record<string, unknown> | null = null
 let mockFetchStatsResult = { policiesAnalyzed: 0, comparisons: 0, savedReports: 0 }
 let mockUpdateProfileFn = vi.fn()
 
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => mockIsSupabaseConfigured,
+  credentials: null,
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => mockIsSupabaseConfigured,
   fetchUserProfile: () => Promise.resolve(mockFetchProfileResult),

@@ -35,6 +35,16 @@ const mockFrom = vi.fn((_table: string) => {
 const mockGetUser = vi.fn()
 const mockUpdateUser = vi.fn()
 
+
+vi.mock('./config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('./config', () => ({
+  isSupabaseConfigured: () => true,
+  credentials: null
+}))
 vi.mock('./client', () => ({
   supabase: {
     from: (...args: unknown[]) => mockFrom(...args),
@@ -43,7 +53,7 @@ vi.mock('./client', () => ({
       updateUser: (...args: unknown[]) => mockUpdateUser(...args),
     },
   },
-  isSupabaseConfigured: () => true,
+
 }))
 
 import {

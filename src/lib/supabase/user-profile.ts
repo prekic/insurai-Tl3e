@@ -5,7 +5,8 @@
  * Profile data is stored in both auth.users (user_metadata) and public.users table.
  */
 
-import { supabase, isSupabaseConfigured } from './client'
+import { supabase } from './client'
+import { isSupabaseConfigured } from './config'
 import type { UserRow, UserUpdate } from './types'
 
 /**

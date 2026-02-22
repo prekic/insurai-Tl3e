@@ -6,7 +6,7 @@
  * comparison and value-based (% of insured value) comparison.
  */
 
-import { supabase } from '@/lib/supabase/client'
+const getSupabase = () => import('@/lib/supabase/client').then(m => m.supabase)
 
 // =============================================================================
 // TYPES
@@ -70,7 +70,7 @@ function isCacheValid(): boolean {
  */
 export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (await getSupabase())
       .from('premium_benchmarks')
       .select('*')
       .eq('is_active', true)

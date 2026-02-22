@@ -244,7 +244,7 @@ describe('ConfigurationService', () => {
 
     it('should handle non-Error exceptions in error message', async () => {
       mockFrom.mockImplementationOnce(() => {
-        throw 'string error'  
+        throw 'string error'
       })
       const result = await service.get('ai', 'key', 'default')
       expect(result).toBe('default')
@@ -395,7 +395,7 @@ describe('ConfigurationService', () => {
 
     it('should handle non-Error exception in getCategory', async () => {
       mockFrom.mockImplementationOnce(() => {
-        throw 42  
+        throw 42
       })
       const result = await service.getCategory('ai')
       expect(result).toEqual({})
@@ -1172,13 +1172,10 @@ describe('ConfigurationService', () => {
         id: 'p1',
         code: 'allianz',
         name: 'Allianz',
-        nameTr: 'Allianz Sigorta',
-        marketShare: 12.8,
-        customerRating: 4.2,
-        establishedYear: 1923,
-        headquarters: 'Istanbul',
+        aliases: [],
         website: 'https://allianz.com.tr',
-        logoUrl: '/logos/allianz.png',
+        supportPhone: undefined,
+        supportEmail: undefined,
         specialties: ['kasko', 'health'],
         isActive: true,
       })
@@ -1400,8 +1397,9 @@ describe('ConfigurationService', () => {
     })
 
     it('should return true when upsert succeeds', async () => {
+      setupSingleQuery({ data: null, error: null })
       mockUpsert.mockResolvedValueOnce({ error: null })
-      mockFrom.mockReturnValueOnce({
+      mockFrom.mockReturnValue({
         select: mockSelect,
         upsert: mockUpsert,
       })
@@ -1410,8 +1408,9 @@ describe('ConfigurationService', () => {
     })
 
     it('should return false when upsert returns error', async () => {
+      setupSingleQuery({ data: null, error: null })
       mockUpsert.mockResolvedValueOnce({ error: { message: 'conflict' } })
-      mockFrom.mockReturnValueOnce({
+      mockFrom.mockReturnValue({
         select: mockSelect,
         upsert: mockUpsert,
       })

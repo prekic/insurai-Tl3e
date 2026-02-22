@@ -6,6 +6,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { UserProfile, UserProfileUpdate, UserStats } from './user-profile'
 
 // Mock isSupabaseConfigured to return false for type tests
+vi.mock('./config', () => ({
+  isSupabaseConfigured: () => false,
+  credentials: null
+}))
 vi.mock('./client', () => ({
   supabase: {
     from: vi.fn(),
@@ -14,7 +18,7 @@ vi.mock('./client', () => ({
       updateUser: vi.fn(),
     },
   },
-  isSupabaseConfigured: () => false,
+
 }))
 
 describe('UserProfile type', () => {

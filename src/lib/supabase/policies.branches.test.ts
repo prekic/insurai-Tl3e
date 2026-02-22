@@ -55,8 +55,18 @@ function buildChain() {
   return chain
 }
 
-vi.mock('./client', () => ({
+
+vi.mock('./config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('./config', () => ({
   isSupabaseConfigured: vi.fn(() => true),
+  credentials: null
+}))
+vi.mock('./client', () => ({
+
   supabase: {
     from: (...args: unknown[]) => {
       mockFrom(...args)
@@ -77,7 +87,7 @@ vi.mock('./client', () => ({
   },
 }))
 
-import { isSupabaseConfigured } from './client'
+import { isSupabaseConfigured } from './config'
 const mockIsConfigured = vi.mocked(isSupabaseConfigured)
 
 beforeEach(() => {

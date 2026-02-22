@@ -16,11 +16,21 @@ const { mockSupabaseAuth, mockIsConfigured } = vi.hoisted(() => ({
   mockIsConfigured: vi.fn(() => true),
 }))
 
+
+vi.mock('./config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('./config', () => ({
+  isSupabaseConfigured: mockIsConfigured,
+  credentials: null
+}))
 vi.mock('./client', () => ({
   supabase: {
     auth: mockSupabaseAuth,
   },
-  isSupabaseConfigured: mockIsConfigured,
+
 }))
 
 // Import after mocking

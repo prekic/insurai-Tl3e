@@ -1,4 +1,5 @@
-import { supabase, isSupabaseConfigured } from './client'
+import { supabase } from './client'
+import { isSupabaseConfigured } from './config'
 import type {
   PolicyRow,
   PolicyInsert,
@@ -400,10 +401,10 @@ async function searchPoliciesFallback(query: string): Promise<PolicyRow[]> {
     .select('*')
     .or(
       `policy_number.ilike.${searchTerm},` +
-        `provider.ilike.${searchTerm},` +
-        `insured_person.ilike.${searchTerm},` +
-        `type_tr.ilike.${searchTerm},` +
-        `location.ilike.${searchTerm}`
+      `provider.ilike.${searchTerm},` +
+      `insured_person.ilike.${searchTerm},` +
+      `type_tr.ilike.${searchTerm},` +
+      `location.ilike.${searchTerm}`
     )
     .order('created_at', { ascending: false })
 
