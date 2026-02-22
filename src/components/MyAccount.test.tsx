@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 import { MyAccount } from './MyAccount'
 
 // Mock sonner toast

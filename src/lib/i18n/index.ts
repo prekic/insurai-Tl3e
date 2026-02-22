@@ -7,8 +7,9 @@ export { I18nProvider, useI18n, useTranslation, useLanguageSelector, type Locale
 // Types and translations
 export type { TranslationDictionary, SupportedLocale, CommonLocale } from './translations'
 export { COMMON_LOCALES } from './translations'
-export { EN_TRANSLATIONS } from './translations-en'
-export { TR_TRANSLATIONS } from './translations-tr'
+// EN_TRANSLATIONS → import directly from '@/lib/i18n/translations-en' (async chunk)
+// TR_TRANSLATIONS → import directly from '@/lib/i18n/translations-tr' (async chunk)
+// SKELETON_TRANSLATIONS → import directly from '@/lib/i18n/translations-skeleton'
 
 // Translation service
 export {

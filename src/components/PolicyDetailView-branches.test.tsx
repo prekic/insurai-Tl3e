@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 import type { AnalyzedPolicy, Coverage, CoverageCategory } from '@/types/policy'
 
 // ---- Mocks ----

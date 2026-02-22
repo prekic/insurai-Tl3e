@@ -4,7 +4,7 @@
 
 import type { TranslationDictionary } from './translations'
 import { COMMON_LOCALES } from './translations'
-import { EN_TRANSLATIONS } from './translations-en'
+import { SKELETON_TRANSLATIONS } from './translations-skeleton'
 import {
   getCachedTranslations,
   setCachedTranslations,
@@ -119,7 +119,7 @@ async function fetchTranslationsFromAPI(locale: string): Promise<{
 async function getPreloadedTranslations(locale: string): Promise<TranslationDictionary | null> {
   try {
     if (locale === 'en') {
-      // EN is also eagerly imported above, so this resolves from module cache instantly
+      const { EN_TRANSLATIONS } = await import('./translations-en')
       return EN_TRANSLATIONS
     }
     if (locale === 'tr') {
@@ -236,7 +236,15 @@ export async function getTranslations(
     message: 'Translation not available. Using English.',
   })
 
-  return EN_TRANSLATIONS
+  // Final fallback: dynamically import EN_TRANSLATIONS as last resort.
+  // This keeps EN out of the main bundle while still providing useful strings
+  // when everything else fails (unknown locale, no cache, API down).
+  try {
+    const { EN_TRANSLATIONS } = await import('./translations-en')
+    return EN_TRANSLATIONS
+  } catch {
+    return SKELETON_TRANSLATIONS
+  }
 }
 
 /**

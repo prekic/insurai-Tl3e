@@ -11,7 +11,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { PolicyChat } from './PolicyChat'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 
 vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),

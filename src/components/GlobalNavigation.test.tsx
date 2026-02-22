@@ -10,7 +10,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { GlobalNavigation } from './GlobalNavigation'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 
 // Mock i18n context to return English translations
 vi.mock('@/lib/i18n/i18n-context', () => ({

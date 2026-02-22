@@ -3,7 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { UnsubscribePage } from './UnsubscribePage'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 
 // Mock getEnvConfig
 vi.mock('@/lib/env', () => ({

@@ -10,7 +10,7 @@ import {
 } from 'react'
 import type { TranslationDictionary } from './translations'
 import { COMMON_LOCALES } from './translations'
-import { EN_TRANSLATIONS } from './translations-en'
+import { SKELETON_TRANSLATIONS } from './translations-skeleton'
 import { getBestLocale, setStoredLocale, clearCachedTranslations } from './translation-cache'
 import {
   getTranslations,
@@ -72,7 +72,7 @@ interface I18nContextValue {
 const I18nContext = createContext<I18nContextValue>({
   locale: 'en',
   setLocale: async () => {},
-  t: EN_TRANSLATIONS,
+  t: SKELETON_TRANSLATIONS,
   translate: () => '',
   isLoading: false,
   progress: { status: 'idle', progress: 100, message: '' },
@@ -92,7 +92,7 @@ interface I18nProviderProps {
 export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderProps) {
   // Determine initial locale from stored preference or browser
   const [locale, setLocaleState] = useState(() => getBestLocale(defaultLocale))
-  const [translations, setTranslations] = useState<TranslationDictionary>(EN_TRANSLATIONS)
+  const [translations, setTranslations] = useState<TranslationDictionary>(SKELETON_TRANSLATIONS)
   const [isLoading, setIsLoading] = useState(true)
   const [dynamicLocales, setDynamicLocales] = useState<LocaleOption[]>([])
   const [progress, setProgress] = useState<TranslationProgress>({
@@ -141,7 +141,7 @@ export function I18nProvider({ children, defaultLocale = 'en' }: I18nProviderPro
       setTranslations(t)
     } catch (error) {
       console.error('Failed to load translations:', error)
-      setTranslations(EN_TRANSLATIONS)
+      setTranslations(SKELETON_TRANSLATIONS)
     } finally {
       setIsLoading(false)
     }

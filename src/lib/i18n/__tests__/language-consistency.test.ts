@@ -7,7 +7,9 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { EN_TRANSLATIONS, TR_TRANSLATIONS, type TranslationDictionary } from '../translations'
+import { type TranslationDictionary } from '../translations'
+import { EN_TRANSLATIONS } from '../translations-en'
+import { TR_TRANSLATIONS } from '../translations-tr'
 
 /**
  * Recursively collect all leaf keys from a translation object.

@@ -417,7 +417,7 @@ describe('i18n-context coverage', () => {
   })
 
   describe('error handling in loadTranslations', () => {
-    it('falls back to EN_TRANSLATIONS on error', async () => {
+    it('falls back to SKELETON_TRANSLATIONS on error', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       mockGetTranslations.mockRejectedValue(new Error('Network fail'))
 
@@ -425,7 +425,8 @@ describe('i18n-context coverage', () => {
 
       await waitFor(() => {
         expect(result.current.isLoading).toBe(false)
-        expect(result.current.t.nav.home).toBe('Home')
+        // Context uses SKELETON_TRANSLATIONS on error (empty strings)
+        expect(result.current.t.nav.home).toBe('')
       })
 
       expect(consoleSpy).toHaveBeenCalled()

@@ -4,12 +4,10 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import {
-  COMMON_LOCALES,
-  EN_TRANSLATIONS,
-  TR_TRANSLATIONS,
-} from './translations'
+import { COMMON_LOCALES } from './translations'
 import type { TranslationDictionary, CommonLocale } from './translations'
+import { EN_TRANSLATIONS } from './translations-en'
+import { TR_TRANSLATIONS } from './translations-tr'
 
 // =============================================================================
 // COMMON_LOCALES Tests

@@ -8,6 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { HelpCenter } from './HelpCenter'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
+
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en', isRTL: false, isLoading: false, setLocale: vi.fn(), availableLocales: {}, dynamicLocales: [] }),
+}))
 
 // Mock react-router-dom navigate
 const mockNavigate = vi.fn()

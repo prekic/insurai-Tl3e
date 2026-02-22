@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PolicyChat } from './PolicyChat'
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 
 vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),

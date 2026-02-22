@@ -4,9 +4,14 @@
  * Tests for the how it works section
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { HowItWorks } from './HowItWorks'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
+
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+}))
 
 describe('HowItWorks', () => {
   describe('Rendering', () => {
