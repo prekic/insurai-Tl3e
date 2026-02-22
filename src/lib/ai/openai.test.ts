@@ -605,7 +605,8 @@ describe('extractWithOpenAI', () => {
       expect(mockExtractViaProxy).toHaveBeenCalledWith(
         'openai',
         expect.stringContaining('doc'),
-        'Test system prompt'
+        'Test system prompt',
+        undefined
       )
       expect(mockGetOpenAIClient).not.toHaveBeenCalled()
     })
@@ -1014,7 +1015,8 @@ describe('extractWithOpenAI', () => {
       expect(mockExtractViaProxy).toHaveBeenCalledWith(
         'openai',
         expect.stringContaining('My insurance policy text'),
-        'Test system prompt'
+        'Test system prompt',
+        undefined
       )
       // Should include the instruction prefix
       const userMsg = mockExtractViaProxy.mock.calls[0][1] as string

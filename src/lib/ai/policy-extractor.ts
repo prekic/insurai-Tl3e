@@ -33,7 +33,7 @@ import {
   type ValidationResult,
 } from '@/lib/extraction'
 import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
-import { TR_TRANSLATIONS } from '@/lib/i18n/translations'
+import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
 
 export interface ExtractionResult {
   success: true

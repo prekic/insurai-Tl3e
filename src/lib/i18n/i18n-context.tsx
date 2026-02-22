@@ -9,7 +9,8 @@ import {
   ReactNode,
 } from 'react'
 import type { TranslationDictionary } from './translations'
-import { EN_TRANSLATIONS, COMMON_LOCALES } from './translations'
+import { COMMON_LOCALES } from './translations'
+import { EN_TRANSLATIONS } from './translations-en'
 import { getBestLocale, setStoredLocale, clearCachedTranslations } from './translation-cache'
 import {
   getTranslations,

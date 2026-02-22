@@ -8,7 +8,6 @@ import {
   COMMON_LOCALES,
   EN_TRANSLATIONS,
   TR_TRANSLATIONS,
-  PRELOADED_TRANSLATIONS,
 } from './translations'
 import type { TranslationDictionary, CommonLocale } from './translations'
 
@@ -344,25 +343,19 @@ describe('Translation Completeness', () => {
 })
 
 // =============================================================================
-// PRELOADED_TRANSLATIONS Tests
+// Preloaded Locale Coverage Tests
+// (PRELOADED_TRANSLATIONS replaced by lazy getPreloadedTranslations() in translation-service)
 // =============================================================================
 
-describe('PRELOADED_TRANSLATIONS', () => {
-  it('should have English translations', () => {
-    expect(PRELOADED_TRANSLATIONS.en).toBeDefined()
-    expect(PRELOADED_TRANSLATIONS.en).toEqual(EN_TRANSLATIONS)
+describe('Preloaded locale data', () => {
+  it('should have English translations available as a named export', () => {
+    expect(EN_TRANSLATIONS).toBeDefined()
+    expect(typeof EN_TRANSLATIONS).toBe('object')
   })
 
-  it('should have Turkish translations', () => {
-    expect(PRELOADED_TRANSLATIONS.tr).toBeDefined()
-    expect(PRELOADED_TRANSLATIONS.tr).toEqual(TR_TRANSLATIONS)
-  })
-
-  it('should only have en and tr preloaded', () => {
-    const keys = Object.keys(PRELOADED_TRANSLATIONS)
-    expect(keys).toContain('en')
-    expect(keys).toContain('tr')
-    expect(keys.length).toBe(2)
+  it('should have Turkish translations available as a named export', () => {
+    expect(TR_TRANSLATIONS).toBeDefined()
+    expect(typeof TR_TRANSLATIONS).toBe('object')
   })
 })
 

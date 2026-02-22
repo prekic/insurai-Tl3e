@@ -349,7 +349,7 @@ vi.mock('@/lib/i18n/coverage-names', () => ({
   }),
 }))
 
-vi.mock('@/lib/i18n/translations', () => ({
+vi.mock('@/lib/i18n/translations-tr', () => ({
   TR_TRANSLATIONS: {
     insightTranslations: {
       'Comprehensive coverage with multiple protection areas': 'Birden fazla koruma alanı ile kapsamlı teminat',
@@ -370,6 +370,8 @@ vi.mock('@/lib/i18n/translations', () => ({
     },
   },
 }))
+
+vi.mock('@/lib/i18n/translations', () => ({}))
 
 // ---------------------------------------------------------------------------
 // Shared helpers
