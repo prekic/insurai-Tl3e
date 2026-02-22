@@ -3716,6 +3716,12 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Activation**: workflow only runs after branch is merged to `main` (GitHub Actions only reads workflows from default branch)
 
+### 122. Migration 021 — Push Subscriptions Table Applied to Production (Feb 22, 2026)
+- **Feature**: `push_subscriptions` table (RLS + index) applied to production Supabase via SQL Editor
+- **Migration file**: `supabase/migrations/021_push_subscriptions.sql`
+- **Verification**: Confirmed by end-to-end push notification test — `sent: 1` response from cron endpoint proves table exists, VAPID keys are set, and CRON_SECRET is configured correctly in both Railway Variables and GitHub Secrets
+- **Pattern**: Same as Known Issue #114 (migration 020 for unsubscribe translations) — apply manually via Supabase Dashboard → SQL Editor
+
 ---
 
 ## Turkish Market Considerations
@@ -4263,7 +4269,7 @@ connectSrc: [
 - Push notifications require 3 env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
 - Generate once: `node -e "const wp=require('web-push'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"`
 - **Graceful degradation**: If keys not set, `configureWebPush()` logs a warning and all send calls return 0 — no crash
-- **Migration 021 required**: `supabase/migrations/021_push_subscriptions.sql` must be applied to production Supabase before push subscriptions can be stored
+- **Migration 021 applied to production** (Feb 22, 2026) — `push_subscriptions` table with RLS + index confirmed present; see Known Issue #122
 - `sendExtractionCompleteNotification()` fires fire-and-forget after all 4 extraction success paths in `server/routes/ai.ts`
 - `sendPolicyExpiryNotification()` is called by the daily cron scheduler (`server/routes/internal.ts` + `.github/workflows/notify-expiring.yml`) for 7/14/30-day expiry windows — **production-verified Feb 22, 2026** (OS-level browser push notification confirmed delivered and displayed)
 
