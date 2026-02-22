@@ -85,7 +85,7 @@ async chunk: translations-tr-*.js (13.77 KB gzip)
 | Commit | Description |
 |--------|-------------|
 | `469b100` | feat(i18n): Split EN translations into lazy async Vite chunk (completes lazy-i18n) |
-| *(docs commit)* | docs: update CLAUDE.md Known Issue #124 + SESSION_HANDOFF.md |
+| `efbb38f` | docs: update CLAUDE.md Known Issue #124 + SESSION_HANDOFF.md for EN lazy-load session |
 
 ---
 
@@ -134,6 +134,13 @@ All previously-pending items are **resolved**:
 
 ## Deployment Notes
 
+### Deploying This Branch
+The current branch `claude/review-handoff-docs-PvHiV` contains the EN translations lazy-load feature (`469b100`) and the documentation updates (`efbb38f`). To deploy to production:
+1. Create a PR from `claude/review-handoff-docs-PvHiV` → `main`
+2. Once merged, `production.yml` GitHub Actions workflow triggers automatically
+3. Railway rebuilds with Nixpacks — the new EN async chunk will appear in the production bundle
+4. No DB migrations, no new env vars, no Railway config changes required for this deployment
+
 ### Railway Configuration (Unchanged)
 - **Live URL**: https://insurai-production.up.railway.app
 - **Builder**: Nixpacks
@@ -141,6 +148,12 @@ All previously-pending items are **resolved**:
 - **Build**: `npm run build && npm run build:server`
 - **Start**: `NODE_ENV=production node dist-server/index.js`
 - **SW Cache**: v20
+
+### Supabase Auth Redirect URLs (must be set once per new domain)
+- Go to Supabase Dashboard → Authentication → URL Configuration
+- Required entry: `https://insurai-production.up.railway.app/**`
+- Without this, OAuth and magic link flows fail after deployment to a new domain
+- This is already configured for the current production URL — no action needed unless the domain changes
 
 ### Environment Variables — All Confirmed Set
 
@@ -217,7 +230,9 @@ npm run validate
 
 # Verify both EN and TR chunks are separate from main bundle
 npm run build 2>&1 | grep translations
-# expect two lines: translations-en-*.js (~39 KB) and translations-tr-*.js (~39 KB)
+# expect two lines (raw sizes, not gzip):
+#   translations-en-*.js  ~XX kB │ gzip: ~12 kB
+#   translations-tr-*.js  ~40 kB │ gzip: ~14 kB
 
 # Push notification cron (replace with actual secret)
 SECRET="your-cron-secret"

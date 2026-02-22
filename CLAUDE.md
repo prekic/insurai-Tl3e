@@ -3780,7 +3780,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Gotcha — components now render with empty strings briefly on first load**: Unlike before where EN was always available immediately, components may show empty strings for 1 render cycle until the async EN/TR chunk loads. This is invisible in practice (< 50ms on fast connections) but test assertions that fire synchronously may see `''` instead of expected English strings — add `await waitFor(...)` to fix.
 - **New file**: `src/lib/i18n/translations-skeleton.ts` — do NOT add translation content here; it must stay all-empty-string so it has no bundle cost
 - **Files Changed**: `translations-skeleton.ts` (new), `translations.ts`, `index.ts`, `translation-service.ts`, `i18n-context.tsx`, 32 test files
-- **Commits**: `469b100`
+- **Commits**: `469b100` (feature), `efbb38f` (docs)
 
 ---
 
