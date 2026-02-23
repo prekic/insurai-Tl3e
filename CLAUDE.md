@@ -255,6 +255,23 @@ Stage 6: AI EXTRACTION + CONVERSION
   └─ Result: ExtractionResult { success, policy, extractedData, consensus }
 ```
 
+### Proxy Metadata on Extraction Results
+
+Server-side extraction attaches `_proxyMeta` to results for diagnostics:
+```typescript
+_proxyMeta?: {
+  requestId?: string           // Unique request ID
+  route?: string               // e.g., '/api/ai/extract'
+  provider?: string            // 'openai' | 'anthropic'
+  fallback?: boolean           // Whether fallback was used
+  fallbackReason?: string      // e.g., 'billing', 'rate_limit'
+  fallbackChain?: Array<{     // Full provider chain for consensus
+    provider: string; success: boolean; duration_ms?: number; error?: string
+  }>
+}
+```
+Cleaned up after logging: `delete extractedData._proxyMeta` in `policy-extractor.ts`.
+
 ### Confidence Scoring
 
 ```typescript
@@ -641,6 +658,52 @@ checkPolicyBeforeUpload(newPolicy) flow:
 
 OCR-tolerant fuzzy matching handles character confusion: `0↔O`, `1↔l↔I`, `ı↔i↔İ`, `5↔s↔ş`, `8↔b↔B`
 
+### Amendment (Zeyilname) Detection (`src/lib/policy-utils.ts`)
+
+Turkish policy amendments (zeyilname) are detected and tracked:
+
+```typescript
+// Extracted from AI or document markers
+amendmentInfo: {
+  isAmendment: boolean            // true if "ZEYİLNAME" or "POLİÇE DEĞİŞİKLİĞİ" detected
+  amendmentNumber: string | null  // e.g., "1/2024" from "NO: N/YYYY"
+  amendmentDate: string | null    // YYYY-MM-DD
+  basePolicyNumber: string | null // Original policy number (Ana Poliçe No)
+  amendmentReason: string | null  // e.g., "Sigortalı Talebi", "Prim Farkı"
+  premiumDifference: number | null // Can be negative (refunds)
+}
+```
+
+**`comparePoliciesAdvanced()` resolution flow**:
+1. Exact hash match → `exactDuplicate` (same document re-uploaded)
+2. Has amendment markers (`hasAmendmentMarkers()`) → `amendment` with `isVerifiedAmendment: true`
+3. Significant changes but no markers → `amendment` with `isVerifiedAmendment: false`
+4. Only OCR-sensitive fields changed → `extractionVariance` (safe to skip)
+
+### PII Detection Categories (`src/lib/ai/document-normalizer.ts`)
+
+The clean-room normalizer detects 15 PII categories and produces `[TOKEN_N]` redacted copies:
+
+```
+INSURED         Policy holder name
+PERSON          Individual names (agent, beneficiary)
+ADDRESS         Residential/risk address
+PHONE           Phone numbers
+EMAIL           Email addresses
+TAX_ID          Vergi Kimlik Numarası (VKN)
+IBAN            Turkish/EU bank accounts
+BANK_ACCOUNT    Bank account details
+PLATE           Vehicle registration plate
+VIN             Vehicle Identification Number
+ENGINE_NO       Engine serial number
+SERIAL_NO       Equipment/asset serial
+QR_DATA         QR code embedded data
+BARCODE_DATA    Barcode encoded values
+CONTACT_PERSON  Emergency contact info
+```
+
+Three outputs: `CLEAN_COPY` (normalized text), `REDACTED_COPY` (PII replaced with tokens), `PII_VAULT` (original values with context).
+
 ### Traffic Insurance Mandatory Limits (2025 SEDDK)
 
 | Coverage | Per Person | Per Accident | Per Vehicle |
@@ -684,6 +747,66 @@ Gap severity: `critical` (>=90% market inclusion) → `recommended` (70-89%) →
 | 60-74 | C | fair |
 | 40-59 | D | poor |
 | < 40 | F | critical |
+
+### Score Color Mapping (`src/components/evaluation/`)
+
+```typescript
+// ScoreBreakdown.tsx — score thresholds map to Tailwind colors:
+>= 90 → emerald (bg-emerald-500, text-emerald-700)   // A — Excellent
+>= 75 → blue    (bg-blue-500, text-blue-700)          // B — Good
+>= 60 → amber   (bg-amber-500, text-amber-700)        // C — Fair
+>= 40 → orange  (bg-orange-500, text-orange-700)      // D — Poor
+<  40 → red     (bg-red-500, text-red-700)             // F — Critical
+
+// GradeBadge.tsx — grade letter → badge style:
+A: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+B: 'bg-blue-100 text-blue-800 border-blue-200'
+C: 'bg-amber-100 text-amber-800 border-amber-200'
+D: 'bg-orange-100 text-orange-800 border-orange-200'
+F: 'bg-red-100 text-red-800 border-red-200'
+```
+
+### Consensus Extraction Fields
+
+When multi-AI extraction is enabled, these 5 fields are compared across providers:
+```typescript
+consensusFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate']
+consensusAgreementThreshold: 0.8  // 80% must agree; below triggers tertiary AI tiebreak
+```
+
+### Free Trial System (`src/lib/free-trial.ts`)
+
+Anonymous users get one free analysis per 24h session:
+
+```typescript
+// 6 localStorage keys:
+insurai_trial_used       // 'true' if consumed
+insurai_trial_result     // JSON-stringified AnalyzedPolicy
+insurai_trial_timestamp  // Date.now() at usage
+insurai_trial_filename   // Original PDF filename
+insurai_trial_email      // User's captured email
+insurai_trial_share_id   // Cryptographic share link ID
+
+// 24h auto-expiry: hasUsedFreeTrial() checks timestamp and auto-clears if > 24h
+// Key functions: hasUsedFreeTrial(), saveTrialResult(), getTrialTimeRemaining(), formatTimeRemaining()
+```
+
+### Three-Tier Config Merge (`src/hooks/useUserPreferences.ts`)
+
+```typescript
+// Resolution order (last wins):
+// 1. System Defaults (DEFAULT_EVALUATION_CONFIG in types.ts) — always available
+// 2. Admin Settings (app_settings DB) — convertDatabaseConfigToEvaluatorConfig()
+// 3. User Preferences (user_preferences DB or localStorage)
+const mergedConfig = { ...evaluatorConfig, ...userConfig }  // Tier 3 > Tier 2 > Tier 1
+
+// convertDatabaseConfigToEvaluatorConfig() flattens DB fields to nested EvaluationConfig:
+// weightPremium, weightCoverage, weightDeductible, weightCompliance, weightValue → config.weights
+// strictCompliance, includeOptionalCoverages, useRegionalBenchmarks → config booleans
+// Uses DEFAULT_EVALUATION_CONFIG values for any undefined DB fields (nullish coalescing)
+```
+
+User-overridable categories: `ui`, `email` only (defined in `src/lib/config/user-overridable.ts`).
 
 ### Turkish Regions (7)
 `marmara` (1.15x risk), `ege` (1.05x), `akdeniz` (1.08x), `ic_anadolu` (0.95x), `karadeniz` (0.90x), `dogu_anadolu` (0.85x), `guneydogu` (0.88x)
@@ -819,7 +942,7 @@ Express serves both `/api/*` routes AND static files from the same origin — no
 
 - API keys server-side only (never `VITE_` prefix)
 - Helmet security headers (CSP, XSS, HSTS)
-- Rate limiting per IP (tiered by endpoint cost)
+- Rate limiting per IP + per-user (SHA-256 hashed Bearer token)
 - Row Level Security on all Supabase tables
 - HMAC-SHA256 unsubscribe tokens with timing-safe comparison
 - `crypto.getRandomValues()` for share link IDs (not `Math.random()`)
@@ -828,6 +951,25 @@ Express serves both `/api/*` routes AND static files from the same origin — no
 - Zod validation on all API request bodies
 - KVKK/GDPR consent management
 - JSON.parse guarded everywhere (no unhandled parse crashes)
+
+### Rate Limiting (`server/middleware/rate-limit.ts`)
+
+Key generation combines IP + authenticated user identity:
+```typescript
+// Key format: "192.168.1.1:user:abc123def456" (authenticated) or "192.168.1.1" (anonymous)
+// User identity: SHA-256 hash (first 16 chars) of Bearer token — prevents token leakage in rate limit stores
+```
+
+| Limiter | Rate | Endpoints |
+|---------|------|-----------|
+| `aiExtractionLimiter` | 20 req/hr | `/api/ai/extract/*` |
+| `chatLimiter` | 60 req/hr | `/api/ai/chat` |
+| `ocrLimiter` | 30 req/hr | `/api/ai/ocr` |
+| `authLimiter` | 10 req/15min | `/api/email/*`, auth endpoints |
+| `generalLimiter` | 100 req/15min | All routes (global) |
+| `healthLimiter` | 60 req/min | `/api/health` |
+
+Rate limit values are configurable via admin DB settings with 1-minute cache.
 
 ---
 
@@ -887,6 +1029,20 @@ Express serves both `/api/*` routes AND static files from the same origin — no
 ### Landing Page
 - Never use fake stats, testimonials, or social proof — use authentic capability metrics
 - No fabricated user counts, ratings, or invented names
+
+### Policy Hash Memoization (`src/hooks/usePolicyEvaluation.ts`)
+
+Evaluation hooks use a pipe-separated hash of critical fields to avoid re-computation:
+```typescript
+const policyHash = useMemo(() => {
+  if (!policy) return null
+  return [policy.id, policy.premium, policy.coverage, policy.deductible,
+    policy.type, policy.status, policy.expiryDate,
+    policy.coverages?.length || 0, policy.exclusions?.length || 0
+  ].join('|')  // e.g., "uuid|15000|500000|0|kasko|active|2026-12-31|5|2"
+}, [policy])
+```
+Excludes cosmetic fields (`createdAt`, `documentHash`). For multi-policy comparison (`usePolicyEvaluations`), hashes are sorted to normalize array order.
 
 ### TypeScript Closure Patterns
 - **`let x!: T`** (definite assignment) for variables assigned inside async callbacks — not flagged by ESLint
