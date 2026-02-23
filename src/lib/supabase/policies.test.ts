@@ -38,9 +38,19 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
   return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle, mockUpload, mockRemove, mockGetPublicUrl, mockCreateSignedUrl, mockGetUser, mockRpc, mockOr, mockSupabase, mockIsConfigured }
 })
 
+
+vi.mock('./config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('./config', () => ({
+  isSupabaseConfigured: mockIsConfigured,
+  credentials: null
+}))
 vi.mock('./client', () => ({
   supabase: mockSupabase,
-  isSupabaseConfigured: mockIsConfigured,
+
 }))
 
 // Import after mocking

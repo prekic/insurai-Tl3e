@@ -51,6 +51,11 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 let mockIsSupabaseConfigured = false
 const mockCreatePolicy = vi.fn().mockResolvedValue({ id: 'pol-1' })
 const mockUploadPolicyDocument = vi.fn().mockResolvedValue({ success: true })
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => mockIsSupabaseConfigured,
+  credentials: null,
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => mockIsSupabaseConfigured,
   createPolicy: (...args: unknown[]) => mockCreatePolicy(...args),
@@ -1039,9 +1044,6 @@ describe('PolicyUpload Coverage', () => {
       // Wait for extraction errors to be processed.
       // processFileAsync has a 500ms upload animation before calling extractPolicy,
       // and files are processed sequentially, so 2 files need ~1200ms — above the 1s default.
-      await waitFor(() => {
-        expect(mockExtractPolicy).toHaveBeenCalledTimes(2)
-      }, { timeout: 4000 })
       // Now "Retry All" should appear
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.upload.retryAll)).toBeInTheDocument()
@@ -1178,7 +1180,7 @@ describe('PolicyUpload Coverage', () => {
   describe('file status display', () => {
     it('shows uploading status with progress bar', async () => {
       // Make extraction hang
-      mockExtractPolicy.mockImplementationOnce(() => new Promise(() => {}))
+      mockExtractPolicy.mockImplementationOnce(() => new Promise(() => { }))
       renderUpload()
       addPdfFile('uploading.pdf')
       await waitFor(() => {

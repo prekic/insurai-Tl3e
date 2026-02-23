@@ -13,6 +13,16 @@ import { AuthProvider } from '@/lib/supabase/auth-context'
 import { PolicyProvider } from '@/lib/policy-context'
 
 // Mock Supabase
+
+vi.mock('@/lib/supabase/config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => false,
+  credentials: null
+}))
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     auth: {
@@ -20,11 +30,11 @@ vi.mock('@/lib/supabase/client', () => ({
       onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
     },
   },
-  isSupabaseConfigured: () => false,
+
 }))
 
 vi.mock('@/lib/supabase', () => ({
-  isSupabaseConfigured: () => false,
+
   fetchPolicies: vi.fn().mockResolvedValue([]),
   createPolicy: vi.fn().mockResolvedValue({ id: 'new-id' }),
   deleteSupabasePolicy: vi.fn().mockResolvedValue(undefined),

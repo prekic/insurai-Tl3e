@@ -30,7 +30,7 @@ import { ConfirmationDialog, confirmations } from './ui/confirmation-dialog'
 import { useI18n, useLanguageSelector } from '@/lib/i18n'
 import { usePolicies } from '@/lib/policy-context'
 import { exportToCSV, exportPoliciesToPDF } from '@/lib/export'
-import { isSupabaseConfigured } from '@/lib/supabase'
+import { isSupabaseConfigured } from '@/lib/supabase/config'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { EmailPreferences } from './EmailPreferences'
 
@@ -77,16 +77,14 @@ function ToggleSwitch({ id, label, checked, onChange }: ToggleSwitchProps) {
         aria-checked={checked}
         onClick={() => onChange(!checked)}
         onKeyDown={handleKeyDown}
-        className={`relative w-12 h-6 rounded-full transition-colors focus-ring ${
-          checked ? 'bg-blue-600' : 'bg-gray-300'
-        }`}
+        className={`relative w-12 h-6 rounded-full transition-colors focus-ring ${checked ? 'bg-blue-600' : 'bg-gray-300'
+          }`}
       >
         <span className="sr-only">{label}</span>
         <span
           aria-hidden="true"
-          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-            checked ? 'translate-x-6' : 'translate-x-0'
-          }`}
+          className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-0'
+            }`}
         />
       </button>
     </div>
@@ -618,9 +616,8 @@ export function Settings() {
                         onClick={() => setTheme(option.value as typeof theme)}
                         role="radio"
                         aria-checked={isSelected}
-                        className={`flex flex-col items-center gap-1 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all focus-ring ${
-                          isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        className={`flex flex-col items-center gap-1 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all focus-ring ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300'
+                          }`}
                       >
                         <Icon
                           size={20}
@@ -699,9 +696,8 @@ export function Settings() {
                       key={locale.code}
                       onClick={() => handleLanguageChange(locale.code)}
                       disabled={isLoading}
-                      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl border-2 transition-all focus-ring text-left ${
-                        isActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                      } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl border-2 transition-all focus-ring text-left ${isActive ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       aria-pressed={isActive}
                     >
                       <span className="text-lg sm:text-xl" aria-hidden="true">

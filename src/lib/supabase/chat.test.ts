@@ -50,9 +50,19 @@ const {
 // ---------------------------------------------------------------------------
 // vi.mock() - replace Supabase client module
 // ---------------------------------------------------------------------------
+
+vi.mock('./config', () => ({
+
+  credentials: null
+}))
+
+vi.mock('./config', () => ({
+  isSupabaseConfigured: mockIsSupabaseConfigured,
+  credentials: null
+}))
 vi.mock('./client', () => ({
   supabase: { from: mockFrom },
-  isSupabaseConfigured: mockIsSupabaseConfigured,
+
 }))
 
 // ---------------------------------------------------------------------------

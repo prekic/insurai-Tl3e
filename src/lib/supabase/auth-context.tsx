@@ -1,12 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
-import { supabase, isSupabaseConfigured } from './client'
-import {
-  signIn as authSignIn,
-  signUp as authSignUp,
-  signOut as authSignOut,
-  signInWithProvider as authSignInWithProvider,
-} from './auth'
+import { isSupabaseConfigured } from './config'
 
 interface AuthContextValue {
   user: User | null
@@ -38,28 +32,51 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return
     }
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    let isMounted = true
+    let unsubscribeFn: (() => void) | null = null
 
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-    })
+    // Load supabase dynamically to avoid bundling it eagerly
+    import('@/lib/supabase/client')
+      .then(({ supabase }) => {
+        if (!isMounted) return
 
-    return () => subscription.unsubscribe()
+        // Get initial session
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!isMounted) return
+          setSession(session)
+          setUser(session?.user ?? null)
+          setLoading(false)
+        })
+
+        // Listen for auth changes
+        const {
+          data: { subscription },
+        } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!isMounted) return
+          setSession(session)
+          setUser(session?.user ?? null)
+        })
+
+        unsubscribeFn = () => subscription.unsubscribe()
+      })
+      .catch((err) => {
+        console.error('Failed to load Supabase client', err)
+        if (isMounted) setLoading(false)
+      })
+
+    return () => {
+      isMounted = false
+      if (unsubscribeFn) {
+        unsubscribeFn()
+      }
+    }
   }, [isConfigured])
 
   const signIn = useCallback(async (email: string, password: string) => {
     setLoading(true)
     try {
-      await authSignIn(email, password)
+      const auth = await import('@/lib/supabase/auth')
+      await auth.signIn(email, password)
     } finally {
       setLoading(false)
     }
@@ -68,7 +85,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signUp = useCallback(async (email: string, password: string, fullName?: string) => {
     setLoading(true)
     try {
-      await authSignUp(email, password, fullName)
+      const auth = await import('@/lib/supabase/auth')
+      await auth.signUp(email, password, fullName)
     } finally {
       setLoading(false)
     }
@@ -77,18 +95,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const signOut = useCallback(async () => {
     setLoading(true)
     try {
-      await authSignOut()
+      const auth = await import('@/lib/supabase/auth')
+      await auth.signOut()
     } finally {
       setLoading(false)
     }
   }, [])
 
   const signInWithGoogle = useCallback(async () => {
-    await authSignInWithProvider('google')
+    const auth = await import('@/lib/supabase/auth')
+    await auth.signInWithProvider('google')
   }, [])
 
   const signInWithGithub = useCallback(async () => {
-    await authSignInWithProvider('github')
+    const auth = await import('@/lib/supabase/auth')
+    await auth.signInWithProvider('github')
   }, [])
 
   return (

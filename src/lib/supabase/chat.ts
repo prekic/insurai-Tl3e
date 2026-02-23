@@ -1,4 +1,5 @@
-import { supabase, isSupabaseConfigured } from './client'
+import { supabase } from './client'
+import { isSupabaseConfigured } from './config'
 import type {
   ChatConversationRow,
   ChatConversationInsert,

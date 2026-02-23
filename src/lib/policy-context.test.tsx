@@ -33,6 +33,11 @@ const mockSearchPolicies = vi.fn()
 const mockGetPolicyStats = vi.fn()
 const mockIsConfigured = vi.fn(() => false)
 
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => mockIsConfigured(),
+  credentials: null,
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => mockIsConfigured(),
   fetchPolicies: () => mockFetchPolicies(),
@@ -367,7 +372,7 @@ describe('PolicyContext', () => {
 
   describe('usePolicies hook', () => {
     it('should throw error when used outside PolicyProvider', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
 
       expect(() => {
         render(<TestConsumer />)
@@ -1006,7 +1011,7 @@ describe('PolicyContext', () => {
         return (
           <div>
             <div data-testid="loading">{isLoading ? 'loading' : 'ready'}</div>
-            <button onClick={() => add([samplePolicies[0]]).catch(() => {})}>Add</button>
+            <button onClick={() => add([samplePolicies[0]]).catch(() => { })}>Add</button>
           </div>
         )
       }
@@ -1089,7 +1094,7 @@ describe('PolicyContext', () => {
             <div data-testid="count">{policies.length}</div>
             <button onClick={() => {
               if (policies.length >= 2) {
-                merge(policies[0].id, [policies[1].id]).catch(() => {})
+                merge(policies[0].id, [policies[1].id]).catch(() => { })
               }
             }}>Merge</button>
           </div>
@@ -1127,7 +1132,7 @@ describe('PolicyContext', () => {
         return null
       })
 
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
 
       render(
         <PolicyProvider>

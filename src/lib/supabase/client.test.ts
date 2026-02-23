@@ -4,7 +4,8 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import { isSupabaseConfigured, supabase } from './client'
+import { supabase } from './client'
+import { isSupabaseConfigured } from './config'
 
 // =============================================================================
 // isSupabaseConfigured Tests

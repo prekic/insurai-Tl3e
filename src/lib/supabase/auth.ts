@@ -1,4 +1,5 @@
-import { supabase, isSupabaseConfigured } from './client'
+import { supabase } from './client'
+import { isSupabaseConfigured } from './config'
 import type { User, Session, AuthError } from '@supabase/supabase-js'
 
 export interface AuthState {
@@ -157,7 +158,7 @@ export async function updateProfile(data: { fullName?: string; avatarUrl?: strin
  */
 export function onAuthStateChange(callback: (event: string, session: Session | null) => void) {
   if (!isSupabaseConfigured()) {
-    return { data: { subscription: { unsubscribe: () => {} } } }
+    return { data: { subscription: { unsubscribe: () => { } } } }
   }
 
   return supabase.auth.onAuthStateChange(callback)

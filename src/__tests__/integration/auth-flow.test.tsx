@@ -26,6 +26,11 @@ vi.mock('@/lib/supabase/auth', () => ({
 const mockGetSession = vi.fn()
 const mockOnAuthStateChange = vi.fn()
 
+
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => true,
+  credentials: null
+}))
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     auth: {
@@ -33,7 +38,7 @@ vi.mock('@/lib/supabase/client', () => ({
       onAuthStateChange: (callback: (event: string, session: unknown) => void) => mockOnAuthStateChange(callback),
     },
   },
-  isSupabaseConfigured: () => true,
+
 }))
 
 // Import after mock setup
@@ -105,18 +110,18 @@ describe('Authentication Flow Integration', () => {
   })
 
   describe('Initial State', () => {
-    it('should show loading state initially', () => {
+    it('should show loading state initially', async () => {
       render(
         <TestWrapper>
           <AuthTestComponent />
         </TestWrapper>
       )
 
-      // Initially shows loading or transitions quickly to auth component
-      const authComponent = screen.queryByTestId('auth-component')
-      const loading = screen.queryByTestId('loading')
-
-      expect(authComponent || loading).toBeInTheDocument()
+      await waitFor(() => {
+        const authComponent = screen.queryByTestId('auth-component')
+        const loading = screen.queryByTestId('loading')
+        expect(authComponent || loading).toBeInTheDocument()
+      })
     })
 
     it('should show not authenticated state when no session', async () => {

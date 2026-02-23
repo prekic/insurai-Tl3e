@@ -39,6 +39,11 @@ const mockSearchPolicies = vi.fn()
 const mockGetPolicyStats = vi.fn()
 const mockIsConfigured = vi.fn(() => false)
 
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => mockIsConfigured(),
+  credentials: null,
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => mockIsConfigured(),
   fetchPolicies: () => mockFetchPolicies(),
@@ -209,7 +214,7 @@ describe('PolicyContext branch coverage', () => {
 
   describe('saveToStorage error handling', () => {
     it('should handle localStorage.setItem throwing an error', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
       localStorageMock.setItem.mockImplementation(() => { throw new Error('QuotaExceeded') })
 
       const { PolicyProvider, usePolicies } = await getPolicyContextModule()
@@ -255,7 +260,7 @@ describe('PolicyContext branch coverage', () => {
         return (
           <div>
             <div data-testid="loading">{isLoading ? 'yes' : 'no'}</div>
-            <button onClick={() => upd(policies[0]?.id ?? '', { provider: 'NewCo' }).catch(() => {})}>Update</button>
+            <button onClick={() => upd(policies[0]?.id ?? '', { provider: 'NewCo' }).catch(() => { })}>Update</button>
           </div>
         )
       }
@@ -291,7 +296,7 @@ describe('PolicyContext branch coverage', () => {
         return (
           <div>
             <div data-testid="loading">{isLoading ? 'yes' : 'no'}</div>
-            <button onClick={() => del(policies[0]?.id ?? '').catch(() => {})}>Delete</button>
+            <button onClick={() => del(policies[0]?.id ?? '').catch(() => { })}>Delete</button>
           </div>
         )
       }
@@ -326,7 +331,7 @@ describe('PolicyContext branch coverage', () => {
         return (
           <div>
             <div data-testid="loading">{isLoading ? 'yes' : 'no'}</div>
-            <button onClick={() => merge('r1', ['r2']).catch(() => {})}>Merge</button>
+            <button onClick={() => merge('r1', ['r2']).catch(() => { })}>Merge</button>
           </div>
         )
       }
@@ -377,7 +382,7 @@ describe('PolicyContext branch coverage', () => {
 
   describe('refreshStats Supabase error fallback', () => {
     it('should handle stats fetch error gracefully', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
       mockIsConfigured.mockReturnValue(true)
       mockUseAuth.mockReturnValue({ user: mockUser, isConfigured: true })
       mockFetchPolicies.mockResolvedValue([])
@@ -420,7 +425,7 @@ describe('PolicyContext branch coverage', () => {
         return (
           <div>
             <div data-testid="loading">{isLoading ? 'yes' : 'no'}</div>
-            <button onClick={() => add([samplePolicies[0]]).catch(() => {})}>Add</button>
+            <button onClick={() => add([samplePolicies[0]]).catch(() => { })}>Add</button>
           </div>
         )
       }
@@ -768,10 +773,10 @@ describe('Performance branch coverage', () => {
     clearMetrics()
     const callbacks: Record<string, (m: unknown) => void> = {}
     vi.mocked(webVitals.onFCP).mockImplementation((cb) => { callbacks.FCP = cb as (m: unknown) => void })
-    vi.mocked(webVitals.onLCP).mockImplementation(() => {})
-    vi.mocked(webVitals.onCLS).mockImplementation(() => {})
-    vi.mocked(webVitals.onINP).mockImplementation(() => {})
-    vi.mocked(webVitals.onTTFB).mockImplementation(() => {})
+    vi.mocked(webVitals.onLCP).mockImplementation(() => { })
+    vi.mocked(webVitals.onCLS).mockImplementation(() => { })
+    vi.mocked(webVitals.onINP).mockImplementation(() => { })
+    vi.mocked(webVitals.onTTFB).mockImplementation(() => { })
 
     await initWebVitals()
     callbacks.FCP?.({ name: 'FCP', value: 5000, rating: 'poor', delta: 5000, id: 'fcp-1', navigationType: 'navigate' })
@@ -1096,14 +1101,14 @@ describe('CacheStorage branch coverage', () => {
             }
           }, 0)
         },
-        set onerror(_fn: (() => void) | null) {},
+        set onerror(_fn: (() => void) | null) { },
       }
       return req
     }
 
     return {
       get(key: string) { return createRequest(() => storeData.get(key)) },
-      put(entry: { key: string; [k: string]: unknown }) {
+      put(entry: { key: string;[k: string]: unknown }) {
         return createRequest(() => { storeData.set(entry.key, entry); return entry.key })
       },
       delete(key: string) { return createRequest(() => { storeData.delete(key); return undefined }) },
@@ -1143,8 +1148,8 @@ describe('CacheStorage branch coverage', () => {
             fn({ target: req })
           }, 0)
         },
-        set onerror(_fn: unknown) {},
-        set onupgradeneeded(_fn: unknown) {},
+        set onerror(_fn: unknown) { },
+        set onupgradeneeded(_fn: unknown) { },
         result: mockDb,
       }
       return req
@@ -1199,7 +1204,7 @@ describe('CacheStorage branch coverage', () => {
   })
 
   it('should handle debug mode logging on get error', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
     vi.resetModules()
 
     // Temporarily break IDB
@@ -1220,7 +1225,7 @@ describe('CacheStorage branch coverage', () => {
   })
 
   it('should handle debug mode logging on set error', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
     vi.resetModules()
 
     vi.stubGlobal('indexedDB', { open() { throw new Error('IDB broken') } })
@@ -1236,7 +1241,7 @@ describe('CacheStorage branch coverage', () => {
   })
 
   it('should handle non-debug mode on set error silently', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
     vi.resetModules()
 
     vi.stubGlobal('indexedDB', { open() { throw new Error('IDB broken') } })
@@ -1321,7 +1326,7 @@ describe('CacheStorage branch coverage', () => {
   })
 
   it('should handle clear error in debug mode', async () => {
-    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => { })
     vi.resetModules()
     vi.stubGlobal('indexedDB', { open() { throw new Error('IDB broken') } })
 

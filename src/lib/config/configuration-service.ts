@@ -13,7 +13,6 @@
  * - Feature flag support
  */
 
-import { supabase } from '@/lib/supabase/client'
 import type {
   ConfigCategory,
   CacheEntry,
@@ -31,6 +30,9 @@ import type {
   InsuranceProvider,
   MarketBenchmark,
 } from './types'
+
+// Helper to dynamically import supabase to avoid eager loading in the main bundle
+const getSupabase = () => import('@/lib/supabase/client').then(m => m.supabase)
 
 import {
   DEFAULT_AI_CONFIG,
@@ -278,7 +280,7 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('app_settings')
         .select('value')
         .eq('category', category)
@@ -350,7 +352,7 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('app_settings')
         .select('key, value')
         .eq('category', category)
@@ -434,7 +436,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(AI_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -450,7 +452,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(EVALUATION_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -466,7 +468,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(RATE_LIMITS_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -482,7 +484,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(OCR_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -498,7 +500,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(FUZZY_MATCHING_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -514,7 +516,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(GAP_ANALYSIS_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -530,7 +532,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(UI_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -546,7 +548,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(EMAIL_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -629,7 +631,7 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('feature_flags')
         .select('*')
         .eq('key', flagKey)
@@ -725,7 +727,7 @@ export class ConfigurationService {
    */
   async getFeatureFlags(): Promise<FeatureFlag[]> {
     try {
-      const { data, error } = await supabase.from('feature_flags').select('*').order('key')
+      const { data, error } = await (await getSupabase()).from('feature_flags').select('*').order('key')
 
       if (error || !data) {
         return []
@@ -761,7 +763,7 @@ export class ConfigurationService {
 
     try {
       // Try specific policy type first
-      let { data, error } = await supabase
+      let { data, error } = await (await getSupabase())
         .from('regional_factors')
         .select('risk_factor')
         .eq('region_code', regionCode)
@@ -772,7 +774,7 @@ export class ConfigurationService {
 
       // Fall back to 'all' policy type
       if (error || !data) {
-        const result = await supabase
+        const result = await (await getSupabase())
           .from('regional_factors')
           .select('risk_factor')
           .eq('region_code', regionCode)
@@ -807,7 +809,7 @@ export class ConfigurationService {
    */
   async getRegionalFactors(year?: number): Promise<RegionalFactor[]> {
     try {
-      let query = supabase
+      let query = (await getSupabase())
         .from('regional_factors')
         .select('*')
         .eq('is_active', true)
@@ -859,7 +861,7 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('insurance_providers')
         .select('*')
         .eq('is_active', true)
@@ -915,7 +917,7 @@ export class ConfigurationService {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('market_benchmarks')
         .select('*')
         .eq('policy_type', policyType)
@@ -970,7 +972,7 @@ export class ConfigurationService {
     category: string
   ): Promise<Record<string, unknown> | null> {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (await getSupabase())
         .from('user_preferences')
         .select('preferences')
         .eq('user_id', userId)
@@ -996,7 +998,7 @@ export class ConfigurationService {
     preferences: Record<string, unknown>
   ): Promise<boolean> {
     try {
-      const { error } = await supabase.from('user_preferences').upsert(
+      const { error } = await (await getSupabase()).from('user_preferences').upsert(
         {
           user_id: userId,
           category,

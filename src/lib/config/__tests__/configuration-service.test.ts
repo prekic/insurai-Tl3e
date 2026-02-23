@@ -244,7 +244,7 @@ describe('ConfigurationService', () => {
 
     it('should handle non-Error exceptions in error message', async () => {
       mockFrom.mockImplementationOnce(() => {
-        throw 'string error'  
+        throw 'string error'
       })
       const result = await service.get('ai', 'key', 'default')
       expect(result).toBe('default')
@@ -395,7 +395,7 @@ describe('ConfigurationService', () => {
 
     it('should handle non-Error exception in getCategory', async () => {
       mockFrom.mockImplementationOnce(() => {
-        throw 42  
+        throw 42
       })
       const result = await service.getCategory('ai')
       expect(result).toEqual({})

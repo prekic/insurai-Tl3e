@@ -7,19 +7,12 @@ import {
   isNewPolicy,
   createPolicyTimestamp,
 } from '@/lib/policy-utils'
-import {
-  isSupabaseConfigured,
-  fetchPolicies as fetchSupabasePolicies,
-  fetchPolicy as fetchSupabasePolicy,
-  createPolicy as createSupabasePolicy,
-  updatePolicy as updateSupabasePolicy,
-  deleteSupabasePolicy,
-  searchPolicies as searchSupabasePolicies,
-  getPolicyStats as getSupabasePolicyStats,
-  type PolicyRow,
-  type PolicyInsert,
-  type PolicyUpdate,
-} from '@/lib/supabase'
+import { isSupabaseConfigured } from '@/lib/supabase/config'
+import type {
+  PolicyRow,
+  PolicyInsert,
+  PolicyUpdate,
+} from '@/lib/supabase/types'
 import { useAuth } from '@/lib/supabase/auth-context'
 
 // localStorage keys
@@ -266,8 +259,9 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
 
     try {
       if (useSupabase) {
-        // Fetch from Supabase
-        const rows = await fetchSupabasePolicies()
+        // Fetch from Supabase dynamically
+        const { fetchPolicies } = await import('@/lib/supabase')
+        const rows = await fetchPolicies()
         const fetchedPolicies = rows.map(policyRowToAnalyzedPolicy)
         setPolicies(fetchedPolicies)
       } else {
@@ -326,10 +320,11 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
         setRecentlyAddedIds((prev) => new Set([...prev, ...newIds]))
 
         if (useSupabase && user) {
-          // Save to Supabase
+          // Save to Supabase dynamically
+          const { createPolicy } = await import('@/lib/supabase')
           for (const policy of policiesWithTimestamp) {
             const insert = analyzedPolicyToInsert(policy, user.id)
-            await createSupabasePolicy(insert)
+            await createPolicy(insert)
           }
           // Refresh from Supabase to get the server-generated IDs
           await loadPolicies()
@@ -362,9 +357,10 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
       setIsSaving(true)
       try {
         if (useSupabase) {
-          // Update in Supabase
+          // Update in Supabase dynamically
+          const { updatePolicy: updateSupabase } = await import('@/lib/supabase')
           const supabaseUpdates = analyzedPolicyToUpdate(updates)
-          const updatedRow = await updateSupabasePolicy(id, supabaseUpdates)
+          const updatedRow = await updateSupabase(id, supabaseUpdates)
           const updatedPolicy = policyRowToAnalyzedPolicy(updatedRow)
 
           // Update local state
@@ -410,7 +406,8 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
 
       try {
         if (useSupabase) {
-          // Delete from Supabase
+          // Delete from Supabase dynamically
+          const { deleteSupabasePolicy } = await import('@/lib/supabase')
           policyToDelete = policies.find((p) => p.id === id)
           await deleteSupabasePolicy(id)
           setPolicies((prev) => prev.filter((p) => p.id !== id))
@@ -493,7 +490,8 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
       // Fetch from Supabase if configured
       if (useSupabase) {
         try {
-          const row = await fetchSupabasePolicy(id)
+          const { fetchPolicy } = await import('@/lib/supabase')
+          const row = await fetchPolicy(id)
           if (row) {
             return policyRowToAnalyzedPolicy(row)
           }
@@ -510,7 +508,8 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
   const refreshStats = useCallback(async () => {
     if (useSupabase) {
       try {
-        const supabaseStats = await getSupabasePolicyStats()
+        const { getPolicyStats } = await import('@/lib/supabase')
+        const supabaseStats = await getPolicyStats()
         setStats(supabaseStats)
       } catch (error) {
         console.error('Failed to fetch stats:', error)
@@ -568,9 +567,10 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
       }
 
       if (useSupabase) {
-        // Search via Supabase
+        // Search via Supabase dynamically
         try {
-          const rows = await searchSupabasePolicies(query)
+          const { searchPolicies: searchSupabase } = await import('@/lib/supabase')
+          const rows = await searchSupabase(query)
           const results = rows.map(policyRowToAnalyzedPolicy)
           setSearchResults(results)
         } catch (error) {

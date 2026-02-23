@@ -11,7 +11,12 @@ const mockSignUp = vi.fn()
 const mockSignOut = vi.fn()
 const mockSignInWithProvider = vi.fn()
 
-vi.mock('./client', () => ({
+
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: vi.fn(() => true),
+  credentials: null
+}))
+vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     auth: {
       getSession: () => mockGetSession(),
@@ -21,10 +26,10 @@ vi.mock('./client', () => ({
       },
     },
   },
-  isSupabaseConfigured: vi.fn(() => true),
+
 }))
 
-vi.mock('./auth', () => ({
+vi.mock('@/lib/supabase/auth', () => ({
   signIn: (...args: unknown[]) => mockSignIn(...args),
   signUp: (...args: unknown[]) => mockSignUp(...args),
   signOut: () => mockSignOut(),
@@ -63,10 +68,10 @@ describe('AuthContext', () => {
         </AuthProvider>
       )
 
-      // Initially loading
+      // Children render immediately (no blocking), initially loading=true
       expect(screen.getByTestId('loading')).toHaveTextContent('loading')
 
-      // After session check, not loading
+      // After session check, loading becomes false
       await waitFor(() => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })
@@ -133,7 +138,9 @@ describe('AuthContext', () => {
 
       await user.click(screen.getByText('Sign In'))
 
-      expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password')
+      await waitFor(() => {
+        expect(mockSignIn).toHaveBeenCalledWith('test@example.com', 'password')
+      })
     })
   })
 
@@ -154,7 +161,9 @@ describe('AuthContext', () => {
 
       await user.click(screen.getByText('Sign Up'))
 
-      expect(mockSignUp).toHaveBeenCalledWith('test@example.com', 'password', 'Test User')
+      await waitFor(() => {
+        expect(mockSignUp).toHaveBeenCalledWith('test@example.com', 'password', 'Test User')
+      })
     })
   })
 
@@ -175,14 +184,16 @@ describe('AuthContext', () => {
 
       await user.click(screen.getByText('Sign Out'))
 
-      expect(mockSignOut).toHaveBeenCalled()
+      await waitFor(() => {
+        expect(mockSignOut).toHaveBeenCalled()
+      })
     })
   })
 
   describe('useAuth hook', () => {
     it('should throw error when used outside AuthProvider', () => {
       // Suppress console.error for this test
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { })
 
       expect(() => {
         render(<TestConsumer />)
