@@ -60,6 +60,11 @@ export interface SystemMetrics {
     perMinute: number
     rate: number
   }
+  extraction: {
+    total: number
+    errors: number
+    errorRate: number
+  }
   latency: {
     p50: number
     p95: number
@@ -180,6 +185,10 @@ let totalResponseTime = 0
 const responseTimes: number[] = []
 const MAX_RESPONSE_TIMES = 1000
 
+// Extraction-specific counters (for provider error rate alerts)
+let extractionRequestCount = 0
+let extractionErrorCount = 0
+
 const startTime = Date.now()
 
 // Rate tracking
@@ -213,6 +222,14 @@ export function recordRequest(metric: RequestMetric): void {
   // Track errors
   if (metric.statusCode >= 400) {
     errorCount++
+  }
+
+  // Track extraction-specific metrics (AI endpoints)
+  if (metric.endpoint.includes('/ai/extract') || metric.endpoint.includes('/ai/ocr')) {
+    extractionRequestCount++
+    if (metric.statusCode >= 400) {
+      extractionErrorCount++
+    }
   }
 
   // Track per-minute stats
@@ -320,6 +337,11 @@ export function getSystemMetrics(): SystemMetrics {
       total: errorCount,
       perMinute: errorsPerMinute,
       rate: requestCount > 0 ? (errorCount / requestCount) * 100 : 0,
+    },
+    extraction: {
+      total: extractionRequestCount,
+      errors: extractionErrorCount,
+      errorRate: extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0,
     },
     latency: {
       p50: percentile(responseTimes, 50),
@@ -599,6 +621,16 @@ function checkAlertRules(metric: RequestMetric): void {
       case 'status_code':
         value = metric.statusCode
         break
+      case 'extraction_error_rate':
+        // Only evaluate on extraction/OCR requests
+        if (!metric.endpoint.includes('/ai/extract') && !metric.endpoint.includes('/ai/ocr')) continue
+        value = extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0
+        break
+      case 'ai_response_time':
+        // Only evaluate on AI-related requests
+        if (!metric.endpoint.includes('/ai/')) continue
+        value = metric.responseTime
+        break
       default:
         continue
     }
@@ -660,8 +692,35 @@ function triggerAlert(rule: AlertRule, value: number): void {
   rule.lastTriggered = alert.timestamp
   alertRules.set(rule.id, rule)
 
-  // Persist alert
+  log.warn('Alert triggered', { alertId: alert.id, rule: rule.name, metric: rule.metric, value, threshold: rule.threshold, severity: rule.severity })
+
+  // Persist alert to monitoring_alerts table
   persistAlert(alert).catch((err) => log.warn('Failed to persist alert', { alertId: alert.id, ruleName: alert.ruleName, error: err instanceof Error ? err.message : String(err) }))
+
+  // Dispatch admin notification (fire-and-forget)
+  dispatchAlertNotification(alert).catch((err) => log.warn('Failed to dispatch alert notification', { alertId: alert.id, error: err instanceof Error ? err.message : String(err) }))
+}
+
+/**
+ * Dispatch alert to admin notification service for dashboard visibility.
+ * Uses dynamic import to avoid circular dependency with services.
+ */
+async function dispatchAlertNotification(alert: Alert): Promise<void> {
+  const { notifyPerformanceAlert } = await import('../services/admin-notification-service.js')
+  const severity = alert.severity === 'critical' ? 'critical' : 'warning'
+
+  await notifyPerformanceAlert(
+    alert.ruleName,
+    severity,
+    alert.message,
+    {
+      alertId: alert.id,
+      metric: alert.metric,
+      value: alert.value,
+      threshold: alert.threshold,
+      timestamp: alert.timestamp,
+    }
+  )
 }
 
 /**
@@ -941,6 +1000,55 @@ export function initializeDefaultAlertRules(): void {
       enabled: true,
       cooldownMinutes: 5,
       notificationChannels: ['dashboard', 'email'],
+    })
+  }
+
+  // Extraction failure rate alert (AI extraction + OCR endpoints)
+  if (!Array.from(alertRules.values()).find((r) => r.metric === 'extraction_error_rate')) {
+    createAlertRule({
+      name: 'High Extraction Failure Rate',
+      description: 'Alert when AI extraction/OCR error rate exceeds 20%',
+      metric: 'extraction_error_rate',
+      condition: 'gt',
+      threshold: 20,
+      severity: 'warning',
+      enabled: true,
+      cooldownMinutes: 10,
+      notificationChannels: ['dashboard'],
+    })
+  }
+
+  // Critical extraction failure rate
+  if (
+    !Array.from(alertRules.values()).find(
+      (r) => r.metric === 'extraction_error_rate' && r.severity === 'critical'
+    )
+  ) {
+    createAlertRule({
+      name: 'Critical Extraction Failure Rate',
+      description: 'Alert when AI extraction/OCR error rate exceeds 50%',
+      metric: 'extraction_error_rate',
+      condition: 'gt',
+      threshold: 50,
+      severity: 'critical',
+      enabled: true,
+      cooldownMinutes: 5,
+      notificationChannels: ['dashboard', 'email'],
+    })
+  }
+
+  // Slow AI response time (extraction/chat/OCR typically take 10-60s)
+  if (!Array.from(alertRules.values()).find((r) => r.metric === 'ai_response_time')) {
+    createAlertRule({
+      name: 'Slow AI Response',
+      description: 'Alert when AI endpoint response time exceeds 90 seconds',
+      metric: 'ai_response_time',
+      condition: 'gt',
+      threshold: 90000,
+      severity: 'warning',
+      enabled: true,
+      cooldownMinutes: 5,
+      notificationChannels: ['dashboard'],
     })
   }
 }
