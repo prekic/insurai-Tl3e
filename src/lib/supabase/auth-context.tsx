@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
 import { isSupabaseConfigured } from './config'
 
@@ -26,7 +26,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true)
   const isConfigured = isSupabaseConfigured()
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!isConfigured) {
       setLoading(false)
       return
@@ -111,11 +111,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const auth = await import('@/lib/supabase/auth')
     await auth.signInWithProvider('github')
   }, [])
-
-  // Prevent rendering child routes if we are genuinely waiting for Supabase check
-  if (isConfigured && loading) {
-    return null // or a full page spinner since this blocks the app boot
-  }
 
   return (
     <AuthContext.Provider

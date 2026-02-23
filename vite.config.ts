@@ -13,29 +13,29 @@ export default defineConfig({
     // Run: ANALYZE=true npm run build && open stats.html
     ...(process.env.ANALYZE === 'true'
       ? [
-        visualizer({
-          filename: 'stats.html',
-          open: true,
-          gzipSize: true,
-          brotliSize: true,
-          template: 'treemap', // 'treemap', 'sunburst', 'network'
-        }),
-      ]
+          visualizer({
+            filename: 'stats.html',
+            open: true,
+            gzipSize: true,
+            brotliSize: true,
+            template: 'treemap', // 'treemap', 'sunburst', 'network'
+          }),
+        ]
       : []),
     // Sentry source map upload (only when auth token is configured)
     ...(process.env.SENTRY_AUTH_TOKEN
       ? [
-        sentryVitePlugin({
-          org: process.env.SENTRY_ORG || 'insurai',
-          project: process.env.SENTRY_PROJECT || 'insurai-web',
-          authToken: process.env.SENTRY_AUTH_TOKEN,
-          sourcemaps: {
-            assets: './dist/**',
-          },
-          // Only upload in production builds
-          disable: process.env.NODE_ENV !== 'production',
-        }),
-      ]
+          sentryVitePlugin({
+            org: process.env.SENTRY_ORG || 'insurai',
+            project: process.env.SENTRY_PROJECT || 'insurai-web',
+            authToken: process.env.SENTRY_AUTH_TOKEN,
+            sourcemaps: {
+              assets: './dist/**',
+            },
+            // Only upload in production builds
+            disable: process.env.NODE_ENV !== 'production',
+          }),
+        ]
       : []),
   ],
   resolve: {

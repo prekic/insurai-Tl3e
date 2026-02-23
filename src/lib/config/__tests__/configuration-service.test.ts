@@ -1172,10 +1172,13 @@ describe('ConfigurationService', () => {
         id: 'p1',
         code: 'allianz',
         name: 'Allianz',
-        aliases: [],
+        nameTr: 'Allianz Sigorta',
+        marketShare: 12.8,
+        customerRating: 4.2,
+        establishedYear: 1923,
+        headquarters: 'Istanbul',
         website: 'https://allianz.com.tr',
-        supportPhone: undefined,
-        supportEmail: undefined,
+        logoUrl: '/logos/allianz.png',
         specialties: ['kasko', 'health'],
         isActive: true,
       })
@@ -1397,9 +1400,8 @@ describe('ConfigurationService', () => {
     })
 
     it('should return true when upsert succeeds', async () => {
-      setupSingleQuery({ data: null, error: null })
       mockUpsert.mockResolvedValueOnce({ error: null })
-      mockFrom.mockReturnValue({
+      mockFrom.mockReturnValueOnce({
         select: mockSelect,
         upsert: mockUpsert,
       })
@@ -1408,9 +1410,8 @@ describe('ConfigurationService', () => {
     })
 
     it('should return false when upsert returns error', async () => {
-      setupSingleQuery({ data: null, error: null })
       mockUpsert.mockResolvedValueOnce({ error: { message: 'conflict' } })
-      mockFrom.mockReturnValue({
+      mockFrom.mockReturnValueOnce({
         select: mockSelect,
         upsert: mockUpsert,
       })

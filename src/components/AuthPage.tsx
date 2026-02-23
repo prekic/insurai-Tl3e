@@ -86,10 +86,6 @@ export function AuthPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Shield className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-slate-900">InsurAI</span>
-          </div>
           <Shield className="h-16 w-16 text-amber-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-slate-900 mb-2">
             {t.auth.authNotConfigured}
