@@ -226,6 +226,82 @@ Server (port 4001)
 - `proxy-utils.ts` provides lightweight proxy checks without SDK imports
 - Anthropic uses `ANTHROPIC_SCHEMA_PROMPT` (full JSON schema in prompt text) since it lacks `response_format`
 
+### Extraction Pipeline (6 Stages)
+
+```
+extractPolicyFromDocument() pipeline:
+
+Stage 1: PDF TEXT EXTRACTION
+  ├─ Try Document AI (Google Vision) — 15-page chunk limit
+  ├─ Fallback: pdf.js (native text extraction)
+  └─ Density check: chars_per_page < 200 → scanned (OCR), >= 200 → digital
+
+Stage 2: TEXT PRE-PROCESSING
+  ├─ Deterministic: Turkish spacing fixes ("B İ RLE Şİ K" → "BİRLEŞİK")
+  └─ AI-enhanced: Context-aware OCR error correction
+
+Stage 3: FORM FIELD ENHANCEMENT (from Document AI metadata)
+  └─ Refine policy number, insured name, dates, premium from structured fields
+
+Stage 4: TURKISH PATTERN VALIDATION
+  └─ Validate TC Kimlik, IBAN, phone, plate numbers, dates via regex
+
+Stage 5: TABLE PARSING (coverage extraction from Document AI tables)
+  └─ Merge table data with AI coverages using confidence scoring
+
+Stage 6: AI EXTRACTION + CONVERSION
+  ├─ extractWithConsensus() or single provider
+  ├─ convertToAnalyzedPolicy() — coverage nameTr, AI insights TR, gap analysis
+  └─ Result: ExtractionResult { success, policy, extractedData, consensus }
+```
+
+### Confidence Scoring
+
+```typescript
+// Per-field weights for overall confidence (0-1):
+policyNumber: 0.20, provider: 0.15, dates: 0.20, premium: 0.20, coverages: 0.25
+
+// Two thresholds:
+< 0.4  → REJECTED (extraction fails)
+0.4-0.7 → WARNING (show "Low Confidence" banner)
+> 0.7  → PASS (normal extraction)
+```
+
+### Prompt Service (`server/services/prompt-service.ts`)
+
+- DB-first with 5-minute TTL cache, hardcoded fallback if DB unavailable
+- 16 seeded templates: 9 extraction, 1 chat, 3 OCR, 3 analysis
+- Template variables: `{{var}}` and `{{#if var}}...{{/if}}` syntax
+- Admin CRUD via Prompts tab in Admin Dashboard
+
+### File Upload Handoff Patterns
+
+Two different patterns exist for passing files between components:
+
+**Pattern 1 — React Router State** (Hero.tsx → TryAnalysis/PolicyUpload):
+```tsx
+// Sender
+navigate('/try', { state: { file: validFiles[0] } })
+// Receiver — must clear state after processing
+const fileFromState = (location.state as LocationState)?.file
+if (fileFromState && !processedRef.current) {
+  processedRef.current = true
+  processFile(fileFromState)
+  navigate(location.pathname, { replace: true, state: null })  // Clear
+}
+```
+
+**Pattern 2 — CustomEvent + sessionStorage** (GlobalNavigation → PolicyUpload):
+```tsx
+// Sender — Files can't be serialized, so use CustomEvent for File objects
+const event = new CustomEvent('filesSelected', { detail: validFiles })
+window.dispatchEvent(event)
+navigate('/upload', { state: { filesReady: true } })
+// Receiver — PolicyUpload listens for 'filesSelected' event
+```
+
+Both patterns use a `useRef` boolean to prevent duplicate processing on remount.
+
 ---
 
 ## API Endpoints
@@ -443,6 +519,71 @@ log.info('message', { data })  // Structured JSON in production
 
 ---
 
+## Utility Functions
+
+### Core Utilities (`src/lib/utils.ts`)
+
+```typescript
+import { cn, formatCurrency, formatCurrencyCompact, formatDate, formatNumber } from '@/lib/utils'
+
+cn("base-class", isActive && "active-class")     // Tailwind class merging (clsx + twMerge)
+formatCurrency(15000)           // "₺15.000"      (zero decimals for TRY)
+formatCurrency(15000.50)        // "₺15.001"      (rounded — no decimals)
+formatCurrencyCompact(1200000)  // "₺1.2M"        (mobile-friendly)
+formatCurrencyCompact(50000)    // "₺50K"
+formatDate('2026-01-15')        // "15.01.2026"    (Turkish date format)
+formatNumber(1500000)           // "1.500.000"     (Turkish thousands)
+```
+
+**Currency validation**: `validateCurrencyRegion('USD', 'Istanbul')` — warns on foreign currency for Turkish addresses. Supports 70+ currency symbols.
+
+### Insurance Display Helpers (`src/lib/insurance-display.ts`)
+
+```typescript
+// Company name normalization (40+ mappings)
+getShortCompanyName('ALLIANZ SİGORTA A.Ş.')  // → 'Allianz'
+getShortCompanyName('ANADOLU ANONİM TÜRK SİGORTA ŞİRKETİ')  // → 'Anadolu Sigorta'
+// 3-tier: exact match → partial pattern → suffix removal + truncate to 20 chars
+
+// Coverage type by policy (determines how to display main coverage value)
+getCoverageType('kasko')    // → 'sumInsured'  (vehicle value)
+getCoverageType('traffic')  // → 'limit'       (bodily injury limit)
+getCoverageType('health')   // → 'benefit'     (benefit amount)
+
+// Main coverage value extraction (type-aware)
+getMainCoverageValue(kaskoPolicy)    // → policy.coverage (vehicle value)
+getMainCoverageValue(trafficPolicy)  // → Math.max(...bodily injury limits)
+
+// Insured subject extraction (type-specific fallback chains)
+getInsuredSubject(kaskoPolicy)   // → plate number or vehicle model
+getInsuredSubject(homePolicy)    // → property address (truncated to 30 chars)
+getInsuredSubject(healthPolicy)  // → insured person name
+```
+
+### Coverage Display Logic (`PolicyDetailView.tsx:formatCoverageLimit`)
+
+4-tier priority for displaying coverage limits:
+1. **Explicit flags**: `isUnlimited` → "Sınırsız", `isMarketValue` → "Rayiç Değer"
+2. **Kasko knowledge**: `shouldShowUnlimited()` / `shouldShowIncluded()` from kasko-knowledge.ts
+3. **Legacy detection**: Zero limit + pattern matching ("sınırsız", "rayiç", "asistans")
+4. **Currency format**: `formatCurrency(limit)` or "Dahil" (included) if zero + included flag
+
+### Coverage Categories (`src/lib/knowledge/kasko-knowledge.ts`)
+
+| Category | Icon | Turkish Label | Color |
+|----------|------|---------------|-------|
+| `main` | Car | Ana Teminatlar | green |
+| `liability` | Scale | Mali Sorumluluk | blue |
+| `personal_accident` | Users | Ferdi Kaza | purple |
+| `supplementary` | Briefcase | Ek Teminatlar | indigo |
+| `assistance` | LifeBuoy | Asistans Hizmetleri | teal |
+| `legal` | Gavel | Hukuki Koruma | slate |
+| `other` | Shield | Diğer | gray |
+
+UI groups coverages by category on PolicyDetailView with collapsible sections.
+
+---
+
 ## Insurance-Specific Logic
 
 ### Supported Policy Types
@@ -471,6 +612,57 @@ log.info('message', { data })  // Structured JSON in production
 - Resolved at extraction time in `policy-extractor.ts`
 - `PolicyDetailView` uses `getLocalizedCoverageName()` for display with legacy fallback
 
+### Total Coverage Calculation (Policy-Type Aware)
+
+```typescript
+// KASKO: Use vehicle value only — do NOT sum all coverage limits
+totalCoverage = policy.coverage  // or isMarketValue flag
+
+// TRAFFIC: Use highest bodily injury limit (not sum)
+totalCoverage = Math.max(...bodilyInjuryLimits)
+
+// HOME/DASK/BUSINESS: Sum main category coverages
+totalCoverage = mainCoverages.reduce((sum, c) => sum + c.limit, 0)
+```
+
+### Pre-Upload Duplicate Detection (`src/lib/policy-upload-check.ts`)
+
+```
+checkPolicyBeforeUpload(newPolicy) flow:
+  1. Query by: policyNumber + provider + insuredPerson
+  2. If no match → { type: 'noConflict' }
+  3. If match → comparePoliciesAdvanced() → classify diff:
+     - 'critical': policy/provider number changed
+     - 'major': coverage or premium significantly different
+     - 'moderate': dates changed
+     - 'minor': formatting only
+  4. Resolution options: skip | replace | keep_both | track_amendment
+```
+
+OCR-tolerant fuzzy matching handles character confusion: `0↔O`, `1↔l↔I`, `ı↔i↔İ`, `5↔s↔ş`, `8↔b↔B`
+
+### Traffic Insurance Mandatory Limits (2025 SEDDK)
+
+| Coverage | Per Person | Per Accident | Per Vehicle |
+|----------|-----------|-------------|-------------|
+| Bodily Injury | ₺2,700,000 | ₺13,500,000 | - |
+| Material Damage | - | ₺600,000 | ₺300,000 |
+
+These limits are **updated annually by SEDDK**. Source: `src/data/coverage-limits.ts`
+
+### Turkish Regulatory Framework (`src/data/regulations.ts`)
+
+8 regulation types: `law` (Kanun), `regulation` (Yönetmelik), `general_condition` (Genel Şartlar), `clause` (Kloz), `tariff` (Tarife), `circular` (Genelge), `communique` (Tebliğ), `guideline` (Rehber)
+
+Key regulators: **SEDDK** (insurance regulator), **TSB** (insurance association), **DASK** (earthquake insurance), **TARSİM** (agricultural insurance)
+
+### Evaluation Weights (Configurable via Admin)
+
+```typescript
+premium: 20, coverage: 30, deductible: 15, compliance: 20, value: 15
+// Total: 100. Stored in app_settings DB table, overridable per-user.
+```
+
 ### Gap Detection
 ```
 analyzeGapsComprehensive(policy, options)
@@ -495,6 +687,72 @@ Gap severity: `critical` (>=90% market inclusion) → `recommended` (70-89%) →
 
 ### Turkish Regions (7)
 `marmara` (1.15x risk), `ege` (1.05x), `akdeniz` (1.08x), `ic_anadolu` (0.95x), `karadeniz` (0.90x), `dogu_anadolu` (0.85x), `guneydogu` (0.88x)
+
+---
+
+## Landing Page Architecture
+
+### Section Order (`src/components/landing/`)
+
+```
+Hero              — Gradient bg, nav bar, UploadWidget, ComparisonMock
+Benefits          — Feature grid (AI extraction, benchmarking, gap detection, etc.)
+HowItWorks        — 3-step process (Upload → Analyze → Compare)
+Stats             — 4 authentic metrics: 7 types, TR/EN, 15+ checks, <60s
+Testimonials      — Use-case scenarios for 3 audience types (NOT fake quotes)
+WhyChooseUs       — Authentic differentiators (KVKK, No Signup, Turkey-Focused)
+CompareSection    — Interactive comparison demo (hidden on mobile)
+FAQ               — Accordion with common questions
+Footer            — Links, legal, social
+StickyMobileCTA   — Floating mobile CTA button
+```
+
+**Mobile optimizations**: WhoItsFor, PolicyComparisonSection, and CompareSection hidden on mobile (covered by Testimonials). Stats use compact pill badges.
+
+### ComparisonMock (Two Variants)
+
+- **Desktop**: 3-column grid — Allianz Kasko A vs AXA Kasko B with feature rows (✓ / ✗ / ⚠)
+- **Mobile**: Card layout with 3 summary items ("Best Coverage", "Lowest Premium", "AI Pick")
+- Uses real provider names with disclaimer
+
+### Stats — Authentic Metrics Only
+
+```
+7 Policy Types | TR/EN Languages | 15+ Coverage Checks | <60s Analysis
+```
+
+Each metric is verifiable from codebase. Replaced fabricated "4.9/5 rating", "15K+ users" in Feb 2026.
+
+### Hero Component Structure
+
+- Top utility bar (hidden on mobile): "Secure & Encrypted", "Licensed Advisors"
+- Main nav: Logo, Dashboard, Compare, Upload button, Globe picker, Profile/Sign In
+- Hero content (2-column desktop): headlines + UploadWidget | ComparisonMock
+- Mobile hamburger menu with inline TR/EN language toggle
+- File upload from nav: validates → branches on auth state → `/try` (anonymous) or `/upload` (logged in)
+
+### Key Component Interfaces
+
+```typescript
+// PolicyUpload.tsx
+type UploadState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error'
+interface UploadedFile {
+  id: string; file: File; status: UploadState; progress: number
+  policy?: AnalyzedPolicy; error?: string
+  extractionSource?: 'ai' | 'fallback' | 'ocr'
+  lowConfidence?: boolean     // Between warningConfidence and minConfidence
+  conflict?: PreUploadCheckResult
+  awaitingResolution?: boolean
+}
+
+// TryAnalysis.tsx (free trial)
+type AnalysisState = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error' | 'trial-used'
+// Session-based: one analysis per anonymous user per 24h (localStorage)
+// 90-second timeout with progress updates every 10 seconds
+
+// ComparePolicies.tsx — URL-based state
+// Format: /compare?ids=uuid1,uuid2,uuid3 (up to 4 policies, shareable)
+```
 
 ---
 
