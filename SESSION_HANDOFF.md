@@ -1,311 +1,226 @@
-# Session Handoff — February 22, 2026 (EN Translations Lazy-Load — Completes Lazy-i18n)
+# Session Handoff — February 23, 2026
 
 ## Current Status
 
-| Metric | Status |
-|--------|--------|
-| **Build** | Passing |
+| Metric | Value |
+|--------|-------|
+| **Build** | Passing (frontend + server) |
 | **TypeCheck** | 0 errors |
-| **ESLint Errors** | 0 errors |
-| **ESLint Warnings** | 0 warnings ✓ |
-| **Tests** | 15,427 passing (317 test files), 0 failures ✓ |
-| **E2E Tests** | 186/186 Chromium passed (production build) |
-| **Coverage** | 91.67% statements, 85.91% branches, 88.77% functions, 92.5% lines |
-| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100, CLS 0 |
-| **Branch** | `claude/review-handoff-docs-PvHiV` |
-| **Production Readiness** | 9.5/10 |
-| **Live URL** | https://insurai-production.up.railway.app |
-| **Deployment** | Live — extraction pipeline fully operational, all 3 AI providers healthy |
+| **ESLint** | 0 errors, 0 warnings |
+| **Unit Tests** | 15,427 passing (317 files), 0 failures |
+| **E2E Tests** | 186/186 Chromium passed |
+| **Coverage** | 91.67% statements, 85.91% branches, 92.5% lines |
+| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
+| **CLS** | 0 (production verified) |
+| **Production URL** | https://insurai-production.up.railway.app |
+| **Deployment** | Live — all 3 AI providers healthy, extraction pipeline operational |
 | **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
-| **SW Cache Version** | v20 |
-| **Main Bundle Size** | ~259 KB gzip (was 268 KB — EN translations moved to async chunk) |
-| **EN Chunk Size** | ~12 KB gzip (`translations-en-*.js`) |
-| **TR Chunk Size** | 13.77 KB gzip (`translations-tr-*.js`) |
+| **Main Bundle** | ~259 KB gzip + 12 KB EN chunk + 14 KB TR chunk |
+| **SW Cache** | v20 |
+| **Production Readiness** | ~9.5/10 |
 
 ---
 
 ## Session Summary
 
-This session completed the "split EN translations from main chunk" task — the final step in the lazy-i18n story. After the previous session split TR translations into an async Vite chunk (saving −14 KB gzip), this session did the same for EN translations (saving an additional −8.7 KB gzip). Both EN and TR are now async chunks loaded on demand.
+This session rewrote CLAUDE.md from a 4,448-line accumulated changelog into a focused ~520-line developer guide, and updated SESSION_HANDOFF.md with comprehensive project status.
 
-**Total bundle savings from lazy-i18n work across both sessions**: ~22.7 KB gzip from the main chunk.
-
----
-
-## Work Completed This Session
-
-| # | Task | Commit | Files Changed |
-|---|------|--------|---------------|
-| 1 | **EN translations split into async Vite chunk** | `469b100` | `translations-skeleton.ts` (new), `translations.ts`, `index.ts`, `translation-service.ts`, `i18n-context.tsx`, 32 test files |
-| 2 | **CLAUDE.md — Known Issue #124, bundle size, footer** | (this session docs commit) | `CLAUDE.md` |
-| 3 | **SESSION_HANDOFF.md update** | (this session docs commit) | `SESSION_HANDOFF.md` |
+Previous session work (Feb 22) that was validated at the start of this session:
+- Reverted harmful Supabase code-splitting changes (commit `2e0a4dd`)
+- Confirmed: 0 ESLint errors/warnings, 15,427 tests passing, builds clean
 
 ---
 
-## Architecture: EN + TR Translations — Both Lazy-Loaded
+## Completed Features (Full List)
 
-```
-Before this session:
-main chunk (~268 KB gzip)
-  ├── translations-en.ts (EN — eagerly imported by i18n-context.tsx)
-  └── translations-skeleton.ts (not yet created)
-async chunk: translations-tr-*.js (13.77 KB gzip)
+### Core Platform
+- [x] PDF upload with browser-side text extraction (pdf.js v5.4)
+- [x] Multi-provider AI extraction (OpenAI GPT-4o, Anthropic Claude, Google Vision OCR)
+- [x] Multi-turn AI policy chat with conversation history
+- [x] Policy dashboard with sorting, filtering, search, status tracking
+- [x] Side-by-side policy comparison
+- [x] Detailed policy view with coverages, exclusions, AI insights, scoring
+- [x] Duplicate detection with OCR-tolerant fuzzy matching
+- [x] Conflict resolution dialog (skip / replace / keep both / track amendment)
+- [x] Policy evaluation and grading (A-F, 5 weighted dimensions)
+- [x] Gap detection engine (6 analysis types)
+- [x] Regional benchmarking (7 Turkish regions)
+- [x] Market data comparison (DB-first + static fallback)
+- [x] PDF export for policy reports
+- [x] Share links for analysis results
+- [x] Session-based free trial for anonymous users (90s timeout)
 
-After this session:
-main chunk (~259 KB gzip)
-  └── translations-skeleton.ts (all empty strings — ~0 KB content, synchronous)
-async chunk: translations-en-*.js (~12 KB gzip)
-  └── translations-en.ts (EN — lazy via dynamic import)
-async chunk: translations-tr-*.js (13.77 KB gzip)
-  └── translations-tr.ts (TR — lazy via dynamic import)
-```
+### AI & Extraction Pipeline
+- [x] Combined document processing (clean-room deterministic + AI-enhanced)
+- [x] OCR cleanup pipeline with Unicode-safe Turkish matching
+- [x] Configuration-driven OCR Decision Engine (5-component weighted confidence)
+- [x] PDF splitting for Document AI 15-page limit
+- [x] Admin-managed AI prompt templates (16 seeded, versioned)
+- [x] Tiered confidence system (hard reject < 0.4, warning < 0.7)
+- [x] Coverage nameTr resolved at extraction time
+- [x] AI insights translated to Turkish at extraction time (aiInsightsTr)
+- [x] Multi-AI consensus extraction
+- [x] Dynamic SDK imports (lazy-loaded)
 
-**Load sequence (both locales):**
-1. App starts → `i18n-context.tsx` initialises with `SKELETON_TRANSLATIONS` (all empty strings, synchronous)
-2. Components render with empty strings for ~50ms (invisible in practice)
-3. `translation-service.ts` calls `getPreloadedTranslations()` for the user's locale
-4. For `'tr'`: `await import('./translations-tr')` → TR async chunk fetched (13.77 KB gzip)
-5. For `'en'`: `await import('./translations-en')` → EN async chunk fetched (~12 KB gzip)
-6. Context updates → components re-render with real strings
+### Internationalization (i18n)
+- [x] Complete TR/EN translations for ALL user-facing components
+- [x] Database-driven translation system with admin management
+- [x] Lazy-loaded translation chunks (both EN and TR async)
+- [x] Globe language picker in both nav bars
+- [x] Coverage name translation (90+ entries canonical map)
+- [x] AI-assisted bulk translation endpoint
+- [x] 685+ translation keys x 2 languages seeded
 
-**Key files:**
-- `src/lib/i18n/translations-skeleton.ts` — all-empty-string `TranslationDictionary` (923 lines); do NOT add content — it must stay empty so it has zero bundle cost
-- `src/lib/i18n/translations-en.ts` — `EN_TRANSLATIONS`; import from here directly, never from `translations.ts`
-- `src/lib/i18n/translations-tr.ts` — `TR_TRANSLATIONS`; import from here directly, never from `translations.ts`
-- `src/lib/i18n/translations.ts` — `TranslationDictionary` interface + `COMMON_LOCALES` ONLY; no translation objects
+### Admin Dashboard
+- [x] JWT admin auth with bcrypt + role-based access
+- [x] Modular admin routes (9 modules)
+- [x] Settings UI with validation (AI, Evaluation, Rate Limits, OCR, Feature Flags)
+- [x] Settings export/import, audit history, diff viewer
+- [x] Settings templates, webhooks, batch update
+- [x] Config drift detection, performance monitoring
+- [x] Translation management tab
+- [x] Document Journey viewer with content capture
+- [x] Prompt template CRUD with versioning
+- [x] Admin diagnostics endpoint
 
-**Two distinct fallback levels:**
-- `i18n-context.tsx` error path: `setTranslations(SKELETON_TRANSLATIONS)` — entire translation system crashes → empty strings (sync fallback already in hand)
-- `translation-service.ts` final fallback: `await import('./translations-en')` — unknown/unsupported locale → real EN content (async but meaningful)
+### Configuration System
+- [x] Three-tier config (system → admin → user preferences)
+- [x] 843+ configurable settings
+- [x] Feature flags with rollout percentages
+- [x] 7 database tables
+
+### PWA & Push Notifications
+- [x] Service worker with offline support + background sync
+- [x] VAPID-based Web Push notifications
+- [x] Extraction completion notifications
+- [x] Policy expiry push scheduler (daily cron, 7/14/30-day windows)
+- [x] Auto-removal of stale subscriptions
+- [x] Graceful degradation without VAPID keys
+
+### Performance
+- [x] Lighthouse 99/100/93/100 with CLS 0
+- [x] App shell skeleton (prevents CLS)
+- [x] framer-motion removed from main bundle (-38 KB gzip)
+- [x] TR/EN translations lazy chunks (-23 KB gzip total)
+- [x] gzip compression middleware
+- [x] Immutable hashed asset caching
+- [x] HSTS in production
+
+### Security & Hardening
+- [x] Production hardening phases 1-3 complete
+- [x] JSON.parse guarded everywhere
+- [x] Structured logging (100+ console.log replaced)
+- [x] Rate limiting on all endpoints
+- [x] PDF magic byte validation
+- [x] HMAC-SHA256 unsubscribe tokens
+- [x] KVKK/GDPR consent management
+
+### Testing & Quality
+- [x] 15,427 unit tests, 186 E2E tests
+- [x] 0 ESLint errors, 0 warnings
+- [x] CI pipeline with parallel validate + E2E gates
+- [x] 85.91% branch coverage
+- [x] Dead code cleanup (~17,800 lines removed)
+
+### CI/CD
+- [x] GitHub Actions staging + production workflows
+- [x] Playwright E2E in CI
+- [x] Railway deployment with health check + rollback
+- [x] Daily cron for policy expiry notifications
 
 ---
 
-## All Commits This Session
+## Known Bugs
 
-| Commit | Description |
-|--------|-------------|
-| `469b100` | feat(i18n): Split EN translations into lazy async Vite chunk (completes lazy-i18n) |
-| `efbb38f` | docs: update CLAUDE.md Known Issue #124 + SESSION_HANDOFF.md for EN lazy-load session |
+1. **PolicyUpload.test.tsx race condition**: Full test suite occasionally reports 1 unhandled rejection (`window is not defined`). Pre-existing React 19 + JSDOM teardown issue. Zero impact — all 317 files pass.
 
----
-
-## Test Changes Required by EN Split (37 files in `469b100`)
-
-### 1. Components using `useTranslation()` — need `vi.mock('@/lib/i18n/i18n-context')`
-Previously, `i18n-context.tsx` defaulted to `EN_TRANSLATIONS` synchronously. Now it defaults to `SKELETON_TRANSLATIONS` (empty strings). Any component test that calls code paths dependent on translation strings must mock the context:
-
-```typescript
-vi.mock('@/lib/i18n/i18n-context', () => ({
-  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
-  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
-}))
-```
-
-Files that needed this added: `HelpCenter.test.tsx`, `Benefits.test.tsx`, `FAQ.test.tsx`, `Footer.test.tsx`, `HowItWorks.test.tsx`, `Stats.test.tsx`, `Testimonials.test.tsx`, `WhyChooseUs.test.tsx`, `UploadWidget.test.tsx`
-
-### 2. Tests importing `EN_TRANSLATIONS` — path changed
-```typescript
-// Before
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations'
-// After
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
-```
-
-### 3. Context error-fallback assertions — expect `''` not `'Home'`
-`i18n-context.tsx`'s `catch` block now calls `setTranslations(SKELETON_TRANSLATIONS)`, not `setTranslations(EN_TRANSLATIONS)`. Tests asserting on the error-fallback behaviour must expect empty strings.
+2. **Stale lint threshold**: `package.json` lint script has `--max-warnings 47` but actual warnings are 0. Should be tightened to `--max-warnings 0`.
 
 ---
 
-## Known Issues
+## Technical Debt
 
-| Issue | Severity | Status | Notes |
-|-------|----------|--------|-------|
-| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx (React 19 + Vitest concurrency); all files pass individually |
+| Priority | Item |
+|----------|------|
+| Low | framer-motion still a dependency (only used in AuthPage lazy chunk) |
+| Low | `--max-warnings 47` should be `--max-warnings 0` in lint script |
+| Low | Service worker uses cache-first (mitigated by hashed filenames + version bumping) |
+| Low | In-memory rate limit state resets on restart (Redis for persistence at scale) |
+| Low | Supabase migrations applied manually via SQL Editor |
+| Medium | No automated backup schedule (export/import exists) |
+| Medium | New UI strings may not always get added to DB translation system |
+| Medium | E2E tests use placeholder Supabase values in CI |
 
-All previously-pending items are **resolved**:
-- ✅ Migration 021 applied to production (confirmed Feb 22)
-- ✅ VAPID keys set in Railway (confirmed by `sent: 1`)
-- ✅ CRON_SECRET set in Railway + GitHub Secrets (confirmed by 200 response)
-- ✅ Branch merged to `main` (cron workflow active)
-- ✅ TR translations lazy-loaded (−14 KB gzip from main bundle) — Feb 22 session
-- ✅ EN translations lazy-loaded (−8.7 KB gzip from main bundle) — this session
+---
+
+## Next Logical Steps (Priority Order)
+
+### High Priority
+1. **Production monitoring/alerting** — Set up alerting for extraction failures, provider errors, response time degradation beyond Sentry error tracking
+2. **Real user testing** — Platform is feature-complete; get Turkish insurance professionals testing with actual policies
+3. **SEO & marketing content** — Turkish-language SEO content, meta descriptions, structured data
+
+### Medium Priority
+4. **Automated translation sync** — Detect untranslated keys when new UI strings are added
+5. **Policy comparison sharing** — Share side-by-side comparisons (currently only individual results)
+6. **Email notifications** — Transactional emails for extraction complete, policy expiring (infrastructure exists)
+7. **Custom domain** — Move from `*.up.railway.app` to branded domain
+
+### Low Priority
+8. **Redis for rate limiting** — Multi-instance deployment support
+9. **Supabase migration automation** — CLI-based migration tooling
+10. **Supabase client code-splitting** — ~50 KB gzip, next largest candidate
+11. **Manual accessibility audit** — Screen reader testing beyond Lighthouse
+
+---
+
+## Blockers / Decisions Needed
+
+- **None blocking**. Platform is fully operational.
+- **Decision**: Custom domain (DNS + SSL on Railway)
+- **Decision**: Custom analytics dashboard vs. relying on GA4
 
 ---
 
 ## Deployment Notes
 
-### Deploying This Branch
-The current branch `claude/review-handoff-docs-PvHiV` contains the EN translations lazy-load feature (`469b100`) and the documentation updates (`efbb38f`). To deploy to production:
-1. Create a PR from `claude/review-handoff-docs-PvHiV` → `main`
-2. Once merged, `production.yml` GitHub Actions workflow triggers automatically
-3. Railway rebuilds with Nixpacks — the new EN async chunk will appear in the production bundle
-4. No DB migrations, no new env vars, no Railway config changes required for this deployment
+### Current Production Config
+- **Railway**: Nixpacks builder, `npm ci --include=dev`, `node dist-server/index.js`
+- **All env vars confirmed set** (AI keys, Supabase, admin JWT, VAPID, CRON_SECRET)
+- **All migrations applied** (001-021)
+- **Supabase auth redirect** configured for Railway URL
 
-### Railway Configuration (Unchanged)
-- **Live URL**: https://insurai-production.up.railway.app
-- **Builder**: Nixpacks
-- **Install**: `npm ci --include=dev`
-- **Build**: `npm run build && npm run build:server`
-- **Start**: `NODE_ENV=production node dist-server/index.js`
-- **SW Cache**: v20
-
-### Supabase Auth Redirect URLs (must be set once per new domain)
-- Go to Supabase Dashboard → Authentication → URL Configuration
-- Required entry: `https://insurai-production.up.railway.app/**`
-- Without this, OAuth and magic link flows fail after deployment to a new domain
-- This is already configured for the current production URL — no action needed unless the domain changes
-
-### Environment Variables — All Confirmed Set
-
-**Build-time (baked into JS bundle at `npm run build` — must be set in Railway before build):**
-```
-VITE_SUPABASE_URL=https://xxx.supabase.co       # required
-VITE_SUPABASE_ANON_KEY=eyJ...                   # required
-VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX             # optional — GA4 analytics
-VITE_SENTRY_DSN=https://xxx@sentry.io/xxx       # optional — frontend error tracking
-```
-
-**Runtime (read by Node.js server at startup — never exposed to browser):**
-```
-# AI Providers (all healthy as of Feb 22)
-OPENAI_API_KEY
-ANTHROPIC_API_KEY
-GOOGLE_CLOUD_API_KEY
-GCP_SERVICE_ACCOUNT_BASE64   # base64-encoded service account JSON for Document AI
-
-# Supabase (server-side — service role, NOT anon key)
-SUPABASE_URL
-SUPABASE_SERVICE_ROLE_KEY
-
-# Admin auth
-ADMIN_JWT_SECRET             # generate: node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
-
-# Push Notifications (confirmed working Feb 22)
-VAPID_PUBLIC_KEY
-VAPID_PRIVATE_KEY
-VAPID_SUBJECT=mailto:contact@insurai.com
-
-# Cron (confirmed working Feb 22)
-CRON_SECRET                  # also required in GitHub Secrets for notify-expiring.yml workflow
-```
-
-**Optional overrides (server-side):**
-```
-LOG_LEVEL=warn               # default: info; set warn to reduce noise in Railway logs
-UNSUBSCRIBE_SECRET=xxx       # falls back to ADMIN_JWT_SECRET if not set
-PRODUCTION_SERVER_URL=https://insurai-production.up.railway.app  # GitHub Secret for cron workflow
-```
-
----
-
-## CI/CD
-
-- **staging.yml**: typecheck + lint + unit tests + E2E Playwright (parallel) → build → deploy
-- **production.yml**: same + post-deploy health check with Railway CLI rollback
-- **notify-expiring.yml**: daily at 08:00 UTC — active (branch merged to `main`)
-- E2E jobs use `E2E_BASE_URL=http://localhost:3000` (production build via `serve`)
-
----
-
-## Next Steps (Priority Order)
-
-### Bundle Optimisations (Diminishing Returns)
-1. **Supabase client tree-shaking** — `@supabase/supabase-js` is ~50 KB gzip and the next largest chunk candidate. Investigate if only a subset of APIs is used and whether dynamic imports help.
-2. **Verify EN chunk loads only for EN locale** — the `translation-service.ts` dynamic import path now fetches EN only when locale resolves to `'en'`. Worth confirming with network tab on first load that TR users only fetch the TR chunk.
-
-### Product / Feature Work
-3. **Real user testimonials** — replace use-case scenario cards when real user quotes are available
-4. **Policy expiry cron — Supabase Edge Function alternative** — if GitHub Actions reliability is a concern, `pg_cron` + Supabase Edge Function is a serverless alternative with no external dependency
-
-### Infrastructure
-5. **Playwright E2E — real Supabase in CI** — currently uses placeholder Supabase values in CI builds; set `STAGING_SUPABASE_URL` / `STAGING_SUPABASE_ANON_KEY` GitHub Secrets for more realistic E2E testing
-
----
-
-## Verification Commands
-
+### Verification Commands
 ```bash
-# Full validation (expect: 0 errors, 0 warnings, 15,427 tests)
+# Full validation
 npm run validate
 
-# Verify both EN and TR chunks are separate from main bundle
-npm run build 2>&1 | grep translations
-# expect two lines (raw sizes, not gzip):
-#   translations-en-*.js  ~XX kB │ gzip: ~12 kB
-#   translations-tr-*.js  ~40 kB │ gzip: ~14 kB
-
-# Push notification cron (replace with actual secret)
-SECRET="your-cron-secret"
-curl -s -X POST \
-  -H "Authorization: Bearer $SECRET" \
-  https://insurai-production.up.railway.app/api/internal/cron/notify-expiring | python3 -m json.tool
-
-# Production health check
+# Production health
 curl https://insurai-production.up.railway.app/api/health
 curl https://insurai-production.up.railway.app/api/ai/diagnose
-curl https://insurai-production.up.railway.app/api/notifications/public-key
+curl https://insurai-production.up.railway.app/api/admin/diagnostics
+
+# Push notification cron test
+curl -s -X POST -H "Authorization: Bearer $CRON_SECRET" \
+  https://insurai-production.up.railway.app/api/internal/cron/notify-expiring
 ```
 
 ---
 
-## Gotchas Discovered This Session
+## Key Metrics
 
-### Components render empty strings briefly on first load
-- Unlike before (where EN was always available synchronously), components now start with `SKELETON_TRANSLATIONS` (all empty strings)
-- In practice this is invisible (~50ms before async chunk loads), but synchronous test assertions may see `''`
-- Fix: use `await waitFor(...)` in tests that check translated text
-- This only affects code paths that DON'T mock `useTranslation()` — most tests should mock it
-
-### `vi.mock('@/lib/i18n/i18n-context')` now required for landing component tests
-- Landing page components (Benefits, FAQ, Footer, HowItWorks, Stats, Testimonials, WhyChooseUs, UploadWidget, HelpCenter) use `useTranslation()` which now returns empty strings by default in test environment
-- Any test file that renders these components without mocking the context will see empty strings instead of expected English text
-- Pattern to add at the top of affected test files (after `import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'`):
-```typescript
-vi.mock('@/lib/i18n/i18n-context', () => ({
-  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
-  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
-}))
+```
+Tests:        15,427 passing / 317 files / 85.91% branches
+Lighthouse:   99 / 100 / 93 / 100 (Perf / A11y / BP / SEO)
+Bundle:       259 KB gzip (main) + 26 KB (i18n chunks)
+ESLint:       0 errors, 0 warnings
+Migrations:   21 applied to production
+AI Providers: 3/3 healthy (OpenAI, Anthropic, Google)
+Translations: 685+ keys x 2 languages
+Config:       843+ settings configurable via admin UI
 ```
 
-### `translations-skeleton.ts` must stay all-empty-string
-- This 923-line file contains only empty strings — it's in the main chunk and must have zero meaningful content
-- If you need to add a new translation key, add it to BOTH `translations-en.ts` and `translations-tr.ts`
-- Adding content to `translations-skeleton.ts` defeats the purpose (it would add bytes to the main bundle)
-
-### `extractViaProxy` — `notifyUserId` 4th parameter (from prior session)
-- `extractViaProxy(text, provider, options, notifyUserId)` has a 4th parameter added in the Feb 21 session
-- Test assertions on `extractViaProxy` calls must include `undefined` as the 4th arg
-
 ---
 
-## Previous Session Context
-
-**February 22, 2026 (TR Translations Lazy-Load + Push Notification Verification)** (`claude/review-handoff-docs-emPKQ`):
-- Split TR translations into async Vite chunk (−14 KB gzip)
-- Confirmed push notification end-to-end: `sent: 1` from cron endpoint, OS notification delivered
-- Migration 021 (`push_subscriptions` table) confirmed applied to production
-- Updated CLAUDE.md Known Issue #122 + #123
-
-**February 21, 2026 (Policy Expiry Scheduler)**:
-- Daily cron endpoint + GitHub Actions workflow for 7/14/30-day expiry notifications
-- Fixed `extractViaProxy` to forward `x-user-id` header
-- Added 4th `notifyUserId` parameter to `extractViaProxy`
-
-**February 21, 2026 (framer-motion Bundle Optimisation)**:
-- Removed framer-motion from main chunk → −115 KB raw / −38 KB gzip
-- CSS `@keyframes fadeIn` opacity-only animations replace all framer-motion usage
-- SW Cache v20
-
-**February 20, 2026 (PWA Push Notifications)**:
-- Full server + client push notification infrastructure (VAPID, Web Push API)
-- 15,427+ tests across 317 files
-
----
-
-**Last Updated**: February 22, 2026
-**Branch**: `claude/review-handoff-docs-PvHiV`
-**ESLint Status**: 0 errors, 0 warnings ✓
-**Tests**: 15,427 passing (317 files), 0 failures ✓
-**Coverage**: 85.91% branches ✓, 91.67% statements
-**Bundle**: ~259 KB gzip main chunk + ~12 KB gzip EN chunk + 14 KB gzip TR chunk (both async)
-**Next Session Focus**: Supabase client tree-shaking investigation OR new product features — all lazy-i18n work is complete
+**Last Updated**: February 23, 2026
+**Branch**: `claude/review-session-progress-wORwm`
