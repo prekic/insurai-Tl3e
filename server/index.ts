@@ -43,6 +43,8 @@ import {
   captureServerError,
 } from './lib/sentry.js'
 import logger from './lib/logger.js'
+import { apiMetrics } from './middleware/api-metrics.js'
+import { initializeDefaultAlertRules } from './middleware/monitoring.js'
 
 const log = logger.child('Server')
 
@@ -258,6 +260,10 @@ app.use('/api/', generalLimiter)
 // Body parsing
 app.use(express.json({ limit: '10mb' }))
 
+// API metrics collection — records request timing, status, and provider info
+// Must be after body parsing (needs req.body for provider detection)
+app.use('/api/', apiMetrics)
+
 // Health check endpoint (with separate, more permissive limiter)
 // In production (SaaS): Hide rate limit details to prevent abuse planning
 // In development: Show rate limits for debugging
@@ -409,6 +415,9 @@ if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
 
 // Configure Web Push VAPID for browser push notifications
 configureWebPush()
+
+// Ensure monitoring alert rules are initialized
+initializeDefaultAlertRules()
 
 // Start server
 // eslint-disable-next-line prefer-const -- server declared above for graceful shutdown handling

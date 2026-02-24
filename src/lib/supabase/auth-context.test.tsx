@@ -68,10 +68,10 @@ describe('AuthContext', () => {
         </AuthProvider>
       )
 
-      // Initially loading and isConfigured=true means AuthProvider returns null
-      expect(screen.queryByTestId('loading')).not.toBeInTheDocument()
+      // Children render immediately (no blocking), initially loading=true
+      expect(screen.getByTestId('loading')).toHaveTextContent('loading')
 
-      // After session check, not loading so it renders
+      // After session check, loading becomes false
       await waitFor(() => {
         expect(screen.getByTestId('loading')).toHaveTextContent('not-loading')
       })

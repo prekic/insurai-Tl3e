@@ -825,7 +825,7 @@ export class ConfigurationService {
         return []
       }
 
-      return (data as any[]).map((row: any) => ({
+      return data.map((row) => ({
         id: row.id,
         regionCode: row.region_code,
         regionName: row.region_name,
@@ -865,20 +865,23 @@ export class ConfigurationService {
         .from('insurance_providers')
         .select('*')
         .eq('is_active', true)
-        .order('name')
+        .order('market_share', { ascending: false })
 
       if (error || !data) {
         return []
       }
 
-      const providers = (data as any[]).map((row: any) => ({
+      const providers = data.map((row) => ({
         id: row.id,
-        code: row.code || '',
+        code: row.code,
         name: row.name,
-        aliases: row.aliases || [],
+        nameTr: row.name_tr,
+        marketShare: row.market_share,
+        customerRating: row.customer_rating,
+        establishedYear: row.established_year,
+        headquarters: row.headquarters,
         website: row.website,
-        supportPhone: row.support_phone,
-        supportEmail: row.support_email,
+        logoUrl: row.logo_url,
         specialties: row.specialties || [],
         isActive: row.is_active,
       }))
@@ -926,7 +929,7 @@ export class ConfigurationService {
         return []
       }
 
-      const benchmarks = (data as any[]).map((row: any) => ({
+      const benchmarks = data.map((row) => ({
         id: row.id,
         policyType: row.policy_type,
         coverageType: row.coverage_type,
@@ -964,9 +967,6 @@ export class ConfigurationService {
   /**
    * Get user preferences for a category
    */
-  /**
-   * Get user preferences for a category
-   */
   async getUserPreferences(
     userId: string,
     category: string
@@ -998,26 +998,11 @@ export class ConfigurationService {
     preferences: Record<string, unknown>
   ): Promise<boolean> {
     try {
-      // First try to get existing preferences
-      const { data: existingData } = await (await getSupabase())
-        .from('user_preferences')
-        .select('preferences')
-        .eq('user_id', userId)
-        .eq('category', category)
-        .single()
-
-      // Merge new preferences with existing ones
-      const mergedPreferences = {
-        ...(existingData?.preferences || {}),
-        ...preferences, // Merge the new preferences into existing ones
-      }
-
-      // Upsert preferences
       const { error } = await (await getSupabase()).from('user_preferences').upsert(
         {
           user_id: userId,
           category,
-          preferences: mergedPreferences,
+          preferences,
           updated_at: new Date().toISOString(),
         },
         {

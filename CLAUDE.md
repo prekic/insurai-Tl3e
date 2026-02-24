@@ -4134,6 +4134,10 @@ connectSrc: [
 - If you add new fire-and-forget calls (cost tracking, notifications, security events), always log the catch
 - These are non-blocking on purpose but failures must be visible in Railway logs for debugging
 
+**Policy Hash Memoization (`src/hooks/usePolicyEvaluation.ts`):**
+- Evaluation hooks use a pipe-separated hash of critical fields to avoid re-computation.
+- Excludes cosmetic fields (`createdAt`, `documentHash`). For multi-policy comparison (`usePolicyEvaluations`), hashes are sorted to normalize array order.
+
 **Service Worker Cache Issues:**
 - After deployment, browser may load old bundles due to service worker cache
 - Fix: Bump `CACHE_VERSION` in `public/sw.js` (currently v20)
