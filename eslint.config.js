@@ -8,7 +8,7 @@ import globals from 'globals'
 export default tseslint.config(
   // Ignore patterns
   {
-    ignores: ['dist/**', 'dist-server/**', 'node_modules/**', '*.config.js', '*.config.ts'],
+    ignores: ['dist/**', 'dist-server/**', 'node_modules/**', '*.config.js', '*.config.ts', 'supabase/functions/**'],
   },
 
   // Base JavaScript recommended rules

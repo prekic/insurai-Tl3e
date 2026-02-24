@@ -241,6 +241,8 @@ describe('Admin Auth Routes Branch Coverage', () => {
       process.env.ADMIN_JWT_SECRET = 'a'.repeat(64)
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
       process.env.OPENAI_API_KEY = 'sk-test'
       process.env.GOOGLE_CLOUD_API_KEY = 'test'
@@ -257,6 +259,8 @@ describe('Admin Auth Routes Branch Coverage', () => {
     it('does not report SUPABASE_URL issue when VITE_SUPABASE_URL is set', async () => {
       process.env.ADMIN_JWT_SECRET = 'a'.repeat(64)
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       process.env.VITE_SUPABASE_URL = 'https://test.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
       process.env.OPENAI_API_KEY = 'sk-test'

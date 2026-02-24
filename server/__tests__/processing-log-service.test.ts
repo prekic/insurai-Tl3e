@@ -128,6 +128,8 @@ describe('processing-log-service', () => {
   afterEach(() => {
     if (savedUrl) process.env.SUPABASE_URL = savedUrl
     else delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     if (savedKey) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
     else delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
@@ -188,6 +190,8 @@ describe('processing-log-service', () => {
 
     it('returns error when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const service = await importService()
@@ -235,6 +239,8 @@ describe('processing-log-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.updateProcessingLog('doc-001', { status: 'completed' })
@@ -293,6 +299,8 @@ describe('processing-log-service', () => {
 
     it('returns false when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.addProcessingStage('doc-001', {
@@ -357,6 +365,8 @@ describe('processing-log-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.getProcessingLog('doc-001')
@@ -401,6 +411,8 @@ describe('processing-log-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.getProcessingLogByPolicyId('pol-001')
@@ -485,6 +497,8 @@ describe('processing-log-service', () => {
 
     it('returns empty when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.listProcessingLogs()
@@ -555,6 +569,8 @@ describe('processing-log-service', () => {
 
     it('returns zero stats when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const stats = await service.getProcessingStats(30)
@@ -612,6 +628,8 @@ describe('processing-log-service', () => {
 
     it('returns 0 when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const count = await service.deleteOldLogs(90)

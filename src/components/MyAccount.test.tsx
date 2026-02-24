@@ -49,10 +49,14 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 }))
 
 // Mock supabase functions
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => false,
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => false,
-  fetchUserProfile: vi.fn(),
   updateUserProfile: vi.fn(),
+  updatePassword: vi.fn(),
   fetchUserStats: vi.fn(),
 }))
 

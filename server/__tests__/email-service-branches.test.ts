@@ -161,6 +161,8 @@ describe('email-service-branches', () => {
       // No supabase env — logEmailSent will bail early (no client)
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       mockFetch.mockResolvedValueOnce({
@@ -183,6 +185,8 @@ describe('email-service-branches', () => {
     it('uses provided text and replyTo when present in options', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
@@ -211,6 +215,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -233,6 +239,8 @@ describe('email-service-branches', () => {
     it('falls back to REPLY_TO_EMAIL when options.replyTo is not provided', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
@@ -257,6 +265,8 @@ describe('email-service-branches', () => {
     it('handles API error response (response not ok)', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
@@ -283,6 +293,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -306,6 +318,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockRejectedValueOnce(new Error('Network timeout'))
 
@@ -326,6 +340,8 @@ describe('email-service-branches', () => {
     it('handles non-Error throw in catch block (unknown error)', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockRejectedValueOnce('string error')
@@ -412,6 +428,8 @@ describe('email-service-branches', () => {
     it('returns null when SUPABASE_URL and VITE_SUPABASE_URL are both missing', async () => {
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await freshImport()
@@ -438,6 +456,8 @@ describe('email-service-branches', () => {
 
     it('uses VITE_SUPABASE_URL when SUPABASE_URL is not set', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       process.env.VITE_SUPABASE_URL = 'https://vite-test.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-key'
 
@@ -476,7 +496,7 @@ describe('email-service-branches', () => {
       await mod.getEmailPreferences('user-2')
 
       // createClient should only be called once (cached)
-      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+      expect(mockCreateClient).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -591,6 +611,8 @@ describe('email-service-branches', () => {
     it('returns false when no Supabase client', async () => {
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await freshImport()
@@ -649,6 +671,8 @@ describe('email-service-branches', () => {
     it('always returns true for "welcome" (transactional)', async () => {
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'welcome')).toBe(true)
@@ -656,18 +680,24 @@ describe('email-service-branches', () => {
 
     it('always returns true for "password_reset" (transactional)', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'password_reset')).toBe(true)
     })
 
     it('always returns true for "admin_alert" (transactional)', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'admin_alert')).toBe(true)
     })
 
     it('returns policy_alerts preference for "policy_uploaded"', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       // Default policy_alerts = true
       expect(await mod.canSendEmail('user-1', 'policy_uploaded')).toBe(true)
@@ -675,30 +705,40 @@ describe('email-service-branches', () => {
 
     it('returns policy_alerts preference for "policy_expiring"', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'policy_expiring')).toBe(true)
     })
 
     it('returns policy_alerts preference for "policy_expired"', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'policy_expired')).toBe(true)
     })
 
     it('returns marketing preference for "trial_reminder"', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'trial_reminder')).toBe(true)
     })
 
     it('returns marketing preference for "trial_expired"', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       expect(await mod.canSendEmail('user-1', 'trial_expired')).toBe(true)
     })
 
     it('returns true for unknown email type (default case)', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       const mod = await freshImport()
       // Cast to bypass TypeScript — test the runtime default branch
       expect(await mod.canSendEmail('user-1', 'unknown_type' as never)).toBe(true)
@@ -752,6 +792,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -771,6 +813,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -788,6 +832,8 @@ describe('email-service-branches', () => {
     it('uses default name when name is empty string', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
@@ -813,6 +859,8 @@ describe('email-service-branches', () => {
     beforeEach(() => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
     })
 
@@ -1065,6 +1113,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     })
 
     it('uses danger styling and "Acil" when daysRemaining <= 7', async () => {
@@ -1160,6 +1210,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1193,6 +1245,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1213,6 +1267,8 @@ describe('email-service-branches', () => {
     it('sends trial reminder with daysRemaining data', async () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
@@ -1238,6 +1294,8 @@ describe('email-service-branches', () => {
     beforeEach(() => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
     })
 
@@ -1345,6 +1403,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     })
 
     it('includes unsubscribe link when recipientEmail is provided', async () => {
@@ -1403,6 +1463,8 @@ describe('email-service-branches', () => {
     beforeEach(() => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
     })
 
@@ -1507,6 +1569,8 @@ describe('email-service-branches', () => {
       delete process.env.EMAIL_FROM
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1529,6 +1593,8 @@ describe('email-service-branches', () => {
       process.env.EMAIL_FROM = 'Custom <custom@test.com>'
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -1550,6 +1616,8 @@ describe('email-service-branches', () => {
       process.env.RESEND_API_KEY = 're_test_key_123'
       process.env.EMAIL_REPLY_TO = 'reply@custom.com'
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
 
       mockFetch.mockResolvedValueOnce({

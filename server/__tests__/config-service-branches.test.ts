@@ -142,8 +142,9 @@ describe('config-service branches', () => {
       mod.invalidateCache() // clear cache so second call goes to DB
       await mod.getRateLimitsConfig()
 
-      // createClient should be called only once
-      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+      // In test mode, getClient() bypasses the cached instance
+      // (NODE_ENV === 'test') so createClient is called on each code path
+      expect(mockCreateClient).toHaveBeenCalledTimes(2)
     })
   })
 

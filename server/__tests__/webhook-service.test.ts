@@ -103,6 +103,8 @@ describe('webhook-service', () => {
   afterEach(() => {
     if (savedUrl) process.env.SUPABASE_URL = savedUrl
     else delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     if (savedKey) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
     else delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
@@ -217,6 +219,8 @@ describe('webhook-service', () => {
 
     it('returns empty array when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { listWebhooks } = await importService()
       const result = await listWebhooks()
@@ -293,6 +297,8 @@ describe('webhook-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { getWebhook } = await importService()
       const result = await getWebhook('wh-001')
@@ -365,6 +371,8 @@ describe('webhook-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { createWebhook } = await importService()
       const result = await createWebhook({
@@ -422,6 +430,8 @@ describe('webhook-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { updateWebhook } = await importService()
       const result = await updateWebhook('wh-001', { name: 'Updated' })
@@ -459,6 +469,8 @@ describe('webhook-service', () => {
 
     it('returns false when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { deleteWebhook } = await importService()
       const result = await deleteWebhook('wh-001')
@@ -506,6 +518,8 @@ describe('webhook-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { regenerateSecret } = await importService()
       const result = await regenerateSecret('wh-001')
@@ -533,6 +547,8 @@ describe('webhook-service', () => {
   describe('fireWebhooks', () => {
     it('does nothing when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { fireWebhooks } = await importService()
       await fireWebhooks('setting.updated', {
@@ -727,6 +743,8 @@ describe('webhook-service', () => {
 
     it('returns empty when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const { getDeliveries } = await importService()
       const result = await getDeliveries('wh-001')

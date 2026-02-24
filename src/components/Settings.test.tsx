@@ -30,11 +30,13 @@ vi.mock('react-router-dom', async () => {
   }
 })
 
+const mockUsePolicies = vi.fn().mockReturnValue({
+  policies: mockPolicies,
+  clearAllPolicies: mockClearAllPolicies,
+})
+
 vi.mock('@/lib/policy-context', () => ({
-  usePolicies: () => ({
-    policies: mockPolicies,
-    clearAllPolicies: mockClearAllPolicies,
-  }),
+  usePolicies: () => mockUsePolicies(),
 }))
 
 vi.mock('@/lib/supabase/auth-context', () => ({
@@ -151,7 +153,7 @@ vi.mock('@/lib/i18n', () => ({
   }),
 }))
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase/config', () => ({
   isSupabaseConfigured: () => false,
 }))
 
@@ -571,90 +573,13 @@ describe('Settings - Export Functionality', () => {
   })
 
   it('should show error toast when exporting CSV with no policies', async () => {
-    const { toast: _toast } = await import('sonner')
-
-    vi.doMock('@/lib/policy-context', () => ({
-      usePolicies: () => ({
-        policies: [],
-        clearAllPolicies: mockClearAllPolicies,
-      }),
-    }))
-
-    // Re-mock i18n since resetModules clears all mocks
-    vi.doMock('@/lib/i18n', () => ({
-      useI18n: () => ({
-        t: {
-          settings: {
-            title: 'Settings', appearance: 'Appearance', theme: 'Theme',
-            light: 'Light', dark: 'Dark', system: 'System',
-            notifications: 'Notifications', emailNotifications: 'Email Notifications',
-            pushNotifications: 'Push Notifications', renewalReminders: 'Renewal Reminders',
-            marketUpdates: 'Market Updates', language: 'Language', security: 'Security',
-            changePassword: 'Change Password', twoFactor: 'Two-Factor Authentication',
-            aiConfiguration: 'AI Configuration', openaiLabel: 'OpenAI API Key (GPT-4)',
-            claudeLabel: 'Claude API Key (Anthropic)', googleCloudLabel: 'Google Cloud API Key (OCR)',
-            configured: 'Configured', notConfigured: 'Not configured', getKey: 'Get key',
-            openaiDescription: 'Primary AI.', claudeDescription: 'Backup AI.',
-            googleCloudDescription: 'For OCR.', extraction: 'Extraction', consensus: 'Consensus',
-            ocr: 'OCR', on: 'On', off: 'Off', demo: 'Demo',
-            apiKeysPrivacy: 'API keys stored locally.', languageInfo: 'Any language.',
-            dataExport: 'Data & Export', exportCSV: 'Export to Excel (CSV)', exportPDF: 'Export to PDF',
-            exportDescription: 'Export your {count} policies.', storageCloud: 'Cloud',
-            storageLocal: 'Local Browser', storageLabel: 'Storage', clearAllData: 'Clear All Data',
-            accountSection: 'Account', signedIn: 'Signed in',
-            openaiKeySaved: 'Saved', openaiKeySavedDesc: '', openaiKeyRemoved: 'Removed',
-            claudeKeySaved: 'Saved', claudeKeySavedDesc: '', claudeKeyRemoved: 'Removed',
-            googleKeySaved: 'Saved', googleKeySavedDesc: '', googleKeyRemoved: 'Removed',
-            noPoliciesExport: 'No policies to export', policiesExported: 'Exported',
-            policiesExportedDesc: '{count} exported', pdfGenerated: 'PDF generated',
-            pdfGeneratedDesc: '', allDataCleared: 'Cleared', allDataClearedDesc: '',
-            languageChanged: 'Changed to {name}',
-            removeOpenaiTitle: 'Remove', removeOpenaiDesc: 'Remove?',
-            removeClaudeTitle: 'Remove', removeClaudeDesc: 'Remove?',
-            removeGoogleTitle: 'Remove', removeGoogleDesc: 'Remove?',
-            removeKey: 'Remove Key', save: 'Save', cancel: 'Cancel', edit: 'Edit',
-          },
-          common: { back: 'Back' },
-          nav: { signOut: 'Sign Out' },
-          success: { settingsSaved: 'Settings saved' },
-          errors: { unknownError: 'Unknown error' },
-        },
-        isRTL: false,
-      }),
-      useLanguageSelector: () => ({
-        currentLocale: 'en',
-        locales: [
-          { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
-          { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷' },
-        ],
-        setLocale: vi.fn(),
-        isLoading: false,
-        progress: { status: 'idle', message: '', progress: 0 },
-      }),
-    }))
-
-    // Also re-mock other dependencies that resetModules clears
-    vi.doMock('react-router-dom', async () => {
-      const actual = await vi.importActual('react-router-dom')
-      return { ...actual, useNavigate: () => mockNavigate }
+    mockUsePolicies.mockReturnValueOnce({
+      policies: [],
+      clearAllPolicies: mockClearAllPolicies,
     })
-    vi.doMock('@/lib/supabase/auth-context', () => ({
-      useAuth: () => ({ user: { id: 'user-1', email: 'test@example.com' }, signOut: mockSignOut }),
-    }))
-    vi.doMock('@/lib/supabase', () => ({ isSupabaseConfigured: () => false }))
-    vi.doMock('@/lib/export', () => ({ exportToCSV: vi.fn(), exportPoliciesToPDF: vi.fn() }))
-    vi.doMock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
-    // Re-import to get the new mock
-    vi.resetModules()
-    const { Settings: SettingsNoPolicies } = await import('./Settings')
     const { toast: freshToast } = await import('sonner')
-
-    render(
-      <BrowserRouter>
-        <SettingsNoPolicies />
-      </BrowserRouter>
-    )
+    renderSettings()
 
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: /export to excel/i }))

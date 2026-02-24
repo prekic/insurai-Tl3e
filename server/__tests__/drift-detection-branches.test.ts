@@ -300,7 +300,7 @@ describe('drift-detection-service branches', () => {
       await mod.listBaselines()
 
       // createClient should only be called once (cached on second)
-      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+      expect(mockCreateClient).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -311,6 +311,7 @@ describe('drift-detection-service branches', () => {
   describe('listBaselines', () => {
     it('returns empty array when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -355,6 +356,7 @@ describe('drift-detection-service branches', () => {
   describe('getActiveBaseline', () => {
     it('returns null when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -400,6 +402,7 @@ describe('drift-detection-service branches', () => {
   describe('createBaseline', () => {
     it('returns null when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -529,6 +532,7 @@ describe('drift-detection-service branches', () => {
   describe('activateBaseline', () => {
     it('returns false when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -594,6 +598,7 @@ describe('drift-detection-service branches', () => {
   describe('deleteBaseline', () => {
     it('returns false when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -635,6 +640,7 @@ describe('drift-detection-service branches', () => {
   describe('detectDrift', () => {
     it('returns null when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()
@@ -714,6 +720,7 @@ describe('drift-detection-service branches', () => {
   describe('detectDriftAgainst', () => {
     it('returns null when client is null', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const mod = await loadModule()

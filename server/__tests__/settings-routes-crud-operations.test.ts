@@ -89,6 +89,7 @@ describe('Settings Routes — CRUD Operations', () => {
 
   afterEach(() => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     vi.resetModules()
   })
@@ -100,6 +101,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /feature-flags', () => {
     it('returns 503 when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/feature-flags')
@@ -161,6 +163,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('PUT /feature-flags/:key', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).put('/feature-flags/my_flag').send({ enabled: true })
@@ -262,6 +265,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /regional-factors', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/regional-factors')
@@ -330,6 +334,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('PUT /regional-factors/:id', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).put('/regional-factors/rf-1').send({ riskFactor: 1.1 })
@@ -405,6 +410,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /providers', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/providers')
@@ -461,6 +467,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('PUT /providers/:id', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).put('/providers/prov-1').send({ marketShare: 15 })
@@ -555,6 +562,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /benchmarks', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/benchmarks')
@@ -639,6 +647,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('PUT /benchmarks/:id', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).put('/benchmarks/bm-1').send({ typicalLimit: 500000 })
@@ -743,6 +752,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /:category', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/ai')
@@ -809,6 +819,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('GET /:category/:key', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).get('/ai/openai_model')
@@ -867,6 +878,7 @@ describe('Settings Routes — CRUD Operations', () => {
   describe('PUT /:category/:key', () => {
     it('returns 503 when supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const freshApp = await buildApp()
       const res = await request(freshApp).put('/ai/temperature').send({ value: 0.5 })

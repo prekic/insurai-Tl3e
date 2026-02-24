@@ -845,6 +845,10 @@ vi.mock('@/lib/export', () => ({
   exportPoliciesToPDF: vi.fn(),
 }))
 
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: vi.fn(() => false),
+}))
+
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: vi.fn(() => false),
 }))

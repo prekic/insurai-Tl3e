@@ -84,6 +84,8 @@ describe('admin-notification-service', () => {
   afterEach(() => {
     if (savedUrl) process.env.SUPABASE_URL = savedUrl
     else delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     if (savedKey) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
     else delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
@@ -124,6 +126,8 @@ describe('admin-notification-service', () => {
 
     it('returns null when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
 
       const service = await importService()
@@ -195,6 +199,8 @@ describe('admin-notification-service', () => {
 
     it('returns empty array when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.getUnacknowledgedNotifications()
@@ -247,6 +253,8 @@ describe('admin-notification-service', () => {
 
     it('returns empty when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.getNotifications()
@@ -287,6 +295,8 @@ describe('admin-notification-service', () => {
 
     it('returns false when Supabase not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const service = await importService()
       const result = await service.acknowledgeNotification('notif-001')

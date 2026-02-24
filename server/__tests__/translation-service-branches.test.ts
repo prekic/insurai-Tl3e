@@ -156,6 +156,7 @@ describe('TranslationService — Branch Coverage', () => {
     it('returns "0" when supabase is not configured', async () => {
       invalidateCache()
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const version = await getTranslationVersion()
       expect(version).toBe('0')
@@ -236,6 +237,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns [] when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const locales = await getActiveLocales()
       expect(locales).toEqual([])
@@ -274,6 +276,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns [] when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const locales = await getAllLocales()
       expect(locales).toEqual([])
@@ -362,6 +365,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns null when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await createLocale({ code: 'zz', name: 'Test', nativeName: 'Test' })
       expect(result).toBeNull()
@@ -442,6 +446,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns false when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await updateLocale('en', { name: 'English' })
       expect(result).toBe(false)
@@ -505,6 +510,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns [] when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const keys = await getAllKeys()
       expect(keys).toEqual([])
@@ -567,6 +573,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns null when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await createKey({ section: 'a', key: 'b' })
       expect(result).toBeNull()
@@ -594,6 +601,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns false when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await deleteKey('nav', 'home')
       expect(result).toBe(false)
@@ -662,6 +670,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns null when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const dict = await getTranslationsForLocale('en')
       expect(dict).toBeNull()
@@ -743,6 +752,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns [] when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const flat = await getTranslationsFlat('en')
       expect(flat).toEqual([])
@@ -811,6 +821,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns false when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await updateTranslation('en', 'nav', 'home', 'Home')
       expect(result).toBe(false)
@@ -884,6 +895,7 @@ describe('TranslationService — Branch Coverage', () => {
   describe('batchUpdateTranslations', () => {
     it('returns error when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await batchUpdateTranslations('en', [{ section: 'nav', key: 'home', value: 'Home' }])
       expect(result.errors).toContain('Database not configured')
@@ -1107,6 +1119,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns null when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const stats = await getCoverage('en')
       expect(stats).toBeNull()
@@ -1306,6 +1319,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns error when supabase is not configured (non-dryRun)', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await importLocale('en', { nav: { home: 'Home' } })
       expect(result.errors).toContain('Database not configured')
@@ -1512,6 +1526,7 @@ describe('TranslationService — Branch Coverage', () => {
 
     it('returns empty result when supabase is not configured', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       delete process.env.SUPABASE_SERVICE_ROLE_KEY
       const result = await getAuditLog()
       expect(result).toEqual({ entries: [], total: 0 })

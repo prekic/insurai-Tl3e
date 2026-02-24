@@ -242,6 +242,7 @@ describe('GET /export', () => {
 
   afterEach(() => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
 
@@ -249,6 +250,7 @@ describe('GET /export', () => {
 
   it('should return 503 when SUPABASE_URL is not set', async () => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     const res = await request(createApp()).get('/export')
     expect(res.status).toBe(503)
@@ -258,6 +260,8 @@ describe('GET /export', () => {
 
   it('should return 503 when only SUPABASE_URL is missing', async () => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     const res = await request(createApp()).get('/export')
     expect(res.status).toBe(503)
     expect(res.body.success).toBe(false)
@@ -479,6 +483,7 @@ describe('GET /export', () => {
 
   it('should use VITE_SUPABASE_URL as fallback when SUPABASE_URL is not set', async () => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     process.env.VITE_SUPABASE_URL = 'https://vite-test.supabase.co'
     mockFrom.mockImplementation(buildExportFromMock())
     const res = await request(createApp()).get('/export')
@@ -500,6 +505,7 @@ describe('POST /import', () => {
 
   afterEach(() => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
 
@@ -507,6 +513,8 @@ describe('POST /import', () => {
 
   it('should return 503 when Supabase is not configured', async () => {
     delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     const res = await request(createApp()).post('/import').send(makeImportBody())
     expect(res.status).toBe(503)

@@ -122,6 +122,7 @@ describe('notification-service', () => {
     delete process.env.VAPID_PRIVATE_KEY
     delete process.env.VAPID_SUBJECT
     delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     delete process.env.FRONTEND_URL
 

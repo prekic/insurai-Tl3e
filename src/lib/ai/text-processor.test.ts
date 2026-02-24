@@ -23,6 +23,14 @@ import {
 import { env } from '@/lib/env'
 
 describe('Text Processor', () => {
+  beforeEach(() => {
+    vi.stubEnv('VITE_AI_PROXY_URL', '')
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+    vi.unstubAllEnvs()
+  })
   describe('applyComprehensivePreprocessing', () => {
     describe('Turkish character spacing fixes', () => {
       it('should fix spaced Turkish words like "B İ RLE Şİ K"', () => {
@@ -845,6 +853,7 @@ HUSUSİOTOMOBİL KASKO`
     afterEach(() => {
       global.fetch = originalFetch
       vi.restoreAllMocks()
+      vi.unstubAllEnvs()
     })
 
     it('should run deterministic pre-clean before AI correction', async () => {
@@ -1526,12 +1535,17 @@ POLİÇE NO: 1680600025`
   describe('processTextWithAI', () => {
     let originalFetch: typeof global.fetch
 
+    let originalProxyUrl: string | null = null
+
     beforeEach(() => {
       originalFetch = global.fetch
+      originalProxyUrl = env.proxyUrl
+      env.proxyUrl = ''
     })
 
     afterEach(() => {
       global.fetch = originalFetch
+      env.proxyUrl = originalProxyUrl
       vi.restoreAllMocks()
     })
 
@@ -1714,6 +1728,7 @@ POLİÇE NO: 1680600025`
     afterEach(() => {
       global.fetch = originalFetch
       vi.restoreAllMocks()
+      vi.unstubAllEnvs()
     })
 
     it('should use clean room by default', async () => {
@@ -1785,12 +1800,17 @@ POLİÇE NO: 1680600025`
   describe('processDocumentComprehensive', () => {
     let originalFetch: typeof global.fetch
 
+    let originalProxyUrl: string | null = null
+
     beforeEach(() => {
       originalFetch = global.fetch
+      originalProxyUrl = env.proxyUrl
+      env.proxyUrl = ''
     })
 
     afterEach(() => {
       global.fetch = originalFetch
+      env.proxyUrl = originalProxyUrl
       vi.restoreAllMocks()
     })
 
