@@ -64,7 +64,7 @@ export default defineConfig({
   // When E2E_BASE_URL is set, skip starting the dev server (production/preview testing)
   ...(!process.env.E2E_BASE_URL && {
     webServer: {
-      command: 'npm run dev',
+      command: 'npm run dev:all',
       url: 'http://localhost:5173',
       reuseExistingServer: !process.env.CI,
       timeout: 120000,

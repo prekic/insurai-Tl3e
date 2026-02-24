@@ -23,9 +23,16 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 }))
 
 const mockUploadPolicyDocument = vi.fn()
+const mockCreatePolicy = vi.fn()
 const mockGetPolicyDocumentsWithUrls = vi.fn()
 const mockDeletePolicyDocument = vi.fn()
 const mockGetDocumentSignedUrl = vi.fn()
+
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: vi.fn(() => true),
+  uploadPolicyDocument: mockUploadPolicyDocument,
+  createPolicy: mockCreatePolicy,
+}))
 
 vi.mock('@/lib/supabase', () => ({
   isSupabaseConfigured: () => true,

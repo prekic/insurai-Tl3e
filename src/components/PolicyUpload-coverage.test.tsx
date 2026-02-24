@@ -1032,25 +1032,29 @@ describe('PolicyUpload Coverage', () => {
     })
 
     it('retries all failed files via Retry All button', async () => {
-      mockExtractPolicy
-        .mockRejectedValueOnce(new Error('fail1'))
-        .mockRejectedValueOnce(new Error('fail2'))
+      mockExtractPolicy.mockRejectedValue(new Error('fail'))
       renderUpload()
-      const input = document.querySelector('input[type="file"]') as HTMLInputElement
-      const f1 = new File(['%PDF'], 'f1.pdf', { type: 'application/pdf' })
-      const f2 = new File(['%PDF'], 'f2.pdf', { type: 'application/pdf' })
-      Object.defineProperty(input, 'files', { value: [f1, f2], configurable: true })
-      await act(async () => { fireEvent.change(input) })
-      // Wait for extraction errors to be processed.
-      // processFileAsync has a 500ms upload animation before calling extractPolicy,
-      // and files are processed sequentially, so 2 files need ~1200ms — above the 1s default.
-      // Now "Retry All" should appear
+
+      await act(async () => { addPdfFile('fail1.pdf') })
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.upload.retryAll)).toBeInTheDocument()
+        expect(screen.getByText('fail1.pdf')).toBeInTheDocument()
       })
+
+      await act(async () => { addPdfFile('fail2.pdf') })
+      await waitFor(() => {
+        expect(screen.getByText('fail2.pdf')).toBeInTheDocument()
+      })
+
+      const retryButton = await screen.findByText(EN_TRANSLATIONS.upload.retryAll)
+      expect(retryButton).toBeInTheDocument()
+
       mockExtractPolicy.mockResolvedValue(mockSuccessResult())
       await act(async () => {
-        fireEvent.click(screen.getByText(EN_TRANSLATIONS.upload.retryAll))
+        fireEvent.click(retryButton)
+      })
+
+      await waitFor(() => {
+        expect(mockExtractPolicy).toHaveBeenCalledTimes(4) // 2 fails + 2 retries
       })
     })
   })

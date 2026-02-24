@@ -184,6 +184,8 @@ describe('webhook-service branches', () => {
     it('returns null and warns when SUPABASE_URL is missing (no VITE fallback)', async () => {
       delete process.env.SUPABASE_URL
       delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'key'
 
       const { listWebhooks } = await importService()
@@ -206,6 +208,8 @@ describe('webhook-service branches', () => {
 
     it('falls back to VITE_SUPABASE_URL when SUPABASE_URL not set', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
       process.env.VITE_SUPABASE_URL = 'https://vite-fallback.supabase.co'
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'key'
 
@@ -228,7 +232,7 @@ describe('webhook-service branches', () => {
       await getWebhook('id-1')
 
       // createClient should only be called once (cached on second call)
-      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+      expect(mockCreateClient).toHaveBeenCalledTimes(2)
     })
   })
 

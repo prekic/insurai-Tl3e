@@ -72,10 +72,21 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      - name: Check Supabase secrets
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "::warning title=Supabase Secrets Missing::STAGING_SUPABASE_URL and/or STAGING_SUPABASE_ANON_KEY not set. E2E tests will run without real Supabase integration."
+          else
+            echo "Supabase secrets configured — E2E tests will use real staging instance."
+          fi
+        env:
+          SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+
       - name: Build frontend
         env:
-          VITE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL || 'https://placeholder.supabase.co' }}
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY || 'placeholder' }}
+          VITE_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
         run: npm run build
 
       - name: Run E2E tests against production build

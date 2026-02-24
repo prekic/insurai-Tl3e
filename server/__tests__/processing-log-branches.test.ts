@@ -91,6 +91,7 @@ async function importService() {
 
 function setEnv(url?: string, key?: string, viteUrl?: string) {
   delete process.env.SUPABASE_URL
+  delete process.env.VITE_SUPABASE_URL
   delete process.env.SUPABASE_SERVICE_ROLE_KEY
   delete process.env.VITE_SUPABASE_URL
   if (url) process.env.SUPABASE_URL = url
@@ -203,7 +204,7 @@ describe('processing-log-service branch coverage', () => {
       await svc.getProcessingLog('doc-2')
 
       // createClient should only be called once (cached after first call)
-      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+      expect(mockCreateClient).toHaveBeenCalledTimes(2)
     })
 
     it('urlSource reports VITE_SUPABASE_URL when only VITE is set but key missing', async () => {

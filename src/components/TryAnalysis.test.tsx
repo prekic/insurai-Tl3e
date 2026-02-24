@@ -45,6 +45,24 @@ const {
   })),
 }))
 
+// Mock hooks before importing components
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t: EN_TRANSLATIONS }),
+}))
+
+vi.mock('@/lib/processing-log-api', () => ({
+  createProcessingLog: vi.fn().mockResolvedValue(true),
+  updateProcessingLog: vi.fn().mockResolvedValue(true),
+}))
+
+vi.mock('@/hooks/useBackendHealth', () => ({
+  useBackendHealth: vi.fn(() => ({
+    health: { status: 'healthy', providers: { openai: true, anthropic: false, google: false } },
+    checkHealth: vi.fn(),
+    runDiagnostics: vi.fn(),
+  })),
+}))
+
 // Mock AI extraction service
 vi.mock('@/lib/ai', () => ({
   extractPolicyFromDocument: mockExtractPolicy,

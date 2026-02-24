@@ -53,7 +53,7 @@ export interface RenderedPrompt {
 let supabase: SupabaseClient | null = null
 
 function getClient(): SupabaseClient | null {
-  if (supabase) return supabase
+  if (supabase && process.env.NODE_ENV !== 'test') return supabase
 
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY

@@ -134,6 +134,7 @@ describe('PUT /batch — Batch Update Route', () => {
 
   afterEach(() => {
     delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
 
@@ -144,6 +145,7 @@ describe('PUT /batch — Batch Update Route', () => {
   describe('503 — Supabase not configured', () => {
     it('returns 503 when SUPABASE_URL is missing', async () => {
       delete process.env.SUPABASE_URL
+      delete process.env.VITE_SUPABASE_URL
 
       const res = await request(app)
         .put('/batch')

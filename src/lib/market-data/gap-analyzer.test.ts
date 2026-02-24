@@ -9,6 +9,16 @@ import { analyzeGaps, generateGapInsights } from './gap-analyzer'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { GapAnalysis } from '@/types/market-data'
 
+// Mock configService so it doesn't hit the real database
+vi.mock('@/lib/config/configuration-service', () => ({
+  configService: {
+    getMarketBenchmarks: vi.fn().mockResolvedValue([]),
+    getRegionalFactor: vi.fn().mockResolvedValue(1.0),
+    getRegionalFactors: vi.fn().mockResolvedValue([]),
+    getInsuranceProviders: vi.fn().mockResolvedValue([]),
+  },
+}))
+
 // Mock market benchmarks
 vi.mock('@/data/market-data/benchmarks', () => ({
   MARKET_BENCHMARKS: {

@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry push notification scheduler (daily cron, 7/14/30-day windows, production-verified)**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**
 - **Production Readiness**: ~9.5/10 (15,427+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 22, 2026 (EN translations lazy-load — completes lazy-i18n; both EN + TR are now async Vite chunks)
+- **Last Updated**: February 24, 2026 (Supabase client code-splitting verified; pg_cron edge function migrated; Real Supabase E2E integration)
 
 ---
 
@@ -3688,42 +3688,26 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Remaining**: Main chunk reduced to ~268 KB gzip after TR lazy-load (#123) and ~259 KB gzip after EN lazy-load (#124). Both EN and TR translations are now async chunks — the lazy-i18n story is complete. Supabase client (~50 KB gzip) is the next largest independent candidate if further splitting is desired.
 - **Files Changed**: `src/components/animations/AnimatedComponents.tsx`, `src/App.tsx`, `src/index.css`
 
-### 121. Policy Expiry Push Notification Scheduler (Added Feb 21, 2026)
-- **Feature**: Daily GitHub Actions cron that fires push notifications to users whose policies expire in exactly 7, 14, or 30 days
-- **Previous state**: `sendPolicyExpiryNotification()` existed in `notification-service.ts` but was never called — no scheduler
+### 121. Policy Expiry Push Notification Scheduler (Added Feb 21, 2026; Migrated to Edge Function Feb 24, 2026)
+- **Feature**: Daily push notifications to users whose policies expire in exactly 7, 14, or 30 days
+- **Architecture (current)**: Supabase Edge Function (`supabase/functions/notify-expiring/index.ts`) scheduled via `pg_cron` + `pg_net`. Fully serverless — no dependency on Railway or GitHub Actions.
+- **Architecture (previous, removed)**: GitHub Actions cron → Railway `POST /api/internal/cron/notify-expiring`. Both `server/routes/internal.ts` and `.github/workflows/notify-expiring.yml` have been deleted.
 - **Also fixed**: `extractViaProxy()` was not forwarding `x-user-id` header, so `sendExtractionCompleteNotification()` was silently skipped on client-side extraction paths
-- **Files Created**:
-  - `server/routes/internal.ts` — `POST /api/internal/cron/notify-expiring` endpoint
-  - `.github/workflows/notify-expiring.yml` — daily cron workflow (08:00 UTC / 11:00 Istanbul)
-- **Files Modified**:
-  - `server/index.ts` — registers `/api/internal` router
-  - `src/lib/ai/policy-extractor.ts` — threads `userId` through extraction options
-  - `src/lib/ai/config.ts` — `extractViaProxy()` conditionally adds `x-user-id` header
-  - `src/lib/ai/providers/openai.ts` + `claude.ts` — accept and forward `notifyUserId`
-  - `src/components/PolicyUpload.tsx` — passes `user?.id` in extraction options
-- **Auth**: `Authorization: Bearer <CRON_SECRET>` with `crypto.timingSafeEqual` (timing-attack safe)
+- **Files**:
+  - `supabase/functions/notify-expiring/index.ts` — Deno Edge Function using `npm:web-push` and `@supabase/supabase-js`
+  - `supabase/functions/notify-expiring/deno.json` — Deno config
+  - `supabase/migrations/022_setup_pg_cron.sql` — enables `pg_cron` + `pg_net`, schedules daily invocation at 08:00 UTC
 - **Idempotent**: each policy matches exactly one window per day (expires in exactly N days) — safe to run multiple times
-- **Graceful degradation**: skips with `log.warn` if VAPID or Supabase not configured; never crashes
-- **Response format**:
-  ```json
-  { "success": true, "totalSent": 0, "totalErrors": 0,
-    "windows": { "7": { "found": 0, "sent": 0, "errors": 0 }, "14": {...}, "30": {...} } }
-  ```
-- **Required secrets**:
-  - `CRON_SECRET` in Railway Variables AND GitHub Secrets (generate: `openssl rand -hex 32`)
-  - `PRODUCTION_SERVER_URL` in GitHub Secrets (optional — defaults to Railway URL)
-- **Manual test**: GitHub Actions → Policy Expiry Notifications → Run workflow; or curl directly:
-  ```bash
-  SECRET="your-secret"; curl -s -X POST \
-    -H "Authorization: Bearer $SECRET" \
-    https://insurai-production.up.railway.app/api/internal/cron/notify-expiring | python3 -m json.tool
-  ```
-- **Activation**: workflow only runs after branch is merged to `main` (GitHub Actions only reads workflows from default branch)
+- **Graceful degradation**: skips with `console.warn` if VAPID keys not set; never crashes
+- **Required Supabase Edge Secrets** (set via `npx supabase secrets set`):
+  - `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
+- **Manual test**: invoke the Edge Function directly via `supabase functions invoke notify-expiring`
+- **Verification**: `SELECT * FROM cron.job;` to confirm the schedule is registered
 
 ### 122. Migration 021 — Push Subscriptions Table Applied to Production (Feb 22, 2026)
 - **Feature**: `push_subscriptions` table (RLS + index) applied to production Supabase via SQL Editor
 - **Migration file**: `supabase/migrations/021_push_subscriptions.sql`
-- **Verification**: Confirmed by end-to-end push notification test — `sent: 1` response from cron endpoint proves table exists, VAPID keys are set, and CRON_SECRET is configured correctly in both Railway Variables and GitHub Secrets
+- **Verification**: Confirmed by end-to-end push notification test — `sent: 1` from Edge Function proves table exists and VAPID keys are set
 - **Pattern**: Same as Known Issue #114 (migration 020 for unsubscribe translations) — apply manually via Supabase Dashboard → SQL Editor
 
 ### 123. TR Translations Lazy-Loaded as Async Vite Chunk (Added Feb 22, 2026)
@@ -4324,18 +4308,12 @@ connectSrc: [
 - The lazy-loads in `translation-service.ts` are `await import('./translations-en')` and `await import('./translations-tr')` — Vite/Rollup keeps them in async chunks only if no eager import elsewhere pulls them into the main chunk
 - `src/lib/i18n/translations-skeleton.ts` — do NOT add translation content here; it must stay all-empty-string to have zero bundle cost (it IS in the main chunk)
 
-**Internal Cron Endpoint — CRON_SECRET must be set in both places:**
-- `CRON_SECRET` must be set in **Railway Variables** (so the server accepts it) AND **GitHub Secrets** (so the workflow can send it)
-- Generate with `openssl rand -hex 32` — same value in both places
-- The endpoint uses `crypto.timingSafeEqual` — any mismatch (wrong secret, extra whitespace) returns `401 Unauthorized`
-- Test auth independently: a bare `curl -X POST <url>` (no header) must return `401`; with correct `Bearer` token must return `200`
-- `PRODUCTION_SERVER_URL` GitHub Secret is optional — workflow defaults to `https://insurai-production.up.railway.app`
-
-**GitHub Actions — Workflow Only Runs from Default Branch:**
-- Workflow YAML files added to a feature branch do NOT appear in the Actions UI until merged to `main`
-- After committing `.github/workflows/notify-expiring.yml` to a branch, the "Policy Expiry Notifications" workflow is invisible in Actions → only shows up after merging
-- To test before merging: call the endpoint directly with curl (see Known Issue #121 for command)
-- `workflow_dispatch:` block allows manual trigger from Actions UI once merged
+**Policy Expiry Scheduler — Supabase Edge Function (Migrated Feb 24, 2026):**
+- The policy expiry notification scheduler has been migrated from GitHub Actions + Railway endpoint to a Supabase Edge Function
+- The Edge Function lives at `supabase/functions/notify-expiring/index.ts` and is scheduled via `pg_cron` (migration `022_setup_pg_cron.sql`)
+- VAPID keys must be set as **Supabase Edge Secrets**: `npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=...`
+- `CRON_SECRET` and `PRODUCTION_SERVER_URL` GitHub Secrets are no longer needed (old architecture removed)
+- Verify cron schedule: `SELECT * FROM cron.job;` in Supabase SQL Editor
 
 **Push Notifications — VAPID Keys Required (Feb 20-21, 2026):**
 - Push notifications require 3 env vars: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`
@@ -4343,12 +4321,20 @@ connectSrc: [
 - **Graceful degradation**: If keys not set, `configureWebPush()` logs a warning and all send calls return 0 — no crash
 - **Migration 021 applied to production** (Feb 22, 2026) — `push_subscriptions` table with RLS + index confirmed present; see Known Issue #122
 - `sendExtractionCompleteNotification()` fires fire-and-forget after all 4 extraction success paths in `server/routes/ai.ts`
-- `sendPolicyExpiryNotification()` is called by the daily cron scheduler (`server/routes/internal.ts` + `.github/workflows/notify-expiring.yml`) for 7/14/30-day expiry windows — **production-verified Feb 22, 2026** (OS-level browser push notification confirmed delivered and displayed)
+- `sendPolicyExpiryNotification()` is called by the Supabase Edge Function (`supabase/functions/notify-expiring/index.ts`) for 7/14/30-day expiry windows — **production-verified Feb 22, 2026**
 
 **Flaky Test Patterns:**
 - `cost-tracking/tracker.test.ts`: `projectedMonthEnd` needs floating-point tolerance (`toBeCloseTo`), not exact equality
 - `translation-service.test.ts`: Cache expiry checks must capture `Date.now()` before the operation, not after. Use `clearAllMocks` instead of `restoreAllMocks` to avoid mock chain teardown issues
 - `vite.config.ts` has `testTimeout: 10000` (2× default) for resilience under coverage instrumentation
+
+**Vitest Global Mock Leakage with `createClient()` (Cascading Failures):**
+- **Symptom**: Mocking `@supabase/supabase-js` heavily can cause in-memory state (like cached Supabase clients inside server services) to bleed between test runs if not carefully isolated.
+- **Root Cause**: `server/services/translation-service.ts` or `admin-db.ts` creates and caches a Supabase client. If test A instantiates it with mock A, and the next test B runs without calling `vi.resetModules()`, the service keeps using mock A.
+- **Fix**: 
+  1. Add `beforeEach(() => { vi.resetModules(); })` to clear backend service require caches.
+  2. Because `vi.mock()` is hoisted, any variables referenced inside it must ALSO be hoisted.
+  3. Pattern: `const { mockClient } = vi.hoisted(() => ({ mockClient: { from: vi.fn(), ... } })); vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => mockClient) }));`
 
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
@@ -4373,7 +4359,7 @@ connectSrc: [
 - **DO NOT** use `npm run test:e2e:fast` in CI — this starts a Vite dev server, not a production build
 - `serve` and `wait-on` are devDependencies — do not remove them from `package.json`
 - If E2E tests fail in CI but pass locally, check whether `E2E_BASE_URL` is set and the build step ran first
-- Optional secrets for real Supabase in CI build: `STAGING_SUPABASE_URL/ANON_KEY`, `PROD_SUPABASE_URL/ANON_KEY` — placeholder values used if secrets not configured
+- **Real Supabase integration in CI build (Migrated Feb 24, 2026)**: Requires `STAGING_SUPABASE_URL`/`ANON_KEY` and `PROD_SUPABASE_URL`/`ANON_KEY` as GitHub Secrets. If not configured, the build gracefully degrades and warns that Supabase features are disabled during E2E testing.
 
 ---
 
@@ -4442,7 +4428,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,427 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,444 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
-**Bundle**: ~259 KB gzip main chunk + 12 KB gzip EN chunk + 14 KB gzip TR chunk (both async)
-**Last Updated**: February 22, 2026 (EN translations lazy-load — completes lazy-i18n)
+**Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
+**Last Updated**: February 24, 2026 (Supabase optimisations verified, pg_cron migration, E2E integration)

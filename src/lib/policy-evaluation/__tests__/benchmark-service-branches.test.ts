@@ -106,11 +106,13 @@ describe('Benchmark Service - Branch Coverage', () => {
   // isCacheValid - covers the cache expiration branch
   // =========================================================================
   describe('Cache Validity', () => {
-    it('should trigger refresh when cache is empty', () => {
+    it('should trigger refresh when cache is empty', async () => {
       // When cache is empty, getPremiumBenchmark should trigger refreshBenchmarks
       // The function returns undefined because cache is empty
       const result = getPremiumBenchmark('nonexistent')
       expect(result).toBeUndefined()
+      // Wait for the background refresh to complete so it doesn't pollute the next test
+      await new Promise(resolve => setTimeout(resolve, 10))
     })
 
     it('should use cached data without refresh when cache is populated and fresh', async () => {

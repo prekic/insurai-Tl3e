@@ -89,6 +89,7 @@ describe('Cost Control', () => {
     process.env = { ...originalEnv }
     delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
 

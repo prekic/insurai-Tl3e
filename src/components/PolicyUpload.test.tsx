@@ -97,8 +97,13 @@ vi.mock('@/lib/supabase/auth-context', () => ({
 }))
 
 const mockCreatePolicy = vi.fn().mockResolvedValue({ id: 'created-policy-1' })
+vi.mock('@/lib/supabase/config', () => ({
+  isSupabaseConfigured: () => true,
+  credentials: null,
+}))
+
 vi.mock('@/lib/supabase', () => ({
-  isSupabaseConfigured: () => false,
+  isSupabaseConfigured: () => true,
   uploadPolicyDocument: (...args: unknown[]) => mockUploadPolicyDocument(...args),
   createPolicy: (...args: unknown[]) => mockCreatePolicy(...args),
 }))
@@ -109,6 +114,11 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
     info: vi.fn(),
   },
+}))
+
+vi.mock('@/lib/processing-log-api', () => ({
+  createProcessingLog: vi.fn().mockResolvedValue(true),
+  updateProcessingLog: vi.fn().mockResolvedValue(true),
 }))
 
 // Mock sample policies
