@@ -49,7 +49,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     // Hero
     heroTitle: 'Yapay Zeka Destekli Sigorta Analizi',
     heroSubtitle: 'Türkiye Sigorta Profesyonelleri için',
-    heroDescription: 'Poliçelerinizi yükleyin, anında AI analizi alın ve piyasa standartlarıyla karşılaştırın.',
+    heroDescription:
+      'Poliçelerinizi yükleyin, anında AI analizi alın ve piyasa standartlarıyla karşılaştırın.',
     uploadCta: 'Poliçenizi yükleyin',
     viewDemo: 'Demo Görüntüle',
     trustedBy: 'Sigorta profesyonellerinin güvendiği',
@@ -89,16 +90,20 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     howItWorksHeadline: 'Poliçelerinizi kıyaslamak için üç adım',
     howItWorksDesc: 'Jargon yok, kılavuz yok—sadece kendi dilinizde net teminat bilgisi.',
     step1Title: 'Poliçe yükleyin',
-    step1Description: 'Sigorta belgelerinizi bırakın—PDF, Word veya taranmış görüntüler. Her formatı kabul ediyoruz.',
+    step1Description:
+      'Sigorta belgelerinizi bırakın—PDF, Word veya taranmış görüntüler. Her formatı kabul ediyoruz.',
     step2Title: 'AI teminatları analiz eder',
-    step2Description: 'Yapay zekamız limitleri, muafiyetleri, ek teminatları ve istisnaları çıkarır ve günlük dilde açıklar.',
+    step2Description:
+      'Yapay zekamız limitleri, muafiyetleri, ek teminatları ve istisnaları çıkarır ve günlük dilde açıklar.',
     step3Title: 'Karşılaştırın ve takip edin',
-    step3Description: 'Poliçeleri yan yana karşılaştırın ve yenileme tarihleri için hatırlatıcılar ayarlayın.',
+    step3Description:
+      'Poliçeleri yan yana karşılaştırın ve yenileme tarihleri için hatırlatıcılar ayarlayın.',
 
     // Benefits
     benefits: 'Neden InsurAI',
     benefitsSubtitle: 'Sigorta profesyonelleri için tasarlandı',
-    benefitsSectionDesc: 'Türk sigorta piyasası profesyonelleri için en güçlü sigorta analiz platformu.',
+    benefitsSectionDesc:
+      'Türk sigorta piyasası profesyonelleri için en güçlü sigorta analiz platformu.',
     benefitAnalysisTitle: 'Kapsamlı Analiz',
     benefitAnalysisDesc: 'Yapay zeka, poliçe belgelerinizdeki her detayı otomatik olarak çıkarır.',
     benefitInstantTitle: 'Anlık Sonuçlar',
@@ -137,31 +142,56 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     // Testimonials / Use Cases
     useCasesTitle: 'InsurAI ile neler',
     useCasesHighlight: 'yapabilirsiniz',
-    useCasesSubtitle: 'Sigorta profesyonelleri ve poliçe sahipleri için gerçek kullanım senaryoları.',
+    useCasesSubtitle:
+      'Sigorta profesyonelleri ve poliçe sahipleri için gerçek kullanım senaryoları.',
     useCaseBrokers: 'Sigorta Brokerleri',
-    useCaseBrokersDesc: 'Müşteri poliçelerini yükleyin, anında teminat eksikliği raporları alın ve yan yana karşılaştırmalar sunun — saatler yerine dakikalar içinde.',
+    useCaseBrokersDesc:
+      'Müşteri poliçelerini yükleyin, anında teminat eksikliği raporları alın ve yan yana karşılaştırmalar sunun — saatler yerine dakikalar içinde.',
     useCaseRiskManagers: 'Kurumsal Risk Yöneticileri',
-    useCaseRiskManagersDesc: 'Karmaşık ticari poliçeleri piyasa kıyaslamalarıyla analiz edin ve yenileme sezonundan önce eksik teminatlı alanları belirleyin.',
+    useCaseRiskManagersDesc:
+      'Karmaşık ticari poliçeleri piyasa kıyaslamalarıyla analiz edin ve yenileme sezonundan önce eksik teminatlı alanları belirleyin.',
     useCasePolicyholders: 'Bireysel Poliçe Sahipleri',
-    useCasePolicyholdersDesc: 'Kasko veya sağlık poliçenizi yükleyin ve neyin teminatta olup olmadığının anlaşılır bir açıklamasını alın.',
+    useCasePolicyholdersDesc:
+      'Kasko veya sağlık poliçenizi yükleyin ve neyin teminatta olup olmadığının anlaşılır bir açıklamasını alın.',
+
+    // Testimonials
+    testimonialsTitle: 'Güvenilen',
+    testimonialsHighlight: 'Risk Profesyonelleri',
+    testimonialsSubtitle:
+      "Kurumsal ekiplerin risk değerlendirme ve hasar iş akışlarını hızlandırmak için InsurAI'ı nasıl kullandığını görün.",
+    testimonial1Author: 'Kıdemli Hasar Uzmanı, Küresel Mülkiyet',
+    testimonial1Quote:
+      '"InsurAI, karmaşık hasar taleplerimizin incelenme süresini %40 azalttı. Yapay zekanın istisnaları poliçe limitleriyle anında eşleştirme yeteneği rakipsiz."',
+    testimonial2Author: 'Baş Risk Sorumlusu, Üretim Sanayi',
+    testimonial2Quote:
+      '"İş durması ve tedarik zinciri etkilerini hesaplamak haftalarca sürerdi. Artık tedarikçi olasılıklarını saatler içinde doğru bir şekilde değerlendirebiliyoruz."',
+    testimonial3Author: 'Ticari Sigortalar Başkan Yardımcısı, Bölgesel Broker',
+    testimonial3Quote:
+      '"Risk değerlendirme iş akışımızdaki verimlilik artışı devrim niteliğinde. Ekibimiz artık yenileme görüşmelerinden önce karmaşık ticari poliçeleri güvenle piyasayla kıyaslayabiliyor."',
 
     // FAQ
     faq: 'Sıkça sorulan sorular',
     faqSubtitle: 'InsurAI hakkında bilmeniz gereken her şey.',
     faqHighlight: 'sorular',
     faqQ1: 'Hangi dosya formatları desteklenir?',
-    faqA1: 'PDF, Word belgeleri (DOC, DOCX) ve görüntü dosyaları (PNG, JPG, JPEG) desteklenmektedir. Yapay zekamız OCR ile taranmış belgeleri de işleyebilir.',
+    faqA1:
+      'PDF, Word belgeleri (DOC, DOCX) ve görüntü dosyaları (PNG, JPG, JPEG) desteklenmektedir. Yapay zekamız OCR ile taranmış belgeleri de işleyebilir.',
     faqQ2: 'AI analizi ne kadar doğru?',
-    faqA2: 'Yapay zekamız çıkarılan verileri çapraz doğrulamak için birden fazla model kullanır ve belirsizlikleri işaretler. Her sonuç, çıkarımın ne kadar güvenilir olduğunu gösteren bir güven puanı içerir.',
+    faqA2:
+      'Yapay zekamız çıkarılan verileri çapraz doğrulamak için birden fazla model kullanır ve belirsizlikleri işaretler. Her sonuç, çıkarımın ne kadar güvenilir olduğunu gösteren bir güven puanı içerir.',
     faqQ3: 'Verilerim güvende mi?',
-    faqA3: 'Evet, tüm belgeler için banka düzeyinde şifreleme (AES-256) kullanıyoruz. Dosyalarınız güvenli şekilde işlenir ve üçüncü taraflarla paylaşılmaz. Tamamen KVKK uyumluyuz.',
+    faqA3:
+      'Evet, tüm belgeler için banka düzeyinde şifreleme (AES-256) kullanıyoruz. Dosyalarınız güvenli şekilde işlenir ve üçüncü taraflarla paylaşılmaz. Tamamen KVKK uyumluyuz.',
     faqQ4: 'Hangi sigorta türleri desteklenir?',
-    faqA4: 'Kasko, Trafik, Konut, Sağlık, DASK, Hayat ve Ticari poliçeler dahil tüm büyük Türk sigorta türlerini destekliyoruz.',
+    faqA4:
+      'Kasko, Trafik, Konut, Sağlık, DASK, Hayat ve Ticari poliçeler dahil tüm büyük Türk sigorta türlerini destekliyoruz.',
     faqQ5: 'Farklı sigortacıların poliçelerini karşılaştırabilir miyim?',
-    faqA5: 'Evet. Herhangi bir Türk sigorta şirketinden poliçe yükleyin ve yapay zeka destekli analizimizle yan yana karşılaştırın.',
+    faqA5:
+      'Evet. Herhangi bir Türk sigorta şirketinden poliçe yükleyin ve yapay zeka destekli analizimizle yan yana karşılaştırın.',
 
     // Footer
-    footerDescription: 'Türk sigorta piyasası profesyonelleri için yapay zeka destekli poliçe analiz platformu.',
+    footerDescription:
+      'Türk sigorta piyasası profesyonelleri için yapay zeka destekli poliçe analiz platformu.',
     footerProduct: 'Ürün',
     footerFeatures: 'Özellikler',
     footerPricing: 'Fiyatlandırma',
@@ -230,7 +260,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
 
     // CompareSection (CTA)
     ctaTitle: 'Poliçelerinizi anlamaya hazır mısınız?',
-    ctaDescription: 'İlk poliçenizi yükleyin ve yapay zeka destekli sigorta analizinin gücünü görün.',
+    ctaDescription:
+      'İlk poliçenizi yükleyin ve yapay zeka destekli sigorta analizinin gücünü görün.',
     freeInstantAnalysis: 'Ücretsiz anlık analiz',
 
     // PolicyComparisonSection
@@ -259,7 +290,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     // WhoItsFor
     whoTitle: 'Sigorta profesyonelleri',
     whoHighlight: 'için tasarlandı',
-    whoDesc: 'İster broker, ister risk yöneticisi veya poliçe sahibi olun, InsurAI teminatınızı anlamanıza yardımcı olur.',
+    whoDesc:
+      'İster broker, ister risk yöneticisi veya poliçe sahibi olun, InsurAI teminatınızı anlamanıza yardımcı olur.',
     whoBrokersTitle: 'Sigorta Brokerleri',
     whoBrokersDesc: 'Müşterileriniz için poliçeleri hızla analiz edin ve karşılaştırın.',
     whoRiskTitle: 'Kurumsal Risk Yöneticileri',
@@ -371,7 +403,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     amendmentTracked: 'Değişiklik kaydedildi',
     amendmentFailed: 'Değişiklik kaydedilemedi',
     editMode: 'Düzenleme Modu',
-    editModeDesc: 'Kaydetmeden önce çıkarılan verileri düzenleyin. Değişiklik yapmak için poliçeye gidin.',
+    editModeDesc:
+      'Kaydetmeden önce çıkarılan verileri düzenleyin. Değişiklik yapmak için poliçeye gidin.',
     viewPolicyBtn: 'Poliçeyi Görüntüle',
     // Hata başlıkları ve mesajları
     errorAnalysisFailed: 'Analiz Başarısız',
@@ -380,7 +413,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     errorContactSupport: 'Bu sorun devam ederse lütfen destek ile iletişime geçin.',
     errorPdfTimeout: 'PDF İşleme Zaman Aşımı',
     errorPdfTimeoutMsg: 'PDF işlenmesi çok uzun sürdü.',
-    errorPdfTimeoutTip: 'Dosya çok büyük veya karmaşık olabilir. Daha küçük bir dosya deneyin veya tekrar deneyin.',
+    errorPdfTimeoutTip:
+      'Dosya çok büyük veya karmaşık olabilir. Daha küçük bir dosya deneyin veya tekrar deneyin.',
     errorPdfWorker: 'PDF İşleme Hatası',
     errorPdfWorkerMsg: 'PDF işlemcisi bir hatayla karşılaştı.',
     errorPdfWorkerTip: 'Bu genellikle geçicidir. Lütfen tekrar deneyin.',
@@ -403,10 +437,12 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     errorProviderNotReadyTip: 'Bu sorun devam ederse lütfen destek ile iletişime geçin.',
     errorLowConfidence: 'Düşük Çıkarım Güvenilirliği',
     errorLowConfidenceMsg: 'AI bu belgeden güvenilir şekilde veri çıkaramadı.',
-    errorLowConfidenceTip: 'PDF taranmış veya düşük metin kalitesine sahip olabilir. Daha net bir belge deneyin.',
+    errorLowConfidenceTip:
+      'PDF taranmış veya düşük metin kalitesine sahip olabilir. Daha net bir belge deneyin.',
     errorRequestTimeout: 'İstek Zaman Aşımı',
     errorRequestTimeoutMsg: 'İstek tamamlanması çok uzun sürdü.',
-    errorRequestTimeoutTip: 'Belge çok büyük veya AI servisi yavaş olabilir. Daha sonra tekrar deneyin.',
+    errorRequestTimeoutTip:
+      'Belge çok büyük veya AI servisi yavaş olabilir. Daha sonra tekrar deneyin.',
     // Durum rozetleri
     checkingBackend: 'Arka uç sunucu kontrol ediliyor...',
     aiExtractionEnabled: 'AI çıkarım etkin',
@@ -446,7 +482,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     connectionIssue: 'Bağlantı sorunu',
     connectionError: 'AI asistanına bağlanırken sorun yaşanıyor',
     retryMessage: 'Tekrar Dene',
-    welcomeMessage: 'Merhaba! Ben AI sigorta asistanınızım. Poliçelerinizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
+    welcomeMessage:
+      'Merhaba! Ben AI sigorta asistanınızım. Poliçelerinizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
     // Mesaj işlemleri
     copyToClipboard: 'Panoya kopyala',
     copied: 'Kopyalandı',
@@ -478,7 +515,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     messages: 'mesaj',
     // Karşılama
     greeting: 'Merhaba! Bugün sigorta poliçeleriniz hakkında nasıl yardımcı olabilirim?',
-    greetingWithCount: 'Merhaba! Ben AI sigorta asistanınızım. {count} yüklü poliçenizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
+    greetingWithCount:
+      'Merhaba! Ben AI sigorta asistanınızım. {count} yüklü poliçenizi anlamanıza yardımcı olabilirim. Teminatlarınız hakkında sorular sorun, poliçeleri karşılaştırın veya öneriler alın.',
     // Hatalar
     aiThinking: 'AI düşünüyor',
     connectionBanner: 'AI asistanına bağlanırken sorun yaşanıyor',
@@ -533,9 +571,10 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     apiKeysPrivacy: 'API anahtarları yerel olarak saklanır ve sunucularımıza gönderilmez.',
     languageInfo: 'Herhangi bir dil kullanılabilir. AI yeni dilleri otomatik çevirir.',
     dataExport: 'Veri ve Dışa Aktarma',
-    exportCSV: 'Excel\'e Aktar (CSV)',
-    exportPDF: 'PDF\'e Aktar',
-    exportDescription: '{count} poliçenizi yedekleme veya paylaşım için Excel veya PDF formatında dışa aktarın.',
+    exportCSV: "Excel'e Aktar (CSV)",
+    exportPDF: "PDF'e Aktar",
+    exportDescription:
+      '{count} poliçenizi yedekleme veya paylaşım için Excel veya PDF formatında dışa aktarın.',
     storageCloud: 'Bulut (Supabase)',
     storageLocal: 'Yerel Tarayıcı',
     storageLabel: 'Depolama',
@@ -560,11 +599,14 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     allDataClearedDesc: 'Poliçeleriniz kaldırıldı.',
     languageChanged: 'Dil {name} olarak değiştirildi',
     removeOpenaiTitle: 'OpenAI API Anahtarını Kaldır',
-    removeOpenaiDesc: 'OpenAI API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar AI destekli çıkarma devre dışı kalacak.',
+    removeOpenaiDesc:
+      'OpenAI API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar AI destekli çıkarma devre dışı kalacak.',
     removeClaudeTitle: 'Claude API Anahtarını Kaldır',
-    removeClaudeDesc: 'Claude API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar çoklu model uzlaşması devre dışı kalacak.',
+    removeClaudeDesc:
+      'Claude API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar çoklu model uzlaşması devre dışı kalacak.',
     removeGoogleTitle: 'Google Cloud API Anahtarını Kaldır',
-    removeGoogleDesc: 'Google Cloud API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar OCR devre dışı kalacak.',
+    removeGoogleDesc:
+      'Google Cloud API anahtarını kaldırmak istediğinizden emin misiniz? Yeni bir anahtar ekleyene kadar OCR devre dışı kalacak.',
     removeKey: 'Anahtarı Kaldır',
     save: 'Kaydet',
     cancel: 'İptal',
@@ -715,7 +757,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     namePlaceholder: 'Ahmet Yılmaz',
     emailPlaceholder: 'siz@ornek.com',
     authNotConfigured: 'Kimlik Doğrulama Yapılandırılmamış',
-    authNotConfiguredDesc: 'Supabase bilgileri ayarlanmamış. Lütfen .env dosyanızda VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini yapılandırın.',
+    authNotConfiguredDesc:
+      'Supabase bilgileri ayarlanmamış. Lütfen .env dosyanızda VITE_SUPABASE_URL ve VITE_SUPABASE_ANON_KEY değerlerini yapılandırın.',
     continueToDemo: 'Demoya Devam Et',
   },
 
@@ -827,11 +870,12 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
   tryAnalysis: {
     preparingDocument: 'Belge hazırlanıyor...',
     uploadingDocument: 'Belge yükleniyor...',
-    extractingText: 'PDF\'den metin çıkarılıyor...',
+    extractingText: "PDF'den metin çıkarılıyor...",
     analyzingStructure: 'Belge yapısı analiz ediliyor...',
     processingWithAI: 'Yapay zeka ile işleniyor...',
     almostThere: 'Neredeyse bitti...',
-    analysisTimedOut: 'Analiz zaman aşımına uğradı. Yapay zeka servisi meşgul olabilir. Lütfen tekrar deneyin.',
+    analysisTimedOut:
+      'Analiz zaman aşımına uğradı. Yapay zeka servisi meşgul olabilir. Lütfen tekrar deneyin.',
     noResponse: 'Analiz servisinden yanıt alınamadı.',
     analysisFailed: 'Analiz başarısız oldu',
     aiExtractionFailed: 'Yapay zeka çıkarımı başarısız oldu',
@@ -841,7 +885,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     lowConfidenceTitle: 'Düşük Güvenilirlik Sonucu',
     analysisSuccessDesc: 'Poliçeniz başarıyla analiz edildi.',
     trialAlreadyUsed: 'Ücretsiz denemenizi zaten kullandınız.',
-    serviceUnavailableToast: 'Analiz servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
+    serviceUnavailableToast:
+      'Analiz servisi geçici olarak kullanılamıyor. Lütfen daha sonra tekrar deneyin.',
     pleaseWait: 'Lütfen bekleyin...',
     trialAlreadyUsedTitle: 'Deneme Zaten Kullanıldı',
     trialAlreadyUsedDesc: 'Bu oturum için ücretsiz poliçe analizinizi zaten kullandınız.',
@@ -862,7 +907,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     aiPowered: 'Yapay Zeka Destekli',
     oneFreeAnalysis: 'Oturum başına bir ücretsiz analiz',
     serviceUnavailable: 'Analiz servisi geçici olarak kullanılamıyor',
-    serviceStartingUp: 'Analiz servisi başlatılıyor olabilir. Lütfen bir dakika sonra tekrar deneyin.',
+    serviceStartingUp:
+      'Analiz servisi başlatılıyor olabilir. Lütfen bir dakika sonra tekrar deneyin.',
     alreadyHaveAccount: 'Zaten hesabınız var mı?',
   },
 
@@ -889,11 +935,13 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
 
   shared: {
     analysisNotFound: 'Analiz Bulunamadı',
-    analysisNotFoundDesc: 'Bu paylaşılan bağlantı mevcut değil. Analiz kaldırılmış veya bağlantı hatalı olabilir.',
+    analysisNotFoundDesc:
+      'Bu paylaşılan bağlantı mevcut değil. Analiz kaldırılmış veya bağlantı hatalı olabilir.',
     tryFreeAnalysis: 'Ücretsiz Analiz Dene',
     backToHome: 'Ana Sayfaya Dön',
     linkExpired: 'Bağlantı Süresi Dolmuş',
-    linkExpiredDesc: 'Bu paylaşılan analizin süresi dolmuş. Analiz sonuçları 24 saat boyunca geçerlidir.',
+    linkExpiredDesc:
+      'Bu paylaşılan analizin süresi dolmuş. Analiz sonuçları 24 saat boyunca geçerlidir.',
     sharedAnalysis: 'Paylaşılan Analiz',
     expiresIn: '{time} içinde sona eriyor',
     expiringSoon: 'Yakında sona eriyor',
@@ -927,10 +975,12 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     marketingEmails: 'Pazarlama ve tanıtım e-postaları',
     specialOffers: 'Özel teklifler ve kampanyalar',
     productUpdates: 'Ürün güncellemeleri',
-    willContinue: 'Poliçe uyarıları ve güvenlik bildirimleri gibi önemli e-postaları almaya devam edeceksiniz.',
+    willContinue:
+      'Poliçe uyarıları ve güvenlik bildirimleri gibi önemli e-postaları almaya devam edeceksiniz.',
     confirmButton: 'Evet, Aboneliğimi İptal Et',
     processing: 'İşleniyor...',
-    successMessage: 'Pazarlama e-postalarından başarıyla çıktınız. Artık tanıtım e-postaları almayacaksınız.',
+    successMessage:
+      'Pazarlama e-postalarından başarıyla çıktınız. Artık tanıtım e-postaları almayacaksınız.',
     changeYourMind: 'Fikrinizi değiştirirseniz, hesap ayarlarınızdan tekrar abone olabilirsiniz.',
     retry: 'Tekrar Dene',
     connectionError: 'Bağlantı hatası',
@@ -938,17 +988,19 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     unsubscribeFailed: 'Abonelikten çıkma başarısız',
     pleaseTryLater: 'Lütfen daha sonra tekrar deneyin.',
     backToHome: 'Ana Sayfaya Dön',
-    footer: 'InsurAI - Türkiye\'nin #1 Sigorta Analiz Platformu',
+    footer: "InsurAI - Türkiye'nin #1 Sigorta Analiz Platformu",
   },
 
   // Push notification opt-in prompt
   notifications: {
     promptTitle: 'Analiziniz hazır olduğunda bildirim alın',
-    promptBody: 'Poliçe çıkarma işleminiz tamamlandığında, bu sekmeyi kapatsanız bile tarayıcı bildirimi göndereceğiz.',
+    promptBody:
+      'Poliçe çıkarma işleminiz tamamlandığında, bu sekmeyi kapatsanız bile tarayıcı bildirimi göndereceğiz.',
     enableButton: 'Bildirimleri etkinleştir',
     maybeLater: 'Belki daha sonra',
     permissionDenied: 'Bildirimler engellendi',
-    permissionDeniedHint: 'Etkinleştirmek için tarayıcı adres çubuğundaki kilit simgesine tıklayın ve bildirimlere izin verin.',
+    permissionDeniedHint:
+      'Etkinleştirmek için tarayıcı adres çubuğundaki kilit simgesine tıklayın ve bildirimlere izin verin.',
   },
 
   // Coverage name translations (English → Turkish — from shared module)
@@ -956,31 +1008,44 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
 
   // AI insight translations (Turkish values)
   insightTranslations: {
-    'Comprehensive coverage with multiple protection areas': 'Birçok koruma alanıyla kapsamlı teminat',
+    'Comprehensive coverage with multiple protection areas':
+      'Birçok koruma alanıyla kapsamlı teminat',
     'High coverage limits for major risks': 'Büyük riskler için yüksek teminat limitleri',
     'Zero deductible on some coverages': 'Bazı teminatlarda sıfır muafiyet',
-    'Includes special endorsements for enhanced protection': 'Artırılmış koruma için özel klozlar içerir',
+    'Includes special endorsements for enhanced protection':
+      'Artırılmış koruma için özel klozlar içerir',
     'Standard coverage for policy type': 'Poliçe türüne uygun standart teminat',
-    'Multiple exclusions may limit coverage in certain scenarios': 'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
-    'High deductibles may result in significant out-of-pocket costs': 'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
-    'Total coverage significantly below market average': 'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
-    'Consider adding DASK earthquake insurance if not included': 'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
-    'Review coverage limits annually to ensure adequate protection': 'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
-    'Premium is above 75th percentile - compare with other providers': 'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
-    'Coverage below market median - consider increasing limits': 'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
-    'Premium is 10% below market average for this coverage level': 'Prim bu teminat seviyesi için piyasa ortalamasının %10 altında',
+    'Multiple exclusions may limit coverage in certain scenarios':
+      'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
+    'High deductibles may result in significant out-of-pocket costs':
+      'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
+    'Total coverage significantly below market average':
+      'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
+    'Consider adding DASK earthquake insurance if not included':
+      'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
+    'Review coverage limits annually to ensure adequate protection':
+      'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
+    'Premium is above 75th percentile - compare with other providers':
+      'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
+    'Coverage below market median - consider increasing limits':
+      'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
+    'Premium is 10% below market average for this coverage level':
+      'Prim bu teminat seviyesi için piyasa ortalamasının %10 altında',
     'Natural disaster deductible is higher than typical': 'Doğal afet muafiyeti normalden yüksek',
     'Glass coverage included at no additional cost': 'Cam teminatı ek ücret olmadan dahil',
-    'Standard mandatory coverage - no gaps detected': 'Standart zorunlu teminat - eksik tespit edilmedi',
+    'Standard mandatory coverage - no gaps detected':
+      'Standart zorunlu teminat - eksik tespit edilmedi',
     'Premium is at market average': 'Prim piyasa ortalamasında',
-    'Contents coverage may be insufficient for high-value items': 'Eşya teminatı yüksek değerli eşyalar için yetersiz olabilir',
+    'Contents coverage may be insufficient for high-value items':
+      'Eşya teminatı yüksek değerli eşyalar için yetersiz olabilir',
     'Consider supplemental earthquake coverage': 'Ek deprem teminatı düşünün',
-    'Policy expiring in 45 days - renewal recommended': 'Poliçe 45 gün içinde sona eriyor - yenileme önerilir',
-    'Dental coverage is below average for this tier': 'Diş teminatı bu seviye için ortalamanın altında',
+    'Policy expiring in 45 days - renewal recommended':
+      'Poliçe 45 gün içinde sona eriyor - yenileme önerilir',
+    'Dental coverage is below average for this tier':
+      'Diş teminatı bu seviye için ortalamanın altında',
     'Good maternity benefits included': 'İyi doğum yardımları dahil',
-    'missingCoverage': 'Yaygın teminat eksik: {name}',
-    'invalidTcKimlik': 'Geçersiz TC Kimlik: {value}',
-    'marketPremiumsYoY': 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin',
+    missingCoverage: 'Yaygın teminat eksik: {name}',
+    invalidTcKimlik: 'Geçersiz TC Kimlik: {value}',
+    marketPremiumsYoY: 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin',
   },
 }
-

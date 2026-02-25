@@ -1,0 +1,19 @@
+# Repository CODEOWNERS
+# Default owner for everything not explicitly mapped
+*                   @prekic
+
+# Frontend source code
+/src/               @prekic
+
+# Server code
+/server/            @prekic
+
+# Supabase Edge Functions, Migrations, DB config
+/supabase/          @prekic
+
+# End-to-end tests
+/e2e/               @prekic
+
+# Infrastructure and Workflows
+/.github/           @prekic
+/docs/              @prekic

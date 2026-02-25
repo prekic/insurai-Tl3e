@@ -1,0 +1,17 @@
+# insurai - AI Agent Guidelines
+
+## Tech Stack
+- Frontend: React, Vite, Tailwind CSS
+- Backend: Express, Node.js
+- Database & Auth: Supabase (Postgres, Auth, Edge Functions)
+- Testing: Vitest, Playwright
+- Deployment: Railway (Nixpacks)
+
+## Hard Constraints & Gotchas
+1. **Vitest & Supabase Memory Leaks**: Always use `beforeEach(() => { vi.resetModules(); })` to prevent Supabase client memory leaks in Vitest.
+2. **Landing Component i18n**: Always mock `@/lib/i18n/i18n-context` in component tests for landing elements to avoid empty string flashes.
+3. **Translation Skeleton**: Never bloat `translations-skeleton.ts`; it must purely contain empty strings.
+4. **Proxy Function Signature**: The `extractViaProxy` function requires `notifyUserId` as the 4th parameter; tests must account for this.
+
+## Required Workflows
+- **Session Wrap-Up**: Always update `CLAUDE.md` and `SESSION_HANDOFF.md` at the end of a session.

@@ -172,6 +172,15 @@ export interface TranslationDictionary {
     useCaseRiskManagersDesc: string
     useCasePolicyholders: string
     useCasePolicyholdersDesc: string
+    testimonialsTitle: string
+    testimonialsHighlight: string
+    testimonialsSubtitle: string
+    testimonial1Author: string
+    testimonial1Quote: string
+    testimonial2Author: string
+    testimonial2Quote: string
+    testimonial3Author: string
+    testimonial3Quote: string
 
     // FAQ
     faq: string

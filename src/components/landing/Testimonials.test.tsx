@@ -1,10 +1,10 @@
 /**
  * Testimonials Component Tests
  *
- * Tests for the use cases section (formerly testimonials)
+ * Tests for the testimonials section
  */
 
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Testimonials } from './Testimonials'
 import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
@@ -13,50 +13,62 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
 }))
 
-describe('Testimonials', () => {
+describe('Testimonials Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   describe('Rendering', () => {
     it('should render the section', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText(/What you can/)).toBeInTheDocument()
+      expect(screen.getByText(/Trusted by/)).toBeInTheDocument()
     })
 
     it('should display highlighted text', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('do with InsurAI')).toBeInTheDocument()
+      expect(screen.getByText('Risk Professionals')).toBeInTheDocument()
     })
 
     it('should display subtitle', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Real use cases for insurance professionals and policyholders.')).toBeInTheDocument()
+      expect(screen.getByText(/See how enterprise teams use InsurAI/)).toBeInTheDocument()
     })
   })
 
-  describe('Use Case Cards', () => {
-    it('should render Insurance Brokers use case', () => {
+  describe('Testimonial Cards', () => {
+    it('should render Claims Adjuster testimonial', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Insurance Brokers')).toBeInTheDocument()
-      expect(screen.getByText(/Upload client policies, get instant coverage gap reports/)).toBeInTheDocument()
+      expect(screen.getByText('Senior Claims Adjuster, Global Property')).toBeInTheDocument()
+      expect(
+        screen.getByText(/InsurAI reduced our complex property damage claim review time by 40%/)
+      ).toBeInTheDocument()
     })
 
-    it('should render Corporate Risk Managers use case', () => {
+    it('should render Chief Risk Officer testimonial', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Corporate Risk Managers')).toBeInTheDocument()
-      expect(screen.getByText(/Analyze complex commercial policies against market benchmarks/)).toBeInTheDocument()
+      expect(screen.getByText('Chief Risk Officer, Manufacturing')).toBeInTheDocument()
+      expect(
+        screen.getByText(/Calculating BI and supply chain impacts used to take weeks/)
+      ).toBeInTheDocument()
     })
 
-    it('should render Individual Policyholders use case', () => {
+    it('should render Commercial Lines VP testimonial', () => {
       render(<Testimonials />)
 
-      expect(screen.getByText('Individual Policyholders')).toBeInTheDocument()
-      expect(screen.getByText(/Upload your kasko or health policy/)).toBeInTheDocument()
+      expect(screen.getByText('VP of Commercial Lines, Regional Brokerage')).toBeInTheDocument()
+      expect(
+        screen.getByText(
+          /The efficiency gained in our risk assessment workflow has been transformative/
+        )
+      ).toBeInTheDocument()
     })
 
-    it('should render all 3 use case cards', () => {
+    it('should render all 3 testimonial cards', () => {
       const { container } = render(<Testimonials />)
 
       const cards = container.querySelectorAll('.rounded-2xl.shadow-lg')
@@ -64,12 +76,12 @@ describe('Testimonials', () => {
     })
   })
 
-  describe('Styling', () => {
-    it('should have white background', () => {
-      const { container } = render(<Testimonials />)
+  describe('Accessibility & Styling', () => {
+    it('should have a labeled section region', () => {
+      render(<Testimonials />)
 
-      const section = container.querySelector('section')
-      expect(section).toHaveClass('bg-white')
+      const region = screen.getByRole('region', { name: /Trusted by Risk Professionals/i })
+      expect(region).toBeInTheDocument()
     })
 
     it('should use grid layout', () => {
