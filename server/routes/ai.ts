@@ -47,6 +47,7 @@ import * as adminNotificationService from '../services/admin-notification-servic
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
 import { captureServerError } from '../lib/sentry.js'
+import { persistExtractionEvent } from '../services/extraction-metrics-service.js'
 
 const router = Router()
 
@@ -72,14 +73,45 @@ function recordExtractionEvent(event: ExtractionEvent): void {
   if (extractionMetrics.length > EXTRACTION_BUFFER_SIZE) {
     extractionMetrics.shift()
   }
+  // Dual-write to DB (fire-and-forget, non-blocking)
+  persistExtractionEvent({
+    request_id: event.requestId,
+    provider: event.provider,
+    success: event.success,
+    duration_ms: event.durationMs,
+    error_code: event.errorCode,
+    error_message: event.errorMessage,
+    document_length: event.documentLength,
+  }).catch((err) => log.warn('Failed to persist extraction metric to DB', {
+    error: err instanceof Error ? err.message : String(err),
+  }))
 }
 
 /** Exported for the admin monitoring endpoint */
-export function getExtractionHealthSnapshot() {
+export async function getExtractionHealthSnapshot() {
   const now = Date.now()
   const last24h = extractionMetrics.filter(
     (e) => now - new Date(e.timestamp).getTime() < 24 * 60 * 60 * 1000
   )
+
+  // If buffer is empty (e.g., after server restart), try DB fallback
+  if (last24h.length === 0) {
+    try {
+      const { getDBExtractionHealth } = await import('../services/extraction-metrics-service.js')
+      const dbHealth = await getDBExtractionHealth(24)
+      if (dbHealth && dbHealth.last_period.total > 0) {
+        return {
+          last_24h: dbHealth.last_period,
+          by_provider: dbHealth.by_provider,
+          recent_errors: dbHealth.recent_errors,
+          buffer_size: 0,
+          source: 'database' as const,
+        }
+      }
+    } catch {
+      // DB fallback failed, return empty buffer data
+    }
+  }
 
   const total = last24h.length
   const failed = last24h.filter((e) => !e.success).length
@@ -128,6 +160,7 @@ export function getExtractionHealthSnapshot() {
     by_provider: providerStats,
     recent_errors: recentErrors,
     buffer_size: extractionMetrics.length,
+    source: 'memory' as const,
   }
 }
 

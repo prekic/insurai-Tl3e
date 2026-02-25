@@ -154,7 +154,8 @@ describe('processing-log-api', () => {
       expect(result).toBeNull()
       expect(console.error).toHaveBeenCalledWith(
         '[ProcessingLogAPI] Create failed:',
-        'Validation failed'
+        'Validation failed',
+        { documentId: 'doc-002' }
       )
     })
 
@@ -176,7 +177,8 @@ describe('processing-log-api', () => {
       expect(result).toBeNull()
       expect(console.error).toHaveBeenCalledWith(
         '[ProcessingLogAPI] Create error:',
-        networkError
+        networkError,
+        expect.objectContaining({ documentId: 'doc-003' })
       )
     })
 
@@ -201,7 +203,8 @@ describe('processing-log-api', () => {
       expect(result).toBeNull()
       expect(console.error).toHaveBeenCalledWith(
         '[ProcessingLogAPI] Create error:',
-        expect.any(Error)
+        expect.any(Error),
+        expect.objectContaining({ documentId: 'doc-004' })
       )
     })
 
@@ -294,7 +297,8 @@ describe('processing-log-api', () => {
       expect(result).toBeNull()
       expect(console.error).toHaveBeenCalledWith(
         '[ProcessingLogAPI] Update failed:',
-        'Document not found'
+        'Document not found',
+        { documentId: 'nonexistent-doc' }
       )
     })
 
@@ -309,7 +313,8 @@ describe('processing-log-api', () => {
       expect(result).toBeNull()
       expect(console.error).toHaveBeenCalledWith(
         '[ProcessingLogAPI] Update error:',
-        error
+        error,
+        { documentId: 'doc-001' }
       )
     })
 

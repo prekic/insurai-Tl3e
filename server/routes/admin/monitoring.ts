@@ -425,9 +425,9 @@ router.post(
 router.get(
   '/monitoring/extraction-health',
   authenticateAdmin,
-  (_req: AuthenticatedRequest, res: Response) => {
+  async (_req: AuthenticatedRequest, res: Response) => {
     try {
-      const snapshot = getExtractionHealthSnapshot()
+      const snapshot = await getExtractionHealthSnapshot()
       res.json({ success: true, data: snapshot })
     } catch (error) {
       log.error('Failed to get extraction health', {

@@ -273,7 +273,7 @@ describe('TryAnalysis', () => {
       }, { timeout: 5000 })
 
       // Should have processed the file with useFallback: false to surface real errors
-      expect(mockExtractPolicy).toHaveBeenCalledWith(mockFile, { useFallback: false })
+      expect(mockExtractPolicy).toHaveBeenCalledWith(mockFile, expect.objectContaining({ useFallback: false }))
     })
 
     it('does not process file if trial already used', async () => {
