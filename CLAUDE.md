@@ -3910,15 +3910,14 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Feature**: Extraction events are now persisted to Supabase alongside the in-memory ring buffer
 - **Architecture**: Dual-write pattern — events recorded in-memory (ring buffer for real-time dashboard) AND persisted to DB (fire-and-forget for historical analysis and server restart survival)
 - **Migration**: `supabase/migrations/023_extraction_metrics.sql`
-  - Table `extraction_metrics` with columns: id, request_id, timestamp, provider, success, duration_ms, error_code, error_message, document_length
-  - Indexes on timestamp (for 24h window queries) and provider+success (for per-provider breakdowns)
-  - RLS enabled with service-role insert policy and admin read policy
-  - Auto-cleanup: `DELETE FROM extraction_metrics WHERE timestamp < NOW() - INTERVAL '30 days'` comment included
+  - Table `extraction_metrics` with columns: id, request_id, created_at, provider, success, duration_ms, error_code, error_message, document_length
+  - Indexes on created_at (for 24h window queries), provider, success, and compound provider+created_at
+  - No RLS — admin-only access via service role key (same pattern as admin_notifications)
+  - Auto-cleanup via pg_cron: `DELETE FROM extraction_metrics WHERE created_at < NOW() - INTERVAL '30 days'` (daily at 03:00 UTC)
 - **Service**: `server/services/extraction-metrics-service.ts` (159 lines)
   - Lazy Supabase client initialization (only when SUPABASE_URL and SERVICE_ROLE_KEY are set)
   - `persistExtractionEvent()` — Inserts event to DB; returns silently on failure (fire-and-forget)
-  - `queryRecentMetrics()` — Fetches last 24h events from DB for dashboard hydration
-  - `getDBHealthSnapshot()` — Aggregates DB metrics into same format as in-memory `getExtractionHealthSnapshot()`
+  - `getDBExtractionHealth()` — Fetches last 24h events from DB, aggregates per-provider stats and recent errors
   - Structured logging via `logger.child('extraction-metrics')`
 - **Wiring**: `server/routes/ai.ts` `recordExtractionEvent()` now calls `persistExtractionEvent()` as fire-and-forget after in-memory recording
 - **Behavioral Change**: `getExtractionHealthSnapshot()` is now **async** (was sync) — falls back to DB query when in-memory buffer is empty (e.g., after server restart). Response includes `source: 'memory' | 'database'` field to indicate data origin
