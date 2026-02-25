@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**.
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**.
 - **Production Readiness**: ~9.5/10 (15,444+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 25, 2026 (State-of-the-art documentation framework implemented; TruffleHog scanner enabled; Testimonials mapped to i18n chunks)
+- **Last Updated**: February 25, 2026 (Export dropdown, user onboarding, extraction observability, admin mobile UX, notification management, processing log tracking)
 
 ---
 
@@ -162,7 +162,8 @@ insurai/
 | `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | **UPDATED** Main nav with Globe language picker, auth state, direct upload |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
-| `src/components/TryAnalysis.tsx` | **NEW** Anonymous free trial analysis (Jan 30, 2026) |
+| `src/components/TryAnalysis.tsx` | **UPDATED** Anonymous free trial analysis with ProcessingLogger (Feb 25, 2026) |
+| `src/components/WelcomeOnboarding.tsx` | **NEW** First-time user onboarding with 3-step guide and drag-drop upload (Feb 25, 2026) |
 | `src/components/AuthPage.tsx` | **UPDATED** Login/signup with full i18n (Feb 12, 2026) |
 | `src/components/AllSamplesDemo.tsx` | **UPDATED** Sample policies grid with full i18n (Feb 12, 2026) |
 | `src/components/HelpCenter.tsx` | **UPDATED** Help center with full i18n (Feb 12, 2026) |
@@ -684,6 +685,7 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/providers` | GET | Check which AI providers are configured | - |
 | `/api/ai/diagnose` | GET | Test API key validity | - |
 | `/api/health` | GET | Server health check | 60/min |
+| `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, recent errors) | Admin |
 
 ### Request/Response Examples
 
@@ -3780,6 +3782,100 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `translations-skeleton.ts` (new), `translations.ts`, `index.ts`, `translation-service.ts`, `i18n-context.tsx`, 32 test files
 - **Commits**: `469b100` (feature), `efbb38f` (docs)
 
+### 125. Export Dropdown with PDF, CSV, and Text Export (Added Feb 25, 2026)
+- **Feature**: Policy detail view and dashboard now have an export dropdown with PDF, CSV, and text export
+- **Functions Added** (`src/lib/export.ts`):
+  - `exportSinglePolicyToCSV()` — Bilingual section headers (EN/TR by locale), includes coverages, exclusions, AI insights
+  - `exportToPDF()` — Print-optimized HTML popup for single policy
+  - `exportPoliciesToPDF()` — Multi-policy PDF report with title
+  - `exportToExcel()` — Delegates to CSV (placeholder for future xlsx support)
+- **Files**: `src/lib/export.ts`, `src/components/PolicyDetailView.tsx`, `src/components/PolicyDashboard.tsx`
+- **Commit**: `99311a6`
+
+### 126. Automated User Onboarding Flow (Added Feb 25, 2026)
+- **Feature**: First-time dashboard visitors see a guided onboarding flow with 3-step visual guide and drag-drop upload
+- **Component**: `src/components/WelcomeOnboarding.tsx`
+  - Props: `onUpload: (file: File) => void`, `onSkip: () => void`, `userName?: string | null`
+  - 3-step guide: Upload PDF → AI Analyzes → Get Insights & Score
+  - Drag-drop with `FILE_CONSTRAINTS` validation (PDF only, max 10 MB)
+  - i18n: `t.onboarding.*` section (18 keys, EN + TR)
+  - Shown once per user via `localStorage('insurai_onboarding_completed')`
+- **Integration**: `PolicyDashboard.tsx` checks `localStorage` and shows `WelcomeOnboarding` for first-time users
+- **Tests**: `src/components/WelcomeOnboarding.test.tsx` (248 lines)
+- **Commits**: `9229226`, `2e2c66b`
+
+### 127. Extraction Error Observability for Admin Tracking (Added Feb 25, 2026)
+- **Feature**: In-memory extraction metrics ring buffer with Sentry capture and enhanced processing log error fields
+- **Ring Buffer** (`server/routes/ai.ts`):
+  - `ExtractionEvent` interface: requestId, timestamp, provider, success, durationMs, errorCode, errorMessage, documentLength
+  - `recordExtractionEvent()` — Called on all extraction success/failure paths
+  - `extractionMetrics[]` — In-memory circular buffer (200 events, FIFO)
+  - `getExtractionHealthSnapshot()` — Returns 24h window with per-provider breakdown, error rate, recent errors (last 10)
+- **Admin Endpoint**: `GET /api/admin/monitoring/extraction-health` (`server/routes/admin/monitoring.ts`)
+- **Enhanced Processing Log Types** (`src/types/processing-log.ts`):
+  - `error_stack?: string` — Stack trace for debugging
+  - `error_type?: string` — Error class name
+  - `error_code?: string` — Structured error code
+  - `error_context?: { extraction_provider, document_length, ocr_used, last_successful_stage, data_at_failure, browser_info }` — Rich failure context
+  - `request_id?: string` — Links frontend extraction to server-side logs
+  - `extraction_route?: string` — Server endpoint used
+  - `extraction_mode?: 'proxy' | 'direct' | 'consensus'` — How extraction was invoked
+  - `fallback_used?: boolean` — True if primary provider failed
+  - `fallback_chain?: Array<{ provider, success, duration_ms, error, error_code }>` — Full provider attempt chain
+- **Sentry Integration**: `captureServerError()` called on all extraction failures with context (requestId, provider, document length)
+- **Files**: `server/routes/ai.ts`, `server/routes/admin/monitoring.ts`, `src/types/processing-log.ts`, `src/lib/processing-logger.ts`
+- **Commit**: `0026f45`
+
+### 128. Admin Dashboard Mobile-Responsive (Fixed Feb 25, 2026)
+- **Problem**: Admin dashboard was not scrollable or clickable on mobile — sidebar tabs were cut off, tables overflowed
+- **Solution (AdminDashboard.tsx)**:
+  - Mobile: Hamburger menu toggle, slide-out drawer sidebar with fixed overlay and backdrop
+  - Tab clicks close the drawer on mobile
+  - Responsive header with hamburger icon visible below `md` breakpoint
+- **Solution (ProcessingLogsTab.tsx)**:
+  - Mobile: Card layout (`md:hidden`) with tappable cards showing key fields
+  - Desktop: Original table layout (`hidden md:block`) with `overflow-x-auto`
+  - Clickable rows navigate to Document Journey on both views
+- **Files**: `src/components/admin/AdminDashboard.tsx`, `src/components/admin/tabs/ProcessingLogsTab.tsx`
+- **Commit**: `b2847ab`
+
+### 129. Notification Bulk Select and Delete (Added Feb 25, 2026)
+- **Feature**: Admin notifications tab now supports checkbox selection, select-all, and bulk/all delete
+- **Backend** (`server/services/admin-notification-service.ts`):
+  - `deleteNotifications(ids: string[]): Promise<number>` — Bulk delete by IDs
+  - `deleteAllNotifications(options?: { category?, acknowledged? }): Promise<number>` — Filtered mass delete
+- **Endpoint**: `DELETE /api/admin/notifications` accepting `{ ids: string[] }` or `{ all: true, category?, acknowledged? }`
+- **Frontend** (`src/components/admin/tabs/NotificationsTab.tsx`):
+  - Checkbox per notification, selected items highlighted with blue ring
+  - Select All / Deselect All with CheckSquare/MinusSquare/Square icons
+  - "Delete Selected" button with confirmation count, "Delete All" in header
+  - Audit logging via `logAdminAction()` on all deletes
+- **Files**: `server/services/admin-notification-service.ts`, `server/routes/admin/content.ts`, `src/components/admin/tabs/NotificationsTab.tsx`
+- **Commit**: `8b15bab`
+
+### 130. Processing Logger for Anonymous Uploads (Fixed Feb 25, 2026)
+- **Problem**: Uploads via TryAnalysis (`/try` route) created zero processing log entries — completely invisible in admin dashboard
+- **Root Cause**: `TryAnalysis.tsx` called `extractPolicyFromDocument()` without passing a `logger` parameter
+- **Solution**: Added `ProcessingLogger` creation in `runExtraction()` with the same create-then-update persist callback pattern used by `PolicyUpload.tsx`
+- **Pattern** (shared between PolicyUpload and TryAnalysis):
+  ```typescript
+  const logger = createProcessingLogger({ filename, file_size, mime_type, user_id })
+  let logCreatePromise: Promise<boolean> | null = null
+  logger.setPersistCallback(async (log) => {
+    if (!logCreatePromise) {
+      logCreatePromise = (async () => { await createProcessingLog(log); return true })()
+      await logCreatePromise
+    } else {
+      await logCreatePromise
+      await updateProcessingLog(log.document_id, log)
+    }
+  })
+  // Pass logger to extraction: extractPolicyFromDocument(file, { logger, userId: user?.id })
+  ```
+- **Also Fixed**: `processing-log-api.ts` now logs HTTP status codes on failure for better debugging
+- **Files**: `src/components/TryAnalysis.tsx`, `src/lib/processing-log-api.ts`
+- **Commit**: `dd6f234`
+
 ---
 
 ## Turkish Market Considerations
@@ -4379,6 +4475,26 @@ connectSrc: [
 - If E2E tests fail in CI but pass locally, check whether `E2E_BASE_URL` is set and the build step ran first
 - **Real Supabase integration in CI build (Migrated Feb 24, 2026)**: Requires `STAGING_SUPABASE_URL`/`ANON_KEY` and `PROD_SUPABASE_URL`/`ANON_KEY` as GitHub Secrets. If not configured, the build gracefully degrades and warns that Supabase features are disabled during E2E testing.
 
+**TryAnalysis ProcessingLogger Pattern (Added Feb 25, 2026):**
+- `TryAnalysis.tsx` now mirrors `PolicyUpload.tsx`'s processing logger pattern
+- Both use `createProcessingLog()` (first persist call) → `updateProcessingLog()` (subsequent calls)
+- The create promise is memoized in a closure to avoid duplicate DB rows
+- If adding new extraction paths anywhere in the codebase, always pass `logger` to `extractPolicyFromDocument()`
+- Without a logger, uploads are completely invisible in the admin Processing Logs tab
+
+**Extraction Error Observability — In-Memory Ring Buffer (Added Feb 25, 2026):**
+- `extractionMetrics[]` in `server/routes/ai.ts` is in-memory only — server restarts clear it
+- Buffer size is 200 events (constant `EXTRACTION_BUFFER_SIZE`, not configurable via admin settings)
+- `getExtractionHealthSnapshot()` returns the last 24h window with per-provider breakdown and recent errors
+- Endpoint: `GET /api/admin/monitoring/extraction-health` (admin auth required)
+- Admin monitoring module imports it via `import { getExtractionHealthSnapshot } from '../ai.js'`
+
+**User Onboarding — localStorage Key (Added Feb 25, 2026):**
+- `insurai_onboarding_completed` in localStorage controls whether `WelcomeOnboarding` is shown
+- Set to `'true'` when user uploads a file or clicks "Skip for now"
+- File validation uses centralized `FILE_CONSTRAINTS` from `src/lib/errors.ts` (PDF only, max 10 MB)
+- i18n keys are under `t.onboarding.*` (18 keys) — if adding new onboarding steps, add translations to both `translations-en.ts` and `translations-tr.ts`
+
 ---
 
 ## CI/CD
@@ -4449,4 +4565,4 @@ npm run build:analyze
 **Tests**: 15,444 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 24, 2026 (Supabase optimisations verified, pg_cron migration, E2E integration)
+**Last Updated**: February 25, 2026 (Export dropdown, user onboarding, extraction observability, admin mobile UX, notification management, processing log tracking)
