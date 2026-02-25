@@ -3921,7 +3921,9 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `getDBHealthSnapshot()` — Aggregates DB metrics into same format as in-memory `getExtractionHealthSnapshot()`
   - Structured logging via `logger.child('extraction-metrics')`
 - **Wiring**: `server/routes/ai.ts` `recordExtractionEvent()` now calls `persistExtractionEvent()` as fire-and-forget after in-memory recording
-- **Files**: `supabase/migrations/023_extraction_metrics.sql` (new), `server/services/extraction-metrics-service.ts` (new), `server/routes/ai.ts`
+- **Behavioral Change**: `getExtractionHealthSnapshot()` is now **async** (was sync) — falls back to DB query when in-memory buffer is empty (e.g., after server restart). Response includes `source: 'memory' | 'database'` field to indicate data origin
+- **Admin Route Change**: `server/routes/admin/monitoring.ts` handler changed from sync to `async` with `await getExtractionHealthSnapshot()`
+- **Files**: `supabase/migrations/023_extraction_metrics.sql` (new), `server/services/extraction-metrics-service.ts` (new), `server/routes/ai.ts`, `server/routes/admin/monitoring.ts`
 - **Commit**: `ac7e05c`
 
 ### 134. extraction-metrics-service Logger Import Fix (Fixed Feb 25, 2026)
@@ -4539,12 +4541,13 @@ connectSrc: [
 - If adding new extraction paths anywhere in the codebase, always pass `logger` to `extractPolicyFromDocument()`
 - Without a logger, uploads are completely invisible in the admin Processing Logs tab
 
-**Extraction Error Observability — In-Memory Ring Buffer (Added Feb 25, 2026):**
-- `extractionMetrics[]` in `server/routes/ai.ts` is in-memory only — server restarts clear it
+**Extraction Error Observability — In-Memory Ring Buffer with DB Fallback (Updated Feb 25, 2026):**
+- `extractionMetrics[]` in `server/routes/ai.ts` is in-memory — server restarts clear it
 - Buffer size is 200 events (constant `EXTRACTION_BUFFER_SIZE`, not configurable via admin settings)
-- `getExtractionHealthSnapshot()` returns the last 24h window with per-provider breakdown and recent errors
+- `getExtractionHealthSnapshot()` is **async** — returns in-memory data when available, falls back to DB query (`getDBExtractionHealth()`) when buffer is empty (e.g., after server restart)
+- Response includes `source: 'memory' | 'database'` field indicating data origin
 - Endpoint: `GET /api/admin/monitoring/extraction-health` (admin auth required)
-- Admin monitoring module imports it via `import { getExtractionHealthSnapshot } from '../ai.js'`
+- Admin monitoring module imports it via `import { getExtractionHealthSnapshot } from '../ai.js'` — handler must be `async` and `await` the call
 
 **User Onboarding — localStorage Key (Added Feb 25, 2026):**
 - `insurai_onboarding_completed` in localStorage controls whether `WelcomeOnboarding` is shown
