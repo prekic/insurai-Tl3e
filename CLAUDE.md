@@ -10,8 +10,8 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**.
-- **Production Readiness**: ~9.5/10 (15,444+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 25, 2026 (Export dropdown, user onboarding, extraction observability, admin mobile UX, notification management, processing log tracking)
+- **Production Readiness**: ~9.5/10 (15,500+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 25, 2026 (Admin extraction health dashboard, Excel export with xlsx, comparison enhancements, DB extraction metrics persistence)
 
 ---
 
@@ -112,7 +112,7 @@ insurai/
 | `src/lib/policy-context.tsx` | React Context for policy state management |
 | `src/lib/policy-utils.ts` | **NEW** Duplicate detection, fuzzy matching, policy comparison |
 | `src/lib/policy-upload-check.ts` | **NEW** Pre-upload conflict detection service |
-| `src/lib/export.ts` | **NEW** Policy export utilities (CSV, PDF, text) with bilingual headers (Feb 25, 2026) |
+| `src/lib/export.ts` | **UPDATED** Policy export utilities (CSV, PDF, text, Excel/xlsx) with bilingual headers (Feb 25, 2026) |
 
 ### AI & Extraction
 | File | Purpose |
@@ -1264,11 +1264,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 22, 2026)
-- **Total**: 15,427 tests across 317 test files (18 skipped)
-- **Passing**: 100% (0 failures)
+### Test Counts (as of Feb 25, 2026)
+- **Total**: 15,503 tests across 319 test files (18 skipped)
+- **Passing**: 100% (0 failures; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions.
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3784,15 +3784,19 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `translations-skeleton.ts` (new), `translations.ts`, `index.ts`, `translation-service.ts`, `i18n-context.tsx`, 32 test files
 - **Commits**: `469b100` (feature), `efbb38f` (docs)
 
-### 125. Export Dropdown with PDF, CSV, and Text Export (Added Feb 25, 2026)
-- **Feature**: Policy detail view and dashboard now have an export dropdown with PDF, CSV, and text export
+### 125. Export Dropdown with PDF, CSV, Text, and Excel Export (Updated Feb 25, 2026)
+- **Feature**: Policy detail view and dashboard now have an export dropdown with PDF, CSV, text, and Excel (xlsx) export
 - **Functions Added** (`src/lib/export.ts`):
   - `exportSinglePolicyToCSV()` — Bilingual section headers (EN/TR by locale), includes coverages, exclusions, AI insights
   - `exportToPDF()` — Print-optimized HTML popup for single policy
   - `exportPoliciesToPDF()` — Multi-policy PDF report with title
-  - `exportToExcel()` — Delegates to CSV (placeholder for future xlsx support)
-- **Files**: `src/lib/export.ts`, `src/components/PolicyDetailView.tsx`, `src/components/PolicyDashboard.tsx`
-- **Commit**: `99311a6`
+  - `exportToExcel()` — Real xlsx via lazy `import('xlsx')` (SheetJS), creates multi-column worksheet with fallback to CSV
+  - `exportSinglePolicyToExcel()` — Multi-sheet xlsx workbook (Policy Info, Coverages, Exclusions, AI Insights) with locale-aware headers
+  - `exportComparisonToCSV()` — Multi-policy comparison CSV with bilingual headers
+  - `exportComparisonToPDF()` — Comparison table as print-optimized HTML popup
+- **xlsx Dependency**: `xlsx` (SheetJS) installed as production dependency; lazy-loaded via `await import('xlsx')` to avoid bundle impact
+- **Files**: `src/lib/export.ts`, `src/components/PolicyDetailView.tsx`, `src/components/PolicyDashboard.tsx`, `src/components/ComparePolicies.tsx`
+- **Commits**: `99311a6`, `ac7e05c`
 
 ### 126. Automated User Onboarding Flow (Added Feb 25, 2026)
 - **Feature**: First-time dashboard visitors see a guided onboarding flow with 3-step visual guide and drag-drop upload
@@ -3877,6 +3881,57 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Also Fixed**: `processing-log-api.ts` now logs HTTP status codes on failure for better debugging
 - **Files**: `src/components/TryAnalysis.tsx`, `src/lib/processing-log-api.ts`
 - **Commit**: `dd6f234`
+
+### 131. Admin Extraction Health Dashboard UI (Added Feb 25, 2026)
+- **Feature**: New admin tab showing real-time extraction health metrics with per-provider breakdown
+- **Component**: `src/components/admin/tabs/ExtractionHealthTab.tsx` (410 lines)
+  - Header with auto-refresh timer (every 30s) and manual refresh button
+  - Summary cards: Total Extractions, Success Rate, Avg Duration, Error Rate (24h window)
+  - Per-provider breakdown table: provider name, total/success/fail counts, success rate, avg duration
+  - Recent errors list (last 10): timestamp, provider, error code, error message, request ID
+  - Graceful error and loading states
+- **Registration**: Added `extraction_health` to admin tab union type, TABS array, and switch case in `AdminDashboard.tsx`
+- **Data Source**: `GET /api/admin/monitoring/extraction-health` endpoint (created in Known Issue #127)
+- **Files**: `src/components/admin/tabs/ExtractionHealthTab.tsx` (new), `src/components/admin/AdminDashboard.tsx`, `src/types/admin.ts`
+- **Commit**: `ac7e05c`
+
+### 132. ComparePolicies Enhancements — Stats, Chart, Diff, Export (Added Feb 25, 2026)
+- **Feature**: Major enhancement to the multi-policy comparison page with 5 improvements
+- **Quick Stats Card** (`QuickStatsCard` component): 4-stat gradient grid showing policies count, average score, average premium, total coverage — with TrendingUp/BarChart3 icons
+- **Score Comparison Chart** (`ScoreComparisonChart` component): CSS horizontal bar chart for 5 evaluation categories (premium, coverage, deductible, compliance, value) plus overall score — color-coded bars per policy with legend and "Best" indicator
+- **Enhanced Coverage Matrix** (`EnhancedCoverageMatrix` component): Coverage table with diff highlighting — amber row background for mixed inclusion, emerald cell for best limit, red for not-included; sticky left column for mobile horizontal scrolling
+- **Export Dropdown**: Header-level dropdown with PDF and CSV export options using `exportComparisonToPDF()` and `exportComparisonToCSV()` with toast feedback
+- **Mobile Layout**: Reduced gap and padding on selected policies preview for smaller screens
+- **i18n**: 21 new `comparison.*` translation keys across all 4 translation files
+- **Files**: `src/components/ComparePolicies.tsx` (+317 lines), `src/lib/i18n/translations-*.ts`
+- **Commit**: `ac7e05c`
+
+### 133. Extraction Metrics DB Persistence with Dual-Write (Added Feb 25, 2026)
+- **Feature**: Extraction events are now persisted to Supabase alongside the in-memory ring buffer
+- **Architecture**: Dual-write pattern — events recorded in-memory (ring buffer for real-time dashboard) AND persisted to DB (fire-and-forget for historical analysis and server restart survival)
+- **Migration**: `supabase/migrations/023_extraction_metrics.sql`
+  - Table `extraction_metrics` with columns: id, request_id, timestamp, provider, success, duration_ms, error_code, error_message, document_length
+  - Indexes on timestamp (for 24h window queries) and provider+success (for per-provider breakdowns)
+  - RLS enabled with service-role insert policy and admin read policy
+  - Auto-cleanup: `DELETE FROM extraction_metrics WHERE timestamp < NOW() - INTERVAL '30 days'` comment included
+- **Service**: `server/services/extraction-metrics-service.ts` (159 lines)
+  - Lazy Supabase client initialization (only when SUPABASE_URL and SERVICE_ROLE_KEY are set)
+  - `persistExtractionEvent()` — Inserts event to DB; returns silently on failure (fire-and-forget)
+  - `queryRecentMetrics()` — Fetches last 24h events from DB for dashboard hydration
+  - `getDBHealthSnapshot()` — Aggregates DB metrics into same format as in-memory `getExtractionHealthSnapshot()`
+  - Structured logging via `logger.child('extraction-metrics')`
+- **Wiring**: `server/routes/ai.ts` `recordExtractionEvent()` now calls `persistExtractionEvent()` as fire-and-forget after in-memory recording
+- **Files**: `supabase/migrations/023_extraction_metrics.sql` (new), `server/services/extraction-metrics-service.ts` (new), `server/routes/ai.ts`
+- **Commit**: `ac7e05c`
+
+### 134. extraction-metrics-service Logger Import Fix (Fixed Feb 25, 2026)
+- **Problem**: `extraction-metrics-service.ts` imported `{ log }` from `../lib/logger.js` but the module only exports `logger` (named) and `logger` (default) — no `log` export exists
+- **Root Cause**: Typo in initial service implementation; `log` is not a valid export name
+- **Impact**: Caused `Cannot read properties of undefined (reading 'child')` in all 10+ server AI route test files because `ai.ts` imports `extraction-metrics-service.ts` at module scope
+- **Fix**: Changed `import { log } from '../lib/logger.js'` to `import { logger } from '../lib/logger.js'` and `log.child({...})` to `logger.child('...')`
+- **Note**: The `logger.child()` method expects a string argument (tag name), not an object. All other services in the codebase use the string form: `logger.child('module-name')`
+- **File**: `server/services/extraction-metrics-service.ts`
+- **Commit**: `ac7e05c`
 
 ---
 
@@ -4455,7 +4510,7 @@ connectSrc: [
 **Unhandled Rejection Warning in Full Test Suite:**
 - When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
 - This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
-- All 317 test files pass; `PolicyUpload.test.tsx` passes when run individually
+- All 319 test files pass; `PolicyUpload.test.tsx` passes when run individually
 - The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
 - Not introduced by any session; it's a known React 19 + Vitest concurrency issue
 
@@ -4528,6 +4583,31 @@ connectSrc: [
 - Without this, empty-state tests render `WelcomeOnboarding` instead of the expected empty dashboard and assertions fail
 - `WelcomeOnboarding` must also be mocked as a default export: `vi.mock('./WelcomeOnboarding', () => ({ default: () => <div data-testid="welcome-onboarding" /> }))`
 
+**Server Logger Exports — `logger` Not `log` (Fixed Feb 25, 2026):**
+- `server/lib/logger.ts` exports `logger` (named) and `logger` (default) — there is NO `log` export
+- `logger.child()` expects a **string** tag, not an object: `logger.child('module-name')` not `logger.child({ service: 'module-name' })`
+- This caused `Cannot read properties of undefined (reading 'child')` in 10+ server test files when `extraction-metrics-service.ts` imported `{ log }` instead of `{ logger }`
+- Pattern: `import { logger } from '../lib/logger.js'` → `const svcLog = logger.child('my-service')`
+
+**Excel Export — Lazy xlsx Import with CSV Fallback (Added Feb 25, 2026):**
+- `exportToExcel()` in `src/lib/export.ts` uses `await import('xlsx')` (dynamic import) to avoid bundling the 1.2 MB xlsx library in the main chunk
+- If the dynamic import fails, the function falls back to CSV export via `exportToCSV()` — the user gets a `.csv` file instead of `.xlsx`
+- Tests must treat `exportToExcel` as async: `await expect(exportToExcel(policies)).resolves.toBeUndefined()`
+- The `xlsx` package is a regular dependency (not devDependency) — it must be present at runtime for Excel export to work
+
+**Extraction Metrics Dual-Write — Fire-and-Forget DB Persistence (Added Feb 25, 2026):**
+- `persistExtractionEvent()` in `server/services/extraction-metrics-service.ts` writes to DB as fire-and-forget — it never blocks the extraction response path
+- If DB insert fails (missing Supabase config, network error), it logs a warning and returns silently
+- The in-memory ring buffer (200 events) is the primary data source for the dashboard; DB is secondary for restart survival and historical analysis
+- Both are recorded in `recordExtractionEvent()` in `server/routes/ai.ts`: ring buffer push (synchronous) + `persistExtractionEvent()` (async, non-blocking)
+
+**Admin Tab Registration Pattern (Added Feb 25, 2026):**
+- Adding a new admin tab requires changes in 3 places:
+  1. `src/types/admin.ts` — Add to the `AdminTabId` union type
+  2. `src/components/admin/AdminDashboard.tsx` — Add to `TABS` array AND `renderTabContent()` switch case
+  3. Create the tab component file in `src/components/admin/tabs/`
+- The `ExtractionHealthTab.tsx` follows this pattern (see Known Issue #131)
+
 ---
 
 ## CI/CD
@@ -4595,7 +4675,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,444 tests, all passing (317 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,503 tests, all passing (319 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 25, 2026 (Export dropdown, user onboarding, extraction observability, admin mobile UX, notification management, processing log tracking)
+**Last Updated**: February 25, 2026 (Extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence, test fixes)
