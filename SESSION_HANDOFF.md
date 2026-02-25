@@ -12,7 +12,7 @@
 | **E2E Tests** | 186/186 Chromium passed (production build) |
 | **Coverage** | 91.67% statements, 85.91% branches, 88.77% functions, 92.5% lines |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100, CLS 0 |
-| **Branch** | `claude/load-project-context-0fAbD` |
+| **Branch** | `claude/complete-handoff-docs-Goirm` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Deployment** | CI pipeline handles deploy (requires Supabase env secrets in GitHub) |
@@ -24,7 +24,7 @@
 
 ## Session Summary
 
-This branch (`claude/load-project-context-0fAbD`) spans **3 micro-sessions** delivering 6 features across 8 commits and 31 files (+7,161 / −2,856 lines):
+This branch (`claude/complete-handoff-docs-Goirm`) spans **3 micro-sessions** delivering 6 features across 10 commits and 33 files (+7,474 / −3,089 lines):
 
 1. **Export Dropdown** — PDF, CSV, and text export from policy detail view and dashboard
 2. **Automated User Onboarding** — 3-step guided flow for first-time dashboard visitors with drag-drop upload
@@ -47,6 +47,9 @@ This branch (`claude/load-project-context-0fAbD`) spans **3 micro-sessions** del
 | `b2847ab` | fix: make admin dashboard mobile-responsive with sidebar drawer and card layout | 3 |
 | `8b15bab` | feat: add bulk select and delete for admin notifications | 3 |
 | `dd6f234` | fix: add processing logger to TryAnalysis so all uploads are tracked | 3 |
+| `f397cc7` | docs: update CLAUDE.md and SESSION_HANDOFF.md for session handoff | 3 |
+
+**Cleanup**: `fix-mocks.cjs` and `fix-mocks.js` (utility scripts) were deleted in this branch — confirmed no production or test imports.
 
 ---
 
@@ -58,8 +61,12 @@ This branch (`claude/load-project-context-0fAbD`) spans **3 micro-sessions** del
 |------|---------|
 | `src/lib/export.ts` | Added `exportSinglePolicyToCSV()`, `exportToPDF()`, `exportPoliciesToPDF()` with bilingual headers |
 | `src/lib/export.test.ts` | 417+ lines of export function tests |
-| `src/components/PolicyDetailView.tsx` | Export dropdown menu integration |
+| `src/components/PolicyDetailView.tsx` | Export dropdown menu integration (aria-haspopup, outside-click close) |
+| `src/components/PolicyDetailView.test.tsx` | Updated mock factory for export functions |
+| `src/components/PolicyDetailView-branches.test.tsx` | **+12 new tests**: dropdown open/close, aria attributes, PDF/CSV/text triggers, popup-blocked error, locale passthrough |
 | `src/components/PolicyDashboard.tsx` | Export dropdown from dashboard |
+| `src/components/PolicyDashboard.test.tsx` | +7 onboarding tests (render/dismiss/navigate/userName) |
+| `src/components/PolicyDashboard-branches.test.tsx` | Updated mocks: added `vi.mock('@/lib/export')`, `vi.mock('./WelcomeOnboarding')`, `localStorage.setItem('insurai_onboarding_completed', 'true')` in `beforeEach` (see gotcha below) |
 
 ### Feature 2: User Onboarding (commits `9229226`, `2e2c66b`)
 
@@ -82,7 +89,8 @@ This branch (`claude/load-project-context-0fAbD`) spans **3 micro-sessions** del
 | `src/types/processing-log.ts` | `error_context`, `fallback_chain`, `extraction_route`, `extraction_mode`, `request_id` fields |
 | `src/lib/processing-logger.ts` | Enhanced stage logging with error context |
 | `src/lib/ai/policy-extractor.ts` | Error context propagation to processing logger |
-| `src/lib/ai/config.ts` | Error propagation from proxy extraction |
+| `src/lib/ai/config.ts` | Enhanced error messages in `extractViaProxy` — now includes proxy URL and "server may be restarting, timed out, or unreachable" context |
+| `src/lib/ai/config.test.ts` | Updated assertion: `toBe('Failed to fetch')` → `toContain('Failed to fetch')` + `toContain('server may be restarting')` |
 
 ### Feature 4: Admin Dashboard Mobile (commit `b2847ab`)
 
@@ -216,18 +224,26 @@ All features use existing tables. No new Supabase migrations need to be applied.
 
 ## Next Steps (Priority Order)
 
-### Immediate
-1. **Merge this PR** — `feat(admin): add export dropdown, user onboarding, extraction observability, mobile admin UX, and notification management`
-2. **Verify processing logs** — Upload a policy via `/try` route and confirm a log entry appears in admin Processing Logs tab
+### P0 — Merge
+1. **Merge this PR** — Use the Conventional Commit title below. This triggers `release-please` for automated semantic versioning.
+2. **Post-merge verification** — Run these against production after deploy:
+   - Upload a policy via `/try` route → confirm a log entry appears in admin Processing Logs tab
+   - Visit admin Dashboard on mobile → verify hamburger drawer opens/closes correctly
+   - Check `GET /api/admin/monitoring/extraction-health` returns valid JSON
 
-### Product / Feature Work
-3. **Multi-policy comparison improvements** — Enhance the Compare Policies page with better visualization
-4. **Admin extraction health dashboard** — Build a visual UI panel consuming `GET /api/admin/monitoring/extraction-health`
-5. **Export enhancements** — Excel (xlsx) support, PDF report with charts/graphs
+### P1 — Product / Feature Work
+3. **Admin extraction health dashboard UI** — The `GET /api/admin/monitoring/extraction-health` endpoint is live but has no visual panel in the admin dashboard. Build a new tab or card in the Monitoring section showing:
+   - Success/failure rates (24h window)
+   - Per-provider latency graphs
+   - Recent error list with expandable details
+   - Recommended starting point: `src/components/admin/tabs/` — add `ExtractionHealthPanel.tsx`
+4. **Export enhancements** — Excel (xlsx) support via `xlsx` or `exceljs` package, PDF report with embedded charts/graphs
+5. **Multi-policy comparison improvements** — Enhance the Compare Policies page (`src/components/ComparePolicies.tsx`) with better visualization, side-by-side coverage diff
 
-### Infrastructure
-6. **Persist extraction metrics to DB** — If ring buffer proves insufficient, migrate to Supabase table with TTL
-7. **Processing log cleanup cron** — Auto-delete processing logs older than 30 days
+### P2 — Infrastructure
+6. **Persist extraction metrics to DB** — If ring buffer proves insufficient at scale, migrate `extractionMetrics[]` to a Supabase table with TTL-based auto-cleanup (e.g., keep 30 days)
+7. **Processing log cleanup cron** — Auto-delete processing logs older than 30 days via Edge Function or pg_cron (same pattern as policy expiry in ADR-0002)
+8. **Test the onboarding flow end-to-end** — Clear `localStorage('insurai_onboarding_completed')`, log in as a new user, verify 3-step guide appears, upload file, confirm redirect to `/upload`
 
 ---
 
@@ -275,6 +291,22 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 - `WelcomeOnboarding.tsx` and `PolicyUpload.tsx` both import from this single source of truth
 - Don't hardcode file size limits — always use `FILE_CONSTRAINTS.MAX_SIZE_BYTES`
 
+### Onboarding breaks existing PolicyDashboard tests
+- `PolicyDashboard-branches.test.tsx` must set `localStorage.setItem('insurai_onboarding_completed', 'true')` in `beforeEach`
+- Without this, empty-state tests render `WelcomeOnboarding` instead of the expected empty dashboard — assertions fail on missing text
+- `WelcomeOnboarding` is also mocked: `vi.mock('./WelcomeOnboarding', () => ({ default: () => <div data-testid="welcome-onboarding" /> }))` — the mock must return a `default` export (component is default-exported)
+
+### exportToPDF popup-blocked handling
+- `exportToPDF()` uses `window.open('', '_blank')` to create a print popup
+- If the browser blocks the popup (`window.open` returns `null`), the function returns `false`
+- `PolicyDetailView` checks the return value and shows `toast.error('Please allow popups to export PDF')` when blocked
+- Tests mock `window.open` to return `null` to verify this path: `vi.spyOn(window, 'open').mockReturnValue(null)`
+
+### extractViaProxy enhanced error messages (behavioral change)
+- `src/lib/ai/config.ts` now appends context to extraction fetch errors: `"Failed to fetch (network request to .../api/ai/extract failed — server may be restarting, timed out, or unreachable)"`
+- This is a user-visible change — error messages in the UI will now include the proxy URL and a hint about server state
+- Test assertions changed from `toBe('Failed to fetch')` to `toContain('Failed to fetch')` to accommodate the appended context
+
 ### Admin notification delete — safety filter
 - `deleteAllNotifications()` requires at least one filter (`category` or `acknowledged`) OR explicitly no filters (which triggers a `gte('created_at', '1970-01-01')` catch-all)
 - The frontend "Delete All" button sends `{ all: true }` which maps to the catch-all path
@@ -317,10 +349,12 @@ feat(admin): add export dropdown, user onboarding, extraction observability, mob
 
 ---
 
-**Last Updated**: February 25, 2026
-**Branch**: `claude/load-project-context-0fAbD`
-**ESLint Status**: 0 errors, 0 warnings ✓
+**Last Updated**: February 25, 2026 (comprehensive handoff audit)
+**Branch**: `claude/complete-handoff-docs-Goirm`
+**ESLint Status**: 0 errors, 0 warnings ✓ (verified: `npm run lint` passes clean)
+**TypeCheck**: 0 errors ✓ (verified: `npm run typecheck` passes clean)
 **Tests**: 15,444 passing (317 files), 0 failures ✓
 **Coverage**: 85.91% branches ✓, 91.67% statements
 **Bundle**: ~214 KB gzip main chunk + async EN/TR/Supabase chunks
+**Architecture Decision**: No new ADR required — all changes are additive features (no new technology, no deployment strategy change, no major architectural shift)
 **Next Session Focus**: Merge this PR; build extraction health dashboard UI; enhance multi-policy comparison.
