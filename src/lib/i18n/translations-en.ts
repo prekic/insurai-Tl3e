@@ -345,6 +345,22 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     confidence: 'AI Confidence',
   },
 
+  exportMenu: {
+    exportAs: 'Export As',
+    pdfReport: 'PDF Report',
+    pdfReportDesc: 'Branded report with coverages and insights',
+    csvExport: 'CSV Spreadsheet',
+    csvExportDesc: 'All data in spreadsheet format',
+    textSummary: 'Text Summary',
+    textSummaryDesc: 'Plain text overview',
+    generating: 'Generating...',
+    pdfSuccess: 'PDF report opened in print dialog',
+    csvSuccess: 'CSV file downloaded',
+    textSuccess: 'Summary downloaded',
+    exportFailed: 'Export failed',
+    popupBlocked: 'Please allow popups to export PDF',
+  },
+
   upload: {
     title: 'Upload Policies',
     subtitle: 'Upload your insurance documents for AI analysis',
@@ -993,6 +1009,27 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     permissionDenied: 'Notifications blocked',
     permissionDeniedHint:
       'To enable, click the lock icon in your browser address bar and allow notifications.',
+  },
+
+  // Onboarding
+  onboarding: {
+    welcomeTitle: 'Welcome to InsurAI!',
+    welcomeWithName: 'Welcome to InsurAI, {name}!',
+    welcomeSubtitle: 'Get AI-powered analysis of your insurance policies in seconds.',
+    howItWorks: 'How it works',
+    step1Title: 'Upload your PDF',
+    step1Desc: 'Drop your insurance policy document — we support all Turkish policy types.',
+    step2Title: 'AI analyzes it',
+    step2Desc: 'Our AI extracts coverage details, limits, exclusions, and key terms.',
+    step3Title: 'Get insights & score',
+    step3Desc: 'See your coverage score, gap analysis, and actionable recommendations.',
+    uploadTitle: 'Drop your policy PDF here',
+    uploadSubtitle: 'or click to browse',
+    uploadHint: 'PDF files up to 10 MB',
+    invalidFile: 'Please select a PDF file.',
+    fileTooLarge: 'File is too large. Maximum size is 10 MB.',
+    skipForNow: 'Skip for now',
+    exploreSamples: 'Or explore sample policies',
   },
 
   // Coverage name translations (English identity map — generated from shared module)

@@ -84,6 +84,46 @@ vi.mock('./PolicyDocuments', () => ({
   ),
 }))
 
+vi.mock('@/lib/i18n/i18n-context', async () => {
+  const { EN_TRANSLATIONS } = await vi.importActual<typeof import('@/lib/i18n/translations-en')>(
+    '@/lib/i18n/translations-en'
+  )
+  const mockI18n = {
+    t: EN_TRANSLATIONS,
+    locale: 'en',
+    isLoading: false,
+    translate: (key: string) => key,
+    setLocale: vi.fn(),
+    availableLocales: ['en', 'tr'],
+    dynamicLocales: [],
+    progress: { loaded: 1, total: 1 },
+  }
+  return {
+    useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+    useI18n: () => mockI18n,
+  }
+})
+
+vi.mock('@/hooks/usePdfExport', () => ({
+  usePdfExport: () => ({
+    exportPolicy: vi.fn().mockResolvedValue(true),
+    isGenerating: false,
+    error: null,
+    lastResult: null,
+    exportGapAnalysis: vi.fn(),
+    exportPortfolio: vi.fn(),
+    exportSummary: vi.fn(),
+    downloadPolicyHTML: vi.fn(),
+    downloadPortfolioHTML: vi.fn(),
+    getAvailableTypes: vi.fn().mockReturnValue([]),
+    clearError: vi.fn(),
+  }),
+}))
+
+vi.mock('@/lib/export', () => ({
+  exportSinglePolicyToCSV: vi.fn(),
+}))
+
 function renderPolicyDetailView(policyId = 'policy-1') {
   return render(
     <MemoryRouter initialEntries={[`/policy/${policyId}`]}>
@@ -154,11 +194,11 @@ describe('PolicyDetailView', () => {
       expect(screen.getByText('🏠')).toBeInTheDocument()
     })
 
-    it('should render Share and Download buttons', () => {
+    it('should render Share and Export buttons', () => {
       renderPolicyDetailView()
 
       expect(screen.getByRole('button', { name: /share/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /download/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /export as/i })).toBeInTheDocument()
     })
 
     it('should navigate back when back button is clicked', async () => {
@@ -396,7 +436,9 @@ describe('PolicyDetailView', () => {
       renderPolicyDetailView()
 
       // Market Comparison may appear in multiple places or use Turkish
-      expect(screen.getAllByText(/Market Comparison|Piyasa Karşılaştırması/i).length).toBeGreaterThan(0)
+      expect(
+        screen.getAllByText(/Market Comparison|Piyasa Karşılaştırması/i).length
+      ).toBeGreaterThan(0)
     })
 
     it('should display market average premium', () => {
@@ -491,9 +533,7 @@ describe('PolicyDetailView Edge Cases', () => {
   it('should handle coverage without deductible', () => {
     mockGetPolicyById.mockReturnValue({
       ...mockPolicy,
-      coverages: [
-        { name: 'Basic', nameTr: 'Temel', included: true, limit: 100000, deductible: 0 },
-      ],
+      coverages: [{ name: 'Basic', nameTr: 'Temel', included: true, limit: 100000, deductible: 0 }],
     })
     renderPolicyDetailView()
 

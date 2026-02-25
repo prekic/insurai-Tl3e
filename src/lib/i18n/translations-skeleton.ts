@@ -305,6 +305,22 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     confidence: '',
   },
 
+  exportMenu: {
+    exportAs: '',
+    pdfReport: '',
+    pdfReportDesc: '',
+    csvExport: '',
+    csvExportDesc: '',
+    textSummary: '',
+    textSummaryDesc: '',
+    generating: '',
+    pdfSuccess: '',
+    csvSuccess: '',
+    textSuccess: '',
+    exportFailed: '',
+    popupBlocked: '',
+  },
+
   upload: {
     title: '',
     subtitle: '',
@@ -922,6 +938,27 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     maybeLater: '',
     permissionDenied: '',
     permissionDeniedHint: '',
+  },
+
+  // Onboarding
+  onboarding: {
+    welcomeTitle: '',
+    welcomeWithName: '',
+    welcomeSubtitle: '',
+    howItWorks: '',
+    step1Title: '',
+    step1Desc: '',
+    step2Title: '',
+    step2Desc: '',
+    step3Title: '',
+    step3Desc: '',
+    uploadTitle: '',
+    uploadSubtitle: '',
+    uploadHint: '',
+    invalidFile: '',
+    fileTooLarge: '',
+    skipForNow: '',
+    exploreSamples: '',
   },
 
   // Empty record — populated once real locale chunk loads

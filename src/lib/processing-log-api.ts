@@ -22,14 +22,22 @@ export async function createProcessingLog(
       body: JSON.stringify(log),
     })
 
+    if (!response.ok) {
+      console.error('[ProcessingLogAPI] Create HTTP error:', response.status, response.statusText)
+      return null
+    }
+
     const data = await response.json()
     if (data.success) {
       return data.data
     }
-    console.error('[ProcessingLogAPI] Create failed:', data.error)
+    console.error('[ProcessingLogAPI] Create failed:', data.error, { documentId: log.document_id })
     return null
   } catch (error) {
-    console.error('[ProcessingLogAPI] Create error:', error)
+    console.error('[ProcessingLogAPI] Create error:', error, {
+      documentId: log.document_id,
+      apiBase: API_BASE,
+    })
     return null
   }
 }
@@ -48,14 +56,21 @@ export async function updateProcessingLog(
       body: JSON.stringify(updates),
     })
 
+    if (!response.ok) {
+      console.error('[ProcessingLogAPI] Update HTTP error:', response.status, response.statusText, {
+        documentId,
+      })
+      return null
+    }
+
     const data = await response.json()
     if (data.success) {
       return data.data
     }
-    console.error('[ProcessingLogAPI] Update failed:', data.error)
+    console.error('[ProcessingLogAPI] Update failed:', data.error, { documentId })
     return null
   } catch (error) {
-    console.error('[ProcessingLogAPI] Update error:', error)
+    console.error('[ProcessingLogAPI] Update error:', error, { documentId })
     return null
   }
 }

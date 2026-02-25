@@ -9,7 +9,12 @@
 import { Router, Request, Response } from 'express'
 import OpenAI from 'openai'
 import Anthropic from '@anthropic-ai/sdk'
-import { aiExtractionLimiter, ocrLimiter, chatLimiter, generalLimiter } from '../middleware/rate-limit.js'
+import {
+  aiExtractionLimiter,
+  ocrLimiter,
+  chatLimiter,
+  generalLimiter,
+} from '../middleware/rate-limit.js'
 import {
   validateOpenAIExtraction,
   validateAnthropicExtraction,
@@ -41,8 +46,90 @@ import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.j
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
+import { captureServerError } from '../lib/sentry.js'
 
 const router = Router()
+
+// ────────────────────────────────────────────────────────────────────────────
+// In-memory extraction metrics ring buffer (last 200 events, no DB needed)
+// ────────────────────────────────────────────────────────────────────────────
+interface ExtractionEvent {
+  requestId: string
+  timestamp: string
+  provider: 'openai' | 'anthropic' | 'unknown'
+  success: boolean
+  durationMs: number
+  errorCode?: string
+  errorMessage?: string
+  documentLength?: number
+}
+
+const EXTRACTION_BUFFER_SIZE = 200
+const extractionMetrics: ExtractionEvent[] = []
+
+function recordExtractionEvent(event: ExtractionEvent): void {
+  extractionMetrics.push(event)
+  if (extractionMetrics.length > EXTRACTION_BUFFER_SIZE) {
+    extractionMetrics.shift()
+  }
+}
+
+/** Exported for the admin monitoring endpoint */
+export function getExtractionHealthSnapshot() {
+  const now = Date.now()
+  const last24h = extractionMetrics.filter(
+    (e) => now - new Date(e.timestamp).getTime() < 24 * 60 * 60 * 1000
+  )
+
+  const total = last24h.length
+  const failed = last24h.filter((e) => !e.success).length
+  const succeeded = total - failed
+
+  // Per-provider breakdown
+  const byProvider: Record<string, { total: number; failed: number; totalLatency: number }> = {}
+  for (const e of last24h) {
+    const p = e.provider
+    if (!byProvider[p]) byProvider[p] = { total: 0, failed: 0, totalLatency: 0 }
+    byProvider[p].total++
+    if (!e.success) byProvider[p].failed++
+    byProvider[p].totalLatency += e.durationMs
+  }
+
+  const providerStats: Record<string, { total: number; failed: number; avg_latency_ms: number }> =
+    {}
+  for (const [p, stats] of Object.entries(byProvider)) {
+    providerStats[p] = {
+      total: stats.total,
+      failed: stats.failed,
+      avg_latency_ms: stats.total > 0 ? Math.round(stats.totalLatency / stats.total) : 0,
+    }
+  }
+
+  // Recent errors (last 10)
+  const recentErrors = last24h
+    .filter((e) => !e.success)
+    .slice(-10)
+    .reverse()
+    .map((e) => ({
+      requestId: e.requestId,
+      provider: e.provider,
+      code: e.errorCode || 'UNKNOWN',
+      message: e.errorMessage?.substring(0, 200),
+      timestamp: e.timestamp,
+    }))
+
+  return {
+    last_24h: {
+      total,
+      success: succeeded,
+      failed,
+      error_rate: total > 0 ? Math.round((failed / total) * 1000) / 1000 : 0,
+    },
+    by_provider: providerStats,
+    recent_errors: recentErrors,
+    buffer_size: extractionMetrics.length,
+  }
+}
 
 /**
  * Confidence weight type used to build dynamic prompt sections.
@@ -56,10 +143,10 @@ interface ConfidenceWeights {
 }
 
 const DEFAULT_CONFIDENCE_WEIGHTS: ConfidenceWeights = {
-  policyNumber: 0.20,
+  policyNumber: 0.2,
   provider: 0.15,
-  dates: 0.20,
-  premium: 0.20,
+  dates: 0.2,
+  premium: 0.2,
   coverages: 0.25,
 }
 
@@ -68,7 +155,13 @@ const DEFAULT_CONFIDENCE_WEIGHTS: ConfidenceWeights = {
  */
 function buildConfidencePromptSection(w: ConfidenceWeights): string {
   // Compute the example overall: each field at the example values
-  const exOverall = (w.policyNumber * 1.0 + w.provider * 1.0 + w.dates * 0.9 + w.premium * 1.0 + w.coverages * 0.8).toFixed(2)
+  const exOverall = (
+    w.policyNumber * 1.0 +
+    w.provider * 1.0 +
+    w.dates * 0.9 +
+    w.premium * 1.0 +
+    w.coverages * 0.8
+  ).toFixed(2)
 
   return `## Confidence Scoring Rules (CRITICAL — follow exactly):
 Each confidence score (0 to 1) reflects how clearly the field was found in the document.
@@ -100,7 +193,9 @@ overall = ${w.policyNumber.toFixed(2)}*1.0 + ${w.provider.toFixed(2)}*1.0 + ${w.
  * must be included in the prompt text itself to ensure structured output.
  * This is critical for reliable extraction with Claude models.
  */
-function buildAnthropicSchemaPrompt(weights: ConfidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS): string {
+function buildAnthropicSchemaPrompt(
+  weights: ConfidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS
+): string {
   return `
 You are an expert insurance policy analyzer. Extract all policy information and return it as valid JSON.
 
@@ -236,8 +331,14 @@ function cleanupTempCredentials(): void {
 
 // Register cleanup handlers (runs on normal exit and signals)
 process.on('exit', cleanupTempCredentials)
-process.on('SIGINT', () => { cleanupTempCredentials(); process.exit(0) })
-process.on('SIGTERM', () => { cleanupTempCredentials(); process.exit(0) })
+process.on('SIGINT', () => {
+  cleanupTempCredentials()
+  process.exit(0)
+})
+process.on('SIGTERM', () => {
+  cleanupTempCredentials()
+  process.exit(0)
+})
 
 /**
  * Get the path to GCP service account credentials
@@ -260,7 +361,8 @@ function getGCPCredentialsPath(): string | null {
   // Check for base64-encoded credentials (for Railway/Heroku/etc.)
   // This allows passing service account JSON as an environment variable
   // Supports both GCP_SERVICE_ACCOUNT_BASE64 (user's existing var) and GCP_CREDENTIALS_BASE64
-  const base64Credentials = process.env.GCP_SERVICE_ACCOUNT_BASE64 || process.env.GCP_CREDENTIALS_BASE64
+  const base64Credentials =
+    process.env.GCP_SERVICE_ACCOUNT_BASE64 || process.env.GCP_CREDENTIALS_BASE64
   if (base64Credentials) {
     try {
       const credentialsJson = Buffer.from(base64Credentials, 'base64').toString('utf-8')
@@ -273,7 +375,9 @@ function getGCPCredentialsPath(): string | null {
       _cachedCredentialsPath = tempPath
       return _cachedCredentialsPath
     } catch (error) {
-      log.error('Failed to decode base64 credentials', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Failed to decode base64 credentials', {
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
@@ -322,7 +426,9 @@ async function getDocumentAIAccessToken(): Promise<string | null> {
     })
     log.debug('GoogleAuth created, getting access token')
     const token = await auth.getAccessToken()
-    log.debug('Access token obtained successfully', { tokenLength: token ? String(token).length : 0 })
+    log.debug('Access token obtained successfully', {
+      tokenLength: token ? String(token).length : 0,
+    })
     return token as string
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error)
@@ -369,7 +475,7 @@ interface DocumentAIResponse {
   error?: {
     code: number
     message: string
-    status?: string  // GCP error status like "INVALID_ARGUMENT", "PERMISSION_DENIED"
+    status?: string // GCP error status like "INVALID_ARGUMENT", "PERMISSION_DENIED"
   }
 }
 
@@ -387,6 +493,7 @@ router.post(
   validateOpenAIExtraction,
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
+    const startTime = Date.now()
     log.info('Extraction request received', { requestId })
 
     try {
@@ -401,8 +508,18 @@ router.post(
       log.debug('OpenAI client ready', { requestId })
 
       // Body is validated and sanitized by middleware
-      const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as OpenAIExtractionInput & { policyType?: string }
-      log.info('Document received', { requestId, chars: documentText?.length || 0, type: policyType || 'auto-detect', model: model || 'gpt-4o' })
+      const {
+        documentText,
+        systemPrompt: clientPrompt,
+        model,
+        policyType,
+      } = req.body as OpenAIExtractionInput & { policyType?: string }
+      log.info('Document received', {
+        requestId,
+        chars: documentText?.length || 0,
+        type: policyType || 'auto-detect',
+        model: model || 'gpt-4o',
+      })
 
       // Get extraction prompt from admin system (falls back to hardcoded if unavailable)
       let finalSystemPrompt: string
@@ -419,29 +536,49 @@ router.post(
           finalSystemPrompt = renderedPrompt.systemPrompt
           finalUserPrompt = renderedPrompt.userPrompt
           promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
-          log.info('Using prompt template', { requestId, provider: 'openai', template: promptTemplateUsed })
+          log.info('Using prompt template', {
+            requestId,
+            provider: 'openai',
+            template: promptTemplateUsed,
+          })
         } else {
           finalSystemPrompt = 'Extract policy information as JSON.'
-          log.info('Using fallback prompt', { requestId, provider: 'openai', reason: 'admin prompt unavailable' })
+          log.info('Using fallback prompt', {
+            requestId,
+            provider: 'openai',
+            reason: 'admin prompt unavailable',
+          })
         }
       }
 
       log.info('Calling OpenAI API', { requestId })
-      log.debug('System prompt preview', { requestId, preview: finalSystemPrompt.substring(0, 100) })
+      log.debug('System prompt preview', {
+        requestId,
+        preview: finalSystemPrompt.substring(0, 100),
+      })
       log.debug('User prompt length', { requestId, chars: finalUserPrompt.length })
 
       // Get AI config from database (falls back to defaults if unavailable)
       const aiConfig = await getAIConfig()
-      log.info('Using config', { requestId, model: model || aiConfig.openaiExtractionModel, temperature: aiConfig.temperature, maxTokens: aiConfig.maxTokens })
+      log.info('Using config', {
+        requestId,
+        model: model || aiConfig.openaiExtractionModel,
+        temperature: aiConfig.temperature,
+        maxTokens: aiConfig.maxTokens,
+      })
 
       // Ensure "json" is in the prompt (required by OpenAI when using response_format: json_object)
       const jsonReminder = '\n\nRespond with valid JSON only.'
-      const systemPromptWithJson = finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
-        ? finalSystemPrompt
-        : finalSystemPrompt + jsonReminder
-      const userPromptWithJson = finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON') || systemPromptWithJson.includes('json')
-        ? finalUserPrompt
-        : finalUserPrompt + jsonReminder
+      const systemPromptWithJson =
+        finalSystemPrompt.includes('json') || finalSystemPrompt.includes('JSON')
+          ? finalSystemPrompt
+          : finalSystemPrompt + jsonReminder
+      const userPromptWithJson =
+        finalUserPrompt.includes('json') ||
+        finalUserPrompt.includes('JSON') ||
+        systemPromptWithJson.includes('json')
+          ? finalUserPrompt
+          : finalUserPrompt + jsonReminder
 
       const response = await client.chat.completions.create({
         model: model || aiConfig.openaiExtractionModel,
@@ -486,7 +623,9 @@ router.post(
         timestamp: new Date().toISOString(),
       }).catch((err) => {
         if (process.env.NODE_ENV !== 'production') {
-          log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
+          log.debug('Cost tracking failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       })
 
@@ -494,18 +633,47 @@ router.post(
       try {
         parsedData = JSON.parse(content)
       } catch (parseError) {
-        log.error('OpenAI returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: content.slice(0, 200) })
-        return res.status(502).json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
+        log.error('OpenAI returned invalid JSON', {
+          requestId,
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          contentPreview: content.slice(0, 200),
+        })
+        return res
+          .status(502)
+          .json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
       }
 
-      log.info('Extraction successful', { requestId, inputTokens, outputTokens, cost: cost.totalCost })
+      log.info('Extraction successful', {
+        requestId,
+        inputTokens,
+        outputTokens,
+        cost: cost.totalCost,
+      })
+
+      // Record successful extraction metric
+      recordExtractionEvent({
+        requestId,
+        timestamp: new Date().toISOString(),
+        provider: 'openai',
+        success: true,
+        durationMs: Date.now() - startTime,
+        documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
+      })
 
       // Fire push notification if user is authenticated (non-blocking fire-and-forget)
       const notifyUserIdOAI = req.headers['x-user-id'] as string | undefined
       if (notifyUserIdOAI) {
         const extractedOAI = parsedData as Record<string, unknown>
-        sendExtractionCompleteNotification(notifyUserIdOAI, String(extractedOAI.policyType || 'policy'), (extractedOAI.policyNumber as string | null | undefined) ?? null)
-          .catch((err) => log.warn('Push notification failed after OpenAI extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        sendExtractionCompleteNotification(
+          notifyUserIdOAI,
+          String(extractedOAI.policyType || 'policy'),
+          (extractedOAI.policyNumber as string | null | undefined) ?? null
+        ).catch((err) =>
+          log.warn('Push notification failed after OpenAI extraction', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
       }
 
       res.json({
@@ -526,7 +694,11 @@ router.post(
         documentTextLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
       }
       // Always log errors (safe info only)
-      log.error('Extraction failed', { requestId, errorType: errorDetails.errorType, message: message.substring(0, 200) })
+      log.error('Extraction failed', {
+        requestId,
+        errorType: errorDetails.errorType,
+        message: message.substring(0, 200),
+      })
 
       // Determine specific error code
       // In production, show generic messages; in dev/staging, show specific ones
@@ -536,20 +708,63 @@ router.post(
 
       if (message.includes('401') || message.includes('Incorrect API key')) {
         code = 'INVALID_API_KEY'
-        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'OpenAI API key is invalid'
+        userMessage = IS_PRODUCTION
+          ? 'AI service temporarily unavailable'
+          : 'OpenAI API key is invalid'
       } else if (message.includes('429')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'OpenAI rate limit exceeded - please wait and retry'
+        userMessage = IS_PRODUCTION
+          ? 'Service busy, please try again later'
+          : 'OpenAI rate limit exceeded - please wait and retry'
       } else if (message.includes('insufficient_quota')) {
         code = 'QUOTA_EXCEEDED'
-        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'OpenAI API quota exhausted - add credits to your account'
+        userMessage = IS_PRODUCTION
+          ? 'AI service temporarily unavailable'
+          : 'OpenAI API quota exhausted - add credits to your account'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
-        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
+        userMessage = IS_PRODUCTION
+          ? 'Request timed out, please try again'
+          : 'Request timed out - try a smaller document'
       } else if (message.includes('context_length_exceeded')) {
         code = 'DOCUMENT_TOO_LARGE'
-        userMessage = IS_PRODUCTION ? 'Document is too large to process' : 'Document too large for AI processing'
+        userMessage = IS_PRODUCTION
+          ? 'Document is too large to process'
+          : 'Document too large for AI processing'
       }
+
+      // Capture in Sentry with extraction context
+      captureServerError(error instanceof Error ? error : new Error(message), {
+        requestId,
+        provider: 'openai',
+        errorCode: code,
+        documentLength: errorDetails.documentTextLength,
+      })
+
+      // Record extraction metric
+      recordExtractionEvent({
+        requestId,
+        timestamp: errorDetails.timestamp,
+        provider: 'openai',
+        success: false,
+        durationMs: Date.now() - startTime,
+        errorCode: code,
+        errorMessage: message.substring(0, 200),
+        documentLength: errorDetails.documentTextLength,
+      })
+
+      // Notify admin of extraction failure
+      adminNotificationService
+        .notifyAPIError('OpenAI', code, message.substring(0, 200), {
+          requestId,
+          documentLength: errorDetails.documentTextLength,
+        })
+        .catch((err) =>
+          log.warn('Failed to notify extraction error', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
 
       res.status(500).json({
         error: userMessage,
@@ -576,6 +791,7 @@ router.post(
   validateAnthropicExtraction,
   async (req: Request, res: Response) => {
     const requestId = `ext-ant-${Date.now()}`
+    const startTime = Date.now()
     try {
       const client = getAnthropicClient()
       if (!client) {
@@ -586,7 +802,12 @@ router.post(
       }
 
       // Body is validated and sanitized by middleware
-      const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string }
+      const {
+        documentText,
+        systemPrompt: clientPrompt,
+        model,
+        policyType,
+      } = req.body as AnthropicExtractionInput & { policyType?: string }
 
       // Get AI config from database first (needed for dynamic confidence weights in prompt)
       const aiConfig = await getAIConfig()
@@ -619,7 +840,11 @@ router.post(
           finalSystemPrompt = schemaPrompt
           finalUserPrompt = renderedPrompt.userPrompt
           promptTemplateUsed = `${renderedPrompt.templateName} v${renderedPrompt.version}`
-          log.info('Using prompt template', { provider: 'anthropic', template: promptTemplateUsed, withSchema: true })
+          log.info('Using prompt template', {
+            provider: 'anthropic',
+            template: promptTemplateUsed,
+            withSchema: true,
+          })
         } else {
           finalSystemPrompt = schemaPrompt
           log.info('Using ANTHROPIC_SCHEMA_PROMPT fallback', { provider: 'anthropic' })
@@ -668,7 +893,9 @@ router.post(
         timestamp: new Date().toISOString(),
       }).catch((err) => {
         if (process.env.NODE_ENV !== 'production') {
-          log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
+          log.debug('Cost tracking failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
         }
       })
 
@@ -676,9 +903,25 @@ router.post(
       try {
         parsedData = JSON.parse(jsonContent)
       } catch (parseError) {
-        log.error('Anthropic returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: jsonContent.slice(0, 200) })
-        return res.status(502).json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
+        log.error('Anthropic returned invalid JSON', {
+          requestId,
+          parseError: parseError instanceof Error ? parseError.message : String(parseError),
+          contentPreview: jsonContent.slice(0, 200),
+        })
+        return res
+          .status(502)
+          .json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
       }
+
+      // Record successful extraction metric
+      recordExtractionEvent({
+        requestId,
+        timestamp: new Date().toISOString(),
+        provider: 'anthropic',
+        success: true,
+        durationMs: Date.now() - startTime,
+        documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
+      })
 
       res.json({
         success: true,
@@ -695,8 +938,16 @@ router.post(
       const notifyUserIdANT = req.headers['x-user-id'] as string | undefined
       if (notifyUserIdANT) {
         const extractedANT = parsedData as Record<string, unknown>
-        sendExtractionCompleteNotification(notifyUserIdANT, String(extractedANT.policyType || 'policy'), (extractedANT.policyNumber as string | null | undefined) ?? null)
-          .catch((err) => log.warn('Push notification failed after Anthropic extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        sendExtractionCompleteNotification(
+          notifyUserIdANT,
+          String(extractedANT.policyType || 'policy'),
+          (extractedANT.policyNumber as string | null | undefined) ?? null
+        ).catch((err) =>
+          log.warn('Push notification failed after Anthropic extraction', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error'
@@ -717,44 +968,105 @@ router.post(
       let shouldNotifyAdmin = false
       let notificationCategory: 'billing' | 'api_error' | 'rate_limit' = 'api_error'
 
-      if (message.includes('401') || message.includes('invalid x-api-key') || message.includes('Invalid API Key')) {
+      if (
+        message.includes('401') ||
+        message.includes('invalid x-api-key') ||
+        message.includes('Invalid API Key')
+      ) {
         code = 'INVALID_API_KEY'
-        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic API key is invalid'
+        userMessage = IS_PRODUCTION
+          ? 'AI service temporarily unavailable'
+          : 'Anthropic API key is invalid'
         shouldNotifyAdmin = true
         notificationCategory = 'api_error'
       } else if (message.includes('429') || message.includes('rate_limit')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Anthropic rate limit exceeded - please wait and retry'
+        userMessage = IS_PRODUCTION
+          ? 'Service busy, please try again later'
+          : 'Anthropic rate limit exceeded - please wait and retry'
         shouldNotifyAdmin = true
         notificationCategory = 'rate_limit'
-      } else if (message.includes('credit') || message.includes('billing') || message.includes('FAILED_PRECONDITION')) {
+      } else if (
+        message.includes('credit') ||
+        message.includes('billing') ||
+        message.includes('FAILED_PRECONDITION')
+      ) {
         code = 'BILLING_ERROR'
-        userMessage = IS_PRODUCTION ? 'AI service temporarily unavailable' : 'Anthropic billing issue - check your account'
+        userMessage = IS_PRODUCTION
+          ? 'AI service temporarily unavailable'
+          : 'Anthropic billing issue - check your account'
         shouldNotifyAdmin = true
         notificationCategory = 'billing'
       } else if (message.includes('overloaded') || message.includes('529')) {
         code = 'PROVIDER_OVERLOADED'
-        userMessage = IS_PRODUCTION ? 'AI service temporarily busy, please retry' : 'Anthropic API overloaded - temporary capacity issue'
+        userMessage = IS_PRODUCTION
+          ? 'AI service temporarily busy, please retry'
+          : 'Anthropic API overloaded - temporary capacity issue'
       } else if (message.includes('timeout') || message.includes('ETIMEDOUT')) {
         code = 'TIMEOUT'
-        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Request timed out - try a smaller document'
+        userMessage = IS_PRODUCTION
+          ? 'Request timed out, please try again'
+          : 'Request timed out - try a smaller document'
       }
+
+      // Capture in Sentry with extraction context
+      captureServerError(error instanceof Error ? error : new Error(message), {
+        requestId,
+        provider: 'anthropic',
+        errorCode: code,
+        documentLength: errorDetails.documentTextLength,
+      })
+
+      // Record extraction metric
+      recordExtractionEvent({
+        requestId,
+        timestamp: errorDetails.timestamp,
+        provider: 'anthropic',
+        success: false,
+        durationMs: Date.now() - startTime,
+        errorCode: code,
+        errorMessage: message.substring(0, 200),
+        documentLength: errorDetails.documentTextLength,
+      })
 
       // Create admin notification for critical errors
       if (shouldNotifyAdmin) {
         if (notificationCategory === 'billing') {
-          adminNotificationService.notifyBillingIssue('Anthropic', message, errorDetails).catch((err) => {
-            log.error('Admin notification failed', { error: err instanceof Error ? err.message : String(err) })
-          })
+          adminNotificationService
+            .notifyBillingIssue('Anthropic', message, errorDetails)
+            .catch((err) => {
+              log.error('Admin notification failed', {
+                error: err instanceof Error ? err.message : String(err),
+              })
+            })
         } else if (notificationCategory === 'rate_limit') {
           adminNotificationService.notifyRateLimit('Anthropic', errorDetails).catch((err) => {
-            log.error('Admin notification failed', { error: err instanceof Error ? err.message : String(err) })
+            log.error('Admin notification failed', {
+              error: err instanceof Error ? err.message : String(err),
+            })
           })
         } else {
-          adminNotificationService.notifyAPIError('Anthropic', code, message, errorDetails).catch((err) => {
-            log.error('Admin notification failed', { error: err instanceof Error ? err.message : String(err) })
-          })
+          adminNotificationService
+            .notifyAPIError('Anthropic', code, message, errorDetails)
+            .catch((err) => {
+              log.error('Admin notification failed', {
+                error: err instanceof Error ? err.message : String(err),
+              })
+            })
         }
+      } else {
+        // Still notify admin for non-critical errors (just as api_error, not billing/rate_limit)
+        adminNotificationService
+          .notifyAPIError('Anthropic', code, message.substring(0, 200), {
+            requestId,
+            documentLength: errorDetails.documentTextLength,
+          })
+          .catch((err) =>
+            log.warn('Failed to notify extraction error', {
+              requestId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          )
       }
 
       res.status(500).json({
@@ -785,7 +1097,12 @@ router.post(
     const startTime = Date.now()
     log.info('Unified extraction request received', { requestId })
 
-    const { documentText, systemPrompt: clientPrompt, model, policyType } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
+    const {
+      documentText,
+      systemPrompt: clientPrompt,
+      model,
+      policyType,
+    } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
 
     // Get AI config from database first (needed for dynamic confidence weights in prompt)
     const aiConfig = await getAIConfig()
@@ -814,14 +1131,23 @@ router.post(
       if (renderedPrompt) {
         openaiSystemPrompt = renderedPrompt.systemPrompt
         finalUserPrompt = renderedPrompt.userPrompt
-        log.info('Using prompt template', { requestId, template: renderedPrompt.templateName, version: renderedPrompt.version })
+        log.info('Using prompt template', {
+          requestId,
+          template: renderedPrompt.templateName,
+          version: renderedPrompt.version,
+        })
       } else {
         openaiSystemPrompt = 'Extract policy information as JSON.'
         log.info('Using fallback prompt', { requestId })
       }
     }
 
-    log.info('Using config', { requestId, anthropicModel: aiConfig.anthropicExtractionModel, openaiModel: aiConfig.openaiExtractionModel, setupMs: Date.now() - startTime })
+    log.info('Using config', {
+      requestId,
+      anthropicModel: aiConfig.anthropicExtractionModel,
+      openaiModel: aiConfig.openaiExtractionModel,
+      setupMs: Date.now() - startTime,
+    })
 
     // Try Anthropic first if available
     const anthropicClient = getAnthropicClient()
@@ -854,7 +1180,11 @@ router.post(
         try {
           parsedData = JSON.parse(jsonContent)
         } catch (parseError) {
-          log.error('Anthropic returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: jsonContent.slice(0, 200) })
+          log.error('Anthropic returned invalid JSON', {
+            requestId,
+            parseError: parseError instanceof Error ? parseError.message : String(parseError),
+            contentPreview: jsonContent.slice(0, 200),
+          })
           throw new Error('AI returned invalid JSON — response could not be parsed')
         }
 
@@ -875,16 +1205,43 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch((err) => log.warn('Failed to record Anthropic usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        }).catch((err) =>
+          log.warn('Failed to record Anthropic usage', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
 
-        log.info('Anthropic extraction successful', { requestId, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
+        log.info('Anthropic extraction successful', {
+          requestId,
+          anthropicMs: Date.now() - anthropicStart,
+          totalMs: Date.now() - startTime,
+        })
+
+        // Record successful extraction metric
+        recordExtractionEvent({
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'anthropic',
+          success: true,
+          durationMs: Date.now() - startTime,
+          documentLength: documentText?.length ?? 0,
+        })
 
         // Fire push notification if user is authenticated (non-blocking fire-and-forget)
         const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
         if (notifyUserIdUNI_ANT) {
           const extractedUNI_ANT = parsedData as Record<string, unknown>
-          sendExtractionCompleteNotification(notifyUserIdUNI_ANT, String(extractedUNI_ANT.policyType || 'policy'), (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null)
-            .catch((err) => log.warn('Push notification failed after unified/Anthropic extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+          sendExtractionCompleteNotification(
+            notifyUserIdUNI_ANT,
+            String(extractedUNI_ANT.policyType || 'policy'),
+            (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null
+          ).catch((err) =>
+            log.warn('Push notification failed after unified/Anthropic extraction', {
+              requestId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          )
         }
 
         return res.json({
@@ -899,10 +1256,18 @@ router.post(
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
-        log.error('Anthropic failed', { requestId, error: message, anthropicMs: Date.now() - anthropicStart, totalMs: Date.now() - startTime })
+        log.error('Anthropic failed', {
+          requestId,
+          error: message,
+          anthropicMs: Date.now() - anthropicStart,
+          totalMs: Date.now() - startTime,
+        })
 
         // Classify the Anthropic error for structured fallback reporting
-        const isBillingError = message.includes('credit') || message.includes('billing') || message.includes('FAILED_PRECONDITION')
+        const isBillingError =
+          message.includes('credit') ||
+          message.includes('billing') ||
+          message.includes('FAILED_PRECONDITION')
         const isRateLimitError = message.includes('429') || message.includes('rate_limit')
         const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
         const isOverloadedError = message.includes('overloaded') || message.includes('529')
@@ -913,37 +1278,90 @@ router.post(
         else if (isRateLimitError) fallbackReason = 'ANTHROPIC_RATE_LIMITED'
         else if (isAuthError) fallbackReason = 'ANTHROPIC_AUTH_ERROR'
         else if (isOverloadedError) fallbackReason = 'ANTHROPIC_OVERLOADED'
-        else if (message.includes('timeout') || message.includes('ETIMEDOUT')) fallbackReason = 'ANTHROPIC_TIMEOUT'
+        else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
+          fallbackReason = 'ANTHROPIC_TIMEOUT'
+
+        // Capture in Sentry (even though we're falling back to OpenAI, record the failure)
+        captureServerError(error instanceof Error ? error : new Error(message), {
+          requestId,
+          provider: 'anthropic',
+          errorCode: fallbackReason,
+          documentLength: documentText?.length ?? 0,
+          willFallback: !!openaiClient,
+        })
+
+        // Record Anthropic failure metric (even in fallback path)
+        recordExtractionEvent({
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'anthropic',
+          success: false,
+          durationMs: Date.now() - anthropicStart,
+          errorCode: fallbackReason,
+          errorMessage: message.substring(0, 200),
+          documentLength: documentText?.length ?? 0,
+        })
 
         // Notify admin for critical errors (not for transient capacity issues)
         if (isBillingError) {
           log.warn('Anthropic billing error, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService.notifyBillingIssue('Anthropic', message, {
-            requestId,
-            errorMessage: message,
-            timestamp: new Date().toISOString(),
-          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
+          adminNotificationService
+            .notifyBillingIssue('Anthropic', message, {
+              requestId,
+              errorMessage: message,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) =>
+              log.warn('Failed to notify billing issue', {
+                provider: 'Anthropic',
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
         } else if (isRateLimitError) {
           log.warn('Anthropic rate limit, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService.notifyRateLimit('Anthropic', {
-            requestId,
-            errorMessage: message,
-            timestamp: new Date().toISOString(),
-          }).catch((err) => log.warn('Failed to notify rate limit', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
+          adminNotificationService
+            .notifyRateLimit('Anthropic', {
+              requestId,
+              errorMessage: message,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) =>
+              log.warn('Failed to notify rate limit', {
+                provider: 'Anthropic',
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
         } else if (isAuthError) {
           log.warn('Anthropic auth error, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService.notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
-            requestId,
-            timestamp: new Date().toISOString(),
-          }).catch((err) => log.warn('Failed to notify API error', { provider: 'Anthropic', requestId, error: err instanceof Error ? err.message : String(err) }))
+          adminNotificationService
+            .notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
+              requestId,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) =>
+              log.warn('Failed to notify API error', {
+                provider: 'Anthropic',
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
         } else if (isOverloadedError) {
-          log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', { requestId, fallbackReason })
+          log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', {
+            requestId,
+            fallbackReason,
+          })
         } else {
-          log.warn('Anthropic failed with unknown error, falling back to OpenAI', { requestId, fallbackReason, error: message })
+          log.warn('Anthropic failed with unknown error, falling back to OpenAI', {
+            requestId,
+            fallbackReason,
+            error: message,
+          })
         }
 
         // Store fallback reason for response
-        (req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
+        ;(req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
 
         // Fall back to OpenAI if available
         if (openaiClient) {
@@ -955,16 +1373,24 @@ router.post(
     // Try OpenAI (either as fallback or primary)
     if (openaiClient) {
       const openaiStart = Date.now()
-      log.info('Trying OpenAI', { requestId, elapsedMs: openaiStart - startTime, isFallback: !!anthropicClient })
+      log.info('Trying OpenAI', {
+        requestId,
+        elapsedMs: openaiStart - startTime,
+        isFallback: !!anthropicClient,
+      })
       try {
         // Ensure "json" is in the prompt for OpenAI
         const jsonReminder = '\n\nRespond with valid JSON only.'
-        const systemPromptWithJson = openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
-          ? openaiSystemPrompt
-          : openaiSystemPrompt + jsonReminder
-        const userPromptWithJson = finalUserPrompt.includes('json') || finalUserPrompt.includes('JSON') || systemPromptWithJson.includes('json')
-          ? finalUserPrompt
-          : finalUserPrompt + jsonReminder
+        const systemPromptWithJson =
+          openaiSystemPrompt.includes('json') || openaiSystemPrompt.includes('JSON')
+            ? openaiSystemPrompt
+            : openaiSystemPrompt + jsonReminder
+        const userPromptWithJson =
+          finalUserPrompt.includes('json') ||
+          finalUserPrompt.includes('JSON') ||
+          systemPromptWithJson.includes('json')
+            ? finalUserPrompt
+            : finalUserPrompt + jsonReminder
 
         const response = await openaiClient.chat.completions.create({
           model: aiConfig.openaiExtractionModel,
@@ -1002,26 +1428,59 @@ router.post(
           outputCost: cost.outputCost,
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
-        }).catch((err) => log.warn('Failed to record OpenAI usage', { requestId, error: err instanceof Error ? err.message : String(err) }))
+        }).catch((err) =>
+          log.warn('Failed to record OpenAI usage', {
+            requestId,
+            error: err instanceof Error ? err.message : String(err),
+          })
+        )
 
         let parsedOpenAIData: unknown
         try {
           parsedOpenAIData = JSON.parse(content)
         } catch (parseError) {
-          log.error('OpenAI returned invalid JSON', { requestId, parseError: parseError instanceof Error ? parseError.message : String(parseError), contentPreview: content.slice(0, 200) })
+          log.error('OpenAI returned invalid JSON', {
+            requestId,
+            parseError: parseError instanceof Error ? parseError.message : String(parseError),
+            contentPreview: content.slice(0, 200),
+          })
           throw new Error('AI returned invalid JSON — response could not be parsed')
         }
 
         const isFallback = !!anthropicClient
         const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
-        log.info('OpenAI extraction successful', { requestId, fallback: isFallback, fallbackReason: storedFallbackReason, openaiMs: Date.now() - openaiStart, totalMs: Date.now() - startTime })
+        log.info('OpenAI extraction successful', {
+          requestId,
+          fallback: isFallback,
+          fallbackReason: storedFallbackReason,
+          openaiMs: Date.now() - openaiStart,
+          totalMs: Date.now() - startTime,
+        })
+
+        // Record successful extraction metric
+        recordExtractionEvent({
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'openai',
+          success: true,
+          durationMs: Date.now() - startTime,
+          documentLength: documentText?.length ?? 0,
+        })
 
         // Fire push notification if user is authenticated (non-blocking fire-and-forget)
         const notifyUserIdUNI_OAI = req.headers['x-user-id'] as string | undefined
         if (notifyUserIdUNI_OAI) {
           const extractedUNI_OAI = parsedOpenAIData as Record<string, unknown>
-          sendExtractionCompleteNotification(notifyUserIdUNI_OAI, String(extractedUNI_OAI.policyType || 'policy'), (extractedUNI_OAI.policyNumber as string | null | undefined) ?? null)
-            .catch((err) => log.warn('Push notification failed after unified/OpenAI extraction', { requestId, error: err instanceof Error ? err.message : String(err) }))
+          sendExtractionCompleteNotification(
+            notifyUserIdUNI_OAI,
+            String(extractedUNI_OAI.policyType || 'policy'),
+            (extractedUNI_OAI.policyNumber as string | null | undefined) ?? null
+          ).catch((err) =>
+            log.warn('Push notification failed after unified/OpenAI extraction', {
+              requestId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          )
         }
 
         return res.json({
@@ -1035,21 +1494,83 @@ router.post(
           cost: cost.totalCost,
           requestId,
           route: '/api/ai/extract',
-          ...(isFallback && { fallbackChain: [
-            { provider: 'anthropic', success: false, error_code: storedFallbackReason },
-            { provider: 'openai', success: true, duration_ms: Date.now() - openaiStart },
-          ]}),
+          ...(isFallback && {
+            fallbackChain: [
+              { provider: 'anthropic', success: false, error_code: storedFallbackReason },
+              { provider: 'openai', success: true, duration_ms: Date.now() - openaiStart },
+            ],
+          }),
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error'
         log.error('OpenAI also failed', { requestId, error: message })
 
-        // Notify admin about OpenAI failure too
+        // Classify error code
+        let openaiErrorCode = 'OPENAI_UNKNOWN_ERROR'
+        if (message.includes('401') || message.includes('Incorrect API key'))
+          openaiErrorCode = 'OPENAI_AUTH_ERROR'
+        else if (message.includes('429')) openaiErrorCode = 'OPENAI_RATE_LIMITED'
+        else if (message.includes('insufficient_quota') || message.includes('billing'))
+          openaiErrorCode = 'OPENAI_BILLING_ERROR'
+        else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
+          openaiErrorCode = 'OPENAI_TIMEOUT'
+        else if (message.includes('context_length_exceeded'))
+          openaiErrorCode = 'OPENAI_CONTEXT_LENGTH'
+
+        // Capture in Sentry — both providers failed, this is critical
+        captureServerError(error instanceof Error ? error : new Error(message), {
+          requestId,
+          provider: 'openai',
+          errorCode: openaiErrorCode,
+          documentLength: documentText?.length ?? 0,
+          allProvidersFailed: true,
+        })
+
+        // Record OpenAI failure metric
+        recordExtractionEvent({
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'openai',
+          success: false,
+          durationMs: Date.now() - openaiStart,
+          errorCode: openaiErrorCode,
+          errorMessage: message.substring(0, 200),
+          documentLength: documentText?.length ?? 0,
+        })
+
+        // Notify admin — both providers failed is always critical
+        adminNotificationService
+          .notifyAPIError(
+            'OpenAI',
+            openaiErrorCode,
+            `All providers failed. OpenAI error: ${message.substring(0, 200)}`,
+            {
+              requestId,
+              allProvidersFailed: true,
+              documentLength: documentText?.length ?? 0,
+            }
+          )
+          .catch((err) =>
+            log.warn('Failed to notify all-providers-failed', {
+              requestId,
+              error: err instanceof Error ? err.message : String(err),
+            })
+          )
+
+        // Legacy: specific billing notification
         if (message.includes('insufficient_quota') || message.includes('billing')) {
-          adminNotificationService.notifyBillingIssue('OpenAI', message, {
-            requestId,
-            timestamp: new Date().toISOString(),
-          }).catch((err) => log.warn('Failed to notify billing issue', { provider: 'OpenAI', requestId, error: err instanceof Error ? err.message : String(err) }))
+          adminNotificationService
+            .notifyBillingIssue('OpenAI', message, {
+              requestId,
+              timestamp: new Date().toISOString(),
+            })
+            .catch((err) =>
+              log.warn('Failed to notify billing issue', {
+                provider: 'OpenAI',
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
         }
 
         return res.status(500).json({
@@ -1062,9 +1583,14 @@ router.post(
     }
 
     // No providers available
-    log.error('No AI providers configured', { requestId, hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY, hasOpenaiKey: !!process.env.OPENAI_API_KEY })
+    log.error('No AI providers configured', {
+      requestId,
+      hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+      hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+    })
     return res.status(503).json({
-      error: 'No AI providers configured. Check OPENAI_API_KEY and ANTHROPIC_API_KEY environment variables.',
+      error:
+        'No AI providers configured. Check OPENAI_API_KEY and ANTHROPIC_API_KEY environment variables.',
       code: 'NO_PROVIDERS_CONFIGURED',
     })
   }
@@ -1081,165 +1607,173 @@ router.post(
  * 2. API key in header (X-goog-api-key) - keeps key out of URLs/logs
  * 3. API key in query param (fallback) - less secure, visible in logs
  */
-router.post(
-  '/ocr',
-  validateJSON,
-  ocrLimiter,
-  validateOCR,
-  async (req: Request, res: Response) => {
-    try {
-      // Only attempt OAuth if service account credentials exist (avoids wasted async call)
-      const hasServiceAccount = !!getGCPCredentialsPath()
-      const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
-      const apiKey = process.env.GOOGLE_CLOUD_API_KEY
+router.post('/ocr', validateJSON, ocrLimiter, validateOCR, async (req: Request, res: Response) => {
+  try {
+    // Only attempt OAuth if service account credentials exist (avoids wasted async call)
+    const hasServiceAccount = !!getGCPCredentialsPath()
+    const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
+    const apiKey = process.env.GOOGLE_CLOUD_API_KEY
 
-      if (hasServiceAccount && !oauthToken) {
-        log.warn('Vision OCR: service account found but OAuth token retrieval failed — falling back to API key')
-      }
+    if (hasServiceAccount && !oauthToken) {
+      log.warn(
+        'Vision OCR: service account found but OAuth token retrieval failed — falling back to API key'
+      )
+    }
 
-      if (!oauthToken && !apiKey) {
-        return res.status(503).json({
-          error: 'Google Cloud not configured',
-          code: 'PROVIDER_NOT_CONFIGURED',
-        })
-      }
-
-      // Body is validated and sanitized by middleware
-      const { imageBase64 } = req.body as OCRInput
-
-      // Build request with appropriate authentication
-      // Priority: OAuth token > API key query param
-      let url = 'https://vision.googleapis.com/v1/images:annotate'
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      }
-
-      if (oauthToken) {
-        headers['Authorization'] = `Bearer ${oauthToken}`
-        log.info('Vision OCR: using OAuth bearer token authentication')
-      } else if (apiKey) {
-        url = `${url}?key=${apiKey}`
-        log.info('Vision OCR: using API key authentication')
-      }
-
-      // Call Vision OCR with 60-second timeout to prevent hanging
-      const controller = new AbortController()
-      const fetchTimeout = setTimeout(() => controller.abort(), 60000)
-      let response: globalThis.Response
-      try {
-        response = await fetch(url, {
-          method: 'POST',
-          headers,
-          signal: controller.signal,
-          body: JSON.stringify({
-            requests: [
-              {
-                image: { content: imageBase64 },
-                features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
-                imageContext: { languageHints: ['tr', 'en'] },
-              },
-            ],
-          }),
-        })
-      } finally {
-        clearTimeout(fetchTimeout)
-      }
-
-      if (!response.ok) {
-        const errorData = (await response.json().catch(() => ({}))) as {
-          error?: { message?: string }
-        }
-        throw new Error(errorData.error?.message || `API error: ${response.status}`)
-      }
-
-      const result = (await response.json()) as {
-        responses?: Array<{
-          fullTextAnnotation?: {
-            text?: string
-            pages?: Array<{ blocks?: Array<{ confidence?: number }> }>
-          }
-        }>
-      }
-      const annotation = result.responses?.[0]?.fullTextAnnotation
-      const pageCount = annotation?.pages?.length || 1
-
-      // Track cost usage for OCR (Google Vision charges per image/page)
-      // Estimate: $1.50 per 1000 pages for document text detection
-      const ocrCost = pageCount * 0.0015
-
-      // Record usage asynchronously (don't block response)
-      recordUsage({
-        provider: 'google',
-        model: 'cloud-vision-v1',
-        operation: 'ocr',
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        inputCost: 0,
-        outputCost: 0,
-        totalCost: ocrCost,
-        timestamp: new Date().toISOString(),
-      }).catch((err) => {
-        if (process.env.NODE_ENV !== 'production') {
-          log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
-        }
-      })
-
-      res.json({
-        success: true,
-        data: {
-          text: annotation?.text || '',
-          confidence: annotation?.pages?.[0]?.blocks?.[0]?.confidence || 0,
-          pageCount,
-        },
-        cost: ocrCost,
-      })
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error'
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        provider: 'google-vision',
-        errorType: error instanceof Error ? error.constructor.name : 'Unknown',
-        message,
-      }
-      // Only log full error details in development
-      if (process.env.NODE_ENV !== 'production') {
-        log.debug('OCR failed', errorDetails)
-      }
-
-      // Determine specific error code
-      // In production, show generic messages; in dev/staging, show specific ones
-      const IS_PRODUCTION = process.env.NODE_ENV === 'production'
-      let code = 'OCR_FAILED'
-      let userMessage = IS_PRODUCTION ? 'Unable to process scanned document' : 'OCR processing failed'
-
-      if (error instanceof Error && error.name === 'AbortError') {
-        code = 'TIMEOUT'
-        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Vision OCR timed out after 60s - try a smaller image'
-      } else if (message.includes('API key not valid') || message.includes('400')) {
-        code = 'INVALID_API_KEY'
-        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Google Cloud API key is invalid'
-      } else if (message.includes('PERMISSION_DENIED')) {
-        code = 'API_NOT_ENABLED'
-        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Cloud Vision API not enabled - enable it in Google Cloud Console'
-      } else if (message.includes('BILLING')) {
-        code = 'BILLING_ERROR'
-        userMessage = IS_PRODUCTION ? 'Document scanning service unavailable' : 'Billing not enabled on Google Cloud project'
-      } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
-        code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Google Cloud rate limit exceeded'
-      }
-
-      res.status(500).json({
-        error: userMessage,
-        code,
-        // Only show detailed error info in development/staging for debugging
-        ...(process.env.NODE_ENV !== 'production' && { details: message }),
-        timestamp: errorDetails.timestamp,
+    if (!oauthToken && !apiKey) {
+      return res.status(503).json({
+        error: 'Google Cloud not configured',
+        code: 'PROVIDER_NOT_CONFIGURED',
       })
     }
+
+    // Body is validated and sanitized by middleware
+    const { imageBase64 } = req.body as OCRInput
+
+    // Build request with appropriate authentication
+    // Priority: OAuth token > API key query param
+    let url = 'https://vision.googleapis.com/v1/images:annotate'
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+
+    if (oauthToken) {
+      headers['Authorization'] = `Bearer ${oauthToken}`
+      log.info('Vision OCR: using OAuth bearer token authentication')
+    } else if (apiKey) {
+      url = `${url}?key=${apiKey}`
+      log.info('Vision OCR: using API key authentication')
+    }
+
+    // Call Vision OCR with 60-second timeout to prevent hanging
+    const controller = new AbortController()
+    const fetchTimeout = setTimeout(() => controller.abort(), 60000)
+    let response: globalThis.Response
+    try {
+      response = await fetch(url, {
+        method: 'POST',
+        headers,
+        signal: controller.signal,
+        body: JSON.stringify({
+          requests: [
+            {
+              image: { content: imageBase64 },
+              features: [{ type: 'DOCUMENT_TEXT_DETECTION', maxResults: 1 }],
+              imageContext: { languageHints: ['tr', 'en'] },
+            },
+          ],
+        }),
+      })
+    } finally {
+      clearTimeout(fetchTimeout)
+    }
+
+    if (!response.ok) {
+      const errorData = (await response.json().catch(() => ({}))) as {
+        error?: { message?: string }
+      }
+      throw new Error(errorData.error?.message || `API error: ${response.status}`)
+    }
+
+    const result = (await response.json()) as {
+      responses?: Array<{
+        fullTextAnnotation?: {
+          text?: string
+          pages?: Array<{ blocks?: Array<{ confidence?: number }> }>
+        }
+      }>
+    }
+    const annotation = result.responses?.[0]?.fullTextAnnotation
+    const pageCount = annotation?.pages?.length || 1
+
+    // Track cost usage for OCR (Google Vision charges per image/page)
+    // Estimate: $1.50 per 1000 pages for document text detection
+    const ocrCost = pageCount * 0.0015
+
+    // Record usage asynchronously (don't block response)
+    recordUsage({
+      provider: 'google',
+      model: 'cloud-vision-v1',
+      operation: 'ocr',
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      inputCost: 0,
+      outputCost: 0,
+      totalCost: ocrCost,
+      timestamp: new Date().toISOString(),
+    }).catch((err) => {
+      if (process.env.NODE_ENV !== 'production') {
+        log.debug('Cost tracking failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      }
+    })
+
+    res.json({
+      success: true,
+      data: {
+        text: annotation?.text || '',
+        confidence: annotation?.pages?.[0]?.blocks?.[0]?.confidence || 0,
+        pageCount,
+      },
+      cost: ocrCost,
+    })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    const errorDetails = {
+      timestamp: new Date().toISOString(),
+      provider: 'google-vision',
+      errorType: error instanceof Error ? error.constructor.name : 'Unknown',
+      message,
+    }
+    // Only log full error details in development
+    if (process.env.NODE_ENV !== 'production') {
+      log.debug('OCR failed', errorDetails)
+    }
+
+    // Determine specific error code
+    // In production, show generic messages; in dev/staging, show specific ones
+    const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+    let code = 'OCR_FAILED'
+    let userMessage = IS_PRODUCTION ? 'Unable to process scanned document' : 'OCR processing failed'
+
+    if (error instanceof Error && error.name === 'AbortError') {
+      code = 'TIMEOUT'
+      userMessage = IS_PRODUCTION
+        ? 'Request timed out, please try again'
+        : 'Vision OCR timed out after 60s - try a smaller image'
+    } else if (message.includes('API key not valid') || message.includes('400')) {
+      code = 'INVALID_API_KEY'
+      userMessage = IS_PRODUCTION
+        ? 'Document scanning service unavailable'
+        : 'Google Cloud API key is invalid'
+    } else if (message.includes('PERMISSION_DENIED')) {
+      code = 'API_NOT_ENABLED'
+      userMessage = IS_PRODUCTION
+        ? 'Document scanning service unavailable'
+        : 'Cloud Vision API not enabled - enable it in Google Cloud Console'
+    } else if (message.includes('BILLING')) {
+      code = 'BILLING_ERROR'
+      userMessage = IS_PRODUCTION
+        ? 'Document scanning service unavailable'
+        : 'Billing not enabled on Google Cloud project'
+    } else if (message.includes('429') || message.includes('RESOURCE_EXHAUSTED')) {
+      code = 'RATE_LIMIT_EXCEEDED'
+      userMessage = IS_PRODUCTION
+        ? 'Service busy, please try again later'
+        : 'Google Cloud rate limit exceeded'
+    }
+
+    res.status(500).json({
+      error: userMessage,
+      code,
+      // Only show detailed error info in development/staging for debugging
+      ...(process.env.NODE_ENV !== 'production' && { details: message }),
+      timestamp: errorDetails.timestamp,
+    })
   }
-)
+})
 
 /**
  * POST /api/ai/ocr/document-ai
@@ -1266,7 +1800,9 @@ router.post(
       if (!isDocumentAIConfigured()) {
         log.warn('Not configured, returning 503')
         return res.status(503).json({
-          error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI not configured',
+          error: IS_PRODUCTION
+            ? 'Document processing service unavailable'
+            : 'Document AI not configured',
           code: 'PROVIDER_NOT_CONFIGURED',
         })
       }
@@ -1277,7 +1813,9 @@ router.post(
       if (!accessToken) {
         log.error('Access token is null/empty, returning 503')
         return res.status(503).json({
-          error: IS_PRODUCTION ? 'Document processing service unavailable' : 'Failed to get Document AI access token',
+          error: IS_PRODUCTION
+            ? 'Document processing service unavailable'
+            : 'Failed to get Document AI access token',
           code: 'AUTH_FAILED',
         })
       }
@@ -1288,7 +1826,12 @@ router.post(
       // Build Document AI endpoint
       const endpoint = `https://${GCP_CONFIG.location}-documentai.googleapis.com/v1/projects/${GCP_CONFIG.projectId}/locations/${GCP_CONFIG.location}/processors/${GCP_CONFIG.processorId}:process`
 
-      log.info('Calling Document AI API', { location: GCP_CONFIG.location, project: GCP_CONFIG.projectId, processor: GCP_CONFIG.processorId, setupMs: Date.now() - startTime })
+      log.info('Calling Document AI API', {
+        location: GCP_CONFIG.location,
+        project: GCP_CONFIG.projectId,
+        processor: GCP_CONFIG.processorId,
+        setupMs: Date.now() - startTime,
+      })
 
       // Call Document AI with 60-second timeout to prevent hanging
       const controller = new AbortController()
@@ -1325,7 +1868,9 @@ router.post(
       }
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: { message: `HTTP ${response.status}` } })) as DocumentAIResponse
+        const errorData = (await response
+          .json()
+          .catch(() => ({ error: { message: `HTTP ${response.status}` } }))) as DocumentAIResponse
         // Enhanced error logging for debugging
         log.error('API call failed', {
           status: response.status,
@@ -1338,7 +1883,7 @@ router.post(
         throw new Error(errorData.error?.message || `Document AI error: ${response.status}`)
       }
 
-      const result = await response.json() as DocumentAIResponse
+      const result = (await response.json()) as DocumentAIResponse
 
       if (!result.document) {
         throw new Error('Empty response from Document AI')
@@ -1358,7 +1903,8 @@ router.post(
         for (const field of page.formFields || []) {
           const name = field.fieldName?.textAnchor?.content?.trim() || ''
           const value = field.fieldValue?.textAnchor?.content?.trim() || ''
-          const confidence = (field.fieldName?.confidence || 0 + (field.fieldValue?.confidence || 0)) / 2
+          const confidence =
+            (field.fieldName?.confidence || 0 + (field.fieldValue?.confidence || 0)) / 2
 
           if (name || value) {
             formFields.push({
@@ -1384,14 +1930,18 @@ router.post(
 
       // Extract tables
       const tables: Array<{
-        rows: Array<{ cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }> }>
+        rows: Array<{
+          cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }>
+        }>
         headerRows: number
         confidence: number
       }> = []
 
       for (const page of result.document.pages || []) {
         for (const table of page.tables || []) {
-          const rows: Array<{ cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }> }> = []
+          const rows: Array<{
+            cells: Array<{ text: string; rowSpan: number; colSpan: number; confidence: number }>
+          }> = []
 
           // Process header rows
           const headerRowCount = table.headerRows?.length || 0
@@ -1467,10 +2017,18 @@ router.post(
         totalCost: docaiCost,
         timestamp: new Date().toISOString(),
       }).catch((err) => {
-        if (!IS_PRODUCTION) log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
+        if (!IS_PRODUCTION)
+          log.debug('Cost tracking failed', {
+            error: err instanceof Error ? err.message : String(err),
+          })
       })
 
-      log.info('Document AI OCR complete', { pageCount, formFields: formFields.length, tables: tables.length, processingTimeMs })
+      log.info('Document AI OCR complete', {
+        pageCount,
+        formFields: formFields.length,
+        tables: tables.length,
+        processingTimeMs,
+      })
 
       res.json({
         success: true,
@@ -1498,31 +2056,45 @@ router.post(
       log.error('Processing failed', errorDetails)
 
       let code = 'DOCUMENT_AI_FAILED'
-      let userMessage = IS_PRODUCTION ? 'Unable to process document' : 'Document AI processing failed'
+      let userMessage = IS_PRODUCTION
+        ? 'Unable to process document'
+        : 'Document AI processing failed'
 
       if (error instanceof Error && error.name === 'AbortError') {
         code = 'TIMEOUT'
-        userMessage = IS_PRODUCTION ? 'Request timed out, please try again' : 'Document AI timed out after 60s - try a smaller document'
+        userMessage = IS_PRODUCTION
+          ? 'Request timed out, please try again'
+          : 'Document AI timed out after 60s - try a smaller document'
       } else if (message.includes('PERMISSION_DENIED')) {
         code = 'PERMISSION_DENIED'
-        userMessage = IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI permission denied - check service account permissions'
+        userMessage = IS_PRODUCTION
+          ? 'Document processing service unavailable'
+          : 'Document AI permission denied - check service account permissions'
       } else if (message.includes('NOT_FOUND')) {
         code = 'PROCESSOR_NOT_FOUND'
-        userMessage = IS_PRODUCTION ? 'Document processing service unavailable' : 'Document AI processor not found - check processor ID'
+        userMessage = IS_PRODUCTION
+          ? 'Document processing service unavailable'
+          : 'Document AI processor not found - check processor ID'
       } else if (message.includes('RESOURCE_EXHAUSTED') || message.includes('429')) {
         code = 'RATE_LIMIT_EXCEEDED'
-        userMessage = IS_PRODUCTION ? 'Service busy, please try again later' : 'Document AI rate limit exceeded'
+        userMessage = IS_PRODUCTION
+          ? 'Service busy, please try again later'
+          : 'Document AI rate limit exceeded'
       } else if (message.includes('exceed the limit') || message.includes('exceed limit')) {
         // Standard OCR processor has a 15-page limit per request.
         // Documents >15 pages should be split client-side via pdf-splitter.ts.
         code = 'PAGE_LIMIT_EXCEEDED'
-        log.error('Page limit exceeded - document should have been split before sending', { errorMessage: message })
+        log.error('Page limit exceeded - document should have been split before sending', {
+          errorMessage: message,
+        })
         userMessage = IS_PRODUCTION
           ? 'Document exceeds page limit. Please upload a document with 15 or fewer pages per chunk.'
           : `Document AI page limit exceeded: ${message}. Documents >15 pages must be split via pdf-splitter.ts.`
       } else if (message.includes('INVALID_ARGUMENT')) {
         code = 'INVALID_DOCUMENT'
-        userMessage = IS_PRODUCTION ? 'Unable to process this document format' : 'Invalid document format for Document AI'
+        userMessage = IS_PRODUCTION
+          ? 'Unable to process this document format'
+          : 'Invalid document format for Document AI'
       }
 
       res.status(500).json({
@@ -1582,7 +2154,10 @@ router.post(
       const renderedPrompt = await getChatPrompt(message, policyContext)
       if (renderedPrompt) {
         systemPrompt = renderedPrompt.systemPrompt
-        log.info('Using chat prompt template', { template: renderedPrompt.templateName, version: renderedPrompt.version })
+        log.info('Using chat prompt template', {
+          template: renderedPrompt.templateName,
+          version: renderedPrompt.version,
+        })
       } else {
         // Fallback to hardcoded prompt
         systemPrompt = CHAT_SYSTEM_PROMPT_FALLBACK
@@ -1648,7 +2223,10 @@ router.post(
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
         }).catch((err) => {
-          if (!IS_PRODUCTION) log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
+          if (!IS_PRODUCTION)
+            log.debug('Cost tracking failed', {
+              error: err instanceof Error ? err.message : String(err),
+            })
         })
 
         return res.json({
@@ -1711,7 +2289,10 @@ router.post(
           totalCost: cost.totalCost,
           timestamp: new Date().toISOString(),
         }).catch((err) => {
-          if (!IS_PRODUCTION) log.debug('Cost tracking failed', { error: err instanceof Error ? err.message : String(err) })
+          if (!IS_PRODUCTION)
+            log.debug('Cost tracking failed', {
+              error: err instanceof Error ? err.message : String(err),
+            })
         })
 
         return res.json({
@@ -1796,10 +2377,20 @@ interface ProviderDiagnostic {
  * Error codes are always returned (even in production) — they contain no secrets.
  */
 function classifyDiagnosticError(error: string): string {
-  if (error.includes('Invalid API key') || error.includes('401') || error.includes('Incorrect') || error.includes('Authentication failed') || error.includes('UNAUTHENTICATED')) {
+  if (
+    error.includes('Invalid API key') ||
+    error.includes('401') ||
+    error.includes('Incorrect') ||
+    error.includes('Authentication failed') ||
+    error.includes('UNAUTHENTICATED')
+  ) {
     return 'INVALID_CREDENTIALS'
   }
-  if (error.includes('Rate limit') || error.includes('429') || error.includes('RESOURCE_EXHAUSTED')) {
+  if (
+    error.includes('Rate limit') ||
+    error.includes('429') ||
+    error.includes('RESOURCE_EXHAUSTED')
+  ) {
     return 'RATE_LIMITED'
   }
   if (error.includes('quota') || error.includes('insufficient_quota')) {
@@ -1809,16 +2400,32 @@ function classifyDiagnosticError(error: string): string {
   if (error.includes('overloaded') || error.includes('529')) {
     return 'PROVIDER_OVERLOADED'
   }
-  if (error.includes('billing') || error.includes('credit') || error.includes('BILLING') || error.includes('Billing') || error.includes('FAILED_PRECONDITION')) {
+  if (
+    error.includes('billing') ||
+    error.includes('credit') ||
+    error.includes('BILLING') ||
+    error.includes('Billing') ||
+    error.includes('FAILED_PRECONDITION')
+  ) {
     return 'BILLING_ERROR'
   }
-  if (error.includes('PERMISSION_DENIED') || error.includes('not enabled') || error.includes('has not been used') || error.includes('Permission denied')) {
+  if (
+    error.includes('PERMISSION_DENIED') ||
+    error.includes('not enabled') ||
+    error.includes('has not been used') ||
+    error.includes('Permission denied')
+  ) {
     return 'API_NOT_ENABLED'
   }
   if (error.includes('NOT_FOUND') || error.includes('not found') || error.includes('404')) {
     return 'NOT_FOUND'
   }
-  if (error.includes('ENOTFOUND') || error.includes('ECONNREFUSED') || error.includes('ETIMEDOUT') || error.includes('fetch failed')) {
+  if (
+    error.includes('ENOTFOUND') ||
+    error.includes('ECONNREFUSED') ||
+    error.includes('ETIMEDOUT') ||
+    error.includes('fetch failed')
+  ) {
     return 'NETWORK_ERROR'
   }
   return 'UNKNOWN_ERROR'
@@ -1906,7 +2513,10 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       }
       diagnostics.openai.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.openai.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
-      log.warn('OpenAI diagnostic failed', { errorCode: diagnostics.openai.errorCode, error: errorMsg })
+      log.warn('OpenAI diagnostic failed', {
+        errorCode: diagnostics.openai.errorCode,
+        error: errorMsg,
+      })
     }
   }
 
@@ -1944,7 +2554,10 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       }
       diagnostics.anthropic.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.anthropic.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
-      log.warn('Anthropic diagnostic failed', { errorCode: diagnostics.anthropic.errorCode, error: errorMsg })
+      log.warn('Anthropic diagnostic failed', {
+        errorCode: diagnostics.anthropic.errorCode,
+        error: errorMsg,
+      })
     }
   }
 
@@ -1961,7 +2574,9 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       const oauthToken = hasServiceAccount ? await getDocumentAIAccessToken() : null
 
       if (hasServiceAccount && !oauthToken) {
-        log.warn('Google Vision diagnostic: service account found but OAuth token retrieval failed — falling back to API key')
+        log.warn(
+          'Google Vision diagnostic: service account found but OAuth token retrieval failed — falling back to API key'
+        )
       }
 
       // Build request with appropriate authentication
@@ -1984,17 +2599,29 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
         diagnostics.google.valid = false
         diagnostics.google.latencyMs = Date.now() - startTime
         diagnostics.google.errorCode = 'INVALID_CREDENTIALS'
-        diagnostics.google.error = sanitizeDiagnosticError('Authentication failed - no valid OAuth token or API key', IS_PRODUCTION)
-        log.warn('Google Vision diagnostic: no valid authentication method available', { hasServiceAccount, hasApiKey: !!googleApiKey })
+        diagnostics.google.error = sanitizeDiagnosticError(
+          'Authentication failed - no valid OAuth token or API key',
+          IS_PRODUCTION
+        )
+        log.warn('Google Vision diagnostic: no valid authentication method available', {
+          hasServiceAccount,
+          hasApiKey: !!googleApiKey,
+        })
       } else {
         // Make a minimal API call to verify credentials work
         // Using a tiny 1x1 white PNG to minimize cost
-        const testImage = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
+        const testImage =
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='
         const response = await fetch(url, {
           method: 'POST',
           headers,
           body: JSON.stringify({
-            requests: [{ image: { content: testImage }, features: [{ type: 'TEXT_DETECTION', maxResults: 1 }] }],
+            requests: [
+              {
+                image: { content: testImage },
+                features: [{ type: 'TEXT_DETECTION', maxResults: 1 }],
+              },
+            ],
           }),
         })
         diagnostics.google.latencyMs = Date.now() - startTime
@@ -2023,11 +2650,19 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
           // Map Google Cloud error statuses to actionable messages
           if (errorMsg.includes('API key not valid') || (httpStatus === 400 && !errorStatus)) {
             errorMsg = 'Invalid API key - check GOOGLE_CLOUD_API_KEY in .env'
-          } else if (errorStatus === 'PERMISSION_DENIED' || errorMsg.includes('PERMISSION_DENIED') || errorMsg.includes('has not been used')) {
+          } else if (
+            errorStatus === 'PERMISSION_DENIED' ||
+            errorMsg.includes('PERMISSION_DENIED') ||
+            errorMsg.includes('has not been used')
+          ) {
             errorMsg = 'Cloud Vision API not enabled - enable it in Google Cloud Console'
           } else if (errorStatus === 'UNAUTHENTICATED' || httpStatus === 401) {
             errorMsg = 'Authentication failed - check GOOGLE_CLOUD_API_KEY'
-          } else if (errorStatus === 'FAILED_PRECONDITION' || errorMsg.includes('Billing') || errorMsg.includes('BILLING')) {
+          } else if (
+            errorStatus === 'FAILED_PRECONDITION' ||
+            errorMsg.includes('Billing') ||
+            errorMsg.includes('BILLING')
+          ) {
             errorMsg = 'Billing not enabled on Google Cloud project'
           } else if (errorStatus === 'RESOURCE_EXHAUSTED' || httpStatus === 429) {
             errorMsg = 'Rate limit exceeded - try again later'
@@ -2056,7 +2691,10 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       const errorMsg = error instanceof Error ? error.message : 'Unknown error'
       diagnostics.google.errorCode = classifyDiagnosticError(errorMsg)
       diagnostics.google.error = sanitizeDiagnosticError(errorMsg, IS_PRODUCTION)
-      log.warn('Google Vision diagnostic exception', { errorCode: diagnostics.google.errorCode, error: errorMsg })
+      log.warn('Google Vision diagnostic exception', {
+        errorCode: diagnostics.google.errorCode,
+        error: errorMsg,
+      })
     }
   }
 
@@ -2132,7 +2770,9 @@ router.post('/processing-log', generalLimiter, async (req: Request, res: Respons
 
     res.json({ success: true, data: result.data })
   } catch (error) {
-    log.error('Failed to create processing log', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to create processing log', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create processing log',
@@ -2162,7 +2802,9 @@ router.patch('/processing-log/:documentId', generalLimiter, async (req: Request,
 
     res.json({ success: true, data: result })
   } catch (error) {
-    log.error('Failed to update processing log', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to update processing log', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update processing log',
@@ -2175,38 +2817,44 @@ router.patch('/processing-log/:documentId', generalLimiter, async (req: Request,
  * POST /api/ai/processing-log/:documentId/stage
  * Rate limited: general limiter (60 requests per minute)
  */
-router.post('/processing-log/:documentId/stage', generalLimiter, async (req: Request, res: Response) => {
-  try {
-    const documentId = req.params.documentId as string
-    const stage = req.body
+router.post(
+  '/processing-log/:documentId/stage',
+  generalLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      const documentId = req.params.documentId as string
+      const stage = req.body
 
-    if (!stage.stage || !stage.status) {
-      res.status(400).json({
-        success: false,
-        error: 'stage and status are required',
+      if (!stage.stage || !stage.status) {
+        res.status(400).json({
+          success: false,
+          error: 'stage and status are required',
+        })
+        return
+      }
+
+      const success = await processingLogService.addProcessingStage(documentId, stage)
+
+      if (!success) {
+        res.status(404).json({
+          success: false,
+          error: 'Processing log not found',
+        })
+        return
+      }
+
+      res.json({ success: true })
+    } catch (error) {
+      log.error('Failed to add processing stage', {
+        error: error instanceof Error ? error.message : String(error),
       })
-      return
-    }
-
-    const success = await processingLogService.addProcessingStage(documentId, stage)
-
-    if (!success) {
-      res.status(404).json({
+      res.status(500).json({
         success: false,
-        error: 'Processing log not found',
+        error: error instanceof Error ? error.message : 'Failed to add processing stage',
       })
-      return
     }
-
-    res.json({ success: true })
-  } catch (error) {
-    log.error('Failed to add processing stage', { error: error instanceof Error ? error.message : String(error) })
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Failed to add processing stage',
-    })
   }
-})
+)
 
 /**
  * Get a processing log by document ID
@@ -2228,7 +2876,9 @@ router.get('/processing-log/:documentId', generalLimiter, async (req: Request, r
 
     res.json({ success: true, data: log })
   } catch (error) {
-    log.error('Failed to get processing log', { error: error instanceof Error ? error.message : String(error) })
+    log.error('Failed to get processing log', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get processing log',

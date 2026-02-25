@@ -27,19 +27,45 @@ import { PolicyDashboard } from './PolicyDashboard'
 // ─── Translation mock ──────────────────────────────────────────────────────
 const t = {
   nav: {
-    home: 'Home', dashboard: 'Dashboard', compare: 'Compare', chat: 'Chat',
-    upload: 'Upload', settings: 'Settings', myAccount: 'My Account',
-    helpCenter: 'Help Center', signOut: 'Sign Out', search: 'Search policies',
-    notifications: 'Notifications', noNotifications: 'No notifications yet',
+    home: 'Home',
+    dashboard: 'Dashboard',
+    compare: 'Compare',
+    chat: 'Chat',
+    upload: 'Upload',
+    settings: 'Settings',
+    myAccount: 'My Account',
+    helpCenter: 'Help Center',
+    signOut: 'Sign Out',
+    search: 'Search policies',
+    notifications: 'Notifications',
+    noNotifications: 'No notifications yet',
     userMenu: 'User menu',
   },
   common: {
-    loading: 'Loading...', error: 'Error', retry: 'Retry', cancel: 'Cancel',
-    save: 'Save', delete: 'Delete', edit: 'Edit', view: 'View', close: 'Close',
-    back: 'Back', next: 'Next', previous: 'Previous', submit: 'Submit',
-    confirm: 'Confirm', yes: 'Yes', no: 'No', all: 'All', none: 'None',
-    search: 'Search', filter: 'Filter', sort: 'Sort', more: 'More',
-    less: 'Less', actions: 'Actions',
+    loading: 'Loading...',
+    error: 'Error',
+    retry: 'Retry',
+    cancel: 'Cancel',
+    save: 'Save',
+    delete: 'Delete',
+    edit: 'Edit',
+    view: 'View',
+    close: 'Close',
+    back: 'Back',
+    next: 'Next',
+    previous: 'Previous',
+    submit: 'Submit',
+    confirm: 'Confirm',
+    yes: 'Yes',
+    no: 'No',
+    all: 'All',
+    none: 'None',
+    search: 'Search',
+    filter: 'Filter',
+    sort: 'Sort',
+    more: 'More',
+    less: 'Less',
+    actions: 'Actions',
   },
   landing: {} as Record<string, string>,
   dashboard: {
@@ -58,40 +84,72 @@ const t = {
     showingPolicies: 'Showing {shown} of {total} policies',
   },
   policy: {
-    policies: 'Policies', policy: 'Policy', policyNumber: 'Policy Number',
-    provider: 'Provider', type: 'Type', coverage: 'Coverage',
-    sumInsured: 'Sum Insured', limit: 'Limit',
-    sumInsuredLimit: 'Sum Insured / Limit', premium: 'Premium',
-    deductible: 'Deductible', startDate: 'Start Date',
-    expiryDate: 'Expiry Date', status: 'Status',
-    active: 'Active', expiring: 'Expiring', expired: 'Expired',
-    pending: 'Pending', uploadDate: 'Upload Date',
-    totalPolicies: 'Total Policies', totalCoverage: 'Total Coverage',
-    totalSumInsured: 'Total Sum Insured', totalLimit: 'Total Limits',
-    expiringSoon: 'Expiring Soon', noPoliciesFound: 'No policies found',
-    uploadFirst: 'Upload your first policy', adjustFilters: 'Adjust filters',
-    insured: 'Insured', plate: 'Plate', vehicle: 'Vehicle',
-    address: 'Address', business: 'Business', subject: 'Subject',
-    viewDetails: 'View Details', hideDetails: 'Hide Details',
-    perYear: '/yr', coverageDetails: 'Coverage Details',
-    exclusions: 'Exclusions', specialConditions: 'Special Conditions',
-    included: 'Included', notIncluded: 'Not Included',
-    insuredPerson: 'Insured Person', location: 'Location',
-    period: 'Period', confidence: 'Confidence',
+    policies: 'Policies',
+    policy: 'Policy',
+    policyNumber: 'Policy Number',
+    provider: 'Provider',
+    type: 'Type',
+    coverage: 'Coverage',
+    sumInsured: 'Sum Insured',
+    limit: 'Limit',
+    sumInsuredLimit: 'Sum Insured / Limit',
+    premium: 'Premium',
+    deductible: 'Deductible',
+    startDate: 'Start Date',
+    expiryDate: 'Expiry Date',
+    status: 'Status',
+    active: 'Active',
+    expiring: 'Expiring',
+    expired: 'Expired',
+    pending: 'Pending',
+    uploadDate: 'Upload Date',
+    totalPolicies: 'Total Policies',
+    totalCoverage: 'Total Coverage',
+    totalSumInsured: 'Total Sum Insured',
+    totalLimit: 'Total Limits',
+    expiringSoon: 'Expiring Soon',
+    noPoliciesFound: 'No policies found',
+    uploadFirst: 'Upload your first policy',
+    adjustFilters: 'Adjust filters',
+    insured: 'Insured',
+    plate: 'Plate',
+    vehicle: 'Vehicle',
+    address: 'Address',
+    business: 'Business',
+    subject: 'Subject',
+    viewDetails: 'View Details',
+    hideDetails: 'Hide Details',
+    perYear: '/yr',
+    coverageDetails: 'Coverage Details',
+    exclusions: 'Exclusions',
+    specialConditions: 'Special Conditions',
+    included: 'Included',
+    notIncluded: 'Not Included',
+    insuredPerson: 'Insured Person',
+    location: 'Location',
+    period: 'Period',
+    confidence: 'Confidence',
   },
   upload: {
     title: 'Upload Policies',
     subtitle: 'Upload your insurance documents for AI analysis',
     uploadPolicy: 'Upload Policy',
-    dropHere: 'Drop here', orClickBrowse: 'or browse',
-    supportedFormats: 'Supported', maxSize: 'Max size',
-    uploading: 'Uploading...', analyzing: 'Analyzing...',
-    complete: 'Complete', failed: 'Failed',
+    dropHere: 'Drop here',
+    orClickBrowse: 'or browse',
+    supportedFormats: 'Supported',
+    maxSize: 'Max size',
+    uploading: 'Uploading...',
+    analyzing: 'Analyzing...',
+    complete: 'Complete',
+    failed: 'Failed',
   },
   a11y: {
-    skipToContent: 'Skip', nowViewing: 'Now viewing',
-    menuExpanded: 'Menu expanded', menuCollapsed: 'Menu collapsed',
-    selected: 'Selected', notSelected: 'Not selected',
+    skipToContent: 'Skip',
+    nowViewing: 'Now viewing',
+    menuExpanded: 'Menu expanded',
+    menuCollapsed: 'Menu collapsed',
+    selected: 'Selected',
+    notSelected: 'Not selected',
     policyStats: 'Policy statistics',
   },
   auth: {} as Record<string, string>,
@@ -111,6 +169,26 @@ const t = {
   comparePolicies: {} as Record<string, string>,
   unsubscribe: {} as Record<string, string>,
   insightTranslations: {} as Record<string, string>,
+  notifications: {} as Record<string, string>,
+  onboarding: {
+    welcomeTitle: 'Welcome to InsurAI!',
+    welcomeWithName: 'Welcome to InsurAI, {name}!',
+    welcomeSubtitle: 'Get AI-powered analysis of your insurance policies in seconds.',
+    howItWorks: 'How it works',
+    step1Title: 'Upload your PDF',
+    step1Desc: 'Drop your insurance policy document — we support all Turkish policy types.',
+    step2Title: 'AI analyzes it',
+    step2Desc: 'Our AI extracts coverage details, limits, exclusions, and key terms.',
+    step3Title: 'Get insights & score',
+    step3Desc: 'See your coverage score, gap analysis, and actionable recommendations.',
+    uploadTitle: 'Drop your policy PDF here',
+    uploadSubtitle: 'or click to browse',
+    uploadHint: 'PDF files up to 50 MB',
+    invalidFile: 'Please select a PDF file.',
+    fileTooLarge: 'File is too large. Maximum size is 50 MB.',
+    skipForNow: 'Skip for now',
+    exploreSamples: 'Or explore sample policies',
+  },
 }
 
 let mockLocale = 'en'
@@ -123,7 +201,9 @@ const mockNavigate = vi.fn()
 vi.mock('react-router-dom', () => ({
   useNavigate: () => mockNavigate,
   useLocation: () => ({ state: null, pathname: '/dashboard' }),
-  Link: ({ children, to }: { children: React.ReactNode; to: string }) => <a href={to}>{children}</a>,
+  Link: ({ children, to }: { children: React.ReactNode; to: string }) => (
+    <a href={to}>{children}</a>
+  ),
 }))
 
 // ─── Policy context mock ────────────────────────────────────────────────────
@@ -175,6 +255,12 @@ vi.mock('@/hooks/useTrialTransfer', () => ({
   useTrialTransfer: () => {},
 }))
 
+vi.mock('@/lib/free-trial', () => ({
+  hasPendingTrialTransfer: () => false,
+  getTrialDataForTransfer: () => null,
+  clearTrialData: vi.fn(),
+}))
+
 // ─── PolicyCardGrid mock ────────────────────────────────────────────────────
 vi.mock('./PolicyCard', () => ({
   PolicyCardGrid: ({ policies, onView, onDelete }: any) => (
@@ -197,6 +283,29 @@ vi.mock('@/lib/supabase/auth-context', () => ({
     loading: false,
     isConfigured: true,
   }),
+}))
+
+// ─── WelcomeOnboarding mock ─────────────────────────────────────────────────
+vi.mock('./WelcomeOnboarding', () => ({
+  WelcomeOnboarding: ({
+    onUpload,
+    onSkip,
+  }: {
+    onUpload: (f: File) => void
+    onSkip: () => void
+  }) => (
+    <div data-testid="welcome-onboarding">
+      <button onClick={onSkip}>Skip for now</button>
+      <button onClick={() => onUpload(new File(['pdf'], 'test.pdf', { type: 'application/pdf' }))}>
+        Upload
+      </button>
+    </div>
+  ),
+}))
+
+// ─── i18n-context mock (used by WelcomeOnboarding) ──────────────────────────
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({ t, locale: 'en', isLoading: false }),
 }))
 
 // ─── Sonner mock ────────────────────────────────────────────────────────────
@@ -250,7 +359,7 @@ function getFilterButtons() {
 }
 
 function getFilterButton(textIncludes: string) {
-  return getFilterButtons().find(btn =>
+  return getFilterButtons().find((btn) =>
     (btn.textContent || '').toLowerCase().includes(textIncludes.toLowerCase())
   )
 }
@@ -259,9 +368,7 @@ function getTableSortButton(label: string) {
   // Sort buttons are inside <thead>, so find within that scope
   const thead = document.querySelector('thead')!
   const buttons = within(thead).getAllByRole('button')
-  return buttons.find(btn =>
-    (btn.textContent || '').toLowerCase().includes(label.toLowerCase())
-  )!
+  return buttons.find((btn) => (btn.textContent || '').toLowerCase().includes(label.toLowerCase()))!
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -279,6 +386,8 @@ describe('PolicyDashboard Branch Coverage', () => {
     mockSelectionCount = 0
     mockFullPolicies = []
     mockDashboardPolicies = []
+    // Mark onboarding as completed so empty-state tests see the normal empty state
+    localStorage.setItem('insurai_onboarding_completed', 'true')
   })
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -478,18 +587,33 @@ describe('PolicyDashboard Branch Coverage', () => {
 
     beforeEach(() => {
       p1 = makePolicy({
-        id: 'p1', provider: 'Axa Sigorta', type: 'kasko', coverage: 100000,
-        premium: 1000, expiryDate: '2026-06-01', status: 'active',
+        id: 'p1',
+        provider: 'Axa Sigorta',
+        type: 'kasko',
+        coverage: 100000,
+        premium: 1000,
+        expiryDate: '2026-06-01',
+        status: 'active',
         policyNumber: 'POL-001',
       })
       p2 = makePolicy({
-        id: 'p2', provider: 'Zurich Sigorta', type: 'home', coverage: 300000,
-        premium: 3000, expiryDate: '2026-01-01', status: 'expired',
+        id: 'p2',
+        provider: 'Zurich Sigorta',
+        type: 'home',
+        coverage: 300000,
+        premium: 3000,
+        expiryDate: '2026-01-01',
+        status: 'expired',
         policyNumber: 'POL-002',
       })
       p3 = makePolicy({
-        id: 'p3', provider: 'Mapfre Sigorta', type: 'health', coverage: 200000,
-        premium: 2000, expiryDate: '2026-03-01', status: 'expiring',
+        id: 'p3',
+        provider: 'Mapfre Sigorta',
+        type: 'health',
+        coverage: 200000,
+        premium: 2000,
+        expiryDate: '2026-03-01',
+        status: 'expiring',
         policyNumber: 'POL-003',
       })
       mockFullPolicies = [p1, p2, p3]
@@ -575,7 +699,7 @@ describe('PolicyDashboard Branch Coverage', () => {
 
       // The column header for Status is a <button> inside a <th> with text "Status"
       const columnHeaders = screen.getAllByRole('columnheader')
-      const statusTh = columnHeaders.find(th => th.textContent?.includes('Status'))
+      const statusTh = columnHeaders.find((th) => th.textContent?.includes('Status'))
       expect(statusTh).toBeTruthy()
       const statusSortBtn = within(statusTh!).getByRole('button')
       await user.click(statusSortBtn)
@@ -593,7 +717,7 @@ describe('PolicyDashboard Branch Coverage', () => {
       renderDashboard()
 
       const columnHeaders = screen.getAllByRole('columnheader')
-      const statusTh = columnHeaders.find(th => th.textContent?.includes('Status'))!
+      const statusTh = columnHeaders.find((th) => th.textContent?.includes('Status'))!
       const statusSortBtn = within(statusTh).getByRole('button')
       await user.click(statusSortBtn) // asc
       await user.click(statusSortBtn) // desc
@@ -607,8 +731,11 @@ describe('PolicyDashboard Branch Coverage', () => {
 
     it('handles unknown status in sort ordering (falls back to 4)', async () => {
       const pUnknown = makePolicy({
-        id: 'p4', status: 'cancelled', provider: 'Test',
-        policyNumber: 'POL-004', expiryDate: '2026-02-01',
+        id: 'p4',
+        status: 'cancelled',
+        provider: 'Test',
+        policyNumber: 'POL-004',
+        expiryDate: '2026-02-01',
       })
       mockFullPolicies = [p1, pUnknown]
       mockDashboardPolicies = [p1, pUnknown]
@@ -704,9 +831,27 @@ describe('PolicyDashboard Branch Coverage', () => {
     let p1: any, p2: any, p3: any
 
     beforeEach(() => {
-      p1 = makePolicy({ id: 'p1', policyNumber: 'POL-001', provider: 'Axa Sigorta', type: 'kasko', typeTr: 'Kasko' })
-      p2 = makePolicy({ id: 'p2', policyNumber: 'TRF-002', provider: 'Allianz Sigorta', type: 'traffic', typeTr: 'Trafik' })
-      p3 = makePolicy({ id: 'p3', policyNumber: 'HLT-003', provider: 'Mapfre Sigorta', type: 'health', typeTr: 'Saglik' })
+      p1 = makePolicy({
+        id: 'p1',
+        policyNumber: 'POL-001',
+        provider: 'Axa Sigorta',
+        type: 'kasko',
+        typeTr: 'Kasko',
+      })
+      p2 = makePolicy({
+        id: 'p2',
+        policyNumber: 'TRF-002',
+        provider: 'Allianz Sigorta',
+        type: 'traffic',
+        typeTr: 'Trafik',
+      })
+      p3 = makePolicy({
+        id: 'p3',
+        policyNumber: 'HLT-003',
+        provider: 'Mapfre Sigorta',
+        type: 'health',
+        typeTr: 'Saglik',
+      })
       mockFullPolicies = [p1, p2, p3]
       mockDashboardPolicies = [p1, p2, p3]
     })
@@ -979,12 +1124,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Alpha Dup' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2,
-        duplicateOf: p1,
-        similarity: 'exact',
-        matchedFields: ['policyNumber', 'provider'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber', 'provider'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText('Duplicate Policies Detected')).toBeInTheDocument()
     })
@@ -994,10 +1141,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Exact duplicate/)).toBeInTheDocument()
     })
@@ -1007,10 +1158,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'high',
-        matchedFields: ['provider', 'type'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'high',
+          matchedFields: ['provider', 'type'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Very similar/)).toBeInTheDocument()
     })
@@ -1020,10 +1175,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'medium',
-        matchedFields: ['type'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'medium',
+          matchedFields: ['type'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Possibly duplicate/)).toBeInTheDocument()
     })
@@ -1033,10 +1192,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber', 'provider', 'type', 'coverage', 'premium'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber', 'provider', 'type', 'coverage', 'premium'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/\+2/)).toBeInTheDocument()
     })
@@ -1046,10 +1209,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber', 'provider'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber', 'provider'],
+        },
+      ]
       renderDashboard()
       expect(screen.queryByText(/\+\d+/)).not.toBeInTheDocument()
     })
@@ -1090,10 +1257,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'delete-id', provider: 'Dup' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       const mergeBtn = screen.getByText('Merge')
       await userEvent.setup().click(mergeBtn)
@@ -1105,10 +1276,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dismiss-id', provider: 'Dup' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       const dismissBtn = screen.getByTitle('Dismiss')
       await userEvent.setup().click(dismissBtn)
@@ -1119,10 +1294,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p1 = makePolicy({ id: 'p1' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: makePolicy({ id: 'dup1' }), duplicateOf: p1,
-        similarity: 'exact', matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: makePolicy({ id: 'dup1' }),
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Found 1 duplicate or very similar policy\./)).toBeInTheDocument()
     })
@@ -1132,8 +1311,18 @@ describe('PolicyDashboard Branch Coverage', () => {
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
       mockDuplicates = [
-        { policy: makePolicy({ id: 'dup1' }), duplicateOf: p1, similarity: 'exact', matchedFields: ['policyNumber'] },
-        { policy: makePolicy({ id: 'dup2' }), duplicateOf: p1, similarity: 'high', matchedFields: ['provider'] },
+        {
+          policy: makePolicy({ id: 'dup1' }),
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+        {
+          policy: makePolicy({ id: 'dup2' }),
+          duplicateOf: p1,
+          similarity: 'high',
+          matchedFields: ['provider'],
+        },
       ]
       renderDashboard()
       expect(screen.getByText(/Found 2 duplicate or very similar policies\./)).toBeInTheDocument()
@@ -1170,10 +1359,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const original = makePolicy({ id: 'orig' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p1, duplicateOf: original,
-        similarity: 'high', matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p1,
+          duplicateOf: original,
+          similarity: 'high',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
 
       const row = screen.getByText('DUP-001').closest('tr')
@@ -1185,10 +1378,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const original = makePolicy({ id: 'orig' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p1, duplicateOf: original,
-        similarity: 'high', matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p1,
+          duplicateOf: original,
+          similarity: 'high',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
 
       expect(screen.getByText('Dup')).toBeInTheDocument()
@@ -1222,7 +1419,9 @@ describe('PolicyDashboard Branch Coverage', () => {
   describe('Table row details', () => {
     it('shows subject info when fullPolicy found', () => {
       const p1 = makePolicy({
-        id: 'p1', type: 'health', insuredPerson: 'Jane Doe',
+        id: 'p1',
+        type: 'health',
+        insuredPerson: 'Jane Doe',
         policyNumber: 'HLT-001',
       })
       mockFullPolicies = [p1]
@@ -1234,8 +1433,11 @@ describe('PolicyDashboard Branch Coverage', () => {
 
     it('shows dash when no subject info available', () => {
       const p1 = makePolicy({
-        id: 'p1', type: 'nakliyat', insuredPerson: undefined,
-        policyNumber: 'NAK-001', location: undefined,
+        id: 'p1',
+        type: 'nakliyat',
+        insuredPerson: undefined,
+        policyNumber: 'NAK-001',
+        location: undefined,
       })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
@@ -1245,7 +1447,9 @@ describe('PolicyDashboard Branch Coverage', () => {
 
     it('displays "Limit" label for traffic policy', () => {
       const p1 = makePolicy({
-        id: 'p1', type: 'traffic', policyNumber: 'TRF-001',
+        id: 'p1',
+        type: 'traffic',
+        policyNumber: 'TRF-001',
         coverages: [
           { name: 'Bodily Injury', nameTr: 'Ölüm', limit: 200000, deductible: 0, included: true },
         ],
@@ -1331,10 +1535,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Birebir kopya/)).toBeInTheDocument()
     })
@@ -1345,10 +1553,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'high',
-        matchedFields: ['provider'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'high',
+          matchedFields: ['provider'],
+        },
+      ]
       renderDashboard()
       // "Çok benzer" appears in the duplicate item text
       const matches = screen.getAllByText(/benzer/i)
@@ -1361,10 +1573,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'medium',
-        matchedFields: ['type'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'medium',
+          matchedFields: ['type'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Muhtemel kopya/)).toBeInTheDocument()
     })
@@ -1391,10 +1607,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber', 'provider'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber', 'provider'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Eslesen alanlar/)).toBeInTheDocument()
     })
@@ -1405,10 +1625,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const p2 = makePolicy({ id: 'dup1', provider: 'Dup Provider' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p2, duplicateOf: p1, similarity: 'exact',
-        matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p2,
+          duplicateOf: p1,
+          similarity: 'exact',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText(/Birle/)).toBeInTheDocument()
     })
@@ -1427,7 +1651,12 @@ describe('PolicyDashboard Branch Coverage', () => {
     })
 
     it('navigates to policy detail via view button (stopPropagation)', async () => {
-      const p1 = makePolicy({ id: 'view-test', provider: 'Test Co', type: 'kasko', policyNumber: 'VW-001' })
+      const p1 = makePolicy({
+        id: 'view-test',
+        provider: 'Test Co',
+        type: 'kasko',
+        policyNumber: 'VW-001',
+      })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
       renderDashboard()
@@ -1525,8 +1754,11 @@ describe('PolicyDashboard Branch Coverage', () => {
     it('shows "Limit" for traffic type in Turkish', () => {
       mockLocale = 'tr'
       const p1 = makePolicy({
-        id: 'p1', type: 'traffic',
-        coverages: [{ name: 'Death', nameTr: 'Ölüm', limit: 100000, deductible: 0, included: true }],
+        id: 'p1',
+        type: 'traffic',
+        coverages: [
+          { name: 'Death', nameTr: 'Ölüm', limit: 100000, deductible: 0, included: true },
+        ],
       })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
@@ -1554,9 +1786,24 @@ describe('PolicyDashboard Branch Coverage', () => {
   // ──────────────────────────────────────────────────────────────────────────
   describe('Combined search + status filter', () => {
     it('applies both search and status filter simultaneously', async () => {
-      const p1 = makePolicy({ id: 'p1', status: 'active', provider: 'Axa Sigorta', policyNumber: 'AXA-001' })
-      const p2 = makePolicy({ id: 'p2', status: 'active', provider: 'Mapfre Sigorta', policyNumber: 'MAP-001' })
-      const p3 = makePolicy({ id: 'p3', status: 'expired', provider: 'Axa Sigorta', policyNumber: 'AXA-002' })
+      const p1 = makePolicy({
+        id: 'p1',
+        status: 'active',
+        provider: 'Axa Sigorta',
+        policyNumber: 'AXA-001',
+      })
+      const p2 = makePolicy({
+        id: 'p2',
+        status: 'active',
+        provider: 'Mapfre Sigorta',
+        policyNumber: 'MAP-001',
+      })
+      const p3 = makePolicy({
+        id: 'p3',
+        status: 'expired',
+        provider: 'Axa Sigorta',
+        policyNumber: 'AXA-002',
+      })
       mockFullPolicies = [p1, p2, p3]
       mockDashboardPolicies = [p1, p2, p3]
       renderDashboard()
@@ -1594,10 +1841,14 @@ describe('PolicyDashboard Branch Coverage', () => {
       const original = makePolicy({ id: 'orig' })
       mockFullPolicies = [p1]
       mockDashboardPolicies = [p1]
-      mockDuplicates = [{
-        policy: p1, duplicateOf: original,
-        similarity: 'high', matchedFields: ['policyNumber'],
-      }]
+      mockDuplicates = [
+        {
+          policy: p1,
+          duplicateOf: original,
+          similarity: 'high',
+          matchedFields: ['policyNumber'],
+        },
+      ]
       renderDashboard()
       expect(screen.getByText('Kopya')).toBeInTheDocument()
     })

@@ -10,7 +10,13 @@ import { logger } from '../lib/logger.js'
 const log = logger.child('AdminNotification')
 
 export type NotificationType = 'error' | 'warning' | 'info'
-export type NotificationCategory = 'billing' | 'api_error' | 'rate_limit' | 'system' | 'security' | 'performance'
+export type NotificationCategory =
+  | 'billing'
+  | 'api_error'
+  | 'rate_limit'
+  | 'system'
+  | 'security'
+  | 'performance'
 
 export interface AdminNotification {
   id?: string
@@ -18,7 +24,7 @@ export interface AdminNotification {
   category: NotificationCategory
   title: string
   message: string
-  provider?: string  // 'anthropic', 'openai', etc.
+  provider?: string // 'anthropic', 'openai', etc.
   details?: Record<string, unknown>
   acknowledged: boolean
   created_at?: string
@@ -58,10 +64,12 @@ export async function createNotification(
 
   const { data, error } = await client
     .from('admin_notifications')
-    .insert([{
-      ...notification,
-      acknowledged: false,
-    }])
+    .insert([
+      {
+        ...notification,
+        acknowledged: false,
+      },
+    ])
     .select()
     .single()
 
@@ -109,17 +117,13 @@ export async function getNotifications(
 
   const { limit = 50, offset = 0, category } = options
 
-  let query = client
-    .from('admin_notifications')
-    .select('*', { count: 'exact' })
+  let query = client.from('admin_notifications').select('*', { count: 'exact' })
 
   if (category) {
     query = query.eq('category', category)
   }
 
-  query = query
-    .order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+  query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1)
 
   const { data, error, count } = await query
 
@@ -159,6 +163,62 @@ export async function acknowledgeNotification(
   }
 
   return true
+}
+
+/**
+ * Delete notifications by IDs
+ */
+export async function deleteNotifications(ids: string[]): Promise<number> {
+  const client = getSupabase()
+  if (!client) return 0
+
+  const { error, count } = await client
+    .from('admin_notifications')
+    .delete({ count: 'exact' })
+    .in('id', ids)
+
+  if (error) {
+    log.error('Failed to delete notifications', { error: String(error), count: ids.length })
+    return 0
+  }
+
+  log.info('Deleted notifications', { count: count || 0 })
+  return count || 0
+}
+
+/**
+ * Delete all notifications matching a filter
+ */
+export async function deleteAllNotifications(
+  options: { category?: NotificationCategory; acknowledged?: boolean } = {}
+): Promise<number> {
+  const client = getSupabase()
+  if (!client) return 0
+
+  let query = client.from('admin_notifications').delete({ count: 'exact' })
+
+  if (options.category) {
+    query = query.eq('category', options.category)
+  }
+  if (options.acknowledged !== undefined) {
+    query = query.eq('acknowledged', options.acknowledged)
+  }
+
+  // Safety: require at least one filter or explicit "all"
+  if (!options.category && options.acknowledged === undefined) {
+    // Delete all — use a truthy condition
+    query = query.gte('created_at', '1970-01-01')
+  }
+
+  const { error, count } = await query
+
+  if (error) {
+    log.error('Failed to delete all notifications', { error: String(error) })
+    return 0
+  }
+
+  log.info('Deleted all matching notifications', { count: count || 0, options })
+  return count || 0
 }
 
 /**

@@ -348,6 +348,22 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     confidence: 'AI Güven Skoru',
   },
 
+  exportMenu: {
+    exportAs: 'Dışa Aktar',
+    pdfReport: 'PDF Raporu',
+    pdfReportDesc: 'Teminat ve görüşler ile markalı rapor',
+    csvExport: 'CSV Tablosu',
+    csvExportDesc: 'Tüm veriler tablo formatında',
+    textSummary: 'Metin Özeti',
+    textSummaryDesc: 'Düz metin özeti',
+    generating: 'Oluşturuluyor...',
+    pdfSuccess: 'PDF raporu yazdırma penceresinde açıldı',
+    csvSuccess: 'CSV dosyası indirildi',
+    textSuccess: 'Özet indirildi',
+    exportFailed: 'Dışa aktarma başarısız',
+    popupBlocked: 'PDF dışa aktarmak için açılır pencerelere izin verin',
+  },
+
   upload: {
     title: 'Poliçe Yükle',
     subtitle: 'Sigorta belgelerinizi AI analizi için yükleyin',
@@ -1001,6 +1017,28 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     permissionDenied: 'Bildirimler engellendi',
     permissionDeniedHint:
       'Etkinleştirmek için tarayıcı adres çubuğundaki kilit simgesine tıklayın ve bildirimlere izin verin.',
+  },
+
+  // Onboarding
+  onboarding: {
+    welcomeTitle: "InsurAI'ye Hoş Geldiniz!",
+    welcomeWithName: "InsurAI'ye Hoş Geldiniz, {name}!",
+    welcomeSubtitle: 'Sigorta poliçelerinizin yapay zeka destekli analizini saniyeler içinde alın.',
+    howItWorks: 'Nasıl çalışır',
+    step1Title: "PDF'nizi yükleyin",
+    step1Desc: 'Sigorta poliçe belgenizi bırakın — tüm Türk poliçe türlerini destekliyoruz.',
+    step2Title: 'Yapay zeka analiz eder',
+    step2Desc:
+      'Yapay zekamız teminat detaylarını, limitleri, istisnaları ve önemli koşulları çıkarır.',
+    step3Title: 'Bilgi ve puan alın',
+    step3Desc: 'Teminat puanınızı, eksik analizi ve uygulanabilir önerileri görün.',
+    uploadTitle: "Poliçe PDF'nizi buraya bırakın",
+    uploadSubtitle: 'veya göz atmak için tıklayın',
+    uploadHint: "10 MB'a kadar PDF dosyaları",
+    invalidFile: 'Lütfen bir PDF dosyası seçin.',
+    fileTooLarge: "Dosya çok büyük. Maksimum boyut 10 MB'dır.",
+    skipForNow: 'Şimdilik atla',
+    exploreSamples: 'Veya örnek poliçeleri inceleyin',
   },
 
   // Coverage name translations (English → Turkish — from shared module)

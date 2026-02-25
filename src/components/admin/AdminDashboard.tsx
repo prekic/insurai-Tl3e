@@ -30,6 +30,8 @@ import { NotificationsTab } from './tabs/NotificationsTab'
 import { BenchmarksTab } from './tabs/BenchmarksTab'
 import { TranslationsTab } from './tabs/TranslationsTab'
 
+import { cn } from '@/lib/utils'
+
 // Icons
 import {
   LayoutDashboard,
@@ -52,6 +54,8 @@ import {
   XCircle,
   TrendingUp,
   Languages,
+  Menu,
+  X,
 } from 'lucide-react'
 
 const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
@@ -76,6 +80,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
 export function AdminDashboard() {
   const { isAuthenticated, isLoading: authLoading } = useAdminAuth()
   const [activeTab, setActiveTab] = useState<AdminSection>('overview')
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null)
   const [alerts, setAlerts] = useState<AdminAlert[]>([])
@@ -96,20 +101,24 @@ export function AdminDashboard() {
 
   const fetchAlerts = useCallback(async () => {
     try {
-      const response = await adminFetch('/api/admin/security/logs?severity=critical&resolved=false&limit=10')
+      const response = await adminFetch(
+        '/api/admin/security/logs?severity=critical&resolved=false&limit=10'
+      )
       const data = await response.json()
       if (data.success) {
         // Convert security logs to alerts format
-        setAlerts(data.data.map((log: Record<string, unknown>) => ({
-          id: log.id,
-          timestamp: log.timestamp,
-          type: log.eventType,
-          severity: log.severity,
-          title: String(log.eventType).replace(/_/g, ' '),
-          message: JSON.stringify(log.details),
-          acknowledged: false,
-          resolved: log.resolved,
-        })))
+        setAlerts(
+          data.data.map((log: Record<string, unknown>) => ({
+            id: log.id,
+            timestamp: log.timestamp,
+            type: log.eventType,
+            severity: log.severity,
+            title: String(log.eventType).replace(/_/g, ' '),
+            message: JSON.stringify(log.details),
+            acknowledged: false,
+            resolved: log.resolved,
+          }))
+        )
       }
     } catch (error) {
       console.error('Failed to fetch alerts:', error)
@@ -217,24 +226,42 @@ export function AdminDashboard() {
     }
   }
 
+  const handleTabSelect = (tabId: AdminSection) => {
+    setActiveTab(tabId)
+    setSidebarOpen(false)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Logo and title */}
-            <div className="flex items-center gap-4">
+            {/* Hamburger (mobile) + Logo */}
+            <div className="flex items-center gap-3">
+              <button
+                className="p-2 -ml-2 text-gray-500 hover:text-gray-700 md:hidden"
+                onClick={() => setSidebarOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center">
                   <Shield className="h-5 w-5 text-white" />
                 </div>
-                <span className="text-xl font-bold text-gray-900">InsurAI Admin</span>
+                <span className="text-xl font-bold text-gray-900 hidden sm:inline">
+                  InsurAI Admin
+                </span>
+                <span className="text-xl font-bold text-gray-900 sm:hidden">Admin</span>
               </div>
 
               {/* System Status */}
               {systemHealth && (
-                <div className={`flex items-center gap-2 px-3 py-1 rounded-full border ${getStatusColor(systemHealth.status)}`}>
+                <div
+                  className={`hidden sm:flex items-center gap-2 px-3 py-1 rounded-full border ${getStatusColor(systemHealth.status)}`}
+                >
                   {getStatusIcon(systemHealth.status)}
                   <span className="text-sm font-medium capitalize">{systemHealth.status}</span>
                 </div>
@@ -242,14 +269,14 @@ export function AdminDashboard() {
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 md:gap-4">
               {/* Alerts indicator */}
               {unacknowledgedAlerts.length > 0 && (
                 <Button
                   variant="ghost"
                   size="sm"
                   className="relative"
-                  onClick={() => setActiveTab('alerts')}
+                  onClick={() => handleTabSelect('alerts')}
                 >
                   <Bell className="h-5 w-5" />
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
@@ -260,12 +287,12 @@ export function AdminDashboard() {
 
               {/* Refresh */}
               <Button variant="outline" size="sm" onClick={refresh} disabled={isLoading}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
+                <RefreshCw className={cn('h-4 w-4', isLoading && 'animate-spin')} />
+                <span className="hidden md:inline ml-2">Refresh</span>
               </Button>
 
-              {/* Last refresh time */}
-              <span className="text-sm text-gray-500">
+              {/* Last refresh time — hidden on mobile */}
+              <span className="hidden md:inline text-sm text-gray-500">
                 Last updated: {lastRefresh.toLocaleTimeString()}
               </span>
             </div>
@@ -273,14 +300,40 @@ export function AdminDashboard() {
         </div>
       </header>
 
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       <div className="flex">
-        {/* Sidebar Navigation */}
-        <aside className="w-64 bg-white border-r border-gray-200 min-h-[calc(100vh-4rem)] sticky top-16">
+        {/* Sidebar Navigation — mobile: slide-out drawer; desktop: static */}
+        <aside
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 transform transition-transform duration-200 ease-in-out overflow-y-auto',
+            'md:static md:translate-x-0 md:min-h-[calc(100vh-4rem)] md:sticky md:top-16',
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          )}
+        >
+          {/* Close button — mobile only */}
+          <div className="flex items-center justify-between p-4 border-b border-gray-200 md:hidden">
+            <span className="font-semibold text-gray-900">Navigation</span>
+            <button
+              className="p-1 text-gray-400 hover:text-gray-600"
+              onClick={() => setSidebarOpen(false)}
+              aria-label="Close menu"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
           <nav className="p-4 space-y-1">
             {TABS.map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => handleTabSelect(tab.id)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab.id
                     ? 'bg-blue-50 text-blue-700'
@@ -299,7 +352,7 @@ export function AdminDashboard() {
           </nav>
 
           {/* Environment info */}
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
+          <div className="hidden md:block absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
             <div className="text-xs text-gray-500 space-y-1">
               <div className="flex justify-between">
                 <span>Environment:</span>
@@ -320,7 +373,7 @@ export function AdminDashboard() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-6">
+        <main className="flex-1 min-w-0 p-3 md:p-6">
           <div className="max-w-[1400px] mx-auto">
             {isLoading && !systemHealth ? (
               <div className="flex items-center justify-center h-64">

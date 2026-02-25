@@ -354,6 +354,23 @@ export interface TranslationDictionary {
     confidence: string
   }
 
+  // Export Menu (PolicyDetailView)
+  exportMenu: {
+    exportAs: string
+    pdfReport: string
+    pdfReportDesc: string
+    csvExport: string
+    csvExportDesc: string
+    textSummary: string
+    textSummaryDesc: string
+    generating: string
+    pdfSuccess: string
+    csvSuccess: string
+    textSuccess: string
+    exportFailed: string
+    popupBlocked: string
+  }
+
   // Upload
   upload: {
     title: string
@@ -1006,6 +1023,27 @@ export interface TranslationDictionary {
     maybeLater: string
     permissionDenied: string
     permissionDeniedHint: string
+  }
+
+  // Onboarding
+  onboarding: {
+    welcomeTitle: string
+    welcomeWithName: string
+    welcomeSubtitle: string
+    howItWorks: string
+    step1Title: string
+    step1Desc: string
+    step2Title: string
+    step2Desc: string
+    step3Title: string
+    step3Desc: string
+    uploadTitle: string
+    uploadSubtitle: string
+    uploadHint: string
+    invalidFile: string
+    fileTooLarge: string
+    skipForNow: string
+    exploreSamples: string
   }
 
   // Coverage name translations (keyed by English name, value is locale-specific)

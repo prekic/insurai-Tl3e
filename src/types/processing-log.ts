@@ -8,56 +8,56 @@
  * Processing stage names that map to the pipeline steps
  */
 export type ProcessingStage =
-  | 'upload'              // File received in browser
-  | 'pdf_extraction'      // Text extraction via pdf.js
-  | 'ocr_decision'        // OCR Decision Engine analysis (language, policy type, quality)
-  | 'ocr_check'           // Legacy: Density check to determine if OCR needed
-  | 'ocr_processing'      // OCR via Document AI/Vision/Tesseract
-  | 'text_preprocessing'  // Text normalization, OCR cleanup
-  | 'ai_extraction'       // GPT-4o/Claude structured extraction
+  | 'upload' // File received in browser
+  | 'pdf_extraction' // Text extraction via pdf.js
+  | 'ocr_decision' // OCR Decision Engine analysis (language, policy type, quality)
+  | 'ocr_check' // Legacy: Density check to determine if OCR needed
+  | 'ocr_processing' // OCR via Document AI/Vision/Tesseract
+  | 'text_preprocessing' // Text normalization, OCR cleanup
+  | 'ai_extraction' // GPT-4o/Claude structured extraction
   | 'form_field_enhancement' // Document AI form fields applied
-  | 'table_parsing'       // Coverage table parsing
-  | 'validation'          // Data validation (Zod, business rules)
-  | 'duplicate_check'     // Duplicate/amendment detection
+  | 'table_parsing' // Coverage table parsing
+  | 'validation' // Data validation (Zod, business rules)
+  | 'duplicate_check' // Duplicate/amendment detection
   | 'conflict_resolution' // User resolved duplicate conflict
-  | 'database_save'       // Save to Supabase
+  | 'database_save' // Save to Supabase
 
 /**
  * Status of a processing stage
  */
 export type ProcessingStageStatus =
-  | 'pending'    // Not started
-  | 'running'    // In progress
-  | 'completed'  // Finished successfully
-  | 'failed'     // Failed with error
-  | 'skipped'    // Skipped (e.g., OCR not needed)
-  | 'partial'    // Completed with warnings
+  | 'pending' // Not started
+  | 'running' // In progress
+  | 'completed' // Finished successfully
+  | 'failed' // Failed with error
+  | 'skipped' // Skipped (e.g., OCR not needed)
+  | 'partial' // Completed with warnings
 
 /**
  * Overall document processing status
  */
 export type ProcessingStatus =
-  | 'pending'    // Queued but not started
+  | 'pending' // Queued but not started
   | 'processing' // Currently being processed
-  | 'completed'  // All stages finished successfully
-  | 'failed'     // Processing failed
-  | 'partial'    // Some stages failed but document was saved
+  | 'completed' // All stages finished successfully
+  | 'failed' // Processing failed
+  | 'partial' // Some stages failed but document was saved
 
 /**
  * Decision context for skipped stages - explains WHY a stage was skipped
  */
 export interface StageDecisionContext {
-  assessment_performed: string    // What was checked (e.g., "Text density analysis")
+  assessment_performed: string // What was checked (e.g., "Text density analysis")
   threshold?: {
-    name: string                  // e.g., "chars_per_page"
-    value: number                 // The threshold value (e.g., 200)
-    unit?: string                 // e.g., "characters per page"
+    name: string // e.g., "chars_per_page"
+    value: number // The threshold value (e.g., 200)
+    unit?: string // e.g., "characters per page"
     comparison: 'less_than' | 'greater_than' | 'equals' | 'not_equals'
   }
-  actual_values: Record<string, number | string | boolean>  // Actual measured values
-  decision_logic: string          // How the decision was made
-  alternatives?: string[]         // What would have triggered the stage
-  documentation_url?: string      // Link to relevant docs
+  actual_values: Record<string, number | string | boolean> // Actual measured values
+  decision_logic: string // How the decision was made
+  alternatives?: string[] // What would have triggered the stage
+  documentation_url?: string // Link to relevant docs
 }
 
 /**
@@ -76,14 +76,15 @@ export interface ProcessingStageRecord {
 
   // Full text content for admin debugging
   // These are stored separately to allow UI to show previews first
-  full_input_text?: string       // Full input text before this stage
-  full_output_text?: string      // Full output text after this stage
-  full_extracted_json?: string   // Full extracted JSON (for ai_extraction stage)
-  diff_summary?: {               // Text difference summary for preprocessing stages
+  full_input_text?: string // Full input text before this stage
+  full_output_text?: string // Full output text after this stage
+  full_extracted_json?: string // Full extracted JSON (for ai_extraction stage)
+  diff_summary?: {
+    // Text difference summary for preprocessing stages
     characters_added: number
     characters_removed: number
     lines_changed: number
-    major_changes: string[]      // List of significant changes made
+    major_changes: string[] // List of significant changes made
   }
 
   // Decision context for skipped stages - explains WHY it was skipped
@@ -141,6 +142,7 @@ export interface DocumentProcessingLog {
     extraction_provider?: string
     document_length?: number
     ocr_used?: boolean
+    error_code?: string
     last_successful_stage?: string
     data_at_failure?: Record<string, unknown>
     browser_info?: string
@@ -148,7 +150,7 @@ export interface DocumentProcessingLog {
   }
 
   // Request correlation
-  request_id?: string             // Links frontend extraction to server-side logs
+  request_id?: string // Links frontend extraction to server-side logs
 
   // Summary flags for filtering
   ocr_used: boolean
@@ -157,15 +159,16 @@ export interface DocumentProcessingLog {
   extraction_confidence?: number
 
   // Route and fallback tracking
-  extraction_route?: string       // Server endpoint used (e.g., '/api/ai/extract', '/api/ai/extract/openai')
-  extraction_mode?: 'proxy' | 'direct' | 'consensus'  // How extraction was invoked
-  fallback_used?: boolean         // True if primary provider failed and fallback was used
-  fallback_chain?: Array<{        // Full provider attempt chain
-    provider: string              // e.g., 'anthropic', 'openai'
+  extraction_route?: string // Server endpoint used (e.g., '/api/ai/extract', '/api/ai/extract/openai')
+  extraction_mode?: 'proxy' | 'direct' | 'consensus' // How extraction was invoked
+  fallback_used?: boolean // True if primary provider failed and fallback was used
+  fallback_chain?: Array<{
+    // Full provider attempt chain
+    provider: string // e.g., 'anthropic', 'openai'
     success: boolean
     duration_ms?: number
-    error?: string                // Error message if failed
-    error_code?: string           // Structured error code (e.g., 'ANTHROPIC_BILLING_ERROR')
+    error?: string // Error message if failed
+    error_code?: string // Structured error code (e.g., 'ANTHROPIC_BILLING_ERROR')
   }>
 
   // Extracted summary
@@ -206,7 +209,7 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     label: 'PDF Extraction',
     labelTr: 'PDF Metin Çıkarma',
     description: 'Text extracted from PDF using pdf.js',
-    descriptionTr: 'pdf.js ile PDF\'den metin çıkarıldı',
+    descriptionTr: "pdf.js ile PDF'den metin çıkarıldı",
     icon: 'FileText',
     color: 'indigo',
   },
@@ -318,7 +321,7 @@ export const PIPELINE_STAGES: ProcessingStage[] = [
   'upload',
   'pdf_extraction',
   'ocr_decision',
-  'ocr_check',  // Legacy - kept for backwards compatibility
+  'ocr_check', // Legacy - kept for backwards compatibility
   'ocr_processing',
   'text_preprocessing',
   'ai_extraction',

@@ -67,17 +67,15 @@ function RecentErrorsPanel({
             {/* Error Header */}
             <div
               className="p-3 cursor-pointer hover:bg-red-50 transition-colors"
-              onClick={() => setExpandedError(
-                expandedError === log.document_id ? null : log.document_id
-              )}
+              onClick={() =>
+                setExpandedError(expandedError === log.document_id ? null : log.document_id)
+              }
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <AlertTriangle className="text-red-500" size={16} />
                   <div>
-                    <div className="font-medium text-gray-900 text-sm">
-                      {log.filename}
-                    </div>
+                    <div className="font-medium text-gray-900 text-sm">{log.filename}</div>
                     <div className="text-xs text-gray-500">
                       {log.error_stage && `Stage: ${log.error_stage} • `}
                       {new Date(log.started_at).toLocaleString('tr-TR')}
@@ -120,9 +118,7 @@ function RecentErrorsPanel({
                 {log.error_type && (
                   <div className="mb-3">
                     <div className="text-xs font-medium text-red-700 mb-1">Error Type</div>
-                    <div className="text-sm text-red-900">
-                      {log.error_type}
-                    </div>
+                    <div className="text-sm text-red-900">{log.error_type}</div>
                   </div>
                 )}
 
@@ -134,25 +130,33 @@ function RecentErrorsPanel({
                       {log.error_context.extraction_provider && (
                         <div className="bg-white p-2 rounded border border-red-200">
                           <span className="text-gray-500">Provider:</span>{' '}
-                          <span className="font-medium">{log.error_context.extraction_provider}</span>
+                          <span className="font-medium">
+                            {log.error_context.extraction_provider}
+                          </span>
                         </div>
                       )}
                       {log.error_context.document_length && (
                         <div className="bg-white p-2 rounded border border-red-200">
                           <span className="text-gray-500">Doc Length:</span>{' '}
-                          <span className="font-medium">{log.error_context.document_length.toLocaleString()} chars</span>
+                          <span className="font-medium">
+                            {log.error_context.document_length.toLocaleString()} chars
+                          </span>
                         </div>
                       )}
                       {log.error_context.last_successful_stage && (
                         <div className="bg-white p-2 rounded border border-red-200">
                           <span className="text-gray-500">Last OK Stage:</span>{' '}
-                          <span className="font-medium">{log.error_context.last_successful_stage}</span>
+                          <span className="font-medium">
+                            {log.error_context.last_successful_stage}
+                          </span>
                         </div>
                       )}
                       {log.error_context.ocr_used !== undefined && (
                         <div className="bg-white p-2 rounded border border-red-200">
                           <span className="text-gray-500">OCR Used:</span>{' '}
-                          <span className="font-medium">{log.error_context.ocr_used ? 'Yes' : 'No'}</span>
+                          <span className="font-medium">
+                            {log.error_context.ocr_used ? 'Yes' : 'No'}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -170,14 +174,15 @@ function RecentErrorsPanel({
                 )}
 
                 {/* Data at Failure */}
-                {log.error_context?.data_at_failure && Object.keys(log.error_context.data_at_failure).length > 0 && (
-                  <div className="mt-3">
-                    <div className="text-xs font-medium text-red-700 mb-1">Data at Failure</div>
-                    <pre className="text-xs text-red-800 bg-white p-2 rounded border border-red-200 overflow-x-auto max-h-32">
-                      {JSON.stringify(log.error_context.data_at_failure, null, 2)}
-                    </pre>
-                  </div>
-                )}
+                {log.error_context?.data_at_failure &&
+                  Object.keys(log.error_context.data_at_failure).length > 0 && (
+                    <div className="mt-3">
+                      <div className="text-xs font-medium text-red-700 mb-1">Data at Failure</div>
+                      <pre className="text-xs text-red-800 bg-white p-2 rounded border border-red-200 overflow-x-auto max-h-32">
+                        {JSON.stringify(log.error_context.data_at_failure, null, 2)}
+                      </pre>
+                    </div>
+                  )}
               </div>
             )}
           </div>
@@ -458,10 +463,7 @@ export function ProcessingLogsTab() {
       )}
 
       {/* Recent Errors Panel - Prominent display for admin */}
-      <RecentErrorsPanel
-        errors={recentErrors}
-        onViewLog={setSelectedLog}
-      />
+      <RecentErrorsPanel errors={recentErrors} onViewLog={setSelectedLog} />
 
       {/* Toolbar */}
       <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
@@ -473,18 +475,18 @@ export function ProcessingLogsTab() {
               placeholder="Search by filename..."
               value={filters.search}
               onChange={(e) => handleFilterChange('search', e.target.value)}
-              className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+              className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full md:w-64"
             />
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setShowFilters(!showFilters)}>
             <Filter size={16} className="mr-2" />
             Filters
-            {showFilters ? <ChevronUp size={16} className="ml-1" /> : <ChevronDown size={16} className="ml-1" />}
+            {showFilters ? (
+              <ChevronUp size={16} className="ml-1" />
+            ) : (
+              <ChevronDown size={16} className="ml-1" />
+            )}
           </Button>
         </div>
 
@@ -576,13 +578,64 @@ export function ProcessingLogsTab() {
 
       {/* Error State */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
-          {error}
-        </div>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">{error}</div>
       )}
 
-      {/* Logs Table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Mobile Card List */}
+      <div className="md:hidden space-y-3">
+        {loading && logs.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+            <Loader2 className="animate-spin mx-auto mb-2" size={24} />
+            Loading processing logs...
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-lg p-8 text-center text-gray-500">
+            <FileText className="mx-auto mb-2 text-gray-300" size={32} />
+            No processing logs found
+          </div>
+        ) : (
+          logs.map((log) => (
+            <div
+              key={log.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 active:bg-gray-50 cursor-pointer transition-colors"
+              onClick={() => setSelectedLog(log)}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <FileText className="text-gray-400 flex-shrink-0" size={16} />
+                  <span className="font-medium text-sm text-gray-900 truncate">{log.filename}</span>
+                </div>
+                {getStatusBadge(log.status)}
+              </div>
+              {log.extracted_summary?.policy_number && (
+                <div className="text-xs text-gray-500 mb-2 ml-6">
+                  {log.extracted_summary.policy_number}
+                </div>
+              )}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <span>{log.stages.length} stages</span>
+                <span>{formatDuration(log.total_duration_ms)}</span>
+                {log.ocr_used && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">
+                    <ScanLine size={10} />
+                    {log.ocr_engine || 'OCR'}
+                  </span>
+                )}
+                {log.ai_provider && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">
+                    <Brain size={10} />
+                    {log.ai_provider}
+                  </span>
+                )}
+              </div>
+              <div className="text-xs text-gray-400 mt-2">{formatDate(log.started_at)}</div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Logs Table */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-lg overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
@@ -626,7 +679,11 @@ export function ProcessingLogsTab() {
               </tr>
             ) : (
               logs.map((log) => (
-                <tr key={log.id} className="hover:bg-gray-50">
+                <tr
+                  key={log.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => setSelectedLog(log)}
+                >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <FileText className="text-gray-400" size={16} />
@@ -642,12 +699,8 @@ export function ProcessingLogsTab() {
                       </div>
                     </div>
                   </td>
-                  <td className="px-4 py-3">
-                    {getStatusBadge(log.status)}
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {log.stages.length} stages
-                  </td>
+                  <td className="px-4 py-3">{getStatusBadge(log.status)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{log.stages.length} stages</td>
                   <td className="px-4 py-3 text-sm text-gray-600">
                     {formatDuration(log.total_duration_ms)}
                   </td>
@@ -667,14 +720,15 @@ export function ProcessingLogsTab() {
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">
-                    {formatDate(log.started_at)}
-                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(log.started_at)}</td>
                   <td className="px-4 py-3 text-right">
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedLog(log)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedLog(log)
+                      }}
                     >
                       <Eye size={16} className="mr-1" />
                       View Journey
@@ -685,34 +739,37 @@ export function ProcessingLogsTab() {
             )}
           </tbody>
         </table>
-
-        {/* Pagination */}
-        {total > pageSize && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-            <div className="text-sm text-gray-500">
-              Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, total)} of {total}
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setPage((p) => p + 1)}
-                disabled={(page + 1) * pageSize >= total}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Pagination */}
+      {total > pageSize && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 bg-white border border-gray-200 rounded-lg">
+          <div className="hidden sm:block text-sm text-gray-500">
+            Showing {page * pageSize + 1} - {Math.min((page + 1) * pageSize, total)} of {total}
+          </div>
+          <div className="text-sm text-gray-500 sm:hidden">
+            {page + 1} / {Math.ceil(total / pageSize)}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={(page + 1) * pageSize >= total}
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

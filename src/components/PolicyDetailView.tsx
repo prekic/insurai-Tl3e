@@ -1,7 +1,37 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Download, Share2, Shield, AlertTriangle, Check, X, Sparkles, TrendingUp, TrendingDown, BarChart3, Loader2, Car, Scale, Users, Briefcase, Gavel, LifeBuoy, HelpCircle, Info, ShieldCheck, FileText, ChevronDown, ChevronUp, Copy, CheckCircle, Code } from 'lucide-react'
+import {
+  ArrowLeft,
+  Download,
+  Share2,
+  Shield,
+  AlertTriangle,
+  Check,
+  X,
+  Sparkles,
+  TrendingUp,
+  TrendingDown,
+  BarChart3,
+  Loader2,
+  Car,
+  Scale,
+  Users,
+  Briefcase,
+  Gavel,
+  LifeBuoy,
+  HelpCircle,
+  Info,
+  ShieldCheck,
+  FileText,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  CheckCircle,
+  Code,
+  FileSpreadsheet,
+  FileDown,
+} from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
@@ -21,6 +51,8 @@ import {
 } from '@/lib/knowledge/kasko-knowledge'
 import { getShortCompanyName } from '@/lib/insurance-display'
 import { useTranslation } from '@/lib/i18n/i18n-context'
+import { usePdfExport } from '@/hooks/usePdfExport'
+import { exportSinglePolicyToCSV } from '@/lib/export'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -53,8 +85,12 @@ function formatCoverageLimit(coverage: Coverage): string {
       return 'Rayiç Değer'
     }
     // Services without numeric limits
-    if (nameLower.includes('asistans') || nameLower.includes('hizmet') ||
-        nameLower.includes('ikame') || nameLower.includes('onarım')) {
+    if (
+      nameLower.includes('asistans') ||
+      nameLower.includes('hizmet') ||
+      nameLower.includes('ikame') ||
+      nameLower.includes('onarım')
+    ) {
       return 'Dahil'
     }
     return 'Dahil' // Default to "Dahil" instead of ₺0 for zero-limit coverages
@@ -67,13 +103,20 @@ function formatCoverageLimit(coverage: Coverage): string {
  */
 function getCategoryIcon(category: CoverageCategory) {
   switch (category) {
-    case 'main': return Car
-    case 'liability': return Scale
-    case 'personal_accident': return Users
-    case 'supplementary': return Briefcase
-    case 'assistance': return LifeBuoy
-    case 'legal': return Gavel
-    default: return Shield
+    case 'main':
+      return Car
+    case 'liability':
+      return Scale
+    case 'personal_accident':
+      return Users
+    case 'supplementary':
+      return Briefcase
+    case 'assistance':
+      return LifeBuoy
+    case 'legal':
+      return Gavel
+    default:
+      return Shield
   }
 }
 
@@ -100,9 +143,11 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 
   // Add deductible info if applicable
   if (coverage.deductible && coverage.deductible > 0) {
-    parts.push(locale === 'tr'
-      ? `Muafiyet: ${formatCurrency(coverage.deductible)}`
-      : `Deductible: ${formatCurrency(coverage.deductible)}`)
+    parts.push(
+      locale === 'tr'
+        ? `Muafiyet: ${formatCurrency(coverage.deductible)}`
+        : `Deductible: ${formatCurrency(coverage.deductible)}`
+    )
   }
 
   // Add description if available
@@ -117,15 +162,15 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 
   // Add info about special values
   if (coverage.isMarketValue) {
-    parts.push(locale === 'tr'
-      ? 'Hasar anındaki piyasa değeri üzerinden ödenir'
-      : 'Paid based on market value at time of loss')
+    parts.push(
+      locale === 'tr'
+        ? 'Hasar anındaki piyasa değeri üzerinden ödenir'
+        : 'Paid based on market value at time of loss'
+    )
   }
 
   if (coverage.isUnlimited) {
-    parts.push(locale === 'tr'
-      ? 'Limit üst sınırı yoktur'
-      : 'No upper limit')
+    parts.push(locale === 'tr' ? 'Limit üst sınırı yoktur' : 'No upper limit')
   }
 
   return parts.length > 0 ? parts.join(' • ') : null
@@ -141,7 +186,7 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 function getLocalizedCoverageName(
   coverage: { name: string; nameTr?: string },
   locale: string,
-  coverageNames: Record<string, string>,
+  coverageNames: Record<string, string>
 ): string {
   if (locale === 'en') return coverage.name
 
@@ -160,7 +205,7 @@ function getLocalizedCoverageName(
 function translateInsightLegacy(
   insight: string,
   locale: string,
-  insightTranslations: Record<string, string>,
+  insightTranslations: Record<string, string>
 ): string {
   if (locale === 'en') return insight
 
@@ -191,7 +236,9 @@ function translateInsightLegacy(
 
   const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
   if (yoyMatch) {
-    const template = insightTranslations['marketPremiumsYoY'] || 'Market premiums increased {percent}% YoY - lock in rates early'
+    const template =
+      insightTranslations['marketPremiumsYoY'] ||
+      'Market premiums increased {percent}% YoY - lock in rates early'
     const translated = template.replace('{percent}', yoyMatch[1])
     return prefix ? `${prefix}${translated}` : translated
   }
@@ -208,7 +255,7 @@ function getLocalizedInsight(
   policy: { aiInsights: string[]; aiInsightsTr?: string[] },
   index: number,
   locale: string,
-  insightTranslations: Record<string, string>,
+  insightTranslations: Record<string, string>
 ): string {
   if (locale === 'en') return policy.aiInsights[index]
   // Use pre-translated TR insights if available
@@ -281,13 +328,17 @@ function CollapsibleCoverageCategory({
                   <div className="w-6 h-6 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
                     <Check className="text-blue-600" size={12} />
                   </div>
-                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(groupedCoverage, locale, coverageNames)}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">
+                    {getLocalizedCoverageName(groupedCoverage, locale, coverageNames)}
+                  </p>
                 </div>
                 <div className="grid grid-cols-1 gap-1 ml-8">
                   {groupedCoverage.subLimits.map((subLimit, j) => (
                     <div key={j} className="flex justify-between items-center text-xs">
                       <span className="text-gray-600 truncate mr-2">{subLimit.label}</span>
-                      <span className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}>
+                      <span
+                        className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
+                      >
                         {subLimit.isUnlimited ? 'Sınırsız' : formatCurrency(subLimit.limit)}
                       </span>
                     </div>
@@ -300,8 +351,12 @@ function CollapsibleCoverageCategory({
           // Regular coverage - with click-to-expand info
           const coverage = groupedCoverage as unknown as Coverage
           const limitDisplay = formatCoverageLimit(coverage)
-          const isSpecialValue = coverage.isUnlimited || coverage.isMarketValue ||
-            limitDisplay === 'Dahil' || limitDisplay === 'Sınırsız' || limitDisplay === 'Rayiç Değer'
+          const isSpecialValue =
+            coverage.isUnlimited ||
+            coverage.isMarketValue ||
+            limitDisplay === 'Dahil' ||
+            limitDisplay === 'Sınırsız' ||
+            limitDisplay === 'Rayiç Değer'
           const infoText = getCoverageInfoText(coverage, locale)
           const isCoverageExpanded = expandedCoverageIndex === i
           const hasInfo = !!infoText
@@ -323,12 +378,19 @@ function CollapsibleCoverageCategory({
                       <X className="text-gray-400" size={12} />
                     </div>
                   )}
-                  <p className="font-medium text-gray-900 text-sm truncate">{getLocalizedCoverageName(coverage, locale, coverageNames)}</p>
+                  <p className="font-medium text-gray-900 text-sm truncate">
+                    {getLocalizedCoverageName(coverage, locale, coverageNames)}
+                  </p>
                   {hasInfo && (
-                    <Info size={12} className={`text-gray-400 flex-shrink-0 transition-colors ${isCoverageExpanded ? 'text-blue-500' : ''}`} />
+                    <Info
+                      size={12}
+                      className={`text-gray-400 flex-shrink-0 transition-colors ${isCoverageExpanded ? 'text-blue-500' : ''}`}
+                    />
                   )}
                 </div>
-                <p className={`font-semibold text-sm flex-shrink-0 ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}>
+                <p
+                  className={`font-semibold text-sm flex-shrink-0 ${isSpecialValue ? 'text-blue-600' : 'text-gray-900'}`}
+                >
                   {limitDisplay}
                 </p>
               </button>
@@ -337,9 +399,7 @@ function CollapsibleCoverageCategory({
               {isCoverageExpanded && infoText && (
                 <div className="px-2.5 pb-2.5">
                   <div className="p-2 bg-blue-50 rounded-md border border-blue-100 ml-8">
-                    <p className="text-xs text-gray-600 leading-relaxed">
-                      {infoText}
-                    </p>
+                    <p className="text-xs text-gray-600 leading-relaxed">{infoText}</p>
                   </div>
                 </div>
               )}
@@ -360,8 +420,8 @@ function CollapsibleCoverageCategory({
               </>
             ) : (
               <>
-                <ChevronDown size={14} />
-                +{coverages.length - PREVIEW_COUNT} {locale === 'tr' ? 'daha fazla' : 'more'}
+                <ChevronDown size={14} />+{coverages.length - PREVIEW_COUNT}{' '}
+                {locale === 'tr' ? 'daha fazla' : 'more'}
               </>
             )}
           </button>
@@ -386,7 +446,7 @@ function CoveragesByCategory({
 }) {
   const { t } = useTranslation()
   // Filter and prepare coverages
-  const filteredCoverages = coverages.filter(coverage => {
+  const filteredCoverages = coverages.filter((coverage) => {
     // Always keep coverages with limits, unlimited flag, or market value flag
     if (coverage.limit > 0) return true
     if (coverage.isUnlimited) return true
@@ -405,7 +465,7 @@ function CoveragesByCategory({
       'kasko sigortası',
       'konut sigortası',
     ]
-    return !categoryPatterns.some(pattern => nameLower.includes(pattern))
+    return !categoryPatterns.some((pattern) => nameLower.includes(pattern))
   })
 
   // Group coverages by category, then apply sub-limit grouping
@@ -463,11 +523,14 @@ function CoveragesByCategory({
             <span className="text-sm">Temel Kasko Teminatları (Dahil)</span>
           </div>
           <p className="text-xs sm:text-sm text-green-700 mb-2 leading-relaxed">
-            Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç rayiç bedeli üzerinden teminat altındadır.
+            Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç
+            rayiç bedeli üzerinden teminat altındadır.
           </p>
           <div className="text-xs text-green-600 flex items-start gap-1">
             <HelpCircle size={12} className="flex-shrink-0 mt-0.5" />
-            <span>Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.</span>
+            <span>
+              Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.
+            </span>
           </div>
         </div>
       )}
@@ -523,22 +586,50 @@ function ExclusionsSection({
   const getSeverityStyles = (severity: AnalyzedExclusion['severity']) => {
     switch (severity) {
       case 'critical':
-        return { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-800', icon: 'text-red-600', badge: 'destructive' as const }
+        return {
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          text: 'text-red-800',
+          icon: 'text-red-600',
+          badge: 'destructive' as const,
+        }
       case 'important':
-        return { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-800', icon: 'text-amber-600', badge: 'warning' as const }
+        return {
+          bg: 'bg-amber-50',
+          border: 'border-amber-200',
+          text: 'text-amber-800',
+          icon: 'text-amber-600',
+          badge: 'warning' as const,
+        }
       case 'standard':
-        return { bg: 'bg-yellow-50', border: 'border-yellow-100', text: 'text-gray-700', icon: 'text-yellow-600', badge: 'outline' as const }
+        return {
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-100',
+          text: 'text-gray-700',
+          icon: 'text-yellow-600',
+          badge: 'outline' as const,
+        }
       default:
-        return { bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-600', icon: 'text-gray-400', badge: 'secondary' as const }
+        return {
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          text: 'text-gray-600',
+          icon: 'text-gray-400',
+          badge: 'secondary' as const,
+        }
     }
   }
 
   const getSeverityLabel = (severity: AnalyzedExclusion['severity']) => {
     switch (severity) {
-      case 'critical': return locale === 'tr' ? 'Kritik' : 'Critical'
-      case 'important': return locale === 'tr' ? 'Önemli' : 'Important'
-      case 'standard': return locale === 'tr' ? 'Standart' : 'Standard'
-      default: return locale === 'tr' ? 'Bilgi' : 'Info'
+      case 'critical':
+        return locale === 'tr' ? 'Kritik' : 'Critical'
+      case 'important':
+        return locale === 'tr' ? 'Önemli' : 'Important'
+      case 'standard':
+        return locale === 'tr' ? 'Standart' : 'Standard'
+      default:
+        return locale === 'tr' ? 'Bilgi' : 'Info'
     }
   }
 
@@ -556,10 +647,15 @@ function ExclusionsSection({
           <CardContent>
             <div className="space-y-2">
               {analysis.coveragesInExclusions.map((item, i) => (
-                <div key={i} className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-3 bg-green-50 rounded-lg"
+                >
                   <div className="flex items-center gap-3">
                     <Check className="text-green-600" size={16} />
-                    <span className="text-sm text-gray-700">{item.original.replace(/\(.*\)/, '').trim()}</span>
+                    <span className="text-sm text-gray-700">
+                      {item.original.replace(/\(.*\)/, '').trim()}
+                    </span>
                   </div>
                   <span className="text-sm font-semibold text-green-700">
                     {item.extractedLimit ? formatCurrency(item.extractedLimit) : ''}
@@ -600,14 +696,17 @@ function ExclusionsSection({
                       <X className={`flex-shrink-0 mt-0.5 ${styles.icon}`} size={16} />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-sm leading-relaxed ${styles.text} ${exclusion.severity === 'critical' ? 'font-medium' : ''}`}>
+                          <span
+                            className={`text-sm leading-relaxed ${styles.text} ${exclusion.severity === 'critical' ? 'font-medium' : ''}`}
+                          >
                             {exclusion.original}
                           </span>
-                          {exclusion.severity !== 'standard' && exclusion.severity !== 'informational' && (
-                            <Badge variant={styles.badge} className="text-xs">
-                              {getSeverityLabel(exclusion.severity)}
-                            </Badge>
-                          )}
+                          {exclusion.severity !== 'standard' &&
+                            exclusion.severity !== 'informational' && (
+                              <Badge variant={styles.badge} className="text-xs">
+                                {getSeverityLabel(exclusion.severity)}
+                              </Badge>
+                            )}
                           {exclusion.needsClarification && (
                             <HelpCircle className="text-blue-500" size={14} />
                           )}
@@ -648,7 +747,8 @@ function ExclusionsSection({
       </Card>
 
       {/* Clarification Needed */}
-      {(analysis.clarificationNeeded.length > 0 || analysis.missingImportantExclusions.length > 0) && (
+      {(analysis.clarificationNeeded.length > 0 ||
+        analysis.missingImportantExclusions.length > 0) && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-blue-900">
@@ -665,7 +765,10 @@ function ExclusionsSection({
             <div className="space-y-3">
               {/* Items from exclusions that need clarification */}
               {analysis.clarificationNeeded.map((item, i) => (
-                <div key={`clarify-${i}`} className="p-3 bg-white rounded-lg border border-blue-200">
+                <div
+                  key={`clarify-${i}`}
+                  className="p-3 bg-white rounded-lg border border-blue-200"
+                >
                   <p className="text-sm font-medium text-gray-800 mb-1">{item.item}</p>
                   <p className="text-sm text-blue-700 flex items-center gap-1">
                     <HelpCircle size={12} />
@@ -676,9 +779,12 @@ function ExclusionsSection({
 
               {/* Important topics not mentioned in exclusions */}
               {analysis.missingImportantExclusions
-                .filter(item => item.importance === 'high')
+                .filter((item) => item.importance === 'high')
                 .map((item, i) => (
-                  <div key={`missing-${i}`} className="p-3 bg-white rounded-lg border border-blue-200">
+                  <div
+                    key={`missing-${i}`}
+                    className="p-3 bg-white rounded-lg border border-blue-200"
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-800">{item.name}</span>
                       <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
@@ -741,7 +847,7 @@ function RawExtractedTextSection({
 
   // Calculate text stats for current display text
   const lineCount = displayText.split('\n').length
-  const wordCount = displayText.split(/\s+/).filter(w => w.length > 0).length
+  const wordCount = displayText.split(/\s+/).filter((w) => w.length > 0).length
   const charCount = displayText.length
 
   // Show preview (first 500 characters)
@@ -756,8 +862,12 @@ function RawExtractedTextSection({
             <FileText className="text-gray-600 flex-shrink-0" size={18} />
             <span className="truncate">
               {locale === 'tr'
-                ? (showRaw ? 'Ham Metin' : 'Poliçe Metni')
-                : (showRaw ? 'Raw Text' : 'Document')}
+                ? showRaw
+                  ? 'Ham Metin'
+                  : 'Poliçe Metni'
+                : showRaw
+                  ? 'Raw Text'
+                  : 'Document'}
             </span>
             {!showRaw && hasProcessedText && (
               <Badge variant="success" className="text-xs flex-shrink-0">
@@ -774,7 +884,15 @@ function RawExtractedTextSection({
                 className="gap-1 text-xs h-8 px-2 sm:px-3"
               >
                 {showRaw ? <Sparkles size={12} /> : <Code size={12} />}
-                <span className="hidden sm:inline">{showRaw ? (locale === 'tr' ? 'İşlenmiş' : 'Processed') : (locale === 'tr' ? 'Ham' : 'Raw')}</span>
+                <span className="hidden sm:inline">
+                  {showRaw
+                    ? locale === 'tr'
+                      ? 'İşlenmiş'
+                      : 'Processed'
+                    : locale === 'tr'
+                      ? 'Ham'
+                      : 'Raw'}
+                </span>
               </Button>
             )}
             <Button
@@ -784,7 +902,15 @@ function RawExtractedTextSection({
               className="gap-1 h-8 px-2 sm:px-3"
             >
               {copied ? <CheckCircle className="text-green-600" size={14} /> : <Copy size={14} />}
-              <span className="hidden sm:inline">{copied ? (locale === 'tr' ? 'Kopyalandı' : 'Copied') : (locale === 'tr' ? 'Kopyala' : 'Copy')}</span>
+              <span className="hidden sm:inline">
+                {copied
+                  ? locale === 'tr'
+                    ? 'Kopyalandı'
+                    : 'Copied'
+                  : locale === 'tr'
+                    ? 'Kopyala'
+                    : 'Copy'}
+              </span>
             </Button>
             <Button
               variant="ghost"
@@ -793,7 +919,15 @@ function RawExtractedTextSection({
               className="gap-1 h-8 px-2"
             >
               {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              <span className="hidden sm:inline">{isExpanded ? (locale === 'tr' ? 'Küçült' : 'Less') : (locale === 'tr' ? 'Genişlet' : 'More')}</span>
+              <span className="hidden sm:inline">
+                {isExpanded
+                  ? locale === 'tr'
+                    ? 'Küçült'
+                    : 'Less'
+                  : locale === 'tr'
+                    ? 'Genişlet'
+                    : 'More'}
+              </span>
             </Button>
           </div>
         </div>
@@ -804,7 +938,9 @@ function RawExtractedTextSection({
         </p>
       </CardHeader>
       <CardContent>
-        <div className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}>
+        <div
+          className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}
+        >
           <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap break-words font-mono leading-relaxed max-w-full">
             {isExpanded ? displayText : previewText}
             {!isExpanded && hasMore && '...'}
@@ -859,8 +995,8 @@ export function PolicyDetailView() {
   const confidenceScore = locationState?.confidenceScore
 
   // Try local cache first, then fetch from Supabase if not found
-  const [policy, setPolicy] = useState<AnalyzedPolicy | undefined>(() =>
-    trialPolicy ?? (id ? getPolicyById(id) : undefined)
+  const [policy, setPolicy] = useState<AnalyzedPolicy | undefined>(
+    () => trialPolicy ?? (id ? getPolicyById(id) : undefined)
   )
   const [isLoadingPolicy, setIsLoadingPolicy] = useState(!policy && !!id && !trialPolicy)
 
@@ -871,14 +1007,16 @@ export function PolicyDetailView() {
     let cancelled = false
     setIsLoadingPolicy(true)
 
-    fetchPolicyById(id).then((fetchedPolicy) => {
-      if (cancelled) return
-      setPolicy(fetchedPolicy ?? undefined)
-      setIsLoadingPolicy(false)
-    }).catch(() => {
-      if (cancelled) return
-      setIsLoadingPolicy(false)
-    })
+    fetchPolicyById(id)
+      .then((fetchedPolicy) => {
+        if (cancelled) return
+        setPolicy(fetchedPolicy ?? undefined)
+        setIsLoadingPolicy(false)
+      })
+      .catch(() => {
+        if (cancelled) return
+        setIsLoadingPolicy(false)
+      })
 
     return () => {
       cancelled = true
@@ -893,6 +1031,82 @@ export function PolicyDetailView() {
   const [scoreBreakdownExpanded, setScoreBreakdownExpanded] = useState(false)
   const [coveragesExpanded, setCoveragesExpanded] = useState(true) // Default expanded - important content
   const [exclusionsExpanded, setExclusionsExpanded] = useState(false) // Default collapsed
+
+  // Export dropdown state
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+  const { exportPolicy, isGenerating: isPdfGenerating } = usePdfExport()
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [exportMenuOpen])
+
+  // Export handlers
+  const handleExportPdf = useCallback(async () => {
+    if (!policy) return
+    setExportMenuOpen(false)
+    const success = await exportPolicy(policy)
+    if (success) {
+      toast.success(t.exportMenu.pdfSuccess)
+    } else {
+      toast.error(t.exportMenu.popupBlocked)
+    }
+  }, [policy, exportPolicy, t.exportMenu.pdfSuccess, t.exportMenu.popupBlocked])
+
+  const handleExportCsv = useCallback(() => {
+    if (!policy) return
+    setExportMenuOpen(false)
+    exportSinglePolicyToCSV(policy, locale === 'tr' ? 'tr' : 'en')
+    toast.success(t.exportMenu.csvSuccess)
+  }, [policy, locale, t.exportMenu.csvSuccess])
+
+  const handleExportText = useCallback(() => {
+    if (!policy) return
+    setExportMenuOpen(false)
+    const summary = [
+      `${locale === 'tr' ? 'Poliçe' : 'Policy'}: ${policy.policyNumber}`,
+      `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${getShortCompanyName(policy.provider)}`,
+      `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
+      `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
+      `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
+      `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium)}`,
+      `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible)}`,
+      `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
+      '',
+      `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
+      ...policy.coverages.map(
+        (c) =>
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`
+      ),
+      '',
+      `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
+      ...policy.exclusions.map((e) => `• ${e}`),
+      '',
+      `=== ${locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS'} ===`,
+      ...policy.aiInsights.map(
+        (_, i) => `• ${getLocalizedInsight(policy, i, locale, t.insightTranslations)}`
+      ),
+    ].join('\n')
+
+    const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    toast.success(t.exportMenu.textSuccess)
+  }, [policy, locale, t])
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -910,9 +1124,17 @@ export function PolicyDetailView() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found'}</h2>
-          <p className="text-gray-600 mb-4">{locale === 'tr' ? 'Aradığınız poliçe mevcut değil.' : 'The policy you\'re looking for doesn\'t exist.'}</p>
-          <Button onClick={() => navigate('/dashboard')}>{locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard'}</Button>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found'}
+          </h2>
+          <p className="text-gray-600 mb-4">
+            {locale === 'tr'
+              ? 'Aradığınız poliçe mevcut değil.'
+              : "The policy you're looking for doesn't exist."}
+          </p>
+          <Button onClick={() => navigate('/dashboard')}>
+            {locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard'}
+          </Button>
         </div>
       </div>
     )
@@ -967,7 +1189,7 @@ export function PolicyDetailView() {
           <div className="flex items-center gap-2 w-full">
             {/* Back button - minimal padding */}
             <button
-              onClick={() => isTrialResult ? navigate('/') : navigate(-1)}
+              onClick={() => (isTrialResult ? navigate('/') : navigate(-1))}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
               aria-label={locale === 'tr' ? 'Geri' : 'Go back'}
             >
@@ -985,15 +1207,19 @@ export function PolicyDetailView() {
                 >
                   {policy.typeTr}
                 </h1>
-                <p className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis" title={policy.provider}>
+                <p
+                  className="text-xs text-gray-500 whitespace-nowrap overflow-hidden text-ellipsis"
+                  title={policy.provider}
+                >
                   {getShortCompanyName(policy.provider)}
                 </p>
                 {/* Show plate for vehicle policies */}
-                {(policy.type === 'kasko' || policy.type === 'traffic') && policy.vehicleInfo?.plate && (
-                  <p className="text-xs text-blue-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
-                    🚗 {policy.vehicleInfo.plate}
-                  </p>
-                )}
+                {(policy.type === 'kasko' || policy.type === 'traffic') &&
+                  policy.vehicleInfo?.plate && (
+                    <p className="text-xs text-blue-600 font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+                      🚗 {policy.vehicleInfo.plate}
+                    </p>
+                  )}
               </div>
             </div>
 
@@ -1024,44 +1250,70 @@ export function PolicyDetailView() {
               >
                 <Share2 size={18} className="text-gray-600" />
               </button>
-              <button
-                onClick={() => {
-                  const summary = [
-                    `${locale === 'tr' ? 'Poliçe' : 'Policy'}: ${policy.policyNumber}`,
-                    `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${getShortCompanyName(policy.provider)}`,
-                    `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
-                    `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
-                    `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
-                    `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium)}`,
-                    `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible)}`,
-                    `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
-                    '',
-                    `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
-                    ...policy.coverages.map(c => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`),
-                    '',
-                    `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
-                    ...policy.exclusions.map(e => `• ${e}`),
-                    '',
-                    `=== ${locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS'} ===`,
-                    ...policy.aiInsights.map((_, i) => `• ${getLocalizedInsight(policy, i, locale, t.insightTranslations)}`),
-                  ].join('\n')
-
-                  const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
-                  const url = URL.createObjectURL(blob)
-                  const link = document.createElement('a')
-                  link.href = url
-                  link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
-                  document.body.appendChild(link)
-                  link.click()
-                  document.body.removeChild(link)
-                  URL.revokeObjectURL(url)
-                  toast.success(locale === 'tr' ? 'Özet indirildi' : 'Summary downloaded')
-                }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label={locale === 'tr' ? 'İndir' : 'Download'}
-              >
-                <Download size={18} className="text-gray-600" />
-              </button>
+              {/* Export dropdown */}
+              <div className="relative" ref={exportMenuRef}>
+                <button
+                  onClick={() => setExportMenuOpen((prev) => !prev)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  aria-label={t.exportMenu.exportAs}
+                  aria-expanded={exportMenuOpen}
+                  aria-haspopup="true"
+                >
+                  {isPdfGenerating ? (
+                    <Loader2 size={18} className="text-gray-600 animate-spin" />
+                  ) : (
+                    <Download size={18} className="text-gray-600" />
+                  )}
+                </button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <button
+                      onClick={handleExportPdf}
+                      disabled={isPdfGenerating}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors disabled:opacity-50"
+                    >
+                      <FileText size={16} className="text-red-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">
+                          {t.exportMenu.pdfReport}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {t.exportMenu.pdfReportDesc}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleExportCsv}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <FileSpreadsheet size={16} className="text-green-600 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">
+                          {t.exportMenu.csvExport}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {t.exportMenu.csvExportDesc}
+                        </div>
+                      </div>
+                    </button>
+                    <div className="border-t border-gray-100 my-1" />
+                    <button
+                      onClick={handleExportText}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <FileDown size={16} className="text-gray-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">
+                          {t.exportMenu.textSummary}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {t.exportMenu.textSummaryDesc}
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1080,7 +1332,10 @@ export function PolicyDetailView() {
                     <Shield className="text-blue-600 flex-shrink-0" size={16} />
                     <span className="truncate">Poliçe Özeti</span>
                   </span>
-                  <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="text-xs flex-shrink-0">
+                  <Badge
+                    variant={policy.status === 'active' ? 'success' : 'warning'}
+                    className="text-xs flex-shrink-0"
+                  >
                     {policy.status === 'active' ? 'Aktif' : 'Bitiyor'}
                   </Badge>
                 </CardTitle>
@@ -1092,10 +1347,14 @@ export function PolicyDetailView() {
                   <div className="col-span-2 p-2.5 sm:p-3 bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
                     <p className="text-xs text-blue-600 font-medium mb-1">Teminat</p>
                     <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
-                      {policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}
+                      {policy.type === 'kasko'
+                        ? 'Araç Rayiç Bedeli'
+                        : formatCurrency(policy.coverage)}
                     </p>
                     {policy.type === 'kasko' && (
-                      <p className="text-[10px] text-blue-500 mt-0.5">Hasar anındaki piyasa değeri</p>
+                      <p className="text-[10px] text-blue-500 mt-0.5">
+                        Hasar anındaki piyasa değeri
+                      </p>
                     )}
                   </div>
 
@@ -1116,7 +1375,10 @@ export function PolicyDetailView() {
                   {/* Insured - full width for long names */}
                   <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Sigortalı</p>
-                    <p className="text-sm font-semibold text-gray-900 truncate" title={policy.insuredPerson}>
+                    <p
+                      className="text-sm font-semibold text-gray-900 truncate"
+                      title={policy.insuredPerson}
+                    >
                       {policy.insuredPerson || '-'}
                     </p>
                   </div>
@@ -1124,14 +1386,18 @@ export function PolicyDetailView() {
                   {/* Policy number - now that type is in header */}
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Poliçe No</p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">{policy.policyNumber}</p>
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {policy.policyNumber}
+                    </p>
                   </div>
 
                   {/* Location for non-vehicle policies */}
                   {policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location && (
                     <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                       <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">Konum</p>
-                      <p className="text-sm font-semibold text-gray-900 truncate">{policy.location}</p>
+                      <p className="text-sm font-semibold text-gray-900 truncate">
+                        {policy.location}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1140,11 +1406,15 @@ export function PolicyDetailView() {
                 <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2.5 border-t text-xs text-gray-500">
                   <div className="truncate">
                     <span className="text-gray-400">Başlangıç:</span>{' '}
-                    <span className="font-medium text-gray-700">{formatDate(policy.startDate)}</span>
+                    <span className="font-medium text-gray-700">
+                      {formatDate(policy.startDate)}
+                    </span>
                   </div>
                   <div className="truncate text-right">
                     <span className="text-gray-400">Bitiş:</span>{' '}
-                    <span className="font-medium text-gray-700">{formatDate(policy.expiryDate)}</span>
+                    <span className="font-medium text-gray-700">
+                      {formatDate(policy.expiryDate)}
+                    </span>
                   </div>
                 </div>
               </CardContent>
@@ -1156,14 +1426,18 @@ export function PolicyDetailView() {
                 <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                     <BarChart3 className="text-blue-600 flex-shrink-0" size={18} />
-                    <span className="truncate">{locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}</span>
+                    <span className="truncate">
+                      {locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 sm:p-6 space-y-3 sm:space-y-4">
                   {/* Overall Score with Grade - Compact */}
                   <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
                     <div className="flex items-center gap-2 sm:gap-3">
-                      <div className="text-2xl sm:text-3xl font-bold text-gray-900">{evaluation.overallScore}</div>
+                      <div className="text-2xl sm:text-3xl font-bold text-gray-900">
+                        {evaluation.overallScore}
+                      </div>
                       <div className="text-xs sm:text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-1.5 sm:gap-2">
@@ -1187,15 +1461,9 @@ export function PolicyDetailView() {
                       />
                     </button>
                     {scoreBreakdownExpanded ? (
-                      <ScoreBreakdown
-                        breakdown={evaluation.scoreBreakdown}
-                        variant="full"
-                      />
+                      <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
                     ) : (
-                      <ScoreBreakdown
-                        breakdown={evaluation.scoreBreakdown}
-                        variant="mini"
-                      />
+                      <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
                     )}
                   </div>
 
@@ -1225,8 +1493,8 @@ export function PolicyDetailView() {
                             </>
                           ) : (
                             <>
-                              <ChevronDown size={14} />
-                              +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                              <ChevronDown size={14} />+{evaluation.recommendations.length - 2}{' '}
+                              {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
                             </>
                           )}
                         </button>
@@ -1242,29 +1510,41 @@ export function PolicyDetailView() {
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
-                  <span className="truncate">{locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}</span>
-                  <Badge variant="outline" className="text-xs text-purple-600 border-purple-300 ml-auto">
+                  <span className="truncate">
+                    {locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-xs text-purple-600 border-purple-300 ml-auto"
+                  >
                     {Math.round(policy.aiConfidence * 100)}%
                   </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 sm:space-y-3">
-                  {(insightsExpanded
-                    ? policy.aiInsights
-                    : policy.aiInsights.slice(0, 3)
-                  ).map((_insight, i) => {
-                    // Get localized insight: pre-translated (new) or display-time translated (legacy)
-                    const rawLocalized = getLocalizedInsight(policy, i, locale, t.insightTranslations)
-                    // Strip any existing prefix characters from the text for clean display
-                    const displayText = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
-                    return (
-                      <div key={i} className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2">
-                        <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
-                        <span>{displayText}</span>
-                      </div>
-                    )
-                  })}
+                  {(insightsExpanded ? policy.aiInsights : policy.aiInsights.slice(0, 3)).map(
+                    (_insight, i) => {
+                      // Get localized insight: pre-translated (new) or display-time translated (legacy)
+                      const rawLocalized = getLocalizedInsight(
+                        policy,
+                        i,
+                        locale,
+                        t.insightTranslations
+                      )
+                      // Strip any existing prefix characters from the text for clean display
+                      const displayText = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      return (
+                        <div
+                          key={i}
+                          className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2"
+                        >
+                          <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
+                          <span>{displayText}</span>
+                        </div>
+                      )
+                    }
+                  )}
                   {policy.aiInsights.length > 3 && (
                     <button
                       onClick={() => setInsightsExpanded(!insightsExpanded)}
@@ -1277,8 +1557,8 @@ export function PolicyDetailView() {
                         </>
                       ) : (
                         <>
-                          <ChevronDown size={14} />
-                          +{policy.aiInsights.length - 3} {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
+                          <ChevronDown size={14} />+{policy.aiInsights.length - 3}{' '}
+                          {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
                         </>
                       )}
                     </button>
@@ -1293,25 +1573,38 @@ export function PolicyDetailView() {
                 <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                     <TrendingUp className="text-blue-600 flex-shrink-0" size={18} />
-                    <span className="truncate">{locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}</span>
+                    <span className="truncate">
+                      {locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}
+                    </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-3 sm:p-6">
                   <div className="space-y-3">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs text-gray-500">{locale === 'tr' ? 'Priminiz' : 'Your Premium'}</span>
-                        <span className="text-xs text-gray-500">{locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}</span>
+                        <span className="text-xs text-gray-500">
+                          {locale === 'tr' ? 'Priminiz' : 'Your Premium'}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-gray-900">{formatCurrency(policy.premium)}</span>
-                        <span className="font-semibold text-sm text-gray-600">{formatCurrency(policy.marketComparison.averagePremium)}</span>
+                        <span className="font-semibold text-sm text-gray-900">
+                          {formatCurrency(policy.premium)}
+                        </span>
+                        <span className="font-semibold text-sm text-gray-600">
+                          {formatCurrency(policy.marketComparison.averagePremium)}
+                        </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (
                         <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
                           <TrendingDown size={12} />
                           <span>
-                            {Math.round((1 - policy.premium / policy.marketComparison.averagePremium) * 100)}% {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                            {Math.round(
+                              (1 - policy.premium / policy.marketComparison.averagePremium) * 100
+                            )}
+                            % {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
                           </span>
                         </div>
                       )}
@@ -1319,13 +1612,18 @@ export function PolicyDetailView() {
                         <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs">
                           <TrendingUp size={12} />
                           <span>
-                            {Math.round((policy.premium / policy.marketComparison.averagePremium - 1) * 100)}% {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                            {Math.round(
+                              (policy.premium / policy.marketComparison.averagePremium - 1) * 100
+                            )}
+                            % {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="pt-2 border-t">
-                      <p className="text-xs text-gray-500 mb-1">{locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}</p>
+                      <p className="text-xs text-gray-500 mb-1">
+                        {locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}
+                      </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -1333,7 +1631,9 @@ export function PolicyDetailView() {
                             style={{ width: `${policy.marketComparison.percentile}%` }}
                           />
                         </div>
-                        <span className="font-semibold text-gray-900 text-xs">{policy.marketComparison.percentile}%</span>
+                        <span className="font-semibold text-gray-900 text-xs">
+                          {policy.marketComparison.percentile}%
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -1385,7 +1685,9 @@ export function PolicyDetailView() {
                     {policy.vehicleInfo.vehicleClass && (
                       <div>
                         <p className="text-sm text-gray-500">Araç Sınıfı</p>
-                        <p className="font-semibold text-gray-900">{policy.vehicleInfo.vehicleClass}</p>
+                        <p className="font-semibold text-gray-900">
+                          {policy.vehicleInfo.vehicleClass}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1463,7 +1765,9 @@ export function PolicyDetailView() {
               ) : (
                 <CardContent className="pt-0 pb-3">
                   <p className="text-sm text-gray-500">
-                    {locale === 'tr' ? 'Kapsam dışı durumlar ve sigortacıya sorulacak konular' : 'Uncovered situations and questions for your insurer'}
+                    {locale === 'tr'
+                      ? 'Kapsam dışı durumlar ve sigortacıya sorulacak konular'
+                      : 'Uncovered situations and questions for your insurer'}
                   </p>
                 </CardContent>
               )}
@@ -1490,16 +1794,29 @@ export function PolicyDetailView() {
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <Badge variant={policy.status === 'active' ? 'success' : 'warning'} className="mb-4">
-                    {policy.status === 'active' ? (locale === 'tr' ? 'Aktif' : 'Active') : (locale === 'tr' ? 'Bitiyor' : 'Expiring Soon')}
+                  <Badge
+                    variant={policy.status === 'active' ? 'success' : 'warning'}
+                    className="mb-4"
+                  >
+                    {policy.status === 'active'
+                      ? locale === 'tr'
+                        ? 'Aktif'
+                        : 'Active'
+                      : locale === 'tr'
+                        ? 'Bitiyor'
+                        : 'Expiring Soon'}
                   </Badge>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">{locale === 'tr' ? 'Başlangıç' : 'Start Date'}</span>
+                      <span className="text-gray-500">
+                        {locale === 'tr' ? 'Başlangıç' : 'Start Date'}
+                      </span>
                       <span className="font-medium">{formatDate(policy.startDate)}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-gray-500">{locale === 'tr' ? 'Bitiş' : 'Expiry Date'}</span>
+                      <span className="text-gray-500">
+                        {locale === 'tr' ? 'Bitiş' : 'Expiry Date'}
+                      </span>
                       <span className="font-medium">{formatDate(policy.expiryDate)}</span>
                     </div>
                   </div>
@@ -1520,7 +1837,9 @@ export function PolicyDetailView() {
                   {/* Overall Score with Grade */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="text-3xl font-bold text-gray-900">{evaluation.overallScore}</div>
+                      <div className="text-3xl font-bold text-gray-900">
+                        {evaluation.overallScore}
+                      </div>
                       <div className="text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1534,10 +1853,7 @@ export function PolicyDetailView() {
                     <p className="text-sm font-medium text-gray-700 mb-2">
                       {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
                     </p>
-                    <ScoreBreakdown
-                      breakdown={evaluation.scoreBreakdown}
-                      variant="full"
-                    />
+                    <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
                   </div>
 
                   {/* Top Recommendations */}
@@ -1553,7 +1869,8 @@ export function PolicyDetailView() {
                       </div>
                       {evaluation.recommendations.length > 2 && (
                         <p className="text-xs text-gray-500 mt-2 text-center">
-                          +{evaluation.recommendations.length - 2} {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                          +{evaluation.recommendations.length - 2}{' '}
+                          {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
                         </p>
                       )}
                     </div>
@@ -1576,8 +1893,12 @@ export function PolicyDetailView() {
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="text-purple-600">{locale === 'tr' ? 'Güven:' : 'Confidence:'}</span>
-                    <span className="font-semibold text-purple-900">{Math.round(policy.aiConfidence * 100)}%</span>
+                    <span className="text-purple-600">
+                      {locale === 'tr' ? 'Güven:' : 'Confidence:'}
+                    </span>
+                    <span className="font-semibold text-purple-900">
+                      {Math.round(policy.aiConfidence * 100)}%
+                    </span>
                   </div>
                   {policy.aiInsights.map((_insight, i) => (
                     <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
@@ -1601,18 +1922,29 @@ export function PolicyDetailView() {
                   <div className="space-y-4">
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-xs sm:text-sm text-gray-500">{locale === 'tr' ? 'Priminiz' : 'Your Premium'}</span>
-                        <span className="text-xs sm:text-sm text-gray-500">{locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}</span>
+                        <span className="text-xs sm:text-sm text-gray-500">
+                          {locale === 'tr' ? 'Priminiz' : 'Your Premium'}
+                        </span>
+                        <span className="text-xs sm:text-sm text-gray-500">
+                          {locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-gray-900">{formatCurrency(policy.premium)}</span>
-                        <span className="font-semibold text-gray-600">{formatCurrency(policy.marketComparison.averagePremium)}</span>
+                        <span className="font-semibold text-gray-900">
+                          {formatCurrency(policy.premium)}
+                        </span>
+                        <span className="font-semibold text-gray-600">
+                          {formatCurrency(policy.marketComparison.averagePremium)}
+                        </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (
                         <div className="flex items-center gap-1 mt-1 text-green-600 text-xs sm:text-sm">
                           <TrendingDown size={14} />
                           <span>
-                            {Math.round((1 - policy.premium / policy.marketComparison.averagePremium) * 100)}% {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                            {Math.round(
+                              (1 - policy.premium / policy.marketComparison.averagePremium) * 100
+                            )}
+                            % {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
                           </span>
                         </div>
                       )}
@@ -1620,13 +1952,18 @@ export function PolicyDetailView() {
                         <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs sm:text-sm">
                           <TrendingUp size={14} />
                           <span>
-                            {Math.round((policy.premium / policy.marketComparison.averagePremium - 1) * 100)}% {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                            {Math.round(
+                              (policy.premium / policy.marketComparison.averagePremium - 1) * 100
+                            )}
+                            % {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="pt-2 border-t">
-                      <p className="text-xs sm:text-sm text-gray-500 mb-1">{locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                        {locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}
+                      </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                           <div
@@ -1634,7 +1971,9 @@ export function PolicyDetailView() {
                             style={{ width: `${policy.marketComparison.percentile}%` }}
                           />
                         </div>
-                        <span className="font-semibold text-gray-900 text-sm">{policy.marketComparison.percentile}%</span>
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {policy.marketComparison.percentile}%
+                        </span>
                       </div>
                     </div>
                   </div>
