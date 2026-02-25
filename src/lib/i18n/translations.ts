@@ -354,6 +354,23 @@ export interface TranslationDictionary {
     confidence: string
   }
 
+  // Export Menu (PolicyDetailView)
+  exportMenu: {
+    exportAs: string
+    pdfReport: string
+    pdfReportDesc: string
+    csvExport: string
+    csvExportDesc: string
+    textSummary: string
+    textSummaryDesc: string
+    generating: string
+    pdfSuccess: string
+    csvSuccess: string
+    textSuccess: string
+    exportFailed: string
+    popupBlocked: string
+  }
+
   // Upload
   upload: {
     title: string

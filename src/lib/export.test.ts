@@ -5,7 +5,13 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { exportToCSV, exportToExcel, exportToPDF, exportPoliciesToPDF } from './export'
+import {
+  exportToCSV,
+  exportToExcel,
+  exportToPDF,
+  exportPoliciesToPDF,
+  exportSinglePolicyToCSV,
+} from './export'
 import type { AnalyzedPolicy } from '@/types/policy'
 
 // Mock URL and document APIs
@@ -65,8 +71,12 @@ describe('Export Module', () => {
       return document.createElement(tagName)
     })
 
-    vi.spyOn(document.body, 'appendChild').mockImplementation(mockAppendChild as unknown as typeof document.body.appendChild)
-    vi.spyOn(document.body, 'removeChild').mockImplementation(mockRemoveChild as unknown as typeof document.body.removeChild)
+    vi.spyOn(document.body, 'appendChild').mockImplementation(
+      mockAppendChild as unknown as typeof document.body.appendChild
+    )
+    vi.spyOn(document.body, 'removeChild').mockImplementation(
+      mockRemoveChild as unknown as typeof document.body.removeChild
+    )
 
     // Setup window.open mock
     global.window.open = mockWindowOpen as unknown as typeof window.open
@@ -358,7 +368,10 @@ describe('Export Module', () => {
 
   describe('exportPoliciesToPDF', () => {
     it('should open print window for multiple policies', () => {
-      const policies = [createMockPolicy(), createMockPolicy({ id: 'policy-2', policyNumber: 'POL-002' })]
+      const policies = [
+        createMockPolicy(),
+        createMockPolicy({ id: 'policy-2', policyNumber: 'POL-002' }),
+      ]
 
       exportPoliciesToPDF(policies)
 
@@ -457,8 +470,12 @@ describe('CSV Content Validation', () => {
       return document.createElement(tagName)
     })
 
-    vi.spyOn(document.body, 'appendChild').mockImplementation(vi.fn() as unknown as typeof document.body.appendChild)
-    vi.spyOn(document.body, 'removeChild').mockImplementation(vi.fn() as unknown as typeof document.body.removeChild)
+    vi.spyOn(document.body, 'appendChild').mockImplementation(
+      vi.fn() as unknown as typeof document.body.appendChild
+    )
+    vi.spyOn(document.body, 'removeChild').mockImplementation(
+      vi.fn() as unknown as typeof document.body.removeChild
+    )
   })
 
   it('should include headers in CSV', () => {
@@ -467,5 +484,393 @@ describe('CSV Content Validation', () => {
 
     // CSV should be created with headers even for empty array
     expect(global.URL.createObjectURL).toHaveBeenCalled()
+  })
+})
+
+describe('exportSinglePolicyToCSV', () => {
+  const mockClick = vi.fn()
+  let capturedCsvContent = ''
+  let capturedDownloadName = ''
+
+  const createMockPolicy = (overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy => ({
+    id: 'policy-1',
+    policyNumber: 'POL-001',
+    provider: 'Allianz Türkiye',
+    logo: '',
+    type: 'home',
+    typeTr: 'Konut Sigortası',
+    coverage: 500000,
+    premium: 2500,
+    monthlyPremium: 208.33,
+    deductible: 1000,
+    startDate: '2024-01-01',
+    expiryDate: '2025-01-01',
+    status: 'active',
+    uploadDate: '2024-01-01',
+    fileName: 'policy-001.pdf',
+    documentType: 'policy',
+    aiConfidence: 0.95,
+    insuredPerson: 'Ahmet Yılmaz',
+    location: 'İstanbul, Türkiye',
+    coverages: [
+      { name: 'Fire', nameTr: 'Yangın', limit: 500000, deductible: 0, included: true },
+      { name: 'Theft', nameTr: 'Hırsızlık', limit: 100000, deductible: 1000, included: true },
+    ],
+    exclusions: ['War damage', 'Nuclear events'],
+    specialConditions: [],
+    insuranceLine: 'property',
+    aiInsights: ['Good coverage', 'Consider adding flood'],
+    ...overrides,
+  })
+
+  // Intercept Blob constructor to capture CSV content
+  const OriginalBlob = global.Blob
+  beforeEach(() => {
+    vi.clearAllMocks()
+    capturedCsvContent = ''
+    capturedDownloadName = ''
+
+    global.Blob = class MockBlob extends OriginalBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        super(parts, options)
+        if (parts && parts.length > 0) {
+          capturedCsvContent = parts.map((p) => String(p)).join('')
+        }
+      }
+    } as typeof Blob
+
+    global.URL = {
+      createObjectURL: vi.fn(() => 'blob:mock-url'),
+      revokeObjectURL: vi.fn(),
+    } as unknown as typeof URL
+
+    vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+      if (tagName === 'a') {
+        const link = {
+          href: '',
+          download: '',
+          click: mockClick,
+        }
+        Object.defineProperty(link, 'download', {
+          get() {
+            return capturedDownloadName
+          },
+          set(value: string) {
+            capturedDownloadName = value
+          },
+        })
+        return link as unknown as HTMLElement
+      }
+      return document.createElement(tagName)
+    })
+
+    vi.spyOn(document.body, 'appendChild').mockImplementation(
+      vi.fn() as unknown as typeof document.body.appendChild
+    )
+    vi.spyOn(document.body, 'removeChild').mockImplementation(
+      vi.fn() as unknown as typeof document.body.removeChild
+    )
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    global.Blob = OriginalBlob
+  })
+
+  function getCsvContent(): string {
+    expect(capturedCsvContent).toBeTruthy()
+    return capturedCsvContent
+  }
+
+  it('should create a downloadable CSV file', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy)
+
+    expect(global.URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob))
+    expect(mockClick).toHaveBeenCalled()
+    expect(global.URL.revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
+  })
+
+  it('should include BOM for Excel compatibility', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy)
+
+    const content = getCsvContent()
+    expect(content.charCodeAt(0)).toBe(0xfeff) // BOM character
+  })
+
+  it('should use sanitized policy number in filename', () => {
+    const policy = createMockPolicy({ policyNumber: 'POL/001-ABC' })
+    exportSinglePolicyToCSV(policy)
+
+    expect(capturedDownloadName).toContain('POL_001_ABC')
+    expect(capturedDownloadName).toMatch(/\.csv$/)
+  })
+
+  it('should include all 4 sections with Turkish headers by default', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy)
+
+    const content = getCsvContent()
+    expect(content).toContain('# POLİÇE BİLGİLERİ')
+    expect(content).toContain('# TEMİNATLAR')
+    expect(content).toContain('# İSTİSNALAR')
+    expect(content).toContain('# AI GÖRÜŞLERİ')
+  })
+
+  it('should include English section headers when locale is en', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('# POLICY INFORMATION')
+    expect(content).toContain('# COVERAGES')
+    expect(content).toContain('# EXCLUSIONS')
+    expect(content).toContain('# AI INSIGHTS')
+  })
+
+  it('should include policy info rows in Turkish', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'tr')
+
+    const content = getCsvContent()
+    expect(content).toContain('Poliçe No')
+    expect(content).toContain('POL-001')
+    expect(content).toContain('Şirket')
+    expect(content).toContain('Allianz Türkiye')
+    expect(content).toContain('Sigortalı')
+    expect(content).toContain('Ahmet Yılmaz')
+  })
+
+  it('should include policy info rows in English', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Policy Number')
+    expect(content).toContain('Provider')
+    expect(content).toContain('Insured Person')
+  })
+
+  it('should include coverage rows with name, nameTr, limit, deductible, included', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Fire')
+    expect(content).toContain('Yangın')
+    expect(content).toContain('500000')
+    expect(content).toContain('Hırsızlık')
+    expect(content).toContain('Yes') // included: true
+  })
+
+  it('should show "Unlimited" for unlimited coverages in English', () => {
+    const policy = createMockPolicy({
+      coverages: [
+        {
+          name: 'Liability',
+          nameTr: 'Sorumluluk',
+          limit: 0,
+          deductible: 0,
+          included: true,
+          isUnlimited: true,
+        },
+      ],
+    })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Unlimited')
+  })
+
+  it('should show "Sınırsız" for unlimited coverages in Turkish', () => {
+    const policy = createMockPolicy({
+      coverages: [
+        {
+          name: 'Liability',
+          nameTr: 'Sorumluluk',
+          limit: 0,
+          deductible: 0,
+          included: true,
+          isUnlimited: true,
+        },
+      ],
+    })
+    exportSinglePolicyToCSV(policy, 'tr')
+
+    const content = getCsvContent()
+    expect(content).toContain('Sınırsız')
+  })
+
+  it('should show "Market Value" for market value coverages in English', () => {
+    const policy = createMockPolicy({
+      coverages: [
+        {
+          name: 'Vehicle',
+          nameTr: 'Araç',
+          limit: 0,
+          deductible: 0,
+          included: true,
+          isMarketValue: true,
+        },
+      ],
+    })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Market Value')
+  })
+
+  it('should show "Rayiç Değer" for market value coverages in Turkish', () => {
+    const policy = createMockPolicy({
+      coverages: [
+        {
+          name: 'Vehicle',
+          nameTr: 'Araç',
+          limit: 0,
+          deductible: 0,
+          included: true,
+          isMarketValue: true,
+        },
+      ],
+    })
+    exportSinglePolicyToCSV(policy, 'tr')
+
+    const content = getCsvContent()
+    expect(content).toContain('Rayiç Değer')
+  })
+
+  it('should include exclusions', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('War damage')
+    expect(content).toContain('Nuclear events')
+  })
+
+  it('should include AI insights', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Good coverage')
+    expect(content).toContain('Consider adding flood')
+  })
+
+  it('should use aiInsightsTr for Turkish locale when available', () => {
+    const policy = createMockPolicy({
+      aiInsights: ['Good coverage'],
+      aiInsightsTr: ['İyi teminat'],
+    })
+    exportSinglePolicyToCSV(policy, 'tr')
+
+    const content = getCsvContent()
+    expect(content).toContain('İyi teminat')
+  })
+
+  it('should handle empty coverages array', () => {
+    const policy = createMockPolicy({ coverages: [] })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('# COVERAGES')
+    expect(content).toContain('Coverage Name') // header still present
+  })
+
+  it('should handle empty exclusions array', () => {
+    const policy = createMockPolicy({ exclusions: [] })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('# EXCLUSIONS')
+  })
+
+  it('should handle empty AI insights array', () => {
+    const policy = createMockPolicy({ aiInsights: [] })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('# AI INSIGHTS')
+  })
+
+  it('should escape CSV values containing commas', () => {
+    const policy = createMockPolicy({ location: 'İstanbul, Türkiye' })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    // Location value with comma should be quoted
+    expect(content).toContain('"İstanbul, Türkiye"')
+  })
+
+  it('should escape CSV values containing quotes', () => {
+    const policy = createMockPolicy({ provider: 'Company "Best" Insurance' })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('"Company ""Best"" Insurance"')
+  })
+
+  it('should show "Araç Rayiç Bedeli" for kasko coverage in Turkish', () => {
+    const policy = createMockPolicy({ type: 'kasko', typeTr: 'Kasko' })
+    exportSinglePolicyToCSV(policy, 'tr')
+
+    const content = getCsvContent()
+    expect(content).toContain('Araç Rayiç Bedeli')
+  })
+
+  it('should show "Market Value" for kasko coverage in English', () => {
+    const policy = createMockPolicy({ type: 'kasko', typeTr: 'Kasko' })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    expect(content).toContain('Market Value')
+  })
+
+  it('should show "Hayır" / "No" for non-included coverages', () => {
+    const policy = createMockPolicy({
+      coverages: [{ name: 'Flood', nameTr: 'Sel', limit: 0, deductible: 0, included: false }],
+    })
+
+    exportSinglePolicyToCSV(policy, 'tr')
+    const contentTr = getCsvContent()
+    expect(contentTr).toContain('Hayır')
+
+    capturedCsvContent = ''
+    exportSinglePolicyToCSV(policy, 'en')
+    const contentEn = getCsvContent()
+    expect(contentEn).toContain('No')
+  })
+
+  it('should have correct MIME type', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy)
+
+    // Verify blob was created with correct type via createObjectURL call
+    expect(global.URL.createObjectURL).toHaveBeenCalled()
+    const blob = (global.URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob
+    expect(blob.type).toBe('text/csv;charset=utf-8;')
+  })
+
+  it('should default to Turkish locale', () => {
+    const policy = createMockPolicy()
+    exportSinglePolicyToCSV(policy) // no locale argument
+
+    const content = getCsvContent()
+    expect(content).toContain('# POLİÇE BİLGİLERİ')
+    expect(content).toContain('Alan') // Turkish field label
+  })
+
+  it('should handle missing optional fields gracefully', () => {
+    const policy = createMockPolicy({
+      insuredPerson: undefined,
+      location: undefined,
+    })
+    exportSinglePolicyToCSV(policy, 'en')
+
+    const content = getCsvContent()
+    // Should not throw, should produce valid CSV
+    expect(content).toContain('Insured Person')
+    expect(content).toContain('Location')
   })
 })

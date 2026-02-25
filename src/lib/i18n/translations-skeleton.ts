@@ -305,6 +305,22 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     confidence: '',
   },
 
+  exportMenu: {
+    exportAs: '',
+    pdfReport: '',
+    pdfReportDesc: '',
+    csvExport: '',
+    csvExportDesc: '',
+    textSummary: '',
+    textSummaryDesc: '',
+    generating: '',
+    pdfSuccess: '',
+    csvSuccess: '',
+    textSuccess: '',
+    exportFailed: '',
+    popupBlocked: '',
+  },
+
   upload: {
     title: '',
     subtitle: '',

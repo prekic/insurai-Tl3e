@@ -348,6 +348,22 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     confidence: 'AI Güven Skoru',
   },
 
+  exportMenu: {
+    exportAs: 'Dışa Aktar',
+    pdfReport: 'PDF Raporu',
+    pdfReportDesc: 'Teminat ve görüşler ile markalı rapor',
+    csvExport: 'CSV Tablosu',
+    csvExportDesc: 'Tüm veriler tablo formatında',
+    textSummary: 'Metin Özeti',
+    textSummaryDesc: 'Düz metin özeti',
+    generating: 'Oluşturuluyor...',
+    pdfSuccess: 'PDF raporu yazdırma penceresinde açıldı',
+    csvSuccess: 'CSV dosyası indirildi',
+    textSuccess: 'Özet indirildi',
+    exportFailed: 'Dışa aktarma başarısız',
+    popupBlocked: 'PDF dışa aktarmak için açılır pencerelere izin verin',
+  },
+
   upload: {
     title: 'Poliçe Yükle',
     subtitle: 'Sigorta belgelerinizi AI analizi için yükleyin',

@@ -25,9 +25,22 @@ vi.mock('react-router-dom', () => ({
   }),
 }))
 
-vi.mock('@/lib/i18n/i18n-context', () => ({
-  useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
-}))
+vi.mock('@/lib/i18n/i18n-context', () => {
+  const mockI18n = {
+    t: EN_TRANSLATIONS,
+    locale: 'en',
+    isLoading: false,
+    translate: (key: string) => key,
+    setLocale: vi.fn(),
+    availableLocales: ['en', 'tr'],
+    dynamicLocales: [],
+    progress: { loaded: 1, total: 1 },
+  }
+  return {
+    useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+    useI18n: () => mockI18n,
+  }
+})
 
 const mockGetPolicyById = vi.fn()
 const mockFetchPolicyById = vi.fn()
@@ -52,11 +65,56 @@ const mockEvaluation = {
   grade: 'B' as const,
   status: 'good' as const,
   scoreBreakdown: {
-    premium: { category: 'Premium', categoryTR: 'Prim', score: 80, weight: 20, details: 'Good', detailsTR: 'İyi', issues: [], issuesTR: [] },
-    coverage: { category: 'Coverage', categoryTR: 'Teminat', score: 85, weight: 30, details: 'Good', detailsTR: 'İyi', issues: [], issuesTR: [] },
-    deductible: { category: 'Deductible', categoryTR: 'Muafiyet', score: 75, weight: 15, details: 'Ok', detailsTR: 'Ok', issues: [], issuesTR: [] },
-    compliance: { category: 'Compliance', categoryTR: 'Uyumluluk', score: 90, weight: 20, details: 'Good', detailsTR: 'İyi', issues: [], issuesTR: [] },
-    value: { category: 'Value', categoryTR: 'Değer', score: 78, weight: 15, details: 'Fair', detailsTR: 'Orta', issues: [], issuesTR: [] },
+    premium: {
+      category: 'Premium',
+      categoryTR: 'Prim',
+      score: 80,
+      weight: 20,
+      details: 'Good',
+      detailsTR: 'İyi',
+      issues: [],
+      issuesTR: [],
+    },
+    coverage: {
+      category: 'Coverage',
+      categoryTR: 'Teminat',
+      score: 85,
+      weight: 30,
+      details: 'Good',
+      detailsTR: 'İyi',
+      issues: [],
+      issuesTR: [],
+    },
+    deductible: {
+      category: 'Deductible',
+      categoryTR: 'Muafiyet',
+      score: 75,
+      weight: 15,
+      details: 'Ok',
+      detailsTR: 'Ok',
+      issues: [],
+      issuesTR: [],
+    },
+    compliance: {
+      category: 'Compliance',
+      categoryTR: 'Uyumluluk',
+      score: 90,
+      weight: 20,
+      details: 'Good',
+      detailsTR: 'İyi',
+      issues: [],
+      issuesTR: [],
+    },
+    value: {
+      category: 'Value',
+      categoryTR: 'Değer',
+      score: 78,
+      weight: 15,
+      details: 'Fair',
+      detailsTR: 'Orta',
+      issues: [],
+      issuesTR: [],
+    },
   },
   marketComparison: {
     premiumPercentile: 40,
@@ -71,9 +129,30 @@ const mockEvaluation = {
     issues: [],
   },
   recommendations: [
-    { priority: 'high' as const, type: 'increase_coverage' as const, title: 'Increase Coverage', titleTR: 'Teminatı Artır', description: 'Desc 1', descriptionTR: 'Açıklama 1' },
-    { priority: 'medium' as const, type: 'add_coverage' as const, title: 'Add Flood', titleTR: 'Sel Ekle', description: 'Desc 2', descriptionTR: 'Açıklama 2' },
-    { priority: 'low' as const, type: 'review_premium' as const, title: 'Review Premium', titleTR: 'Primi İncele', description: 'Desc 3', descriptionTR: 'Açıklama 3' },
+    {
+      priority: 'high' as const,
+      type: 'increase_coverage' as const,
+      title: 'Increase Coverage',
+      titleTR: 'Teminatı Artır',
+      description: 'Desc 1',
+      descriptionTR: 'Açıklama 1',
+    },
+    {
+      priority: 'medium' as const,
+      type: 'add_coverage' as const,
+      title: 'Add Flood',
+      titleTR: 'Sel Ekle',
+      description: 'Desc 2',
+      descriptionTR: 'Açıklama 2',
+    },
+    {
+      priority: 'low' as const,
+      type: 'review_premium' as const,
+      title: 'Review Premium',
+      titleTR: 'Primi İncele',
+      description: 'Desc 3',
+      descriptionTR: 'Açıklama 3',
+    },
   ],
   summary: {
     strengths: ['Good coverage'],
@@ -100,11 +179,15 @@ vi.mock('./evaluation/GradeBadge', () => ({
 }))
 
 vi.mock('./evaluation/StatusIndicator', () => ({
-  StatusIndicator: ({ status }: { status: string }) => <span data-testid="status-indicator">{status}</span>,
+  StatusIndicator: ({ status }: { status: string }) => (
+    <span data-testid="status-indicator">{status}</span>
+  ),
 }))
 
 vi.mock('./evaluation/ScoreBreakdown', () => ({
-  ScoreBreakdown: ({ variant }: { variant: string }) => <div data-testid={`score-breakdown-${variant}`}>Breakdown {variant}</div>,
+  ScoreBreakdown: ({ variant }: { variant: string }) => (
+    <div data-testid={`score-breakdown-${variant}`}>Breakdown {variant}</div>
+  ),
 }))
 
 vi.mock('./evaluation/RecommendationCard', () => ({
@@ -127,12 +210,41 @@ vi.mock('@/lib/insurance-display', () => ({
   getShortCompanyName: (name: string) => name,
 }))
 
+const mockExportPolicy = vi.fn().mockResolvedValue(true)
+
+vi.mock('@/hooks/usePdfExport', () => ({
+  usePdfExport: () => ({
+    exportPolicy: mockExportPolicy,
+    isGenerating: false,
+    error: null,
+    lastResult: null,
+    exportGapAnalysis: vi.fn(),
+    exportPortfolio: vi.fn(),
+    exportSummary: vi.fn(),
+    downloadPolicyHTML: vi.fn(),
+    downloadPortfolioHTML: vi.fn(),
+    getAvailableTypes: vi.fn().mockReturnValue([]),
+    clearError: vi.fn(),
+  }),
+}))
+
+const mockExportSinglePolicyToCSV = vi.fn()
+
+vi.mock('@/lib/export', () => ({
+  exportSinglePolicyToCSV: (...args: unknown[]) => mockExportSinglePolicyToCSV(...args),
+}))
+
 // Mock kasko-knowledge functions
 vi.mock('@/lib/knowledge/kasko-knowledge', () => ({
   KASKO_COVERAGE_CATEGORIES: {
     main: { order: 1, labelTr: 'Ana Teminatlar', labelEn: 'Main Coverage', color: 'blue' },
     liability: { order: 2, labelTr: 'Sorumluluk', labelEn: 'Liability', color: 'orange' },
-    personal_accident: { order: 3, labelTr: 'Ferdi Kaza', labelEn: 'Personal Accident', color: 'purple' },
+    personal_accident: {
+      order: 3,
+      labelTr: 'Ferdi Kaza',
+      labelEn: 'Personal Accident',
+      color: 'purple',
+    },
     supplementary: { order: 4, labelTr: 'Ek Teminatlar', labelEn: 'Supplementary', color: 'green' },
     assistance: { order: 5, labelTr: 'Asistans', labelEn: 'Assistance', color: 'teal' },
     legal: { order: 6, labelTr: 'Hukuksal', labelEn: 'Legal', color: 'indigo' },
@@ -154,17 +266,25 @@ vi.mock('@/lib/knowledge/kasko-knowledge', () => ({
   shouldShowIncluded: (name: string, _limit: number) => {
     return name.toLowerCase().includes('ikame araç')
   },
-  groupCoverageSubLimits: (coverages: Coverage[]) => coverages.map(c => ({
-    ...c,
-    nameEn: c.name,
-    isGrouped: false,
-  })),
+  groupCoverageSubLimits: (coverages: Coverage[]) =>
+    coverages.map((c) => ({
+      ...c,
+      nameEn: c.name,
+      isGrouped: false,
+    })),
   sortByImportance: (coverages: unknown[]) => coverages,
   analyzeExclusionsComprehensive: (exclusions: string[], _isCommercial: boolean) => ({
     exclusions: exclusions.map((e, i) => ({
       original: e,
       type: 'exclusion' as const,
-      severity: i === 0 ? 'critical' as const : i === 1 ? 'important' as const : i === 2 ? 'standard' as const : 'informational' as const,
+      severity:
+        i === 0
+          ? ('critical' as const)
+          : i === 1
+            ? ('important' as const)
+            : i === 2
+              ? ('standard' as const)
+              : ('informational' as const),
       explanation: `Explanation for ${e}`,
       explanationEn: `English explanation for ${e}`,
       examples: i === 0 ? ['Example 1', 'Example 2'] : undefined,
@@ -198,10 +318,40 @@ function buildPolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
     fileName: 'kasko.pdf',
     location: 'Istanbul',
     coverages: [
-      { name: 'Collision', nameTr: 'Çarpma', included: true, limit: 350000, deductible: 2000, category: 'main' as CoverageCategory, importance: 'critical' as const },
-      { name: 'Theft', nameTr: 'Hırsızlık', included: true, limit: 350000, deductible: 0, category: 'main' as CoverageCategory },
-      { name: 'Fire', nameTr: 'Yangın', included: true, limit: 350000, deductible: 0, category: 'main' as CoverageCategory },
-      { name: 'Glass Coverage', nameTr: 'Cam Teminatı', included: true, limit: 25000, deductible: 500, category: 'supplementary' as CoverageCategory, description: 'Windshield and windows' },
+      {
+        name: 'Collision',
+        nameTr: 'Çarpma',
+        included: true,
+        limit: 350000,
+        deductible: 2000,
+        category: 'main' as CoverageCategory,
+        importance: 'critical' as const,
+      },
+      {
+        name: 'Theft',
+        nameTr: 'Hırsızlık',
+        included: true,
+        limit: 350000,
+        deductible: 0,
+        category: 'main' as CoverageCategory,
+      },
+      {
+        name: 'Fire',
+        nameTr: 'Yangın',
+        included: true,
+        limit: 350000,
+        deductible: 0,
+        category: 'main' as CoverageCategory,
+      },
+      {
+        name: 'Glass Coverage',
+        nameTr: 'Cam Teminatı',
+        included: true,
+        limit: 25000,
+        deductible: 500,
+        category: 'supplementary' as CoverageCategory,
+        description: 'Windshield and windows',
+      },
     ],
     exclusions: ['War damage', 'Racing/competition use', 'Normal wear and tear', 'Drunk driving'],
     specialConditions: ['Garage parking required'],
@@ -396,7 +546,9 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows location for non-vehicle policies', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({ type: 'home', typeTr: 'Konut', location: 'Ankara' }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({ type: 'home', typeTr: 'Konut', location: 'Ankara' })
+      )
       renderComponent()
       expect(screen.getByText('Ankara')).toBeInTheDocument()
     })
@@ -518,7 +670,9 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('does not show plate in header for traffic without plate', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({ type: 'traffic', typeTr: 'Trafik', vehicleInfo: { make: 'Ford' } }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({ type: 'traffic', typeTr: 'Trafik', vehicleInfo: { make: 'Ford' } })
+      )
       renderComponent()
       // No plate text like "🚗 34 ABC 123" should be rendered since plate is undefined
       expect(screen.queryByText(/34 ABC 123/)).not.toBeInTheDocument()
@@ -532,18 +686,30 @@ describe('PolicyDetailView Branch Coverage', () => {
   describe('Share button', () => {
     it('uses navigator.share when available', async () => {
       const mockShare = vi.fn().mockResolvedValue(undefined)
-      Object.defineProperty(navigator, 'share', { value: mockShare, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      })
       renderComponent()
       await userEvent.setup().click(screen.getByRole('button', { name: /share/i }))
       expect(mockShare).toHaveBeenCalled()
       // Clean up
-      Object.defineProperty(navigator, 'share', { value: undefined, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
     })
 
     it('falls back to clipboard when navigator.share is not available', async () => {
       const { toast } = await import('sonner')
       // Ensure share is not available
-      Object.defineProperty(navigator, 'share', { value: undefined, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
       // Mock clipboard on the navigator object
       const mockWriteText = vi.fn().mockResolvedValue(undefined)
       Object.defineProperty(navigator, 'clipboard', {
@@ -563,13 +729,21 @@ describe('PolicyDetailView Branch Coverage', () => {
     it('shows error toast when share fails (not AbortError)', async () => {
       const { toast } = await import('sonner')
       const mockShare = vi.fn().mockRejectedValue(new Error('Share failed'))
-      Object.defineProperty(navigator, 'share', { value: mockShare, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      })
       renderComponent()
       await userEvent.setup().click(screen.getByRole('button', { name: /share/i }))
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith('Share failed')
       })
-      Object.defineProperty(navigator, 'share', { value: undefined, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
     })
 
     it('does NOT show error toast when share is aborted by user', async () => {
@@ -577,21 +751,98 @@ describe('PolicyDetailView Branch Coverage', () => {
       const abortErr = new Error('User cancelled')
       abortErr.name = 'AbortError'
       const mockShare = vi.fn().mockRejectedValue(abortErr)
-      Object.defineProperty(navigator, 'share', { value: mockShare, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: mockShare,
+        writable: true,
+        configurable: true,
+      })
       renderComponent()
       await userEvent.setup().click(screen.getByRole('button', { name: /share/i }))
       await waitFor(() => {
         expect(toast.error).not.toHaveBeenCalled()
       })
-      Object.defineProperty(navigator, 'share', { value: undefined, writable: true, configurable: true })
+      Object.defineProperty(navigator, 'share', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      })
     })
   })
 
   // =====================================================================
-  // Download button
+  // Export dropdown menu
   // =====================================================================
-  describe('Download button', () => {
-    it('triggers file download on click', async () => {
+  describe('Export dropdown menu', () => {
+    it('opens dropdown on export button click', async () => {
+      renderComponent()
+      const exportBtn = screen.getByRole('button', { name: /export as/i })
+      await userEvent.setup().click(exportBtn)
+      expect(screen.getByText('PDF Report')).toBeInTheDocument()
+      expect(screen.getByText('CSV Spreadsheet')).toBeInTheDocument()
+      expect(screen.getByText('Text Summary')).toBeInTheDocument()
+    })
+
+    it('closes dropdown on second click', async () => {
+      renderComponent()
+      const user = userEvent.setup()
+      const exportBtn = screen.getByRole('button', { name: /export as/i })
+      await user.click(exportBtn)
+      expect(screen.getByText('PDF Report')).toBeInTheDocument()
+      await user.click(exportBtn)
+      expect(screen.queryByText('PDF Report')).not.toBeInTheDocument()
+    })
+
+    it('closes dropdown on outside click', async () => {
+      renderComponent()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      expect(screen.getByText('PDF Report')).toBeInTheDocument()
+      // Click on body (outside the dropdown)
+      await user.click(document.body)
+      await waitFor(() => {
+        expect(screen.queryByText('PDF Report')).not.toBeInTheDocument()
+      })
+    })
+
+    it('has correct aria attributes', () => {
+      renderComponent()
+      const exportBtn = screen.getByRole('button', { name: /export as/i })
+      expect(exportBtn).toHaveAttribute('aria-haspopup', 'true')
+      expect(exportBtn).toHaveAttribute('aria-expanded', 'false')
+    })
+
+    it('sets aria-expanded true when open', async () => {
+      renderComponent()
+      const exportBtn = screen.getByRole('button', { name: /export as/i })
+      await userEvent.setup().click(exportBtn)
+      expect(exportBtn).toHaveAttribute('aria-expanded', 'true')
+    })
+
+    it('triggers PDF export on PDF Report click', async () => {
+      const { toast } = await import('sonner')
+      renderComponent()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('PDF Report'))
+      await waitFor(() => {
+        expect(mockExportPolicy).toHaveBeenCalled()
+        expect(toast.success).toHaveBeenCalledWith('PDF report opened in print dialog')
+      })
+    })
+
+    it('triggers CSV export on CSV Spreadsheet click', async () => {
+      const { toast } = await import('sonner')
+      renderComponent()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('CSV Spreadsheet'))
+      await waitFor(() => {
+        expect(mockExportSinglePolicyToCSV).toHaveBeenCalled()
+        expect(toast.success).toHaveBeenCalledWith('CSV file downloaded')
+      })
+    })
+
+    it('triggers text download on Text Summary click', async () => {
       const { toast } = await import('sonner')
       const createObjectURL = vi.fn().mockReturnValue('blob:url')
       const revokeObjectURL = vi.fn()
@@ -599,13 +850,39 @@ describe('PolicyDetailView Branch Coverage', () => {
       global.URL.revokeObjectURL = revokeObjectURL
 
       renderComponent()
-      await userEvent.setup().click(screen.getByRole('button', { name: /download/i }))
-      // After download, success toast is shown
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('Text Summary'))
       await waitFor(() => {
         expect(toast.success).toHaveBeenCalledWith('Summary downloaded')
       })
       expect(createObjectURL).toHaveBeenCalled()
       expect(revokeObjectURL).toHaveBeenCalled()
+    })
+
+    it('shows popup blocked error when PDF export fails', async () => {
+      const { toast } = await import('sonner')
+      mockExportPolicy.mockResolvedValueOnce(false)
+      renderComponent()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('PDF Report'))
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith('Please allow popups to export PDF')
+      })
+    })
+
+    it('passes locale to CSV export', async () => {
+      renderComponent()
+      const user = userEvent.setup()
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('CSV Spreadsheet'))
+      await waitFor(() => {
+        expect(mockExportSinglePolicyToCSV).toHaveBeenCalledWith(
+          expect.objectContaining({ policyNumber: 'POL-001' }),
+          'en' // locale is 'en' from mock
+        )
+      })
     })
   })
 
@@ -619,19 +896,23 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows "above average" when premium > averagePremium', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 12000,
-        marketComparison: { averagePremium: 10000, averageCoverage: 400000, percentile: 70 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 12000,
+          marketComparison: { averagePremium: 10000, averageCoverage: 400000, percentile: 70 },
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/above average/).length).toBeGreaterThan(0)
     })
 
     it('shows neither when premium equals averagePremium', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 10000,
-        marketComparison: { averagePremium: 10000, averageCoverage: 400000, percentile: 50 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 10000,
+          marketComparison: { averagePremium: 10000, averageCoverage: 400000, percentile: 50 },
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/below average/)).not.toBeInTheDocument()
       expect(screen.queryByText(/above average/)).not.toBeInTheDocument()
@@ -665,9 +946,11 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('displays all insights when 3 or fewer', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        aiInsights: ['Insight one', 'Insight two'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          aiInsights: ['Insight one', 'Insight two'],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Insight one').length).toBeGreaterThan(0)
       expect(screen.getAllByText('Insight two').length).toBeGreaterThan(0)
@@ -681,9 +964,11 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('does not show expand button when 3 or fewer insights', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        aiInsights: ['One', 'Two', 'Three'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          aiInsights: ['One', 'Two', 'Three'],
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/more insights/)).not.toBeInTheDocument()
     })
@@ -745,7 +1030,9 @@ describe('PolicyDetailView Branch Coverage', () => {
   describe('Exclusions section expand/collapse', () => {
     it('is collapsed by default', () => {
       renderComponent()
-      expect(screen.getByText('Uncovered situations and questions for your insurer')).toBeInTheDocument()
+      expect(
+        screen.getByText('Uncovered situations and questions for your insurer')
+      ).toBeInTheDocument()
     })
 
     it('expands when header is clicked', async () => {
@@ -854,14 +1141,20 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('ExclusionsSection clarification and missing items', () => {
     it('shows Ask Your Insurer section when clarificationNeeded has entries', async () => {
-      vi.mocked(await import('@/lib/knowledge/kasko-knowledge')).analyzeExclusionsComprehensive = vi.fn().mockReturnValue({
-        exclusions: [{ original: 'Test', type: 'exclusion', severity: 'standard' }],
-        coveragesInExclusions: [],
-        clarificationNeeded: [
-          { item: 'Flood coverage', question: 'Sel teminatı dahil mi?', questionEn: 'Is flood included?' },
-        ],
-        missingImportantExclusions: [],
-      })
+      vi.mocked(await import('@/lib/knowledge/kasko-knowledge')).analyzeExclusionsComprehensive = vi
+        .fn()
+        .mockReturnValue({
+          exclusions: [{ original: 'Test', type: 'exclusion', severity: 'standard' }],
+          coveragesInExclusions: [],
+          clarificationNeeded: [
+            {
+              item: 'Flood coverage',
+              question: 'Sel teminatı dahil mi?',
+              questionEn: 'Is flood included?',
+            },
+          ],
+          missingImportantExclusions: [],
+        })
       renderComponent()
       await userEvent.setup().click(screen.getByText(/Exclusions & Questions/))
       expect(screen.getByText('Ask Your Insurer')).toBeInTheDocument()
@@ -869,15 +1162,27 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows missing important exclusions with "Not specified" badge', async () => {
-      vi.mocked(await import('@/lib/knowledge/kasko-knowledge')).analyzeExclusionsComprehensive = vi.fn().mockReturnValue({
-        exclusions: [{ original: 'Test', type: 'exclusion', severity: 'standard' }],
-        coveragesInExclusions: [],
-        clarificationNeeded: [],
-        missingImportantExclusions: [
-          { name: 'Flood', nameEn: 'Flood', question: 'Is flood risk covered?', importance: 'high' },
-          { name: 'Landslide', nameEn: 'Landslide', question: 'Landslide coverage?', importance: 'medium' },
-        ],
-      })
+      vi.mocked(await import('@/lib/knowledge/kasko-knowledge')).analyzeExclusionsComprehensive = vi
+        .fn()
+        .mockReturnValue({
+          exclusions: [{ original: 'Test', type: 'exclusion', severity: 'standard' }],
+          coveragesInExclusions: [],
+          clarificationNeeded: [],
+          missingImportantExclusions: [
+            {
+              name: 'Flood',
+              nameEn: 'Flood',
+              question: 'Is flood risk covered?',
+              importance: 'high',
+            },
+            {
+              name: 'Landslide',
+              nameEn: 'Landslide',
+              question: 'Landslide coverage?',
+              importance: 'medium',
+            },
+          ],
+        })
       renderComponent()
       await userEvent.setup().click(screen.getByText(/Exclusions & Questions/))
       expect(screen.getByText('Ask Your Insurer')).toBeInTheDocument()
@@ -893,41 +1198,79 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('Coverage formatting and categories', () => {
     it('shows "Sinırsız" for isUnlimited coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Liability', nameTr: 'Sorumluluk', included: true, limit: 0, deductible: 0, isUnlimited: true, category: 'liability' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Liability',
+              nameTr: 'Sorumluluk',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isUnlimited: true,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
     })
 
     it('shows "Rayic Deger" for isMarketValue coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Total Loss', nameTr: 'Tam Hasar', included: true, limit: 0, deductible: 0, isMarketValue: true, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Total Loss',
+              nameTr: 'Tam Hasar',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isMarketValue: true,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
     })
 
     it('shows "Dahil" for zero-limit included coverage (ikame araç)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'ikame araç', nameTr: 'İkame Araç', included: true, limit: 0, deductible: 0, category: 'assistance' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'ikame araç',
+              nameTr: 'İkame Araç',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'assistance' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
     })
 
     it('shows "Sinırsız" when shouldShowUnlimited returns true (artan mali)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Artan Mali Sorumluluk', nameTr: 'Artan Mali', included: true, limit: 0, deductible: 0, category: 'liability' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Artan Mali Sorumluluk',
+              nameTr: 'Artan Mali',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
     })
@@ -938,71 +1281,134 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows "Sınırsız" for zero-limit name containing "sınırsız"', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Sınırsız Sorumluluk', nameTr: 'Sınırsız', included: true, limit: 0, deductible: 0, category: 'liability' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Sınırsız Sorumluluk',
+              nameTr: 'Sınırsız',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
     })
 
     it('shows "Rayic Deger" for zero-limit name containing "rayiç"', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Rayiç Bedel Teminatı', nameTr: 'Rayiç Bedel', included: true, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Rayiç Bedel Teminatı',
+              nameTr: 'Rayiç Bedel',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
     })
 
     it('shows "Dahil" for zero-limit asistans service', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Yol Asistans Hizmeti', nameTr: 'Asistans', included: true, limit: 0, deductible: 0, category: 'assistance' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Yol Asistans Hizmeti',
+              nameTr: 'Asistans',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'assistance' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
     })
 
     it('shows "Dahil" for zero-limit onarım service', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Mini Onarım', nameTr: 'Mini Onarım', included: true, limit: 0, deductible: 0, category: 'supplementary' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Mini Onarım',
+              nameTr: 'Mini Onarım',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'supplementary' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
     })
 
     it('shows "Dahil" for zero-limit with name containing "market value"', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Market Value Coverage', nameTr: 'Rayiç', included: true, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Market Value Coverage',
+              nameTr: 'Rayiç',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
     })
 
     it('shows "Dahil" as default for zero-limit generic coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Generic Service', nameTr: 'Genel Servis', included: true, limit: 0, deductible: 0, category: 'other' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Generic Service',
+              nameTr: 'Genel Servis',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'other' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
     })
 
     it('shows "Sınırsız" for zero-limit name containing "unlimited"', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Unlimited Coverage', nameTr: 'Sınırsız Teminat', included: true, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Unlimited Coverage',
+              nameTr: 'Sınırsız Teminat',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
     })
@@ -1013,32 +1419,68 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('CoveragesByCategory filtering', () => {
     it('filters out zero-limit non-special category headers', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Collision', nameTr: 'Çarpma', included: true, limit: 350000, deductible: 0, category: 'main' as CoverageCategory },
-          { name: 'Zorunlu Mali Sorumluluk Kapsamı', nameTr: 'ZMSS', included: false, limit: 0, deductible: 0, category: 'other' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Collision',
+              nameTr: 'Çarpma',
+              included: true,
+              limit: 350000,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+            {
+              name: 'Zorunlu Mali Sorumluluk Kapsamı',
+              nameTr: 'ZMSS',
+              included: false,
+              limit: 0,
+              deductible: 0,
+              category: 'other' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.queryByText('ZMSS')).not.toBeInTheDocument()
     })
 
     it('keeps zero-limit coverage with isUnlimited flag', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'IMM', nameTr: 'İhtiyari Mali', included: true, limit: 0, deductible: 0, isUnlimited: true, category: 'liability' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'IMM',
+              nameTr: 'İhtiyari Mali',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isUnlimited: true,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/İhtiyari Mali|IMM/).length).toBeGreaterThan(0)
     })
 
     it('keeps zero-limit coverage with isMarketValue flag', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Market Value', nameTr: 'Rayiç', included: true, limit: 0, deductible: 0, isMarketValue: true, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Market Value',
+              nameTr: 'Rayiç',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isMarketValue: true,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/Rayiç/).length).toBeGreaterThan(0)
     })
@@ -1081,11 +1523,20 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows X icon for non-included coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Flood', nameTr: 'Sel', included: false, limit: 50000, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Flood',
+              nameTr: 'Sel',
+              included: false,
+              limit: 50000,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/Flood|Sel/).length).toBeGreaterThan(0)
     })
@@ -1097,7 +1548,7 @@ describe('PolicyDetailView Branch Coverage', () => {
       // Expand supplementary category first (it's not the first category)
       const allButtons = screen.getAllByRole('button')
       // Find the supplementary category header
-      const supplementaryHeader = allButtons.find(b => b.textContent?.includes('Supplementary'))
+      const supplementaryHeader = allButtons.find((b) => b.textContent?.includes('Supplementary'))
       if (supplementaryHeader) {
         await user.click(supplementaryHeader)
       }
@@ -1117,22 +1568,41 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('renders personal_accident category coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Personal Accident', nameTr: 'Ferdi Kaza', included: true, limit: 100000, deductible: 0, category: 'personal_accident' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Personal Accident',
+              nameTr: 'Ferdi Kaza',
+              included: true,
+              limit: 100000,
+              deductible: 0,
+              category: 'personal_accident' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // The personal_accident category should be displayed
       expect(screen.getAllByText(/Personal Accident|Ferdi Kaza/).length).toBeGreaterThan(0)
     })
 
     it('shows special value color (text-blue-600) for unlimited/market value coverages', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Test', nameTr: 'Test', included: true, limit: 0, deductible: 0, isUnlimited: true, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Test',
+              nameTr: 'Test',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isUnlimited: true,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       const sinirElements = screen.getAllByText('Sınırsız')
       // At least one should have the blue styling
@@ -1178,11 +1648,20 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('returns null (no info icon) for coverage without deductible/description/special', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Basic', nameTr: 'Temel', included: true, limit: 100000, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Basic',
+              nameTr: 'Temel',
+              included: true,
+              limit: 100000,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // Coverage button without info has disabled attribute (empty string = truthy)
       const basicElement = screen.getByText('Basic')
@@ -1211,11 +1690,20 @@ describe('PolicyDetailView Branch Coverage', () => {
         isLoading: false,
       })
 
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Collision', nameTr: 'Çarpma/Çarpışma', included: true, limit: 350000, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Collision',
+              nameTr: 'Çarpma/Çarpışma',
+              included: true,
+              limit: 350000,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/Çarpma/).length).toBeGreaterThan(0)
 
@@ -1274,15 +1762,43 @@ describe('PolicyDetailView Branch Coverage', () => {
 
     it('does not show expand for 2 or fewer recommendations', () => {
       vi.mocked(mockEvaluation).recommendations = [
-        { priority: 'high' as const, type: 'increase_coverage' as const, title: 'Inc', titleTR: 'Art', description: 'd', descriptionTR: 'd' },
+        {
+          priority: 'high' as const,
+          type: 'increase_coverage' as const,
+          title: 'Inc',
+          titleTR: 'Art',
+          description: 'd',
+          descriptionTR: 'd',
+        },
       ]
       renderComponent()
       expect(screen.queryByText(/more recommendations/)).not.toBeInTheDocument()
       // Restore
       vi.mocked(mockEvaluation).recommendations = [
-        { priority: 'high' as const, type: 'increase_coverage' as const, title: 'Increase Coverage', titleTR: 'Teminatı Artır', description: 'Desc 1', descriptionTR: 'Açıklama 1' },
-        { priority: 'medium' as const, type: 'add_coverage' as const, title: 'Add Flood', titleTR: 'Sel Ekle', description: 'Desc 2', descriptionTR: 'Açıklama 2' },
-        { priority: 'low' as const, type: 'review_premium' as const, title: 'Review Premium', titleTR: 'Primi İncele', description: 'Desc 3', descriptionTR: 'Açıklama 3' },
+        {
+          priority: 'high' as const,
+          type: 'increase_coverage' as const,
+          title: 'Increase Coverage',
+          titleTR: 'Teminatı Artır',
+          description: 'Desc 1',
+          descriptionTR: 'Açıklama 1',
+        },
+        {
+          priority: 'medium' as const,
+          type: 'add_coverage' as const,
+          title: 'Add Flood',
+          titleTR: 'Sel Ekle',
+          description: 'Desc 2',
+          descriptionTR: 'Açıklama 2',
+        },
+        {
+          priority: 'low' as const,
+          type: 'review_premium' as const,
+          title: 'Review Premium',
+          titleTR: 'Primi İncele',
+          description: 'Desc 3',
+          descriptionTR: 'Açıklama 3',
+        },
       ]
     })
 
@@ -1292,9 +1808,30 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.queryByText('Recommendations')).not.toBeInTheDocument()
       // Restore
       vi.mocked(mockEvaluation).recommendations = [
-        { priority: 'high' as const, type: 'increase_coverage' as const, title: 'Increase Coverage', titleTR: 'Teminatı Artır', description: 'Desc 1', descriptionTR: 'Açıklama 1' },
-        { priority: 'medium' as const, type: 'add_coverage' as const, title: 'Add Flood', titleTR: 'Sel Ekle', description: 'Desc 2', descriptionTR: 'Açıklama 2' },
-        { priority: 'low' as const, type: 'review_premium' as const, title: 'Review Premium', titleTR: 'Primi İncele', description: 'Desc 3', descriptionTR: 'Açıklama 3' },
+        {
+          priority: 'high' as const,
+          type: 'increase_coverage' as const,
+          title: 'Increase Coverage',
+          titleTR: 'Teminatı Artır',
+          description: 'Desc 1',
+          descriptionTR: 'Açıklama 1',
+        },
+        {
+          priority: 'medium' as const,
+          type: 'add_coverage' as const,
+          title: 'Add Flood',
+          titleTR: 'Sel Ekle',
+          description: 'Desc 2',
+          descriptionTR: 'Açıklama 2',
+        },
+        {
+          priority: 'low' as const,
+          type: 'review_premium' as const,
+          title: 'Review Premium',
+          titleTR: 'Primi İncele',
+          description: 'Desc 3',
+          descriptionTR: 'Açıklama 3',
+        },
       ]
     })
   })
@@ -1332,30 +1869,36 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('shows processed text toggle when processedText differs', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: 'Raw text here',
-        processedText: 'Processed text here',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: 'Raw text here',
+          processedText: 'Processed text here',
+        })
+      )
       renderComponent()
       // Should show Raw/Processed toggle button and AI badge
       expect(screen.getByText('AI')).toBeInTheDocument()
     })
 
     it('does not show toggle when processedText equals extractedText', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: 'Same text',
-        processedText: 'Same text',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: 'Same text',
+          processedText: 'Same text',
+        })
+      )
       renderComponent()
       // No AI badge since texts are equal
       expect(screen.queryByText('AI')).not.toBeInTheDocument()
     })
 
     it('toggles between raw and processed text', async () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: 'Raw version',
-        processedText: 'Processed version',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: 'Raw version',
+          processedText: 'Processed version',
+        })
+      )
       renderComponent()
       const user = userEvent.setup()
       // Click raw button to switch to raw text
@@ -1427,7 +1970,9 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('does NOT render text section when no extractedText', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({ extractedText: undefined, processedText: undefined }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({ extractedText: undefined, processedText: undefined })
+      )
       renderComponent()
       expect(screen.queryByText('Document')).not.toBeInTheDocument()
       expect(screen.queryByText('Raw Text')).not.toBeInTheDocument()
@@ -1445,17 +1990,21 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('handles insight with emoji prefix (strips for display)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        aiInsights: ['✓ Good policy structure'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          aiInsights: ['✓ Good policy structure'],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/Good policy structure/).length).toBeGreaterThan(0)
     })
 
     it('strips various emoji prefixes (warning, bulb, x)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        aiInsights: ['⚠ Warning about coverage', '💡 Tip for saving', '❌ Missing coverage'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          aiInsights: ['⚠ Warning about coverage', '💡 Tip for saving', '❌ Missing coverage'],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/Warning about coverage/).length).toBeGreaterThan(0)
       expect(screen.getAllByText(/Tip for saving/).length).toBeGreaterThan(0)
@@ -1468,10 +2017,12 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('getLocalizedInsight with aiInsightsTr', () => {
     it('returns aiInsights[index] for en locale regardless of aiInsightsTr', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        aiInsights: ['English insight'],
-        aiInsightsTr: ['Turkish insight'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          aiInsights: ['English insight'],
+          aiInsightsTr: ['Turkish insight'],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/English insight/).length).toBeGreaterThan(0)
     })
@@ -1530,21 +2081,33 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('renders with non-kasko traffic type that has plate in header', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        type: 'traffic',
-        typeTr: 'Trafik',
-        vehicleInfo: { plate: '06 DEF 456' },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          type: 'traffic',
+          typeTr: 'Trafik',
+          vehicleInfo: { plate: '06 DEF 456' },
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/06 DEF 456/).length).toBeGreaterThanOrEqual(1)
     })
 
     it('handles coverage with empty description string (whitespace only)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Test', nameTr: 'Test', included: true, limit: 100, deductible: 0, category: 'main' as CoverageCategory, description: '   ' },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Test',
+              nameTr: 'Test',
+              included: true,
+              limit: 100,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+              description: '   ',
+            },
+          ],
+        })
+      )
       renderComponent()
       // Should not show info icon for whitespace-only description
       const testEl = screen.getByText('Test')
@@ -1553,21 +2116,40 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('handles missing nameTr in coverage (en locale returns name)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Only English Name', nameTr: '', included: true, limit: 5000, deductible: 0, category: 'other' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Only English Name',
+              nameTr: '',
+              included: true,
+              limit: 5000,
+              deductible: 0,
+              category: 'other' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getAllByText('Only English Name').length).toBeGreaterThan(0)
     })
 
     it('handles isMarketValue info text display', async () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'MV Coverage', nameTr: 'MV', included: true, limit: 0, deductible: 500, isMarketValue: true, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'MV Coverage',
+              nameTr: 'MV',
+              included: true,
+              limit: 0,
+              deductible: 500,
+              isMarketValue: true,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // Click on the coverage to see info text
       const mvEl = screen.getByText('MV Coverage')
@@ -1581,11 +2163,21 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('handles isUnlimited info text display', async () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'UL Coverage', nameTr: 'UL', included: true, limit: 0, deductible: 100, isUnlimited: true, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'UL Coverage',
+              nameTr: 'UL',
+              included: true,
+              limit: 0,
+              deductible: 100,
+              isUnlimited: true,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       const ulEl = screen.getByText('UL Coverage')
       const btn = ulEl.closest('button')
@@ -1598,18 +2190,22 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('handles processedText-only display (no extractedText)', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: undefined,
-        processedText: 'Processed only',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: undefined,
+          processedText: 'Processed only',
+        })
+      )
       renderComponent()
       expect(screen.getByText('Document')).toBeInTheDocument()
     })
 
     it('shows coverage badge count in section header', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        exclusions: ['A', 'B', 'C', 'D', 'E'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          exclusions: ['A', 'B', 'C', 'D', 'E'],
+        })
+      )
       renderComponent()
       expect(screen.getByText('5')).toBeInTheDocument()
     })
@@ -1620,11 +2216,20 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('getCategoryInfo fallback', () => {
     it('returns Other for unknown category', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Unknown Cat', nameTr: 'Bilinmeyen', included: true, limit: 1000, deductible: 0, category: 'other' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Unknown Cat',
+              nameTr: 'Bilinmeyen',
+              included: true,
+              limit: 1000,
+              deductible: 0,
+              category: 'other' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // "Other" category label should be shown
       expect(screen.getAllByText(/Other|Diğer/).length).toBeGreaterThan(0)
@@ -1636,11 +2241,20 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('Empty categories are not rendered', () => {
     it('does not render categories with zero coverages', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Only Main', nameTr: 'Sadece Ana', included: true, limit: 1000, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Only Main',
+              nameTr: 'Sadece Ana',
+              included: true,
+              limit: 1000,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // Only Main Coverage category should appear, not Liability, etc.
       expect(screen.queryByText('Liability')).not.toBeInTheDocument()
@@ -1672,10 +2286,12 @@ describe('PolicyDetailView Branch Coverage', () => {
   // =====================================================================
   describe('RawExtractedTextSection additional branches', () => {
     it('shows processed text toggle when both extractedText and processedText exist and differ', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: 'Raw text from PDF',
-        processedText: 'AI processed clean text',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: 'Raw text from PDF',
+          processedText: 'AI processed clean text',
+        })
+      )
       renderComponent()
       // "AI" badge should be shown because processedText differs from extractedText
       expect(screen.getByText('AI')).toBeInTheDocument()
@@ -1684,10 +2300,12 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('toggles between raw and processed text', async () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: 'Raw text from PDF original',
-        processedText: 'AI processed clean text result',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: 'Raw text from PDF original',
+          processedText: 'AI processed clean text result',
+        })
+      )
       renderComponent()
       // Initially shows processed text (Document title)
       expect(screen.getByText('Document')).toBeInTheDocument()
@@ -1720,10 +2338,12 @@ describe('PolicyDetailView Branch Coverage', () => {
 
     it('does not show toggle button when processedText equals extractedText', () => {
       const sameText = 'Same text content'
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        extractedText: sameText,
-        processedText: sameText,
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          extractedText: sameText,
+          processedText: sameText,
+        })
+      )
       renderComponent()
       // "Raw" toggle should not appear since texts are identical
       expect(screen.queryByText('Raw')).not.toBeInTheDocument()
@@ -1752,12 +2372,14 @@ describe('PolicyDetailView Branch Coverage', () => {
 
   describe('Non-kasko policy type branches', () => {
     it('shows location field for home policy type', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        type: 'home',
-        typeTr: 'Konut',
-        location: 'Istanbul, Kadikoy',
-        vehicleInfo: undefined,
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          type: 'home',
+          typeTr: 'Konut',
+          location: 'Istanbul, Kadikoy',
+          vehicleInfo: undefined,
+        })
+      )
       renderComponent()
       expect(screen.getByText('Konum')).toBeInTheDocument()
       expect(screen.getByText('Istanbul, Kadikoy')).toBeInTheDocument()
@@ -1769,21 +2391,25 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('does not show vehicle info section for non-kasko policy', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        type: 'home',
-        typeTr: 'Konut',
-        vehicleInfo: undefined,
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          type: 'home',
+          typeTr: 'Konut',
+          vehicleInfo: undefined,
+        })
+      )
       renderComponent()
       expect(screen.queryByText('Vehicle Information')).not.toBeInTheDocument()
     })
 
     it('shows formatted coverage amount for non-kasko (not "Araç Rayiç Bedeli")', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        type: 'home',
-        typeTr: 'Konut',
-        coverage: 500000,
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          type: 'home',
+          typeTr: 'Konut',
+          coverage: 500000,
+        })
+      )
       renderComponent()
       expect(screen.queryByText('Araç Rayiç Bedeli')).not.toBeInTheDocument()
     })
@@ -1791,46 +2417,56 @@ describe('PolicyDetailView Branch Coverage', () => {
 
   describe('Market comparison edge cases', () => {
     it('shows "below average" when premium is lower than market average', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 5000,
-        marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 30 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 5000,
+          marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 30 },
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/below average/).length).toBeGreaterThan(0)
     })
 
     it('shows "above average" when premium is higher than market average', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 15000,
-        marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 70 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 15000,
+          marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 70 },
+        })
+      )
       renderComponent()
       expect(screen.getAllByText(/above average/).length).toBeGreaterThan(0)
     })
 
     it('shows neither above/below when premium equals market average', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 10000,
-        marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 50 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 10000,
+          marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 50 },
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/below average/)).not.toBeInTheDocument()
       expect(screen.queryByText(/above average/)).not.toBeInTheDocument()
     })
 
     it('does not show market comparison when premium is 0', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        premium: 0,
-        marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 50 },
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          premium: 0,
+          marketComparison: { averagePremium: 10000, averageCoverage: 500000, percentile: 50 },
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/Market Comparison/)).not.toBeInTheDocument()
     })
 
     it('does not show market comparison when marketComparison is undefined', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        marketComparison: undefined,
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          marketComparison: undefined,
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/Market Comparison/)).not.toBeInTheDocument()
     })
@@ -1873,11 +2509,20 @@ describe('PolicyDetailView Branch Coverage', () => {
 
   describe('Coverage included false branch', () => {
     it('shows X icon for not-included coverage', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Excluded Item', nameTr: 'Dahil Olmayan', included: false, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Excluded Item',
+              nameTr: 'Dahil Olmayan',
+              included: false,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // The excluded coverage name should appear
       expect(screen.getByText('Excluded Item')).toBeInTheDocument()
@@ -1886,12 +2531,28 @@ describe('PolicyDetailView Branch Coverage', () => {
 
   describe('Coverage filtering in CoveragesByCategory', () => {
     it('filters out category header coverages with zero limit', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Zorunlu Mali Sorumluluk Teminati', nameTr: 'ZMS', included: true, limit: 0, deductible: 0, category: 'liability' as CoverageCategory },
-          { name: 'Real Coverage', nameTr: 'Gerçek', included: true, limit: 5000, deductible: 0, category: 'liability' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Zorunlu Mali Sorumluluk Teminati',
+              nameTr: 'ZMS',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'liability' as CoverageCategory,
+            },
+            {
+              name: 'Real Coverage',
+              nameTr: 'Gerçek',
+              included: true,
+              limit: 5000,
+              deductible: 0,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       // The header-like coverage should be filtered out
       expect(screen.queryByText('ZMS')).not.toBeInTheDocument()
@@ -1899,21 +2560,41 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('keeps unlimited coverages with zero limit', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Unlimited Thing', nameTr: 'Sınırsız', isUnlimited: true, included: true, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Unlimited Thing',
+              nameTr: 'Sınırsız',
+              isUnlimited: true,
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getByText('Unlimited Thing')).toBeInTheDocument()
     })
 
     it('keeps marketValue coverages with zero limit', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        coverages: [
-          { name: 'Market Val', nameTr: 'Rayiç', isMarketValue: true, included: true, limit: 0, deductible: 0, category: 'main' as CoverageCategory },
-        ],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Market Val',
+              nameTr: 'Rayiç',
+              isMarketValue: true,
+              included: true,
+              limit: 0,
+              deductible: 0,
+              category: 'main' as CoverageCategory,
+            },
+          ],
+        })
+      )
       renderComponent()
       expect(screen.getByText('Market Val')).toBeInTheDocument()
     })
@@ -1921,9 +2602,16 @@ describe('PolicyDetailView Branch Coverage', () => {
 
   describe('Exclusions clarification section', () => {
     it('renders exclusions section when expanded', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        exclusions: ['Terör eylemleri', 'Nükleer riskler', 'Savaş ve iç savaş', 'Deprem hasarları'],
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          exclusions: [
+            'Terör eylemleri',
+            'Nükleer riskler',
+            'Savaş ve iç savaş',
+            'Deprem hasarları',
+          ],
+        })
+      )
       renderComponent()
       // Expand exclusions first
       const exclusionHeader = screen.getByText(/Exclusions & Questions/)
@@ -1943,10 +2631,12 @@ describe('PolicyDetailView Branch Coverage', () => {
     })
 
     it('does not show implicit coverages note for non-kasko policies', () => {
-      mockGetPolicyById.mockReturnValue(buildPolicy({
-        type: 'home',
-        typeTr: 'Konut',
-      }))
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          type: 'home',
+          typeTr: 'Konut',
+        })
+      )
       renderComponent()
       expect(screen.queryByText(/Temel Kasko Teminatları/)).not.toBeInTheDocument()
     })
@@ -1956,14 +2646,17 @@ describe('PolicyDetailView Branch Coverage', () => {
   // Download summary content includes kasko vs non-kasko text
   // =====================================================================
   describe('Download summary content variations', () => {
-    it('includes kasko coverage text in download summary', async () => {
+    it('includes kasko coverage text in download summary via export dropdown', async () => {
       const createObjectURL = vi.fn().mockReturnValue('blob:url')
       const revokeObjectURL = vi.fn()
       global.URL.createObjectURL = createObjectURL
       global.URL.revokeObjectURL = revokeObjectURL
 
       renderComponent()
-      await userEvent.setup().click(screen.getByRole('button', { name: /download/i }))
+      const user = userEvent.setup()
+      // Open export dropdown then click Text Summary
+      await user.click(screen.getByRole('button', { name: /export as/i }))
+      await user.click(screen.getByText('Text Summary'))
 
       // Verify the blob was created with summary content
       await waitFor(() => {

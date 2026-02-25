@@ -345,6 +345,22 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     confidence: 'AI Confidence',
   },
 
+  exportMenu: {
+    exportAs: 'Export As',
+    pdfReport: 'PDF Report',
+    pdfReportDesc: 'Branded report with coverages and insights',
+    csvExport: 'CSV Spreadsheet',
+    csvExportDesc: 'All data in spreadsheet format',
+    textSummary: 'Text Summary',
+    textSummaryDesc: 'Plain text overview',
+    generating: 'Generating...',
+    pdfSuccess: 'PDF report opened in print dialog',
+    csvSuccess: 'CSV file downloaded',
+    textSuccess: 'Summary downloaded',
+    exportFailed: 'Export failed',
+    popupBlocked: 'Please allow popups to export PDF',
+  },
+
   upload: {
     title: 'Upload Policies',
     subtitle: 'Upload your insurance documents for AI analysis',
