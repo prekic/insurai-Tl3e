@@ -29,11 +29,13 @@ import { ProcessingLogsTab } from './tabs/ProcessingLogsTab'
 import { NotificationsTab } from './tabs/NotificationsTab'
 import { BenchmarksTab } from './tabs/BenchmarksTab'
 import { TranslationsTab } from './tabs/TranslationsTab'
+import { ExtractionHealthTab } from './tabs/ExtractionHealthTab'
 
 import { cn } from '@/lib/utils'
 
 // Icons
 import {
+  Activity,
   LayoutDashboard,
   Brain,
   MessageSquare,
@@ -75,6 +77,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'analytics', label: 'Analytics', icon: <BarChart3 className="h-4 w-4" /> },
   { id: 'audit', label: 'Audit Log', icon: <ScrollText className="h-4 w-4" /> },
   { id: 'alerts', label: 'Alerts', icon: <Bell className="h-4 w-4" /> },
+  { id: 'extraction_health', label: 'Extraction Health', icon: <Activity className="h-4 w-4" /> },
 ]
 
 export function AdminDashboard() {
@@ -221,6 +224,8 @@ export function AdminDashboard() {
         return <AlertsTab />
       case 'processing_logs':
         return <ProcessingLogsTab />
+      case 'extraction_health':
+        return <ExtractionHealthTab />
       default:
         return <OverviewTab systemHealth={systemHealth} />
     }

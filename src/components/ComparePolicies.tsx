@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, X, AlertTriangle, Lightbulb, Scale, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, X, AlertTriangle, Lightbulb, Scale, ChevronDown, ChevronUp, Download, FileText, FileSpreadsheet, BarChart3, TrendingUp } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from './ui/button'
-import { cn } from '@/lib/utils'
+import { cn, formatCurrency } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { usePolicies } from '@/lib/policy-context'
 import { usePolicyComparison } from '@/hooks/usePolicyComparison'
@@ -15,7 +16,9 @@ import {
   RecommendationList,
   GradeBadge,
 } from './evaluation'
+import { exportComparisonToCSV, exportComparisonToPDF } from '@/lib/export'
 import type { AnalyzedPolicy } from '@/types/policy'
+import type { PolicyComparison as PolicyComparisonType } from '@/lib/policy-evaluation/types'
 
 /**
  * ComparePolicies page for side-by-side policy comparison.
@@ -53,6 +56,34 @@ export function ComparePolicies() {
     differences: true,
     recommendation: true,
   })
+
+  // Export dropdown state
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!exportMenuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [exportMenuOpen])
+
+  const handleExportPdf = useCallback(() => {
+    exportComparisonToPDF(selectedPolicies)
+    setExportMenuOpen(false)
+    toast.success(t.comparison.pdfExported)
+  }, [selectedPolicies, t.comparison.pdfExported])
+
+  const handleExportCsv = useCallback(() => {
+    exportComparisonToCSV(selectedPolicies)
+    setExportMenuOpen(false)
+    toast.success(t.comparison.csvExported)
+  }, [selectedPolicies, t.comparison.csvExported])
 
   // Run comparison
   const { comparison, isValid, validationMessage, error } = usePolicyComparison(selectedPolicies)
@@ -125,12 +156,38 @@ export function ComparePolicies() {
               {t.comparison.subtitle}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {selectedPolicies.length > 0 && (
               <Button variant="outline" onClick={clearAll} className="gap-2">
                 <X className="w-4 h-4" />
                 {t.comparison.clearAll}
               </Button>
+            )}
+            {comparison && (
+              <div className="relative" ref={exportMenuRef}>
+                <Button variant="outline" onClick={() => setExportMenuOpen(!exportMenuOpen)} className="gap-2">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t.comparison.exportComparison}</span>
+                </Button>
+                {exportMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                    <button
+                      onClick={handleExportPdf}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <FileText size={16} className="text-red-500 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-900">{t.comparison.exportPdf}</span>
+                    </button>
+                    <button
+                      onClick={handleExportCsv}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <FileSpreadsheet size={16} className="text-green-600 flex-shrink-0" />
+                      <span className="text-sm font-medium text-gray-900">{t.comparison.exportCsv}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
             <Button
               variant="outline"
@@ -206,11 +263,11 @@ export function ComparePolicies() {
         {/* Selected Policies Preview */}
         {selectedPolicies.length > 0 && (
           <div className="mb-6">
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               {selectedPolicies.map((policy, index) => (
                 <div
                   key={policy.id}
-                  className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200"
+                  className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 sm:py-2 bg-white rounded-lg border border-gray-200"
                 >
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
                     {index + 1}
@@ -265,6 +322,12 @@ export function ComparePolicies() {
         {/* Comparison Results */}
         {comparison && (
           <div className="space-y-6">
+            {/* Quick Stats Summary */}
+            <QuickStatsCard comparison={comparison} t={t} />
+
+            {/* Score Comparison Chart */}
+            <ScoreComparisonChart comparison={comparison} t={t} />
+
             {/* Winners Summary */}
             <section className="bg-white rounded-2xl border border-gray-200 p-6">
               <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -282,14 +345,14 @@ export function ComparePolicies() {
               <ComparisonTable comparison={comparison} />
             </CollapsibleSection>
 
-            {/* Coverage Matrix */}
+            {/* Coverage Matrix with Diff Highlighting */}
             <CollapsibleSection
               title={t.comparison.coverageMatrix}
               expanded={expandedSections.coverage}
               onToggle={() => toggleSection('coverage')}
             >
               <CoverageSummary comparison={comparison} className="mb-4" />
-              <CoverageMatrix comparison={comparison} />
+              <EnhancedCoverageMatrix comparison={comparison} t={t} locale={locale} />
             </CollapsibleSection>
 
             {/* Key Differences */}
@@ -516,6 +579,244 @@ function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
         <strong>{t.comparison.recommendation}</strong>{' '}
         {locale === 'tr' ? tradeoff.recommendationTR : tradeoff.recommendation}
       </p>
+    </div>
+  )
+}
+
+// =============================================================================
+// Quick Stats Summary Card
+// =============================================================================
+
+interface QuickStatsCardProps {
+  comparison: PolicyComparisonType
+  t: { comparison: { quickStats: string; avgScore: string; avgPremium: string; totalCoverage: string; policiesCompared: string } }
+}
+
+function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
+  const avgScore = Math.round(
+    comparison.policies.reduce((sum, p) => sum + p.evaluation.overallScore, 0) / comparison.policies.length
+  )
+  const avgPremium =
+    comparison.policies.reduce((sum, p) => sum + p.policy.premium, 0) / comparison.policies.length
+  const totalCoverage = comparison.policies.reduce((sum, p) => sum + p.policy.coverage, 0)
+
+  const stats = [
+    { label: t.comparison.policiesCompared, value: String(comparison.policies.length), icon: <Scale className="w-5 h-5 text-blue-500" /> },
+    { label: t.comparison.avgScore, value: `${avgScore}/100`, icon: <BarChart3 className="w-5 h-5 text-emerald-500" /> },
+    { label: t.comparison.avgPremium, value: formatCurrency(avgPremium), icon: <TrendingUp className="w-5 h-5 text-amber-500" /> },
+    { label: t.comparison.totalCoverage, value: formatCurrency(totalCoverage), icon: <TrendingUp className="w-5 h-5 text-purple-500" /> },
+  ]
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <BarChart3 className="w-5 h-5 text-blue-600" />
+        {t.comparison.quickStats}
+      </h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        {stats.map((stat) => (
+          <div key={stat.label} className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-100">
+            <div className="flex items-center gap-2 mb-1">
+              {stat.icon}
+              <span className="text-xs text-gray-500 truncate">{stat.label}</span>
+            </div>
+            <div className="text-lg sm:text-xl font-bold text-gray-900 truncate">{stat.value}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+// =============================================================================
+// Score Comparison Chart (CSS-based horizontal bars)
+// =============================================================================
+
+interface ScoreComparisonChartProps {
+  comparison: PolicyComparisonType
+  t: { comparison: { scoreChart: string; premium: string; coverage: string; deductible: string; compliance: string; value: string; overall: string; best: string } }
+}
+
+function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
+  const categories = ['premium', 'coverage', 'deductible', 'compliance', 'value'] as const
+  const categoryLabels: Record<string, string> = {
+    premium: t.comparison.premium,
+    coverage: t.comparison.coverage,
+    deductible: t.comparison.deductible,
+    compliance: t.comparison.compliance,
+    value: t.comparison.value,
+  }
+
+  const policyColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6']
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
+      <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <BarChart3 className="w-5 h-5 text-blue-600" />
+        {t.comparison.scoreChart}
+      </h2>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-3 mb-4">
+        {comparison.policies.map((p, i) => (
+          <div key={p.policy.id} className="flex items-center gap-2 text-sm">
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: policyColors[i] }} />
+            <span className="font-medium text-gray-700">{p.label || p.policy.provider}</span>
+            <GradeBadge grade={p.evaluation.grade} size="sm" />
+          </div>
+        ))}
+      </div>
+
+      {/* Category bars */}
+      <div className="space-y-4">
+        {categories.map((cat) => {
+          const scores = comparison.policies.map((p) => p.evaluation.scoreBreakdown[cat].score)
+          const maxScore = Math.max(...scores)
+
+          return (
+            <div key={cat}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-sm font-medium text-gray-700">{categoryLabels[cat]}</span>
+                <span className="text-xs text-gray-400">{t.comparison.best}: {maxScore}</span>
+              </div>
+              <div className="space-y-1.5">
+                {comparison.policies.map((p, i) => {
+                  const score = p.evaluation.scoreBreakdown[cat].score
+                  const isBest = score === maxScore && scores.filter(s => s === maxScore).length === 1
+                  return (
+                    <div key={p.policy.id} className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">{p.label || p.policy.provider}</span>
+                      <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden relative">
+                        <div
+                          className="h-full rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${score}%`, backgroundColor: policyColors[i] }}
+                        />
+                      </div>
+                      <span className={cn('text-xs font-medium w-8 text-right', isBest ? 'text-emerald-600' : 'text-gray-600')}>
+                        {score}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Overall */}
+        <div className="pt-3 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-bold text-gray-900">{t.comparison.overall}</span>
+          </div>
+          <div className="space-y-1.5">
+            {comparison.policies.map((p, i) => {
+              const score = p.evaluation.overallScore
+              const isBest = p.policy.id === comparison.winners.overallBest
+              return (
+                <div key={p.policy.id} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">{p.label || p.policy.provider}</span>
+                  <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden relative">
+                    <div
+                      className={cn('h-full rounded-full transition-all duration-700 ease-out', isBest && 'ring-2 ring-offset-1 ring-emerald-400')}
+                      style={{ width: `${score}%`, backgroundColor: policyColors[i] }}
+                    />
+                  </div>
+                  <span className={cn('text-sm font-bold w-8 text-right', isBest ? 'text-emerald-600' : 'text-gray-700')}>
+                    {score}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// =============================================================================
+// Enhanced Coverage Matrix with Diff Highlighting
+// =============================================================================
+
+interface EnhancedCoverageMatrixProps {
+  comparison: PolicyComparisonType
+  t: { comparison: { included: string; notIncluded: string; best: string } }
+  locale: string
+}
+
+function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatrixProps) {
+  if (!comparison.coverageMatrix || comparison.coverageMatrix.length === 0) {
+    return <CoverageMatrix comparison={comparison} />
+  }
+
+  return (
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <table className="w-full text-sm min-w-[500px]">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="text-left py-2 px-3 font-medium text-gray-600 sticky left-0 bg-white">
+              {locale === 'tr' ? 'Teminat' : 'Coverage'}
+            </th>
+            {comparison.policies.map((p) => (
+              <th key={p.policy.id} className="text-center py-2 px-2 font-medium text-gray-600 whitespace-nowrap">
+                {p.label || p.policy.provider}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {comparison.coverageMatrix.map((row) => {
+            const limits = row.policies.map(p => p.limit)
+            const maxLimit = Math.max(...limits.filter(l => l > 0))
+            const allIncluded = row.policies.every(p => p.included)
+            const noneIncluded = row.policies.every(p => !p.included)
+            const hasDiff = !allIncluded && !noneIncluded
+
+            return (
+              <tr
+                key={row.coverageName}
+                className={cn(
+                  'border-b border-gray-100',
+                  hasDiff && 'bg-amber-50/50'
+                )}
+              >
+                <td className="py-2 px-3 font-medium text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">
+                  {locale === 'tr' ? row.coverageNameTR : row.coverageName}
+                </td>
+                {row.policies.map((p) => {
+                  const isBest = p.limit === maxLimit && maxLimit > 0 && limits.filter(l => l === maxLimit).length === 1
+                  return (
+                    <td
+                      key={p.policyId}
+                      className={cn(
+                        'text-center py-2 px-2',
+                        !p.included && 'bg-red-50/70',
+                        isBest && 'bg-emerald-50/70'
+                      )}
+                    >
+                      {p.included ? (
+                        <div>
+                          <span className={cn(
+                            'font-medium',
+                            isBest ? 'text-emerald-700' : 'text-gray-900'
+                          )}>
+                            {p.limit > 0 ? formatCurrency(p.limit) : t.comparison.included}
+                          </span>
+                          {isBest && (
+                            <span className="ml-1 text-[10px] text-emerald-600 font-semibold">{t.comparison.best}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-red-500 text-xs font-medium">{t.comparison.notIncluded}</span>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
     </div>
   )
 }

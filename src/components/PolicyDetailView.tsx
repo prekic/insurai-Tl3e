@@ -52,7 +52,7 @@ import {
 import { getShortCompanyName } from '@/lib/insurance-display'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePdfExport } from '@/hooks/usePdfExport'
-import { exportSinglePolicyToCSV } from '@/lib/export'
+import { exportSinglePolicyToCSV, exportSinglePolicyToExcel } from '@/lib/export'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -1068,6 +1068,13 @@ export function PolicyDetailView() {
     toast.success(t.exportMenu.csvSuccess)
   }, [policy, locale, t.exportMenu.csvSuccess])
 
+  const handleExportExcel = useCallback(async () => {
+    if (!policy) return
+    setExportMenuOpen(false)
+    await exportSinglePolicyToExcel(policy, locale === 'tr' ? 'tr' : 'en')
+    toast.success(t.exportMenu.excelSuccess)
+  }, [policy, locale, t.exportMenu.excelSuccess])
+
   const handleExportText = useCallback(() => {
     if (!policy) return
     setExportMenuOpen(false)
@@ -1293,6 +1300,20 @@ export function PolicyDetailView() {
                         </div>
                         <div className="text-xs text-gray-500 truncate">
                           {t.exportMenu.csvExportDesc}
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={handleExportExcel}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                    >
+                      <FileSpreadsheet size={16} className="text-emerald-700 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-gray-900">
+                          {t.exportMenu.excelExport}
+                        </div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {t.exportMenu.excelExportDesc}
                         </div>
                       </div>
                     </button>

@@ -361,6 +361,9 @@ export interface TranslationDictionary {
     pdfReportDesc: string
     csvExport: string
     csvExportDesc: string
+    excelExport: string
+    excelExportDesc: string
+    excelSuccess: string
     textSummary: string
     textSummaryDesc: string
     generating: string
@@ -852,6 +855,26 @@ export interface TranslationDictionary {
     recommendedChoice: string
     improvementSuggestions: string
     recommendation: string
+    exportComparison: string
+    exportPdf: string
+    exportCsv: string
+    quickStats: string
+    avgScore: string
+    avgPremium: string
+    totalCoverage: string
+    policiesCompared: string
+    scoreChart: string
+    premium: string
+    coverage: string
+    deductible: string
+    compliance: string
+    value: string
+    overall: string
+    best: string
+    included: string
+    notIncluded: string
+    pdfExported: string
+    csvExported: string
   }
 
   // Insurance Terms
