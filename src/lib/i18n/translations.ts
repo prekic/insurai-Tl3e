@@ -1025,6 +1025,27 @@ export interface TranslationDictionary {
     permissionDeniedHint: string
   }
 
+  // Onboarding
+  onboarding: {
+    welcomeTitle: string
+    welcomeWithName: string
+    welcomeSubtitle: string
+    howItWorks: string
+    step1Title: string
+    step1Desc: string
+    step2Title: string
+    step2Desc: string
+    step3Title: string
+    step3Desc: string
+    uploadTitle: string
+    uploadSubtitle: string
+    uploadHint: string
+    invalidFile: string
+    fileTooLarge: string
+    skipForNow: string
+    exploreSamples: string
+  }
+
   // Coverage name translations (keyed by English name, value is locale-specific)
   coverageNames: Record<string, string>
 

@@ -940,6 +940,27 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     permissionDeniedHint: '',
   },
 
+  // Onboarding
+  onboarding: {
+    welcomeTitle: '',
+    welcomeWithName: '',
+    welcomeSubtitle: '',
+    howItWorks: '',
+    step1Title: '',
+    step1Desc: '',
+    step2Title: '',
+    step2Desc: '',
+    step3Title: '',
+    step3Desc: '',
+    uploadTitle: '',
+    uploadSubtitle: '',
+    uploadHint: '',
+    invalidFile: '',
+    fileTooLarge: '',
+    skipForNow: '',
+    exploreSamples: '',
+  },
+
   // Empty record — populated once real locale chunk loads
   coverageNames: {},
 

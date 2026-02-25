@@ -1019,6 +1019,28 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
       'Etkinleştirmek için tarayıcı adres çubuğundaki kilit simgesine tıklayın ve bildirimlere izin verin.',
   },
 
+  // Onboarding
+  onboarding: {
+    welcomeTitle: "InsurAI'ye Hoş Geldiniz!",
+    welcomeWithName: "InsurAI'ye Hoş Geldiniz, {name}!",
+    welcomeSubtitle: 'Sigorta poliçelerinizin yapay zeka destekli analizini saniyeler içinde alın.',
+    howItWorks: 'Nasıl çalışır',
+    step1Title: "PDF'nizi yükleyin",
+    step1Desc: 'Sigorta poliçe belgenizi bırakın — tüm Türk poliçe türlerini destekliyoruz.',
+    step2Title: 'Yapay zeka analiz eder',
+    step2Desc:
+      'Yapay zekamız teminat detaylarını, limitleri, istisnaları ve önemli koşulları çıkarır.',
+    step3Title: 'Bilgi ve puan alın',
+    step3Desc: 'Teminat puanınızı, eksik analizi ve uygulanabilir önerileri görün.',
+    uploadTitle: "Poliçe PDF'nizi buraya bırakın",
+    uploadSubtitle: 'veya göz atmak için tıklayın',
+    uploadHint: "50 MB'a kadar PDF dosyaları",
+    invalidFile: 'Lütfen bir PDF dosyası seçin.',
+    fileTooLarge: "Dosya çok büyük. Maksimum boyut 50 MB'dır.",
+    skipForNow: 'Şimdilik atla',
+    exploreSamples: 'Veya örnek poliçeleri inceleyin',
+  },
+
   // Coverage name translations (English → Turkish — from shared module)
   coverageNames: { ...COVERAGE_NAMES_EN_TO_TR },
 

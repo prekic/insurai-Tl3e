@@ -8,7 +8,7 @@ import { PolicyDashboard } from './PolicyDashboard'
 const mockNavigate = vi.fn()
 const mockDeletePolicy = vi.fn()
 
-const mockPolicies = [
+const threePolicies = [
   {
     id: 'policy-1',
     policyNumber: 'POL-001',
@@ -65,6 +65,10 @@ const mockPolicies = [
   },
 ]
 
+// Mutable mock state — tests can override these before rendering
+let mockPolicies: typeof threePolicies = threePolicies
+let mockIsLoading = false
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
@@ -77,7 +81,7 @@ vi.mock('@/lib/policy-context', () => ({
   usePolicies: () => ({
     policies: mockPolicies,
     deletePolicy: mockDeletePolicy,
-    isLoading: false,
+    isLoading: mockIsLoading,
     recentlyAddedIds: new Set<string>(),
     isPolicyNew: () => false,
     duplicates: [],
@@ -167,9 +171,59 @@ vi.mock('sonner', () => ({
 // Mock auth context for useTrialTransfer hook
 vi.mock('@/lib/supabase/auth-context', () => ({
   useAuth: () => ({
-    user: { id: 'user-1', email: 'test@example.com' },
+    user: { id: 'user-1', email: 'test@example.com', user_metadata: { full_name: 'Test User' } },
     loading: false,
     isConfigured: true,
+  }),
+}))
+
+// Mock WelcomeOnboarding component
+vi.mock('./WelcomeOnboarding', () => ({
+  WelcomeOnboarding: ({
+    onUpload,
+    onSkip,
+    userName,
+  }: {
+    onUpload: (f: File) => void
+    onSkip: () => void
+    userName?: string | null
+  }) => (
+    <div data-testid="welcome-onboarding">
+      <span data-testid="onboarding-username">{userName || 'none'}</span>
+      <button onClick={onSkip}>Skip for now</button>
+      <button onClick={() => onUpload(new File(['pdf'], 'test.pdf', { type: 'application/pdf' }))}>
+        Upload from onboarding
+      </button>
+    </div>
+  ),
+}))
+
+// Mock i18n-context (used by WelcomeOnboarding)
+vi.mock('@/lib/i18n/i18n-context', () => ({
+  useTranslation: () => ({
+    t: {
+      onboarding: {
+        welcomeTitle: 'Welcome to InsurAI!',
+        welcomeWithName: 'Welcome to InsurAI, {name}!',
+        welcomeSubtitle: 'Get AI-powered analysis of your insurance policies in seconds.',
+        howItWorks: 'How it works',
+        step1Title: 'Upload your PDF',
+        step1Desc: 'Drop your insurance policy document.',
+        step2Title: 'AI analyzes it',
+        step2Desc: 'Our AI extracts coverage details.',
+        step3Title: 'Get insights & score',
+        step3Desc: 'See your coverage score.',
+        uploadTitle: 'Drop your policy PDF here',
+        uploadSubtitle: 'or click to browse',
+        uploadHint: 'PDF files up to 50 MB',
+        invalidFile: 'Please select a PDF file.',
+        fileTooLarge: 'File is too large. Maximum size is 50 MB.',
+        skipForNow: 'Skip for now',
+        exploreSamples: 'Or explore sample policies',
+      },
+    },
+    locale: 'en',
+    isLoading: false,
   }),
 }))
 
@@ -184,6 +238,10 @@ function renderDashboard() {
 describe('PolicyDashboard', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPolicies = threePolicies
+    mockIsLoading = false
+    // Mark onboarding as completed so these tests see the normal dashboard
+    localStorage.setItem('insurai_onboarding_completed', 'true')
   })
 
   describe('Rendering', () => {
@@ -191,9 +249,7 @@ describe('PolicyDashboard', () => {
       renderDashboard()
 
       expect(screen.getByText('Policy Dashboard')).toBeInTheDocument()
-      expect(
-        screen.getByText('Manage and track all your insurance policies')
-      ).toBeInTheDocument()
+      expect(screen.getByText('Manage and track all your insurance policies')).toBeInTheDocument()
     })
 
     it('should render upload policy button', () => {
@@ -336,7 +392,7 @@ describe('PolicyDashboard', () => {
       const fieldset = screen.getByRole('group', { name: /filter by status/i })
       const buttons = fieldset.querySelectorAll('button')
       // Second button is "Active"
-      const activeFilterButton = Array.from(buttons).find(btn =>
+      const activeFilterButton = Array.from(buttons).find((btn) =>
         btn.textContent?.toLowerCase().includes('active')
       )
       expect(activeFilterButton).toBeDefined()
@@ -358,7 +414,7 @@ describe('PolicyDashboard', () => {
       // Find filter buttons within the filter fieldset
       const fieldset = screen.getByRole('group', { name: /filter by status/i })
       const buttons = fieldset.querySelectorAll('button')
-      const expiringFilterButton = Array.from(buttons).find(btn =>
+      const expiringFilterButton = Array.from(buttons).find((btn) =>
         btn.textContent?.toLowerCase().includes('expiring')
       )
       expect(expiringFilterButton).toBeDefined()
@@ -382,9 +438,10 @@ describe('PolicyDashboard', () => {
       const buttons = fieldset.querySelectorAll('button')
 
       // First click active to filter
-      const activeFilterButton = Array.from(buttons).find(btn =>
-        btn.textContent?.toLowerCase().includes('active') &&
-        !btn.textContent?.toLowerCase().includes('expiring')
+      const activeFilterButton = Array.from(buttons).find(
+        (btn) =>
+          btn.textContent?.toLowerCase().includes('active') &&
+          !btn.textContent?.toLowerCase().includes('expiring')
       )
       if (activeFilterButton) {
         await user.click(activeFilterButton)
@@ -441,38 +498,97 @@ describe('PolicyDashboard', () => {
 describe('PolicyDashboard - Loading State', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-
-    vi.doMock('@/lib/policy-context', () => ({
-      usePolicies: () => ({
-        policies: [],
-        deletePolicy: vi.fn(),
-        isLoading: true,
-      }),
-      useDashboardPolicies: () => [],
-    }))
+    mockPolicies = []
+    mockIsLoading = true
+    localStorage.setItem('insurai_onboarding_completed', 'true')
   })
 
   it('should show loading skeleton when isLoading is true', () => {
-    // This test verifies loading state is shown
-    // The actual skeleton elements would be checked
+    renderDashboard()
+    // Skeleton has animate-pulse elements
+    const pulseElements = document.querySelectorAll('.animate-pulse')
+    expect(pulseElements.length).toBeGreaterThan(0)
   })
 })
 
 describe('PolicyDashboard - Empty State', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockPolicies = []
+    mockIsLoading = false
+    // Mark onboarding as completed so we test the normal empty state
+    localStorage.setItem('insurai_onboarding_completed', 'true')
   })
 
-  it('should show empty state when no policies exist', () => {
-    vi.doMock('@/lib/policy-context', () => ({
-      usePolicies: () => ({
-        policies: [],
-        deletePolicy: vi.fn(),
-        isLoading: false,
-      }),
-      useDashboardPolicies: () => [],
-    }))
+  it('should show empty state when no policies exist and onboarding dismissed', () => {
+    renderDashboard()
+    expect(screen.getByText('No policies found')).toBeInTheDocument()
+  })
+})
 
-    // Would verify empty state message appears
+describe('PolicyDashboard - Onboarding', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockPolicies = []
+    mockIsLoading = false
+    // Clear onboarding dismissed flag for onboarding tests
+    localStorage.removeItem('insurai_onboarding_completed')
+  })
+
+  it('should render onboarding when no policies and onboarding not dismissed', () => {
+    renderDashboard()
+    expect(screen.getByTestId('welcome-onboarding')).toBeInTheDocument()
+  })
+
+  it('should NOT render onboarding when policies exist', () => {
+    mockPolicies = threePolicies
+    renderDashboard()
+
+    expect(screen.queryByTestId('welcome-onboarding')).not.toBeInTheDocument()
+    expect(screen.getByText('Policy Dashboard')).toBeInTheDocument()
+  })
+
+  it('should NOT render onboarding when localStorage has completed flag', () => {
+    localStorage.setItem('insurai_onboarding_completed', 'true')
+    renderDashboard()
+
+    expect(screen.queryByTestId('welcome-onboarding')).not.toBeInTheDocument()
+  })
+
+  it('should dismiss onboarding and set localStorage when skip is clicked', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    expect(screen.getByTestId('welcome-onboarding')).toBeInTheDocument()
+
+    await user.click(screen.getByText('Skip for now'))
+
+    // Onboarding should disappear
+    expect(screen.queryByTestId('welcome-onboarding')).not.toBeInTheDocument()
+
+    // localStorage should be set
+    expect(localStorage.getItem('insurai_onboarding_completed')).toBe('true')
+  })
+
+  it('should navigate to upload when onboarding upload is triggered', async () => {
+    const user = userEvent.setup()
+    renderDashboard()
+
+    await user.click(screen.getByText('Upload from onboarding'))
+
+    // Should navigate to /upload with file state
+    expect(mockNavigate).toHaveBeenCalledWith('/upload', {
+      state: { files: [expect.any(File)], autoProcess: true },
+    })
+
+    // localStorage should be set
+    expect(localStorage.getItem('insurai_onboarding_completed')).toBe('true')
+  })
+
+  it('should pass userName from auth context to WelcomeOnboarding', () => {
+    renderDashboard()
+
+    // The mock WelcomeOnboarding renders the userName in a span
+    expect(screen.getByTestId('onboarding-username')).toHaveTextContent('Test User')
   })
 })

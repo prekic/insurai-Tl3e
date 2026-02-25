@@ -1011,6 +1011,27 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
       'To enable, click the lock icon in your browser address bar and allow notifications.',
   },
 
+  // Onboarding
+  onboarding: {
+    welcomeTitle: 'Welcome to InsurAI!',
+    welcomeWithName: 'Welcome to InsurAI, {name}!',
+    welcomeSubtitle: 'Get AI-powered analysis of your insurance policies in seconds.',
+    howItWorks: 'How it works',
+    step1Title: 'Upload your PDF',
+    step1Desc: 'Drop your insurance policy document — we support all Turkish policy types.',
+    step2Title: 'AI analyzes it',
+    step2Desc: 'Our AI extracts coverage details, limits, exclusions, and key terms.',
+    step3Title: 'Get insights & score',
+    step3Desc: 'See your coverage score, gap analysis, and actionable recommendations.',
+    uploadTitle: 'Drop your policy PDF here',
+    uploadSubtitle: 'or click to browse',
+    uploadHint: 'PDF files up to 50 MB',
+    invalidFile: 'Please select a PDF file.',
+    fileTooLarge: 'File is too large. Maximum size is 50 MB.',
+    skipForNow: 'Skip for now',
+    exploreSamples: 'Or explore sample policies',
+  },
+
   // Coverage name translations (English identity map — generated from shared module)
   coverageNames: buildCoverageNamesIdentityMap(),
 
