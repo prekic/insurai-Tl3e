@@ -4518,6 +4518,16 @@ connectSrc: [
 - Tab clicks automatically close the drawer on mobile (prevents dead-end navigation)
 - `ProcessingLogsTab.tsx` has dual layout: mobile card view (`md:hidden`) and desktop table view (`hidden md:block`)
 
+**extractViaProxy Enhanced Error Messages (Changed Feb 25, 2026):**
+- `src/lib/ai/config.ts` `extractViaProxy()` now appends diagnostic context to network errors: `"Failed to fetch (network request to .../api/ai/extract failed — server may be restarting, timed out, or unreachable)"`
+- This is a user-visible change — error messages in PolicyUpload/TryAnalysis UI now include the proxy URL and a hint about server state
+- Test assertions for extraction errors must use `toContain('Failed to fetch')` not `toBe('Failed to fetch')` — the message has additional context appended
+
+**Onboarding Breaks Existing PolicyDashboard Tests (Test Gotcha Feb 25, 2026):**
+- `PolicyDashboard-branches.test.tsx` must set `localStorage.setItem('insurai_onboarding_completed', 'true')` in `beforeEach`
+- Without this, empty-state tests render `WelcomeOnboarding` instead of the expected empty dashboard and assertions fail
+- `WelcomeOnboarding` must also be mocked as a default export: `vi.mock('./WelcomeOnboarding', () => ({ default: () => <div data-testid="welcome-onboarding" /> }))`
+
 ---
 
 ## CI/CD

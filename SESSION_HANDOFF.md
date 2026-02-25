@@ -61,8 +61,12 @@ This branch (`claude/complete-handoff-docs-Goirm`) spans **3 micro-sessions** de
 |------|---------|
 | `src/lib/export.ts` | Added `exportSinglePolicyToCSV()`, `exportToPDF()`, `exportPoliciesToPDF()` with bilingual headers |
 | `src/lib/export.test.ts` | 417+ lines of export function tests |
-| `src/components/PolicyDetailView.tsx` | Export dropdown menu integration |
+| `src/components/PolicyDetailView.tsx` | Export dropdown menu integration (aria-haspopup, outside-click close) |
+| `src/components/PolicyDetailView.test.tsx` | Updated mock factory for export functions |
+| `src/components/PolicyDetailView-branches.test.tsx` | **+12 new tests**: dropdown open/close, aria attributes, PDF/CSV/text triggers, popup-blocked error, locale passthrough |
 | `src/components/PolicyDashboard.tsx` | Export dropdown from dashboard |
+| `src/components/PolicyDashboard.test.tsx` | +7 onboarding tests (render/dismiss/navigate/userName) |
+| `src/components/PolicyDashboard-branches.test.tsx` | Updated mocks: added `vi.mock('@/lib/export')`, `vi.mock('./WelcomeOnboarding')`, `localStorage.setItem('insurai_onboarding_completed', 'true')` in `beforeEach` (see gotcha below) |
 
 ### Feature 2: User Onboarding (commits `9229226`, `2e2c66b`)
 
@@ -85,7 +89,8 @@ This branch (`claude/complete-handoff-docs-Goirm`) spans **3 micro-sessions** de
 | `src/types/processing-log.ts` | `error_context`, `fallback_chain`, `extraction_route`, `extraction_mode`, `request_id` fields |
 | `src/lib/processing-logger.ts` | Enhanced stage logging with error context |
 | `src/lib/ai/policy-extractor.ts` | Error context propagation to processing logger |
-| `src/lib/ai/config.ts` | Error propagation from proxy extraction |
+| `src/lib/ai/config.ts` | Enhanced error messages in `extractViaProxy` — now includes proxy URL and "server may be restarting, timed out, or unreachable" context |
+| `src/lib/ai/config.test.ts` | Updated assertion: `toBe('Failed to fetch')` → `toContain('Failed to fetch')` + `toContain('server may be restarting')` |
 
 ### Feature 4: Admin Dashboard Mobile (commit `b2847ab`)
 
@@ -285,6 +290,22 @@ curl https://insurai-production.up.railway.app/api/ai/diagnose
 - File validation (PDF type, 10 MB max) is centralized in `src/lib/errors.ts` as `FILE_CONSTRAINTS`
 - `WelcomeOnboarding.tsx` and `PolicyUpload.tsx` both import from this single source of truth
 - Don't hardcode file size limits — always use `FILE_CONSTRAINTS.MAX_SIZE_BYTES`
+
+### Onboarding breaks existing PolicyDashboard tests
+- `PolicyDashboard-branches.test.tsx` must set `localStorage.setItem('insurai_onboarding_completed', 'true')` in `beforeEach`
+- Without this, empty-state tests render `WelcomeOnboarding` instead of the expected empty dashboard — assertions fail on missing text
+- `WelcomeOnboarding` is also mocked: `vi.mock('./WelcomeOnboarding', () => ({ default: () => <div data-testid="welcome-onboarding" /> }))` — the mock must return a `default` export (component is default-exported)
+
+### exportToPDF popup-blocked handling
+- `exportToPDF()` uses `window.open('', '_blank')` to create a print popup
+- If the browser blocks the popup (`window.open` returns `null`), the function returns `false`
+- `PolicyDetailView` checks the return value and shows `toast.error('Please allow popups to export PDF')` when blocked
+- Tests mock `window.open` to return `null` to verify this path: `vi.spyOn(window, 'open').mockReturnValue(null)`
+
+### extractViaProxy enhanced error messages (behavioral change)
+- `src/lib/ai/config.ts` now appends context to extraction fetch errors: `"Failed to fetch (network request to .../api/ai/extract failed — server may be restarting, timed out, or unreachable)"`
+- This is a user-visible change — error messages in the UI will now include the proxy URL and a hint about server state
+- Test assertions changed from `toBe('Failed to fetch')` to `toContain('Failed to fetch')` to accommodate the appended context
 
 ### Admin notification delete — safety filter
 - `deleteAllNotifications()` requires at least one filter (`category` or `acknowledged`) OR explicitly no filters (which triggers a `gte('created_at', '1970-01-01')` catch-all)
