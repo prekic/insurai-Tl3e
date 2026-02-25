@@ -112,6 +112,7 @@ insurai/
 | `src/lib/policy-context.tsx` | React Context for policy state management |
 | `src/lib/policy-utils.ts` | **NEW** Duplicate detection, fuzzy matching, policy comparison |
 | `src/lib/policy-upload-check.ts` | **NEW** Pre-upload conflict detection service |
+| `src/lib/export.ts` | **NEW** Policy export utilities (CSV, PDF, text) with bilingual headers (Feb 25, 2026) |
 
 ### AI & Extraction
 | File | Purpose |
@@ -686,6 +687,7 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/diagnose` | GET | Test API key validity | - |
 | `/api/health` | GET | Server health check | 60/min |
 | `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, recent errors) | Admin |
+| `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 
 ### Request/Response Examples
 
@@ -4494,6 +4496,27 @@ connectSrc: [
 - Set to `'true'` when user uploads a file or clicks "Skip for now"
 - File validation uses centralized `FILE_CONSTRAINTS` from `src/lib/errors.ts` (PDF only, max 10 MB)
 - i18n keys are under `t.onboarding.*` (18 keys) — if adding new onboarding steps, add translations to both `translations-en.ts` and `translations-tr.ts`
+
+**Admin Notification Bulk Delete — Request Format (Added Feb 25, 2026):**
+- `DELETE /api/admin/notifications` accepts two body shapes:
+  - `{ ids: string[] }` — delete specific notifications by ID
+  - `{ all: true, category?, acknowledged? }` — mass delete with optional filters
+- The "Delete All" button in the UI sends `{ all: true }` — this maps to a `gte('created_at', '1970-01-01')` catch-all query
+- All delete operations are audit-logged via `logAdminAction()` — never bypass this for admin routes
+- The endpoint returns `{ success: true, deleted: number }` with the count of deleted rows
+
+**Export Utilities — Client-Side Only (Added Feb 25, 2026):**
+- `src/lib/export.ts` handles all PDF/CSV/text exports entirely in the browser — no server round-trip
+- CSV exports include a UTF-8 BOM (`\uFEFF`) for Excel compatibility
+- PDF export uses `window.open()` + `document.write()` with print-optimized CSS — this will not work in SSR or headless environments
+- Single-policy CSV (`exportSinglePolicyToCSV`) has bilingual section headers based on locale and handles special display values: `isUnlimited` → "Sınırsız", `isMarketValue` → "Rayiç Değer"
+- Multi-policy CSV (`exportToCSV`) is a flat table format suitable for data analysis
+
+**Admin Dashboard Mobile — Sidebar Drawer Pattern (Added Feb 25, 2026):**
+- `AdminDashboard.tsx` uses a `sidebarOpen` boolean state to toggle the mobile sidebar drawer
+- The drawer uses `fixed inset-0 z-50` positioning with a semi-transparent backdrop (`bg-black/50`)
+- Tab clicks automatically close the drawer on mobile (prevents dead-end navigation)
+- `ProcessingLogsTab.tsx` has dual layout: mobile card view (`md:hidden`) and desktop table view (`hidden md:block`)
 
 ---
 
