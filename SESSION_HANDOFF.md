@@ -40,10 +40,10 @@ This session focused on **Repository Hygiene, Documentation Architecture, and Pr
 
 | # | Task | Files Changed |
 |---|------|---------------|
-| 1 | **TruffleHog & Conventional Commits** | `.github/workflows/staging.yml`, `production.yml`, `release-please.yml`, `CONTRIBUTING.md` |
-| 2 | **Runbooks & Document Architecture** | `docs/ARCHITECTURE.md`, `docs/development/CORE_PLAYBOOK.md`, `docs/architecture/SUPABASE_LAYER.md`, `docs/runbooks/*.md` |
-| 3 | **Realistic i18n Testimonials** | `translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts`, `Testimonials.tsx`, `Testimonials.test.tsx` |
-| 4 | **Repository Hygiene Rules** | `.github/dependabot.yml`, `.github/CODEOWNERS`, `package.json`, `.husky/pre-commit` |
+| 1 | **TruffleHog & Conventional Commits** | `.github/workflows/staging.yml`, `.github/workflows/production.yml`, `.github/workflows/release-please.yml`, `CONTRIBUTING.md`, `package.json`, `package-lock.json` |
+| 2 | **Runbooks & Document Architecture** | `docs/ARCHITECTURE.md`, `docs/development/CORE_PLAYBOOK.md`, `docs/architecture/SUPABASE_LAYER.md`, `docs/runbooks/01-railway-deployment-troubleshooting.md`, `docs/runbooks/02-e2e-ci-failures.md`, `docs/adr/0000-template.md`, `docs/adr/0001-record-architecture-decisions.md`, `docs/development/local-setup.md` |
+| 3 | **Realistic i18n Testimonials** | `src/lib/i18n/translations-en.ts`, `src/lib/i18n/translations-tr.ts`, `src/lib/i18n/translations-skeleton.ts`, `src/lib/i18n/translations.ts`, `src/components/landing/Testimonials.tsx`, `src/components/landing/Testimonials.test.tsx` |
+| 4 | **Repository Hygiene Rules** | `.github/dependabot.yml`, `.github/CODEOWNERS`, `.husky/pre-commit`, `.husky/pre-push` |
 
 ---
 
@@ -310,6 +310,14 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
     useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false })
   }))
   ```
+
+### TruffleHog CI Blocking
+- We injected TruffleHog API key scanning into the `.github/workflows/staging.yml` and `production.yml` flows.
+- **Gotcha**: If you temporarily hardcode a Supabase key or API token into a file to test it locally and accidentally commit it, TruffleHog will block the pull request. You must strip the credential and re-commit. 
+
+### Husky Pre-Commit Enforcements
+- We added `husky` tracking locally.
+- **Gotcha**: Running `git commit` will now automatically trigger a `lint-staged` run. If your commit contains unused variables or missing imports, the commit aborts. Do not use `--no-verify` as the CI pipeline will block the PR anyway.
 
 ---
 
