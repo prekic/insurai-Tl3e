@@ -44,19 +44,19 @@ export interface CompleteStageOptions {
  * Options for skipping a stage with detailed decision context
  */
 export interface SkipStageOptions {
-  reason: string                    // Human-readable reason
+  reason: string // Human-readable reason
   decision_context: {
-    assessment_performed: string    // What was checked
+    assessment_performed: string // What was checked
     threshold?: {
-      name: string                  // e.g., "chars_per_page"
-      value: number                 // The threshold value
-      unit?: string                 // e.g., "characters", "percent"
+      name: string // e.g., "chars_per_page"
+      value: number // The threshold value
+      unit?: string // e.g., "characters", "percent"
       comparison: 'less_than' | 'greater_than' | 'equals' | 'not_equals'
     }
-    actual_values: Record<string, number | string | boolean>  // Actual measured values
-    decision_logic: string          // How the decision was made
-    alternatives?: string[]         // What would have triggered the stage
-    documentation_url?: string      // Link to relevant docs
+    actual_values: Record<string, number | string | boolean> // Actual measured values
+    decision_logic: string // How the decision was made
+    alternatives?: string[] // What would have triggered the stage
+    documentation_url?: string // Link to relevant docs
   }
 }
 
@@ -118,10 +118,7 @@ export class ProcessingLogger {
   /**
    * Start a new processing stage
    */
-  startStage(
-    stage: ProcessingStage,
-    input?: Record<string, unknown>
-  ): void {
+  startStage(stage: ProcessingStage, input?: Record<string, unknown>): void {
     // Complete any running stage first
     if (this.currentStage) {
       this.failStage('Stage interrupted by new stage')
@@ -243,7 +240,9 @@ export class ProcessingLogger {
       duration_ms: 0,
       metadata: isDetailedOptions
         ? { skip_reason: reasonOrOptions.reason }
-        : (reasonOrOptions ? { skip_reason: reasonOrOptions } : undefined),
+        : reasonOrOptions
+          ? { skip_reason: reasonOrOptions }
+          : undefined,
       // Add detailed decision context if provided
       decision_context: isDetailedOptions ? reasonOrOptions.decision_context : undefined,
     }
@@ -394,6 +393,7 @@ export class ProcessingLogger {
       extraction_provider?: string
       document_length?: number
       ocr_used?: boolean
+      error_code?: string
       data_at_failure?: Record<string, unknown>
     }
   ): void {
@@ -403,10 +403,9 @@ export class ProcessingLogger {
     const errorType = error instanceof Error ? error.constructor.name : 'Unknown'
 
     // Find the last successful stage
-    const completedStages = this.log.stages.filter(s => s.status === 'completed')
-    const lastSuccessfulStage = completedStages.length > 0
-      ? completedStages[completedStages.length - 1].stage
-      : undefined
+    const completedStages = this.log.stages.filter((s) => s.status === 'completed')
+    const lastSuccessfulStage =
+      completedStages.length > 0 ? completedStages[completedStages.length - 1].stage : undefined
 
     this.log.status = 'failed'
     this.log.error_message = errorMessage
@@ -417,6 +416,7 @@ export class ProcessingLogger {
       extraction_provider: context?.extraction_provider || this.log.ai_provider,
       document_length: context?.document_length,
       ocr_used: context?.ocr_used ?? this.log.ocr_used,
+      error_code: context?.error_code,
       last_successful_stage: lastSuccessfulStage,
       data_at_failure: context?.data_at_failure,
       browser_info: typeof navigator !== 'undefined' ? navigator.userAgent : 'server',
@@ -452,9 +452,7 @@ export class ProcessingLogger {
    */
   getElapsedTime(): number {
     if (!this.log.started_at) return 0
-    const end = this.log.completed_at
-      ? new Date(this.log.completed_at).getTime()
-      : Date.now()
+    const end = this.log.completed_at ? new Date(this.log.completed_at).getTime() : Date.now()
     return end - new Date(this.log.started_at).getTime()
   }
 
@@ -470,9 +468,7 @@ export class ProcessingLogger {
    */
   private findCurrentStageIndex(): number {
     if (!this.currentStage) return -1
-    return this.log.stages.findIndex(
-      (s) => s.stage === this.currentStage && s.status === 'running'
-    )
+    return this.log.stages.findIndex((s) => s.stage === this.currentStage && s.status === 'running')
   }
 
   /**
@@ -502,9 +498,7 @@ export function createProcessingLogger(
 /**
  * Create a ProcessingLogger from an existing log (for resuming)
  */
-export function resumeProcessingLogger(
-  existingLog: DocumentProcessingLog
-): ProcessingLogger {
+export function resumeProcessingLogger(existingLog: DocumentProcessingLog): ProcessingLogger {
   const logger = new ProcessingLogger(
     {
       filename: existingLog.filename,

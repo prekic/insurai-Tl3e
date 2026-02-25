@@ -1,4 +1,10 @@
-import { isAIConfigured, AI_CONFIG, getConfiguredProviders, isProxyConfigured, type AIProvider } from './config'
+import {
+  isAIConfigured,
+  AI_CONFIG,
+  getConfiguredProviders,
+  isProxyConfigured,
+  type AIProvider,
+} from './config'
 import { getAIConfig } from '@/lib/config'
 import type { ProcessingLogger } from '@/lib/processing-logger'
 import { isPDFFile, extractTextFromPDFWithRetry } from './pdf-parser'
@@ -14,15 +20,21 @@ import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-pa
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
 import { extractWithClaude } from './providers/claude'
-import { processTextWithAI, applyBasicOCRCorrections, textNeedsProcessing, processTextEnhanced, type CleanRoomResult } from './text-processor'
 import {
-  ExtractedPolicyData,
-  ExtractedCoverage,
-} from './extraction-schema'
+  processTextWithAI,
+  applyBasicOCRCorrections,
+  textNeedsProcessing,
+  processTextEnhanced,
+  type CleanRoomResult,
+} from './text-processor'
+import { ExtractedPolicyData, ExtractedCoverage } from './extraction-schema'
 import type { AnalyzedPolicy, PolicyType, Coverage, CoverageImportance } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
-import { generateMarketComparisonData, generateMarketComparisonDataAsync } from '@/lib/market-data/service'
+import {
+  generateMarketComparisonData,
+  generateMarketComparisonDataAsync,
+} from '@/lib/market-data/service'
 import { marketDataProvider } from '@/lib/market-data/market-data-provider'
 import { RiskAssessmentService } from '@/lib/ml'
 import { GapDetectionService } from '@/lib/gap-detection'
@@ -84,7 +96,24 @@ export interface ExtractionResult {
 export interface ExtractionError {
   success: false
   error: {
-    code: 'NO_AI_CONFIG' | 'PDF_PARSE_ERROR' | 'PDF_TIMEOUT' | 'PDF_WORKER_ERROR' | 'FILE_READ_ERROR' | 'AI_ERROR' | 'INVALID_FILE' | 'LOW_CONFIDENCE' | 'OCR_ERROR'
+    code:
+      | 'NO_AI_CONFIG'
+      | 'PDF_PARSE_ERROR'
+      | 'PDF_TIMEOUT'
+      | 'PDF_WORKER_ERROR'
+      | 'FILE_READ_ERROR'
+      | 'AI_ERROR'
+      | 'INVALID_FILE'
+      | 'LOW_CONFIDENCE'
+      | 'OCR_ERROR'
+      | 'NETWORK_ERROR'
+      | 'TIMEOUT'
+      | 'RATE_LIMIT_EXCEEDED'
+      | 'INVALID_API_KEY'
+      | 'BILLING_ERROR'
+      | 'DOCUMENT_TOO_LARGE'
+      | 'INVALID_RESPONSE'
+      | 'PROVIDER_OVERLOADED'
     message: string
     details?: string
     // Enhanced error info for debugging
@@ -98,9 +127,9 @@ export type ExtractionResponse = ExtractionResult | ExtractionError
 
 export interface ExtractionOptions {
   useFallback?: boolean
-  useOCR?: boolean  // Legacy option, OCR-first is now always used
+  useOCR?: boolean // Legacy option, OCR-first is now always used
   useConsensus?: boolean
-  useCleanRoom?: boolean  // Use deterministic clean-room processing (default: true)
+  useCleanRoom?: boolean // Use deterministic clean-room processing (default: true)
   primaryProvider?: AIProvider
   providers?: AIProvider[]
   /** Optional logger for tracking processing stages with actual data */
@@ -113,10 +142,10 @@ export interface ExtractionOptions {
  * Default confidence scoring weights (used when DB config unavailable).
  */
 const DEFAULT_CONFIDENCE_WEIGHTS = {
-  policyNumber: 0.20,
+  policyNumber: 0.2,
   provider: 0.15,
-  dates: 0.20,
-  premium: 0.20,
+  dates: 0.2,
+  premium: 0.2,
   coverages: 0.25,
 }
 
@@ -126,9 +155,19 @@ const DEFAULT_CONFIDENCE_WEIGHTS = {
  * This ensures consistent scoring regardless of AI model behavior.
  */
 function recalculateOverallConfidence(
-  confidence: { overall?: number; policyNumber?: number; provider?: number; dates?: number; premium?: number; coverages?: number } | undefined | null,
+  confidence:
+    | {
+        overall?: number
+        policyNumber?: number
+        provider?: number
+        dates?: number
+        premium?: number
+        coverages?: number
+      }
+    | undefined
+    | null,
   fallback: number,
-  weights = DEFAULT_CONFIDENCE_WEIGHTS,
+  weights = DEFAULT_CONFIDENCE_WEIGHTS
 ): number {
   if (!confidence) return fallback
 
@@ -143,13 +182,21 @@ function recalculateOverallConfidence(
     return fallback
   }
 
-  return pn * weights.policyNumber + pr * weights.provider + dt * weights.dates + pm * weights.premium + cv * weights.coverages
+  return (
+    pn * weights.policyNumber +
+    pr * weights.provider +
+    dt * weights.dates +
+    pm * weights.premium +
+    cv * weights.coverages
+  )
 }
 
 /**
  * Safely get lowercase name from coverage, handling undefined/null
  */
-function getCoverageName(coverage: { name?: string | null; description?: string | null } | undefined | null): string {
+function getCoverageName(
+  coverage: { name?: string | null; description?: string | null } | undefined | null
+): string {
   if (!coverage) return ''
   // Try name first, fall back to description
   return (coverage.name || coverage.description || '').toLowerCase()
@@ -193,7 +240,7 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
   // For kasko and nakliyat: find the main/vehicle coverage
   if (policyType === 'kasko' || policyType === 'nakliyat') {
     // Look for market value coverage first
-    const marketValueCoverage = coverages.find(c => c.isMarketValue)
+    const marketValueCoverage = coverages.find((c) => c.isMarketValue)
     if (marketValueCoverage) {
       // Market value - use 0 as placeholder since actual value varies
       // The display should show "Rayiç Değer" instead of a number
@@ -201,41 +248,44 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
     }
 
     // Look for main category coverage
-    const mainCoverage = coverages.find(c => c.category === 'main' && c.limit > 0)
+    const mainCoverage = coverages.find((c) => c.category === 'main' && c.limit > 0)
     if (mainCoverage) {
       return mainCoverage.limit
     }
 
     // Look for coverage that looks like vehicle value
-    const vehicleValue = coverages.find(c => {
+    const vehicleValue = coverages.find((c) => {
       const nameLower = getCoverageName(c)
       return (
-        nameLower.includes('araç bedeli') ||
-        nameLower.includes('araç değeri') ||
-        nameLower.includes('sigorta bedeli') ||
-        nameLower.includes('kasko') && !nameLower.includes('mali')
-      ) && c.limit > 0
+        (nameLower.includes('araç bedeli') ||
+          nameLower.includes('araç değeri') ||
+          nameLower.includes('sigorta bedeli') ||
+          (nameLower.includes('kasko') && !nameLower.includes('mali'))) &&
+        c.limit > 0
+      )
     })
     if (vehicleValue) {
       return vehicleValue.limit
     }
 
     // Fallback: find the highest non-liability coverage
-    const nonLiabilityCoverages = coverages.filter(c => {
+    const nonLiabilityCoverages = coverages.filter((c) => {
       const nameLower = getCoverageName(c)
-      return c.category !== 'liability' &&
+      return (
+        c.category !== 'liability' &&
         !nameLower.includes('mali sorumluluk') &&
         !nameLower.includes('hukuki') &&
         c.limit > 0
+      )
     })
     if (nonLiabilityCoverages.length > 0) {
-      return Math.max(...nonLiabilityCoverages.map(c => c.limit))
+      return Math.max(...nonLiabilityCoverages.map((c) => c.limit))
     }
   }
 
   // For traffic insurance: use the highest bodily injury limit
   if (policyType === 'traffic') {
-    const bodilyInjury = coverages.find(c => {
+    const bodilyInjury = coverages.find((c) => {
       const nameLower = getCoverageName(c)
       return nameLower.includes('bedeni') || nameLower.includes('ölüm')
     })
@@ -245,13 +295,13 @@ function calculateMainCoverage(policyType: PolicyType, coverages: Coverage[]): n
   }
 
   // For other policy types: sum only main category coverages, or use highest
-  const mainCoverages = coverages.filter(c => c.category === 'main' && c.limit > 0)
+  const mainCoverages = coverages.filter((c) => c.category === 'main' && c.limit > 0)
   if (mainCoverages.length > 0) {
     return mainCoverages.reduce((sum, c) => sum + c.limit, 0)
   }
 
   // Fallback: use the highest individual coverage limit
-  const validLimits = coverages.filter(c => c.limit > 0).map(c => c.limit)
+  const validLimits = coverages.filter((c) => c.limit > 0).map((c) => c.limit)
   if (validLimits.length > 0) {
     return Math.max(...validLimits)
   }
@@ -272,11 +322,11 @@ export async function extractPolicyFromDocument(
     useFallback = true,
     // useOCR is a legacy option, OCR-first is now always used
     useConsensus = true,
-    useCleanRoom = true,  // Default to clean-room processing
+    useCleanRoom = true, // Default to clean-room processing
     primaryProvider,
     providers,
-    logger,  // Optional processing logger for tracking stages
-    userId,  // Authenticated user ID for push notification targeting
+    logger, // Optional processing logger for tracking stages
+    userId, // Authenticated user ID for push notification targeting
   } = options
 
   // Validate file type
@@ -295,7 +345,10 @@ export async function extractPolicyFromDocument(
 
   // Check if AI is configured
   if (!isAIConfigured()) {
-    console.error('[PolicyExtractor] FALLBACK TRIGGERED: AI not configured. isProxyConfigured:', isProxyConfigured())
+    console.error(
+      '[PolicyExtractor] FALLBACK TRIGGERED: AI not configured. isProxyConfigured:',
+      isProxyConfigured()
+    )
     if (useFallback) {
       return createFallbackResult(file)
     }
@@ -305,7 +358,8 @@ export async function extractPolicyFromDocument(
       error: {
         code: 'NO_AI_CONFIG',
         message: 'AI extraction is not configured',
-        details: 'Ensure the backend server is running on port 4001 with OPENAI_API_KEY or ANTHROPIC_API_KEY set in .env (not VITE_ prefixed - API keys must stay server-side)',
+        details:
+          'Ensure the backend server is running on port 4001 with OPENAI_API_KEY or ANTHROPIC_API_KEY set in .env (not VITE_ prefixed - API keys must stay server-side)',
       },
       fallbackAvailable: false,
     }
@@ -377,14 +431,14 @@ export async function extractPolicyFromDocument(
           warnings: ocrData.metadata.warnings,
         },
         metadata: {
-          pages: ocrData.pages.map(p => ({
+          pages: ocrData.pages.map((p) => ({
             page: p.pageNumber,
             chars: p.text.length,
             confidence: p.confidence,
             warnings: p.warnings,
           })),
           form_fields: ocrFormFields.slice(0, 10),
-          tables_structure: ocrTables.map(t => ({
+          tables_structure: ocrTables.map((t) => ({
             page: t.pageNumber,
             rows: t.rows?.length || 0,
             cols: t.rows?.[0]?.cells?.length || 0,
@@ -394,11 +448,13 @@ export async function extractPolicyFromDocument(
       })
 
       if (import.meta.env.DEV) {
-        console.warn(`[Document AI OCR] ${ocrData.pageCount} pages, ` +
-          `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
-          `${ocrFormFields.length} form fields, ` +
-          `${ocrTables.length} tables, ` +
-          `${ocrData.metadata.processingTimeMs}ms`)
+        console.warn(
+          `[Document AI OCR] ${ocrData.pageCount} pages, ` +
+            `${(ocrData.confidence * 100).toFixed(1)}% confidence, ` +
+            `${ocrFormFields.length} form fields, ` +
+            `${ocrTables.length} tables, ` +
+            `${ocrData.metadata.processingTimeMs}ms`
+        )
       }
     } else {
       // Document AI failed - properly close the stage and log error details
@@ -451,7 +507,9 @@ export async function extractPolicyFromDocument(
       pageCount = pdfResult.data.pageCount
       extractionMethod = 'pdf.js'
       usedOCR = false // pdf.js extracts native text, not OCR
-      console.warn(`[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`)
+      console.warn(
+        `[PolicyExtractor] pdf.js SUCCESS: ${pageCount} pages, ${documentText.length} chars`
+      )
 
       logger?.setOCRUsed('pdf.js')
       logger?.setPageCount(pageCount)
@@ -470,7 +528,9 @@ export async function extractPolicyFromDocument(
       logger?.failStage(`pdf.js extraction also failed: ${pdfResult.error.message}`)
 
       if (useFallback) {
-        console.error('[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed')
+        console.error(
+          '[PolicyExtractor] FALLBACK TRIGGERED: Both Document AI and pdf.js text extraction failed'
+        )
         return createFallbackResult(file)
       }
 
@@ -481,7 +541,8 @@ export async function extractPolicyFromDocument(
           message: documentAIAvailable
             ? `Document AI failed and pdf.js fallback also failed: ${pdfResult.error.message}`
             : `Document AI not configured and pdf.js extraction failed: ${pdfResult.error.message}`,
-          details: 'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
+          details:
+            'Ensure the backend server is running with Document AI configured, or the PDF contains extractable text',
         },
         fallbackAvailable: true,
       }
@@ -489,7 +550,9 @@ export async function extractPolicyFromDocument(
   }
 
   if (!documentText || documentText.trim().length === 0) {
-    console.error('[PolicyExtractor] FALLBACK TRIGGERED: No text extracted from document (empty after OCR/pdf.js)')
+    console.error(
+      '[PolicyExtractor] FALLBACK TRIGGERED: No text extracted from document (empty after OCR/pdf.js)'
+    )
     logger?.failStage('No text could be extracted from the document')
     if (useFallback) {
       return createFallbackResult(file)
@@ -506,7 +569,10 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
-  logger?.startStage('text_preprocessing', { text_length: documentText.length, use_clean_room: useCleanRoom })
+  logger?.startStage('text_preprocessing', {
+    text_length: documentText.length,
+    use_clean_room: useCleanRoom,
+  })
 
   // Process text to correct OCR errors and improve readability
   let processedText = documentText
@@ -529,11 +595,13 @@ export async function extractPolicyFromDocument(
         // Debug info - text processing stats
         if (import.meta.env.DEV) {
           const validation = cleanRoomResult?.validationReport
-          console.warn(`[DEBUG] Clean-room processing: ` +
-            `${processingResult.cleanupStats.totalCharactersRemoved} chars normalized, ` +
-            `${cleanRoomResult?.piiVault?.length || 0} PII items detected, ` +
-            `${validation?.issues?.length || 0} validation issues, ` +
-            `${Math.round(processingResult.confidence * 100)}% confidence`)
+          console.warn(
+            `[DEBUG] Clean-room processing: ` +
+              `${processingResult.cleanupStats.totalCharactersRemoved} chars normalized, ` +
+              `${cleanRoomResult?.piiVault?.length || 0} PII items detected, ` +
+              `${validation?.issues?.length || 0} validation issues, ` +
+              `${Math.round(processingResult.confidence * 100)}% confidence`
+          )
         }
       }
     } catch (error) {
@@ -557,12 +625,14 @@ export async function extractPolicyFromDocument(
         // Debug info - text processing stats
         if (import.meta.env.DEV) {
           const stats = processingResult.cleanupStats
-          console.warn(`[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ` +
-            `${stats.garbageBlocksRemoved} garbage blocks removed, ` +
-            `${stats.spacedCharsFixed} spaced chars fixed, ` +
-            `${stats.urlsCleaned} URLs cleaned, ` +
-            `${stats.totalCharactersRemoved} chars removed, ` +
-            `${Math.round(processingResult.confidence * 100)}% confidence`)
+          console.warn(
+            `[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ` +
+              `${stats.garbageBlocksRemoved} garbage blocks removed, ` +
+              `${stats.spacedCharsFixed} spaced chars fixed, ` +
+              `${stats.urlsCleaned} URLs cleaned, ` +
+              `${stats.totalCharactersRemoved} chars removed, ` +
+              `${Math.round(processingResult.confidence * 100)}% confidence`
+          )
         }
       }
     } catch (error) {
@@ -644,7 +714,6 @@ export async function extractPolicyFromDocument(
 
   // Call AI for extraction (use processed text for better results)
   try {
-
     if (useMultiProvider) {
       // Use multi-model consensus (use processed text for better extraction)
       const consensusResult: ConsensusResult = await extractWithConsensus(processedText, {
@@ -654,9 +723,7 @@ export async function extractPolicyFromDocument(
 
       extractedData = consensusResult.data
       consensusInfo = {
-        providers: consensusResult.providerResults
-          .filter((r) => !r.error)
-          .map((r) => r.provider),
+        providers: consensusResult.providerResults.filter((r) => !r.error).map((r) => r.provider),
         agreement: consensusResult.consensus.agreement,
         score: consensusResult.consensus.score,
       }
@@ -682,9 +749,7 @@ export async function extractPolicyFromDocument(
       if (meta.fallback !== undefined || meta.fallbackChain) {
         logger?.setFallbackInfo({
           fallback_used: !!meta.fallback,
-          chain: meta.fallbackChain || [
-            { provider: meta.provider || provider, success: true },
-          ],
+          chain: meta.fallbackChain || [{ provider: meta.provider || provider, success: true }],
         })
       }
       // Clean up metadata before further processing
@@ -707,11 +772,21 @@ export async function extractPolicyFromDocument(
     } catch {
       // DB unavailable — use hardcoded defaults
     }
-    const confidenceOverall = recalculateOverallConfidence(extractedData.confidence, rawOverall, confidenceWeights)
+    const confidenceOverall = recalculateOverallConfidence(
+      extractedData.confidence,
+      rawOverall,
+      confidenceWeights
+    )
     if (extractedData.confidence) {
       extractedData.confidence.overall = confidenceOverall
     }
-    console.warn('[PolicyExtractor] Confidence overall:', confidenceOverall, '(AI reported:', rawOverall, ')')
+    console.warn(
+      '[PolicyExtractor] Confidence overall:',
+      confidenceOverall,
+      '(AI reported:',
+      rawOverall,
+      ')'
+    )
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {
@@ -727,7 +802,7 @@ export async function extractPolicyFromDocument(
       },
       metadata: {
         consensus: consensusInfo,
-        coverages: extractedData.coverages?.slice(0, 5) ?? [],  // First 5 coverages for preview
+        coverages: extractedData.coverages?.slice(0, 5) ?? [], // First 5 coverages for preview
         exclusions_count: extractedData.exclusions?.length ?? 0,
       },
       // Full content for admin debugging
@@ -752,13 +827,16 @@ export async function extractPolicyFromDocument(
         error: {
           code: 'LOW_CONFIDENCE',
           message: `Extraction confidence too low: ${Math.round(confidenceOverall * 100)}%`,
-          details: 'The AI could not reliably extract policy information. Please try with a clearer document.',
+          details:
+            'The AI could not reliably extract policy information. Please try with a clearer document.',
         },
         fallbackAvailable: false,
       }
     }
     if (isLowConfidence) {
-      console.warn(`[PolicyExtractor] Low confidence extraction (${Math.round(confidenceOverall * 100)}%) — results will include warning`)
+      console.warn(
+        `[PolicyExtractor] Low confidence extraction (${Math.round(confidenceOverall * 100)}%) — results will include warning`
+      )
     }
 
     // ========================================================================
@@ -796,25 +874,39 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for policy number (high priority - very reliable from Document AI)
-      const formPolicyNumber = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.policyNumber, extractedData.policyNumber, 0.6)
+      const formPolicyNumber = getFormFieldValue(
+        TURKISH_FORM_FIELD_PATTERNS.policyNumber,
+        extractedData.policyNumber,
+        0.6
+      )
       if (formPolicyNumber && formPolicyNumber !== extractedData.policyNumber) {
         enhancedExtractedData = { ...enhancedExtractedData, policyNumber: formPolicyNumber }
         if (import.meta.env.DEV) {
-          console.warn(`[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`)
+          console.warn(
+            `[Document AI] Policy number enhanced: "${extractedData.policyNumber}" → "${formPolicyNumber}"`
+          )
         }
       }
 
       // Use form fields for insured name
-      const formInsuredName = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.insuredName, extractedData.insuredName)
+      const formInsuredName = getFormFieldValue(
+        TURKISH_FORM_FIELD_PATTERNS.insuredName,
+        extractedData.insuredName
+      )
       if (formInsuredName && formInsuredName !== extractedData.insuredName) {
         enhancedExtractedData = { ...enhancedExtractedData, insuredName: formInsuredName }
         if (import.meta.env.DEV) {
-          console.warn(`[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`)
+          console.warn(
+            `[Document AI] Insured name enhanced: "${extractedData.insuredName}" → "${formInsuredName}"`
+          )
         }
       }
 
       // Use form fields for dates
-      const formStartDate = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.startDate, extractedData.startDate)
+      const formStartDate = getFormFieldValue(
+        TURKISH_FORM_FIELD_PATTERNS.startDate,
+        extractedData.startDate
+      )
       if (formStartDate && formStartDate !== extractedData.startDate) {
         // Normalize date format if needed (DD.MM.YYYY → YYYY-MM-DD)
         const normalizedDate = formStartDate.includes('.')
@@ -823,7 +915,10 @@ export async function extractPolicyFromDocument(
         enhancedExtractedData = { ...enhancedExtractedData, startDate: normalizedDate }
       }
 
-      const formEndDate = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.endDate, extractedData.endDate)
+      const formEndDate = getFormFieldValue(
+        TURKISH_FORM_FIELD_PATTERNS.endDate,
+        extractedData.endDate
+      )
       if (formEndDate && formEndDate !== extractedData.endDate) {
         const normalizedDate = formEndDate.includes('.')
           ? formEndDate.split('.').reverse().join('-')
@@ -832,7 +927,10 @@ export async function extractPolicyFromDocument(
       }
 
       // Use form fields for premium (parse Turkish number format)
-      const formPremium = getFormFieldValue(TURKISH_FORM_FIELD_PATTERNS.premium, extractedData.premium?.toString())
+      const formPremium = getFormFieldValue(
+        TURKISH_FORM_FIELD_PATTERNS.premium,
+        extractedData.premium?.toString()
+      )
       if (formPremium) {
         // Parse Turkish currency format: "₺5.000,50" or "5.000,50 TL"
         const cleanPremium = formPremium
@@ -843,7 +941,9 @@ export async function extractPolicyFromDocument(
         if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
           enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
           if (import.meta.env.DEV) {
-            console.warn(`[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`)
+            console.warn(
+              `[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`
+            )
           }
         }
       }
@@ -873,7 +973,8 @@ export async function extractPolicyFromDocument(
             ocr_backend: 'document-ai',
             has_form_fields: !!(ocrFormFields && ocrFormFields.length > 0),
           },
-          decision_logic: 'OCR was performed with Document AI backend, but no form fields were detected. Document may not have structured form fields.',
+          decision_logic:
+            'OCR was performed with Document AI backend, but no form fields were detected. Document may not have structured form fields.',
           alternatives: usedOCR
             ? [
                 'Use Google Document AI which has better form field detection',
@@ -930,10 +1031,16 @@ export async function extractPolicyFromDocument(
 
         // Update extractedData with enhancements
         if (merged.policyNumber && !extractedData.policyNumber) {
-          enhancedExtractedData = { ...enhancedExtractedData, policyNumber: merged.policyNumber as string }
+          enhancedExtractedData = {
+            ...enhancedExtractedData,
+            policyNumber: merged.policyNumber as string,
+          }
         }
         if (merged.startDate && !extractedData.startDate) {
-          enhancedExtractedData = { ...enhancedExtractedData, startDate: merged.startDate as string }
+          enhancedExtractedData = {
+            ...enhancedExtractedData,
+            startDate: merged.startDate as string,
+          }
         }
         if (merged.endDate && !extractedData.endDate) {
           enhancedExtractedData = { ...enhancedExtractedData, endDate: merged.endDate as string }
@@ -942,7 +1049,10 @@ export async function extractPolicyFromDocument(
           enhancedExtractedData = { ...enhancedExtractedData, premium: merged.premium as number }
         }
         if (merged.insuredPerson && !extractedData.insuredName) {
-          enhancedExtractedData = { ...enhancedExtractedData, insuredName: merged.insuredPerson as string }
+          enhancedExtractedData = {
+            ...enhancedExtractedData,
+            insuredName: merged.insuredPerson as string,
+          }
         }
       }
     } catch (error) {
@@ -960,7 +1070,7 @@ export async function extractPolicyFromDocument(
     if (ocrTables && ocrTables.length > 0) {
       logger?.startStage('table_parsing', {
         tables_count: ocrTables.length,
-        tables_structure: ocrTables.map(t => ({
+        tables_structure: ocrTables.map((t) => ({
           rows: t.rows?.length || 0,
           cols: t.rows?.[0]?.cells?.length || 0,
         })),
@@ -971,7 +1081,9 @@ export async function extractPolicyFromDocument(
 
         if (tableData.coverages.length > 0) {
           if (import.meta.env.DEV) {
-            console.warn(`[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`)
+            console.warn(
+              `[Table Parser] Extracted ${tableData.coverages.length} coverages from ${ocrTables.length} tables`
+            )
           }
 
           // Merge table coverages with AI-extracted coverages
@@ -1001,7 +1113,7 @@ export async function extractPolicyFromDocument(
               table_confidence: tableData.confidence,
             },
             metadata: {
-              extracted_coverages: tableData.coverages.slice(0, 5),  // First 5 for preview
+              extracted_coverages: tableData.coverages.slice(0, 5), // First 5 for preview
             },
           })
 
@@ -1016,7 +1128,9 @@ export async function extractPolicyFromDocument(
       } catch (error) {
         // Table parsing is optional, continue without it
         console.warn('Table coverage parsing failed:', error)
-        logger?.failStage('Table parsing failed: ' + (error instanceof Error ? error.message : 'Unknown error'))
+        logger?.failStage(
+          'Table parsing failed: ' + (error instanceof Error ? error.message : 'Unknown error')
+        )
       }
     } else {
       // Provide detailed decision context for why table parsing was skipped
@@ -1048,13 +1162,18 @@ export async function extractPolicyFromDocument(
 
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = await convertToAnalyzedPolicy(enhancedExtractedData, file, documentText, processedText)
+    const policy = await convertToAnalyzedPolicy(
+      enhancedExtractedData,
+      file,
+      documentText,
+      processedText
+    )
 
     // Add validation warnings to AI insights
     if (patternValidation) {
       const validationInsights = [
-        ...patternValidation.errors.map(e => `❌ ${e}`),
-        ...patternValidation.warnings.map(w => `⚠️ ${w}`),
+        ...patternValidation.errors.map((e) => `❌ ${e}`),
+        ...patternValidation.warnings.map((w) => `⚠️ ${w}`),
       ]
       if (validationInsights.length > 0 && policy.aiInsights) {
         policy.aiInsights = [...validationInsights, ...policy.aiInsights]
@@ -1068,7 +1187,9 @@ export async function extractPolicyFromDocument(
       output: {
         validation_errors: patternValidation?.errors?.length || 0,
         validation_warnings: patternValidation?.warnings?.length || 0,
-        enhancements_applied: patternValidation ? Object.keys(patternValidation.enhancements).length : 0,
+        enhancements_applied: patternValidation
+          ? Object.keys(patternValidation.enhancements).length
+          : 0,
         final_policy_id: policy.id,
       },
       // Full policy JSON for admin debugging
@@ -1100,42 +1221,95 @@ export async function extractPolicyFromDocument(
       confidenceScore: confidenceOverall,
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
-      patternValidation: patternValidation ? {
-        errors: patternValidation.errors,
-        warnings: patternValidation.warnings,
-        enhanced: Object.keys(patternValidation.enhancements),
-      } : undefined,
+      patternValidation: patternValidation
+        ? {
+            errors: patternValidation.errors,
+            warnings: patternValidation.warnings,
+            enhanced: Object.keys(patternValidation.enhancements),
+          }
+        : undefined,
       // Document AI OCR data (when available) or pdf.js extraction info
-      documentOCR: documentAIOcrData ? {
-        pdfHash: documentAIOcrData.pdfHash,
-        pages: documentAIOcrData.pages,
-        confidence: documentAIOcrData.confidence,
-        formFields: ocrFormFields,
-        tables: ocrTables,
-        fieldsUsed: formFieldsUsed,
-        tableCoveragesUsed,
-        processingTimeMs: documentAIOcrData.metadata.processingTimeMs,
-        warnings: documentAIOcrData.metadata.warnings,
-      } : {
-        // pdf.js fallback - minimal data
-        pdfHash: '',
-        pages: [] as PageText[],
-        confidence: 0.9, // Assumed good quality for native text
-        formFields: [] as FormField[],
-        tables: [] as Table[],
-        fieldsUsed: 0, // No form fields used in pdf.js extraction
-        tableCoveragesUsed: 0,
-        processingTimeMs: 0,
-        warnings: ['Extracted with pdf.js (Document AI unavailable)'],
-      },
+      documentOCR: documentAIOcrData
+        ? {
+            pdfHash: documentAIOcrData.pdfHash,
+            pages: documentAIOcrData.pages,
+            confidence: documentAIOcrData.confidence,
+            formFields: ocrFormFields,
+            tables: ocrTables,
+            fieldsUsed: formFieldsUsed,
+            tableCoveragesUsed,
+            processingTimeMs: documentAIOcrData.metadata.processingTimeMs,
+            warnings: documentAIOcrData.metadata.warnings,
+          }
+        : {
+            // pdf.js fallback - minimal data
+            pdfHash: '',
+            pages: [] as PageText[],
+            confidence: 0.9, // Assumed good quality for native text
+            formFields: [] as FormField[],
+            tables: [] as Table[],
+            fieldsUsed: 0, // No form fields used in pdf.js extraction
+            tableCoveragesUsed: 0,
+            processingTimeMs: 0,
+            warnings: ['Extracted with pdf.js (Document AI unavailable)'],
+          },
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
     const errorStack = error instanceof Error ? error.stack : undefined
     const errorType = error instanceof Error ? error.constructor.name : 'Unknown'
 
+    // Classify error code for structured logging
+    let errorCode: ExtractionError['error']['code'] = 'AI_ERROR'
+    if (
+      errorMessage.includes('Load failed') ||
+      errorMessage.includes('fetch') ||
+      errorMessage.includes('NetworkError')
+    ) {
+      errorCode = 'NETWORK_ERROR'
+    } else if (
+      errorMessage.includes('timeout') ||
+      errorMessage.includes('timed out') ||
+      errorMessage.includes('ETIMEDOUT')
+    ) {
+      errorCode = 'TIMEOUT'
+    } else if (
+      errorMessage.includes('429') ||
+      errorMessage.includes('rate_limit') ||
+      errorMessage.includes('Rate limit')
+    ) {
+      errorCode = 'RATE_LIMIT_EXCEEDED'
+    } else if (
+      errorMessage.includes('401') ||
+      errorMessage.includes('API key') ||
+      errorMessage.includes('Unauthorized')
+    ) {
+      errorCode = 'INVALID_API_KEY'
+    } else if (
+      errorMessage.includes('billing') ||
+      errorMessage.includes('credit') ||
+      errorMessage.includes('quota')
+    ) {
+      errorCode = 'BILLING_ERROR'
+    } else if (errorMessage.includes('context_length') || errorMessage.includes('too large')) {
+      errorCode = 'DOCUMENT_TOO_LARGE'
+    } else if (errorMessage.includes('JSON') || errorMessage.includes('parse')) {
+      errorCode = 'INVALID_RESPONSE'
+    } else if (
+      errorMessage.includes('overloaded') ||
+      errorMessage.includes('529') ||
+      errorMessage.includes('503')
+    ) {
+      errorCode = 'PROVIDER_OVERLOADED'
+    }
+
     // Log extraction failure with explicit string for production visibility
-    console.error('[PolicyExtractor] EXTRACTION FAILED - Message:', errorMessage)
+    console.error(
+      '[PolicyExtractor] EXTRACTION FAILED - Code:',
+      errorCode,
+      '- Message:',
+      errorMessage
+    )
     console.error('[PolicyExtractor] EXTRACTION FAILED - Stack:', errorStack)
     console.error('[PolicyExtractor] EXTRACTION FAILED - Type:', errorType)
 
@@ -1145,6 +1319,7 @@ export async function extractPolicyFromDocument(
         extraction_provider: primaryProvider || 'unknown',
         document_length: documentText?.length || 0,
         ocr_used: usedOCR,
+        error_code: errorCode,
         data_at_failure: {
           file_name: file.name,
           file_size: file.size,
@@ -1156,14 +1331,17 @@ export async function extractPolicyFromDocument(
     }
 
     if (useFallback) {
-      console.error(`[PolicyExtractor] FALLBACK TRIGGERED: AI extraction threw error: ${errorMessage}`, { errorType, errorStack: errorStack?.substring(0, 500) })
+      console.error(
+        `[PolicyExtractor] FALLBACK TRIGGERED: AI extraction threw error: ${errorMessage}`,
+        { errorType, errorStack: errorStack?.substring(0, 500) }
+      )
       return createFallbackResult(file)
     }
 
     return {
       success: false,
       error: {
-        code: 'AI_ERROR',
+        code: errorCode,
         message: `Failed to extract policy data: ${errorMessage}`,
         details: errorMessage,
         stack: errorStack,
@@ -1177,7 +1355,11 @@ export async function extractPolicyFromDocument(
 /**
  * Extract using a specific provider
  */
-async function extractWithProvider(provider: AIProvider, documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
+async function extractWithProvider(
+  provider: AIProvider,
+  documentText: string,
+  notifyUserId?: string
+): Promise<ExtractedPolicyData> {
   switch (provider) {
     case 'openai':
       return extractWithOpenAI(documentText, notifyUserId)
@@ -1195,7 +1377,12 @@ async function extractWithProvider(provider: AIProvider, documentText: string, n
  * @param rawText - Raw extracted text from PDF/OCR (for reference)
  * @param processedText - AI-processed text with OCR corrections (for display and chat)
  */
-async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, rawText?: string, processedText?: string): Promise<AnalyzedPolicy> {
+async function convertToAnalyzedPolicy(
+  data: ExtractedPolicyData,
+  file: File,
+  rawText?: string,
+  processedText?: string
+): Promise<AnalyzedPolicy> {
   const now = new Date()
 
   // Debug logging for production troubleshooting
@@ -1227,9 +1414,10 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
 
   // Determine status based on dates
   // Handle both camelCase (endDate) and snake_case (end_date) from AI
-  const rawEndDate = data.endDate ?? rawData.end_date as string | undefined
+  const rawEndDate = data.endDate ?? (rawData.end_date as string | undefined)
   let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
-  const expiryDateStr = rawEndDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+  const expiryDateStr =
+    rawEndDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   if (rawEndDate) {
     const endDate = new Date(rawEndDate)
     const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
@@ -1266,12 +1454,16 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
   })
 
   // Get policy type - handle both camelCase and snake_case
-  const rawPolicyType = data.policyType ?? rawData.policy_type as string | undefined
-  const policyType = (rawPolicyType && rawPolicyType in POLICY_TYPES ? rawPolicyType : 'home') as PolicyType
+  const rawPolicyType = data.policyType ?? (rawData.policy_type as string | undefined)
+  const policyType = (
+    rawPolicyType && rawPolicyType in POLICY_TYPES ? rawPolicyType : 'home'
+  ) as PolicyType
   const typeInfo = POLICY_TYPES[policyType]
 
   if (rawPolicyType && !(rawPolicyType in POLICY_TYPES)) {
-    console.warn(`[convertToAnalyzedPolicy] Unknown policy type: ${rawPolicyType}, falling back to 'home'`)
+    console.warn(
+      `[convertToAnalyzedPolicy] Unknown policy type: ${rawPolicyType}, falling back to 'home'`
+    )
   }
 
   // Calculate total coverage based on policy type
@@ -1289,10 +1481,10 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
   }
 
   // Handle policyNumber - AI might return camelCase or snake_case
-  const policyNumber = data.policyNumber ?? rawData.policy_number as string ?? `POL-${Date.now()}`
+  const policyNumber = data.policyNumber ?? (rawData.policy_number as string) ?? `POL-${Date.now()}`
 
   // Handle provider - AI might return camelCase or snake_case
-  const provider = data.provider ?? rawData.provider as string ?? 'Unknown Provider'
+  const provider = data.provider ?? (rawData.provider as string) ?? 'Unknown Provider'
 
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
@@ -1306,24 +1498,30 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
     premium: premiumValue,
     monthlyPremium: premiumValue / 12,
     deductible: coverages[0]?.deductible ?? 0,
-    startDate: data.startDate ?? rawData.start_date as string ?? now.toISOString().split('T')[0],
+    startDate: data.startDate ?? (rawData.start_date as string) ?? now.toISOString().split('T')[0],
     expiryDate: expiryDateStr,
     status,
     uploadDate: now.toISOString().split('T')[0],
     fileName: file.name,
     documentType: 'PDF',
     documentUrl: URL.createObjectURL(file),
-    insuredPerson: data.insuredName ?? rawData.insured_name as string ?? undefined,
-    location: data.insuredAddress ?? rawData.insured_address as string ?? undefined,
-    insuredAddress: data.insuredAddress ?? rawData.insured_address as string ?? undefined,
+    insuredPerson: data.insuredName ?? (rawData.insured_name as string) ?? undefined,
+    location: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
+    insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     coverages,
     exclusions: data.exclusions,
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
     // Currency might be in data.currency, data.premium.currency, or snake_case
-    currency: data.currency ?? (data.premium && typeof data.premium === 'object' ? (data.premium as { currency?: string }).currency : undefined) ?? 'TRY',
+    currency:
+      data.currency ??
+      (data.premium && typeof data.premium === 'object'
+        ? (data.premium as { currency?: string }).currency
+        : undefined) ??
+      'TRY',
     // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
-    aiConfidence: typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
+    aiConfidence:
+      typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
     aiInsights: await generateAIInsightsAsync(data),
     marketComparison: await generateMarketComparisonAsync(data),
     extractedText: rawText,
@@ -1377,16 +1575,16 @@ async function convertToAnalyzedPolicy(data: ExtractedPolicyData, file: File, ra
 /**
  * Create fallback result using sample data
  */
-function createFallbackResult(
-  file: File,
-  partialData?: ExtractedPolicyData
-): ExtractionResult {
-  console.error('[PolicyExtractor] createFallbackResult called - returning SAMPLE data instead of real AI extraction', {
-    fileName: file.name,
-    fileSize: file.size,
-    hasPartialData: !!partialData,
-    partialPolicyNumber: partialData?.policyNumber,
-  })
+function createFallbackResult(file: File, partialData?: ExtractedPolicyData): ExtractionResult {
+  console.error(
+    '[PolicyExtractor] createFallbackResult called - returning SAMPLE data instead of real AI extraction',
+    {
+      fileName: file.name,
+      fileSize: file.size,
+      hasPartialData: !!partialData,
+      partialPolicyNumber: partialData?.policyNumber,
+    }
+  )
   // Pick a random sample policy
   const samplePolicy = samplePolicies[Math.floor(Math.random() * samplePolicies.length)]
 
@@ -1482,7 +1680,9 @@ function translateInsightToTr(insight: string): string {
   // Dynamic pattern: "Market premiums increased N% YoY..."
   const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
   if (yoyMatch) {
-    const template = trMap['marketPremiumsYoY'] || 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin'
+    const template =
+      trMap['marketPremiumsYoY'] ||
+      'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin'
     const translated = template.replace('{percent}', yoyMatch[1])
     return prefix ? `${prefix}${translated}` : translated
   }
@@ -1503,9 +1703,9 @@ function translateInsightsToTr(insights: string[]): string[] {
  */
 async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const insights: string[] = []
-  insights.push(...generateStrengths(data).map(s => `✓ ${s}`))
-  insights.push(...(await generateGapsAsync(data)).map(g => `⚠ ${g}`))
-  insights.push(...(await generateRecommendationsAsync(data)).map(r => `💡 ${r}`))
+  insights.push(...generateStrengths(data).map((s) => `✓ ${s}`))
+  insights.push(...(await generateGapsAsync(data)).map((g) => `⚠ ${g}`))
+  insights.push(...(await generateRecommendationsAsync(data)).map((r) => `💡 ${r}`))
 
   const currency = data.currency ?? 'TRY'
   const address = data.insuredAddress
@@ -1550,7 +1750,7 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
  * Check if policy has kasko base coverage that includes fundamental protections
  */
 function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
-  return coverages.some(c => {
+  return coverages.some((c) => {
     const nameLower = getCoverageName(c)
     return (
       nameLower === 'kasko' ||
@@ -1568,15 +1768,25 @@ function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
  * These should NOT be flagged as missing if kasko coverage exists
  */
 const KASKO_IMPLICIT_COVERAGES = [
-  'çarpma', 'çarpışma', 'collision',
-  'hırsızlık', 'theft',
-  'yangın', 'fire',
-  'doğal afet', 'natural disaster',
-  'sel', 'flood',
-  'deprem', 'earthquake',
-  'ani hareket', 'sudden movement',
-  'fırtına', 'storm',
-  'dolu', 'hail',
+  'çarpma',
+  'çarpışma',
+  'collision',
+  'hırsızlık',
+  'theft',
+  'yangın',
+  'fire',
+  'doğal afet',
+  'natural disaster',
+  'sel',
+  'flood',
+  'deprem',
+  'earthquake',
+  'ani hareket',
+  'sudden movement',
+  'fırtına',
+  'storm',
+  'dolu',
+  'hail',
 ]
 
 /**
@@ -1591,15 +1801,15 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
     gaps.push('Multiple exclusions may limit coverage in certain scenarios')
   }
 
-  const avgDeductible = benchmark.commonCoverages.reduce(
-    (sum, c) => sum + c.typicalDeductible, 0
-  ) / benchmark.commonCoverages.length
+  const avgDeductible =
+    benchmark.commonCoverages.reduce((sum, c) => sum + c.typicalDeductible, 0) /
+    benchmark.commonCoverages.length
 
   if (data.coverages.some((c) => c.deductible && c.deductible > avgDeductible * 2)) {
     gaps.push('High deductibles may result in significant out-of-pocket costs')
   }
 
-  const criticalCoverages = benchmark.commonCoverages.filter(c => c.inclusionRate >= 90)
+  const criticalCoverages = benchmark.commonCoverages.filter((c) => c.inclusionRate >= 90)
   const isKaskoPolicy = policyType === 'kasko'
   const hasBaseKasko = isKaskoPolicy && hasKaskoBaseCoverage(data.coverages)
   const isTrafficPolicy = policyType === 'traffic'
@@ -1608,8 +1818,9 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
     const criticalNameLower = critical.nameTr.toLowerCase()
 
     if (hasBaseKasko) {
-      const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(implicit =>
-        criticalNameLower.includes(implicit) || getCoverageName(critical).includes(implicit)
+      const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(
+        (implicit) =>
+          criticalNameLower.includes(implicit) || getCoverageName(critical).includes(implicit)
       )
       if (isImplicitCoverage) continue
     }
@@ -1617,23 +1828,30 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
     const baseNameMatch = criticalNameLower.match(/^([^(]+)/)
     const criticalBaseName = baseNameMatch ? baseNameMatch[1].trim() : criticalNameLower
 
-    const hasCoverage = data.coverages.some(c => {
+    const hasCoverage = data.coverages.some((c) => {
       const coverageNameLower = getCoverageName(c)
       const coverageLimit = c.limit ?? 0
 
-      if (coverageNameLower.includes(getCoverageName(critical)) ||
-          coverageNameLower.includes(criticalNameLower)) {
+      if (
+        coverageNameLower.includes(getCoverageName(critical)) ||
+        coverageNameLower.includes(criticalNameLower)
+      ) {
         return true
       }
 
       if (isTrafficPolicy) {
-        const matchesBaseName = coverageNameLower.includes(criticalBaseName) ||
+        const matchesBaseName =
+          coverageNameLower.includes(criticalBaseName) ||
           criticalBaseName.includes(coverageNameLower.replace(/\([^)]*\)/g, '').trim())
 
         if (matchesBaseName) {
           const limitTolerance = critical.typicalLimit * 0.1
           if (Math.abs(coverageLimit - critical.typicalLimit) <= limitTolerance) return true
-          if (criticalNameLower.includes('kaza başı') && coverageLimit >= critical.typicalLimit * 0.9) return true
+          if (
+            criticalNameLower.includes('kaza başı') &&
+            coverageLimit >= critical.typicalLimit * 0.9
+          )
+            return true
         }
       }
 
@@ -1642,9 +1860,9 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
 
     if (!hasCoverage) {
       if (isTrafficPolicy && criticalNameLower.includes('kişi başı')) {
-        const hasPerAccident = data.coverages.some(c =>
-          getCoverageName(c).includes(criticalBaseName) &&
-          (c.limit ?? 0) >= critical.typicalLimit
+        const hasPerAccident = data.coverages.some(
+          (c) =>
+            getCoverageName(c).includes(criticalBaseName) && (c.limit ?? 0) >= critical.typicalLimit
         )
         if (hasPerAccident) continue
       }
@@ -1658,9 +1876,13 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
   }
 
   if (policyType === 'home') {
-    const hasDaskMention = data.coverages.some(c => {
+    const hasDaskMention = data.coverages.some((c) => {
       const nameLower = getCoverageName(c)
-      return nameLower.includes('deprem') || nameLower.includes('dask') || nameLower.includes('earthquake')
+      return (
+        nameLower.includes('deprem') ||
+        nameLower.includes('dask') ||
+        nameLower.includes('earthquake')
+      )
     })
     if (!hasDaskMention) {
       gaps.push('Consider adding DASK earthquake insurance if not included')
@@ -1688,7 +1910,9 @@ async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<
   }
 
   if (benchmark.trends.premiumChangeYoY > 30) {
-    recommendations.push(`Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`)
+    recommendations.push(
+      `Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`
+    )
   }
 
   recommendations.push('Review coverage limits annually to ensure adequate protection')
@@ -1698,7 +1922,9 @@ async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<
 /**
  * Generate market comparison (async, DB-backed)
  */
-async function generateMarketComparisonAsync(data: ExtractedPolicyData): Promise<AnalyzedPolicy['marketComparison']> {
+async function generateMarketComparisonAsync(
+  data: ExtractedPolicyData
+): Promise<AnalyzedPolicy['marketComparison']> {
   const premium = data.premium ?? 0
   const policyType = (data.policyType ?? 'home') as PolicyType
   const location = data.insuredAddress ?? undefined
@@ -1728,11 +1954,11 @@ import { env } from '@/lib/env'
  */
 export interface ComprehensiveExtractionResult {
   success: boolean
-  policyBrief: string | null           // Markdown formatted Policy Brief
-  structuredData: StructuredPolicyData | null  // Machine-readable JSON
-  watchOuts: string[]                   // Top 15 watch-outs
-  qualityScore: number                  // 0-100 quality score
-  sectionsFound: string[]               // Document sections identified
+  policyBrief: string | null // Markdown formatted Policy Brief
+  structuredData: StructuredPolicyData | null // Machine-readable JSON
+  watchOuts: string[] // Top 15 watch-outs
+  qualityScore: number // 0-100 quality score
+  sectionsFound: string[] // Document sections identified
   preprocessingStats: {
     garbageBlocksRemoved: number
     qrBlocksRemoved: number
@@ -1754,15 +1980,11 @@ export async function extractPolicyComprehensive(
   rawText: string,
   options: {
     provider?: 'openai' | 'anthropic'
-    requireQualityScore?: number  // Minimum quality score (default: 90)
-    maxRetries?: number           // Max retries for quality improvement
+    requireQualityScore?: number // Minimum quality score (default: 90)
+    maxRetries?: number // Max retries for quality improvement
   } = {}
 ): Promise<ComprehensiveExtractionResult> {
-  const {
-    provider = 'openai',
-    requireQualityScore = 90,
-    maxRetries = 2,
-  } = options
+  const { provider = 'openai', requireQualityScore = 90, maxRetries = 2 } = options
 
   // Pass 1: Comprehensive preprocessing
   const { text: preprocessed, stats } = applyComprehensivePreprocessing(rawText, {
@@ -1799,7 +2021,10 @@ export async function extractPolicyComprehensive(
     attempts++
 
     try {
-      const userPrompt = EXTRACTION_USER_PROMPT_TEMPLATE.replace('{PROCESSED_TEXT}', preprocessed.slice(0, 25000))
+      const userPrompt = EXTRACTION_USER_PROMPT_TEMPLATE.replace(
+        '{PROCESSED_TEXT}',
+        preprocessed.slice(0, 25000)
+      )
 
       const response = await fetch(`${API_URL}/api/ai/chat`, {
         method: 'POST',
@@ -1836,9 +2061,10 @@ export async function extractPolicyComprehensive(
 
       // Log quality issue in development
       if (import.meta.env.DEV) {
-        console.warn(`[Extraction] Quality score ${qualityScore} < ${requireQualityScore}, retry ${attempts}/${maxRetries + 1}`)
+        console.warn(
+          `[Extraction] Quality score ${qualityScore} < ${requireQualityScore}, retry ${attempts}/${maxRetries + 1}`
+        )
       }
-
     } catch (error) {
       if (import.meta.env.DEV) {
         console.error(`[Extraction] Attempt ${attempts} failed:`, error)
@@ -1922,7 +2148,7 @@ export function comprehensiveToAnalyzedPolicy(
   }
 
   // Convert coverages — resolve nameTr via AI value, then canonical map fallback
-  const coverages: Coverage[] = data.coverages.map(c => {
+  const coverages: Coverage[] = data.coverages.map((c) => {
     const aiNameTr = c.nameTr && c.nameTr !== c.name ? c.nameTr : null
     const mappedNameTr = lookupCoverageNameTr(c.name)
     return {
@@ -1934,7 +2160,8 @@ export function comprehensiveToAnalyzedPolicy(
       isUnlimited: c.isUnlimited,
       isMarketValue: c.isMarketValue,
       category: c.category,
-      importance: c.category === 'main' ? 'critical' : c.category === 'liability' ? 'standard' : 'minor',
+      importance:
+        c.category === 'main' ? 'critical' : c.category === 'liability' ? 'standard' : 'minor',
     }
   })
 
@@ -1963,13 +2190,13 @@ export function comprehensiveToAnalyzedPolicy(
     location: data.insured.address ?? undefined,
     insuredAddress: data.insured.address ?? undefined,
     coverages,
-    exclusions: data.exclusions.map(e => e.trigger),
+    exclusions: data.exclusions.map((e) => e.trigger),
     specialConditions: [],
     insuranceLine: 'Kasko',
     currency: data.premium.currency,
     aiConfidence: result.qualityScore / 100,
     aiInsights: [
-      ...result.watchOuts.slice(0, 5).map(w => `⚠ ${w}`),
+      ...result.watchOuts.slice(0, 5).map((w) => `⚠ ${w}`),
       `🔍 Kalite skoru: ${result.qualityScore}/100`,
     ],
     marketComparison: generateMarketComparisonData(
@@ -1980,15 +2207,17 @@ export function comprehensiveToAnalyzedPolicy(
     ),
     extractedText: rawText,
     processedText,
-    vehicleInfo: data.vehicle ? {
-      make: data.vehicle.make,
-      model: data.vehicle.model,
-      year: data.vehicle.year,
-      plate: data.vehicle.plate,
-      chassisNo: data.vehicle.chassisNumber ?? undefined,
-      engineNo: data.vehicle.engineNumber ?? undefined,
-      usage: data.vehicle.usageType,
-    } : undefined,
+    vehicleInfo: data.vehicle
+      ? {
+          make: data.vehicle.make,
+          model: data.vehicle.model,
+          year: data.vehicle.year,
+          plate: data.vehicle.plate,
+          chassisNo: data.vehicle.chassisNumber ?? undefined,
+          engineNo: data.vehicle.engineNumber ?? undefined,
+          usage: data.vehicle.usageType,
+        }
+      : undefined,
   }
 
   // Translate insights to Turkish at extraction time

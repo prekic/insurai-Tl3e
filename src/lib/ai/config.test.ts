@@ -224,10 +224,10 @@ describe('AI Config (config.ts)', () => {
 
       const result = await checkProxyProviders()
       expect(result).toEqual(providerData)
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/providers',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      )
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/providers', {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      })
     })
 
     it('should return null when fetch response is not ok', async () => {
@@ -604,14 +604,11 @@ describe('AI Config (config.ts)', () => {
       expect(result.route).toBe('unified')
       expect(result.fallbackChain).toHaveLength(1)
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/extract',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ documentText: 'document text', systemPrompt: 'system prompt' }),
-        }
-      )
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentText: 'document text', systemPrompt: 'system prompt' }),
+      })
     })
 
     it('should include fallbackReason when present in response', async () => {
@@ -771,7 +768,8 @@ describe('AI Config (config.ts)', () => {
       errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
-      expect(result.error).toBe('Failed to fetch')
+      expect(result.error).toContain('Failed to fetch')
+      expect(result.error).toContain('server may be restarting, timed out, or unreachable')
     })
 
     it('should handle non-Error thrown objects', async () => {
@@ -821,18 +819,15 @@ describe('AI Config (config.ts)', () => {
       expect(result.fallback).toBe(false)
       expect(result.usage).toEqual({ input_tokens: 300, output_tokens: 100 })
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/extract',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            documentText: 'document text',
-            systemPrompt: 'system prompt',
-            policyType: 'kasko',
-          }),
-        }
-      )
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentText: 'document text',
+          systemPrompt: 'system prompt',
+          policyType: 'kasko',
+        }),
+      })
     })
 
     it('should work without optional parameters', async () => {
@@ -851,7 +846,9 @@ describe('AI Config (config.ts)', () => {
       const result = await extractWithFallback('document text')
       expect(result.success).toBe(true)
 
-      const callBody = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body)
+      const callBody = JSON.parse(
+        (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+      )
       expect(callBody.documentText).toBe('document text')
       expect(callBody.systemPrompt).toBeUndefined()
       expect(callBody.policyType).toBeUndefined()
@@ -924,14 +921,11 @@ describe('AI Config (config.ts)', () => {
       expect(result.success).toBe(true)
       expect(result.data).toEqual(ocrData)
 
-      expect(globalThis.fetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/ai/ocr',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ imageBase64: 'base64imagedata' }),
-        }
-      )
+      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageBase64: 'base64imagedata' }),
+      })
     })
 
     it('should handle HTTP error with error field', async () => {

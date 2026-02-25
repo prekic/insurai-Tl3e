@@ -253,7 +253,13 @@ export async function extractViaProxy(
   // Observability fields
   requestId?: string
   route?: string
-  fallbackChain?: Array<{ provider: string; success: boolean; duration_ms?: number; error?: string; error_code?: string }>
+  fallbackChain?: Array<{
+    provider: string
+    success: boolean
+    duration_ms?: number
+    error?: string
+    error_code?: string
+  }>
 }> {
   const proxyUrl = getProxyUrl()
   if (!proxyUrl) {
@@ -283,7 +289,8 @@ export async function extractViaProxy(
       success: result.success,
       hasData: !!result.data,
       dataType: result.data ? typeof result.data : 'undefined',
-      dataKeys: result.data && typeof result.data === 'object' ? Object.keys(result.data).slice(0, 15) : [],
+      dataKeys:
+        result.data && typeof result.data === 'object' ? Object.keys(result.data).slice(0, 15) : [],
       provider: result.provider,
       fallback: result.fallback,
       error: result.error,
@@ -294,7 +301,10 @@ export async function extractViaProxy(
       const errorMsg = result.details
         ? `${result.error || 'Server error'}: ${result.details}`
         : result.error || `HTTP ${response.status}`
-      console.error('[extractViaProxy] HTTP error:', errorMsg, { code: result.code, status: response.status })
+      console.error('[extractViaProxy] HTTP error:', errorMsg, {
+        code: result.code,
+        status: response.status,
+      })
       return {
         success: false,
         error: errorMsg,
@@ -324,10 +334,23 @@ export async function extractViaProxy(
       fallbackChain: result.fallbackChain,
     }
   } catch (error) {
-    console.error('[extractViaProxy] Exception:', error)
+    const rawMessage = error instanceof Error ? error.message : 'Network error'
+    // Enhance "Load failed" and similar browser-level fetch errors with context
+    let enhancedMessage = rawMessage
+    if (
+      rawMessage === 'Load failed' ||
+      rawMessage === 'Failed to fetch' ||
+      rawMessage === 'NetworkError when attempting to fetch resource.'
+    ) {
+      enhancedMessage = `${rawMessage} (network request to ${proxyUrl}/api/ai/extract failed — server may be restarting, timed out, or unreachable)`
+    }
+    console.error('[extractViaProxy] Exception:', enhancedMessage, {
+      originalError: rawMessage,
+      proxyUrl,
+    })
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Network error',
+      error: enhancedMessage,
     }
   }
 }
@@ -381,9 +404,18 @@ export async function extractWithFallback(
       usage: result.usage,
     }
   } catch (error) {
+    const rawMessage = error instanceof Error ? error.message : 'Network error'
+    let enhancedMessage = rawMessage
+    if (
+      rawMessage === 'Load failed' ||
+      rawMessage === 'Failed to fetch' ||
+      rawMessage === 'NetworkError when attempting to fetch resource.'
+    ) {
+      enhancedMessage = `${rawMessage} (network request to ${proxyUrl}/api/ai/extract failed — server may be restarting, timed out, or unreachable)`
+    }
     return {
       success: false,
-      error: error instanceof Error ? error.message : 'Network error',
+      error: enhancedMessage,
     }
   }
 }
