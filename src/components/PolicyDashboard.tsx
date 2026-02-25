@@ -37,6 +37,7 @@ import {
   getSubjectDisplay,
 } from '@/lib/insurance-display'
 import { useTrialTransfer } from '@/hooks/useTrialTransfer'
+import { hasPendingTrialTransfer } from '@/lib/free-trial'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { WelcomeOnboarding } from './WelcomeOnboarding'
 import type { DuplicatePolicy } from '@/types/policy'
@@ -93,7 +94,8 @@ export function PolicyDashboard() {
   // Onboarding state
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => isOnboardingCompleted())
 
-  const showOnboarding = !isLoading && fullPolicies.length === 0 && !onboardingDismissed
+  const showOnboarding =
+    !isLoading && fullPolicies.length === 0 && !onboardingDismissed && !hasPendingTrialTransfer()
 
   const handleOnboardingUpload = (file: File) => {
     completeOnboarding()

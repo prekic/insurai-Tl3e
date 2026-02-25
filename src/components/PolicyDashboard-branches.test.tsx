@@ -255,6 +255,12 @@ vi.mock('@/hooks/useTrialTransfer', () => ({
   useTrialTransfer: () => {},
 }))
 
+vi.mock('@/lib/free-trial', () => ({
+  hasPendingTrialTransfer: () => false,
+  getTrialDataForTransfer: () => null,
+  clearTrialData: vi.fn(),
+}))
+
 // ─── PolicyCardGrid mock ────────────────────────────────────────────────────
 vi.mock('./PolicyCard', () => ({
   PolicyCardGrid: ({ policies, onView, onDelete }: any) => (

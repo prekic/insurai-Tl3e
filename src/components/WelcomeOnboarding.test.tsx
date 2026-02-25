@@ -19,13 +19,22 @@ const mockTranslations = {
     step3Desc: 'See your coverage score, gap analysis, and actionable recommendations.',
     uploadTitle: 'Drop your policy PDF here',
     uploadSubtitle: 'or click to browse',
-    uploadHint: 'PDF files up to 50 MB',
+    uploadHint: 'PDF files up to 10 MB',
     invalidFile: 'Please select a PDF file.',
-    fileTooLarge: 'File is too large. Maximum size is 50 MB.',
+    fileTooLarge: 'File is too large. Maximum size is 10 MB.',
     skipForNow: 'Skip for now',
     exploreSamples: 'Or explore sample policies',
   },
 }
+
+vi.mock('@/lib/errors', () => ({
+  FILE_CONSTRAINTS: {
+    MAX_SIZE_MB: 10,
+    MAX_SIZE_BYTES: 10 * 1024 * 1024,
+    ALLOWED_TYPES: ['application/pdf'],
+    ALLOWED_EXTENSIONS: ['.pdf'],
+  },
+}))
 
 vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({
@@ -102,7 +111,7 @@ describe('WelcomeOnboarding', () => {
 
     it('renders file size hint', () => {
       renderComponent()
-      expect(screen.getByText('PDF files up to 50 MB')).toBeInTheDocument()
+      expect(screen.getByText('PDF files up to 10 MB')).toBeInTheDocument()
     })
 
     it('has accessible drop zone with role button', () => {
@@ -153,14 +162,14 @@ describe('WelcomeOnboarding', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Please select a PDF file.')
     })
 
-    it('rejects files over 50MB with error message', () => {
+    it('rejects files over 10MB with error message', () => {
       const onUpload = vi.fn()
       renderComponent({ onUpload })
 
       const dropZone = screen.getByRole('button', { name: /drop your policy pdf/i })
       // Create a File with a large size by overriding the size property
       const largeFile = new File(['x'], 'large.pdf', { type: 'application/pdf' })
-      Object.defineProperty(largeFile, 'size', { value: 51 * 1024 * 1024 })
+      Object.defineProperty(largeFile, 'size', { value: 11 * 1024 * 1024 })
 
       fireEvent.drop(dropZone, {
         dataTransfer: { files: [largeFile] },
@@ -168,7 +177,7 @@ describe('WelcomeOnboarding', () => {
 
       expect(onUpload).not.toHaveBeenCalled()
       expect(screen.getByRole('alert')).toHaveTextContent(
-        'File is too large. Maximum size is 50 MB.'
+        'File is too large. Maximum size is 10 MB.'
       )
     })
 

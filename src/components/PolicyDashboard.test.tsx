@@ -168,6 +168,13 @@ vi.mock('sonner', () => ({
   },
 }))
 
+// Mock free-trial for hasPendingTrialTransfer
+vi.mock('@/lib/free-trial', () => ({
+  hasPendingTrialTransfer: () => false,
+  getTrialDataForTransfer: () => null,
+  clearTrialData: vi.fn(),
+}))
+
 // Mock auth context for useTrialTransfer hook
 vi.mock('@/lib/supabase/auth-context', () => ({
   useAuth: () => ({

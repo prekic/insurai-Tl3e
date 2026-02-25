@@ -5,8 +5,7 @@ import { useTranslation } from '@/lib/i18n/i18n-context'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StaggeredList } from '@/components/animations/AnimatedComponents'
-
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50 MB
+import { FILE_CONSTRAINTS } from '@/lib/errors'
 
 interface WelcomeOnboardingProps {
   onUpload: (file: File) => void
@@ -18,7 +17,7 @@ export function WelcomeOnboarding({ onUpload, onSkip, userName }: WelcomeOnboard
   const { t } = useTranslation()
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | undefined>(undefined)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const title = userName
     ? t.onboarding.welcomeWithName.replace('{name}', userName)
@@ -35,7 +34,7 @@ export function WelcomeOnboarding({ onUpload, onSkip, userName }: WelcomeOnboard
       setError(t.onboarding.invalidFile)
       return
     }
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > FILE_CONSTRAINTS.MAX_SIZE_BYTES) {
       setError(t.onboarding.fileTooLarge)
       return
     }
@@ -131,7 +130,7 @@ export function WelcomeOnboarding({ onUpload, onSkip, userName }: WelcomeOnboard
             <p className="text-sm text-gray-500 mt-1">{t.onboarding.uploadSubtitle}</p>
             <p className="text-xs text-gray-400 mt-2">{t.onboarding.uploadHint}</p>
             <input
-              ref={fileInputRef as React.RefObject<HTMLInputElement>}
+              ref={fileInputRef}
               type="file"
               accept=".pdf"
               className="hidden"
