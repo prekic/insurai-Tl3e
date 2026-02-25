@@ -1,19 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import {
-  Upload,
-  FileText,
-  Sparkles,
-  Clock,
-  XCircle,
-  Shield,
-  AlertTriangle,
-} from 'lucide-react'
+import { Upload, FileText, Sparkles, Clock, XCircle, Shield, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { sanitizeFileName } from '@/lib/sanitize'
 import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
+import { createProcessingLogger } from '@/lib/processing-logger'
+import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -94,7 +88,7 @@ export function TryAnalysis() {
         // Pass file along to upload page
         navigate('/upload', {
           replace: true,
-          state: { files: [fileFromState], autoProcess: true }
+          state: { files: [fileFromState], autoProcess: true },
         })
       } else {
         navigate('/upload', { replace: true })
@@ -105,176 +99,231 @@ export function TryAnalysis() {
   const backendReady = health.status === 'healthy'
 
   // Core extraction logic shared by both entry points (file from state, file from user selection)
-  const runExtraction = useCallback(async (file: File) => {
-    // Track upload started
-    trackTrialUploadStarted(file.type, file.size)
+  const runExtraction = useCallback(
+    async (file: File) => {
+      // Track upload started
+      trackTrialUploadStarted(file.type, file.size)
 
-    // Start analysis
-    setSelectedFile(file)
-    setState('uploading')
-    setProgress(10)
-    setProgressMessage(t.tryAnalysis.preparingDocument)
-    setError(null)
+      // Start analysis
+      setSelectedFile(file)
+      setState('uploading')
+      setProgress(10)
+      setProgressMessage(t.tryAnalysis.preparingDocument)
+      setError(null)
 
-    let progressInterval: ReturnType<typeof setInterval> | null = null
-
-    try {
-      setProgress(20)
-      setProgressMessage(t.tryAnalysis.uploadingDocument)
-      await new Promise((r) => setTimeout(r, 400))
-
-      setState('analyzing')
-      setProgress(40)
-      setProgressMessage(t.tryAnalysis.extractingText)
-
-      trackTrialAnalysisStarted()
-
-      // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
-      const EXTRACTION_TIMEOUT_MS = 120000
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => {
-          reject(new Error(t.tryAnalysis.analysisTimedOut))
-        }, EXTRACTION_TIMEOUT_MS)
+      // Create processing logger for admin dashboard tracking
+      const logger = createProcessingLogger({
+        filename: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        user_id: user?.id,
       })
 
-      // Update progress during extraction
-      progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev < 85) return prev + 5
-          return prev
-        })
-        setProgressMessage((prev) => {
-          const messages = [
-            t.tryAnalysis.extractingText,
-            t.tryAnalysis.analyzingStructure,
-            t.tryAnalysis.processingWithAI,
-            t.tryAnalysis.almostThere,
-          ]
-          const currentIndex = messages.indexOf(prev)
-          if (currentIndex < messages.length - 1) {
-            return messages[currentIndex + 1]
+      // Set up persistence callback (same pattern as PolicyUpload)
+      let logCreatePromise: Promise<boolean> | null = null
+      logger.setPersistCallback(async (log) => {
+        try {
+          if (!logCreatePromise) {
+            logCreatePromise = (async () => {
+              const result = await createProcessingLog(log)
+              return !!result
+            })()
+            await logCreatePromise
+          } else {
+            await logCreatePromise
+            await updateProcessingLog(log.document_id, log)
           }
-          return prev
-        })
-      }, 10000) // Update every 10 seconds
-
-      // Run extraction with timeout - useFallback: false to surface real errors instead of mock data
-      const extractionResult = await Promise.race([
-        extractPolicyFromDocument(file, { useFallback: false }),
-        timeoutPromise,
-      ])
-
-      if (progressInterval) clearInterval(progressInterval)
-
-      // Handle null/undefined result
-      if (!extractionResult) {
-        throw new Error(t.tryAnalysis.noResponse)
-      }
-
-      if (!extractionResult.success) {
-        throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
-      }
-
-      // Reject fallback/sample data - user expects real AI results
-      if ('source' in extractionResult && extractionResult.source === 'fallback') {
-        console.warn('[TryAnalysis] Extraction returned fallback sample data instead of real AI results')
-        throw new Error(t.tryAnalysis.aiExtractionFailed)
-      }
-
-      // Validate policy exists
-      if (!extractionResult.policy) {
-        throw new Error(t.tryAnalysis.noDataExtracted)
-      }
-
-      setProgress(95)
-      setProgressMessage(t.tryAnalysis.finalizingAnalysis)
-
-      const policy = extractionResult.policy
-      const fileName = sanitizeFileName(file.name)
-
-      // Check for low confidence warning
-      const isLowConfidence = 'lowConfidence' in extractionResult && extractionResult.lowConfidence === true
-      const confidenceScore = 'confidenceScore' in extractionResult ? extractionResult.confidenceScore as number : undefined
-
-      // Ensure policy has required fields for display
-      const policyWithDefaults = {
-        ...policy,
-        id: policy.id || 'trial-' + Date.now(),
-        fileName,
-      }
-
-      saveTrialResult(policyWithDefaults, fileName)
-
-      setProgress(100)
-      setProgressMessage(t.tryAnalysis.analysisComplete)
-
-      trackTrialAnalysisCompleted(
-        policy.type,
-        policy.aiConfidence,
-        policy.coverages?.length || 0
-      )
-
-      if (isLowConfidence) {
-        toast.warning(t.tryAnalysis.lowConfidenceTitle, {
-          description: `Confidence: ${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%. Some extracted data may be inaccurate.`,
-        })
-      } else {
-        toast.success(t.tryAnalysis.analysisComplete, {
-          description: t.tryAnalysis.analysisSuccessDesc,
-        })
-      }
-
-      // Navigate to PolicyDetailView with the result
-      navigate('/policy/trial', {
-        state: {
-          policy: policyWithDefaults,
-          isTrialResult: true,
-          lowConfidence: isLowConfidence,
-          confidenceScore,
-        },
-        replace: true,
+        } catch (err) {
+          console.error('[TryAnalysis] Failed to persist processing log:', err)
+        }
       })
-    } catch (err) {
-      if (progressInterval) clearInterval(progressInterval)
-      console.warn('[TryAnalysis] Extraction error:', err instanceof Error ? err.message : err)
-      const message = err instanceof Error ? err.message : t.tryAnalysis.analysisFailed
-      setError(message)
-      setState('error')
-      trackTrialAnalysisFailed(message)
-      toast.error(t.tryAnalysis.analysisFailed, { description: message })
-    }
-  }, [navigate, t])
+
+      // Start upload stage
+      logger.startStage('upload', {
+        filename: file.name,
+        file_size: file.size,
+        mime_type: file.type,
+        source: 'try_analysis',
+      })
+
+      let progressInterval: ReturnType<typeof setInterval> | null = null
+
+      try {
+        setProgress(20)
+        setProgressMessage(t.tryAnalysis.uploadingDocument)
+        await new Promise((r) => setTimeout(r, 400))
+
+        logger.completeStage({ output: { upload_complete: true } })
+
+        setState('analyzing')
+        setProgress(40)
+        setProgressMessage(t.tryAnalysis.extractingText)
+
+        trackTrialAnalysisStarted()
+
+        // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
+        const EXTRACTION_TIMEOUT_MS = 120000
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => {
+            reject(new Error(t.tryAnalysis.analysisTimedOut))
+          }, EXTRACTION_TIMEOUT_MS)
+        })
+
+        // Update progress during extraction
+        progressInterval = setInterval(() => {
+          setProgress((prev) => {
+            if (prev < 85) return prev + 5
+            return prev
+          })
+          setProgressMessage((prev) => {
+            const messages = [
+              t.tryAnalysis.extractingText,
+              t.tryAnalysis.analyzingStructure,
+              t.tryAnalysis.processingWithAI,
+              t.tryAnalysis.almostThere,
+            ]
+            const currentIndex = messages.indexOf(prev)
+            if (currentIndex < messages.length - 1) {
+              return messages[currentIndex + 1]
+            }
+            return prev
+          })
+        }, 10000) // Update every 10 seconds
+
+        // Run extraction with timeout - useFallback: false to surface real errors instead of mock data
+        const extractionResult = await Promise.race([
+          extractPolicyFromDocument(file, { useFallback: false, logger, userId: user?.id }),
+          timeoutPromise,
+        ])
+
+        if (progressInterval) clearInterval(progressInterval)
+
+        // Handle null/undefined result
+        if (!extractionResult) {
+          throw new Error(t.tryAnalysis.noResponse)
+        }
+
+        if (!extractionResult.success) {
+          throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
+        }
+
+        // Reject fallback/sample data - user expects real AI results
+        if ('source' in extractionResult && extractionResult.source === 'fallback') {
+          console.warn(
+            '[TryAnalysis] Extraction returned fallback sample data instead of real AI results'
+          )
+          throw new Error(t.tryAnalysis.aiExtractionFailed)
+        }
+
+        // Validate policy exists
+        if (!extractionResult.policy) {
+          throw new Error(t.tryAnalysis.noDataExtracted)
+        }
+
+        setProgress(95)
+        setProgressMessage(t.tryAnalysis.finalizingAnalysis)
+
+        const policy = extractionResult.policy
+        const fileName = sanitizeFileName(file.name)
+
+        // Check for low confidence warning
+        const isLowConfidence =
+          'lowConfidence' in extractionResult && extractionResult.lowConfidence === true
+        const confidenceScore =
+          'confidenceScore' in extractionResult
+            ? (extractionResult.confidenceScore as number)
+            : undefined
+
+        // Ensure policy has required fields for display
+        const policyWithDefaults = {
+          ...policy,
+          id: policy.id || 'trial-' + Date.now(),
+          fileName,
+        }
+
+        saveTrialResult(policyWithDefaults, fileName)
+
+        // Mark processing as complete
+        logger.complete()
+
+        setProgress(100)
+        setProgressMessage(t.tryAnalysis.analysisComplete)
+
+        trackTrialAnalysisCompleted(policy.type, policy.aiConfidence, policy.coverages?.length || 0)
+
+        if (isLowConfidence) {
+          toast.warning(t.tryAnalysis.lowConfidenceTitle, {
+            description: `Confidence: ${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%. Some extracted data may be inaccurate.`,
+          })
+        } else {
+          toast.success(t.tryAnalysis.analysisComplete, {
+            description: t.tryAnalysis.analysisSuccessDesc,
+          })
+        }
+
+        // Navigate to PolicyDetailView with the result
+        navigate('/policy/trial', {
+          state: {
+            policy: policyWithDefaults,
+            isTrialResult: true,
+            lowConfidence: isLowConfidence,
+            confidenceScore,
+          },
+          replace: true,
+        })
+      } catch (err) {
+        if (progressInterval) clearInterval(progressInterval)
+        console.warn('[TryAnalysis] Extraction error:', err instanceof Error ? err.message : err)
+        const message = err instanceof Error ? err.message : t.tryAnalysis.analysisFailed
+
+        // Log the failure for admin visibility
+        logger.fail(message, {
+          error_type: err instanceof Error ? err.name : 'UnknownError',
+          source: 'try_analysis',
+        })
+
+        setError(message)
+        setState('error')
+        trackTrialAnalysisFailed(message)
+        toast.error(t.tryAnalysis.analysisFailed, { description: message })
+      }
+    },
+    [navigate, t, user?.id]
+  )
 
   // Validate file and check eligibility before running extraction
-  const processFile = useCallback((file: File) => {
-    // Check trial eligibility
-    const trialCheck = canPerformFreeTrial()
-    if (!trialCheck.canTry) {
-      toast.error(t.tryAnalysis.trialAlreadyUsed, {
-        description: trialCheck.reason,
-      })
-      setState('trial-used')
-      return
-    }
+  const processFile = useCallback(
+    (file: File) => {
+      // Check trial eligibility
+      const trialCheck = canPerformFreeTrial()
+      if (!trialCheck.canTry) {
+        toast.error(t.tryAnalysis.trialAlreadyUsed, {
+          description: trialCheck.reason,
+        })
+        setState('trial-used')
+        return
+      }
 
-    // Validate file
-    const { valid, errors } = validateFiles([file])
-    if (errors.length > 0 || valid.length === 0) {
-      const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
-      toast.error(errorInfo.title, { description: errorInfo.description })
-      return
-    }
+      // Validate file
+      const { valid, errors } = validateFiles([file])
+      if (errors.length > 0 || valid.length === 0) {
+        const errorInfo = getErrorMessage(errors[0]?.code || 'INVALID_FILE_TYPE')
+        toast.error(errorInfo.title, { description: errorInfo.description })
+        return
+      }
 
-    // Check backend availability
-    if (!backendReady || !isAIConfigured()) {
-      toast.error(t.tryAnalysis.serviceUnavailableToast, {
-        description: t.tryAnalysis.pleaseWait,
-      })
-      return
-    }
+      // Check backend availability
+      if (!backendReady || !isAIConfigured()) {
+        toast.error(t.tryAnalysis.serviceUnavailableToast, {
+          description: t.tryAnalysis.pleaseWait,
+        })
+        return
+      }
 
-    runExtraction(file)
-  }, [backendReady, runExtraction, t])
+      runExtraction(file)
+    },
+    [backendReady, runExtraction, t]
+  )
 
   // Process file passed from landing page UploadWidget via router state
   useEffect(() => {
@@ -282,12 +331,7 @@ export function TryAnalysis() {
     const fileFromState = locationState?.file
 
     // Only process once, when we have a file and backend is ready
-    if (
-      fileFromState &&
-      !processedFromStateRef.current &&
-      backendReady &&
-      state === 'idle'
-    ) {
+    if (fileFromState && !processedFromStateRef.current && backendReady && state === 'idle') {
       processedFromStateRef.current = true
       // Clear location state to prevent reprocessing on refresh
       navigate(location.pathname, { replace: true, state: {} })
@@ -375,14 +419,12 @@ export function TryAnalysis() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full mb-4">
             <Sparkles size={16} className="text-emerald-600" />
-            <span className="text-sm font-medium text-emerald-700">{t.tryAnalysis.freeAnalysisBadge}</span>
+            <span className="text-sm font-medium text-emerald-700">
+              {t.tryAnalysis.freeAnalysisBadge}
+            </span>
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {t.tryAnalysis.title}
-          </h1>
-          <p className="text-gray-600">
-            {t.tryAnalysis.subtitle}
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.tryAnalysis.title}</h1>
+          <p className="text-gray-600">{t.tryAnalysis.subtitle}</p>
         </div>
 
         {/* Upload Card */}
@@ -392,7 +434,9 @@ export function TryAnalysis() {
               <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <XCircle className="text-red-600" size={32} />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">{t.tryAnalysis.analysisFailedTitle}</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">
+                {t.tryAnalysis.analysisFailedTitle}
+              </h2>
               <p className="text-gray-600 mb-6">{error}</p>
               <Button onClick={handleTryAgain} variant="outline">
                 {t.tryAnalysis.tryAgain}
@@ -405,9 +449,7 @@ export function TryAnalysis() {
                   <FileText className="text-blue-600" size={24} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">
-                    {selectedFile?.name}
-                  </p>
+                  <p className="font-medium text-gray-900 truncate">{selectedFile?.name}</p>
                   <p className="text-sm text-gray-500">{progressMessage}</p>
                 </div>
               </div>
@@ -419,7 +461,10 @@ export function TryAnalysis() {
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-sm text-gray-500 text-center">{Math.round(progress)}{t.tryAnalysis.percentComplete}</p>
+              <p className="text-sm text-gray-500 text-center">
+                {Math.round(progress)}
+                {t.tryAnalysis.percentComplete}
+              </p>
 
               {/* Analyzing animation */}
               {state === 'analyzing' && (
@@ -428,16 +473,16 @@ export function TryAnalysis() {
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" />
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.1s]" />
                     <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <span className="text-sm text-indigo-700 ml-2">{t.tryAnalysis.aiAnalyzing}</span>
+                    <span className="text-sm text-indigo-700 ml-2">
+                      {t.tryAnalysis.aiAnalyzing}
+                    </span>
                   </div>
                 </div>
               )}
             </div>
           ) : (
             <div
-              className={`p-8 transition-colors ${
-                isDragging ? 'bg-blue-50' : 'bg-white'
-              }`}
+              className={`p-8 transition-colors ${isDragging ? 'bg-blue-50' : 'bg-white'}`}
               onDragOver={(e) => {
                 e.preventDefault()
                 setIsDragging(true)
@@ -448,24 +493,18 @@ export function TryAnalysis() {
               <label className="cursor-pointer flex flex-col items-center">
                 <div
                   className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-4 transition-colors ${
-                    isDragging
-                      ? 'bg-blue-100 border-2 border-blue-400'
-                      : 'bg-gray-100'
+                    isDragging ? 'bg-blue-100 border-2 border-blue-400' : 'bg-gray-100'
                   }`}
                 >
-                  <Upload
-                    size={36}
-                    className={isDragging ? 'text-blue-600' : 'text-gray-400'}
-                  />
+                  <Upload size={36} className={isDragging ? 'text-blue-600' : 'text-gray-400'} />
                 </div>
                 <p className="font-semibold text-gray-900 mb-1">
                   {isDragging ? t.tryAnalysis.dropFileHere : t.tryAnalysis.uploadYourPolicy}
                 </p>
-                <p className="text-sm text-gray-500 mb-4">
-                  {t.tryAnalysis.dragDropOrClick}
-                </p>
+                <p className="text-sm text-gray-500 mb-4">{t.tryAnalysis.dragDropOrClick}</p>
                 <p className="text-xs text-gray-400">
-                  {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} up to {FILE_CONSTRAINTS.MAX_SIZE_MB}MB
+                  {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')} up to{' '}
+                  {FILE_CONSTRAINTS.MAX_SIZE_MB}MB
                 </p>
                 <input
                   ref={fileInputRef}
@@ -505,9 +544,7 @@ export function TryAnalysis() {
               <AlertTriangle size={20} className="text-amber-600 flex-shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-amber-800">{t.tryAnalysis.serviceUnavailable}</p>
-                <p className="text-sm text-amber-700 mt-1">
-                  {t.tryAnalysis.serviceStartingUp}
-                </p>
+                <p className="text-sm text-amber-700 mt-1">{t.tryAnalysis.serviceStartingUp}</p>
               </div>
             </div>
           </div>
