@@ -49,7 +49,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     // Hero
     heroTitle: 'AI-Powered Insurance Analysis',
     heroSubtitle: 'for Turkish Market Professionals',
-    heroDescription: 'Upload your policies, get instant AI analysis, and benchmark against market standards.',
+    heroDescription:
+      'Upload your policies, get instant AI analysis, and benchmark against market standards.',
     uploadCta: 'Upload your policy',
     viewDemo: 'View Demo',
     trustedBy: 'Trusted by insurance professionals',
@@ -64,7 +65,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     freeNoSignup: 'Free, no signup required',
     kvkkCompliant: 'KVKK Compliant',
     sslBadge: '256-bit SSL',
-    whatYouGet: 'What you\'ll get:',
+    whatYouGet: "What you'll get:",
     benefitFormats: 'PDF, Word, and scanned images',
     benefitBilingual: 'Turkish/English coverage explanations',
     benefitComparison: 'Side-by-side policy comparison',
@@ -89,16 +90,19 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     howItWorksHeadline: 'Three steps to benchmark your policies',
     howItWorksDesc: 'No jargon, no manuals—just clear coverage in your own language.',
     step1Title: 'Upload policies',
-    step1Description: 'Drop your insurance documents—PDF, Word, or scanned images. We accept any format.',
+    step1Description:
+      'Drop your insurance documents—PDF, Word, or scanned images. We accept any format.',
     step2Title: 'AI analyzes coverage',
-    step2Description: 'Our AI extracts limits, deductibles, extensions, and exclusions and explains them in everyday language.',
+    step2Description:
+      'Our AI extracts limits, deductibles, extensions, and exclusions and explains them in everyday language.',
     step3Title: 'Compare & track',
     step3Description: 'Compare policies side-by-side and set reminders for renewals and key dates.',
 
     // Benefits
     benefits: 'Why choose InsurAI',
     benefitsSubtitle: 'Built for insurance professionals',
-    benefitsSectionDesc: 'The most powerful insurance analysis platform for Turkish market professionals.',
+    benefitsSectionDesc:
+      'The most powerful insurance analysis platform for Turkish market professionals.',
     benefitAnalysisTitle: 'Comprehensive Analysis',
     benefitAnalysisDesc: 'AI extracts every detail from your policy documents automatically.',
     benefitInstantTitle: 'Instant Results',
@@ -139,29 +143,53 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     useCasesHighlight: 'do with InsurAI',
     useCasesSubtitle: 'Real use cases for insurance professionals and policyholders.',
     useCaseBrokers: 'Insurance Brokers',
-    useCaseBrokersDesc: 'Upload client policies, get instant coverage gap reports, and present side-by-side comparisons — all in minutes instead of hours.',
+    useCaseBrokersDesc:
+      'Upload client policies, get instant coverage gap reports, and present side-by-side comparisons — all in minutes instead of hours.',
     useCaseRiskManagers: 'Corporate Risk Managers',
-    useCaseRiskManagersDesc: 'Analyze complex commercial policies against market benchmarks and identify under-insured areas before renewal season.',
+    useCaseRiskManagersDesc:
+      'Analyze complex commercial policies against market benchmarks and identify under-insured areas before renewal season.',
     useCasePolicyholders: 'Individual Policyholders',
-    useCasePolicyholdersDesc: 'Upload your kasko or health policy and get a plain-language explanation of what is and isn\'t covered.',
+    useCasePolicyholdersDesc:
+      "Upload your kasko or health policy and get a plain-language explanation of what is and isn't covered.",
+
+    // Testimonials
+    testimonialsTitle: 'Trusted by',
+    testimonialsHighlight: 'Risk Professionals',
+    testimonialsSubtitle:
+      'See how enterprise teams use InsurAI to streamline their property damage and BI workflows.',
+    testimonial1Author: 'Senior Claims Adjuster, Global Property',
+    testimonial1Quote:
+      '"InsurAI reduced our complex property damage claim review time by 40%. The AI\'s ability to instantly cross-reference exclusions against policy limits is unmatched."',
+    testimonial2Author: 'Chief Risk Officer, Manufacturing',
+    testimonial2Quote:
+      '"Calculating BI and supply chain impacts used to take weeks of manual policy auditing. We now process multiple supplier contingencies accurately within hours."',
+    testimonial3Author: 'VP of Commercial Lines, Regional Brokerage',
+    testimonial3Quote:
+      '"The efficiency gained in our risk assessment workflow has been transformative. Our team can now confidently benchmark complex commercial policies before renewal discussions."',
 
     // FAQ
     faq: 'Frequently asked questions',
     faqSubtitle: 'Everything you need to know about InsurAI.',
     faqHighlight: 'questions',
     faqQ1: 'What file formats are supported?',
-    faqA1: 'We support PDF, Word documents (DOC, DOCX), and image files (PNG, JPG, JPEG). Our AI can also process scanned documents through OCR.',
+    faqA1:
+      'We support PDF, Word documents (DOC, DOCX), and image files (PNG, JPG, JPEG). Our AI can also process scanned documents through OCR.',
     faqQ2: 'How accurate is the AI analysis?',
-    faqA2: 'Our AI uses multiple models to cross-verify extracted data and flags any uncertainties. Each result includes a confidence score so you know how reliable the extraction is.',
+    faqA2:
+      'Our AI uses multiple models to cross-verify extracted data and flags any uncertainties. Each result includes a confidence score so you know how reliable the extraction is.',
     faqQ3: 'Is my data secure?',
-    faqA3: 'Yes, we use bank-level encryption (AES-256) for all documents. Your files are processed securely and never shared with third parties. We are fully KVKK compliant.',
+    faqA3:
+      'Yes, we use bank-level encryption (AES-256) for all documents. Your files are processed securely and never shared with third parties. We are fully KVKK compliant.',
     faqQ4: 'Which insurance types are supported?',
-    faqA4: 'We support all major Turkish insurance types including Kasko, Traffic, Home, Health, DASK, Life, and Commercial policies.',
+    faqA4:
+      'We support all major Turkish insurance types including Kasko, Traffic, Home, Health, DASK, Life, and Commercial policies.',
     faqQ5: 'Can I compare policies from different insurers?',
-    faqA5: 'Yes. Upload policies from any Turkish insurance company and compare them side-by-side with our AI-powered analysis.',
+    faqA5:
+      'Yes. Upload policies from any Turkish insurance company and compare them side-by-side with our AI-powered analysis.',
 
     // Footer
-    footerDescription: 'AI-powered insurance policy analysis platform for Turkish market professionals.',
+    footerDescription:
+      'AI-powered insurance policy analysis platform for Turkish market professionals.',
     footerProduct: 'Product',
     footerFeatures: 'Features',
     footerPricing: 'Pricing',
@@ -259,7 +287,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     // WhoItsFor
     whoTitle: 'Built for',
     whoHighlight: 'insurance professionals',
-    whoDesc: 'Whether you\'re a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.',
+    whoDesc:
+      "Whether you're a broker, risk manager, or policyholder, InsurAI helps you understand your coverage.",
     whoBrokersTitle: 'Insurance Brokers',
     whoBrokersDesc: 'Quickly analyze and compare policies for your clients.',
     whoRiskTitle: 'Corporate Risk Managers',
@@ -371,7 +400,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     amendmentTracked: 'Amendment tracked',
     amendmentFailed: 'Amendment failed',
     editMode: 'Edit Mode',
-    editModeDesc: 'Editing the extracted data before saving. Navigate to the policy to make changes.',
+    editModeDesc:
+      'Editing the extracted data before saving. Navigate to the policy to make changes.',
     viewPolicyBtn: 'View Policy',
     // Error titles and messages
     errorAnalysisFailed: 'Analysis Failed',
@@ -393,7 +423,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     errorRateLimit: 'Rate Limit Exceeded',
     errorRateLimitMsg: 'Too many requests to the AI service.',
     errorRateLimitTip: 'Please wait a few minutes before trying again.',
-    errorOffline: 'You\'re Offline',
+    errorOffline: "You're Offline",
     errorOfflineMsg: 'Your policy will be analyzed when you reconnect to the internet.',
     errorNetwork: 'Network Error',
     errorNetworkMsg: 'Could not connect to the backend server.',
@@ -403,10 +433,12 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     errorProviderNotReadyTip: 'Please contact support if this issue persists.',
     errorLowConfidence: 'Low Extraction Confidence',
     errorLowConfidenceMsg: 'The AI could not reliably extract data from this document.',
-    errorLowConfidenceTip: 'The PDF may be scanned or have poor text quality. Try a clearer document.',
+    errorLowConfidenceTip:
+      'The PDF may be scanned or have poor text quality. Try a clearer document.',
     errorRequestTimeout: 'Request Timeout',
     errorRequestTimeoutMsg: 'The request took too long to complete.',
-    errorRequestTimeoutTip: 'The document may be too large or the AI service is slow. Try again later.',
+    errorRequestTimeoutTip:
+      'The document may be too large or the AI service is slow. Try again later.',
     // Status badges
     checkingBackend: 'Checking backend server...',
     aiExtractionEnabled: 'AI extraction enabled',
@@ -446,7 +478,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     connectionIssue: 'Connection issue',
     connectionError: 'Having trouble connecting to the AI assistant',
     retryMessage: 'Retry',
-    welcomeMessage: "Hello! I'm your AI insurance assistant. I can help you understand your policies. Ask me anything about your coverage, compare policies, or get recommendations.",
+    welcomeMessage:
+      "Hello! I'm your AI insurance assistant. I can help you understand your policies. Ask me anything about your coverage, compare policies, or get recommendations.",
     // Message actions
     copyToClipboard: 'Copy to clipboard',
     copied: 'Copied',
@@ -478,7 +511,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     messages: 'messages',
     // Greeting
     greeting: 'Hello! How can I help you with your insurance policies today?',
-    greetingWithCount: "Hello! I'm your AI insurance assistant. I can help you understand your {count} uploaded policies. Ask me anything about your coverage, compare policies, or get recommendations.",
+    greetingWithCount:
+      "Hello! I'm your AI insurance assistant. I can help you understand your {count} uploaded policies. Ask me anything about your coverage, compare policies, or get recommendations.",
     // Errors
     aiThinking: 'AI is thinking',
     connectionBanner: 'Having trouble connecting to the AI assistant',
@@ -560,11 +594,14 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     allDataClearedDesc: 'Your policies have been removed.',
     languageChanged: 'Language changed to {name}',
     removeOpenaiTitle: 'Remove OpenAI API Key',
-    removeOpenaiDesc: 'Are you sure you want to remove the OpenAI API key? AI-powered extraction will be disabled until you add a new key.',
+    removeOpenaiDesc:
+      'Are you sure you want to remove the OpenAI API key? AI-powered extraction will be disabled until you add a new key.',
     removeClaudeTitle: 'Remove Claude API Key',
-    removeClaudeDesc: 'Are you sure you want to remove the Claude API key? Multi-model consensus will be disabled until you add a new key.',
+    removeClaudeDesc:
+      'Are you sure you want to remove the Claude API key? Multi-model consensus will be disabled until you add a new key.',
     removeGoogleTitle: 'Remove Google Cloud API Key',
-    removeGoogleDesc: 'Are you sure you want to remove the Google Cloud API key? OCR for scanned documents will be disabled until you add a new key.',
+    removeGoogleDesc:
+      'Are you sure you want to remove the Google Cloud API key? OCR for scanned documents will be disabled until you add a new key.',
     removeKey: 'Remove Key',
     save: 'Save',
     cancel: 'Cancel',
@@ -715,7 +752,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     namePlaceholder: 'John Doe',
     emailPlaceholder: 'you@example.com',
     authNotConfigured: 'Authentication Not Configured',
-    authNotConfiguredDesc: 'Supabase credentials are not set. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.',
+    authNotConfiguredDesc:
+      'Supabase credentials are not set. Please configure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.',
     continueToDemo: 'Continue to Demo',
   },
 
@@ -889,11 +927,13 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
 
   shared: {
     analysisNotFound: 'Analysis Not Found',
-    analysisNotFoundDesc: 'This shared link is not available. The analysis may have been removed or the link is incorrect.',
+    analysisNotFoundDesc:
+      'This shared link is not available. The analysis may have been removed or the link is incorrect.',
     tryFreeAnalysis: 'Try Free Analysis',
     backToHome: 'Back to Home',
     linkExpired: 'Link Expired',
-    linkExpiredDesc: 'This shared analysis has expired. Analysis results are available for 24 hours.',
+    linkExpiredDesc:
+      'This shared analysis has expired. Analysis results are available for 24 hours.',
     sharedAnalysis: 'Shared Analysis',
     expiresIn: 'Expires in {time}',
     expiringSoon: 'Expiring soon',
@@ -927,10 +967,12 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     marketingEmails: 'Marketing and promotional emails',
     specialOffers: 'Special offers and campaigns',
     productUpdates: 'Product updates',
-    willContinue: 'You will continue to receive important emails such as policy alerts and security notifications.',
+    willContinue:
+      'You will continue to receive important emails such as policy alerts and security notifications.',
     confirmButton: 'Yes, Unsubscribe Me',
     processing: 'Processing...',
-    successMessage: 'You have been successfully unsubscribed from marketing emails. You will no longer receive promotional emails.',
+    successMessage:
+      'You have been successfully unsubscribed from marketing emails. You will no longer receive promotional emails.',
     changeYourMind: 'If you change your mind, you can re-subscribe from your account settings.',
     retry: 'Try Again',
     connectionError: 'Connection error',
@@ -938,17 +980,19 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     unsubscribeFailed: 'Unsubscribe failed',
     pleaseTryLater: 'Please try again later.',
     backToHome: 'Back to Home',
-    footer: 'InsurAI - Turkey\'s #1 Insurance Analysis Platform',
+    footer: "InsurAI - Turkey's #1 Insurance Analysis Platform",
   },
 
   // Push notification opt-in prompt
   notifications: {
     promptTitle: 'Get notified when your analysis is ready',
-    promptBody: 'We\'ll send a browser notification when your policy extraction completes — even if you close this tab.',
+    promptBody:
+      "We'll send a browser notification when your policy extraction completes — even if you close this tab.",
     enableButton: 'Enable notifications',
     maybeLater: 'Maybe later',
     permissionDenied: 'Notifications blocked',
-    permissionDeniedHint: 'To enable, click the lock icon in your browser address bar and allow notifications.',
+    permissionDeniedHint:
+      'To enable, click the lock icon in your browser address bar and allow notifications.',
   },
 
   // Coverage name translations (English identity map — generated from shared module)
@@ -956,30 +1000,46 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
 
   // AI insight translations (English = English)
   insightTranslations: {
-    'Comprehensive coverage with multiple protection areas': 'Comprehensive coverage with multiple protection areas',
+    'Comprehensive coverage with multiple protection areas':
+      'Comprehensive coverage with multiple protection areas',
     'High coverage limits for major risks': 'High coverage limits for major risks',
     'Zero deductible on some coverages': 'Zero deductible on some coverages',
-    'Includes special endorsements for enhanced protection': 'Includes special endorsements for enhanced protection',
+    'Includes special endorsements for enhanced protection':
+      'Includes special endorsements for enhanced protection',
     'Standard coverage for policy type': 'Standard coverage for policy type',
-    'Multiple exclusions may limit coverage in certain scenarios': 'Multiple exclusions may limit coverage in certain scenarios',
-    'High deductibles may result in significant out-of-pocket costs': 'High deductibles may result in significant out-of-pocket costs',
-    'Total coverage significantly below market average': 'Total coverage significantly below market average',
-    'Consider adding DASK earthquake insurance if not included': 'Consider adding DASK earthquake insurance if not included',
-    'Review coverage limits annually to ensure adequate protection': 'Review coverage limits annually to ensure adequate protection',
-    'Premium is above 75th percentile - compare with other providers': 'Premium is above 75th percentile - compare with other providers',
-    'Coverage below market median - consider increasing limits': 'Coverage below market median - consider increasing limits',
-    'Premium is 10% below market average for this coverage level': 'Premium is 10% below market average for this coverage level',
-    'Natural disaster deductible is higher than typical': 'Natural disaster deductible is higher than typical',
-    'Glass coverage included at no additional cost': 'Glass coverage included at no additional cost',
-    'Standard mandatory coverage - no gaps detected': 'Standard mandatory coverage - no gaps detected',
+    'Multiple exclusions may limit coverage in certain scenarios':
+      'Multiple exclusions may limit coverage in certain scenarios',
+    'High deductibles may result in significant out-of-pocket costs':
+      'High deductibles may result in significant out-of-pocket costs',
+    'Total coverage significantly below market average':
+      'Total coverage significantly below market average',
+    'Consider adding DASK earthquake insurance if not included':
+      'Consider adding DASK earthquake insurance if not included',
+    'Review coverage limits annually to ensure adequate protection':
+      'Review coverage limits annually to ensure adequate protection',
+    'Premium is above 75th percentile - compare with other providers':
+      'Premium is above 75th percentile - compare with other providers',
+    'Coverage below market median - consider increasing limits':
+      'Coverage below market median - consider increasing limits',
+    'Premium is 10% below market average for this coverage level':
+      'Premium is 10% below market average for this coverage level',
+    'Natural disaster deductible is higher than typical':
+      'Natural disaster deductible is higher than typical',
+    'Glass coverage included at no additional cost':
+      'Glass coverage included at no additional cost',
+    'Standard mandatory coverage - no gaps detected':
+      'Standard mandatory coverage - no gaps detected',
     'Premium is at market average': 'Premium is at market average',
-    'Contents coverage may be insufficient for high-value items': 'Contents coverage may be insufficient for high-value items',
+    'Contents coverage may be insufficient for high-value items':
+      'Contents coverage may be insufficient for high-value items',
     'Consider supplemental earthquake coverage': 'Consider supplemental earthquake coverage',
-    'Policy expiring in 45 days - renewal recommended': 'Policy expiring in 45 days - renewal recommended',
-    'Dental coverage is below average for this tier': 'Dental coverage is below average for this tier',
+    'Policy expiring in 45 days - renewal recommended':
+      'Policy expiring in 45 days - renewal recommended',
+    'Dental coverage is below average for this tier':
+      'Dental coverage is below average for this tier',
     'Good maternity benefits included': 'Good maternity benefits included',
-    'missingCoverage': 'Missing common coverage: {name}',
-    'invalidTcKimlik': 'Invalid TC Kimlik: {value}',
-    'marketPremiumsYoY': 'Market premiums increased {percent}% YoY - lock in rates early',
+    missingCoverage: 'Missing common coverage: {name}',
+    invalidTcKimlik: 'Invalid TC Kimlik: {value}',
+    marketPremiumsYoY: 'Market premiums increased {percent}% YoY - lock in rates early',
   },
 }

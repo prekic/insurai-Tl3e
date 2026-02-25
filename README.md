@@ -38,6 +38,8 @@ Upload PDF policies, extract structured data with AI, and benchmark coverage aga
 
 ## Quick Start
 
+For a detailed, foolproof guide to setting up your local environment (including Supabase local dev), see the **[Zero to Hero Local Setup Guide](docs/development/local-setup.md)**.
+
 ### Prerequisites
 
 - Node.js 18+
@@ -100,7 +102,10 @@ RESEND_API_KEY=re_xxx
 
 ---
 
-## Tech Stack
+## Tech Stack & Architecture
+
+For a comprehensive diagram of our data flows, API boundaries, and system topology, see our **[System Architecture Guide](docs/ARCHITECTURE.md)**.
+
 
 | Layer | Technology | Version |
 |-------|------------|---------|
@@ -225,6 +230,8 @@ NODE_ENV=production node dist-server/index.js
 ---
 
 ## Testing
+
+> **Note**: For critical rules on mocked Supabase clients, i18n chunking, and Playwright gotchas, read the **[Core Development Playbook](docs/development/CORE_PLAYBOOK.md)**.
 
 ```bash
 # Run all tests (5800+ tests)

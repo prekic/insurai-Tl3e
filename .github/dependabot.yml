@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "auto-merge"
+    groups:
+      # Group all minor and patch updates together
+      non-breaking-npm:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "auto-merge"
+    groups:
+      # Group all minor and patch updates together
+      non-breaking-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
