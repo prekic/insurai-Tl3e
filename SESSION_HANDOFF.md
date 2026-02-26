@@ -11,18 +11,18 @@
 | **Tests** | 15,551 passing (323 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini20260226` / `main` |
-| **Production Status** | **VERIFIED** — Migration 025 applied, pg_cron jobs running, Admin Settings panels loading, E2E extraction tracking properly. |
+| **Branch** | `feat/admin-monitoring-extras` / `main` |
+| **Production Status** | **VERIFIED** — Migration 026 applied manually, backend Cron Jobs and Extraction Health Historical views active. |
 
 ---
 
 ## Session Summary
 
 **Post-Deploy Verification (Completed):**
-- **Applied Migration 025** to production Supabase and verified settings rows.
-- **Verified `pg_cron` jobs** (`cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`) are active in the database.
-- **Admin Settings Panels** for Monitoring & Alerts and Data Retention successfully reflect database configurations.
-- **End-to-End Extraction Tracking** confirmed functional in production without alert service crashes. Extraction Health dashboard displays live data.
+- **Applied Migration 026** manually via `psql` to production Supabase for `pg_cron` secure views.
+- **Admin Settings Panels** for Cron Jobs and Market Benchmarks render correctly.
+- **Processing Log CSV Export** generates valid download payloads.
+- **Extraction Health Historical Trends** pulls accurate aggregations using backend daily grouping.
 
 **Previous Features Implemented:**
 ### 1. Extraction Health Alerting System
@@ -110,10 +110,9 @@ No new env vars needed for this session's features.
 
 ## Architecture Notes
 
-- **No new architectural patterns** — all features use established patterns (config service, admin panels, in-memory state, fire-and-forget)
-- Alert cooldown is in-memory (resets on server restart) — acceptable because first post-restart alert is always useful
-- pg_cron functions now read from `app_settings` dynamically — no server restart needed to change retention
-- `ConfigCategory` type extended to `'monitoring' | 'retention'` — follows same pattern as `'ai'`, `'evaluation'`, etc.
+- **No new architectural patterns** — The Cron Jobs API and Historical Trends implementation extend the existing `admin/monitoring.ts` controller layer and established React querying idioms. Using `pg_cron` secure views is consistent with previous `app_settings` and metric dashboard strategies. 
+- A new library `date-fns` was introduced temporarily to simplify manual date aggregation on the frontend for Cron Jobs, and `recharts` was brought in explicitly for the Historical Trend chart.
+- CSV export endpoints bypass pagination arrays by stripping limit params, sending native `text/csv` through `res.attachment()`.
 
 ---
 
