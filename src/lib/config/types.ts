@@ -20,6 +20,8 @@ export type ConfigCategory =
   | 'gap_analysis'
   | 'ui'
   | 'email'
+  | 'monitoring'
+  | 'retention'
 
 export type ConfigValueType = 'string' | 'number' | 'boolean' | 'object' | 'array'
 
@@ -116,10 +118,10 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -253,21 +255,21 @@ export const DEFAULT_OCR_CONFIG: OCRConfig = {
   pageVarianceThreshold: 0.5,
   minCharsForValidPage: 50,
   skipOcrThreshold: 0.85,
-  selectiveOcrThreshold: 0.60,
+  selectiveOcrThreshold: 0.6,
   weightCharDensity: 0.25,
-  weightTextQuality: 0.30,
+  weightTextQuality: 0.3,
   weightPageVariance: 0.15,
   weightEncodingCheck: 0.15,
   weightFieldExtraction: 0.15,
-  googleVisionConfidence: 0.80,
+  googleVisionConfidence: 0.8,
   documentAiConfidence: 0.85,
-  tesseractConfidence: 0.70,
-  languageMinConfidence: 0.40,
+  tesseractConfidence: 0.7,
+  languageMinConfidence: 0.4,
   languageSampleSize: 2000,
-  policyTypeMinConfidence: 0.50,
+  policyTypeMinConfidence: 0.5,
   minWordLengthAverage: 2,
-  maxGarbageCharRatio: 0.10,
-  minAlphanumericRatio: 0.60,
+  maxGarbageCharRatio: 0.1,
+  minAlphanumericRatio: 0.6,
   maxPagesQuickAnalysis: 5,
   timeoutSeconds: 30,
   maxTextLength: 500000,
@@ -298,17 +300,17 @@ export interface FuzzyMatchingConfig {
 
 export const DEFAULT_FUZZY_MATCHING_CONFIG: FuzzyMatchingConfig = {
   defaultThreshold: 0.85,
-  shortStringThreshold: 0.90,
+  shortStringThreshold: 0.9,
   policyNumberThreshold: 0.85,
-  providerNameThreshold: 0.80,
-  insuredNameThreshold: 0.80,
+  providerNameThreshold: 0.8,
+  insuredNameThreshold: 0.8,
   coverageNameThreshold: 0.85,
-  arrayMatchRatio: 0.70,
-  keywordOverlapRatio: 0.80,
+  arrayMatchRatio: 0.7,
+  keywordOverlapRatio: 0.8,
   numericTolerancePercent: 0.02,
   seddkLimitTolerance: 0.05,
-  coverageLimitTolerance: 0.10,
-  deductibleTolerance: 0.20,
+  coverageLimitTolerance: 0.1,
+  deductibleTolerance: 0.2,
 }
 
 // =============================================================================
@@ -421,6 +423,44 @@ export const DEFAULT_EMAIL_CONFIG: EmailConfig = {
 }
 
 // =============================================================================
+// MONITORING CONFIGURATION
+// =============================================================================
+
+export interface MonitoringConfig {
+  errorRateWarningThreshold: number
+  errorRateCriticalThreshold: number
+  avgLatencyCriticalMs: number
+  checkIntervalMs: number
+  alertCooldownMinutes: number
+  enableEmailAlerts: boolean
+  alertEmailAddresses: string
+}
+
+export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
+  errorRateWarningThreshold: 0.05,
+  errorRateCriticalThreshold: 0.2,
+  avgLatencyCriticalMs: 12000,
+  checkIntervalMs: 300000,
+  alertCooldownMinutes: 15,
+  enableEmailAlerts: false,
+  alertEmailAddresses: '',
+}
+
+// =============================================================================
+// RETENTION CONFIGURATION
+// =============================================================================
+
+export interface RetentionConfig {
+  processingLogRetentionDays: number
+  extractionMetricsRetentionDays: number
+}
+
+export const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
+  processingLogRetentionDays: 90,
+  extractionMetricsRetentionDays: 30,
+}
+
+// =============================================================================
 // COMBINED CONFIGURATION
 // =============================================================================
 
@@ -433,6 +473,8 @@ export interface AppConfig {
   gapAnalysis: GapAnalysisConfig
   ui: UIConfig
   email: EmailConfig
+  monitoring: MonitoringConfig
+  retention: RetentionConfig
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -444,6 +486,8 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   gapAnalysis: DEFAULT_GAP_ANALYSIS_CONFIG,
   ui: DEFAULT_UI_CONFIG,
   email: DEFAULT_EMAIL_CONFIG,
+  monitoring: DEFAULT_MONITORING_CONFIG,
+  retention: DEFAULT_RETENTION_CONFIG,
 }
 
 // =============================================================================

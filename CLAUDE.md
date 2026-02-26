@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**.
-- **Production Readiness**: ~9.5/10 (15,530+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 26, 2026 (Extraction health hourly chart, processing log auto-cleanup via pg_cron, ExtractionHealthTab tests, pg_cron $$ syntax fix)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**.
+- **Production Readiness**: ~9.5/10 (15,550+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 26, 2026 (Extraction health alerting, admin-configurable retention, E2E tests for monitoring/retention endpoints)
 
 ---
 
@@ -260,6 +260,8 @@ insurai/
 | `src/components/admin/tabs/settings/SettingsWebhooksPanel.tsx` | **NEW** Webhook configuration for external notifications |
 | `src/components/admin/tabs/settings/ConfigPerformancePanel.tsx` | Config fetch latency dashboard with TTL recommendations |
 | `src/components/admin/tabs/settings/ConfigDriftPanel.tsx` | **NEW** Config drift detection with baseline comparison |
+| `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` | **NEW** Extraction health alert threshold configuration |
+| `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | **NEW** Data retention period configuration with manual cleanup |
 | `src/lib/admin/settings-validation.ts` | Client-side validation utilities for settings |
 | `src/lib/admin/settings-templates.ts` | **NEW** Template definitions and management utilities |
 
@@ -293,6 +295,7 @@ insurai/
 | `supabase/migrations/020_seed_unsubscribe_translations.sql` | **NEW** Unsubscribe page translations (22 keys × 2 locales) |
 | `supabase/migrations/023_extraction_metrics.sql` | **NEW** Extraction metrics persistence table + pg_cron 30-day cleanup |
 | `supabase/migrations/024_processing_log_cleanup_cron.sql` | **NEW** pg_cron job for 90-day processing log auto-cleanup |
+| `supabase/migrations/025_monitoring_retention_config.sql` | **NEW** Monitoring/retention config seeds + configurable pg_cron cleanup functions |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -689,6 +692,7 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/diagnose` | GET | Test API key validity | - |
 | `/api/health` | GET | Server health check | 60/min |
 | `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, hourly buckets, recent errors) | Admin |
+| `/api/admin/monitoring/alerts/status` | GET | Alert cooldown state (last fired timestamps per alert type) | Admin |
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 | `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
 | `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
@@ -1156,6 +1160,8 @@ const benchmarks = await configService.getMarketBenchmarks('kasko')
 | `gap_analysis` | Gap detection | Importance weights, scoring |
 | `ui` | User interface | Items per page, animation speed |
 | `email` | Email settings | SMTP config, templates |
+| `monitoring` | Extraction health alerts | Error rate thresholds, latency alerts, email config |
+| `retention` | Data retention | Processing log and extraction metrics retention days |
 
 ### Typed Configuration Interfaces
 
@@ -1270,10 +1276,10 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 26, 2026)
-- **Total**: 15,530 tests across 320 test files (18 skipped)
+- **Total**: 15,551 tests across 323 test files (18 skipped)
 - **Passing**: 100% (0 failures; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion). Feb 26 late session: +21 tests from extraction-alert-service (9), MonitoringAlertsPanel (6), RetentionSettingsPanel (6); 5 existing test files fixed for new extraction-alert-service mock; 7 E2E tests for monitoring/retention endpoints.
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3981,6 +3987,58 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `supabase/migrations/023_extraction_metrics.sql`, `supabase/migrations/024_processing_log_cleanup_cron.sql`
 - **Commit**: `63af4c6`
 
+### 138. Extraction Health Alerting & Admin-Configurable Retention (Added Feb 26, 2026)
+- **Feature**: Automated extraction health alerts fire admin notifications (+ optional email) when error rate or provider latency exceeds configurable thresholds. Retention periods for processing logs and extraction metrics are now admin-configurable via Settings UI.
+- **Alert Service** (`server/services/extraction-alert-service.ts`):
+  - `evaluateAndDispatchAlerts(snapshot, config)` — Checks 3 threshold types: overall error rate (warning/critical), per-provider latency
+  - In-memory cooldown tracking (`lastAlertFired` Map) prevents alert flooding; resets on server restart (acceptable — first post-restart alert is always useful)
+  - `fireAlert()` creates admin notification via `createNotification()` (email dispatch not yet implemented — `enableEmailAlerts`/`alertEmailAddresses` exist in config interface and admin UI but are not consumed in `fireAlert()`)
+  - Per-provider latency check requires `stats.total >= 3` minimum request count guard (avoids false alerts on 1-2 slow requests)
+  - `getAlertState()` returns cooldown state for admin endpoint
+  - `resetAlertState()` test utility
+- **Alert Wiring** (`server/routes/ai.ts`):
+  - Throttled check in `recordExtractionEvent()` — hardcoded 5-minute interval (`300000` ms); the `checkIntervalMs` config field is seeded in DB and shown in admin UI but not consumed at the throttle point (future improvement)
+  - Non-blocking fire-and-forget: `Promise.all([getExtractionHealthSnapshot(), getMonitoringConfig()]).then(...).catch(...)`
+- **Server Config Service** (`server/services/config-service.ts`):
+  - `getMonitoringConfig()` — Returns `MonitoringConfig` with 5-min cache, DB → defaults fallback
+  - `getRetentionConfig()` — Returns `RetentionConfig` with 5-min cache
+  - Key maps: `MONITORING_KEY_MAP` (7 keys), `RETENTION_KEY_MAP` (2 keys)
+- **Client Config Service** (`src/lib/config/configuration-service.ts`):
+  - Mirrors server-side `getMonitoringConfig()` and `getRetentionConfig()` for admin UI
+- **Config Types** (`src/lib/config/types.ts`):
+  - `MonitoringConfig` interface (7 fields) + `DEFAULT_MONITORING_CONFIG`
+  - `RetentionConfig` interface (2 fields) + `DEFAULT_RETENTION_CONFIG`
+  - `ConfigCategory` union extended with `'monitoring' | 'retention'`
+- **Admin Endpoint**: `GET /api/admin/monitoring/alerts/status` — Returns `{ lastFired: { alertKey: timestampMs } }`
+- **Admin UI**:
+  - `MonitoringAlertsPanel.tsx` (366 lines) — Alert threshold config, email toggle, alert status display with age formatting
+  - `RetentionSettingsPanel.tsx` (260 lines) — Retention day inputs, manual cleanup trigger with result feedback
+  - Both added to `SettingsTab.tsx` category navigation (Bell icon for Monitoring, Clock icon for Retention)
+- **Migration 025** (`supabase/migrations/025_monitoring_retention_config.sql`):
+  - Seeds 7 monitoring + 2 retention config rows in `app_settings`
+  - Creates `cleanup_processing_logs_configurable()` and `cleanup_extraction_metrics_configurable()` PL/pgSQL functions that read retention days from `app_settings` at execution time
+  - Unschedules old hardcoded cron jobs and reschedules with configurable versions
+- **Alert Threshold Defaults**:
+  - `error_rate_warning_threshold`: 0.05 (5%)
+  - `error_rate_critical_threshold`: 0.20 (20%)
+  - `avg_latency_critical_ms`: 12000
+  - `alert_cooldown_minutes`: 15
+- **Tests**: 21 new tests (extraction-alert-service 9, MonitoringAlertsPanel 6, RetentionSettingsPanel 6) + 5 existing test files fixed for new mock requirements + 7 E2E tests
+- **Files**:
+  - `server/services/extraction-alert-service.ts` (new, 138 lines)
+  - `server/services/config-service.ts` (+159 lines)
+  - `server/routes/ai.ts` (+19 lines)
+  - `server/routes/admin/monitoring.ts` (+25 lines)
+  - `src/lib/config/types.ts` (+80 lines)
+  - `src/lib/config/configuration-service.ts` (+93 lines)
+  - `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` (new, 366 lines)
+  - `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` (new, 260 lines)
+  - `src/components/admin/tabs/SettingsTab.tsx` (+155 lines)
+  - `supabase/migrations/025_monitoring_retention_config.sql` (new, 118 lines)
+  - `e2e/admin-flows.spec.ts` (+91 lines)
+  - 3 new test files + 5 modified test files
+- **Commit**: `c635685`
+
 ---
 
 ## Turkish Market Considerations
@@ -4657,13 +4715,16 @@ connectSrc: [
   3. Create the tab component file in `src/components/admin/tabs/`
 - The `ExtractionHealthTab.tsx` follows this pattern (see Known Issue #131)
 
-**pg_cron Auto-Cleanup Retention Windows (Added Feb 26, 2026):**
+**pg_cron Auto-Cleanup Retention Windows (Updated Feb 26, 2026):**
 - Two pg_cron jobs run daily for data retention:
-  - `cleanup-extraction-metrics`: 03:00 UTC, deletes rows > **30 days** from `extraction_metrics`
-  - `cleanup-processing-logs`: 04:00 UTC, deletes rows > **90 days** from `document_processing_logs`
-- The 90-day retention is hardcoded in BOTH `processing-log-service.ts` (`deleteOldLogs(daysOld = 90)`) AND migration 024 SQL — if changing retention, update both
+  - `cleanup-extraction-metrics-configurable`: 03:00 UTC, reads retention days from `app_settings` (default **30 days**)
+  - `cleanup-processing-logs-configurable`: 04:00 UTC, reads retention days from `app_settings` (default **90 days**)
+- **Migration 025** replaced hardcoded cron jobs with configurable PL/pgSQL functions that read from `app_settings` at execution time
+- Admin can change retention via Settings → Data Retention without SQL changes
+- The manual cleanup default in `processing-log-service.ts` (`deleteOldLogs(daysOld = 90)`) is independent of the pg_cron configured value
 - Verify jobs are running: `SELECT jobid, jobname, schedule FROM cron.job ORDER BY jobid;`
-- Both migrations (023, 024) require `pg_cron` extension enabled first (migration 022)
+- After applying migration 025, job names should be `cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`
+- All migrations (022–025) require `pg_cron` extension enabled first (migration 022)
 
 **Nested Dollar-Quoting in pg_cron SQL (Fixed Feb 26, 2026):**
 - PostgreSQL `DO $do$...$do$` blocks CANNOT contain `$$..$$` inner quotes — the inner `$$` terminates the outer block
@@ -4696,6 +4757,25 @@ connectSrc: [
 - Accepts optional `?daysOld=N` query parameter (default 90)
 - All calls are audit-logged via `logAdminAction()` — never bypass
 - The pg_cron job handles automated cleanup; this endpoint is for manual triggers only
+
+**Extraction Alert Service — Test Mock Requirements (Added Feb 26, 2026):**
+- Any test file that imports `server/routes/ai.ts` (directly or transitively) must mock both:
+  1. `server/services/extraction-alert-service.js` — `{ evaluateAndDispatchAlerts: vi.fn().mockResolvedValue(undefined) }`
+  2. `server/services/config-service.js` — Must include `getMonitoringConfig` returning a full `MonitoringConfig` object
+- Without these mocks, the throttled alert check in `recordExtractionEvent()` will attempt real config fetches and alert evaluation, causing test failures
+- 5 existing test files were fixed for this in commit `c635685`: `ai-routes-extended`, `ai-ocr-coverage`, `routes-branches`, `ai-chat-ocr-diagnose-logs`, `ai-extraction-routes-branches`
+
+**Configurable Retention Replaces Hardcoded pg_cron (Feb 26, 2026):**
+- Migration 025 creates PL/pgSQL functions that read retention days from `app_settings` at cron execution time
+- Old hardcoded cron jobs (from migrations 023/024) are unscheduled and replaced with configurable versions
+- Admin can now change retention periods via Settings → Data Retention without SQL changes
+- After applying migration 025 to production, verify with `SELECT * FROM cron.job` — job names should end in `-configurable`
+
+**Extraction Alert Email — Not Yet Implemented (Feb 26, 2026):**
+- `MonitoringAlertsPanel.tsx` has an email toggle and email addresses textarea that saves to `app_settings`
+- `extraction-alert-service.ts` defines `enableEmailAlerts` and `alertEmailAddresses` in the `MonitoringConfig` interface but does NOT consume them — `fireAlert()` only calls `createNotification()`, no email sending logic exists
+- If implementing email alerts in a future session, add `sendAdminAlertEmail()` call inside `fireAlert()` gated by `config.enableEmailAlerts`
+- The `checkIntervalMs` config field is similarly seeded but unused — the throttle in `ai.ts` uses hardcoded `300000` ms (5 minutes)
 
 ---
 
@@ -4764,7 +4844,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,530 tests, all passing (320 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,551 tests, all passing (323 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 26, 2026 (Extraction health hourly chart, processing log auto-cleanup, pg_cron $$ syntax fix)
+**Last Updated**: February 26, 2026 (Extraction health alerting, admin-configurable retention, E2E tests for monitoring/retention endpoints)

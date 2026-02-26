@@ -24,7 +24,9 @@ test.describe('Admin Dashboard', () => {
       await page.getByRole('button', { name: /sign in|log in|login/i }).click()
 
       // Should show some form of validation feedback
-      await expect(page.locator('text=/required|invalid|email/i').first()).toBeVisible({ timeout: 5000 })
+      await expect(page.locator('text=/required|invalid|email/i').first()).toBeVisible({
+        timeout: 5000,
+      })
     })
 
     test('should show error for invalid credentials', async ({ page }) => {
@@ -36,10 +38,16 @@ test.describe('Admin Dashboard', () => {
 
       // Should show error message (may be various forms)
       // When DB is not configured, may show configuration error instead of auth error
-      const errorVisible = await page.locator('[role="alert"], .error, [class*="error"], .text-red-600, .bg-red-50').first()
-        .isVisible({ timeout: 10000 }).catch(() => false)
-      const textVisible = await page.getByText(/error|failed|invalid|unavailable|not configured/i).first()
-        .isVisible({ timeout: 5000 }).catch(() => false)
+      const errorVisible = await page
+        .locator('[role="alert"], .error, [class*="error"], .text-red-600, .bg-red-50')
+        .first()
+        .isVisible({ timeout: 10000 })
+        .catch(() => false)
+      const textVisible = await page
+        .getByText(/error|failed|invalid|unavailable|not configured/i)
+        .first()
+        .isVisible({ timeout: 5000 })
+        .catch(() => false)
       expect(errorVisible || textVisible).toBe(true)
     })
   })
@@ -117,7 +125,9 @@ test.describe('Duplicate Detection Flow', () => {
       }
 
       // Upload area should be present — may be visible or hidden file input
-      const uploadArea = page.locator('[class*="upload"], [class*="drop"], input[type="file"]').first()
+      const uploadArea = page
+        .locator('[class*="upload"], [class*="drop"], input[type="file"]')
+        .first()
       await expect(uploadArea).toBeAttached({ timeout: 10000 })
     })
 
@@ -134,7 +144,7 @@ test.describe('Duplicate Detection Flow', () => {
       // Try to upload a text file (should be rejected)
       const fileInput = page.locator('input[type="file"]').first()
 
-      if (await fileInput.count() > 0) {
+      if ((await fileInput.count()) > 0) {
         await fileInput.setInputFiles({
           name: 'test.txt',
           mimeType: 'text/plain',
@@ -142,7 +152,9 @@ test.describe('Duplicate Detection Flow', () => {
         })
 
         // Should show error about file type
-        await expect(page.locator('text=/pdf|invalid|supported/i').first()).toBeVisible({ timeout: 5000 })
+        await expect(page.locator('text=/pdf|invalid|supported/i').first()).toBeVisible({
+          timeout: 5000,
+        })
       }
     })
   })
@@ -159,7 +171,9 @@ test.describe('Duplicate Detection Flow', () => {
       await page.goto('/try')
 
       // Should show upload option or redirect
-      const hasUpload = await page.locator('input[type="file"], [class*="upload"], [class*="drop"]').count()
+      const hasUpload = await page
+        .locator('input[type="file"], [class*="upload"], [class*="drop"]')
+        .count()
       const hasRedirect = page.url().includes('/upload') || page.url().includes('/try')
 
       expect(hasUpload > 0 || hasRedirect).toBeTruthy()
@@ -208,6 +222,65 @@ test.describe.skip('Admin API Security', () => {
 
   test('webhooks should require authentication', async ({ request }) => {
     const response = await request.get('/api/admin/webhooks')
+    expectProtected(response.status())
+  })
+})
+
+// Extraction Health & Alerts API tests require a running Express backend.
+// Skipped in CI where only the static frontend is served.
+test.describe.skip('Extraction Health & Alerts API', () => {
+  const expectProtected = (status: number) => {
+    expect([401, 403, 404, 503]).toContain(status)
+  }
+
+  test('extraction-health endpoint requires authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/monitoring/extraction-health')
+    expectProtected(response.status())
+  })
+
+  test('alerts status endpoint requires authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/monitoring/alerts/status')
+    expectProtected(response.status())
+  })
+})
+
+// Processing Logs API tests require a running Express backend.
+// Skipped in CI where only the static frontend is served.
+test.describe.skip('Processing Logs API', () => {
+  const expectProtected = (status: number) => {
+    expect([401, 403, 404, 503]).toContain(status)
+  }
+
+  test('list processing logs requires authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/processing-logs')
+    expectProtected(response.status())
+  })
+
+  test('processing log stats requires authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/processing-logs/stats')
+    expectProtected(response.status())
+  })
+
+  test('processing log cleanup requires SuperAdmin auth', async ({ request }) => {
+    const response = await request.post('/api/admin/processing-logs/cleanup')
+    expectProtected(response.status())
+  })
+})
+
+// Retention & Monitoring Settings API tests require a running Express backend.
+// Skipped in CI where only the static frontend is served.
+test.describe.skip('Retention & Monitoring Settings API', () => {
+  const expectProtected = (status: number) => {
+    expect([401, 403, 404, 503]).toContain(status)
+  }
+
+  test('retention settings require authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/settings/retention')
+    expectProtected(response.status())
+  })
+
+  test('monitoring settings require authentication', async ({ request }) => {
+    const response = await request.get('/api/admin/settings/monitoring')
     expectProtected(response.status())
   })
 })

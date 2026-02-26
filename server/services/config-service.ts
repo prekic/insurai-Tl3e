@@ -69,6 +69,21 @@ export interface OCRConfig {
   maxTextLength: number
 }
 
+export interface MonitoringConfig {
+  errorRateWarningThreshold: number
+  errorRateCriticalThreshold: number
+  avgLatencyCriticalMs: number
+  checkIntervalMs: number
+  alertCooldownMinutes: number
+  enableEmailAlerts: boolean
+  alertEmailAddresses: string
+}
+
+export interface RetentionConfig {
+  processingLogRetentionDays: number
+  extractionMetricsRetentionDays: number
+}
+
 // =============================================================================
 // DEFAULTS
 // =============================================================================
@@ -89,10 +104,10 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider', 'premium', 'startDate', 'endDate'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -122,6 +137,21 @@ const DEFAULT_OCR_CONFIG: OCRConfig = {
   weightFieldExtraction: 0.15,
   timeoutSeconds: 60,
   maxTextLength: 500000,
+}
+
+const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
+  errorRateWarningThreshold: 0.05,
+  errorRateCriticalThreshold: 0.2,
+  avgLatencyCriticalMs: 12000,
+  checkIntervalMs: 300000,
+  alertCooldownMinutes: 15,
+  enableEmailAlerts: false,
+  alertEmailAddresses: '',
+}
+
+const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
+  processingLogRetentionDays: 90,
+  extractionMetricsRetentionDays: 30,
 }
 
 // =============================================================================
@@ -177,6 +207,21 @@ const OCR_KEY_MAP: Record<string, keyof OCRConfig> = {
   weight_field_extraction: 'weightFieldExtraction',
   timeout_seconds: 'timeoutSeconds',
   max_text_length: 'maxTextLength',
+}
+
+const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
+  error_rate_warning_threshold: 'errorRateWarningThreshold',
+  error_rate_critical_threshold: 'errorRateCriticalThreshold',
+  avg_latency_critical_ms: 'avgLatencyCriticalMs',
+  check_interval_ms: 'checkIntervalMs',
+  alert_cooldown_minutes: 'alertCooldownMinutes',
+  enable_email_alerts: 'enableEmailAlerts',
+  alert_email_addresses: 'alertEmailAddresses',
+}
+
+const RETENTION_KEY_MAP: Record<string, keyof RetentionConfig> = {
+  processing_log_retention_days: 'processingLogRetentionDays',
+  extraction_metrics_retention_days: 'extractionMetricsRetentionDays',
 }
 
 // =============================================================================
@@ -246,13 +291,23 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
   // Check cache first
   const cached = getFromCache<Record<string, unknown>>(cacheKey)
   if (cached !== null) {
-    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, true, true)
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      true,
+      true
+    )
     return cached
   }
 
   const db = getClient()
   if (!db) {
-    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      false
+    )
     return {}
   }
 
@@ -263,7 +318,12 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
       .eq('category', category)
 
     if (error || !data) {
-      recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
+      recordServerConfigFetch(
+        category,
+        Math.round((performance.now() - start) * 100) / 100,
+        false,
+        false
+      )
       return {}
     }
 
@@ -277,10 +337,20 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
 
     // Cache the result
     setInCache(cacheKey, result)
-    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, true)
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      true
+    )
     return result
   } catch {
-    recordServerConfigFetch(category, Math.round((performance.now() - start) * 100) / 100, false, false)
+    recordServerConfigFetch(
+      category,
+      Math.round((performance.now() - start) * 100) / 100,
+      false,
+      false
+    )
     return {}
   }
 }
@@ -302,7 +372,7 @@ export async function getAIConfig(): Promise<AIConfig> {
 
   for (const [dbKey, tsKey] of Object.entries(AI_KEY_MAP)) {
     if (dbSettings[dbKey] !== undefined) {
-      (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
     }
   }
 
@@ -328,7 +398,7 @@ export async function getRateLimitsConfig(): Promise<RateLimitsConfig> {
 
   for (const [dbKey, tsKey] of Object.entries(RATE_LIMITS_KEY_MAP)) {
     if (dbSettings[dbKey] !== undefined) {
-      (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
     }
   }
 
@@ -354,11 +424,66 @@ export async function getOCRConfig(): Promise<OCRConfig> {
 
   for (const [dbKey, tsKey] of Object.entries(OCR_KEY_MAP)) {
     if (dbSettings[dbKey] !== undefined) {
-      (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
     }
   }
 
   // Cache the result
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get monitoring configuration with database values merged over defaults
+ */
+export async function getMonitoringConfig(): Promise<MonitoringConfig> {
+  const cacheKey = 'config:monitoring'
+
+  const cached = getFromCache<MonitoringConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('monitoring')
+  const config = { ...DEFAULT_MONITORING_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(MONITORING_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      const val = dbSettings[dbKey]
+      if (tsKey === 'enableEmailAlerts') {
+        ;(config as Record<string, unknown>)[tsKey] = val === 'true' || val === true
+      } else if (tsKey === 'alertEmailAddresses') {
+        ;(config as Record<string, unknown>)[tsKey] = String(val)
+      } else {
+        ;(config as Record<string, unknown>)[tsKey] = Number(val)
+      }
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get retention configuration with database values merged over defaults
+ */
+export async function getRetentionConfig(): Promise<RetentionConfig> {
+  const cacheKey = 'config:retention'
+
+  const cached = getFromCache<RetentionConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('retention')
+  const config = { ...DEFAULT_RETENTION_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(RETENTION_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+    }
+  }
+
   setInCache(cacheKey, config)
   return config
 }
@@ -393,11 +518,7 @@ export async function isFeatureEnabled(flagKey: string, userId?: string): Promis
   }
 
   try {
-    const { data, error } = await db
-      .from('feature_flags')
-      .select('*')
-      .eq('key', flagKey)
-      .single()
+    const { data, error } = await db.from('feature_flags').select('*').eq('key', flagKey).single()
 
     if (error || !data) {
       return false
@@ -418,9 +539,7 @@ export async function isFeatureEnabled(flagKey: string, userId?: string): Promis
     // Check rollout percentage
     if (flag.rolloutPercentage < 100) {
       // Use user ID or random for consistent bucketing
-      const bucket = userId
-        ? hashString(userId + flagKey) % 100
-        : Math.floor(Math.random() * 100)
+      const bucket = userId ? hashString(userId + flagKey) % 100 : Math.floor(Math.random() * 100)
 
       if (bucket >= flag.rolloutPercentage) {
         return false
@@ -475,6 +594,8 @@ export const configService = {
   getAIConfig,
   getRateLimitsConfig,
   getOCRConfig,
+  getMonitoringConfig,
+  getRetentionConfig,
   isFeatureEnabled,
   invalidateCache,
 }

@@ -96,6 +96,20 @@ vi.mock('../lib/logger.js', () => {
 vi.mock('../services/config-service.js', () => ({
   getAIConfig: (...args: unknown[]) => mockGetAIConfig(...args),
   getRateLimitsConfig: (...args: unknown[]) => mockGetRateLimitsConfig(...args),
+  getMonitoringConfig: vi.fn().mockResolvedValue({
+    errorRateWarningThreshold: 0.05,
+    errorRateCriticalThreshold: 0.2,
+    avgLatencyCriticalMs: 12000,
+    checkIntervalMs: 300000,
+    alertCooldownMinutes: 15,
+    enableEmailAlerts: false,
+    alertEmailAddresses: '',
+  }),
+}))
+
+// Mock extraction alert service
+vi.mock('../services/extraction-alert-service.js', () => ({
+  evaluateAndDispatchAlerts: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/prompt-service.js', () => ({
@@ -159,10 +173,10 @@ const DEFAULT_AI_CONFIG = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -184,7 +198,14 @@ const VALID_POLICY_JSON = JSON.stringify({
   policyType: 'kasko',
   premium: 5000,
   coverages: [],
-  confidence: { overall: 0.9, policyNumber: 1.0, provider: 1.0, dates: 0.8, premium: 0.9, coverages: 0.85 },
+  confidence: {
+    overall: 0.9,
+    policyNumber: 1.0,
+    provider: 1.0,
+    dates: 0.8,
+    premium: 0.9,
+    coverages: 0.85,
+  },
 })
 
 function makeOpenAIResponse(content: string, model = 'gpt-4o') {
@@ -363,9 +384,19 @@ describe('AI Routes Branch Coverage', () => {
       mockGoogleAuthGetAccessToken.mockResolvedValue('oauth-test-token')
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({
-          responses: [{ fullTextAnnotation: { text: 'OCR text', pages: [{ blocks: [{ confidence: 0.95 }] }] } }],
-        }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            responses: [
+              {
+                fullTextAnnotation: {
+                  text: 'OCR text',
+                  pages: [{ blocks: [{ confidence: 0.95 }] }],
+                },
+              },
+            ],
+          }),
+          { status: 200 }
+        )
       )
 
       const aiRouter = (await import('../routes/ai')).default
@@ -373,9 +404,7 @@ describe('AI Routes Branch Coverage', () => {
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(200)
       expect(res.body.success).toBe(true)
@@ -383,7 +412,9 @@ describe('AI Routes Branch Coverage', () => {
       const fetchCall = fetchSpy.mock.calls[0]
       expect(fetchCall[0]).toBe('https://vision.googleapis.com/v1/images:annotate')
       const fetchOpts = fetchCall[1] as RequestInit
-      expect((fetchOpts.headers as Record<string, string>)['Authorization']).toBe('Bearer oauth-test-token')
+      expect((fetchOpts.headers as Record<string, string>)['Authorization']).toBe(
+        'Bearer oauth-test-token'
+      )
       fetchSpy.mockRestore()
     })
 
@@ -394,9 +425,14 @@ describe('AI Routes Branch Coverage', () => {
       mockGoogleAuthGetAccessToken.mockRejectedValue(new Error('Auth failed'))
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({
-          responses: [{ fullTextAnnotation: { text: 'text', pages: [{ blocks: [{ confidence: 0.9 }] }] } }],
-        }), { status: 200 })
+        new Response(
+          JSON.stringify({
+            responses: [
+              { fullTextAnnotation: { text: 'text', pages: [{ blocks: [{ confidence: 0.9 }] }] } },
+            ],
+          }),
+          { status: 200 }
+        )
       )
 
       const aiRouter = (await import('../routes/ai')).default
@@ -404,9 +440,7 @@ describe('AI Routes Branch Coverage', () => {
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(200)
       // URL should include API key
@@ -429,9 +463,7 @@ describe('AI Routes Branch Coverage', () => {
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(503)
       expect(res.body.code).toBe('PROVIDER_NOT_CONFIGURED')
@@ -451,9 +483,7 @@ describe('AI Routes Branch Coverage', () => {
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('TIMEOUT')
@@ -464,16 +494,16 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('PERMISSION_DENIED: API not enabled'))
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('PERMISSION_DENIED: API not enabled'))
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('API_NOT_ENABLED')
@@ -484,16 +514,16 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('BILLING not enabled on project'))
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('BILLING not enabled on project'))
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('BILLING_ERROR')
@@ -504,16 +534,16 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('429 RESOURCE_EXHAUSTED'))
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockRejectedValue(new Error('429 RESOURCE_EXHAUSTED'))
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('RATE_LIMIT_EXCEEDED')
@@ -524,18 +554,23 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'API key not valid. Please pass a valid API key.' } }), { status: 400 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'API key not valid. Please pass a valid API key.' },
+            }),
+            { status: 400 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('INVALID_API_KEY')
@@ -546,18 +581,18 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response('not json', { status: 500, statusText: 'Internal Server Error' })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response('not json', { status: 500, statusText: 'Internal Server Error' })
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
       testApp.use(express.json())
       testApp.use('/api/ai', aiRouter)
 
-      const res = await request(testApp)
-        .post('/api/ai/ocr')
-        .send({ imageBase64: 'dGVzdA==' })
+      const res = await request(testApp).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
       expect(res.status).toBe(500)
       expect(res.body.code).toBe('OCR_FAILED')
@@ -640,9 +675,16 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'PERMISSION_DENIED: check service account', code: 403 } }), { status: 403 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'PERMISSION_DENIED: check service account', code: 403 },
+            }),
+            { status: 403 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -664,9 +706,16 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'NOT_FOUND: processor does not exist', code: 404 } }), { status: 404 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'NOT_FOUND: processor does not exist', code: 404 },
+            }),
+            { status: 404 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -688,9 +737,14 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'RESOURCE_EXHAUSTED: quota exceeded', code: 429 } }), { status: 429 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ error: { message: 'RESOURCE_EXHAUSTED: quota exceeded', code: 429 } }),
+            { status: 429 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -712,9 +766,19 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Document pages in non-imageless mode exceed the limit: 15 got 20', code: 400 } }), { status: 400 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: {
+                message: 'Document pages in non-imageless mode exceed the limit: 15 got 20',
+                code: 400,
+              },
+            }),
+            { status: 400 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -736,9 +800,16 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'INVALID_ARGUMENT: unsupported format', code: 400 } }), { status: 400 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'INVALID_ARGUMENT: unsupported format', code: 400 },
+            }),
+            { status: 400 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -763,27 +834,50 @@ describe('AI Routes Branch Coverage', () => {
       const docAIResponse = {
         document: {
           text: 'Extracted text content',
-          pages: [{
-            pageNumber: 1,
-            formFields: [{
-              fieldName: { textAnchor: { content: 'Policy Number' }, confidence: 0.95 },
-              fieldValue: { textAnchor: { content: 'POL-001' }, confidence: 0.9 },
-              boundingPoly: {
-                normalizedVertices: [{ x: 0.1, y: 0.1 }, { x: 0.3, y: 0.1 }, { x: 0.3, y: 0.15 }, { x: 0.1, y: 0.15 }],
-              },
-            }],
-            tables: [{
-              headerRows: [{ cells: [{ layout: { textAnchor: { content: 'Coverage' }, confidence: 0.9 }, rowSpan: 1, colSpan: 1 }] }],
-              bodyRows: [{ cells: [{ layout: { textAnchor: { content: 'Kasko' }, confidence: 0.85 } }] }],
-            }],
-            blocks: [{ confidence: 0.92 }],
-          }],
+          pages: [
+            {
+              pageNumber: 1,
+              formFields: [
+                {
+                  fieldName: { textAnchor: { content: 'Policy Number' }, confidence: 0.95 },
+                  fieldValue: { textAnchor: { content: 'POL-001' }, confidence: 0.9 },
+                  boundingPoly: {
+                    normalizedVertices: [
+                      { x: 0.1, y: 0.1 },
+                      { x: 0.3, y: 0.1 },
+                      { x: 0.3, y: 0.15 },
+                      { x: 0.1, y: 0.15 },
+                    ],
+                  },
+                },
+              ],
+              tables: [
+                {
+                  headerRows: [
+                    {
+                      cells: [
+                        {
+                          layout: { textAnchor: { content: 'Coverage' }, confidence: 0.9 },
+                          rowSpan: 1,
+                          colSpan: 1,
+                        },
+                      ],
+                    },
+                  ],
+                  bodyRows: [
+                    { cells: [{ layout: { textAnchor: { content: 'Kasko' }, confidence: 0.85 } }] },
+                  ],
+                },
+              ],
+              blocks: [{ confidence: 0.92 }],
+            },
+          ],
         },
       }
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify(docAIResponse), { status: 200 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(JSON.stringify(docAIResponse), { status: 200 }))
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -810,9 +904,9 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({}), { status: 200 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(new Response(JSON.stringify({}), { status: 200 }))
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -893,13 +987,11 @@ describe('AI Routes Branch Coverage', () => {
         model: 'gpt-4o-mini',
       })
 
-      const res = await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'What about my coverage?',
-          policyContext: 'POL-001 Kasko',
-          provider: 'openai',
-        })
+      const res = await request(app).post('/api/ai/chat').send({
+        message: 'What about my coverage?',
+        policyContext: 'POL-001 Kasko',
+        provider: 'openai',
+      })
 
       expect(res.status).toBe(200)
       // Admin prompt was used instead of fallback
@@ -967,8 +1059,14 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockRejectedValue(new Error('OAuth failed'))
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -985,12 +1083,28 @@ describe('AI Routes Branch Coverage', () => {
     it('reports PERMISSION_DENIED error from Google Vision diagnostic', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Cloud Vision API has not been used in project', status: 'PERMISSION_DENIED' } }), { status: 403 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: {
+                message: 'Cloud Vision API has not been used in project',
+                status: 'PERMISSION_DENIED',
+              },
+            }),
+            { status: 403 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1007,12 +1121,25 @@ describe('AI Routes Branch Coverage', () => {
     it('reports BILLING_ERROR from Google Vision diagnostic', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Billing account not configured', status: 'FAILED_PRECONDITION' } }), { status: 403 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'Billing account not configured', status: 'FAILED_PRECONDITION' },
+            }),
+            { status: 403 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1029,12 +1156,25 @@ describe('AI Routes Branch Coverage', () => {
     it('reports RATE_LIMITED from Google Vision diagnostic', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Rate limit exceeded', status: 'RESOURCE_EXHAUSTED' } }), { status: 429 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'Rate limit exceeded', status: 'RESOURCE_EXHAUSTED' },
+            }),
+            { status: 429 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1051,12 +1191,23 @@ describe('AI Routes Branch Coverage', () => {
     it('reports NOT_FOUND from Google Vision diagnostic for 404', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Endpoint not found', status: 'NOT_FOUND' } }), { status: 404 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({ error: { message: 'Endpoint not found', status: 'NOT_FOUND' } }),
+            { status: 404 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1073,8 +1224,14 @@ describe('AI Routes Branch Coverage', () => {
     it('reports error from fetch exception in Google Vision diagnostic', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'))
 
@@ -1093,12 +1250,20 @@ describe('AI Routes Branch Coverage', () => {
     it('reports HTTP 403 with permission denied message', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: '', code: 403 } }), { status: 403 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: { message: '', code: 403 } }), { status: 403 })
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1116,12 +1281,25 @@ describe('AI Routes Branch Coverage', () => {
     it('reports UNAUTHENTICATED error from Google Vision diagnostic', async () => {
       vi.resetModules()
       setupDefaultMocks()
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-      mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [{ type: 'text', text: 'OK' }],
+        model: 'claude-3-5-haiku-20241022',
+      })
 
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ error: { message: 'Authentication failed', status: 'UNAUTHENTICATED' } }), { status: 401 })
-      )
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValue(
+          new Response(
+            JSON.stringify({
+              error: { message: 'Authentication failed', status: 'UNAUTHENTICATED' },
+            }),
+            { status: 401 }
+          )
+        )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1143,7 +1321,7 @@ describe('AI Routes Branch Coverage', () => {
     it('appends JSON reminder to user prompt when no json keyword present', async () => {
       mockGetExtractionPrompt.mockResolvedValue({
         systemPrompt: 'Extract policy data as JSON.',
-        userPrompt: 'Here is the policy document text.',  // No "json" keyword
+        userPrompt: 'Here is the policy document text.', // No "json" keyword
         templateName: 'test',
         version: 1,
       })
@@ -1161,16 +1339,14 @@ describe('AI Routes Branch Coverage', () => {
 
     it('adds json reminder to system prompt that lacks json keyword', async () => {
       mockGetExtractionPrompt.mockResolvedValue({
-        systemPrompt: 'Extract all policy information.',  // No json/JSON keyword
+        systemPrompt: 'Extract all policy information.', // No json/JSON keyword
         userPrompt: 'Document text without keyword.',
         templateName: 'no-json',
         version: 1,
       })
       mockOpenAICreate.mockResolvedValue(makeOpenAIResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/openai')
-        .send({ documentText: 'Test.' })
+      await request(app).post('/api/ai/extract/openai').send({ documentText: 'Test.' })
 
       const callArgs = mockOpenAICreate.mock.calls[0][0]
       // System prompt should have json reminder appended
@@ -1321,7 +1497,11 @@ describe('Rate Limit Branch Coverage', () => {
 
     it('creates a custom rate limiter with custom message', async () => {
       const mod = await importActualRateLimit()
-      const limiter = mod.createRateLimiter({ windowMs: 60000, max: 10, message: 'Custom limit exceeded' })
+      const limiter = mod.createRateLimiter({
+        windowMs: 60000,
+        max: 10,
+        message: 'Custom limit exceeded',
+      })
       expect(limiter).toBeDefined()
       expect(typeof limiter).toBe('function')
     })
@@ -1371,9 +1551,7 @@ describe('Rate Limit Branch Coverage', () => {
 
     it('default AI max is 20 requests per hour', async () => {
       const mod = await importActualRateLimit()
-      expect(mod.rateLimitConfig.ai.max).toBe(
-        parseInt(process.env.RATE_LIMIT_AI_MAX || '20', 10)
-      )
+      expect(mod.rateLimitConfig.ai.max).toBe(parseInt(process.env.RATE_LIMIT_AI_MAX || '20', 10))
     })
 
     it('default health limiter allows 60 per minute', async () => {
@@ -1519,7 +1697,10 @@ describe('Diagnostic Error Classification Branches', () => {
   it('classifies PROVIDER_OVERLOADED for overloaded errors', async () => {
     vi.resetModules()
     setupDefaultMocks()
-    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: 'OK' } }],
+      model: 'gpt-4o-mini',
+    })
     mockAnthropicCreate.mockRejectedValue(new Error('529 overloaded error'))
 
     const aiRouter = (await import('../routes/ai')).default
@@ -1535,7 +1716,10 @@ describe('Diagnostic Error Classification Branches', () => {
     vi.resetModules()
     setupDefaultMocks()
     mockOpenAICreate.mockRejectedValue(new Error('fetch failed'))
-    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'OK' }],
+      model: 'claude-3-5-haiku-20241022',
+    })
 
     const aiRouter = (await import('../routes/ai')).default
     const testApp = express()
@@ -1550,7 +1734,10 @@ describe('Diagnostic Error Classification Branches', () => {
     vi.resetModules()
     setupDefaultMocks()
     mockOpenAICreate.mockRejectedValue(new Error('Something completely novel'))
-    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'OK' }],
+      model: 'claude-3-5-haiku-20241022',
+    })
 
     const aiRouter = (await import('../routes/ai')).default
     const testApp = express()
@@ -1566,7 +1753,10 @@ describe('Diagnostic Error Classification Branches', () => {
     vi.resetModules()
     setupDefaultMocks()
     mockOpenAICreate.mockRejectedValue(new Error('401 Incorrect API key'))
-    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'OK' }],
+      model: 'claude-3-5-haiku-20241022',
+    })
 
     const aiRouter = (await import('../routes/ai')).default
     const testApp = express()
@@ -1588,8 +1778,14 @@ describe('Diagnostic Error Classification Branches', () => {
   it('returns full details in non-production mode', async () => {
     vi.resetModules()
     setupDefaultMocks()
-    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: 'OK' } }],
+      model: 'gpt-4o-mini',
+    })
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'OK' }],
+      model: 'claude-3-5-haiku-20241022',
+    })
 
     const aiRouter = (await import('../routes/ai')).default
     const testApp = express()
@@ -1607,12 +1803,18 @@ describe('Diagnostic Error Classification Branches', () => {
   it('returns proper summary when all providers are valid', async () => {
     vi.resetModules()
     setupDefaultMocks()
-    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
-    mockAnthropicCreate.mockResolvedValue({ content: [{ type: 'text', text: 'OK' }], model: 'claude-3-5-haiku-20241022' })
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: 'OK' } }],
+      model: 'gpt-4o-mini',
+    })
+    mockAnthropicCreate.mockResolvedValue({
+      content: [{ type: 'text', text: 'OK' }],
+      model: 'claude-3-5-haiku-20241022',
+    })
 
-    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ responses: [{}] }), { status: 200 })
-    )
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify({ responses: [{}] }), { status: 200 }))
 
     const aiRouter = (await import('../routes/ai')).default
     const testApp = express()
@@ -1631,7 +1833,10 @@ describe('Diagnostic Error Classification Branches', () => {
   it('returns non-production recommendation when some providers invalid', async () => {
     vi.resetModules()
     setupDefaultMocks()
-    mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+    mockOpenAICreate.mockResolvedValue({
+      choices: [{ message: { content: 'OK' } }],
+      model: 'gpt-4o-mini',
+    })
     mockAnthropicCreate.mockRejectedValue(new Error('401 invalid x-api-key'))
 
     const aiRouter = (await import('../routes/ai')).default
