@@ -48,6 +48,20 @@
 - Added comprehensive unit tests for both panels ensuring API integrations and UI rendering.
 - Fixed bundle size issue by successfully putting `xlsx` in its own async chunk.
 
+### 5. Historical Trend Charts (Extraction Health)
+- **`server/services/extraction-metrics-service.ts`** — Added `getDBExtractionHealthHistorical` to group and aggregate statistics per day.
+- **`server/routes/admin/monitoring.ts`** — Exposed `/api/admin/monitoring/extraction-health/historical`.
+- **`HistoricalTrendChart.tsx`** — New Recharts implementation handling live vs historical toggle.
+
+### 6. Processing Logs Export
+- **`/api/admin/processing-logs/export`** — New endpoint for exporting complete filtered logs as CSV, bypassing pagination.
+- **`ProcessingLogsTab.tsx`** — Export button updated to trigger native browser download from the backend endpoint.
+
+### 7. Cron Job Monitoring UI
+- **`026_cron_monitoring_views.sql`** — Secure views (`vw_cron_jobs`, `vw_cron_job_runs`) around `pg_cron` extensions.
+- **`/api/admin/monitoring/cron-jobs`** — New endpoint fetching background jobs and 5 most recent executions.
+- **`CronJobsPanel.tsx`** — New UI rendering job status, command logic, and run history. Added to `SettingsTab.tsx`.
+
 ---
 
 ## Known Issues
@@ -90,9 +104,7 @@ No new env vars needed for this session's features.
 2. Monitor Railway logs for any unexpected edge-case errors coming from alert evaluation logic (`extraction-alert-service.ts`).
 
 ### P2 — Next Features to Implement
-3. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
-4. **Processing log export**: CSV/JSON export for processing logs
-5. **Cron job monitoring UI**: Admin panel showing pg_cron job status and last run times
+(All P2 features from previous sessions have been implemented.)
 
 ---
 
@@ -113,4 +125,5 @@ No new env vars needed for this session's features.
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
 | Feb 26 late | Extraction health alerting, configurable retention, Benchmark UI builds | `claude/load-project-context-6D3KI` |
-| **Feb 26 (Now)** | **Production Extraction Health Verification, App_Settings Debugging, E2E Rollout** | **`gemini20260226`** |
+| Feb 26 (Now) | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
+| **Feb 26 (Latest)** | **Historical Trend Charts, CSV Export, Cron Job Monitoring** | **`feat/admin-monitoring-extras`** |
