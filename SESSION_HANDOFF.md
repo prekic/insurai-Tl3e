@@ -11,17 +11,20 @@
 | **Tests** | 15,551 passing (323 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `claude/load-project-context-6D3KI` |
-| **Last Commit** | `e7c6a4b` — feat(admin): build UIs for Premium and Coverage Market Benchmarks |
+| **Branch** | `gemini20260226` / `main` |
+| **Production Status** | **VERIFIED** — Migration 025 applied, pg_cron jobs running, Admin Settings panels loading, E2E extraction tracking properly. |
 
 ---
 
 ## Session Summary
 
-**2 commits** — 22 files changed, 3488 insertions, 527 deletions.
+**Post-Deploy Verification (Completed):**
+- **Applied Migration 025** to production Supabase and verified settings rows.
+- **Verified `pg_cron` jobs** (`cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`) are active in the database.
+- **Admin Settings Panels** for Monitoring & Alerts and Data Retention successfully reflect database configurations.
+- **End-to-End Extraction Tracking** confirmed functional in production without alert service crashes. Extraction Health dashboard displays live data.
 
-Four features implemented from the prior session's P1/P2 priority list:
-
+**Previous Features Implemented:**
 ### 1. Extraction Health Alerting System
 - **`server/services/extraction-alert-service.ts`** (new) — Evaluates extraction health metrics against configurable thresholds (error rate warning/critical, per-provider latency). In-memory cooldown prevents alert flooding. Fires admin notifications + optional email.
 - Alert evaluation throttled to once per 5 minutes in `recordExtractionEvent()` (`server/routes/ai.ts`)
@@ -47,61 +50,17 @@ Four features implemented from the prior session's P1/P2 priority list:
 
 ---
 
-## Database Changes — NOT YET APPLIED TO PRODUCTION
-
-**Migration 025** (`supabase/migrations/025_monitoring_retention_config.sql`) must be applied to production Supabase:
-
-1. Open Supabase Dashboard → SQL Editor
-2. Paste contents of `supabase/migrations/025_monitoring_retention_config.sql`
-3. Execute
-4. Verify: `SELECT * FROM cron.job ORDER BY jobid;`
-   - Job names should be `cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`
-5. Verify: `SELECT * FROM app_settings WHERE category IN ('monitoring', 'retention');`
-   - Should show 9 rows (7 monitoring + 2 retention)
-
----
-
-## Files Changed (24 files)
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `server/services/extraction-alert-service.ts` | NEW | Alert evaluation + cooldown + dispatch |
-| `server/services/config-service.ts` | MODIFY | +`getMonitoringConfig()`, +`getRetentionConfig()` |
-| `server/routes/ai.ts` | MODIFY | Wire throttled alert check into `recordExtractionEvent()` |
-| `server/routes/admin/monitoring.ts` | MODIFY | +`GET /alerts/status` endpoint |
-| `src/lib/config/types.ts` | MODIFY | +`MonitoringConfig`, +`RetentionConfig`, extended `ConfigCategory` |
-| `src/lib/config/configuration-service.ts` | MODIFY | Client-side `getMonitoringConfig()`, `getRetentionConfig()` |
-| `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` | NEW | Alert threshold admin UI |
-| `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | NEW | Retention period admin UI |
-| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention, +Market Benchmarks panels |
-| `supabase/migrations/025_monitoring_retention_config.sql` | NEW | Config seeds + configurable pg_cron functions |
-| `e2e/admin-flows.spec.ts` | MODIFY | +7 E2E tests |
-| `server/__tests__/extraction-alert-service.test.ts` | NEW | 9 unit tests |
-| `src/components/admin/tabs/settings/MonitoringAlertsPanel.test.tsx` | NEW | 6 component tests |
-| `src/components/admin/tabs/settings/RetentionSettingsPanel.test.tsx` | NEW | 6 component tests |
-| `server/__tests__/ai-chat-ocr-diagnose-logs.test.ts` | MODIFY | +alert service mock |
-| `server/__tests__/ai-extraction-routes-branches.test.ts` | MODIFY | +alert service mock |
-| `server/__tests__/ai-ocr-coverage.test.ts` | MODIFY | +alert service mock |
-| `server/__tests__/ai-routes-extended.test.ts` | MODIFY | +alert service mock |
-| `server/__tests__/routes-branches.test.ts` | MODIFY | +alert status endpoint test |
-| `src/components/admin/tabs/settings/MarketBenchmarksPanel.tsx` | NEW | Admin UI for Coverage Market Benchmarks |
-| `src/components/admin/tabs/settings/MarketBenchmarksPanel.test.tsx` | NEW | Unit tests |
-| `src/components/admin/tabs/BenchmarksTab.test.tsx` | NEW | Unit tests |
-| `package-lock.json` | MODIFY | Resolved missing `xlsx` dependency |
-
----
-
 ## Known Issues
 
 ### Pre-Existing (unchanged)
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
 
-### New Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
+### Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
 - The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
 - **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
 
-### New Gotcha: Alert Service Test Mocks
+### Gotcha: Alert Service Test Mocks
 - Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
 - Without these mocks, the throttled alert check causes real config fetches in tests
 
@@ -122,33 +81,18 @@ Four features implemented from the prior session's P1/P2 priority list:
 ### No New Environment Variables
 No new env vars needed for this session's features.
 
-### Migration 025 Required
-Must apply `supabase/migrations/025_monitoring_retention_config.sql` to production Supabase before the new admin Settings panels will function. Without it, the monitoring/retention categories return empty settings (graceful degradation — defaults used).
-
 ---
 
 ## Priority Next Steps
 
-### P0 — Immediate Post-Merge
-1. **Merge PR** for branch `claude/load-project-context-6D3KI`
-2. **Apply migration 025** to production Supabase (see instructions above)
-3. **Verify pg_cron jobs** updated: `SELECT * FROM cron.job ORDER BY jobid;`
+### P1 — Post-Deployment Review & Monitoring
+1. Keep an eye on the `Extraction Health` admin tab to ensure production traces remain stable.
+2. Monitor Railway logs for any unexpected edge-case errors coming from alert evaluation logic (`extraction-alert-service.ts`).
 
-### P1 — Post-Deploy Verification
-4. **Admin Settings → Monitoring & Alerts**: Verify panel loads, thresholds display correctly
-5. **Admin Settings → Data Retention**: Verify panel loads, retention days editable
-6. **Trigger test extraction**: Upload a PDF, confirm no alert evaluation errors in Railway logs
-7. **Admin Extraction Health tab**: Verify hourly chart and provider stats populate
-
-### P2 — Next Features
-~8. **Bundle analysis**: Run `npm run build:analyze` — verify xlsx is in its own async chunk~ (DONE)
-~9. **Premium benchmark admin UI**: Allow admins to edit market benchmark data via Settings~ (DONE)
-~10. **Coverage benchmark editing**: Expand admin coverage benchmark table with add/edit/delete~ (DONE)
-
-### P3 — Nice to Have
-11. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
-12. **Processing log export**: CSV/JSON export for processing logs
-13. **Cron job monitoring UI**: Admin panel showing pg_cron job status and last run times
+### P2 — Next Features to Implement
+3. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
+4. **Processing log export**: CSV/JSON export for processing logs
+5. **Cron job monitoring UI**: Admin panel showing pg_cron job status and last run times
 
 ---
 
@@ -168,4 +112,5 @@ Must apply `supabase/migrations/025_monitoring_retention_config.sql` to producti
 | Feb 25 early | Export dropdown, onboarding, extraction observability, admin mobile | `claude/complete-handoff-docs-Goirm` |
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
-| **Feb 26 late** | **Extraction health alerting, configurable retention, E2E tests, Benchmark UIs** | **`claude/load-project-context-6D3KI`** |
+| Feb 26 late | Extraction health alerting, configurable retention, Benchmark UI builds | `claude/load-project-context-6D3KI` |
+| **Feb 26 (Now)** | **Production Extraction Health Verification, App_Settings Debugging, E2E Rollout** | **`gemini20260226`** |
