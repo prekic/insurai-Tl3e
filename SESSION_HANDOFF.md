@@ -1,4 +1,4 @@
-# Session Handoff — February 26, 2026 (Extraction Health Chart, Processing Log Cleanup, Tests)
+# Session Handoff — February 26, 2026 (Extraction Health Chart, pg_cron Cleanup, Dollar-Quote Fix)
 
 ## Current Status
 
@@ -23,15 +23,16 @@
 
 ## Session Summary
 
-This session continued from the previous session (`claude/load-project-context-3VUJ2`) and completed 3 P1 items from the handoff:
+This session completed 4 commits across 11 files (+1,260 lines):
 
-1. **Extraction health chart** — Added `HourlyChart` component with stacked success/failure bar chart, hover tooltips, and x-axis time labels. Server-side `buildHourlyBuckets()` aggregates events into 24 hourly buckets.
-2. **Processing log cleanup cron** — Added `deleteOldLogs()` service function + `POST /api/admin/processing-logs/cleanup` admin endpoint + pg_cron migration (`024_processing_log_cleanup_cron.sql`) for automated 90-day retention.
-3. **ExtractionHealthTab tests** — 26 comprehensive tests covering loading, error, data display, auto-refresh, hourly chart, provider stats, recent errors, and edge cases.
+1. **Extraction health hourly chart** (`c910653`) — Added `HourlyChart` component with stacked success/failure bar chart, hover tooltips, auto-refresh (10s), health status banner (green/amber/red), and server-side `buildHourlyBuckets()` for 24-hour time-series data.
+2. **Processing log cleanup cron** (`c910653`) — Added `deleteOldLogs()` service function + `POST /api/admin/processing-logs/cleanup` admin endpoint + migration `024_processing_log_cleanup_cron.sql` for automated 90-day retention.
+3. **ExtractionHealthTab tests** (`c910653`) — 26 comprehensive tests covering loading, error, summary cards, health status banners, provider breakdown, recent errors, auto-refresh toggle, hourly chart, and edge cases.
+4. **pg_cron $$ dollar-quote syntax fix** (`63af4c6`) — Fixed nested `$$` inside `$do$` blocks in migrations 023 and 024 that caused PostgreSQL parse errors when applied via Supabase SQL Editor.
 
-Additional:
-4. **ProcessingLogsTab enhanced** — Improved table with sortable columns, clickable rows, status badges, and mobile-responsive card layout.
-5. **.gitignore updates** — Added worktree and xlsx build artifacts to `.gitignore`.
+Additional housekeeping:
+5. **.gitignore updates** (`e6d5828`) — Added worktree dirs and xlsx build artifacts.
+6. **SESSION_HANDOFF.md update** (`395db43`) — Documentation sync.
 
 ---
 
@@ -41,44 +42,45 @@ Additional:
 |--------|-------------|
 | `c910653` | feat: extraction health chart, processing log cleanup, and ExtractionHealthTab tests |
 | `e6d5828` | chore: add worktrees and xlsx to gitignore |
+| `395db43` | docs: update SESSION_HANDOFF.md for Feb 26 session |
+| `63af4c6` | fix: nested $$ dollar-quote syntax error in pg_cron migrations |
 
 ---
 
 ## New Features Implemented
 
 ### 1. Extraction Health Hourly Chart
-- **Component**: `HourlyChart` in `ExtractionHealthTab.tsx` — stacked bar chart with green (success) / red (failed) bars
-- **Server**: `buildHourlyBuckets()` in `server/routes/ai.ts` — creates 24 hourly buckets from extraction events
-- **Data**: `hourly_buckets` field added to health snapshot response; also populated from DB fallback via `getDBExtractionHealth()`
-- **UX**: Hover tooltips show time, total, success, failed, avg latency per hour; x-axis labels every 3rd hour; peak volume shown in legend
+- **Component**: `HourlyChart` in `ExtractionHealthTab.tsx` — CSS stacked bar chart (green success / red failed) with hover tooltips
+- **Server**: `buildHourlyBuckets()` in `server/routes/ai.ts` — creates 24 hourly buckets from in-memory extraction events
+- **DB fallback**: `getDBExtractionHealth()` in `extraction-metrics-service.ts` also populates hourly buckets for restart recovery
+- **Auto-refresh**: 10-second interval with toggle button + manual refresh
+- **Health banner**: Color-coded (green <5% errors, amber 5-20%, red >20%)
 
-### 2. Processing Log Cleanup Infrastructure
-- **Service**: `deleteOldLogs(daysOld: number = 90)` in `server/services/processing-log-service.ts`
-- **Admin Endpoint**: `POST /api/admin/processing-logs/cleanup` with optional `?daysOld=N` query param; returns `{ success: true, deleted: number }`; audit-logged
-- **pg_cron Migration**: `supabase/migrations/024_processing_log_cleanup_cron.sql` — schedules daily cleanup at 04:00 UTC (1 hour after extraction_metrics cleanup at 03:00 UTC)
-- **Retention**: 90 days default (matches extraction_metrics 30-day retention; processing logs kept longer for audit trail)
+### 2. Processing Log Auto-Cleanup
+- **Service**: `deleteOldLogs(daysOld: number = 90)` in `processing-log-service.ts`
+- **Endpoint**: `POST /api/admin/processing-logs/cleanup` (SuperAdmin auth, audit-logged)
+- **pg_cron**: Migration 024 schedules daily cleanup at 04:00 UTC
+- **Production**: Both pg_cron jobs confirmed running (verified via `SELECT * FROM cron.job`)
 
-### 3. ExtractionHealthTab Test Coverage
-- **File**: `src/components/admin/tabs/ExtractionHealthTab.test.tsx` (516 lines, 26 tests)
-- **Coverage**: Loading state, error state with retry, summary cards (total, success rate, avg duration, error rate), provider breakdown table, recent errors with expand/collapse, auto-refresh toggle, hourly chart rendering, empty data handling
-
-### 4. ProcessingLogsTab Enhancements
-- **Sortable columns** — Click column headers to sort by any field
-- **Status badges** — Color-coded status indicators (green success, red failed, blue in-progress, gray pending)
-- **Clickable rows** — Navigate to Document Journey viewer for each log
-- **Mobile card layout** — Card-based display on mobile, table on desktop
-- **Pagination info** — Shows current page position and total pages
+### 3. pg_cron Dollar-Quote Fix
+- **Problem**: Nested `$$` inside `$do$` blocks fails in PostgreSQL
+- **Fix**: Changed inner SQL to single-quoted strings with escaped inner quotes
+- **Files**: migrations 023 and 024
 
 ---
 
-## New Database Migration
+## New Database Migrations
 
-| Migration | Purpose | Status |
-|-----------|---------|--------|
-| `023_extraction_metrics.sql` | `extraction_metrics` table for persistent extraction event storage | **Not yet applied to production** |
-| `024_processing_log_cleanup_cron.sql` | pg_cron job for 90-day processing log auto-cleanup | **Not yet applied to production** |
+| Migration | Purpose | Production Status |
+|-----------|---------|-------------------|
+| `023_extraction_metrics.sql` | `extraction_metrics` table + pg_cron 30-day cleanup | **Applied** (table created, cron job running) |
+| `024_processing_log_cleanup_cron.sql` | pg_cron 90-day processing log auto-cleanup | **Applied** (cron job running) |
 
-Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021).
+**pg_cron jobs verified in production:**
+```
+jobid=1: cleanup-extraction-metrics (0 3 * * *) — 30-day retention
+jobid=2: cleanup-processing-logs (0 4 * * *) — 90-day retention
+```
 
 ---
 
@@ -87,14 +89,16 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 | File | Lines Changed | Purpose |
 |------|---------------|---------|
 | `server/routes/ai.ts` | +63 | `buildHourlyBuckets()`, hourly data in health snapshot + DB fallback |
-| `server/services/extraction-metrics-service.ts` | +41 | `hourly_buckets` in DB health query with date_trunc aggregation |
-| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()` function + log stat queries |
+| `server/services/extraction-metrics-service.ts` | +41 | `hourly_buckets` in DB health query |
+| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()`, log stat queries |
 | `server/routes/admin/content.ts` | +54 | `POST /processing-logs/cleanup` endpoint |
-| `src/components/admin/tabs/ExtractionHealthTab.tsx` | +293/−78 | `HourlyChart` component, auto-refresh, enhanced UI |
+| `src/components/admin/tabs/ExtractionHealthTab.tsx` | +293/−78 | `HourlyChart`, auto-refresh, enhanced UI |
 | `src/components/admin/tabs/ProcessingLogsTab.tsx` | +177 | Sortable table, status badges, mobile cards |
 | `src/components/admin/tabs/ExtractionHealthTab.test.tsx` | +516 (new) | 26 comprehensive tests |
+| `supabase/migrations/023_extraction_metrics.sql` | +4/−4 | Fix $$ quoting |
 | `supabase/migrations/024_processing_log_cleanup_cron.sql` | +26 (new) | pg_cron cleanup job |
-| `.gitignore` | +6 | Worktree dirs and xlsx artifacts |
+| `.gitignore` | +6 | Worktree dirs, xlsx artifacts |
+| `SESSION_HANDOFF.md` | rewritten | Session documentation |
 
 ---
 
@@ -104,17 +108,16 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 |-------|----------|--------|-------|
 | Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx; all files pass individually |
 | PolicyDetailView-branches timer teardown | Info | Pre-existing | Flaky under full suite concurrency; passes individually |
-| Migration 023 not applied to production | Medium | Pending | DB metrics won't persist until migration is applied; in-memory ring buffer still works |
-| Migration 024 not applied to production | Low | Pending | Manual cleanup via admin endpoint still works; pg_cron automates it |
+| 90-day retention hardcoded in two places | Low | By design | `processing-log-service.ts` default param AND migration 024 SQL — must update both if changing |
 
 ---
 
 ## Deployment Notes
 
-### New Database Migrations Required
-- `supabase/migrations/023_extraction_metrics.sql` — Creates `extraction_metrics` table
-- `supabase/migrations/024_processing_log_cleanup_cron.sql` — Schedules 90-day processing log auto-cleanup
-- Apply manually via Supabase SQL Editor before expecting DB-persisted metrics or auto-cleanup
+### Production pg_cron — Confirmed Running
+- Extension: pg_cron v1.6.4
+- Jobs: 2 active (extraction-metrics cleanup at 03:00 UTC, processing-logs cleanup at 04:00 UTC)
+- Grants: `USAGE ON SCHEMA cron` and `ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron` to `postgres`
 
 ### Railway Configuration (Unchanged)
 - **Live URL**: https://insurai-production.up.railway.app
@@ -130,26 +133,34 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 ## Next Steps (Priority Order)
 
 ### P0 — Merge & Deploy
-1. **Merge this PR** — Use the Conventional Commit title at the bottom
-2. **Apply migrations 023 + 024** — Run in Supabase SQL Editor
-3. **Post-merge verification**:
-   - Upload a policy via `/try` route → confirm processing log entry appears
-   - Visit admin Dashboard → Extraction Health tab → verify hourly chart renders
-   - Try export dropdown → PDF, CSV, Excel all work
-   - Visit Compare Policies → verify stats card, score chart, enhanced matrix
+1. **Merge this PR** — Conventional Commit title below
+2. **Post-merge verification**:
+   - Visit admin Dashboard → Extraction Health tab → verify hourly chart renders with stacked bars
+   - Trigger a test extraction → confirm new event appears in chart within 10s (auto-refresh)
+   - Visit admin Dashboard → Processing Logs tab → verify sortable table and mobile card layout
 
 ### P1 — Product / Feature Work
-4. **Processing log stats dashboard** — Add a stats panel showing total logs, success/failure breakdown, avg processing time
-5. **Extraction health alerting** — Email/notification when error rate exceeds threshold
-6. **Admin Settings for cleanup retention** — Make the 90-day retention configurable via admin settings
+3. **Extraction health alerting** — Email/notification when error rate exceeds configurable threshold (builds on existing notification infrastructure)
+4. **Admin Settings for cleanup retention** — Make the 90-day (processing logs) and 30-day (extraction metrics) retention configurable via admin settings instead of hardcoded
+5. **Processing log stats dashboard** — Add aggregate stats panel (total logs, success/failure breakdown, avg processing time, storage used)
 
-### P2 — Infrastructure
-7. **Bundle analysis** — Run `npm run build:analyze` to check impact of `xlsx` dependency on chunks
-8. **E2E test expansion** — Add E2E tests for admin extraction health tab and processing logs
+### P2 — Infrastructure & Quality
+6. **Bundle analysis** — Run `npm run build:analyze` to measure impact of `xlsx` dependency on chunks
+7. **E2E test expansion** — Add Playwright tests for admin extraction health tab and processing logs tab
+8. **Premium benchmarks admin UI** — Backend CRUD endpoints exist in `content.ts` but no admin tab UI yet
+
+### P3 — Nice to Have
+9. **Extraction health historical trends** — Weekly/monthly trend charts from DB-persisted metrics
+10. **Processing log export** — Export processing logs as CSV/JSON for offline analysis
+11. **Cron job monitoring UI** — Admin panel showing pg_cron job status, last run time, next scheduled run
 
 ---
 
 ## Previous Session Context
+
+**February 26, 2026 (This Session)** (`claude/load-project-context-e6OeC`):
+- Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests, pg_cron dollar-quote fix
+- 15,530 tests, 320 files
 
 **February 25, 2026 (Test Fixes, Documentation Sync)** (`claude/load-project-context-3VUJ2`):
 - Admin extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence
@@ -166,7 +177,7 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 ## PR Title (Conventional Commit)
 
 ```
-feat(admin): extraction health chart, processing log cleanup cron, ExtractionHealthTab tests
+feat(admin): extraction health hourly chart, processing log pg_cron cleanup, ExtractionHealthTab tests
 ```
 
 ---
@@ -178,4 +189,4 @@ feat(admin): extraction health chart, processing log cleanup cron, ExtractionHea
 **Tests**: 15,530 passing (320 files), 0 failures
 **Coverage**: ~85.91% branches, ~91.67% statements
 **Bundle**: ~214 KB gzip main chunk + async EN/TR/Supabase chunks
-**Architecture Decision**: No new ADR required — all changes are additive features using existing patterns
+**Architecture Decision**: No new ADR required — all changes are additive features using existing patterns (pg_cron was already in use for policy expiry notifications via migration 022)
