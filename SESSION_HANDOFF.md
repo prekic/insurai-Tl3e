@@ -61,7 +61,7 @@ Four features implemented from the prior session's P1/P2 priority list:
 
 ---
 
-## Files Changed (22 files)
+## Files Changed (24 files)
 
 | File | Action | Purpose |
 |------|--------|---------|
@@ -73,7 +73,7 @@ Four features implemented from the prior session's P1/P2 priority list:
 | `src/lib/config/configuration-service.ts` | MODIFY | Client-side `getMonitoringConfig()`, `getRetentionConfig()` |
 | `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` | NEW | Alert threshold admin UI |
 | `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | NEW | Retention period admin UI |
-| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention panels |
+| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention, +Market Benchmarks panels |
 | `supabase/migrations/025_monitoring_retention_config.sql` | NEW | Config seeds + configurable pg_cron functions |
 | `e2e/admin-flows.spec.ts` | MODIFY | +7 E2E tests |
 | `server/__tests__/extraction-alert-service.test.ts` | NEW | 9 unit tests |
@@ -87,6 +87,7 @@ Four features implemented from the prior session's P1/P2 priority list:
 | `src/components/admin/tabs/settings/MarketBenchmarksPanel.tsx` | NEW | Admin UI for Coverage Market Benchmarks |
 | `src/components/admin/tabs/settings/MarketBenchmarksPanel.test.tsx` | NEW | Unit tests |
 | `src/components/admin/tabs/BenchmarksTab.test.tsx` | NEW | Unit tests |
+| `package-lock.json` | MODIFY | Resolved missing `xlsx` dependency |
 
 ---
 
@@ -95,6 +96,10 @@ Four features implemented from the prior session's P1/P2 priority list:
 ### Pre-Existing (unchanged)
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
+
+### New Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
+- The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
+- **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
 
 ### New Gotcha: Alert Service Test Mocks
 - Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
