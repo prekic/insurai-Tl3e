@@ -43,6 +43,7 @@ import { ConfigDriftPanel } from './settings/ConfigDriftPanel'
 import { MonitoringAlertsPanel } from './settings/MonitoringAlertsPanel'
 import { RetentionSettingsPanel } from './settings/RetentionSettingsPanel'
 import { MarketBenchmarksPanel } from './settings/MarketBenchmarksPanel'
+import { CronJobsPanel } from './settings/CronJobsPanel'
 
 type SettingsCategory =
   | 'ai'
@@ -58,6 +59,7 @@ type SettingsCategory =
   | 'templates'
   | 'webhooks'
   | 'drift'
+  | 'cron_jobs'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -144,6 +146,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Drift Detection',
     description: 'Detect when config differs from a known-good baseline',
     icon: <GitCompareArrows className="h-5 w-5" />,
+  },
+  {
+    id: 'cron_jobs',
+    label: 'Cron Jobs',
+    description: 'Monitor pg_cron jobs and their execution history',
+    icon: <Clock className="h-5 w-5" />,
   },
 ]
 
@@ -520,6 +528,8 @@ export function SettingsTab() {
         return <SettingsWebhooksPanel />
       case 'drift':
         return <ConfigDriftPanel />
+      case 'cron_jobs':
+        return <CronJobsPanel />
       default:
         return null
     }

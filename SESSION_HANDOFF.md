@@ -11,18 +11,19 @@
 | **Tests** | 15,551 passing (323 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini20260226` / `main` |
-| **Production Status** | **VERIFIED** — Migration 025 applied, pg_cron jobs running, Admin Settings panels loading, E2E extraction tracking properly. |
+| **Branch** | `feat/admin-monitoring-extras` / `main` |
+| **Production Status** | **VERIFIED** — Migration 026 applied manually, backend Cron Jobs and Extraction Health Historical views active. |
 
 ---
 
 ## Session Summary
 
 **Post-Deploy Verification (Completed):**
-- **Applied Migration 025** to production Supabase and verified settings rows.
-- **Verified `pg_cron` jobs** (`cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`) are active in the database.
-- **Admin Settings Panels** for Monitoring & Alerts and Data Retention successfully reflect database configurations.
-- **End-to-End Extraction Tracking** confirmed functional in production without alert service crashes. Extraction Health dashboard displays live data.
+- **Applied Migration 026** manually via `psql` to production Supabase for `pg_cron` secure views (due to `supabase db push` linkage issues).
+- **Admin Settings Panels** for Cron Jobs and Market Benchmarks render correctly.
+- **Processing Log CSV Export** generates valid download payloads.
+- **Extraction Health Historical Trends** pulls accurate aggregations using backend daily grouping.
+- **Dependencies** `recharts` and `date-fns` integrated into `package.json` without bundle bloat issues.
 
 **Previous Features Implemented:**
 ### 1. Extraction Health Alerting System
@@ -48,6 +49,20 @@
 - Added comprehensive unit tests for both panels ensuring API integrations and UI rendering.
 - Fixed bundle size issue by successfully putting `xlsx` in its own async chunk.
 
+### 5. Historical Trend Charts (Extraction Health)
+- **`server/services/extraction-metrics-service.ts`** — Added `getDBExtractionHealthHistorical` to group and aggregate statistics per day.
+- **`server/routes/admin/monitoring.ts`** — Exposed `/api/admin/monitoring/extraction-health/historical`.
+- **`src/components/admin/tabs/ExtractionHealthTab.tsx`** — Updated with a Live vs Historical toggle, embedding a new `recharts`-based chart visualization inline.
+
+### 6. Processing Logs Export
+- **`server/routes/admin/content.ts`** — Added the `/api/admin/processing-logs/export` endpoint for exporting complete filtered logs as CSV, bypassing pagination.
+- **`src/components/admin/tabs/ProcessingLogsTab.tsx`** — Export button updated to trigger native browser download from the backend endpoint.
+
+### 7. Cron Job Monitoring UI
+- **`026_cron_monitoring_views.sql`** — Secure views (`vw_cron_jobs`, `vw_cron_job_runs`) around `pg_cron` extensions.
+- **`/api/admin/monitoring/cron-jobs`** — New endpoint fetching background jobs and 5 most recent executions.
+- **`CronJobsPanel.tsx`** — New UI rendering job status, command logic, and run history. Added to `SettingsTab.tsx`.
+
 ---
 
 ## Known Issues
@@ -55,6 +70,9 @@
 ### Pre-Existing (unchanged)
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
+
+### Gotcha: Supabase DB Push linkage & Manual Migrations
+- Running `npx supabase db push` can fail if the local remote project isn't linked via `npx supabase link`. If encountering blockers applying migrations from terminal, fallback strictly to manually applying the file over PostgreSQL: `psql $SUPABASE_URL -f supabase/migrations/xxx.sql`. Make sure `psql` is actually installed locally first (`sudo apt-get install postgresql-client`).
 
 ### Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
 - The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
@@ -90,18 +108,15 @@ No new env vars needed for this session's features.
 2. Monitor Railway logs for any unexpected edge-case errors coming from alert evaluation logic (`extraction-alert-service.ts`).
 
 ### P2 — Next Features to Implement
-3. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
-4. **Processing log export**: CSV/JSON export for processing logs
-5. **Cron job monitoring UI**: Admin panel showing pg_cron job status and last run times
+(All P2 features from previous sessions have been implemented.)
 
 ---
 
 ## Architecture Notes
 
-- **No new architectural patterns** — all features use established patterns (config service, admin panels, in-memory state, fire-and-forget)
-- Alert cooldown is in-memory (resets on server restart) — acceptable because first post-restart alert is always useful
-- pg_cron functions now read from `app_settings` dynamically — no server restart needed to change retention
-- `ConfigCategory` type extended to `'monitoring' | 'retention'` — follows same pattern as `'ai'`, `'evaluation'`, etc.
+- **No new architectural patterns** — The Cron Jobs API and Historical Trends implementation extend the existing `admin/monitoring.ts` controller layer and established React querying idioms. Using `pg_cron` secure views is consistent with previous `app_settings` and metric dashboard strategies. 
+- A new library `date-fns` was introduced temporarily to simplify manual date aggregation on the frontend for Cron Jobs, and `recharts` was brought in explicitly for the Historical Trend chart.
+- CSV export endpoints bypass pagination arrays by stripping limit params, sending native `text/csv` through `res.attachment()`.
 
 ---
 
@@ -113,4 +128,5 @@ No new env vars needed for this session's features.
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
 | Feb 26 late | Extraction health alerting, configurable retention, Benchmark UI builds | `claude/load-project-context-6D3KI` |
-| **Feb 26 (Now)** | **Production Extraction Health Verification, App_Settings Debugging, E2E Rollout** | **`gemini20260226`** |
+| Feb 26 (Now) | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
+| **Feb 26 (Latest)** | **Historical Trend Charts, CSV Export, Cron Job Monitoring** | **`feat/admin-monitoring-extras`** |

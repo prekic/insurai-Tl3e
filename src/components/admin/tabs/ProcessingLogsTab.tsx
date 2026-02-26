@@ -323,15 +323,38 @@ export function ProcessingLogsTab() {
     setPage(0)
   }
 
-  const exportLogs = () => {
-    const dataStr = JSON.stringify(logs, null, 2)
-    const blob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `processing-logs-${new Date().toISOString().split('T')[0]}.json`
-    a.click()
-    URL.revokeObjectURL(url)
+  const exportLogs = async () => {
+    try {
+      const params = new URLSearchParams()
+      if (filters.status) params.set('status', filters.status)
+      if (filters.ocr_used) params.set('ocr_used', filters.ocr_used)
+      if (filters.ai_provider) params.set('ai_provider', filters.ai_provider)
+      if (filters.search) params.set('search', filters.search)
+      if (filters.from_date) params.set('from_date', filters.from_date)
+      if (filters.to_date) params.set('to_date', filters.to_date)
+
+      // Must bypass fetch JSON parsing for blob download
+      const response = await fetch(`/api/admin/processing-logs/export?${params.toString()}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('adminToken')}`,
+        },
+      })
+
+      if (!response.ok) throw new Error('Export failed')
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `processing_logs_${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError('Failed to export logs as CSV')
+      console.error(err)
+    }
   }
 
   const toggleSelect = (documentId: string) => {

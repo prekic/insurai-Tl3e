@@ -99,6 +99,93 @@ router.get(
 )
 
 /**
+ * Export processing logs as CSV
+ * GET /api/admin/processing-logs/export
+ */
+router.get(
+  '/processing-logs/export',
+  authenticateAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { status, ocr_used, ai_provider, from_date, to_date, search } = req.query
+
+      const filters = {
+        status: status as string | undefined,
+        ocr_used: ocr_used === 'true' ? true : ocr_used === 'false' ? false : undefined,
+        ai_provider: ai_provider as string | undefined,
+        from_date: from_date as string | undefined,
+        to_date: to_date as string | undefined,
+        search: search as string | undefined,
+        limit: 10000, // Large reasonable limit for export
+        offset: 0,
+      }
+
+      const result = await processingLogService.listProcessingLogs(filters)
+
+      // Convert to CSV
+      const headers = [
+        'ID',
+        'Document ID',
+        'Status',
+        'Upload Type',
+        'File Name',
+        'File Size',
+        'MIME Type',
+        'AI Provider',
+        'AI Model',
+        'OCR Used',
+        'Duration MS',
+        'Error',
+        'Created At',
+      ]
+
+      const escapeCSV = (value: string | null | undefined): string => {
+        if (!value) return ''
+        const str = String(value)
+        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+          return `"${str.replace(/"/g, '""')}"`
+        }
+        return str
+      }
+
+      const rows = result.logs.map((log) => [
+        log.id,
+        log.document_id,
+        log.status,
+        log.upload_type,
+        log.file_name,
+        log.file_size,
+        log.mime_type,
+        log.ai_provider,
+        log.ai_model,
+        log.ocr_used,
+        log.duration_ms,
+        log.error_message,
+        log.created_at,
+      ])
+
+      const csvContent = [
+        headers.map(escapeCSV).join(','),
+        ...rows.map((row) => row.map(escapeCSV).join(',')),
+      ].join('\n')
+
+      const bom = '\uFEFF'
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="processing_logs_${new Date().toISOString().split('T')[0]}.csv"`
+      )
+      res.send(bom + csvContent)
+    } catch (error) {
+      log.error('Failed to export processing logs', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Failed to export processing logs' })
+    }
+  }
+)
+
+/**
  * Delete selected processing logs
  * DELETE /api/admin/processing-logs
  * Body: { ids: string[] } or { all: true, status?: string, before_date?: string }
