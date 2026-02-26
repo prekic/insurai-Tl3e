@@ -32,7 +32,7 @@ CREATE INDEX IF NOT EXISTS idx_extraction_metrics_provider_created
 
 -- Schedule daily cleanup: delete records older than 30 days
 -- Uses pg_cron (enabled in migration 022)
-DO $$
+DO $do$
 BEGIN
   -- Only create the cron job if pg_cron extension is available
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
@@ -46,6 +46,6 @@ EXCEPTION
   WHEN others THEN
     RAISE NOTICE 'pg_cron not available, skipping cleanup schedule';
 END;
-$$;
+$do$;
 
 COMMENT ON TABLE public.extraction_metrics IS 'Persistent storage for AI extraction events. Auto-cleaned after 30 days via pg_cron.';

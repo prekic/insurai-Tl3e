@@ -6,7 +6,7 @@
 --
 -- Idempotent: safe to run multiple times.
 
-DO $$
+DO $do$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     PERFORM cron.schedule(
@@ -23,4 +23,4 @@ EXCEPTION
   WHEN others THEN
     RAISE NOTICE 'pg_cron not available or scheduling failed, skipping processing log cleanup schedule: %', SQLERRM;
 END;
-$$;
+$do$;
