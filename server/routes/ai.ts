@@ -48,6 +48,8 @@ import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
 import { captureServerError } from '../lib/sentry.js'
 import { persistExtractionEvent } from '../services/extraction-metrics-service.js'
+import { evaluateAndDispatchAlerts } from '../services/extraction-alert-service.js'
+import { getMonitoringConfig } from '../services/config-service.js'
 
 const router = Router()
 
@@ -68,6 +70,9 @@ interface ExtractionEvent {
 const EXTRACTION_BUFFER_SIZE = 200
 const extractionMetrics: ExtractionEvent[] = []
 
+// Alert check throttling — at most once per 5 minutes
+let lastAlertCheckTime = 0
+
 function recordExtractionEvent(event: ExtractionEvent): void {
   extractionMetrics.push(event)
   if (extractionMetrics.length > EXTRACTION_BUFFER_SIZE) {
@@ -87,6 +92,20 @@ function recordExtractionEvent(event: ExtractionEvent): void {
       error: err instanceof Error ? err.message : String(err),
     })
   )
+
+  // Throttled alert check — at most once per checkIntervalMs (5min fallback)
+  const now = Date.now()
+  if (now - lastAlertCheckTime > 300000) {
+    lastAlertCheckTime = now
+    // Fire-and-forget: get snapshot + config, then evaluate
+    Promise.all([getExtractionHealthSnapshot(), getMonitoringConfig()])
+      .then(([snapshot, config]) => evaluateAndDispatchAlerts(snapshot, config))
+      .catch((err) =>
+        log.warn('Alert dispatch failed', {
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
+  }
 }
 
 /** Exported for the admin monitoring endpoint */

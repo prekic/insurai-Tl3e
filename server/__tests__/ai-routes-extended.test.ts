@@ -102,6 +102,20 @@ vi.mock('../lib/logger.js', () => {
 // Mock config service
 vi.mock('../services/config-service.js', () => ({
   getAIConfig: (...args: unknown[]) => mockGetAIConfig(...args),
+  getMonitoringConfig: vi.fn().mockResolvedValue({
+    errorRateWarningThreshold: 0.05,
+    errorRateCriticalThreshold: 0.2,
+    avgLatencyCriticalMs: 12000,
+    checkIntervalMs: 300000,
+    alertCooldownMinutes: 15,
+    enableEmailAlerts: false,
+    alertEmailAddresses: '',
+  }),
+}))
+
+// Mock extraction alert service
+vi.mock('../services/extraction-alert-service.js', () => ({
+  evaluateAndDispatchAlerts: vi.fn().mockResolvedValue(undefined),
 }))
 
 // Mock prompt service
@@ -171,10 +185,10 @@ const DEFAULT_AI_CONFIG = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -215,7 +229,14 @@ const VALID_POLICY_JSON = JSON.stringify({
   policyType: 'kasko',
   premium: 5000,
   coverages: [],
-  confidence: { overall: 0.9, policyNumber: 1.0, provider: 1.0, dates: 0.8, premium: 0.9, coverages: 0.85 },
+  confidence: {
+    overall: 0.9,
+    policyNumber: 1.0,
+    provider: 1.0,
+    dates: 0.8,
+    premium: 0.9,
+    coverages: 0.85,
+  },
 })
 
 // Store original env
@@ -273,12 +294,10 @@ describe('AI Routes Extended', () => {
     it('uses client-provided system prompt when present', async () => {
       mockOpenAICreate.mockResolvedValue(makeOpenAIResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/openai')
-        .send({
-          documentText: 'Test document with JSON data.',
-          systemPrompt: 'Custom extraction prompt with json output.',
-        })
+      await request(app).post('/api/ai/extract/openai').send({
+        documentText: 'Test document with JSON data.',
+        systemPrompt: 'Custom extraction prompt with json output.',
+      })
 
       expect(mockOpenAICreate).toHaveBeenCalled()
       const callArgs = mockOpenAICreate.mock.calls[0][0]
@@ -294,9 +313,7 @@ describe('AI Routes Extended', () => {
       })
       mockOpenAICreate.mockResolvedValue(makeOpenAIResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/openai')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/openai').send({ documentText: 'Test document.' })
 
       const callArgs = mockOpenAICreate.mock.calls[0][0]
       expect(callArgs.messages[0].content).toContain('Admin system prompt')
@@ -524,9 +541,7 @@ describe('AI Routes Extended', () => {
     it('uses ANTHROPIC_SCHEMA_PROMPT as system prompt', async () => {
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
       expect(callArgs.system).toContain('expert insurance policy analyzer')
@@ -537,14 +552,12 @@ describe('AI Routes Extended', () => {
     it('uses confidence weights from config in schema prompt', async () => {
       mockGetAIConfig.mockResolvedValue({
         ...DEFAULT_AI_CONFIG,
-        confidenceWeightPolicyNumber: 0.30,
+        confidenceWeightPolicyNumber: 0.3,
         confidenceWeightCoverages: 0.35,
       })
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
       expect(callArgs.system).toContain('policyNumber: weight 30%')
@@ -554,12 +567,10 @@ describe('AI Routes Extended', () => {
     it('prepends schema when client provides custom prompt', async () => {
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({
-          documentText: 'Test document.',
-          systemPrompt: 'Custom instructions for extraction.',
-        })
+      await request(app).post('/api/ai/extract/anthropic').send({
+        documentText: 'Test document.',
+        systemPrompt: 'Custom instructions for extraction.',
+      })
 
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
       // System should be the schema prompt
@@ -578,9 +589,7 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
       // System should be the schema prompt (not admin system prompt)
@@ -590,7 +599,10 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns 500 with EMPTY_RESPONSE for empty Anthropic response', async () => {
-      mockAnthropicCreate.mockResolvedValue({ content: [], usage: { input_tokens: 10, output_tokens: 0 } })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [],
+        usage: { input_tokens: 10, output_tokens: 0 },
+      })
 
       const res = await request(app)
         .post('/api/ai/extract/anthropic')
@@ -669,9 +681,7 @@ describe('AI Routes Extended', () => {
     it('notifies admin on billing errors', async () => {
       mockAnthropicCreate.mockRejectedValue(new Error('credit balance insufficient'))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
       expect(mockNotifyBillingIssue).toHaveBeenCalledWith(
         'Anthropic',
@@ -683,22 +693,15 @@ describe('AI Routes Extended', () => {
     it('notifies admin on rate limit errors', async () => {
       mockAnthropicCreate.mockRejectedValue(new Error('429 rate_limit'))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
-      expect(mockNotifyRateLimit).toHaveBeenCalledWith(
-        'Anthropic',
-        expect.any(Object)
-      )
+      expect(mockNotifyRateLimit).toHaveBeenCalledWith('Anthropic', expect.any(Object))
     })
 
     it('notifies admin on auth errors', async () => {
       mockAnthropicCreate.mockRejectedValue(new Error('401 Invalid API Key'))
 
-      await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract/anthropic').send({ documentText: 'Test document.' })
 
       expect(mockNotifyAPIError).toHaveBeenCalledWith(
         'Anthropic',
@@ -851,9 +854,7 @@ describe('AI Routes Extended', () => {
       mockAnthropicCreate.mockRejectedValue(new Error('Anthropic down'))
       mockOpenAICreate.mockRejectedValue(new Error('insufficient_quota'))
 
-      await request(app)
-        .post('/api/ai/extract')
-        .send({ documentText: 'Test policy document.' })
+      await request(app).post('/api/ai/extract').send({ documentText: 'Test policy document.' })
 
       expect(mockNotifyBillingIssue).toHaveBeenCalledWith(
         'OpenAI',
@@ -885,10 +886,7 @@ describe('AI Routes Extended', () => {
         .post('/api/ai/extract')
         .send({ documentText: 'Test policy document with json.' })
 
-      expect(mockNotifyRateLimit).toHaveBeenCalledWith(
-        'Anthropic',
-        expect.any(Object)
-      )
+      expect(mockNotifyRateLimit).toHaveBeenCalledWith('Anthropic', expect.any(Object))
     })
 
     it('notifies admin about Anthropic auth error on fallback', async () => {
@@ -921,7 +919,10 @@ describe('AI Routes Extended', () => {
     })
 
     it('falls back when Anthropic returns empty response', async () => {
-      mockAnthropicCreate.mockResolvedValue({ content: [], usage: { input_tokens: 10, output_tokens: 0 } })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [],
+        usage: { input_tokens: 10, output_tokens: 0 },
+      })
       mockOpenAICreate.mockResolvedValue(makeOpenAIResponse(VALID_POLICY_JSON))
 
       const res = await request(app)
@@ -972,12 +973,10 @@ describe('AI Routes Extended', () => {
     it('uses client-provided prompt in unified endpoint', async () => {
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract')
-        .send({
-          documentText: 'Test document.',
-          systemPrompt: 'Custom unified prompt.',
-        })
+      await request(app).post('/api/ai/extract').send({
+        documentText: 'Test document.',
+        systemPrompt: 'Custom unified prompt.',
+      })
 
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
       expect(callArgs.messages[0].content).toBe('Test document.')
@@ -992,9 +991,7 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue(makeAnthropicResponse(VALID_POLICY_JSON))
 
-      await request(app)
-        .post('/api/ai/extract')
-        .send({ documentText: 'Test document.' })
+      await request(app).post('/api/ai/extract').send({ documentText: 'Test document.' })
 
       // Anthropic uses the admin user prompt
       const callArgs = mockAnthropicCreate.mock.calls[0][0]
@@ -1064,9 +1061,7 @@ describe('AI Routes Extended', () => {
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       })
 
-      await request(app)
-        .post('/api/ai/chat')
-        .send({ message: 'Test', provider: 'openai' })
+      await request(app).post('/api/ai/chat').send({ message: 'Test', provider: 'openai' })
 
       const callArgs = mockOpenAICreate.mock.calls[0][0]
       expect(callArgs.messages[0].content).toContain('Admin chat prompt')
@@ -1078,9 +1073,7 @@ describe('AI Routes Extended', () => {
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       })
 
-      await request(app)
-        .post('/api/ai/chat')
-        .send({ message: 'Test', provider: 'openai' })
+      await request(app).post('/api/ai/chat').send({ message: 'Test', provider: 'openai' })
 
       const callArgs = mockOpenAICreate.mock.calls[0][0]
       expect(callArgs.messages[0].content).toContain('expert insurance policy assistant')
@@ -1092,13 +1085,11 @@ describe('AI Routes Extended', () => {
         usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
       })
 
-      await request(app)
-        .post('/api/ai/chat')
-        .send({
-          message: 'Tell me about my policy',
-          policyContext: 'Policy: POL-001\nProvider: Allianz',
-          provider: 'openai',
-        })
+      await request(app).post('/api/ai/chat').send({
+        message: 'Tell me about my policy',
+        policyContext: 'Policy: POL-001\nProvider: Allianz',
+        provider: 'openai',
+      })
 
       const callArgs = mockOpenAICreate.mock.calls[0][0]
       expect(callArgs.messages[0].content).toContain('POL-001')
@@ -1209,7 +1200,10 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns EMPTY_RESPONSE for empty Anthropic chat response', async () => {
-      mockAnthropicCreate.mockResolvedValue({ content: [], usage: { input_tokens: 5, output_tokens: 0 } })
+      mockAnthropicCreate.mockResolvedValue({
+        content: [],
+        usage: { input_tokens: 5, output_tokens: 0 },
+      })
 
       const res = await request(app)
         .post('/api/ai/chat')
@@ -1270,9 +1264,7 @@ describe('AI Routes Extended', () => {
         model: 'gpt-4o-mini',
       })
 
-      await request(app)
-        .post('/api/ai/chat')
-        .send({ message: 'Test', provider: 'openai' })
+      await request(app).post('/api/ai/chat').send({ message: 'Test', provider: 'openai' })
 
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1289,9 +1281,7 @@ describe('AI Routes Extended', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      await request(app)
-        .post('/api/ai/chat')
-        .send({ message: 'Test', provider: 'anthropic' })
+      await request(app).post('/api/ai/chat').send({ message: 'Test', provider: 'anthropic' })
 
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -1320,9 +1310,7 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns 400 for missing message', async () => {
-      const res = await request(app)
-        .post('/api/ai/chat')
-        .send({})
+      const res = await request(app).post('/api/ai/chat').send({})
 
       expect(res.status).toBe(400)
     })
@@ -1572,9 +1560,7 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns 400 for missing document_id', async () => {
-      const res = await request(app)
-        .post('/api/ai/processing-log')
-        .send({ filename: 'test.pdf' })
+      const res = await request(app).post('/api/ai/processing-log').send({ filename: 'test.pdf' })
 
       expect(res.status).toBe(400)
       expect(res.body.success).toBe(false)
@@ -1582,9 +1568,7 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns 400 for missing filename', async () => {
-      const res = await request(app)
-        .post('/api/ai/processing-log')
-        .send({ document_id: 'doc-1' })
+      const res = await request(app).post('/api/ai/processing-log').send({ document_id: 'doc-1' })
 
       expect(res.status).toBe(400)
       expect(res.body.success).toBe(false)
@@ -1775,27 +1759,21 @@ describe('AI Routes Extended', () => {
     })
 
     it('returns 400 for missing documentText on extract/openai', async () => {
-      const res = await request(app)
-        .post('/api/ai/extract/openai')
-        .send({})
+      const res = await request(app).post('/api/ai/extract/openai').send({})
 
       expect(res.status).toBe(400)
       expect(res.body.code).toBe('VALIDATION_ERROR')
     })
 
     it('returns 400 for empty documentText on extract/anthropic', async () => {
-      const res = await request(app)
-        .post('/api/ai/extract/anthropic')
-        .send({ documentText: '' })
+      const res = await request(app).post('/api/ai/extract/anthropic').send({ documentText: '' })
 
       expect(res.status).toBe(400)
       expect(res.body.code).toBe('VALIDATION_ERROR')
     })
 
     it('returns 400 for missing documentText on unified extract', async () => {
-      const res = await request(app)
-        .post('/api/ai/extract')
-        .send({})
+      const res = await request(app).post('/api/ai/extract').send({})
 
       expect(res.status).toBe(400)
       expect(res.body.code).toBe('VALIDATION_ERROR')
@@ -1806,7 +1784,9 @@ describe('AI Routes Extended', () => {
 
       const res = await request(app)
         .post('/api/ai/extract/openai')
-        .send({ documentText: 'Kasko Sigortas\u0131 - \u0130stanbul \u015Ei\u015Fli - JSON format' })
+        .send({
+          documentText: 'Kasko Sigortas\u0131 - \u0130stanbul \u015Ei\u015Fli - JSON format',
+        })
 
       expect([200, 503]).toContain(res.status)
     })

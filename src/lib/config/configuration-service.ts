@@ -25,6 +25,8 @@ import type {
   GapAnalysisConfig,
   UIConfig,
   EmailConfig,
+  MonitoringConfig,
+  RetentionConfig,
   FeatureFlag,
   RegionalFactor,
   InsuranceProvider,
@@ -32,7 +34,7 @@ import type {
 } from './types'
 
 // Helper to dynamically import supabase to avoid eager loading in the main bundle
-const getSupabase = () => import('@/lib/supabase/client').then(m => m.supabase)
+const getSupabase = () => import('@/lib/supabase/client').then((m) => m.supabase)
 
 import {
   DEFAULT_AI_CONFIG,
@@ -43,6 +45,8 @@ import {
   DEFAULT_GAP_ANALYSIS_CONFIG,
   DEFAULT_UI_CONFIG,
   DEFAULT_EMAIL_CONFIG,
+  DEFAULT_MONITORING_CONFIG,
+  DEFAULT_RETENTION_CONFIG,
 } from './types'
 
 import { configPerformanceMonitor } from './config-performance-monitor'
@@ -218,6 +222,21 @@ const EMAIL_KEY_MAP: Record<string, keyof EmailConfig> = {
   default_marketing_enabled: 'defaultMarketingEnabled',
   default_reminders_enabled: 'defaultRemindersEnabled',
   default_digest_enabled: 'defaultDigestEnabled',
+}
+
+const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
+  error_rate_warning_threshold: 'errorRateWarningThreshold',
+  error_rate_critical_threshold: 'errorRateCriticalThreshold',
+  avg_latency_critical_ms: 'avgLatencyCriticalMs',
+  check_interval_ms: 'checkIntervalMs',
+  alert_cooldown_minutes: 'alertCooldownMinutes',
+  enable_email_alerts: 'enableEmailAlerts',
+  alert_email_addresses: 'alertEmailAddresses',
+}
+
+const RETENTION_KEY_MAP: Record<string, keyof RetentionConfig> = {
+  processing_log_retention_days: 'processingLogRetentionDays',
+  extraction_metrics_retention_days: 'extractionMetricsRetentionDays',
 }
 
 // =============================================================================
@@ -436,7 +455,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(AI_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -452,7 +471,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(EVALUATION_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -468,7 +487,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(RATE_LIMITS_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -484,7 +503,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(OCR_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -500,7 +519,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(FUZZY_MATCHING_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -516,7 +535,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(GAP_ANALYSIS_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -532,7 +551,7 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(UI_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -548,7 +567,39 @@ export class ConfigurationService {
 
     for (const [dbKey, tsKey] of Object.entries(EMAIL_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
-        ; (config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Get monitoring configuration with defaults
+   */
+  async getMonitoringConfig(): Promise<MonitoringConfig> {
+    const dbSettings = await this.getCategory('monitoring')
+    const config = { ...DEFAULT_MONITORING_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(MONITORING_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Get retention configuration with defaults
+   */
+  async getRetentionConfig(): Promise<RetentionConfig> {
+    const dbSettings = await this.getCategory('retention')
+    const config = { ...DEFAULT_RETENTION_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(RETENTION_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
       }
     }
 
@@ -727,7 +778,10 @@ export class ConfigurationService {
    */
   async getFeatureFlags(): Promise<FeatureFlag[]> {
     try {
-      const { data, error } = await (await getSupabase()).from('feature_flags').select('*').order('key')
+      const { data, error } = await (await getSupabase())
+        .from('feature_flags')
+        .select('*')
+        .order('key')
 
       if (error || !data) {
         return []
@@ -1093,10 +1147,7 @@ export async function isFeatureEnabled(flagKey: string, userId?: string): Promis
 /**
  * Get regional risk factor (convenience function)
  */
-export async function getRegionalFactor(
-  regionCode: string,
-  policyType?: string
-): Promise<number> {
+export async function getRegionalFactor(regionCode: string, policyType?: string): Promise<number> {
   return configService.getRegionalFactor(regionCode, policyType)
 }
 
@@ -1112,4 +1163,18 @@ export async function getUIConfigForUser(userId: string): Promise<UIConfig> {
  */
 export async function getEmailConfigForUser(userId: string): Promise<EmailConfig> {
   return configService.getEmailConfigForUser(userId)
+}
+
+/**
+ * Get monitoring configuration (convenience function)
+ */
+export async function getMonitoringConfig(): Promise<MonitoringConfig> {
+  return configService.getMonitoringConfig()
+}
+
+/**
+ * Get retention configuration (convenience function)
+ */
+export async function getRetentionConfig(): Promise<RetentionConfig> {
+  return configService.getRetentionConfig()
 }

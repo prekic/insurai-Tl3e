@@ -24,6 +24,8 @@ import {
   Layers,
   Webhook,
   GitCompareArrows,
+  Bell,
+  Clock,
 } from 'lucide-react'
 
 // Sub-panels
@@ -37,8 +39,22 @@ import { ConfigPerformancePanel } from './settings/ConfigPerformancePanel'
 import { SettingsTemplatesPanel } from './settings/SettingsTemplatesPanel'
 import { SettingsWebhooksPanel } from './settings/SettingsWebhooksPanel'
 import { ConfigDriftPanel } from './settings/ConfigDriftPanel'
+import { MonitoringAlertsPanel } from './settings/MonitoringAlertsPanel'
+import { RetentionSettingsPanel } from './settings/RetentionSettingsPanel'
 
-type SettingsCategory = 'ai' | 'evaluation' | 'rate_limits' | 'ocr' | 'feature_flags' | 'history' | 'performance' | 'templates' | 'webhooks' | 'drift'
+type SettingsCategory =
+  | 'ai'
+  | 'evaluation'
+  | 'rate_limits'
+  | 'ocr'
+  | 'feature_flags'
+  | 'monitoring'
+  | 'retention'
+  | 'history'
+  | 'performance'
+  | 'templates'
+  | 'webhooks'
+  | 'drift'
 
 interface CategoryConfig {
   id: SettingsCategory
@@ -77,6 +93,18 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Feature Flags',
     description: 'Enable or disable features and manage rollouts',
     icon: <Sliders className="h-5 w-5" />,
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring & Alerts',
+    description: 'Alert thresholds and notification settings',
+    icon: <Bell className="h-5 w-5" />,
+  },
+  {
+    id: 'retention',
+    label: 'Data Retention',
+    description: 'Cleanup schedules and retention periods',
+    icon: <Clock className="h-5 w-5" />,
   },
   {
     id: 'history',
@@ -153,7 +181,7 @@ export function SettingsTab() {
     setError(null)
     try {
       // Fetch settings for all categories
-      const categories = ['ai', 'evaluation', 'rate_limits', 'ocr']
+      const categories = ['ai', 'evaluation', 'rate_limits', 'ocr', 'monitoring', 'retention']
       const responses = await Promise.all(
         categories.map((cat) => adminFetch(`/api/admin/settings/${cat}`))
       )
@@ -198,9 +226,7 @@ export function SettingsTab() {
         // Update local state
         setSettings((prev) => ({
           ...prev,
-          [category]: prev[category]?.map((s) =>
-            s.key === key ? { ...s, value } : s
-          ) || [],
+          [category]: prev[category]?.map((s) => (s.key === key ? { ...s, value } : s)) || [],
         }))
         setSuccessMessage(`Setting "${key}" updated successfully`)
         setTimeout(() => setSuccessMessage(null), 3000)
@@ -435,6 +461,36 @@ export function SettingsTab() {
             isSaving={isSaving}
           />
         )
+      case 'monitoring':
+        return (
+          <MonitoringAlertsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('monitoring', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'monitoring' })),
+                reason
+              )
+            }
+            isLoading={isLoading}
+            isSaving={isSaving}
+          />
+        )
+      case 'retention':
+        return (
+          <RetentionSettingsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('retention', key, value, reason)}
+            onBatchUpdate={(updates, reason) =>
+              batchUpdateSettings(
+                updates.map((u) => ({ ...u, category: 'retention' })),
+                reason
+              )
+            }
+            isLoading={isLoading}
+            isSaving={isSaving}
+          />
+        )
       case 'feature_flags':
         return <FeatureFlagsPanel />
       case 'history':
@@ -543,7 +599,11 @@ export function SettingsTab() {
 
       {/* Import Dialog */}
       {showImportDialog && importPreview && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-label="Import configuration">
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+          role="dialog"
+          aria-label="Import configuration"
+        >
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
@@ -551,7 +611,11 @@ export function SettingsTab() {
                   <FileWarning className="h-5 w-5 text-amber-500" />
                   Import Configuration
                 </h2>
-                <button onClick={closeImportDialog} className="text-gray-400 hover:text-gray-600" aria-label="Close dialog">
+                <button
+                  onClick={closeImportDialog}
+                  className="text-gray-400 hover:text-gray-600"
+                  aria-label="Close dialog"
+                >
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -568,11 +632,15 @@ export function SettingsTab() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Exported</span>
-                      <span className="font-medium">{new Date(importPreview.exportedAt as string).toLocaleString()}</span>
+                      <span className="font-medium">
+                        {new Date(importPreview.exportedAt as string).toLocaleString()}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">By</span>
-                      <span className="font-medium">{(importPreview.exportedBy as string) || 'Unknown'}</span>
+                      <span className="font-medium">
+                        {(importPreview.exportedBy as string) || 'Unknown'}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Version</span>
@@ -586,25 +654,33 @@ export function SettingsTab() {
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       {importPreview.settings != null && (
                         <div className="bg-blue-50 rounded px-3 py-2">
-                          <span className="text-blue-700 font-medium">{Object.keys(importPreview.settings as object).length}</span>
+                          <span className="text-blue-700 font-medium">
+                            {Object.keys(importPreview.settings as object).length}
+                          </span>
                           <span className="text-blue-600 ml-1">setting categories</span>
                         </div>
                       )}
                       {Array.isArray(importPreview.featureFlags) && (
                         <div className="bg-purple-50 rounded px-3 py-2">
-                          <span className="text-purple-700 font-medium">{(importPreview.featureFlags as unknown[]).length}</span>
+                          <span className="text-purple-700 font-medium">
+                            {(importPreview.featureFlags as unknown[]).length}
+                          </span>
                           <span className="text-purple-600 ml-1">feature flags</span>
                         </div>
                       )}
                       {Array.isArray(importPreview.regionalFactors) && (
                         <div className="bg-green-50 rounded px-3 py-2">
-                          <span className="text-green-700 font-medium">{(importPreview.regionalFactors as unknown[]).length}</span>
+                          <span className="text-green-700 font-medium">
+                            {(importPreview.regionalFactors as unknown[]).length}
+                          </span>
                           <span className="text-green-600 ml-1">regional factors</span>
                         </div>
                       )}
                       {Array.isArray(importPreview.providers) && (
                         <div className="bg-orange-50 rounded px-3 py-2">
-                          <span className="text-orange-700 font-medium">{(importPreview.providers as unknown[]).length}</span>
+                          <span className="text-orange-700 font-medium">
+                            {(importPreview.providers as unknown[]).length}
+                          </span>
                           <span className="text-orange-600 ml-1">providers</span>
                         </div>
                       )}
@@ -615,7 +691,9 @@ export function SettingsTab() {
                   <div className="space-y-2">
                     <h3 className="text-sm font-medium text-gray-700">Import Mode</h3>
                     <div className="space-y-2">
-                      <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'merge' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'merge' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
                         <input
                           type="radio"
                           name="importMode"
@@ -626,10 +704,15 @@ export function SettingsTab() {
                         />
                         <div>
                           <div className="font-medium text-sm">Merge</div>
-                          <div className="text-xs text-gray-500">Only update settings that exist in both backup and database. Safest option.</div>
+                          <div className="text-xs text-gray-500">
+                            Only update settings that exist in both backup and database. Safest
+                            option.
+                          </div>
                         </div>
                       </label>
-                      <label className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'overwrite' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'}`}>
+                      <label
+                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${importMode === 'overwrite' ? 'border-amber-500 bg-amber-50' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
                         <input
                           type="radio"
                           name="importMode"
@@ -640,7 +723,10 @@ export function SettingsTab() {
                         />
                         <div>
                           <div className="font-medium text-sm">Overwrite</div>
-                          <div className="text-xs text-gray-500">Replace all values with backup values. Read-only settings are still protected.</div>
+                          <div className="text-xs text-gray-500">
+                            Replace all values with backup values. Read-only settings are still
+                            protected.
+                          </div>
                         </div>
                       </label>
                     </div>
@@ -649,7 +735,10 @@ export function SettingsTab() {
                   {importMode === 'overwrite' && (
                     <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg text-sm flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span>Overwrite mode will replace current values. An audit trail will be created for every change.</span>
+                      <span>
+                        Overwrite mode will replace current values. An audit trail will be created
+                        for every change.
+                      </span>
                     </div>
                   )}
                 </>
@@ -657,13 +746,19 @@ export function SettingsTab() {
                 /* Import Results */
                 <div className="space-y-4">
                   {/* Summary */}
-                  <div className={`rounded-lg p-4 text-center ${importResult.summary.totalErrors > 0 ? 'bg-amber-50' : 'bg-green-50'}`}>
-                    <div className="text-2xl font-bold text-gray-900">{importResult.summary.totalUpdated}</div>
+                  <div
+                    className={`rounded-lg p-4 text-center ${importResult.summary.totalErrors > 0 ? 'bg-amber-50' : 'bg-green-50'}`}
+                  >
+                    <div className="text-2xl font-bold text-gray-900">
+                      {importResult.summary.totalUpdated}
+                    </div>
                     <div className="text-sm text-gray-600">settings updated</div>
                     <div className="flex justify-center gap-4 mt-2 text-xs text-gray-500">
                       <span>{importResult.summary.totalSkipped} unchanged</span>
                       {importResult.summary.totalErrors > 0 && (
-                        <span className="text-red-600">{importResult.summary.totalErrors} errors</span>
+                        <span className="text-red-600">
+                          {importResult.summary.totalErrors} errors
+                        </span>
                       )}
                     </div>
                   </div>
@@ -674,15 +769,23 @@ export function SettingsTab() {
                     if (r.updated === 0 && r.skipped === 0 && r.errors.length === 0) return null
                     return (
                       <div key={section} className="text-sm">
-                        <div className="font-medium text-gray-700 mb-1 capitalize">{section.replace(/([A-Z])/g, ' $1').trim()}</div>
+                        <div className="font-medium text-gray-700 mb-1 capitalize">
+                          {section.replace(/([A-Z])/g, ' $1').trim()}
+                        </div>
                         <div className="flex gap-3 text-xs text-gray-500">
-                          {r.updated > 0 && <span className="text-green-600">{r.updated} updated</span>}
+                          {r.updated > 0 && (
+                            <span className="text-green-600">{r.updated} updated</span>
+                          )}
                           {r.skipped > 0 && <span>{r.skipped} skipped</span>}
-                          {r.errors.length > 0 && <span className="text-red-600">{r.errors.length} errors</span>}
+                          {r.errors.length > 0 && (
+                            <span className="text-red-600">{r.errors.length} errors</span>
+                          )}
                         </div>
                         {r.errors.length > 0 && (
                           <ul className="mt-1 text-xs text-red-600 list-disc list-inside">
-                            {r.errors.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
+                            {r.errors.slice(0, 5).map((e, i) => (
+                              <li key={i}>{e}</li>
+                            ))}
                             {r.errors.length > 5 && <li>...and {r.errors.length - 5} more</li>}
                           </ul>
                         )}

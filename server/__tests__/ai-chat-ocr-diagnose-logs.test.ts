@@ -96,6 +96,20 @@ vi.mock('../lib/logger.js', () => {
 
 vi.mock('../services/config-service.js', () => ({
   getAIConfig: (...args: unknown[]) => mockGetAIConfig(...args),
+  getMonitoringConfig: vi.fn().mockResolvedValue({
+    errorRateWarningThreshold: 0.05,
+    errorRateCriticalThreshold: 0.2,
+    avgLatencyCriticalMs: 12000,
+    checkIntervalMs: 300000,
+    alertCooldownMinutes: 15,
+    enableEmailAlerts: false,
+    alertEmailAddresses: '',
+  }),
+}))
+
+// Mock extraction alert service
+vi.mock('../services/extraction-alert-service.js', () => ({
+  evaluateAndDispatchAlerts: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/prompt-service.js', () => ({
@@ -122,7 +136,11 @@ vi.mock('../services/processing-log-service.js', () => ({
 }))
 
 vi.mock('../schemas/extraction-schema.js', () => ({
-  EXTRACTION_JSON_SCHEMA: { name: 'policy_extraction', strict: true, schema: { type: 'object', properties: {} } },
+  EXTRACTION_JSON_SCHEMA: {
+    name: 'policy_extraction',
+    strict: true,
+    schema: { type: 'object', properties: {} },
+  },
 }))
 
 vi.mock('fs', async () => {
@@ -154,10 +172,10 @@ const DEFAULT_AI_CONFIG = {
   consensusEnabled: false,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -192,7 +210,8 @@ const FAKE_SERVICE_ACCOUNT = JSON.stringify({
   type: 'service_account',
   project_id: 'test-project',
   private_key_id: 'key-id',
-  private_key: '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0123\n-----END RSA PRIVATE KEY-----',
+  private_key:
+    '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0123\n-----END RSA PRIVATE KEY-----',
   client_email: 'test@test-project.iam.gserviceaccount.com',
   client_id: '123456789',
   auth_uri: 'https://accounts.google.com/o/oauth2/auth',
@@ -351,7 +370,14 @@ describe('AI Routes — GCP Credential Paths, Service Account OCR & Providers', 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
           JSON.stringify({
-            responses: [{ fullTextAnnotation: { text: 'Poliçe No: 123', pages: [{ blocks: [{ confidence: 0.95 }] }] } }],
+            responses: [
+              {
+                fullTextAnnotation: {
+                  text: 'Poliçe No: 123',
+                  pages: [{ blocks: [{ confidence: 0.95 }] }],
+                },
+              },
+            ],
           }),
           { status: 200 }
         )

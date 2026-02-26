@@ -16,6 +16,7 @@ import {
 } from './shared.js'
 import type { AuthenticatedRequest } from './shared.js'
 import { getExtractionHealthSnapshot } from '../ai.js'
+import { getAlertState } from '../../services/extraction-alert-service.js'
 
 const log = logger.child('AdminMonitoring')
 const router = Router()
@@ -405,6 +406,30 @@ router.post(
         error: error instanceof Error ? error.message : String(error),
       })
       res.status(500).json({ success: false, error: 'Failed to resolve alert' })
+    }
+  }
+)
+
+// ============================================================================
+// EXTRACTION ALERT COOLDOWN STATUS
+// ============================================================================
+
+/**
+ * Get extraction alert cooldown state
+ * GET /api/admin/monitoring/alerts/status
+ */
+router.get(
+  '/monitoring/alerts/status',
+  authenticateAdmin,
+  (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const alertState = getAlertState()
+      res.json({ success: true, data: { lastFired: alertState } })
+    } catch (error) {
+      log.error('Failed to get alert status', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Internal server error' })
     }
   }
 )

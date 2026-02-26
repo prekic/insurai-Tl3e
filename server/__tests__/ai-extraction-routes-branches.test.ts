@@ -89,6 +89,20 @@ vi.mock('../lib/logger.js', () => {
 
 vi.mock('../services/config-service.js', () => ({
   getAIConfig: (...args: unknown[]) => mockGetAIConfig(...args),
+  getMonitoringConfig: vi.fn().mockResolvedValue({
+    errorRateWarningThreshold: 0.05,
+    errorRateCriticalThreshold: 0.2,
+    avgLatencyCriticalMs: 12000,
+    checkIntervalMs: 300000,
+    alertCooldownMinutes: 15,
+    enableEmailAlerts: false,
+    alertEmailAddresses: '',
+  }),
+}))
+
+// Mock extraction alert service
+vi.mock('../services/extraction-alert-service.js', () => ({
+  evaluateAndDispatchAlerts: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('../services/prompt-service.js', () => ({
@@ -115,7 +129,11 @@ vi.mock('../services/processing-log-service.js', () => ({
 }))
 
 vi.mock('../schemas/extraction-schema.js', () => ({
-  EXTRACTION_JSON_SCHEMA: { name: 'policy_extraction', strict: true, schema: { type: 'object', properties: {} } },
+  EXTRACTION_JSON_SCHEMA: {
+    name: 'policy_extraction',
+    strict: true,
+    schema: { type: 'object', properties: {} },
+  },
 }))
 
 vi.mock('fs', async () => {
@@ -148,10 +166,10 @@ const DEFAULT_AI_CONFIG = {
   consensusEnabled: true,
   consensusAgreementThreshold: 0.8,
   consensusFields: ['policyNumber', 'provider'],
-  confidenceWeightPolicyNumber: 0.20,
+  confidenceWeightPolicyNumber: 0.2,
   confidenceWeightProvider: 0.15,
-  confidenceWeightDates: 0.20,
-  confidenceWeightPremium: 0.20,
+  confidenceWeightDates: 0.2,
+  confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
 }
 
@@ -414,7 +432,9 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
       const res = await request(app).get('/api/ai/diagnose')
 
       expect(res.body.summary.anyProviderValid).toBe(false)
-      expect(res.body.summary.recommendation).toBe('AI service temporarily unavailable - please try again later')
+      expect(res.body.summary.recommendation).toBe(
+        'AI service temporarily unavailable - please try again later'
+      )
     })
 
     it('production recommendation when providers are valid', async () => {
@@ -447,7 +467,13 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'Request had invalid authentication credentials', status: 'UNAUTHENTICATED', code: 401 } }),
+          JSON.stringify({
+            error: {
+              message: 'Request had invalid authentication credentials',
+              status: 'UNAUTHENTICATED',
+              code: 401,
+            },
+          }),
           { status: 401 }
         )
       )
@@ -464,11 +490,16 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'Authentication failed - check GOOGLE_CLOUD_API_KEY' } }),
+          JSON.stringify({
+            error: { message: 'Authentication failed - check GOOGLE_CLOUD_API_KEY' },
+          }),
           { status: 401 }
         )
       )
@@ -485,11 +516,20 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'Billing account not active', status: 'FAILED_PRECONDITION', code: 400 } }),
+          JSON.stringify({
+            error: {
+              message: 'Billing account not active',
+              status: 'FAILED_PRECONDITION',
+              code: 400,
+            },
+          }),
           { status: 400 }
         )
       )
@@ -506,11 +546,20 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'Quota exceeded for quota metric', status: 'RESOURCE_EXHAUSTED', code: 429 } }),
+          JSON.stringify({
+            error: {
+              message: 'Quota exceeded for quota metric',
+              status: 'RESOURCE_EXHAUSTED',
+              code: 429,
+            },
+          }),
           { status: 429 }
         )
       )
@@ -527,13 +576,13 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(
-          JSON.stringify({ error: { message: 'Too Many Requests' } }),
-          { status: 429 }
-        )
+        new Response(JSON.stringify({ error: { message: 'Too Many Requests' } }), { status: 429 })
       )
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -548,11 +597,16 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'The requested URL was not found', status: 'NOT_FOUND', code: 404 } }),
+          JSON.stringify({
+            error: { message: 'The requested URL was not found', status: 'NOT_FOUND', code: 404 },
+          }),
           { status: 404 }
         )
       )
@@ -569,13 +623,15 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(
-          JSON.stringify({ error: { message: 'Vision API endpoint not found' } }),
-          { status: 404 }
-        )
+        new Response(JSON.stringify({ error: { message: 'Vision API endpoint not found' } }), {
+          status: 404,
+        })
       )
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -590,7 +646,10 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
@@ -613,7 +672,10 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(JSON.stringify({ responses: [{}] }), { status: 200 })
@@ -631,7 +693,10 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'test',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED 142.250.185.74:443'))
 
@@ -655,7 +720,10 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         NODE_ENV: 'test',
         // No GOOGLE_CLOUD_API_KEY — so both auth paths fail
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
       // Token retrieval fails
       mockGoogleAuthGetAccessToken.mockResolvedValue(null)
 
@@ -672,7 +740,10 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'production',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
       mockGoogleAuthGetAccessToken.mockResolvedValue(null)
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -693,11 +764,20 @@ describe('AI Routes — Error Classifier & Google Vision Branches', () => {
         OPENAI_API_KEY: 'test-key',
         NODE_ENV: 'production',
       })
-      mockOpenAICreate.mockResolvedValue({ choices: [{ message: { content: 'OK' } }], model: 'gpt-4o-mini' })
+      mockOpenAICreate.mockResolvedValue({
+        choices: [{ message: { content: 'OK' } }],
+        model: 'gpt-4o-mini',
+      })
 
       vi.spyOn(globalThis, 'fetch').mockResolvedValue(
         new Response(
-          JSON.stringify({ error: { message: 'Cloud Vision API not enabled', status: 'PERMISSION_DENIED', code: 403 } }),
+          JSON.stringify({
+            error: {
+              message: 'Cloud Vision API not enabled',
+              status: 'PERMISSION_DENIED',
+              code: 403,
+            },
+          }),
           { status: 403 }
         )
       )
