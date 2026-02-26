@@ -82,9 +82,11 @@ function recordExtractionEvent(event: ExtractionEvent): void {
     error_code: event.errorCode,
     error_message: event.errorMessage,
     document_length: event.documentLength,
-  }).catch((err) => log.warn('Failed to persist extraction metric to DB', {
-    error: err instanceof Error ? err.message : String(err),
-  }))
+  }).catch((err) =>
+    log.warn('Failed to persist extraction metric to DB', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  )
 }
 
 /** Exported for the admin monitoring endpoint */
@@ -104,6 +106,7 @@ export async function getExtractionHealthSnapshot() {
           last_24h: dbHealth.last_period,
           by_provider: dbHealth.by_provider,
           recent_errors: dbHealth.recent_errors,
+          hourly_buckets: dbHealth.hourly_buckets || [],
           buffer_size: 0,
           source: 'database' as const,
         }
@@ -150,6 +153,9 @@ export async function getExtractionHealthSnapshot() {
       timestamp: e.timestamp,
     }))
 
+  // Hourly buckets for time-series chart (last 24 hours)
+  const hourlyBuckets = buildHourlyBuckets(last24h, now)
+
   return {
     last_24h: {
       total,
@@ -159,9 +165,60 @@ export async function getExtractionHealthSnapshot() {
     },
     by_provider: providerStats,
     recent_errors: recentErrors,
+    hourly_buckets: hourlyBuckets,
     buffer_size: extractionMetrics.length,
     source: 'memory' as const,
   }
+}
+
+/** Build 24 hourly buckets from extraction events for time-series visualization */
+function buildHourlyBuckets(
+  events: ExtractionEvent[],
+  nowMs: number
+): Array<{ hour: string; total: number; success: number; failed: number; avg_latency_ms: number }> {
+  const buckets: Array<{
+    hour: string
+    total: number
+    success: number
+    failed: number
+    totalLatency: number
+  }> = []
+
+  // Create 24 empty buckets (oldest first)
+  for (let i = 23; i >= 0; i--) {
+    const bucketStart = new Date(nowMs - i * 60 * 60 * 1000)
+    bucketStart.setMinutes(0, 0, 0)
+    buckets.push({
+      hour: bucketStart.toISOString(),
+      total: 0,
+      success: 0,
+      failed: 0,
+      totalLatency: 0,
+    })
+  }
+
+  // Assign events to buckets
+  for (const e of events) {
+    const eventTime = new Date(e.timestamp).getTime()
+    for (let b = buckets.length - 1; b >= 0; b--) {
+      const bucketTime = new Date(buckets[b].hour).getTime()
+      if (eventTime >= bucketTime) {
+        buckets[b].total++
+        if (e.success) buckets[b].success++
+        else buckets[b].failed++
+        buckets[b].totalLatency += e.durationMs
+        break
+      }
+    }
+  }
+
+  return buckets.map((b) => ({
+    hour: b.hour,
+    total: b.total,
+    success: b.success,
+    failed: b.failed,
+    avg_latency_ms: b.total > 0 ? Math.round(b.totalLatency / b.total) : 0,
+  }))
 }
 
 /**
