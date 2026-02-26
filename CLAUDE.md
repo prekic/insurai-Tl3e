@@ -23,6 +23,7 @@
 | Styling | Tailwind CSS | v4 |
 | Routing | React Router | v7 |
 | Build | Vite | v7 |
+| Charts | Recharts | v2 |
 | Backend | Express + TypeScript | v5 |
 | Database | Supabase (PostgreSQL) | - |
 | Auth | Supabase Auth | - |
@@ -179,6 +180,8 @@ insurai/
 | `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
 | `src/components/admin/AdminLogin.tsx` | Admin login page |
 | `src/components/admin/tabs/PromptsTab.tsx` | Manage AI prompt templates |
+| `src/components/admin/tabs/ExtractionHealthTab.tsx` | **UPDATED** Live monitoring metrics and Historical Trend Charts |
+| `src/components/admin/tabs/ProcessingLogsTab.tsx` | **UPDATED** Real-time system logs with CSV backend export functionality |
 
 ### Processing Logger (Updated Jan 25, 2026)
 | File | Purpose |

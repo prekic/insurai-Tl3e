@@ -19,10 +19,11 @@
 ## Session Summary
 
 **Post-Deploy Verification (Completed):**
-- **Applied Migration 026** manually via `psql` to production Supabase for `pg_cron` secure views.
+- **Applied Migration 026** manually via `psql` to production Supabase for `pg_cron` secure views (due to `supabase db push` linkage issues).
 - **Admin Settings Panels** for Cron Jobs and Market Benchmarks render correctly.
 - **Processing Log CSV Export** generates valid download payloads.
 - **Extraction Health Historical Trends** pulls accurate aggregations using backend daily grouping.
+- **Dependencies** `recharts` and `date-fns` integrated into `package.json` without bundle bloat issues.
 
 **Previous Features Implemented:**
 ### 1. Extraction Health Alerting System
@@ -51,11 +52,11 @@
 ### 5. Historical Trend Charts (Extraction Health)
 - **`server/services/extraction-metrics-service.ts`** — Added `getDBExtractionHealthHistorical` to group and aggregate statistics per day.
 - **`server/routes/admin/monitoring.ts`** — Exposed `/api/admin/monitoring/extraction-health/historical`.
-- **`HistoricalTrendChart.tsx`** — New Recharts implementation handling live vs historical toggle.
+- **`src/components/admin/tabs/ExtractionHealthTab.tsx`** — Updated with a Live vs Historical toggle, embedding a new `recharts`-based chart visualization inline.
 
 ### 6. Processing Logs Export
-- **`/api/admin/processing-logs/export`** — New endpoint for exporting complete filtered logs as CSV, bypassing pagination.
-- **`ProcessingLogsTab.tsx`** — Export button updated to trigger native browser download from the backend endpoint.
+- **`server/routes/admin/content.ts`** — Added the `/api/admin/processing-logs/export` endpoint for exporting complete filtered logs as CSV, bypassing pagination.
+- **`src/components/admin/tabs/ProcessingLogsTab.tsx`** — Export button updated to trigger native browser download from the backend endpoint.
 
 ### 7. Cron Job Monitoring UI
 - **`026_cron_monitoring_views.sql`** — Secure views (`vw_cron_jobs`, `vw_cron_job_runs`) around `pg_cron` extensions.
@@ -69,6 +70,9 @@
 ### Pre-Existing (unchanged)
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
+
+### Gotcha: Supabase DB Push linkage & Manual Migrations
+- Running `npx supabase db push` can fail if the local remote project isn't linked via `npx supabase link`. If encountering blockers applying migrations from terminal, fallback strictly to manually applying the file over PostgreSQL: `psql $SUPABASE_URL -f supabase/migrations/xxx.sql`. Make sure `psql` is actually installed locally first (`sudo apt-get install postgresql-client`).
 
 ### Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
 - The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
