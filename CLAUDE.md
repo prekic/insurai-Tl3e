@@ -4778,6 +4778,10 @@ connectSrc: [
 - If implementing email alerts in a future session, add `sendAdminAlertEmail()` call inside `fireAlert()` gated by `config.enableEmailAlerts`
 - The `checkIntervalMs` config field is similarly seeded but unused — the throttle in `ai.ts` uses hardcoded `300000` ms (5 minutes)
 
+**BenchmarksTab Multiple DOM Elements in Tests (Gotcha Feb 26, 2026):**
+- The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
+- **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
+
 ---
 
 ## CI/CD
