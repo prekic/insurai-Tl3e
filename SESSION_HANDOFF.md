@@ -1,4 +1,4 @@
-# Session Handoff — February 26, 2026 (Extraction Health Chart, pg_cron Cleanup, Dollar-Quote Fix)
+# Session Handoff — February 26, 2026 (Extraction Health Alerting, Configurable Retention, E2E Tests)
 
 ## Current Status
 
@@ -8,188 +8,140 @@
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings |
-| **Tests** | 15,530 passing (320 test files), 0 failures |
-| **E2E Tests** | 186/186 Chromium passed (production build) |
-| **Coverage** | ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines |
-| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100, CLS 0 |
-| **Branch** | `claude/load-project-context-e6OeC` |
-| **Production Readiness** | 9.5/10 |
-| **Live URL** | https://insurai-production.up.railway.app |
-| **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
-| **SW Cache Version** | v20 |
-| **Main Bundle Size** | ~214 KB gzip (main chunk) |
+| **Tests** | 15,551 passing (323 files, 0 failures) |
+| **Coverage** | ~91.67% statements, ~85.91% branches |
+| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
+| **Branch** | `claude/load-project-context-6D3KI` |
+| **Last Commit** | `c635685` — feat: extraction health alerting, admin configurable retention, E2E tests |
 
 ---
 
 ## Session Summary
 
-This session completed 5 commits across 12 files (+1,260 lines):
+**1 commit** (`c635685`) — 19 files changed, 2700 insertions, 517 deletions.
 
-1. **Extraction health hourly chart** (`c910653`) — Added `HourlyChart` component with stacked success/failure bar chart, hover tooltips, auto-refresh (10s), health status banner (green/amber/red), and server-side `buildHourlyBuckets()` for 24-hour time-series data.
-2. **Processing log cleanup + bulk delete** (`c910653`) — Added `deleteOldLogs()` + `deleteProcessingLogs()` + `deleteAllProcessingLogs()` service functions, `DELETE /api/admin/processing-logs` (bulk delete) + `POST /api/admin/processing-logs/cleanup` endpoints, migration `024_processing_log_cleanup_cron.sql` for automated 90-day retention, and `ProcessingLogsTab` bulk select/delete UI (checkbox selection, select-all, delete selected/all).
-3. **ExtractionHealthTab tests** (`c910653`) — 26 comprehensive tests covering loading, error, summary cards, health status banners, provider breakdown, recent errors, auto-refresh toggle, hourly chart, and edge cases.
-4. **pg_cron $$ dollar-quote syntax fix** (`63af4c6`) — Fixed nested `$$` inside `$do$` blocks in migrations 023 and 024 that caused PostgreSQL parse errors when applied via Supabase SQL Editor.
-5. **CLAUDE.md comprehensive update** (`7e0dbe8`) — Known Issues 135-137, 4 new gotchas, updated test counts and API endpoints.
+Three features implemented from the prior session's P1/P2 priority list:
 
-Additional housekeeping:
-6. **.gitignore updates** (`e6d5828`) — Added worktree dirs and xlsx build artifacts.
-7. **SESSION_HANDOFF.md update** (`395db43`) — Documentation sync.
+### 1. Extraction Health Alerting System
+- **`server/services/extraction-alert-service.ts`** (new) — Evaluates extraction health metrics against configurable thresholds (error rate warning/critical, per-provider latency). In-memory cooldown prevents alert flooding. Fires admin notifications + optional email.
+- Alert evaluation throttled to once per 5 minutes in `recordExtractionEvent()` (`server/routes/ai.ts`)
+- `GET /api/admin/monitoring/alerts/status` endpoint returns cooldown state
 
----
+### 2. Admin-Configurable Retention
+- **`supabase/migrations/025_monitoring_retention_config.sql`** (new) — Seeds 7 monitoring + 2 retention config rows, creates configurable PL/pgSQL cleanup functions, reschedules pg_cron jobs
+- **`server/services/config-service.ts`** — `getMonitoringConfig()` and `getRetentionConfig()` with 5-min cache
+- **`src/lib/config/types.ts`** — `MonitoringConfig` (7 fields), `RetentionConfig` (2 fields), `ConfigCategory` extended
+- **`src/lib/config/configuration-service.ts`** — Client-side mirror for admin UI
+- **`MonitoringAlertsPanel.tsx`** (366 lines) — Alert threshold config, email toggle, alert status display
+- **`RetentionSettingsPanel.tsx`** (260 lines) — Retention day inputs, manual cleanup trigger
+- Both panels registered in `SettingsTab.tsx` navigation
 
-## Commits This Session
-
-| Commit | Description |
-|--------|-------------|
-| `c910653` | feat: extraction health chart, processing log cleanup, and ExtractionHealthTab tests |
-| `e6d5828` | chore: add worktrees and xlsx to gitignore |
-| `395db43` | docs: update SESSION_HANDOFF.md for Feb 26 session |
-| `63af4c6` | fix: nested $$ dollar-quote syntax error in pg_cron migrations |
-| `7e0dbe8` | docs: comprehensive session handoff with Known Issues 135-137, gotchas, and updated metrics |
+### 3. E2E Tests
+- 7 new Playwright API-level tests in `e2e/admin-flows.spec.ts` covering extraction-health, alerts/status, processing-logs, and settings endpoints
 
 ---
 
-## New Features Implemented
+## Database Changes — NOT YET APPLIED TO PRODUCTION
 
-### 1. Extraction Health Hourly Chart
-- **Component**: `HourlyChart` in `ExtractionHealthTab.tsx` — CSS stacked bar chart (green success / red failed) with hover tooltips
-- **Server**: `buildHourlyBuckets()` in `server/routes/ai.ts` — creates 24 hourly buckets from in-memory extraction events
-- **DB fallback**: `getDBExtractionHealth()` in `extraction-metrics-service.ts` also populates hourly buckets for restart recovery
-- **Auto-refresh**: 10-second interval with toggle button + manual refresh
-- **Health banner**: Color-coded (green <5% errors, amber 5-20%, red >20%)
+**Migration 025** (`supabase/migrations/025_monitoring_retention_config.sql`) must be applied to production Supabase:
 
-### 2. Processing Log Auto-Cleanup
-- **Service**: `deleteOldLogs(daysOld: number = 90)` in `processing-log-service.ts`
-- **Endpoint**: `POST /api/admin/processing-logs/cleanup` (SuperAdmin auth, audit-logged)
-- **pg_cron**: Migration 024 schedules daily cleanup at 04:00 UTC
-- **Production**: Both pg_cron jobs confirmed running (verified via `SELECT * FROM cron.job`)
-
-### 3. pg_cron Dollar-Quote Fix
-- **Problem**: Nested `$$` inside `$do$` blocks fails in PostgreSQL
-- **Fix**: Changed inner SQL to single-quoted strings with escaped inner quotes
-- **Files**: migrations 023 and 024
+1. Open Supabase Dashboard → SQL Editor
+2. Paste contents of `supabase/migrations/025_monitoring_retention_config.sql`
+3. Execute
+4. Verify: `SELECT * FROM cron.job ORDER BY jobid;`
+   - Job names should be `cleanup-extraction-metrics-configurable` and `cleanup-processing-logs-configurable`
+5. Verify: `SELECT * FROM app_settings WHERE category IN ('monitoring', 'retention');`
+   - Should show 9 rows (7 monitoring + 2 retention)
 
 ---
 
-## New Database Migrations
+## Files Changed (19 files)
 
-| Migration | Purpose | Production Status |
-|-----------|---------|-------------------|
-| `023_extraction_metrics.sql` | `extraction_metrics` table + pg_cron 30-day cleanup | **Applied** (table created, cron job running) |
-| `024_processing_log_cleanup_cron.sql` | pg_cron 90-day processing log auto-cleanup | **Applied** (cron job running) |
-
-**pg_cron jobs verified in production:**
-```
-jobid=1: cleanup-extraction-metrics (0 3 * * *) — 30-day retention
-jobid=2: cleanup-processing-logs (0 4 * * *) — 90-day retention
-```
-
----
-
-## Files Changed This Session
-
-| File | Lines Changed | Purpose |
-|------|---------------|---------|
-| `server/routes/ai.ts` | +63 | `buildHourlyBuckets()`, hourly data in health snapshot + DB fallback |
-| `server/services/extraction-metrics-service.ts` | +41 | `hourly_buckets` in DB health query |
-| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()`, `deleteProcessingLogs()`, `deleteAllProcessingLogs()`, `getProcessingLog()`, `getProcessingStats()` |
-| `server/routes/admin/content.ts` | +54 | `DELETE /processing-logs` (bulk delete) + `POST /cleanup` endpoints |
-| `src/components/admin/tabs/ExtractionHealthTab.tsx` | +293/−78 | `HourlyChart`, auto-refresh, enhanced UI |
-| `src/components/admin/tabs/ProcessingLogsTab.tsx` | +177 | Bulk select/delete (checkbox, select-all, delete selected/all), mobile cards |
-| `src/components/admin/tabs/ExtractionHealthTab.test.tsx` | +516 (new) | 26 comprehensive tests |
-| `supabase/migrations/023_extraction_metrics.sql` | +4/−4 | Fix $$ quoting |
-| `supabase/migrations/024_processing_log_cleanup_cron.sql` | +26 (new) | pg_cron cleanup job |
-| `.gitignore` | +6 | Worktree dirs, xlsx artifacts |
-| `CLAUDE.md` | +96/−7 | Known Issues 135-137, 4 new gotchas, updated metrics |
-| `SESSION_HANDOFF.md` | rewritten | Session documentation |
+| File | Action | Purpose |
+|------|--------|---------|
+| `server/services/extraction-alert-service.ts` | NEW | Alert evaluation + cooldown + dispatch |
+| `server/services/config-service.ts` | MODIFY | +`getMonitoringConfig()`, +`getRetentionConfig()` |
+| `server/routes/ai.ts` | MODIFY | Wire throttled alert check into `recordExtractionEvent()` |
+| `server/routes/admin/monitoring.ts` | MODIFY | +`GET /alerts/status` endpoint |
+| `src/lib/config/types.ts` | MODIFY | +`MonitoringConfig`, +`RetentionConfig`, extended `ConfigCategory` |
+| `src/lib/config/configuration-service.ts` | MODIFY | Client-side `getMonitoringConfig()`, `getRetentionConfig()` |
+| `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` | NEW | Alert threshold admin UI |
+| `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | NEW | Retention period admin UI |
+| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention panels |
+| `supabase/migrations/025_monitoring_retention_config.sql` | NEW | Config seeds + configurable pg_cron functions |
+| `e2e/admin-flows.spec.ts` | MODIFY | +7 E2E tests |
+| `server/__tests__/extraction-alert-service.test.ts` | NEW | 9 unit tests |
+| `src/components/admin/tabs/settings/MonitoringAlertsPanel.test.tsx` | NEW | 6 component tests |
+| `src/components/admin/tabs/settings/RetentionSettingsPanel.test.tsx` | NEW | 6 component tests |
+| `server/__tests__/ai-chat-ocr-diagnose-logs.test.ts` | MODIFY | +alert service mock |
+| `server/__tests__/ai-extraction-routes-branches.test.ts` | MODIFY | +alert service mock |
+| `server/__tests__/ai-ocr-coverage.test.ts` | MODIFY | +alert service mock |
+| `server/__tests__/ai-routes-extended.test.ts` | MODIFY | +alert service mock |
+| `server/__tests__/routes-branches.test.ts` | MODIFY | +alert status endpoint test |
 
 ---
 
 ## Known Issues
 
-| Issue | Severity | Status | Notes |
-|-------|----------|--------|-------|
-| Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx; all files pass individually |
-| PolicyDetailView-branches timer teardown | Info | Pre-existing | Flaky under full suite concurrency; passes individually |
-| 90-day retention hardcoded in two places | Low | By design | `processing-log-service.ts` default param AND migration 024 SQL — must update both if changing |
+### Pre-Existing (unchanged)
+- **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
+- **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
+
+### New Gotcha: Alert Service Test Mocks
+- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
+- Without these mocks, the throttled alert check causes real config fetches in tests
 
 ---
 
-## Deployment Notes
+## Configuration Requirements
 
-### Production pg_cron — Confirmed Running
-- Extension: pg_cron v1.6.4
-- Jobs: 2 active (extraction-metrics cleanup at 03:00 UTC, processing-logs cleanup at 04:00 UTC)
-- Grants: `USAGE ON SCHEMA cron` and `ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron` to `postgres`
+### No New Environment Variables
+No new env vars needed for this session's features.
 
-### Railway Configuration (Unchanged)
-- **Live URL**: https://insurai-production.up.railway.app
-- **Builder**: Nixpacks
-- **Install**: `npm ci --include=dev`
-- **Build**: `npm run build && npm run build:server`
-- **Start**: `NODE_ENV=production node dist-server/index.js`
-- **SW Cache**: v20
-- **No new environment variables required**
+### Migration 025 Required
+Must apply `supabase/migrations/025_monitoring_retention_config.sql` to production Supabase before the new admin Settings panels will function. Without it, the monitoring/retention categories return empty settings (graceful degradation — defaults used).
 
 ---
 
-## Next Steps (Priority Order)
+## Priority Next Steps
 
-### P0 — Merge & Deploy
-1. **Merge this PR** — Conventional Commit title below
-2. **Post-merge verification**:
-   - Visit admin Dashboard → Extraction Health tab → verify hourly chart renders with stacked bars
-   - Trigger a test extraction → confirm new event appears in chart within 10s (auto-refresh)
-   - Visit admin Dashboard → Processing Logs tab → verify sortable table and mobile card layout
+### P0 — Immediate Post-Merge
+1. **Merge PR** for branch `claude/load-project-context-6D3KI`
+2. **Apply migration 025** to production Supabase (see instructions above)
+3. **Verify pg_cron jobs** updated: `SELECT * FROM cron.job ORDER BY jobid;`
 
-### P1 — Product / Feature Work
-3. **Extraction health alerting** — Email/notification when error rate exceeds configurable threshold (builds on existing notification infrastructure)
-4. **Admin Settings for cleanup retention** — Make the 90-day (processing logs) and 30-day (extraction metrics) retention configurable via admin settings instead of hardcoded
-5. **Processing log stats dashboard** — Add aggregate stats panel (total logs, success/failure breakdown, avg processing time, storage used)
+### P1 — Post-Deploy Verification
+4. **Admin Settings → Monitoring & Alerts**: Verify panel loads, thresholds display correctly
+5. **Admin Settings → Data Retention**: Verify panel loads, retention days editable
+6. **Trigger test extraction**: Upload a PDF, confirm no alert evaluation errors in Railway logs
+7. **Admin Extraction Health tab**: Verify hourly chart and provider stats populate
 
-### P2 — Infrastructure & Quality
-6. **Bundle analysis** — Run `npm run build:analyze` to measure impact of `xlsx` dependency on chunks
-7. **E2E test expansion** — Add Playwright tests for admin extraction health tab and processing logs tab
-8. **Premium benchmarks admin UI** — Backend CRUD endpoints exist in `content.ts` but no admin tab UI yet
+### P2 — Next Features
+8. **Bundle analysis**: Run `npm run build:analyze` — verify xlsx is in its own async chunk
+9. **Premium benchmark admin UI**: Allow admins to edit market benchmark data via Settings
+10. **Coverage benchmark editing**: Expand admin coverage benchmark table with add/edit/delete
 
 ### P3 — Nice to Have
-9. **Extraction health historical trends** — Weekly/monthly trend charts from DB-persisted metrics
-10. **Processing log export** — Export processing logs as CSV/JSON for offline analysis
-11. **Cron job monitoring UI** — Admin panel showing pg_cron job status, last run time, next scheduled run
+11. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
+12. **Processing log export**: CSV/JSON export for processing logs
+13. **Cron job monitoring UI**: Admin panel showing pg_cron job status and last run times
 
 ---
 
-## Previous Session Context
+## Architecture Notes
 
-**February 26, 2026 (This Session)** (`claude/load-project-context-e6OeC`):
-- Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests, pg_cron dollar-quote fix
-- 15,530 tests, 320 files
-
-**February 25, 2026 (Test Fixes, Documentation Sync)** (`claude/load-project-context-3VUJ2`):
-- Admin extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence
-- Test fixes (4 root causes), comprehensive documentation sync
-- 15,503 tests, 319 files
-
-**February 25, 2026 (Export, Onboarding, Observability, Admin UX)** (`claude/complete-handoff-docs-Goirm`):
-- Export dropdown (PDF/CSV/text), user onboarding flow, extraction error observability
-- Admin mobile-responsive dashboard, notification bulk delete, processing logger fix
-- 15,444 tests, 317 files
+- **No new architectural patterns** — all features use established patterns (config service, admin panels, in-memory state, fire-and-forget)
+- Alert cooldown is in-memory (resets on server restart) — acceptable because first post-restart alert is always useful
+- pg_cron functions now read from `app_settings` dynamically — no server restart needed to change retention
+- `ConfigCategory` type extended to `'monitoring' | 'retention'` — follows same pattern as `'ai'`, `'evaluation'`, etc.
 
 ---
 
-## PR Title (Conventional Commit)
+## Session Context Chain
 
-```
-feat(admin): extraction health hourly chart, processing log pg_cron cleanup, ExtractionHealthTab tests
-```
-
----
-
-**Last Updated**: February 26, 2026
-**Branch**: `claude/load-project-context-e6OeC`
-**ESLint Status**: 0 errors, 0 warnings
-**TypeCheck**: 0 errors
-**Tests**: 15,530 passing (320 files), 0 failures
-**Coverage**: ~85.91% branches, ~91.67% statements
-**Bundle**: ~214 KB gzip main chunk + async EN/TR/Supabase chunks
-**Architecture Decision**: No new ADR required — all changes are additive features using existing patterns (pg_cron was already in use for policy expiry notifications via migration 022)
+| Session | Key Deliverables | Branch |
+|---------|-----------------|--------|
+| Feb 25 early | Export dropdown, onboarding, extraction observability, admin mobile | `claude/complete-handoff-docs-Goirm` |
+| Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
+| Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
+| **Feb 26 late** | **Extraction health alerting, configurable retention, E2E tests** | **`claude/load-project-context-6D3KI`** |
