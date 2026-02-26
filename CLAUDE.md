@@ -3992,11 +3992,12 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Alert Service** (`server/services/extraction-alert-service.ts`):
   - `evaluateAndDispatchAlerts(snapshot, config)` — Checks 3 threshold types: overall error rate (warning/critical), per-provider latency
   - In-memory cooldown tracking (`lastAlertFired` Map) prevents alert flooding; resets on server restart (acceptable — first post-restart alert is always useful)
-  - `fireAlert()` creates admin notification + sends email if configured
+  - `fireAlert()` creates admin notification via `createNotification()` (email dispatch not yet implemented — `enableEmailAlerts`/`alertEmailAddresses` exist in config interface and admin UI but are not consumed in `fireAlert()`)
+  - Per-provider latency check requires `stats.total >= 3` minimum request count guard (avoids false alerts on 1-2 slow requests)
   - `getAlertState()` returns cooldown state for admin endpoint
   - `resetAlertState()` test utility
 - **Alert Wiring** (`server/routes/ai.ts`):
-  - Throttled check in `recordExtractionEvent()` — at most once per 5 minutes
+  - Throttled check in `recordExtractionEvent()` — hardcoded 5-minute interval (`300000` ms); the `checkIntervalMs` config field is seeded in DB and shown in admin UI but not consumed at the throttle point (future improvement)
   - Non-blocking fire-and-forget: `Promise.all([getExtractionHealthSnapshot(), getMonitoringConfig()]).then(...).catch(...)`
 - **Server Config Service** (`server/services/config-service.ts`):
   - `getMonitoringConfig()` — Returns `MonitoringConfig` with 5-min cache, DB → defaults fallback
@@ -4769,6 +4770,12 @@ connectSrc: [
 - Old hardcoded cron jobs (from migrations 023/024) are unscheduled and replaced with configurable versions
 - Admin can now change retention periods via Settings → Data Retention without SQL changes
 - After applying migration 025 to production, verify with `SELECT * FROM cron.job` — job names should end in `-configurable`
+
+**Extraction Alert Email — Not Yet Implemented (Feb 26, 2026):**
+- `MonitoringAlertsPanel.tsx` has an email toggle and email addresses textarea that saves to `app_settings`
+- `extraction-alert-service.ts` defines `enableEmailAlerts` and `alertEmailAddresses` in the `MonitoringConfig` interface but does NOT consume them — `fireAlert()` only calls `createNotification()`, no email sending logic exists
+- If implementing email alerts in a future session, add `sendAdminAlertEmail()` call inside `fireAlert()` gated by `config.enableEmailAlerts`
+- The `checkIntervalMs` config field is similarly seeded but unused — the throttle in `ai.ts` uses hardcoded `300000` ms (5 minutes)
 
 ---
 

@@ -91,6 +91,16 @@ Three features implemented from the prior session's P1/P2 priority list:
 - Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
 - Without these mocks, the throttled alert check causes real config fetches in tests
 
+### Incomplete: Alert Email Not Wired
+- `MonitoringAlertsPanel.tsx` has email toggle + address fields → saves to `app_settings` correctly
+- `extraction-alert-service.ts` defines `enableEmailAlerts`/`alertEmailAddresses` in `MonitoringConfig` interface but does NOT read them — `fireAlert()` only calls `createNotification()`, no email logic exists
+- `checkIntervalMs` config is similarly seeded/displayed but unused — throttle in `ai.ts` is hardcoded `300000` ms
+- **Action**: If email alerts are needed, add `sendAdminAlertEmail()` inside `fireAlert()` gated by `config.enableEmailAlerts`
+
+### Subtle: Per-Provider Latency Minimum Threshold
+- `evaluateAndDispatchAlerts()` only fires latency alerts when `stats.total >= 3` — prevents false alerts from 1-2 slow requests
+- This guard is NOT configurable via admin UI (hardcoded in `extraction-alert-service.ts:78`)
+
 ---
 
 ## Configuration Requirements
