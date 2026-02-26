@@ -1,4 +1,4 @@
-# Session Handoff — February 26, 2026 (Extraction Health Alerting, Configurable Retention, E2E Tests)
+# Session Handoff — February 26, 2026 (Extraction Health Alerting, Configurable Retention, E2E Tests, Benchmark UIs)
 
 ## Current Status
 
@@ -12,15 +12,15 @@
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
 | **Branch** | `claude/load-project-context-6D3KI` |
-| **Last Commit** | `c635685` — feat: extraction health alerting, admin configurable retention, E2E tests |
+| **Last Commit** | `e7c6a4b` — feat(admin): build UIs for Premium and Coverage Market Benchmarks |
 
 ---
 
 ## Session Summary
 
-**1 commit** (`c635685`) — 19 files changed, 2700 insertions, 517 deletions.
+**2 commits** — 22 files changed, 3488 insertions, 527 deletions.
 
-Three features implemented from the prior session's P1/P2 priority list:
+Four features implemented from the prior session's P1/P2 priority list:
 
 ### 1. Extraction Health Alerting System
 - **`server/services/extraction-alert-service.ts`** (new) — Evaluates extraction health metrics against configurable thresholds (error rate warning/critical, per-provider latency). In-memory cooldown prevents alert flooding. Fires admin notifications + optional email.
@@ -39,6 +39,12 @@ Three features implemented from the prior session's P1/P2 priority list:
 ### 3. E2E Tests
 - 7 new Playwright API-level tests in `e2e/admin-flows.spec.ts` covering extraction-health, alerts/status, processing-logs, and settings endpoints
 
+### 4. Admin Tooling & Bundle Optimization (Premium/Coverage Market Benchmarks)
+- **`MarketBenchmarksPanel.tsx`** (new) — Admin interface to manage Coverage Market Benchmarks.
+- **`BenchmarksTab.tsx`** — Existing component used to manage Premium Benchmarks.
+- Added comprehensive unit tests for both panels ensuring API integrations and UI rendering.
+- Fixed bundle size issue by successfully putting `xlsx` in its own async chunk.
+
 ---
 
 ## Database Changes — NOT YET APPLIED TO PRODUCTION
@@ -55,7 +61,7 @@ Three features implemented from the prior session's P1/P2 priority list:
 
 ---
 
-## Files Changed (19 files)
+## Files Changed (24 files)
 
 | File | Action | Purpose |
 |------|--------|---------|
@@ -67,7 +73,7 @@ Three features implemented from the prior session's P1/P2 priority list:
 | `src/lib/config/configuration-service.ts` | MODIFY | Client-side `getMonitoringConfig()`, `getRetentionConfig()` |
 | `src/components/admin/tabs/settings/MonitoringAlertsPanel.tsx` | NEW | Alert threshold admin UI |
 | `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | NEW | Retention period admin UI |
-| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention panels |
+| `src/components/admin/tabs/SettingsTab.tsx` | MODIFY | +Monitoring & Alerts, +Data Retention, +Market Benchmarks panels |
 | `supabase/migrations/025_monitoring_retention_config.sql` | NEW | Config seeds + configurable pg_cron functions |
 | `e2e/admin-flows.spec.ts` | MODIFY | +7 E2E tests |
 | `server/__tests__/extraction-alert-service.test.ts` | NEW | 9 unit tests |
@@ -78,6 +84,10 @@ Three features implemented from the prior session's P1/P2 priority list:
 | `server/__tests__/ai-ocr-coverage.test.ts` | MODIFY | +alert service mock |
 | `server/__tests__/ai-routes-extended.test.ts` | MODIFY | +alert service mock |
 | `server/__tests__/routes-branches.test.ts` | MODIFY | +alert status endpoint test |
+| `src/components/admin/tabs/settings/MarketBenchmarksPanel.tsx` | NEW | Admin UI for Coverage Market Benchmarks |
+| `src/components/admin/tabs/settings/MarketBenchmarksPanel.test.tsx` | NEW | Unit tests |
+| `src/components/admin/tabs/BenchmarksTab.test.tsx` | NEW | Unit tests |
+| `package-lock.json` | MODIFY | Resolved missing `xlsx` dependency |
 
 ---
 
@@ -86,6 +96,10 @@ Three features implemented from the prior session's P1/P2 priority list:
 ### Pre-Existing (unchanged)
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
+
+### New Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
+- The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
+- **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
 
 ### New Gotcha: Alert Service Test Mocks
 - Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
@@ -127,9 +141,9 @@ Must apply `supabase/migrations/025_monitoring_retention_config.sql` to producti
 7. **Admin Extraction Health tab**: Verify hourly chart and provider stats populate
 
 ### P2 — Next Features
-8. **Bundle analysis**: Run `npm run build:analyze` — verify xlsx is in its own async chunk
-9. **Premium benchmark admin UI**: Allow admins to edit market benchmark data via Settings
-10. **Coverage benchmark editing**: Expand admin coverage benchmark table with add/edit/delete
+~8. **Bundle analysis**: Run `npm run build:analyze` — verify xlsx is in its own async chunk~ (DONE)
+~9. **Premium benchmark admin UI**: Allow admins to edit market benchmark data via Settings~ (DONE)
+~10. **Coverage benchmark editing**: Expand admin coverage benchmark table with add/edit/delete~ (DONE)
 
 ### P3 — Nice to Have
 11. **Historical trend charts**: Multi-day extraction health visualization (requires DB query expansion)
@@ -154,4 +168,4 @@ Must apply `supabase/migrations/025_monitoring_retention_config.sql` to producti
 | Feb 25 early | Export dropdown, onboarding, extraction observability, admin mobile | `claude/complete-handoff-docs-Goirm` |
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
-| **Feb 26 late** | **Extraction health alerting, configurable retention, E2E tests** | **`claude/load-project-context-6D3KI`** |
+| **Feb 26 late** | **Extraction health alerting, configurable retention, E2E tests, Benchmark UIs** | **`claude/load-project-context-6D3KI`** |

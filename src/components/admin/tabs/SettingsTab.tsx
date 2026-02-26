@@ -26,6 +26,7 @@ import {
   GitCompareArrows,
   Bell,
   Clock,
+  Building2,
 } from 'lucide-react'
 
 // Sub-panels
@@ -41,10 +42,12 @@ import { SettingsWebhooksPanel } from './settings/SettingsWebhooksPanel'
 import { ConfigDriftPanel } from './settings/ConfigDriftPanel'
 import { MonitoringAlertsPanel } from './settings/MonitoringAlertsPanel'
 import { RetentionSettingsPanel } from './settings/RetentionSettingsPanel'
+import { MarketBenchmarksPanel } from './settings/MarketBenchmarksPanel'
 
 type SettingsCategory =
   | 'ai'
   | 'evaluation'
+  | 'market_benchmarks'
   | 'rate_limits'
   | 'ocr'
   | 'feature_flags'
@@ -75,6 +78,12 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Policy Evaluation',
     description: 'Scoring weights, grade thresholds, and evaluation rules',
     icon: <Gauge className="h-5 w-5" />,
+  },
+  {
+    id: 'market_benchmarks',
+    label: 'Market Benchmarks',
+    description: 'Coverage baseline data for AI insights',
+    icon: <Building2 className="h-5 w-5" />,
   },
   {
     id: 'rate_limits',
@@ -431,6 +440,8 @@ export function SettingsTab() {
             isSaving={isSaving}
           />
         )
+      case 'market_benchmarks':
+        return <MarketBenchmarksPanel />
       case 'rate_limits':
         return (
           <RateLimitsPanel
