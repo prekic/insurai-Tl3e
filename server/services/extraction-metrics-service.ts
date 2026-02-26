@@ -196,3 +196,80 @@ export async function getDBExtractionHealth(hours = 24): Promise<{
     return null
   }
 }
+
+/**
+ * Query extraction health snapshot from DB for historical trends.
+ * Supports grouping by day.
+ */
+export async function getDBExtractionHealthHistorical(days = 7): Promise<{
+  daily_buckets: Array<{
+    date: string
+    total: number
+    success: number
+    failed: number
+    avg_latency_ms: number
+  }>
+} | null> {
+  const db = getSupabase()
+  if (!db) return null
+
+  try {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: records, error } = await db
+      .from('extraction_metrics')
+      .select('created_at, success, duration_ms')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+
+    if (error || !records) {
+      svcLog.warn('Failed to query historical extraction metrics', { error: error?.message })
+      return null
+    }
+
+    const nowMs = Date.now()
+    const dailyMap: Record<
+      string,
+      { total: number; success: number; failed: number; latencySum: number }
+    > = {}
+
+    // Initialize buckets for the last N days
+    for (let i = days - 1; i >= 0; i--) {
+      const bucketDate = new Date(nowMs - i * 24 * 60 * 60 * 1000)
+      bucketDate.setHours(0, 0, 0, 0)
+      dailyMap[bucketDate.toISOString().split('T')[0]] = {
+        total: 0,
+        success: 0,
+        failed: 0,
+        latencySum: 0,
+      }
+    }
+
+    for (const r of records) {
+      const dateKey = r.created_at.split('T')[0]
+      if (dailyMap[dateKey]) {
+        dailyMap[dateKey].total++
+        if (r.success) dailyMap[dateKey].success++
+        else dailyMap[dateKey].failed++
+        dailyMap[dateKey].latencySum += r.duration_ms || 0
+      }
+    }
+
+    const daily_buckets = Object.entries(dailyMap).map(([date, b]) => ({
+      date,
+      total: b.total,
+      success: b.success,
+      failed: b.failed,
+      avg_latency_ms: b.total > 0 ? Math.round(b.latencySum / b.total) : 0,
+    }))
+
+    return {
+      daily_buckets,
+    }
+  } catch (err) {
+    svcLog.warn('Failed to query historical extraction metrics', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+    return null
+  }
+}

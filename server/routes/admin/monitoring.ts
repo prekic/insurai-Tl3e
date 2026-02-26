@@ -463,4 +463,81 @@ router.get(
   }
 )
 
+/**
+ * Get historical extraction health trends
+ * GET /api/admin/monitoring/extraction-health/historical
+ */
+router.get(
+  '/monitoring/extraction-health/historical',
+  authenticateAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const days = parseInt(req.query.days as string) || 7
+      const { getDBExtractionHealthHistorical } =
+        await import('../../services/extraction-metrics-service.js')
+      const historicalData = await getDBExtractionHealthHistorical(days)
+      res.json({ success: true, data: historicalData })
+    } catch (error) {
+      log.error('Failed to get historical extraction health', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Failed to get historical extraction health' })
+    }
+  }
+)
+
+/**
+ * Get pg_cron jobs and their recent runs
+ * GET /api/admin/monitoring/cron-jobs
+ */
+router.get(
+  '/monitoring/cron-jobs',
+  authenticateAdmin,
+  requireSuperAdmin,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { client: supabase, error: supabaseError } = getSupabaseWithError()
+
+      if (!supabase) {
+        res.status(503).json({ success: false, error: supabaseError || 'Database not configured' })
+        return
+      }
+
+      // Fetch active jobs
+      const { data: jobs, error: jobsError } = await supabase
+        .from('vw_cron_jobs')
+        .select('*')
+        .order('jobid', { ascending: true })
+
+      if (jobsError) {
+        throw new Error(`Failed to fetch cron jobs: ${jobsError.message}`)
+      }
+
+      // Fetch recent runs for each job
+      const { data: runs, error: runsError } = await supabase
+        .from('vw_cron_job_runs')
+        .select('*')
+        .order('start_time', { ascending: false })
+        .limit(100) // Get the latest 100 runs across all jobs
+
+      if (runsError) {
+        throw new Error(`Failed to fetch cron job runs: ${runsError.message}`)
+      }
+
+      // Aggregate data
+      const aggregatedJobs = jobs.map((job) => ({
+        ...job,
+        recent_runs: runs.filter((run) => run.jobid === job.jobid).slice(0, 5), // Keep top 5 latest runs per job
+      }))
+
+      res.json({ success: true, data: aggregatedJobs })
+    } catch (error) {
+      log.error('Failed to get cron jobs', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Failed to get cron jobs' })
+    }
+  }
+)
+
 export default router
