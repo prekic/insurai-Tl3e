@@ -227,3 +227,9 @@ __marimo__/
 gcp-service-account.json
 .gcp-credentials-temp.json
 coverage-temp/
+
+# Claude Code worktrees
+.claude/worktrees/
+
+# Generated export files
+*.xlsx
