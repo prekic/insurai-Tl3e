@@ -23,16 +23,17 @@
 
 ## Session Summary
 
-This session completed 4 commits across 11 files (+1,260 lines):
+This session completed 5 commits across 12 files (+1,260 lines):
 
 1. **Extraction health hourly chart** (`c910653`) — Added `HourlyChart` component with stacked success/failure bar chart, hover tooltips, auto-refresh (10s), health status banner (green/amber/red), and server-side `buildHourlyBuckets()` for 24-hour time-series data.
-2. **Processing log cleanup cron** (`c910653`) — Added `deleteOldLogs()` service function + `POST /api/admin/processing-logs/cleanup` admin endpoint + migration `024_processing_log_cleanup_cron.sql` for automated 90-day retention.
+2. **Processing log cleanup + bulk delete** (`c910653`) — Added `deleteOldLogs()` + `deleteProcessingLogs()` + `deleteAllProcessingLogs()` service functions, `DELETE /api/admin/processing-logs` (bulk delete) + `POST /api/admin/processing-logs/cleanup` endpoints, migration `024_processing_log_cleanup_cron.sql` for automated 90-day retention, and `ProcessingLogsTab` bulk select/delete UI (checkbox selection, select-all, delete selected/all).
 3. **ExtractionHealthTab tests** (`c910653`) — 26 comprehensive tests covering loading, error, summary cards, health status banners, provider breakdown, recent errors, auto-refresh toggle, hourly chart, and edge cases.
 4. **pg_cron $$ dollar-quote syntax fix** (`63af4c6`) — Fixed nested `$$` inside `$do$` blocks in migrations 023 and 024 that caused PostgreSQL parse errors when applied via Supabase SQL Editor.
+5. **CLAUDE.md comprehensive update** (`7e0dbe8`) — Known Issues 135-137, 4 new gotchas, updated test counts and API endpoints.
 
 Additional housekeeping:
-5. **.gitignore updates** (`e6d5828`) — Added worktree dirs and xlsx build artifacts.
-6. **SESSION_HANDOFF.md update** (`395db43`) — Documentation sync.
+6. **.gitignore updates** (`e6d5828`) — Added worktree dirs and xlsx build artifacts.
+7. **SESSION_HANDOFF.md update** (`395db43`) — Documentation sync.
 
 ---
 
@@ -44,6 +45,7 @@ Additional housekeeping:
 | `e6d5828` | chore: add worktrees and xlsx to gitignore |
 | `395db43` | docs: update SESSION_HANDOFF.md for Feb 26 session |
 | `63af4c6` | fix: nested $$ dollar-quote syntax error in pg_cron migrations |
+| `7e0dbe8` | docs: comprehensive session handoff with Known Issues 135-137, gotchas, and updated metrics |
 
 ---
 
@@ -90,14 +92,15 @@ jobid=2: cleanup-processing-logs (0 4 * * *) — 90-day retention
 |------|---------------|---------|
 | `server/routes/ai.ts` | +63 | `buildHourlyBuckets()`, hourly data in health snapshot + DB fallback |
 | `server/services/extraction-metrics-service.ts` | +41 | `hourly_buckets` in DB health query |
-| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()`, log stat queries |
-| `server/routes/admin/content.ts` | +54 | `POST /processing-logs/cleanup` endpoint |
+| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()`, `deleteProcessingLogs()`, `deleteAllProcessingLogs()`, `getProcessingLog()`, `getProcessingStats()` |
+| `server/routes/admin/content.ts` | +54 | `DELETE /processing-logs` (bulk delete) + `POST /cleanup` endpoints |
 | `src/components/admin/tabs/ExtractionHealthTab.tsx` | +293/−78 | `HourlyChart`, auto-refresh, enhanced UI |
-| `src/components/admin/tabs/ProcessingLogsTab.tsx` | +177 | Sortable table, status badges, mobile cards |
+| `src/components/admin/tabs/ProcessingLogsTab.tsx` | +177 | Bulk select/delete (checkbox, select-all, delete selected/all), mobile cards |
 | `src/components/admin/tabs/ExtractionHealthTab.test.tsx` | +516 (new) | 26 comprehensive tests |
 | `supabase/migrations/023_extraction_metrics.sql` | +4/−4 | Fix $$ quoting |
 | `supabase/migrations/024_processing_log_cleanup_cron.sql` | +26 (new) | pg_cron cleanup job |
 | `.gitignore` | +6 | Worktree dirs, xlsx artifacts |
+| `CLAUDE.md` | +96/−7 | Known Issues 135-137, 4 new gotchas, updated metrics |
 | `SESSION_HANDOFF.md` | rewritten | Session documentation |
 
 ---

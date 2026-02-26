@@ -691,6 +691,7 @@ xl: 1280px  /* Large desktop */
 | `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, hourly buckets, recent errors) | Admin |
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 | `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
+| `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
 | `/api/admin/processing-logs/cleanup` | POST | Trigger manual processing log cleanup (default 90 days) | SuperAdmin |
 
 ### Request/Response Examples
@@ -4681,6 +4682,14 @@ connectSrc: [
 - DB fallback (`getDBExtractionHealth()`) similarly reconstructs hourly buckets from raw DB rows
 - Empty hours show as buckets with `{ total: 0, success: 0, failed: 0, avg_latency_ms: 0 }`
 - The chart refreshes every 10 seconds via auto-refresh — this is lightweight since it only reads the 200-event ring buffer
+
+**Processing Log Bulk Delete — Request Format (Added Feb 26, 2026):**
+- `DELETE /api/admin/processing-logs` accepts two body shapes (mirrors notification bulk delete pattern):
+  - `{ ids: string[] }` — delete specific logs by document ID
+  - `{ all: true, status?, before_date? }` — mass delete with optional filters
+- Requires SuperAdmin auth (not just Admin)
+- All delete operations are audit-logged via `logAdminAction()`
+- `ProcessingLogsTab.tsx` has checkbox bulk select UI with select-all, delete selected, and delete all buttons
 
 **Processing Log Admin Cleanup Endpoint (Added Feb 26, 2026):**
 - `POST /api/admin/processing-logs/cleanup` requires SuperAdmin auth (not just Admin)
