@@ -85,7 +85,11 @@ function getSupabase(): SupabaseClient | null {
     log.warn('Supabase not configured', {
       hasUrl: String(!!url),
       hasKey: String(!!key),
-      urlSource: process.env.SUPABASE_URL ? 'SUPABASE_URL' : (process.env.VITE_SUPABASE_URL ? 'VITE_SUPABASE_URL' : 'none'),
+      urlSource: process.env.SUPABASE_URL
+        ? 'SUPABASE_URL'
+        : process.env.VITE_SUPABASE_URL
+          ? 'VITE_SUPABASE_URL'
+          : 'none',
     })
     return null
   }
@@ -115,7 +119,9 @@ export async function createProcessingLog(
     .single()
 
   if (error) {
-    logger.child('ProcessingLogService').error('Failed to create log', { code: error.code, message: error.message })
+    logger
+      .child('ProcessingLogService')
+      .error('Failed to create log', { code: error.code, message: error.message })
     return { data: null, error: `${error.code}: ${error.message}` }
   }
 
@@ -192,9 +198,7 @@ export async function addProcessingStage(
 /**
  * Get a processing log by document ID
  */
-export async function getProcessingLog(
-  documentId: string
-): Promise<DocumentProcessingLog | null> {
+export async function getProcessingLog(documentId: string): Promise<DocumentProcessingLog | null> {
   const client = getSupabase()
   if (!client) return null
 
@@ -247,9 +251,7 @@ export async function listProcessingLogs(
 
   const { limit = 50, offset = 0, ...queryFilters } = filters
 
-  let query = client
-    .from('document_processing_logs')
-    .select('*', { count: 'exact' })
+  let query = client.from('document_processing_logs').select('*', { count: 'exact' })
 
   // Apply filters
   if (queryFilters.user_id) {
@@ -275,9 +277,7 @@ export async function listProcessingLogs(
   }
 
   // Apply pagination and ordering
-  query = query
-    .order('started_at', { ascending: false })
-    .range(offset, offset + limit - 1)
+  query = query.order('started_at', { ascending: false }).range(offset, offset + limit - 1)
 
   const { data, error, count } = await query
 
@@ -295,9 +295,7 @@ export async function listProcessingLogs(
 /**
  * Get processing statistics for admin dashboard
  */
-export async function getProcessingStats(
-  days: number = 30
-): Promise<ProcessingLogStats> {
+export async function getProcessingStats(days: number = 30): Promise<ProcessingLogStats> {
   const client = getSupabase()
   if (!client) {
     return {
@@ -343,9 +341,7 @@ export async function getProcessingStats(
     .filter((l) => l.total_duration_ms)
     .map((l) => l.total_duration_ms as number)
   const avgDuration =
-    durations.length > 0
-      ? durations.reduce((a, b) => a + b, 0) / durations.length
-      : 0
+    durations.length > 0 ? durations.reduce((a, b) => a + b, 0) / durations.length : 0
 
   const providerCounts: Record<string, number> = {}
   logs.forEach((l) => {
@@ -363,6 +359,64 @@ export async function getProcessingStats(
     ocr_usage_rate: total > 0 ? (ocrUsed / total) * 100 : 0,
     ai_provider_breakdown: providerCounts,
   }
+}
+
+/**
+ * Delete specific processing logs by document IDs
+ */
+export async function deleteProcessingLogs(documentIds: string[]): Promise<number> {
+  const client = getSupabase()
+  if (!client || documentIds.length === 0) return 0
+
+  const { data, error } = await client
+    .from('document_processing_logs')
+    .delete()
+    .in('document_id', documentIds)
+    .select('id')
+
+  if (error) {
+    log.error('Failed to delete processing logs', {
+      error: String(error),
+      count: documentIds.length,
+    })
+    return 0
+  }
+
+  return data?.length || 0
+}
+
+/**
+ * Delete all processing logs with optional filters
+ */
+export async function deleteAllProcessingLogs(options?: {
+  status?: string
+  before_date?: string
+}): Promise<number> {
+  const client = getSupabase()
+  if (!client) return 0
+
+  let query = client.from('document_processing_logs').delete()
+
+  if (options?.status) {
+    query = query.eq('status', options.status)
+  }
+  if (options?.before_date) {
+    query = query.lte('started_at', options.before_date)
+  }
+
+  // If no filters, use a catch-all to delete everything
+  if (!options?.status && !options?.before_date) {
+    query = query.gte('started_at', '1970-01-01')
+  }
+
+  const { data, error } = await query.select('id')
+
+  if (error) {
+    log.error('Failed to delete all processing logs', { error: String(error), options })
+    return 0
+  }
+
+  return data?.length || 0
 }
 
 /**

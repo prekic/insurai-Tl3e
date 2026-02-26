@@ -83,6 +83,13 @@ export async function getDBExtractionHealth(hours = 24): Promise<{
     message: string
     timestamp: string
   }>
+  hourly_buckets: Array<{
+    hour: string
+    total: number
+    success: number
+    failed: number
+    avg_latency_ms: number
+  }>
 } | null> {
   const db = getSupabase()
   if (!db) return null
@@ -119,7 +126,8 @@ export async function getDBExtractionHealth(hours = 24): Promise<{
       providerMap[r.provider].latencySum += r.duration_ms || 0
     }
 
-    const by_provider: Record<string, { total: number; failed: number; avg_latency_ms: number }> = {}
+    const by_provider: Record<string, { total: number; failed: number; avg_latency_ms: number }> =
+      {}
     for (const [provider, stats] of Object.entries(providerMap)) {
       by_provider[provider] = {
         total: stats.total,
@@ -140,6 +148,36 @@ export async function getDBExtractionHealth(hours = 24): Promise<{
         timestamp: r.created_at,
       }))
 
+    // Hourly buckets for time-series chart
+    const nowMs = Date.now()
+    const hourlyMap: Record<
+      string,
+      { total: number; success: number; failed: number; latencySum: number }
+    > = {}
+    for (let i = 23; i >= 0; i--) {
+      const bucketStart = new Date(nowMs - i * 60 * 60 * 1000)
+      bucketStart.setMinutes(0, 0, 0)
+      hourlyMap[bucketStart.toISOString()] = { total: 0, success: 0, failed: 0, latencySum: 0 }
+    }
+    for (const r of records) {
+      const rTime = new Date(r.created_at)
+      rTime.setMinutes(0, 0, 0)
+      const key = rTime.toISOString()
+      if (hourlyMap[key]) {
+        hourlyMap[key].total++
+        if (r.success) hourlyMap[key].success++
+        else hourlyMap[key].failed++
+        hourlyMap[key].latencySum += r.duration_ms || 0
+      }
+    }
+    const hourly_buckets = Object.entries(hourlyMap).map(([hour, b]) => ({
+      hour,
+      total: b.total,
+      success: b.success,
+      failed: b.failed,
+      avg_latency_ms: b.total > 0 ? Math.round(b.latencySum / b.total) : 0,
+    }))
+
     return {
       last_period: {
         total,
@@ -149,6 +187,7 @@ export async function getDBExtractionHealth(hours = 24): Promise<{
       },
       by_provider,
       recent_errors,
+      hourly_buckets,
     }
   } catch (err) {
     svcLog.warn('Failed to query extraction metrics', {

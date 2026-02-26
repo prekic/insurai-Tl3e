@@ -23,6 +23,10 @@ import {
   Activity,
   Brain,
   ScanLine,
+  Trash2,
+  CheckSquare,
+  Square,
+  MinusSquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -213,6 +217,9 @@ export function ProcessingLogsTab() {
   const [page, setPage] = useState(0)
   const pageSize = 20
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
+
   const [filters, setFilters] = useState<Filters>({
     status: '',
     ocr_used: '',
@@ -325,6 +332,79 @@ export function ProcessingLogsTab() {
     a.download = `processing-logs-${new Date().toISOString().split('T')[0]}.json`
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const toggleSelect = (documentId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(documentId)) {
+        next.delete(documentId)
+      } else {
+        next.add(documentId)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === logs.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(logs.map((l) => l.document_id)))
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return
+    const confirmed = window.confirm(
+      `Delete ${selectedIds.size} selected processing log${selectedIds.size !== 1 ? 's' : ''}? This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      const response = await adminFetch('/api/admin/processing-logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setSelectedIds(new Set())
+        fetchLogs()
+        fetchStats()
+        fetchRecentErrors()
+      }
+    } catch (err) {
+      console.error('Failed to delete logs:', err)
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const handleDeleteAll = async () => {
+    const confirmed = window.confirm('Delete ALL processing logs? This cannot be undone.')
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      const response = await adminFetch('/api/admin/processing-logs', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ all: true }),
+      })
+      const data = await response.json()
+      if (data.success) {
+        setSelectedIds(new Set())
+        fetchLogs()
+        fetchStats()
+        fetchRecentErrors()
+      }
+    } catch (err) {
+      console.error('Failed to delete all logs:', err)
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const formatDuration = (ms?: number) => {
@@ -490,7 +570,47 @@ export function ProcessingLogsTab() {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Selection controls */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleSelectAll}
+            title={selectedIds.size === logs.length ? 'Deselect all' : 'Select all'}
+          >
+            {selectedIds.size === 0 ? (
+              <Square size={16} />
+            ) : selectedIds.size === logs.length ? (
+              <CheckSquare size={16} />
+            ) : (
+              <MinusSquare size={16} />
+            )}
+          </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDeleteSelected}
+              disabled={deleting}
+              className="text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Trash2 size={16} className="mr-1" />
+              Delete Selected ({selectedIds.size})
+            </Button>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDeleteAll}
+            disabled={deleting}
+            className="text-red-600 border-red-200 hover:bg-red-50"
+          >
+            <Trash2 size={16} className="mr-1" />
+            Delete All
+          </Button>
+
+          <div className="w-px h-6 bg-gray-200" />
+
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
             <RefreshCw size={16} className={cn('mr-2', loading && 'animate-spin')} />
             Refresh
@@ -597,11 +717,29 @@ export function ProcessingLogsTab() {
           logs.map((log) => (
             <div
               key={log.id}
-              className="bg-white border border-gray-200 rounded-lg p-4 active:bg-gray-50 cursor-pointer transition-colors"
+              className={cn(
+                'bg-white border rounded-lg p-4 active:bg-gray-50 cursor-pointer transition-colors',
+                selectedIds.has(log.document_id)
+                  ? 'border-blue-400 ring-1 ring-blue-200'
+                  : 'border-gray-200'
+              )}
               onClick={() => setSelectedLog(log)}
             >
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleSelect(log.document_id)
+                    }}
+                    className="flex-shrink-0 text-gray-400 hover:text-blue-500"
+                  >
+                    {selectedIds.has(log.document_id) ? (
+                      <CheckSquare size={16} className="text-blue-500" />
+                    ) : (
+                      <Square size={16} />
+                    )}
+                  </button>
                   <FileText className="text-gray-400 flex-shrink-0" size={16} />
                   <span className="font-medium text-sm text-gray-900 truncate">{log.filename}</span>
                 </div>
@@ -639,6 +777,17 @@ export function ProcessingLogsTab() {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th className="px-3 py-3 w-10">
+                <button onClick={toggleSelectAll} className="text-gray-400 hover:text-blue-500">
+                  {selectedIds.size === 0 ? (
+                    <Square size={16} />
+                  ) : selectedIds.size === logs.length ? (
+                    <CheckSquare size={16} className="text-blue-500" />
+                  ) : (
+                    <MinusSquare size={16} className="text-blue-500" />
+                  )}
+                </button>
+              </th>
               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Document
               </th>
@@ -665,14 +814,14 @@ export function ProcessingLogsTab() {
           <tbody className="divide-y divide-gray-100">
             {loading && logs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <Loader2 className="animate-spin mx-auto mb-2" size={24} />
                   Loading processing logs...
                 </td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-4 py-12 text-center text-gray-500">
                   <FileText className="mx-auto mb-2 text-gray-300" size={32} />
                   No processing logs found
                 </td>
@@ -681,9 +830,27 @@ export function ProcessingLogsTab() {
               logs.map((log) => (
                 <tr
                   key={log.id}
-                  className="hover:bg-gray-50 cursor-pointer"
+                  className={cn(
+                    'hover:bg-gray-50 cursor-pointer',
+                    selectedIds.has(log.document_id) && 'bg-blue-50 ring-1 ring-inset ring-blue-200'
+                  )}
                   onClick={() => setSelectedLog(log)}
                 >
+                  <td className="px-3 py-3 w-10">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleSelect(log.document_id)
+                      }}
+                      className="text-gray-400 hover:text-blue-500"
+                    >
+                      {selectedIds.has(log.document_id) ? (
+                        <CheckSquare size={16} className="text-blue-500" />
+                      ) : (
+                        <Square size={16} />
+                      )}
+                    </button>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <FileText className="text-gray-400" size={16} />

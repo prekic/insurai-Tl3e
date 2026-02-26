@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**.
-- **Production Readiness**: ~9.5/10 (15,500+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 25, 2026 (Admin extraction health dashboard, Excel export with xlsx, comparison enhancements, DB extraction metrics persistence)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**.
+- **Production Readiness**: ~9.5/10 (15,530+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 26, 2026 (Extraction health hourly chart, processing log auto-cleanup via pg_cron, ExtractionHealthTab tests, pg_cron $$ syntax fix)
 
 ---
 
@@ -291,6 +291,8 @@ insurai/
 | `supabase/migrations/018_seed_translations.sql` | **NEW** Seeds 685+ translation keys × 2 languages |
 | `supabase/migrations/019_seed_coverage_insight_translations.sql` | **NEW** Coverage names + AI insight translations |
 | `supabase/migrations/020_seed_unsubscribe_translations.sql` | **NEW** Unsubscribe page translations (22 keys × 2 locales) |
+| `supabase/migrations/023_extraction_metrics.sql` | **NEW** Extraction metrics persistence table + pg_cron 30-day cleanup |
+| `supabase/migrations/024_processing_log_cleanup_cron.sql` | **NEW** pg_cron job for 90-day processing log auto-cleanup |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -686,8 +688,11 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/providers` | GET | Check which AI providers are configured | - |
 | `/api/ai/diagnose` | GET | Test API key validity | - |
 | `/api/health` | GET | Server health check | 60/min |
-| `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, recent errors) | Admin |
+| `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, hourly buckets, recent errors) | Admin |
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
+| `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
+| `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
+| `/api/admin/processing-logs/cleanup` | POST | Trigger manual processing log cleanup (default 90 days) | SuperAdmin |
 
 ### Request/Response Examples
 
@@ -1264,11 +1269,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 25, 2026)
-- **Total**: 15,503 tests across 319 test files (18 skipped)
+### Test Counts (as of Feb 26, 2026)
+- **Total**: 15,530 tests across 320 test files (18 skipped)
 - **Passing**: 100% (0 failures; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions.
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion).
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -3934,6 +3939,48 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File**: `server/services/extraction-metrics-service.ts`
 - **Commit**: `ac7e05c`
 
+### 135. Extraction Health Hourly Chart and Auto-Refresh (Added Feb 26, 2026)
+- **Feature**: ExtractionHealthTab now includes a stacked bar chart showing hourly extraction volume over the last 24 hours, with auto-refresh
+- **Components**:
+  - `HourlyChart` component in `ExtractionHealthTab.tsx` — stacked green (success) / red (failed) bars with hover tooltips (time, total, success, failed, avg latency)
+  - Server-side `buildHourlyBuckets()` in `server/routes/ai.ts` — creates 24 hourly buckets from in-memory extraction events
+  - DB fallback: `getDBExtractionHealth()` in `extraction-metrics-service.ts` also populates `hourly_buckets` for restart recovery
+- **Auto-Refresh**: 10-second interval with toggle button; manual refresh button in header
+- **Health Status Banner**: Color-coded based on error rate — green (<5%), amber (5-20%), red (>20%)
+- **Tests**: `ExtractionHealthTab.test.tsx` — 26 tests covering loading, error, charts, auto-refresh, provider stats, recent error expansion, timestamps
+- **Files**: `src/components/admin/tabs/ExtractionHealthTab.tsx`, `server/routes/ai.ts`, `server/services/extraction-metrics-service.ts`
+- **Commit**: `c910653`
+
+### 136. Processing Log Auto-Cleanup via pg_cron (Added Feb 26, 2026)
+- **Feature**: Automated cleanup of `document_processing_logs` rows older than 90 days via scheduled pg_cron job
+- **Components**:
+  - `deleteOldLogs(daysOld: number = 90)` in `server/services/processing-log-service.ts` — deletes rows where `started_at < NOW() - INTERVAL N days`
+  - `POST /api/admin/processing-logs/cleanup` in `server/routes/admin/content.ts` — manual trigger endpoint (SuperAdmin auth, audit-logged)
+  - `supabase/migrations/024_processing_log_cleanup_cron.sql` — pg_cron job scheduled at 04:00 UTC daily (1 hour after extraction_metrics cleanup at 03:00 UTC)
+- **Retention**: 90 days for processing logs (vs 30 days for extraction_metrics) — longer retention for audit trail
+- **pg_cron Status**: Both cleanup jobs confirmed running in production (jobid 1: extraction-metrics at 03:00 UTC, jobid 2: processing-logs at 04:00 UTC)
+- **Files**: `server/services/processing-log-service.ts`, `server/routes/admin/content.ts`, `supabase/migrations/024_processing_log_cleanup_cron.sql`
+- **Commit**: `c910653`
+
+### 137. Nested $$ Dollar-Quote Syntax Error in pg_cron Migrations (Fixed Feb 26, 2026)
+- **Problem**: Migrations 023 and 024 used nested `$$` dollar-quoting inside `DO $do$ ... PERFORM cron.schedule('name', 'schedule', $$SQL$$) ... $do$` blocks, which PostgreSQL rejects because `$$` inside an outer `$do$...$do$` block terminates the outer block prematurely
+- **Root Cause**: PostgreSQL requires distinct dollar-quote tags when nesting — inner `$$` conflicts with outer `$$` or `$do$`
+- **Solution**: Changed inner SQL from `$$DELETE FROM...$$` to `'DELETE FROM...'` (single-quoted string) in both migrations
+- **Pattern** (correct):
+  ```sql
+  DO $do$
+  BEGIN
+    PERFORM cron.schedule(
+      'cleanup-name',
+      '0 3 * * *',
+      'DELETE FROM public.table WHERE created_at < NOW() - INTERVAL ''30 days'''
+    );
+  END;
+  $do$;
+  ```
+- **Files Changed**: `supabase/migrations/023_extraction_metrics.sql`, `supabase/migrations/024_processing_log_cleanup_cron.sql`
+- **Commit**: `63af4c6`
+
 ---
 
 ## Turkish Market Considerations
@@ -4610,6 +4657,46 @@ connectSrc: [
   3. Create the tab component file in `src/components/admin/tabs/`
 - The `ExtractionHealthTab.tsx` follows this pattern (see Known Issue #131)
 
+**pg_cron Auto-Cleanup Retention Windows (Added Feb 26, 2026):**
+- Two pg_cron jobs run daily for data retention:
+  - `cleanup-extraction-metrics`: 03:00 UTC, deletes rows > **30 days** from `extraction_metrics`
+  - `cleanup-processing-logs`: 04:00 UTC, deletes rows > **90 days** from `document_processing_logs`
+- The 90-day retention is hardcoded in BOTH `processing-log-service.ts` (`deleteOldLogs(daysOld = 90)`) AND migration 024 SQL — if changing retention, update both
+- Verify jobs are running: `SELECT jobid, jobname, schedule FROM cron.job ORDER BY jobid;`
+- Both migrations (023, 024) require `pg_cron` extension enabled first (migration 022)
+
+**Nested Dollar-Quoting in pg_cron SQL (Fixed Feb 26, 2026):**
+- PostgreSQL `DO $do$...$do$` blocks CANNOT contain `$$..$$` inner quotes — the inner `$$` terminates the outer block
+- When scheduling cron jobs inside `DO` blocks, use **single-quoted SQL** with escaped inner quotes:
+  ```sql
+  -- WRONG: nested $$ inside $do$
+  DO $do$ BEGIN PERFORM cron.schedule('name', '0 3 * * *', $$DELETE FROM t$$); END; $do$;
+
+  -- CORRECT: single-quoted SQL with escaped quotes
+  DO $do$ BEGIN PERFORM cron.schedule('name', '0 3 * * *', 'DELETE FROM t WHERE x < NOW() - INTERVAL ''30 days'''); END; $do$;
+  ```
+- This was the root cause of migration 023/024 failing when applied via Supabase SQL Editor (Fixed in commit `63af4c6`)
+
+**Hourly Chart Data is Reconstructed Per-Fetch (Added Feb 26, 2026):**
+- `buildHourlyBuckets()` in `server/routes/ai.ts` creates 24-hour time-series from in-memory events on every fetch — NOT pre-computed or cached
+- DB fallback (`getDBExtractionHealth()`) similarly reconstructs hourly buckets from raw DB rows
+- Empty hours show as buckets with `{ total: 0, success: 0, failed: 0, avg_latency_ms: 0 }`
+- The chart refreshes every 10 seconds via auto-refresh — this is lightweight since it only reads the 200-event ring buffer
+
+**Processing Log Bulk Delete — Request Format (Added Feb 26, 2026):**
+- `DELETE /api/admin/processing-logs` accepts two body shapes (mirrors notification bulk delete pattern):
+  - `{ ids: string[] }` — delete specific logs by document ID
+  - `{ all: true, status?, before_date? }` — mass delete with optional filters
+- Requires SuperAdmin auth (not just Admin)
+- All delete operations are audit-logged via `logAdminAction()`
+- `ProcessingLogsTab.tsx` has checkbox bulk select UI with select-all, delete selected, and delete all buttons
+
+**Processing Log Admin Cleanup Endpoint (Added Feb 26, 2026):**
+- `POST /api/admin/processing-logs/cleanup` requires SuperAdmin auth (not just Admin)
+- Accepts optional `?daysOld=N` query parameter (default 90)
+- All calls are audit-logged via `logAdminAction()` — never bypass
+- The pg_cron job handles automated cleanup; this endpoint is for manual triggers only
+
 ---
 
 ## CI/CD
@@ -4677,7 +4764,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,503 tests, all passing (319 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,530 tests, all passing (320 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 25, 2026 (Extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence, test fixes)
+**Last Updated**: February 26, 2026 (Extraction health hourly chart, processing log auto-cleanup, pg_cron $$ syntax fix)

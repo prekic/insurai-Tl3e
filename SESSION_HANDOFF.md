@@ -1,4 +1,4 @@
-# Session Handoff — February 25, 2026 (Test Fixes, Documentation Sync)
+# Session Handoff — February 26, 2026 (Extraction Health Chart, pg_cron Cleanup, Dollar-Quote Fix)
 
 ## Current Status
 
@@ -8,11 +8,11 @@
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings |
-| **Tests** | 15,503 passing (319 test files), 0 failures |
+| **Tests** | 15,530 passing (320 test files), 0 failures |
 | **E2E Tests** | 186/186 Chromium passed (production build) |
 | **Coverage** | ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100, CLS 0 |
-| **Branch** | `claude/load-project-context-3VUJ2` |
+| **Branch** | `claude/load-project-context-e6OeC` |
 | **Production Readiness** | 9.5/10 |
 | **Live URL** | https://insurai-production.up.railway.app |
 | **Tech Stack** | React 19.2, Express 5, Vite 7, Vitest 4, TypeScript 5.9.3 |
@@ -23,11 +23,17 @@
 
 ## Session Summary
 
-This session continued from a previous conversation (`claude/load-project-context-3VUJ2`) that ran out of context. The previous session implemented 5 prioritized tasks (admin extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence, and related infrastructure). Code was complete but validation had not been run.
+This session completed 5 commits across 12 files (+1,260 lines):
 
-This session performed:
-1. **Test validation and fixes** — Ran lint + tests, diagnosed 14 failing test files with 447 test failures, identified 4 root causes, and fixed all of them
-2. **Comprehensive documentation sync** — Updated CLAUDE.md with new known issues (#131-134), new gotchas (5 entries), and updated Quick Reference; rewrote SESSION_HANDOFF.md
+1. **Extraction health hourly chart** (`c910653`) — Added `HourlyChart` component with stacked success/failure bar chart, hover tooltips, auto-refresh (10s), health status banner (green/amber/red), and server-side `buildHourlyBuckets()` for 24-hour time-series data.
+2. **Processing log cleanup + bulk delete** (`c910653`) — Added `deleteOldLogs()` + `deleteProcessingLogs()` + `deleteAllProcessingLogs()` service functions, `DELETE /api/admin/processing-logs` (bulk delete) + `POST /api/admin/processing-logs/cleanup` endpoints, migration `024_processing_log_cleanup_cron.sql` for automated 90-day retention, and `ProcessingLogsTab` bulk select/delete UI (checkbox selection, select-all, delete selected/all).
+3. **ExtractionHealthTab tests** (`c910653`) — 26 comprehensive tests covering loading, error, summary cards, health status banners, provider breakdown, recent errors, auto-refresh toggle, hourly chart, and edge cases.
+4. **pg_cron $$ dollar-quote syntax fix** (`63af4c6`) — Fixed nested `$$` inside `$do$` blocks in migrations 023 and 024 that caused PostgreSQL parse errors when applied via Supabase SQL Editor.
+5. **CLAUDE.md comprehensive update** (`7e0dbe8`) — Known Issues 135-137, 4 new gotchas, updated test counts and API endpoints.
+
+Additional housekeeping:
+6. **.gitignore updates** (`e6d5828`) — Added worktree dirs and xlsx build artifacts.
+7. **SESSION_HANDOFF.md update** (`395db43`) — Documentation sync.
 
 ---
 
@@ -35,78 +41,67 @@ This session performed:
 
 | Commit | Description |
 |--------|-------------|
-| `ac7e05c` | feat: admin extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence |
-| `3265f61` | docs: comprehensive handoff — update CLAUDE.md gotchas, test counts, and rewrite SESSION_HANDOFF.md |
-
-Note: Commit `ac7e05c` was created at the end of the previous session (which ran out of context) and pushed at the start of this session after test fixes were applied. Commit `3265f61` is the initial documentation update; a QA audit follow-up commit will capture the fixes from this cross-reference pass.
-
----
-
-## Test Fixes Applied
-
-### 1. `extraction-metrics-service.ts` — Logger Import Fix (10+ test files)
-- **Root Cause**: Imported `{ log }` from `../lib/logger.js` — no `log` export exists; only `logger`
-- **Impact**: `Cannot read properties of undefined (reading 'child')` cascaded to all server AI route tests because `ai.ts` imports `extraction-metrics-service.ts` at module scope
-- **Fix**: `import { logger }` + `logger.child('extraction-metrics')` (string, not object)
-- **Files affected**: All server test files importing from `ai.ts` routes
-
-### 2. `src/lib/export.test.ts` — Excel Export Now Async (2 test failures)
-- **Root Cause**: `exportToExcel` was updated to use real xlsx (`await import('xlsx')`) but tests still expected synchronous CSV behavior
-- **Fix**: Changed to `await expect(exportToExcel(policies)).resolves.toBeUndefined()` (+15 lines changed)
-
-### 3. `src/lib/processing-log-api.test.ts` — Extra `documentId` Context (5 test failures)
-- **Root Cause**: `console.error` calls now include `{ documentId }` context parameter from the previous session's changes
-- **Fix**: Added third argument to `toHaveBeenCalledWith` — exact objects for update paths, `expect.objectContaining` for create paths (which also include `apiBase`) (+15 lines changed)
-
-### 4. `src/components/TryAnalysis.test.tsx` — Logger Parameter in Extraction (1 test failure)
-- **Root Cause**: `extractPolicyFromDocument` now receives `logger` alongside `useFallback: false`
-- **Fix**: `expect.objectContaining({ useFallback: false })` instead of exact match (+1 line changed)
-
-### Final Test Results
-- 318/319 test files passed (1 pre-existing flaky: `PolicyDetailView-branches.test.tsx` timer teardown race)
-- 15,503/15,504 tests passed
-- 2 unhandled errors from concurrency — pre-existing, zero impact
+| `c910653` | feat: extraction health chart, processing log cleanup, and ExtractionHealthTab tests |
+| `e6d5828` | chore: add worktrees and xlsx to gitignore |
+| `395db43` | docs: update SESSION_HANDOFF.md for Feb 26 session |
+| `63af4c6` | fix: nested $$ dollar-quote syntax error in pg_cron migrations |
+| `7e0dbe8` | docs: comprehensive session handoff with Known Issues 135-137, gotchas, and updated metrics |
 
 ---
 
-## Work from Previous Session (Included in Branch)
+## New Features Implemented
 
-The following features were implemented in the previous session and are part of commit `ac7e05c`:
+### 1. Extraction Health Hourly Chart
+- **Component**: `HourlyChart` in `ExtractionHealthTab.tsx` — CSS stacked bar chart (green success / red failed) with hover tooltips
+- **Server**: `buildHourlyBuckets()` in `server/routes/ai.ts` — creates 24 hourly buckets from in-memory extraction events
+- **DB fallback**: `getDBExtractionHealth()` in `extraction-metrics-service.ts` also populates hourly buckets for restart recovery
+- **Auto-refresh**: 10-second interval with toggle button + manual refresh
+- **Health banner**: Color-coded (green <5% errors, amber 5-20%, red >20%)
 
-### Feature 1: Admin Extraction Health Dashboard UI (Known Issue #131)
-- `src/components/admin/tabs/ExtractionHealthTab.tsx` — New admin tab with auto-refresh (30s), summary cards, per-provider breakdown, recent errors list
-- `src/components/admin/AdminDashboard.tsx` — Registered `extraction_health` in TABS array and `renderTabContent()` switch case (+5 lines)
-- `src/types/admin.ts` — Added `'extraction_health'` to `AdminSection` union type (+1 line)
+### 2. Processing Log Auto-Cleanup
+- **Service**: `deleteOldLogs(daysOld: number = 90)` in `processing-log-service.ts`
+- **Endpoint**: `POST /api/admin/processing-logs/cleanup` (SuperAdmin auth, audit-logged)
+- **pg_cron**: Migration 024 schedules daily cleanup at 04:00 UTC
+- **Production**: Both pg_cron jobs confirmed running (verified via `SELECT * FROM cron.job`)
 
-### Feature 2: Excel/xlsx Export (Known Issue #125 update)
-- `src/lib/export.ts` — `exportToExcel()`, `exportSinglePolicyToExcel()`, `exportComparisonToCSV()`, `exportComparisonToPDF()` using lazy `await import('xlsx')`
-- `src/components/PolicyDetailView.tsx` — Added Excel export button + `handleExportExcel()` handler in export dropdown menu (+23 lines)
-- `xlsx` added as dependency in `package.json` (+ `package-lock.json` auto-updated)
-
-### Feature 3: ComparePolicies Enhancements (Known Issue #132)
-- `src/components/ComparePolicies.tsx` — `QuickStatsCard`, `ScoreComparisonChart`, `EnhancedCoverageMatrix` components, export dropdown with PDF/CSV options (+317 lines)
-
-### Feature 4: Extraction Metrics DB Persistence (Known Issue #133)
-- `server/services/extraction-metrics-service.ts` — `persistExtractionEvent()` (fire-and-forget DB write), `getDBExtractionHealth()` (DB fallback query)
-- `server/routes/ai.ts` — `recordExtractionEvent()` now calls `persistExtractionEvent()` as fire-and-forget; `getExtractionHealthSnapshot()` changed from **sync to async** with DB fallback when buffer is empty (e.g., after server restart); response now includes `source: 'memory' | 'database'` field (+34 lines)
-- `server/routes/admin/monitoring.ts` — Updated handler to `async` and `await getExtractionHealthSnapshot()` (sync→async change)
-- `supabase/migrations/023_extraction_metrics.sql` — New table with indexes, RLS, 30-day retention
-
-### i18n Keys Added (across all 4 translation files)
-- `src/lib/i18n/translations.ts` — Interface: 3 `exportMenu.*` keys (`excelExport`, `excelExportDesc`, `excelSuccess`) + 20 `comparison.*` keys (`exportComparison`, `exportPdf`, `exportCsv`, `quickStats`, `avgScore`, `avgPremium`, `totalCoverage`, `policiesCompared`, `scoreChart`, `premium`, `coverage`, `deductible`, `compliance`, `value`, `overall`, `best`, `included`, `notIncluded`, `pdfExported`, `csvExported`)
-- `src/lib/i18n/translations-en.ts` — English values (+23 lines)
-- `src/lib/i18n/translations-tr.ts` — Turkish values (+23 lines)
-- `src/lib/i18n/translations-skeleton.ts` — Empty skeleton entries (+23 lines)
+### 3. pg_cron Dollar-Quote Fix
+- **Problem**: Nested `$$` inside `$do$` blocks fails in PostgreSQL
+- **Fix**: Changed inner SQL to single-quoted strings with escaped inner quotes
+- **Files**: migrations 023 and 024
 
 ---
 
-## New Database Migration
+## New Database Migrations
 
-| Migration | Purpose | Status |
-|-----------|---------|--------|
-| `023_extraction_metrics.sql` | `extraction_metrics` table for persistent extraction event storage | **Not yet applied to production** |
+| Migration | Purpose | Production Status |
+|-----------|---------|-------------------|
+| `023_extraction_metrics.sql` | `extraction_metrics` table + pg_cron 30-day cleanup | **Applied** (table created, cron job running) |
+| `024_processing_log_cleanup_cron.sql` | pg_cron 90-day processing log auto-cleanup | **Applied** (cron job running) |
 
-Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021).
+**pg_cron jobs verified in production:**
+```
+jobid=1: cleanup-extraction-metrics (0 3 * * *) — 30-day retention
+jobid=2: cleanup-processing-logs (0 4 * * *) — 90-day retention
+```
+
+---
+
+## Files Changed This Session
+
+| File | Lines Changed | Purpose |
+|------|---------------|---------|
+| `server/routes/ai.ts` | +63 | `buildHourlyBuckets()`, hourly data in health snapshot + DB fallback |
+| `server/services/extraction-metrics-service.ts` | +41 | `hourly_buckets` in DB health query |
+| `server/services/processing-log-service.ts` | +88 | `deleteOldLogs()`, `deleteProcessingLogs()`, `deleteAllProcessingLogs()`, `getProcessingLog()`, `getProcessingStats()` |
+| `server/routes/admin/content.ts` | +54 | `DELETE /processing-logs` (bulk delete) + `POST /cleanup` endpoints |
+| `src/components/admin/tabs/ExtractionHealthTab.tsx` | +293/−78 | `HourlyChart`, auto-refresh, enhanced UI |
+| `src/components/admin/tabs/ProcessingLogsTab.tsx` | +177 | Bulk select/delete (checkbox, select-all, delete selected/all), mobile cards |
+| `src/components/admin/tabs/ExtractionHealthTab.test.tsx` | +516 (new) | 26 comprehensive tests |
+| `supabase/migrations/023_extraction_metrics.sql` | +4/−4 | Fix $$ quoting |
+| `supabase/migrations/024_processing_log_cleanup_cron.sql` | +26 (new) | pg_cron cleanup job |
+| `.gitignore` | +6 | Worktree dirs, xlsx artifacts |
+| `CLAUDE.md` | +96/−7 | Known Issues 135-137, 4 new gotchas, updated metrics |
+| `SESSION_HANDOFF.md` | rewritten | Session documentation |
 
 ---
 
@@ -116,19 +111,16 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 |-------|----------|--------|-------|
 | Unhandled rejection in full test suite | Info | Pre-existing | `window is not defined` in PolicyUpload.test.tsx; all files pass individually |
 | PolicyDetailView-branches timer teardown | Info | Pre-existing | Flaky under full suite concurrency; passes individually |
-| Migration 023 not applied to production | Medium | Pending | DB metrics won't persist until migration is applied; in-memory ring buffer still works |
+| 90-day retention hardcoded in two places | Low | By design | `processing-log-service.ts` default param AND migration 024 SQL — must update both if changing |
 
 ---
 
 ## Deployment Notes
 
-### New Dependency
-- `xlsx` (SheetJS) added to `package.json` — required for Excel export functionality
-- Lazy-loaded via `await import('xlsx')` — not in main bundle
-
-### New Database Migration Required
-- `supabase/migrations/023_extraction_metrics.sql` — Creates `extraction_metrics` table
-- Apply manually via Supabase SQL Editor before expecting DB-persisted metrics
+### Production pg_cron — Confirmed Running
+- Extension: pg_cron v1.6.4
+- Jobs: 2 active (extraction-metrics cleanup at 03:00 UTC, processing-logs cleanup at 04:00 UTC)
+- Grants: `USAGE ON SCHEMA cron` and `ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron` to `postgres`
 
 ### Railway Configuration (Unchanged)
 - **Live URL**: https://insurai-production.up.railway.app
@@ -143,93 +135,61 @@ Apply via Supabase Dashboard → SQL Editor (same pattern as migrations 020, 021
 
 ## Next Steps (Priority Order)
 
-### P0 — Merge
-1. **Merge this PR** — Use the Conventional Commit title at the bottom
-2. **Apply migration 023** — Run `023_extraction_metrics.sql` in Supabase SQL Editor
-3. **Post-merge verification**:
-   - Upload a policy via `/try` route → confirm processing log entry appears
-   - Visit admin Dashboard → Extraction Health tab → verify metrics display
-   - Try export dropdown → PDF, CSV, Excel all work
-   - Visit Compare Policies → verify stats card, score chart, enhanced matrix
+### P0 — Merge & Deploy
+1. **Merge this PR** — Conventional Commit title below
+2. **Post-merge verification**:
+   - Visit admin Dashboard → Extraction Health tab → verify hourly chart renders with stacked bars
+   - Trigger a test extraction → confirm new event appears in chart within 10s (auto-refresh)
+   - Visit admin Dashboard → Processing Logs tab → verify sortable table and mobile card layout
 
 ### P1 — Product / Feature Work
-4. **Extraction health chart/graph** — The tab currently shows text/numbers. Add a time-series chart showing success rate over 24h windows
-5. **Processing log cleanup cron** — Auto-delete processing logs older than 30 days via Edge Function or pg_cron
-6. **Admin tab tests** — `ExtractionHealthTab.tsx` currently has no test file
+3. **Extraction health alerting** — Email/notification when error rate exceeds configurable threshold (builds on existing notification infrastructure)
+4. **Admin Settings for cleanup retention** — Make the 90-day (processing logs) and 30-day (extraction metrics) retention configurable via admin settings instead of hardcoded
+5. **Processing log stats dashboard** — Add aggregate stats panel (total logs, success/failure breakdown, avg processing time, storage used)
 
-### P2 — Infrastructure
-7. **Extraction metrics auto-cleanup** — Add pg_cron or Edge Function to `DELETE FROM extraction_metrics WHERE timestamp < NOW() - INTERVAL '30 days'`
-8. **Bundle analysis** — Run `npm run build:analyze` to check impact of `xlsx` dependency on chunks
+### P2 — Infrastructure & Quality
+6. **Bundle analysis** — Run `npm run build:analyze` to measure impact of `xlsx` dependency on chunks
+7. **E2E test expansion** — Add Playwright tests for admin extraction health tab and processing logs tab
+8. **Premium benchmarks admin UI** — Backend CRUD endpoints exist in `content.ts` but no admin tab UI yet
 
----
-
-## Gotchas Discovered This Session
-
-### Server Logger — `logger` Not `log`
-- `server/lib/logger.ts` exports `logger` — there is NO `log` export
-- `logger.child()` takes a **string** tag, not an object: `logger.child('module-name')`
-- This was the root cause of 10+ test file failures — importing `{ log }` gives `undefined`, then `.child()` crashes
-
-### exportToExcel is Async — Tests Must Await
-- `exportToExcel()` uses `await import('xlsx')` — it's a Promise, not synchronous
-- Old test pattern (checking `mockCreateObjectURL`) won't work
-- New pattern: `await expect(exportToExcel(policies)).resolves.toBeUndefined()`
-
-### processing-log-api Console Calls Include Context
-- `console.error` in `processing-log-api.ts` now passes `{ documentId }` (and sometimes `{ documentId, apiBase }`) as additional arguments
-- Test assertions must include this context arg or use `expect.objectContaining()`
-
-### TryAnalysis Passes `logger` to Extraction
-- `extractPolicyFromDocument(file, { useFallback: false, logger })` — test assertions must use `expect.objectContaining({ useFallback: false })` not exact match
-
-### `getExtractionHealthSnapshot()` Is Now Async
-- `server/routes/ai.ts` — The function was synchronous, now returns `Promise<...>` because it tries a DB fallback when the in-memory buffer is empty
-- `server/routes/admin/monitoring.ts` — Handler changed from sync to `async` with `await`
-- Response now includes `source: 'memory' | 'database'` field — consumers that check the shape of the health response should expect this new property
-- After a Railway restart, the buffer is empty, so the first calls will hit the DB fallback (if migration 023 has been applied)
-
-### New i18n Keys — 23 Keys Across 4 Files
-- 3 `exportMenu.*` keys: `excelExport`, `excelExportDesc`, `excelSuccess`
-- 20 `comparison.*` keys: `exportComparison`, `exportPdf`, `exportCsv`, `quickStats`, `avgScore`, `avgPremium`, `totalCoverage`, `policiesCompared`, `scoreChart`, `premium`, `coverage`, `deductible`, `compliance`, `value`, `overall`, `best`, `included`, `notIncluded`, `pdfExported`, `csvExported`
-- Added to: `translations.ts` (interface), `translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts`
+### P3 — Nice to Have
+9. **Extraction health historical trends** — Weekly/monthly trend charts from DB-persisted metrics
+10. **Processing log export** — Export processing logs as CSV/JSON for offline analysis
+11. **Cron job monitoring UI** — Admin panel showing pg_cron job status, last run time, next scheduled run
 
 ---
 
 ## Previous Session Context
+
+**February 26, 2026 (This Session)** (`claude/load-project-context-e6OeC`):
+- Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests, pg_cron dollar-quote fix
+- 15,530 tests, 320 files
+
+**February 25, 2026 (Test Fixes, Documentation Sync)** (`claude/load-project-context-3VUJ2`):
+- Admin extraction health dashboard, Excel export, comparison enhancements, DB metrics persistence
+- Test fixes (4 root causes), comprehensive documentation sync
+- 15,503 tests, 319 files
 
 **February 25, 2026 (Export, Onboarding, Observability, Admin UX)** (`claude/complete-handoff-docs-Goirm`):
 - Export dropdown (PDF/CSV/text), user onboarding flow, extraction error observability
 - Admin mobile-responsive dashboard, notification bulk delete, processing logger fix
 - 15,444 tests, 317 files
 
-**February 22, 2026 (TR Translations Lazy-Load + Push Notification Verification)**:
-- Split TR/EN translations into async Vite chunks
-- Push notification end-to-end confirmed in production
-
-**February 21, 2026 (Policy Expiry Scheduler, framer-motion Removal)**:
-- Policy expiry via pg_cron Edge Function
-- framer-motion removed from main bundle (−38 KB gzip)
-
-**February 20, 2026 (PWA Push Notifications, No-Non-Null-Assertion Cleanup)**:
-- Full server + client push notification infrastructure
-- 0 ESLint warnings achieved
-
 ---
 
 ## PR Title (Conventional Commit)
 
 ```
-feat(admin): add extraction health dashboard, Excel export, comparison enhancements, and DB metrics persistence
+feat(admin): extraction health hourly chart, processing log pg_cron cleanup, ExtractionHealthTab tests
 ```
 
 ---
 
-**Last Updated**: February 25, 2026
-**Branch**: `claude/load-project-context-3VUJ2`
+**Last Updated**: February 26, 2026
+**Branch**: `claude/load-project-context-e6OeC`
 **ESLint Status**: 0 errors, 0 warnings
 **TypeCheck**: 0 errors
-**Tests**: 15,503 passing (319 files), 0 failures
+**Tests**: 15,530 passing (320 files), 0 failures
 **Coverage**: ~85.91% branches, ~91.67% statements
 **Bundle**: ~214 KB gzip main chunk + async EN/TR/Supabase chunks
-**Architecture Decision**: No new ADR required — all changes are additive features using existing patterns (dual-write follows fire-and-forget pattern; admin tab follows registration pattern; xlsx is a runtime dependency lazily imported)
-**Next Session Focus**: Merge this PR; apply migration 023; add extraction health charts; add admin tab tests.
+**Architecture Decision**: No new ADR required — all changes are additive features using existing patterns (pg_cron was already in use for policy expiry notifications via migration 022)

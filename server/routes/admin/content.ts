@@ -99,6 +99,60 @@ router.get(
 )
 
 /**
+ * Delete selected processing logs
+ * DELETE /api/admin/processing-logs
+ * Body: { ids: string[] } or { all: true, status?: string, before_date?: string }
+ */
+router.delete(
+  '/processing-logs',
+  ...requireSuperAdmin(),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { ids, all, status, before_date } = req.body as {
+        ids?: string[]
+        all?: boolean
+        status?: string
+        before_date?: string
+      }
+
+      let deletedCount = 0
+
+      if (all) {
+        deletedCount = await processingLogService.deleteAllProcessingLogs({
+          status,
+          before_date,
+        })
+        await logAdminAction(req, 'delete_all', 'processing_logs', undefined, undefined, {
+          deletedCount,
+          status,
+          before_date,
+        })
+      } else if (ids && Array.isArray(ids) && ids.length > 0) {
+        deletedCount = await processingLogService.deleteProcessingLogs(ids)
+        await logAdminAction(req, 'delete', 'processing_logs', undefined, undefined, {
+          deletedCount,
+          ids,
+        })
+      } else {
+        res.status(400).json({ success: false, error: 'Provide ids array or all: true' })
+        return
+      }
+
+      res.json({
+        success: true,
+        message: `Deleted ${deletedCount} processing log${deletedCount !== 1 ? 's' : ''}`,
+        deletedCount,
+      })
+    } catch (error) {
+      log.error('Failed to delete processing logs', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Failed to delete processing logs' })
+    }
+  }
+)
+
+/**
  * Get a specific processing log by document ID
  * GET /api/admin/processing-logs/:documentId
  */

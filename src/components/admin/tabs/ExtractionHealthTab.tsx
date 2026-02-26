@@ -12,8 +12,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { adminFetch } from '@/lib/admin/api'
 import { Button } from '@/components/ui/button'
 import {
-  RefreshCw, Activity, AlertTriangle, CheckCircle, XCircle,
-  Server, ChevronDown, ChevronUp,
+  RefreshCw,
+  Activity,
+  AlertTriangle,
+  CheckCircle,
+  XCircle,
+  Server,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,6 +37,14 @@ interface RecentError {
   timestamp: string
 }
 
+interface HourlyBucket {
+  hour: string
+  total: number
+  success: number
+  failed: number
+  avg_latency_ms: number
+}
+
 interface ExtractionHealthData {
   last_24h: {
     total: number
@@ -40,6 +54,7 @@ interface ExtractionHealthData {
   }
   by_provider: Record<string, ProviderStats>
   recent_errors: RecentError[]
+  hourly_buckets?: HourlyBucket[]
   buffer_size: number
 }
 
@@ -78,7 +93,7 @@ export function ExtractionHealthTab() {
   }, [autoRefresh, fetchHealth])
 
   const toggleError = (requestId: string) => {
-    setExpandedErrors(prev => {
+    setExpandedErrors((prev) => {
       const next = new Set(prev)
       if (next.has(requestId)) {
         next.delete(requestId)
@@ -115,7 +130,7 @@ export function ExtractionHealthTab() {
   const { last_24h, by_provider, recent_errors, buffer_size } = data
   const errorRatePercent = (last_24h.error_rate * 100).toFixed(1)
   const isHealthy = last_24h.error_rate < 0.05
-  const isWarning = last_24h.error_rate >= 0.05 && last_24h.error_rate < 0.20
+  const isWarning = last_24h.error_rate >= 0.05 && last_24h.error_rate < 0.2
   const providers = Object.entries(by_provider)
 
   return (
@@ -168,44 +183,66 @@ export function ExtractionHealthTab() {
           label="Error Rate"
           value={`${errorRatePercent}%`}
           icon={
-            isHealthy
-              ? <CheckCircle className="h-5 w-5 text-green-500" />
-              : isWarning
-                ? <AlertTriangle className="h-5 w-5 text-amber-500" />
-                : <XCircle className="h-5 w-5 text-red-500" />
+            isHealthy ? (
+              <CheckCircle className="h-5 w-5 text-green-500" />
+            ) : isWarning ? (
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+            ) : (
+              <XCircle className="h-5 w-5 text-red-500" />
+            )
           }
           color={isHealthy ? 'green' : isWarning ? 'amber' : 'red'}
         />
       </div>
 
       {/* Overall Health Status */}
-      <div className={cn(
-        'p-4 rounded-xl border flex items-center gap-3',
-        isHealthy ? 'bg-green-50 border-green-200' : isWarning ? 'bg-amber-50 border-amber-200' : 'bg-red-50 border-red-200'
-      )}>
-        {isHealthy
-          ? <CheckCircle className="h-6 w-6 text-green-600" />
-          : isWarning
-            ? <AlertTriangle className="h-6 w-6 text-amber-600" />
-            : <XCircle className="h-6 w-6 text-red-600" />
-        }
+      <div
+        className={cn(
+          'p-4 rounded-xl border flex items-center gap-3',
+          isHealthy
+            ? 'bg-green-50 border-green-200'
+            : isWarning
+              ? 'bg-amber-50 border-amber-200'
+              : 'bg-red-50 border-red-200'
+        )}
+      >
+        {isHealthy ? (
+          <CheckCircle className="h-6 w-6 text-green-600" />
+        ) : isWarning ? (
+          <AlertTriangle className="h-6 w-6 text-amber-600" />
+        ) : (
+          <XCircle className="h-6 w-6 text-red-600" />
+        )}
         <div>
-          <p className={cn(
-            'font-semibold',
-            isHealthy ? 'text-green-800' : isWarning ? 'text-amber-800' : 'text-red-800'
-          )}>
-            {isHealthy ? 'Extraction Pipeline Healthy' : isWarning ? 'Elevated Error Rate' : 'High Error Rate — Investigate'}
+          <p
+            className={cn(
+              'font-semibold',
+              isHealthy ? 'text-green-800' : isWarning ? 'text-amber-800' : 'text-red-800'
+            )}
+          >
+            {isHealthy
+              ? 'Extraction Pipeline Healthy'
+              : isWarning
+                ? 'Elevated Error Rate'
+                : 'High Error Rate — Investigate'}
           </p>
-          <p className={cn(
-            'text-sm',
-            isHealthy ? 'text-green-700' : isWarning ? 'text-amber-700' : 'text-red-700'
-          )}>
+          <p
+            className={cn(
+              'text-sm',
+              isHealthy ? 'text-green-700' : isWarning ? 'text-amber-700' : 'text-red-700'
+            )}
+          >
             {last_24h.total === 0
               ? 'No extractions recorded in the buffer. Server may have restarted recently.'
               : `${last_24h.success} of ${last_24h.total} extractions succeeded in the current buffer window.`}
           </p>
         </div>
       </div>
+
+      {/* Hourly Volume Chart (Last 24 Hours) */}
+      {data.hourly_buckets && data.hourly_buckets.length > 0 && (
+        <HourlyChart buckets={data.hourly_buckets} />
+      )}
 
       {/* Per-Provider Breakdown */}
       {providers.length > 0 && (
@@ -220,31 +257,65 @@ export function ExtractionHealthTab() {
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50">
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Provider</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Failed</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Error Rate</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Avg Latency</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Latency</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Provider
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Total
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Failed
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Error Rate
+                  </th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Avg Latency
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Latency
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {providers.map(([provider, stats]) => {
                   const providerErrorRate = stats.total > 0 ? stats.failed / stats.total : 0
-                  const latencyColor = stats.avg_latency_ms < 5000 ? 'text-green-600' : stats.avg_latency_ms < 15000 ? 'text-amber-600' : 'text-red-600'
+                  const latencyColor =
+                    stats.avg_latency_ms < 5000
+                      ? 'text-green-600'
+                      : stats.avg_latency_ms < 15000
+                        ? 'text-amber-600'
+                        : 'text-red-600'
                   const latencyBarWidth = Math.min(100, (stats.avg_latency_ms / 30000) * 100)
-                  const latencyBarColor = stats.avg_latency_ms < 5000 ? 'bg-green-400' : stats.avg_latency_ms < 15000 ? 'bg-amber-400' : 'bg-red-400'
+                  const latencyBarColor =
+                    stats.avg_latency_ms < 5000
+                      ? 'bg-green-400'
+                      : stats.avg_latency_ms < 15000
+                        ? 'bg-amber-400'
+                        : 'bg-red-400'
                   return (
                     <tr key={provider} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
                         <span className="font-medium text-gray-900 capitalize">{provider}</span>
                       </td>
-                      <td className="px-6 py-4 text-right font-mono text-gray-700">{stats.total}</td>
-                      <td className="px-6 py-4 text-right font-mono">
-                        <span className={stats.failed > 0 ? 'text-red-600 font-semibold' : 'text-gray-500'}>{stats.failed}</span>
+                      <td className="px-6 py-4 text-right font-mono text-gray-700">
+                        {stats.total}
                       </td>
                       <td className="px-6 py-4 text-right font-mono">
-                        <span className={providerErrorRate > 0.1 ? 'text-red-600 font-semibold' : 'text-gray-500'}>
+                        <span
+                          className={
+                            stats.failed > 0 ? 'text-red-600 font-semibold' : 'text-gray-500'
+                          }
+                        >
+                          {stats.failed}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono">
+                        <span
+                          className={
+                            providerErrorRate > 0.1 ? 'text-red-600 font-semibold' : 'text-gray-500'
+                          }
+                        >
                           {(providerErrorRate * 100).toFixed(1)}%
                         </span>
                       </td>
@@ -255,7 +326,10 @@ export function ExtractionHealthTab() {
                       </td>
                       <td className="px-6 py-4 w-32">
                         <div className="w-full bg-gray-100 rounded-full h-2">
-                          <div className={cn('h-2 rounded-full', latencyBarColor)} style={{ width: `${latencyBarWidth}%` }} />
+                          <div
+                            className={cn('h-2 rounded-full', latencyBarColor)}
+                            style={{ width: `${latencyBarWidth}%` }}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -312,29 +386,40 @@ export function ExtractionHealthTab() {
                         <p className="text-sm text-gray-700 mt-1 truncate">{err.message}</p>
                       </div>
                     </div>
-                    {isExpanded
-                      ? <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                      : <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                    }
+                    {isExpanded ? (
+                      <ChevronUp className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    )}
                   </button>
                   {isExpanded && (
                     <div className="px-6 pb-4 ml-10">
                       <div className="bg-gray-50 rounded-lg p-4 text-sm space-y-2">
                         <div className="flex gap-2">
-                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">Request ID:</span>
+                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">
+                            Request ID:
+                          </span>
                           <span className="font-mono text-gray-700 break-all">{err.requestId}</span>
                         </div>
                         <div className="flex gap-2">
-                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">Provider:</span>
+                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">
+                            Provider:
+                          </span>
                           <span className="text-gray-700 capitalize">{err.provider}</span>
                         </div>
                         <div className="flex gap-2">
-                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">Error Code:</span>
+                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">
+                            Error Code:
+                          </span>
                           <span className="font-mono text-red-700">{err.code || 'N/A'}</span>
                         </div>
                         <div className="flex gap-2">
-                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">Timestamp:</span>
-                          <span className="text-gray-700">{new Date(err.timestamp).toLocaleString()}</span>
+                          <span className="text-gray-500 font-medium w-24 flex-shrink-0">
+                            Timestamp:
+                          </span>
+                          <span className="text-gray-700">
+                            {new Date(err.timestamp).toLocaleString()}
+                          </span>
                         </div>
                         <div>
                           <span className="text-gray-500 font-medium">Full Message:</span>
@@ -363,6 +448,112 @@ export function ExtractionHealthTab() {
 
 // Helper Components
 
+function HourlyChart({ buckets }: { buckets: HourlyBucket[] }) {
+  const maxTotal = Math.max(...buckets.map((b) => b.total), 1)
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6">
+      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+        <Activity className="h-5 w-5 text-blue-500" />
+        Extraction Volume (Last 24 Hours)
+      </h3>
+
+      {/* Chart */}
+      <div className="relative">
+        <div className="flex items-end gap-1 h-40">
+          {buckets.map((bucket, i) => {
+            const successHeight = maxTotal > 0 ? (bucket.success / maxTotal) * 100 : 0
+            const failedHeight = maxTotal > 0 ? (bucket.failed / maxTotal) * 100 : 0
+            const isHovered = hoveredIndex === i
+
+            return (
+              <div
+                key={bucket.hour}
+                className="flex-1 flex flex-col items-stretch justify-end h-full relative cursor-pointer"
+                onMouseEnter={() => setHoveredIndex(i)}
+                onMouseLeave={() => setHoveredIndex(null)}
+              >
+                {/* Tooltip */}
+                {isHovered && bucket.total > 0 && (
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-10 bg-gray-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                    <div className="font-medium">
+                      {new Date(bucket.hour).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </div>
+                    <div>Total: {bucket.total}</div>
+                    <div className="text-green-300">Success: {bucket.success}</div>
+                    {bucket.failed > 0 && (
+                      <div className="text-red-300">Failed: {bucket.failed}</div>
+                    )}
+                    <div className="text-gray-300">Avg: {formatLatency(bucket.avg_latency_ms)}</div>
+                  </div>
+                )}
+                {/* Bar */}
+                {bucket.failed > 0 && (
+                  <div
+                    className={cn('w-full rounded-t-sm', isHovered ? 'bg-red-500' : 'bg-red-400')}
+                    style={{ height: `${failedHeight}%`, minHeight: bucket.failed > 0 ? '2px' : 0 }}
+                  />
+                )}
+                {bucket.success > 0 && (
+                  <div
+                    className={cn(
+                      'w-full',
+                      isHovered ? 'bg-green-500' : 'bg-green-400',
+                      bucket.failed === 0 && 'rounded-t-sm'
+                    )}
+                    style={{
+                      height: `${successHeight}%`,
+                      minHeight: bucket.success > 0 ? '2px' : 0,
+                    }}
+                  />
+                )}
+                {bucket.total === 0 && (
+                  <div className="w-full bg-gray-100 rounded-t-sm" style={{ height: '2px' }} />
+                )}
+              </div>
+            )
+          })}
+        </div>
+
+        {/* X-axis labels (every 3rd hour) */}
+        <div className="flex gap-1 mt-2">
+          {buckets.map((bucket, i) => (
+            <div key={bucket.hour} className="flex-1 text-center">
+              {i % 3 === 0 ? (
+                <span className="text-[10px] text-gray-400">
+                  {new Date(bucket.hour).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 bg-green-400 rounded-sm" />
+          Success
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-3 h-3 bg-red-400 rounded-sm" />
+          Failed
+        </div>
+        <div className="ml-auto text-gray-400">
+          Peak: {Math.max(...buckets.map((b) => b.total))} / hour
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface SummaryCardProps {
   label: string
   value: string
@@ -380,9 +571,7 @@ function SummaryCard({ label, value, icon, color }: SummaryCardProps) {
 
   return (
     <div className={cn('rounded-xl border p-4', bgColors[color])}>
-      <div className="flex items-center justify-between mb-2">
-        {icon}
-      </div>
+      <div className="flex items-center justify-between mb-2">{icon}</div>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       <p className="text-sm text-gray-600">{label}</p>
     </div>
