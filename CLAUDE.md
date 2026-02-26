@@ -205,6 +205,7 @@ insurai/
 | `server/middleware/validation.ts` | Zod schemas for request validation |
 | `server/middleware/rate-limit.ts` | Rate limiting for AI endpoints |
 | `server/lib/sentry.ts` | Sentry error tracking setup |
+| `server/services/extraction-metrics-service.ts` | **UPDATED** Extraction stats, hourly buckets, and historical daily trend aggregation |
 
 ### Push Notifications (Added Feb 20-21, 2026)
 | File | Purpose |
@@ -251,7 +252,7 @@ insurai/
 ### Admin Settings UI (Updated Feb 7, 2026)
 | File | Purpose |
 |------|---------|
-| `src/components/admin/tabs/SettingsTab.tsx` | Settings tab with category navigation + export/import UI |
+| `src/components/admin/tabs/SettingsTab.tsx` | Settings tab with category navigation + export/import UI + **NEW** Cron Jobs Panel |
 | `src/components/admin/tabs/settings/AISettingsPanel.tsx` | AI provider settings (models, temperature, timeouts) |
 | `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | Policy evaluation settings (weights, thresholds) |
 | `src/components/admin/tabs/settings/RateLimitsPanel.tsx` | API rate limit configuration |
@@ -700,9 +701,12 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/diagnose` | GET | Test API key validity | - |
 | `/api/health` | GET | Server health check | 60/min |
 | `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, hourly buckets, recent errors) | Admin |
+| `/api/admin/monitoring/extraction-health/historical` | GET | **NEW** Fetch daily aggregated 30-day extraction health stats | Admin |
 | `/api/admin/monitoring/alerts/status` | GET | Alert cooldown state (last fired timestamps per alert type) | Admin |
+| `/api/admin/monitoring/cron-jobs` | GET | **NEW** List configured pg_cron jobs and recent run execution details | Admin |
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 | `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
+| `/api/admin/processing-logs/export` | GET | **NEW** Export complete filtered processing logs as CSV bypassing pagination | Admin |
 | `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
 | `/api/admin/processing-logs/cleanup` | POST | Trigger manual processing log cleanup (default 90 days) | SuperAdmin |
 
