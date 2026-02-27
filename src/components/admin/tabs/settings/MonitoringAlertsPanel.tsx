@@ -47,6 +47,7 @@ export function MonitoringAlertsPanel({
   const [cooldownMin, setCooldownMin] = useState('')
   const [emailEnabled, setEmailEnabled] = useState(false)
   const [emailAddresses, setEmailAddresses] = useState('')
+  const [minRequests, setMinRequests] = useState('')
   const [dirty, setDirty] = useState(false)
 
   // Sync from settings on load
@@ -58,6 +59,7 @@ export function MonitoringAlertsPanel({
       setCooldownMin(getVal('alert_cooldown_minutes'))
       setEmailEnabled(getVal('enable_email_alerts') === 'true')
       setEmailAddresses(getVal('alert_email_addresses'))
+      setMinRequests(getVal('min_provider_requests_for_latency_alert') || '3')
       setDirty(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -86,6 +88,7 @@ export function MonitoringAlertsPanel({
   const critNum = parseFloat(criticalThreshold)
   const latNum = parseInt(latencyMs)
   const coolNum = parseInt(cooldownMin)
+  const minReqNum = parseInt(minRequests)
 
   const validationErrors: string[] = []
   if (isNaN(warnNum) || warnNum < 0 || warnNum > 1)
@@ -96,6 +99,8 @@ export function MonitoringAlertsPanel({
   if (isNaN(latNum) || latNum < 1000) validationErrors.push('Latency must be at least 1000ms')
   if (isNaN(coolNum) || coolNum < 1 || coolNum > 60)
     validationErrors.push('Cooldown must be 1-60 minutes')
+  if (isNaN(minReqNum) || minReqNum < 1 || minReqNum > 100)
+    validationErrors.push('Min provider requests must be 1-100')
 
   const canSave = dirty && validationErrors.length === 0
 
@@ -118,6 +123,9 @@ export function MonitoringAlertsPanel({
     }
     if (getVal('alert_email_addresses') !== emailAddresses) {
       updates.push({ key: 'alert_email_addresses', value: emailAddresses })
+    }
+    if (getVal('min_provider_requests_for_latency_alert') !== minRequests) {
+      updates.push({ key: 'min_provider_requests_for_latency_alert', value: minRequests })
     }
 
     for (const u of updates) {
@@ -289,6 +297,28 @@ export function MonitoringAlertsPanel({
                 className="w-28"
               />
               <p className="text-xs text-gray-400 mt-1">Min time between same alert type</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Min Provider Requests
+              </label>
+              <Input
+                type="number"
+                min="1"
+                max="100"
+                value={minRequests}
+                onChange={(e) => {
+                  setMinRequests(e.target.value)
+                  setDirty(true)
+                }}
+                className="w-28"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                Min requests before latency alerts fire (prevents false positives)
+              </p>
             </div>
           </div>
         </CardContent>

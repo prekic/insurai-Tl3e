@@ -327,15 +327,9 @@ describe('ExtractionHealthTab', () => {
       expect(screen.getByText('Extraction Pipeline Healthy')).toBeInTheDocument()
     })
 
-    // Find the manual refresh button (the second one without text)
-    const buttons = screen.getAllByRole('button')
-    const refreshBtn = buttons.find(
-      (btn) =>
-        !btn.textContent?.includes('Auto') &&
-        !btn.textContent?.includes('Paused') &&
-        !btn.textContent?.includes('Retry')
-    )
-    if (refreshBtn) fireEvent.click(refreshBtn)
+    // Click the manual refresh button
+    const refreshBtn = screen.getByRole('button', { name: /refresh extraction health/i })
+    fireEvent.click(refreshBtn)
 
     await waitFor(() => {
       expect(mockAdminFetch).toHaveBeenCalledTimes(2)

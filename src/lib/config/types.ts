@@ -434,6 +434,7 @@ export interface MonitoringConfig {
   alertCooldownMinutes: number
   enableEmailAlerts: boolean
   alertEmailAddresses: string
+  minProviderRequestsForLatencyAlert: number
 }
 
 export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
@@ -444,6 +445,7 @@ export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
   alertCooldownMinutes: 15,
   enableEmailAlerts: false,
   alertEmailAddresses: '',
+  minProviderRequestsForLatencyAlert: 3,
 }
 
 // =============================================================================
