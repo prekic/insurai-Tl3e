@@ -1,15 +1,20 @@
 import { Router, Request, Response } from 'express'
-import { getSupabaseAdmin } from '../../lib/supabase'
+import { getSupabaseWithError } from './shared.js'
+import { logger } from '../../lib/logger.js'
 
+const log = logger.child('actuarial')
 const router = Router()
 
 /**
  * GET /api/admin/actuarial/configs
  * Fetches the latest active version for all actuarial config sets.
  */
-router.get('/configs', async (req: Request, res: Response) => {
+router.get('/configs', async (_req: Request, res: Response) => {
   try {
-    const supabase = getSupabaseAdmin()
+    const { client: supabase, error: dbError } = getSupabaseWithError()
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+    }
 
     // Query active config sets and join with their latest active version.
     // Using a lateral join or DISTINCT ON in SQL is cleaner, but via Supabase JS
@@ -41,7 +46,23 @@ router.get('/configs', async (req: Request, res: Response) => {
     if (error) throw error
 
     // Transform the result to flatten the latest version into the set
-    const result = configSets.map((set) => {
+    interface ConfigSetRow {
+      id: string
+      name: string
+      description: string | null
+      config_type: string
+      is_active: boolean
+      updated_at: string
+      versions: Array<{
+        id: string
+        version: number
+        config_data: unknown
+        change_summary: string | null
+        created_at: string
+      }>
+    }
+
+    const result = (configSets as ConfigSetRow[]).map((set) => {
       const latestVersion = set.versions && set.versions.length > 0 ? set.versions[0] : null
       return {
         id: set.id,
@@ -64,7 +85,9 @@ router.get('/configs', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: result })
   } catch (error) {
-    console.error('Error fetching actuarial configs:', error)
+    log.error('Error fetching actuarial configs', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     res.status(500).json({ success: false, error: 'Failed to fetch actuarial configs' })
   }
 })
@@ -82,7 +105,10 @@ router.post('/configs/:name/version', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'configData is required' })
     }
 
-    const supabase = getSupabaseAdmin()
+    const { client: supabase, error: dbError } = getSupabaseWithError()
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+    }
 
     // 1. Get the parent config set ID
     const { data: configSet, error: fetchError } = await supabase
@@ -123,7 +149,9 @@ router.post('/configs/:name/version', async (req: Request, res: Response) => {
 
     res.json({ success: true, data: newVersion })
   } catch (error) {
-    console.error('Error creating new actuarial config version:', error)
+    log.error('Error creating actuarial config version', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     res.status(500).json({ success: false, error: 'Failed to create config version' })
   }
 })
