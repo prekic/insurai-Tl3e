@@ -52,6 +52,7 @@ export type {
   SensitivityFlipPoint,
   EvidenceValidation,
   EvidenceCoverageReport,
+  LayerTimings,
   PolicyEvaluationResult,
   ActuarialPolicyInput,
   ActuarialEvaluationOptions,

@@ -705,6 +705,462 @@ describe('Layer D — TOPSIS Ranking Regression', () => {
   })
 })
 
+// ─────────────────────────────────────────────────────────────────────────────
+// EXPANDED REGRESSION TESTS (P3.3)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('Kasko Extended Scenarios', () => {
+  it('luxury vehicle with high limits produces higher EOOP', () => {
+    const luxury = makeBaseKaskoPolicy({
+      policyId: 'luxury-001',
+      premium: { currency: 'TRY', amount: 40000 },
+      coverages: [
+        makeCoverage('COLLISION', true, 2_000_000, 10000),
+        makeCoverage('THEFT', true, 2_000_000, 0),
+        makeCoverage('FIRE', true, 2_000_000, 0),
+        makeCoverage('NATURAL_DISASTER', true, 2_000_000, 5000),
+        makeCoverage('FLOOD', true, 1_000_000, 5000),
+        makeCoverage('EARTHQUAKE', true, 1_000_000, 10000),
+        makeCoverage('GLASS', true, 50000, 0),
+      ],
+    })
+    const standard = makeBaseKaskoPolicy({ policyId: 'standard-001' })
+
+    const luxResult = runFullEvaluation(luxury, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+    const stdResult = runFullEvaluation(standard, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(luxResult.eligible).toBe(true)
+    // Higher premium drives higher total EOOP even with better coverage
+    expect(luxResult.expectedOutOfPocket.expectedCost.amount).toBeGreaterThan(
+      stdResult.expectedOutOfPocket.expectedCost.amount
+    )
+  })
+
+  it('full coverage with all supplementary add-ons: no false penalties', () => {
+    const fullCoverage = makeBaseKaskoPolicy({
+      policyId: 'full-coverage-001',
+      coverages: [
+        makeCoverage('COLLISION', true, 500000, 3000),
+        makeCoverage('THEFT', true, 500000, 0),
+        makeCoverage('FIRE', true, 500000, 0),
+        makeCoverage('NATURAL_DISASTER', true, 500000, 2000),
+        makeCoverage('FLOOD', true, 300000, 2000),
+        makeCoverage('EARTHQUAKE', true, 300000, 5000),
+        makeCoverage('GLASS', true, 25000, 0),
+        makeCoverage('PERSONAL_ACCIDENT', true, 100000, 0),
+        makeCoverage('LEGAL_PROTECTION', true, 50000, 0),
+        makeCoverage('TOWING', true, 10000, 0),
+      ],
+    })
+
+    const result = runFullEvaluation(fullCoverage, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(true)
+    expect(result.blockingReasons).toHaveLength(0)
+    expect(result.productMismatches).toHaveLength(0)
+    // All known scenarios should have scores assigned
+    expect(Object.keys(result.scenarioScores).length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('zero deductible policy: lower uncovered losses', () => {
+    const zeroDed = makeBaseKaskoPolicy({
+      policyId: 'zero-ded-001',
+      coverages: [
+        makeCoverage('COLLISION', true, 500000, 0),
+        makeCoverage('THEFT', true, 500000, 0),
+        makeCoverage('FIRE', true, 500000, 0),
+        makeCoverage('NATURAL_DISASTER', true, 500000, 0),
+        makeCoverage('GLASS', true, 25000, 0),
+      ],
+    })
+    const highDed = makeBaseKaskoPolicy({
+      policyId: 'high-ded-001',
+      coverages: [
+        makeCoverage('COLLISION', true, 500000, 20000),
+        makeCoverage('THEFT', true, 500000, 10000),
+        makeCoverage('FIRE', true, 500000, 5000),
+        makeCoverage('NATURAL_DISASTER', true, 500000, 10000),
+        makeCoverage('GLASS', true, 25000, 5000),
+      ],
+    })
+
+    const zeroResult = runFullEvaluation(zeroDed, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+    const highResult = runFullEvaluation(highDed, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(zeroResult.eligible).toBe(true)
+    expect(highResult.eligible).toBe(true)
+    // Zero deductible → lower uncovered losses
+    expect(zeroResult.expectedOutOfPocket.expectedUncoveredLoss.amount).toBeLessThan(
+      highResult.expectedOutOfPocket.expectedUncoveredLoss.amount
+    )
+  })
+
+  it('policy with no coverages included: still evaluates gracefully', () => {
+    const noCov = makeBaseKaskoPolicy({
+      policyId: 'no-cov-001',
+      coverages: [
+        makeCoverage('COLLISION', false, 500000, 5000),
+        makeCoverage('THEFT', false, 500000, 0),
+      ],
+    })
+
+    const result = runFullEvaluation(noCov, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    // Should still be eligible (not blocked by compliance) but have high uncovered losses
+    expect(result.eligible).toBe(true)
+    expect(result.expectedOutOfPocket.expectedUncoveredLoss.amount).toBeGreaterThanOrEqual(0)
+  })
+
+  it('policy with zero exclusion texts: semantic analysis handles gracefully', () => {
+    const policy = makeBaseKaskoPolicy({
+      policyId: 'no-excl-001',
+      exclusionTexts: [],
+    })
+
+    const result = runFullEvaluation(policy, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(true)
+    expect(result.semanticExclusions).toHaveLength(0)
+    // No exclusions → no scenario should be excluded
+    const excludedScenarios = result.expectedOutOfPocket.scenarioBreakdown.filter(
+      (s) => s.excludedBySemantic
+    )
+    expect(excludedScenarios).toHaveLength(0)
+  })
+})
+
+describe('Traffic Extended Scenarios', () => {
+  it('traffic at exactly SEDDK 2026 minimums: passes compliance', () => {
+    const trafficExact: ActuarialPolicyInput = {
+      policyId: 'traffic-exact-2026',
+      policyType: 'traffic',
+      premium: { currency: 'TRY', amount: 5000 },
+      effectiveDate: '2026-06-01',
+      expiryDate: '2027-06-01',
+      coverages: [
+        makeCoverage('BODILY_INJURY_PER_PERSON', true, 3_600_000),
+        makeCoverage('BODILY_INJURY_PER_ACCIDENT', true, 18_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_VEHICLE', true, 400_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_ACCIDENT', true, 800_000),
+      ],
+      exclusionTexts: [],
+    }
+
+    const result = runFullEvaluation(trafficExact, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(true)
+    // No blocking reasons related to SEDDK limits
+    const seddkBlocking = result.blockingReasons.filter((r) =>
+      r.code.startsWith('TRAFFIC_BELOW_SEDDK_')
+    )
+    expect(seddkBlocking).toHaveLength(0)
+  })
+
+  it('traffic 1₺ below SEDDK minimum for bodily injury: fails compliance', () => {
+    const trafficBelow: ActuarialPolicyInput = {
+      policyId: 'traffic-below-2026',
+      policyType: 'traffic',
+      premium: { currency: 'TRY', amount: 4000 },
+      effectiveDate: '2026-06-01',
+      expiryDate: '2027-06-01',
+      coverages: [
+        makeCoverage('BODILY_INJURY_PER_PERSON', true, 3_599_999), // 1₺ below
+        makeCoverage('BODILY_INJURY_PER_ACCIDENT', true, 18_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_VEHICLE', true, 400_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_ACCIDENT', true, 800_000),
+      ],
+      exclusionTexts: [],
+    }
+
+    const result = runFullEvaluation(trafficBelow, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(false)
+    expect(
+      result.blockingReasons.some((r) => r.code === 'TRAFFIC_BELOW_SEDDK_BODILYINJURYPERPERSON')
+    ).toBe(true)
+  })
+
+  it('traffic with maximum limits: optimal EOOP', () => {
+    const trafficMax: ActuarialPolicyInput = {
+      policyId: 'traffic-max-2026',
+      policyType: 'traffic',
+      premium: { currency: 'TRY', amount: 8000 },
+      effectiveDate: '2026-06-01',
+      expiryDate: '2027-06-01',
+      coverages: [
+        makeCoverage('BODILY_INJURY_PER_PERSON', true, 10_000_000),
+        makeCoverage('BODILY_INJURY_PER_ACCIDENT', true, 50_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_VEHICLE', true, 2_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_ACCIDENT', true, 5_000_000),
+      ],
+      exclusionTexts: [],
+    }
+
+    const trafficMin: ActuarialPolicyInput = {
+      policyId: 'traffic-min-2026',
+      policyType: 'traffic',
+      premium: { currency: 'TRY', amount: 4000 },
+      effectiveDate: '2026-06-01',
+      expiryDate: '2027-06-01',
+      coverages: [
+        makeCoverage('BODILY_INJURY_PER_PERSON', true, 3_600_000),
+        makeCoverage('BODILY_INJURY_PER_ACCIDENT', true, 18_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_VEHICLE', true, 400_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_ACCIDENT', true, 800_000),
+      ],
+      exclusionTexts: [],
+    }
+
+    const maxResult = runFullEvaluation(trafficMax, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+    const minResult = runFullEvaluation(trafficMin, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(maxResult.eligible).toBe(true)
+    expect(minResult.eligible).toBe(true)
+
+    // Higher limits → lower uncovered losses
+    expect(maxResult.expectedOutOfPocket.expectedUncoveredLoss.amount).toBeLessThanOrEqual(
+      minResult.expectedOutOfPocket.expectedUncoveredLoss.amount
+    )
+  })
+})
+
+describe('DASK/ZAS Extended Scenarios', () => {
+  it('DASK with exactly 2% deductible: passes compliance', () => {
+    const daskCompliant: ActuarialPolicyInput = {
+      policyId: 'dask-compliant-001',
+      policyType: 'dask',
+      premium: { currency: 'TRY', amount: 2500 },
+      effectiveDate: '2026-01-01',
+      expiryDate: '2027-01-01',
+      insuredValue: { currency: 'TRY', amount: 2_000_000 },
+      coverages: [
+        {
+          code: 'EARTHQUAKE',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 2_000_000 }, evidence: makeEvidence() },
+          deductible: {
+            value: { kind: 'pct' as const, percent: 2 },
+            evidence: makeEvidence(),
+          },
+        },
+        {
+          code: 'EQ_STRUCTURAL',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 2_000_000 }, evidence: makeEvidence() },
+          deductible: {
+            value: { kind: 'pct' as const, percent: 2 },
+            evidence: makeEvidence(),
+          },
+        },
+      ],
+      exclusionTexts: [],
+    }
+
+    const result = runFullEvaluation(daskCompliant, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(true)
+    const daskBlocking = result.blockingReasons.filter((r) => r.code.includes('DASK'))
+    expect(daskBlocking).toHaveLength(0)
+  })
+
+  it('ZAS product with multiple perils: evaluates all scenarios', () => {
+    const zasPolicy: ActuarialPolicyInput = {
+      policyId: 'zas-multi-peril',
+      policyType: 'zas',
+      premium: { currency: 'TRY', amount: 3500 },
+      effectiveDate: '2026-01-01',
+      expiryDate: '2027-01-01',
+      insuredValue: { currency: 'TRY', amount: 2_500_000 },
+      coverages: [
+        {
+          code: 'EARTHQUAKE',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 2_500_000 }, evidence: makeEvidence() },
+          deductible: { value: { kind: 'pct' as const, percent: 2 }, evidence: makeEvidence() },
+        },
+        {
+          code: 'FLOOD',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 1_000_000 }, evidence: makeEvidence() },
+          deductible: { value: { kind: 'pct' as const, percent: 2 }, evidence: makeEvidence() },
+        },
+        {
+          code: 'STORM',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 800_000 }, evidence: makeEvidence() },
+          deductible: { value: { kind: 'pct' as const, percent: 2 }, evidence: makeEvidence() },
+        },
+        {
+          code: 'WILDFIRE',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 600_000 }, evidence: makeEvidence() },
+          deductible: { value: { kind: 'pct' as const, percent: 2 }, evidence: makeEvidence() },
+        },
+      ],
+      exclusionTexts: [],
+    }
+
+    const result = runFullEvaluation(zasPolicy, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.eligible).toBe(true)
+    // ZAS scenarios include both ZAS-specific and DASK scenarios
+    expect(result.expectedOutOfPocket.scenarioBreakdown.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('DASK coverage exceeding max coverage: warning but not blocking', () => {
+    const daskExcessive: ActuarialPolicyInput = {
+      policyId: 'dask-excessive-001',
+      policyType: 'dask',
+      premium: { currency: 'TRY', amount: 5000 },
+      effectiveDate: '2026-01-01',
+      expiryDate: '2027-01-01',
+      insuredValue: { currency: 'TRY', amount: 5_000_000 }, // Exceeds 2026 max of 3.2M
+      coverages: [
+        {
+          code: 'EARTHQUAKE',
+          included: true,
+          limit: { value: { currency: 'TRY', amount: 5_000_000 }, evidence: makeEvidence() },
+          deductible: { value: { kind: 'pct' as const, percent: 2 }, evidence: makeEvidence() },
+        },
+      ],
+      exclusionTexts: [],
+    }
+
+    const result = runFullEvaluation(daskExcessive, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    // Should produce a warning but not block
+    const maxCoverageWarning = result.warnings.find((w) => w.code === 'DASK_EXCEEDS_MAX_COVERAGE')
+    expect(maxCoverageWarning).toBeDefined()
+    // Should still be eligible
+    expect(result.eligible).toBe(true)
+  })
+})
+
+describe('Cross-Cutting Edge Cases', () => {
+  it('multi-policy comparison where all policies are identical: equal rankings', () => {
+    const policyA = makeBaseKaskoPolicy({ policyId: 'identical-a' })
+    const policyB = makeBaseKaskoPolicy({ policyId: 'identical-b' })
+
+    const results = evaluateAndRankPolicies([policyA, policyB], {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(results).toHaveLength(2)
+    expect(results[0].eligible).toBe(true)
+    expect(results[1].eligible).toBe(true)
+
+    // Both should have rankings
+    expect(results[0].ranking).toBeDefined()
+    expect(results[1].ranking).toBeDefined()
+
+    // Closeness scores should be identical (same inputs → same TOPSIS score)
+    expect(results[0].ranking!.topsisCloseness).toBe(results[1].ranking!.topsisCloseness)
+  })
+
+  it('mixed policy types in multi-policy evaluation: each evaluates with correct scenarios', () => {
+    const kasko = makeBaseKaskoPolicy({ policyId: 'mixed-kasko' })
+    const traffic: ActuarialPolicyInput = {
+      policyId: 'mixed-traffic',
+      policyType: 'traffic',
+      premium: { currency: 'TRY', amount: 5000 },
+      effectiveDate: '2026-01-01',
+      expiryDate: '2027-01-01',
+      coverages: [
+        makeCoverage('BODILY_INJURY_PER_PERSON', true, 3_600_000),
+        makeCoverage('BODILY_INJURY_PER_ACCIDENT', true, 18_000_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_VEHICLE', true, 400_000),
+        makeCoverage('MATERIAL_DAMAGE_PER_ACCIDENT', true, 800_000),
+      ],
+      exclusionTexts: [],
+    }
+
+    const results = evaluateAndRankPolicies([kasko, traffic], {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(results).toHaveLength(2)
+    // Both should be eligible
+    expect(results[0].eligible).toBe(true)
+    expect(results[1].eligible).toBe(true)
+
+    // Kasko should have kasko-specific scenarios
+    const kaskoResult = results.find((r) =>
+      r.expectedOutOfPocket.scenarioBreakdown.some(
+        (s) => s.scenarioCode === 'SCN_PARTIAL_COLLISION'
+      )
+    )
+    expect(kaskoResult).toBeDefined()
+
+    // Traffic should have traffic-specific scenarios
+    const trafficResult = results.find((r) =>
+      r.expectedOutOfPocket.scenarioBreakdown.some(
+        (s) => s.scenarioCode === 'SCN_BODILY_INJURY_MINOR'
+      )
+    )
+    expect(trafficResult).toBeDefined()
+  })
+
+  it('evaluation result always includes configSnapshot', () => {
+    const policy = makeBaseKaskoPolicy({ policyId: 'config-snapshot-001' })
+
+    const result = runFullEvaluation(policy, {
+      effectiveDate: FUTURE_DATE,
+      monteCarloConfig: FAST_MC,
+    })
+
+    expect(result.configSnapshot).toBeDefined()
+    expect(result.configSnapshot.ruleset).toBeDefined()
+    expect(result.configSnapshot.monteCarlo).toContain('mc-1000')
+    expect(result.evaluatedAt).toBeDefined()
+    // evaluatedAt should be a valid ISO string
+    expect(new Date(result.evaluatedAt).getTime()).toBeGreaterThan(0)
+  })
+})
+
 describe('Multi-Policy End-to-End Regression', () => {
   it('evaluateAndRankPolicies produces TOPSIS rankings for eligible policies', () => {
     const policies: ActuarialPolicyInput[] = [

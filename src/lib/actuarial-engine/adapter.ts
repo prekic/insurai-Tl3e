@@ -53,7 +53,8 @@ function toFieldWithEvidence<T>(value: T): FieldWithEvidence<T> {
 function mapCoverageToCanonical(c: Coverage): CanonicalCoverage {
   // A robust mapping would use a dedicated dictionary (or Layer A semantic mapper).
   // For adapter purposes, we apply heuristic normalization based on the coverage name or category.
-  const nameLower = c.name.toLowerCase()
+  const nameRaw = c.name || c.nameTr || ''
+  const nameLower = nameRaw.toLowerCase()
   const nameTrLower = (c.nameTr || '').toLowerCase()
   const searchStr = `${nameLower} ${nameTrLower}`
   let code = 'OTHER'
@@ -101,10 +102,11 @@ function mapCoverageToCanonical(c: Coverage): CanonicalCoverage {
     code = 'LEGAL_PROTECTION'
   } else {
     // Standardize whatever label we have for unknown coverages into uppercase snake case
-    code = c.name
-      .toUpperCase()
-      .replace(/[^A-Z0-9]/g, '_')
-      .replace(/_+/g, '_')
+    code =
+      nameRaw
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '_')
+        .replace(/_+/g, '_') || 'UNKNOWN'
   }
 
   return {
@@ -171,7 +173,9 @@ export function mapAnalyzedToActuarialInput(policy: AnalyzedPolicy): ActuarialPo
     effectiveDate: policy.startDate,
     expiryDate: policy.expiryDate,
     coverages: policy.coverages.map(mapCoverageToCanonical),
-    exclusionTexts: policy.exclusions || [],
+    exclusionTexts: (policy.exclusions || []).map((e: unknown) =>
+      typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))
+    ),
     indemnityMechanics,
     insuredValue: insuredValueAmount > 0 ? toMoney(insuredValueAmount, policy.currency) : undefined,
   }

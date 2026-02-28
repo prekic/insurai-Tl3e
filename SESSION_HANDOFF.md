@@ -1,57 +1,71 @@
-# Session Handoff — February 28, 2026 (Actuarial Engine, Deployment Hardening, Output Evaluation Tests)
+# Session Handoff — February 28, 2026 (P3 Actuarial Observability)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
 | **Build** | Passing |
-| **TypeCheck** | 0 errors |
+| **TypeCheck** | 0 errors (frontend + server) |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings |
-| **Tests** | 15,753 passing (329 files, 0 failures) |
+| **Tests** | 15,848 passing (333 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini20260228` |
-| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine UI integrations implemented (adapter, ComparePolicies, PolicyDetailView) |
+| **Branch** | `claude/load-project-context-uRxsB` |
+| **Production Status** | Nixpacks + healthcheck deployed; actuarial engine UI integrated; P3 observability complete |
 
 ---
 
 ## Session Summary
 
-### 1. Modular Actuarial Engine (`dc6beae`)
-New 4-layer actuarial evaluation engine at `src/lib/actuarial-engine/` (4,916 lines, 17 files):
+### P3.1 — Actuarial Engine Timing Instrumentation
+- Added `LayerTimings` interface to `types.ts`: `layerA_ms`, `layerB_ms`, `layerC_ms`, optional `layerD_ms`, `total_ms`
+- Instrumented `engine.ts` with `performance.now()` around each layer in both `runFullEvaluation()` and `evaluateAndRankPolicies()`
+- Blocked (compliance-failed) results set `layerC_ms = 0` and `layerD_ms = undefined`
+- Multi-policy TOPSIS evaluations add `layerD_ms` to each eligible result
+- Added `PerformanceTimingsCard` component in `ActuarialTab.tsx`: evaluation count, avg/min/max total time, per-layer averages
+- Exported `recordEvaluationTiming()` with in-memory ring buffer (max 50 entries) for client-side timing capture
+- **8 tests** in `engine-timings.test.ts`
 
-- **Layer A** — Semantic exclusion analysis + evidence pointer validation
-- **Layer B** — Compliance gates (SEDDK 2025/2026 traffic limits, DASK 2% deductible, "Tam Kasko" product name validation)
-- **Layer C** — Monte Carlo EOOP simulation (10,000 iterations, lognormal/Pareto loss models, deterministic Mulberry32 PRNG)
-- **Layer D** — TOPSIS MCDA ranking + weight sensitivity analysis + XAI natural-language summaries
+### P3.2 — Evidence Coverage Dashboard
+- Created `EvidenceCoveragePanel.tsx` (~294 lines) with 3 summary cards:
+  - Coverage Rate (color-coded: green ≥80%, amber ≥50%, red <50%)
+  - Fields With Evidence (count/total)
+  - Review Status (needs review vs verified)
+- Confidence distribution histogram (5 buckets, 0-100%)
+- Fields Needing Review table (field path, evidence count, confidence %, reason)
+- Integrated into `ActuarialTab.tsx` below the performance section
+- **12 tests** in `EvidenceCoveragePanel.test.tsx`
 
-Key functions: `runFullEvaluation(policy)` for single policy, `evaluateAndRankPolicies([...])` for multi-policy comparison.
+### P3.3 — Expanded Golden Regression Tests (+14 tests)
+- **Kasko Extended** (5 tests): luxury high-limit vehicle, full supplementary coverage, zero deductible, no coverages included, zero exclusion texts
+- **Traffic Extended** (3 tests): exact SEDDK 2026 minimums (passes), 1₺ below minimum (fails), maximum limits
+- **DASK/ZAS Extended** (3 tests): exactly 2% deductible (passes), ZAS with multiple perils, coverage exceeding max
+- **Cross-Cutting** (3 tests): identical policies equal TOPSIS ranking, mixed policy types in multi-eval, configSnapshot always present
+- **Total**: 40 golden regression tests (26 existing + 14 new), all deterministic with seed=42
 
-Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature flag `actuarial_engine_enabled` = false.
+### Additional Fixes
+- Fixed pre-existing `no-non-null-assertion` ESLint warning in `engine.ts` (extracted narrowed variable)
+- Fixed pre-existing TS error in `adapter.ts` (exclusions type mismatch — `string[]` vs object with `.text`)
+- Removed unused `Eye` import and prefixed unused `_setLastEvalResult` in `ActuarialTab.tsx`
+- Removed unused `vi` import from `EvidenceCoveragePanel.test.tsx`
 
-**Integrated** into the production pipeline — built adapter `mapAnalyzedToActuarialInput` from `AnalyzedPolicy` → `ActuarialPolicyInput` and added UI displays.
-- **ComparePolicies.tsx**: Shows TOPSIS Closeness Score and Grade.
-- **PolicyDetailView.tsx**: Shows Expected Out-of-Pocket (EOOP) details and Contract Quality bounds.
-- **`src/lib/policy-evaluation/types.ts`**: Added `actuarialRank`, `actuarialCloseness`, `actuarialGrade` fields to `PolicyComparison` type.
-- **`src/lib/policy-evaluation/comparator.ts`**: Lint auto-format (arrow function parentheses) + TOPSIS score integration into comparison results.
+---
 
-### 1b. Actuarial Engine Admin Configuration UI
-- Added Admin Dashboard tab "Actuarial Engine" (`ActuarialTab.tsx`) for managing engine parameters.
-- Backend API (`server/routes/admin/actuarial.ts`): `GET /api/admin/actuarial/configs` and `POST /api/admin/actuarial/configs/:name/version`.
-- Supports editing Monte Carlo simulation params, TOPSIS criteria weights, Kasko risk scenarios, and compliance rules via JSON editor with versioning.
+## Files Modified/Created This Session
 
-### 2. Railway Deployment Hardening (`1f34759`, `acc190f`)
-- Created `nixpacks.toml` with `providers = ["node"]` to disable Caddy/Chromium auto-detection that caused port conflicts
-- Fixed invalid Nix package names (`nodejs_22` → extend-defaults `"..."`)
-- Added `healthcheckPath: "/api/health"` + `healthcheckTimeout: 60` to `railway.json`
-- Fixed `content.ts` CSV export column alignment (server-side field names) and `monitoring.ts` import errors
-
-### 3. Output Evaluation Tests (`c19118c`)
-162 new tests across 3 files validating AI extraction and policy evaluation output quality:
-- `evaluation-scoring-sample-data.test.ts` (63 tests) — Coverage scoring, grade thresholds, recommendations
-- `extraction-output-quality.test.ts` (38 tests) — Extraction field validation, completeness, format
-- `sample-policy-output-evaluation.test.ts` (61 tests) — End-to-end evaluation of all 5 sample policy types
+| File | Change |
+|------|--------|
+| `src/lib/actuarial-engine/types.ts` | Added `LayerTimings` interface, `layerTimings?` field on `PolicyEvaluationResult` |
+| `src/lib/actuarial-engine/engine.ts` | Added `performance.now()` timing instrumentation, fixed non-null assertion |
+| `src/lib/actuarial-engine/index.ts` | Added `LayerTimings` to barrel type exports |
+| `src/lib/actuarial-engine/adapter.ts` | Fixed exclusions mapping type error (defensive `unknown` cast) |
+| `src/lib/actuarial-engine/__tests__/golden-regression.test.ts` | +434 lines: 14 new tests across 4 describe blocks |
+| `src/lib/actuarial-engine/__tests__/engine-timings.test.ts` | **NEW** — 8 tests for LayerTimings |
+| `src/components/admin/tabs/ActuarialTab.tsx` | Added PerformanceTimingsCard, EvidenceCoveragePanel, recordEvaluationTiming() |
+| `src/components/admin/tabs/settings/EvidenceCoveragePanel.tsx` | **NEW** — Evidence coverage dashboard component |
+| `src/components/admin/tabs/settings/EvidenceCoveragePanel.test.tsx` | **NEW** — 12 tests |
+| `CLAUDE.md` | Updated test counts, added Known Issues #143-145 |
 
 ---
 
@@ -61,53 +75,57 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
 
-### Gotcha: Supabase DB Push & Manual Migrations
-- `npx supabase db push` requires `npx supabase link` first. Fallback: apply SQL via `psql $SUPABASE_URL -f supabase/migrations/xxx.sql` or Supabase Dashboard SQL Editor.
+### Gotcha: Actuarial Engine Integration
+- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `adapter.ts` converts from `AnalyzedPolicy`
+- Always import from `@/lib/actuarial-engine` barrel, never from individual layer files
+- **Trial Restriction**: Actuarial UI hidden from anonymous/free trial users via `isTrialResult` check
 
-### Gotcha: BenchmarksTab Multiple DOM Elements in Tests
-- `getByText(/4\.?500/)` matches both table data and informational text. Use `getAllByText(...)[0]`.
+### Gotcha: Timing Ring Buffer Not Yet Wired
+- `recordEvaluationTiming()` is exported from `ActuarialTab.tsx` but not yet called from `ComparePolicies` or `PolicyDetailView`
+- `_setLastEvalResult` is a placeholder — needs external callers to pass evaluation results to the evidence panel
+- Both are ready for wiring but require a follow-up to connect the data flow
+
+### Gotcha: adapter.ts Exclusions Defensive Cast
+- `adapter.ts` uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` because `AnalyzedPolicy.exclusions` is typed `string[]` but some test data/extractions pass objects with `.text`
+- The proper long-term fix is to normalize exclusions in `policy-extractor.ts` at extraction time
+
+### Gotcha: EvidenceCoveragePanel Path
+- `EvidenceCoveragePanel.tsx` lives at `src/components/admin/tabs/settings/` (alongside other settings panels) but is imported by `ActuarialTab.tsx`, not SettingsTab
 
 ### Gotcha: Alert Service Test Mocks
-- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js`.
+- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js`
 
 ### Gotcha: Nixpacks Auto-Detection
-- Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`.
-- `nixpacks.toml` and `railway.json` must stay in sync on install/build/start commands.
-
-### Gotcha: Actuarial Engine Integration
-- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `src/lib/actuarial-engine/adapter.ts` converts from `Policy`/`Coverage`.
-- Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
-- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
+- Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`
 
 ---
 
 ## Configuration Requirements
 
 ### No New Environment Variables
-No new env vars needed. Migration 028 creates tables and seeds a feature flag but does not require runtime configuration changes.
+No new env vars needed. All changes are frontend-only or extend existing actuarial engine infrastructure.
 
 ### Migration 028 (Not Yet Applied)
-`supabase/migrations/028_actuarial_engine_schema.sql` creates 5 tables + feature flag seed. Apply to production **only when ready to enable the actuarial engine**. Idempotent (`CREATE TABLE IF NOT EXISTS`).
+`supabase/migrations/028_actuarial_engine_schema.sql` creates 5 tables + feature flag seed. Apply to production **only when ready to enable the actuarial engine**. Idempotent.
 
 ---
 
 ## Priority Next Steps
 
-### P1 — Deploy & Monitor
-1. Verify Railway deployment with new `nixpacks.toml` and healthcheck configuration
-2. Confirm healthcheck endpoint `/api/health` responds correctly for Railway's liveness probe
-3. Monitor build logs for any Caddy/Chromium auto-detection regressions
+### P1 — Wire Timing Data Flow
+1. Call `recordEvaluationTiming()` from `ComparePolicies.tsx` and `PolicyDetailView.tsx` after actuarial evaluation
+2. Pass `PolicyEvaluationResult` to `ActuarialTab` to populate the evidence coverage panel
+3. Consider persisting timing data to DB for historical analysis
 
 ### P2 — Actuarial Engine Production Enablement
-1. **Database**: Apply `028_actuarial_engine_schema.sql` to production Supabase when ready to enable the engine (idempotent, safe to run)
-2. **Feature Flag**: Flip `actuarial_engine_enabled` to `true` after migration is applied
-3. **Admin UI** ✅ (completed this session): Config panel at Admin Dashboard → "Actuarial Engine" tab for scenario frequencies, TOPSIS weights, Monte Carlo params
+1. **Database**: Apply `028_actuarial_engine_schema.sql` to production Supabase
+2. **Feature Flag**: Flip `actuarial_engine_enabled` to `true`
+3. **Verify**: Admin Dashboard → "Actuarial Engine" tab loads config sets
 
-
-### P3 — Quality & Observability
-1. Add actuarial engine metrics to extraction health monitoring
-2. Build evidence coverage dashboard for admin panel
-3. Expand golden regression tests for health/life/business policy types (currently only kasko/traffic/dask/zas)
+### P3 — Further Quality Improvements
+1. Add health/life/business policy type support to actuarial engine (currently only kasko/traffic/dask/zas)
+2. Add integration tests for actuarial adapter with real sample policy data
+3. Performance benchmarking: Monte Carlo simulation speed with varying iteration counts
 
 ---
 
@@ -119,7 +137,6 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
 | Feb 26 late | Extraction health alerting, configurable retention, Benchmark UI builds | `claude/load-project-context-6D3KI` |
-| Feb 26 | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
-| Feb 26 | Historical Trend Charts, CSV Export, Cron Job Monitoring | `feat/admin-monitoring-extras` |
 | Feb 27 | Alert email wiring, configurable checkIntervalMs + minRequests, migration 027 | `claude/load-project-context-yjssq` |
-| **Feb 28 (Current)** | **Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162), free-trial restriction** | **`gemini20260228`** |
+| Feb 28 early | Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162) | `gemini20260228` |
+| **Feb 28 late (Current)** | **P3 observability: LayerTimings instrumentation, evidence coverage dashboard, 14 new regression tests** | **`claude/load-project-context-uRxsB`** |

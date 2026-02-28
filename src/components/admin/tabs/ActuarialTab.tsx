@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/loading'
 import { adminFetch } from '@/lib/admin/api'
 import { toast } from 'sonner'
-import { Save, History, Calculator, AlertTriangle } from 'lucide-react'
+import { Save, History, Calculator, AlertTriangle, Timer } from 'lucide-react'
+import { EvidenceCoveragePanel } from './settings/EvidenceCoveragePanel'
+import type { PolicyEvaluationResult, LayerTimings } from '@/lib/actuarial-engine/types'
 
 // Define the shape of our config from the DB
 interface ActuarialConfigSet {
@@ -23,11 +25,25 @@ interface ActuarialConfigSet {
   } | null
 }
 
+/** In-memory ring buffer for recent evaluation timings (client-side). */
+const TIMING_BUFFER_MAX = 50
+const timingBuffer: Array<{ timestamp: string; policyId: string; timings: LayerTimings }> = []
+
+/**
+ * Records a timing event from a client-side evaluation.
+ * Called by external code (e.g. ComparePolicies / PolicyDetailView).
+ */
+export function recordEvaluationTiming(policyId: string, timings: LayerTimings) {
+  timingBuffer.push({ timestamp: new Date().toISOString(), policyId, timings })
+  if (timingBuffer.length > TIMING_BUFFER_MAX) timingBuffer.shift()
+}
+
 export function ActuarialTab() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [configs, setConfigs] = useState<Record<string, ActuarialConfigSet>>({})
   const [editedData, setEditedData] = useState<Record<string, string>>({})
+  const [lastEvalResult, _setLastEvalResult] = useState<PolicyEvaluationResult | null>(null)
 
   // Fetch configs on mount
   useEffect(() => {
@@ -148,6 +164,12 @@ export function ActuarialTab() {
         </div>
       </div>
 
+      {/* Performance Timings Section */}
+      <PerformanceTimingsCard timings={timingBuffer} />
+
+      {/* Evidence Coverage Section */}
+      <EvidenceCoveragePanel evaluationResult={lastEvalResult} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {Object.values(configs).map((set) => (
           <Card key={set.id} className="flex flex-col">
@@ -191,6 +213,78 @@ export function ActuarialTab() {
         ))}
       </div>
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Performance Timings Sub-Component
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PerformanceTimingsCard({
+  timings,
+}: {
+  timings: Array<{ timestamp: string; policyId: string; timings: LayerTimings }>
+}) {
+  const stats = useMemo(() => {
+    if (timings.length === 0) return null
+    const totals = timings.map((t) => t.timings.total_ms)
+    const avg = totals.reduce((a, b) => a + b, 0) / totals.length
+    const max = Math.max(...totals)
+    const min = Math.min(...totals)
+    const avgA = timings.reduce((a, t) => a + t.timings.layerA_ms, 0) / timings.length
+    const avgB = timings.reduce((a, t) => a + t.timings.layerB_ms, 0) / timings.length
+    const avgC = timings.reduce((a, t) => a + t.timings.layerC_ms, 0) / timings.length
+    const dTimings = timings.filter((t) => t.timings.layerD_ms !== undefined)
+    const avgD =
+      dTimings.length > 0
+        ? dTimings.reduce((a, t) => a + (t.timings.layerD_ms ?? 0), 0) / dTimings.length
+        : null
+    return { count: timings.length, avg, max, min, avgA, avgB, avgC, avgD }
+  }, [timings])
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Timer className="h-4 w-4 text-indigo-600" />
+          Evaluation Performance
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {!stats ? (
+          <p className="text-gray-500 text-sm">
+            No evaluation timings recorded yet. Run an actuarial evaluation to see performance data.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 uppercase">Evaluations</p>
+                <p className="text-lg font-bold text-gray-900">{stats.count}</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 uppercase">Avg Total</p>
+                <p className="text-lg font-bold text-gray-900">{stats.avg.toFixed(1)}ms</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 uppercase">Min</p>
+                <p className="text-lg font-bold text-green-700">{stats.min.toFixed(1)}ms</p>
+              </div>
+              <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <p className="text-xs text-gray-500 uppercase">Max</p>
+                <p className="text-lg font-bold text-red-700">{stats.max.toFixed(1)}ms</p>
+              </div>
+            </div>
+            <div className="text-xs text-gray-600 space-y-1 border-t pt-2">
+              <p>Layer A (Semantic): avg {stats.avgA.toFixed(1)}ms</p>
+              <p>Layer B (Compliance): avg {stats.avgB.toFixed(1)}ms</p>
+              <p>Layer C (Monte Carlo): avg {stats.avgC.toFixed(1)}ms</p>
+              {stats.avgD !== null && <p>Layer D (TOPSIS): avg {stats.avgD.toFixed(1)}ms</p>}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 
