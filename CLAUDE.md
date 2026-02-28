@@ -4191,7 +4191,15 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files**: `src/lib/actuarial-engine/` (17 files), `supabase/migrations/028_actuarial_engine_schema.sql`
 - **Commits**: `dc6beae`
 
-### 141. Nixpacks Configuration for Railway Deployment (Fixed Feb 28, 2026)
+### 141. Actuarial Engine Admin Configuration UI (Added Feb 28, 2026)
+- **Feature**: Admin dashboard tab for managing actuarial engine parameters (Monte Carlo, TOPSIS weights, risk scenarios, compliance rules)
+- **Backend**: New API routes at `server/routes/admin/actuarial.ts` — `GET /api/admin/actuarial/configs` (fetch latest active versions), `POST /api/admin/actuarial/configs/:name/version` (save new version)
+- **Frontend**: `src/components/admin/tabs/ActuarialTab.tsx` — JSON editor cards for each config set with version history, integrated into `AdminDashboard.tsx` as "Actuarial Engine" tab
+- **Types**: Added `'actuarial'` to `AdminSection` union in `src/types/admin.ts`
+- **Config Sets**: Monte Carlo defaults, TOPSIS criteria defaults, Kasko scenarios, Compliance rules (seeded by migration 028)
+- **Files**: `server/routes/admin/actuarial.ts` (new), `src/components/admin/tabs/ActuarialTab.tsx` (new), `server/routes/admin/index.ts` (modified), `src/components/admin/AdminDashboard.tsx` (modified), `src/types/admin.ts` (modified)
+
+### 142. Nixpacks Configuration for Railway Deployment (Fixed Feb 28, 2026)
 - **Problem**: Railway's Nixpacks builder auto-detected Caddy web server (from `index.html` in `dist/`) and Chromium (from Playwright in devDependencies), causing port conflicts since Express already serves static files, and bloating the production image by 400+ MB
 - **Root Cause**: Without explicit `providers` configuration, Nixpacks scans the project and provisions all detected services. Also used invalid Nix package names (`nodejs_22`, `npm-9_x`) that don't exist in nixpkgs.
 - **Solution**: Created `nixpacks.toml` with `providers = ["node"]` to disable auto-detection, used extend-defaults pattern (`"..."`) for packages with only `openssl` added explicitly, and added `healthcheckPath = "/api/health"` with `healthcheckTimeout = 60` to `railway.json`

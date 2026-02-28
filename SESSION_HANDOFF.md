@@ -34,6 +34,11 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 - **ComparePolicies.tsx**: Shows TOPSIS Closeness Score and Grade.
 - **PolicyDetailView.tsx**: Shows Expected Out-of-Pocket (EOOP) details and Contract Quality bounds.
 
+### 1b. Actuarial Engine Admin Configuration UI
+- Added Admin Dashboard tab "Actuarial Engine" (`ActuarialTab.tsx`) for managing engine parameters.
+- Backend API (`server/routes/admin/actuarial.ts`): `GET /api/admin/actuarial/configs` and `POST /api/admin/actuarial/configs/:name/version`.
+- Supports editing Monte Carlo simulation params, TOPSIS criteria weights, Kasko risk scenarios, and compliance rules via JSON editor with versioning.
+
 ### 2. Railway Deployment Hardening (`1f34759`, `acc190f`)
 - Created `nixpacks.toml` with `providers = ["node"]` to disable Caddy/Chromium auto-detection that caused port conflicts
 - Fixed invalid Nix package names (`nodejs_22` → extend-defaults `"..."`)

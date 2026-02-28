@@ -30,6 +30,7 @@ import { NotificationsTab } from './tabs/NotificationsTab'
 import { BenchmarksTab } from './tabs/BenchmarksTab'
 import { TranslationsTab } from './tabs/TranslationsTab'
 import { ExtractionHealthTab } from './tabs/ExtractionHealthTab'
+import { ActuarialTab } from './tabs/ActuarialTab'
 
 import { cn } from '@/lib/utils'
 
@@ -58,6 +59,7 @@ import {
   Languages,
   Menu,
   X,
+  Calculator,
 } from 'lucide-react'
 
 const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
@@ -78,6 +80,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'audit', label: 'Audit Log', icon: <ScrollText className="h-4 w-4" /> },
   { id: 'alerts', label: 'Alerts', icon: <Bell className="h-4 w-4" /> },
   { id: 'extraction_health', label: 'Extraction Health', icon: <Activity className="h-4 w-4" /> },
+  { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
 ]
 
 export function AdminDashboard() {
@@ -226,6 +229,8 @@ export function AdminDashboard() {
         return <ProcessingLogsTab />
       case 'extraction_health':
         return <ExtractionHealthTab />
+      case 'actuarial':
+        return <ActuarialTab />
       default:
         return <OverviewTab systemHealth={systemHealth} />
     }
