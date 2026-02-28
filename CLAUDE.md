@@ -4181,15 +4181,17 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Feature**: Self-contained 4-layer actuarial evaluation engine for Turkish insurance policies
 - **Architecture**: Layer A (Semantic exclusion analysis + evidence tracking) → Layer B (Compliance gates: SEDDK, DASK, product rules) → Layer C (Monte Carlo EOOP simulation with lognormal/Pareto loss models) → Layer D (TOPSIS MCDA ranking + weight sensitivity XAI)
 - **Scope**: 4,916 lines across 17 files in `src/lib/actuarial-engine/`, plus migration 028 (395 lines)
-- **Status**: Complete and tested but **NOT integrated into production pipeline** — controlled by feature flag `actuarial_engine_enabled` (default: false)
+- **Status**: Complete, tested, and **integrated into the UI pipeline** (adapter, TOPSIS in ComparePolicies, EOOP in PolicyDetailView). Production feature flag `actuarial_engine_enabled` (default: false) — DB tables not yet applied to production.
 - **No new dependencies added**: Uses only built-in math (custom Mulberry32 PRNG, Box-Muller transform, inverse CDF Pareto sampling)
 - **Key Functions**: `runFullEvaluation(policy, options?)` for single policy, `evaluateAndRankPolicies([...])` for multi-policy comparison with TOPSIS ranking
 - **Policy Types**: `'kasko' | 'traffic' | 'dask' | 'zas'`
 - **Database**: Migration `028_actuarial_engine_schema.sql` creates 5 tables (`policy_extractions`, `extraction_evidence`, `actuarial_config_sets`/`versions`, `actuarial_evaluation_runs`, `evaluation_results`)
 - **Tests**: 26 golden regression tests with deterministic seed (42), all passing
-- **Integration Path**: Requires adapter from `AnalyzedPolicy` → `ActuarialPolicyInput` (the engine uses its own canonical type system with `CanonicalCoverage` codes, `EvidencePointer` tracking, and `IndemnityMechanics`)
-- **Files**: `src/lib/actuarial-engine/` (17 files), `supabase/migrations/028_actuarial_engine_schema.sql`
-- **Commits**: `dc6beae`
+- **Adapter**: `src/lib/actuarial-engine/adapter.ts` converts `AnalyzedPolicy` → `ActuarialPolicyInput` with fallback values for missing indemnity mechanics
+- **UI Integration** (`819a6db`): `ComparePolicies.tsx` (TOPSIS rank/grade), `PolicyDetailView.tsx` (EOOP breakdown, Contract Quality Score), `src/lib/policy-evaluation/types.ts` (added `actuarialRank`, `actuarialCloseness`, `actuarialGrade` fields to `PolicyComparison`), `src/lib/policy-evaluation/comparator.ts` (TOPSIS integration + lint fixes)
+- **Trial Restriction** (`1eba6f6`): Engine UI hidden from anonymous/free trial users via `isTrialResult` check in `PolicyDetailView.tsx`
+- **Files**: `src/lib/actuarial-engine/` (18 files incl. adapter), `supabase/migrations/028_actuarial_engine_schema.sql`
+- **Commits**: `dc6beae`, `819a6db`, `1eba6f6`, `8a61b58`
 
 ### 141. Actuarial Engine Admin Configuration UI (Added Feb 28, 2026)
 - **Feature**: Admin dashboard tab for managing actuarial engine parameters (Monte Carlo, TOPSIS weights, risk scenarios, compliance rules)
@@ -4983,12 +4985,12 @@ connectSrc: [
 - If Railway builds suddenly start including unexpected services or become much larger, check `nixpacks.toml` first
 - The `nixpacks.toml` and `railway.json` must stay in sync — both define install/build/start commands. `nixpacks.toml` takes precedence when present.
 
-**Actuarial Engine — Not Yet Integrated (Feb 28, 2026):**
-- The actuarial engine at `src/lib/actuarial-engine/` is complete and tested but NOT wired into the production extraction/evaluation pipeline
-- Feature flag `actuarial_engine_enabled` is seeded as `false` — flipping it to `true` has no effect until an adapter is built
-- Integration requires: (1) adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`, (2) UI components to display EOOP/TOPSIS results, (3) migration 028 applied to production Supabase
-- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
-- The engine uses its own type system (`CanonicalCoverage` with string codes like `"COLLISION"`, `"THEFT"`, not the existing `Coverage` interface) — mapping is needed
+**Actuarial Engine — Integrated, DB Not Yet Applied (Feb 28, 2026):**
+- The actuarial engine at `src/lib/actuarial-engine/` is complete, tested, and integrated into the UI pipeline via `adapter.ts`, `ComparePolicies.tsx`, and `PolicyDetailView.tsx`
+- Feature flag `actuarial_engine_enabled` is seeded as `false` — migration `028_actuarial_engine_schema.sql` must be applied to production Supabase before enabling
+- Admin configuration UI available at Admin Dashboard → "Actuarial Engine" tab (`ActuarialTab.tsx`) for Monte Carlo, TOPSIS, scenario, and compliance parameter management
+- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via `isTrialResult` check in `PolicyDetailView.tsx`
+- The engine uses its own type system (`CanonicalCoverage` with string codes like `"COLLISION"`, `"THEFT"`) — the adapter (`adapter.ts`) handles mapping from `AnalyzedPolicy`
 - Do NOT import from individual layer files — always import from `@/lib/actuarial-engine` (the barrel export in `index.ts`)
 
 ---

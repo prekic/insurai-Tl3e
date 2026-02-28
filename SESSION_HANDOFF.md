@@ -11,7 +11,7 @@
 | **Tests** | 15,753 passing (329 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `claude/load-project-context-yjssq` |
+| **Branch** | `gemini20260228` |
 | **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine UI integrations implemented (adapter, ComparePolicies, PolicyDetailView) |
 
 ---
@@ -33,6 +33,8 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 **Integrated** into the production pipeline — built adapter `mapAnalyzedToActuarialInput` from `AnalyzedPolicy` → `ActuarialPolicyInput` and added UI displays.
 - **ComparePolicies.tsx**: Shows TOPSIS Closeness Score and Grade.
 - **PolicyDetailView.tsx**: Shows Expected Out-of-Pocket (EOOP) details and Contract Quality bounds.
+- **`src/lib/policy-evaluation/types.ts`**: Added `actuarialRank`, `actuarialCloseness`, `actuarialGrade` fields to `PolicyComparison` type.
+- **`src/lib/policy-evaluation/comparator.ts`**: Lint auto-format (arrow function parentheses) + TOPSIS score integration into comparison results.
 
 ### 1b. Actuarial Engine Admin Configuration UI
 - Added Admin Dashboard tab "Actuarial Engine" (`ActuarialTab.tsx`) for managing engine parameters.
@@ -74,7 +76,6 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 
 ### Gotcha: Actuarial Engine Integration
 - Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `src/lib/actuarial-engine/adapter.ts` converts from `Policy`/`Coverage`.
-- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — not directly compatible with `Coverage`/`AnalyzedPolicy`.
 - Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
 - **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
 
@@ -120,4 +121,4 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 | Feb 26 | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
 | Feb 26 | Historical Trend Charts, CSV Export, Cron Job Monitoring | `feat/admin-monitoring-extras` |
 | Feb 27 | Alert email wiring, configurable checkIntervalMs + minRequests, migration 027 | `claude/load-project-context-yjssq` |
-| **Feb 28 (Current)** | **Actuarial engine (4-layer), deployment hardening (nixpacks), output eval tests (162)** | **`claude/load-project-context-yjssq`** |
+| **Feb 28 (Current)** | **Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162), free-trial restriction** | **`gemini20260228`** |
