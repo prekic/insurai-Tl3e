@@ -53,8 +53,11 @@ import { getShortCompanyName } from '@/lib/insurance-display'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePdfExport } from '@/hooks/usePdfExport'
 import { exportSinglePolicyToCSV, exportSinglePolicyToExcel } from '@/lib/export'
-import { evaluateAndRankPolicies } from '@/lib/actuarial-engine/engine'
-import { mapAnalyzedToActuarialInput } from '@/lib/actuarial-engine/adapter'
+import {
+  evaluateAndRankPolicies,
+  mapAnalyzedToActuarialInput,
+  emitEvaluation,
+} from '@/lib/actuarial-engine'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -1069,6 +1072,13 @@ export function PolicyDetailView() {
       return null
     }
   }, [policy, isTrialResult])
+
+  // P1: Emit actuarial timing data to event bus for ActuarialTab
+  useEffect(() => {
+    if (actuarialResult?.layerTimings && policy) {
+      emitEvaluation(policy.id, actuarialResult)
+    }
+  }, [actuarialResult, policy])
 
   // Export handlers
   const handleExportPdf = useCallback(async () => {

@@ -19,6 +19,12 @@
 // ── Engine orchestrator ──────────────────────────────────────────────────────
 export { runFullEvaluation, evaluateAndRankPolicies } from './engine'
 
+// ── Adapter (AnalyzedPolicy → ActuarialPolicyInput) ──────────────────────────
+export { mapAnalyzedToActuarialInput } from './adapter'
+
+// ── Event Bus (evaluation pub/sub) ───────────────────────────────────────────
+export { emitEvaluation, subscribeEvaluation, getListenerCount } from './actuarial-events'
+
 // ── Core types ───────────────────────────────────────────────────────────────
 export type {
   UUID,

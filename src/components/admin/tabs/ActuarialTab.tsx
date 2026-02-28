@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Save, History, Calculator, AlertTriangle, Timer } from 'lucide-react'
 import { EvidenceCoveragePanel } from './settings/EvidenceCoveragePanel'
 import type { PolicyEvaluationResult, LayerTimings } from '@/lib/actuarial-engine/types'
+import { subscribeEvaluation } from '@/lib/actuarial-engine'
 
 // Define the shape of our config from the DB
 interface ActuarialConfigSet {
@@ -43,11 +44,23 @@ export function ActuarialTab() {
   const [isSaving, setIsSaving] = useState(false)
   const [configs, setConfigs] = useState<Record<string, ActuarialConfigSet>>({})
   const [editedData, setEditedData] = useState<Record<string, string>>({})
-  const [lastEvalResult, _setLastEvalResult] = useState<PolicyEvaluationResult | null>(null)
+  const [lastEvalResult, setLastEvalResult] = useState<PolicyEvaluationResult | null>(null)
 
   // Fetch configs on mount
   useEffect(() => {
     fetchConfigs()
+  }, [])
+
+  // P1: Subscribe to actuarial evaluation events from the event bus
+  useEffect(() => {
+    return subscribeEvaluation((event) => {
+      // Record timing in the ring buffer
+      if (event.result.layerTimings) {
+        recordEvaluationTiming(event.policyId, event.result.layerTimings)
+      }
+      // Update the evidence coverage panel with the latest result
+      setLastEvalResult(event.result)
+    })
   }, [])
 
   const fetchConfigs = async () => {

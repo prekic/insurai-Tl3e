@@ -6,6 +6,7 @@
  */
 
 import type { Policy, PolicyType } from '@/types/policy'
+import type { PolicyEvaluationResult } from '@/lib/actuarial-engine/types'
 
 // =============================================================================
 // EVALUATION RESULT TYPES
@@ -171,6 +172,9 @@ export interface PolicyComparison {
     keyDifferences: KeyDifference[]
     tradeoffs: Tradeoff[]
   }
+
+  /** Full actuarial engine results — available when all compared policies are supported types. */
+  actuarialResults?: PolicyEvaluationResult[]
 }
 
 export interface ComparisonMetric {

@@ -82,6 +82,7 @@ export function comparePolicies(
     coverageMatrix,
     rankings,
     analysis,
+    actuarialResults: actuarialResults.length > 0 ? actuarialResults : undefined,
   }
 }
 
