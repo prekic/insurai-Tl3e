@@ -397,7 +397,12 @@ export function ExtractionHealthTab() {
                 <RefreshCw className={cn('h-4 w-4 mr-1', autoRefresh && 'animate-spin')} />
                 {autoRefresh ? 'Auto' : 'Paused'}
               </Button>
-              <Button variant="outline" size="sm" onClick={fetchHealth}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchHealth}
+                aria-label="Refresh extraction health"
+              >
                 <RefreshCw className="h-4 w-4" />
               </Button>
             </div>

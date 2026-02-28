@@ -67,7 +67,7 @@ describe('SettingsTab', () => {
     it('should render category navigation buttons', () => {
       render(<SettingsTab />)
 
-      expect(screen.getByRole('button', { name: /ai/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /^AI Settings/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /evaluation/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /rate limits/i })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /ocr/i })).toBeInTheDocument()
@@ -199,8 +199,8 @@ describe('SettingsTab - Category Icons', () => {
 
     // Each category button should have an icon (svg element)
     const buttons = screen.getAllByRole('button')
-    const categoryButtons = buttons.filter(
-      (btn) => btn.textContent?.match(/AI|Evaluation|Rate Limits|OCR|Feature Flags/i)
+    const categoryButtons = buttons.filter((btn) =>
+      btn.textContent?.match(/AI|Evaluation|Rate Limits|OCR|Feature Flags/i)
     )
 
     categoryButtons.forEach((button) => {

@@ -127,20 +127,20 @@ router.get(
         'ID',
         'Document ID',
         'Status',
-        'Upload Type',
         'File Name',
         'File Size',
         'MIME Type',
         'AI Provider',
-        'AI Model',
         'OCR Used',
+        'OCR Engine',
+        'Confidence',
         'Duration MS',
         'Error',
         'Created At',
       ]
 
-      const escapeCSV = (value: string | null | undefined): string => {
-        if (!value) return ''
+      const escapeCSV = (value: string | number | boolean | null | undefined): string => {
+        if (value === null || value === undefined) return ''
         const str = String(value)
         if (str.includes(',') || str.includes('"') || str.includes('\n')) {
           return `"${str.replace(/"/g, '""')}"`
@@ -152,14 +152,14 @@ router.get(
         log.id,
         log.document_id,
         log.status,
-        log.upload_type,
-        log.file_name,
+        log.filename,
         log.file_size,
         log.mime_type,
         log.ai_provider,
-        log.ai_model,
         log.ocr_used,
-        log.duration_ms,
+        log.ocr_engine,
+        log.extraction_confidence,
+        log.total_duration_ms,
         log.error_message,
         log.created_at,
       ])

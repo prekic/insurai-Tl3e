@@ -1,4 +1,4 @@
-# Session Handoff — February 26, 2026 (Extraction Health Alerting, Configurable Retention, E2E Tests, Benchmark UIs)
+# Session Handoff — February 28, 2026 (Actuarial Engine, Deployment Hardening, Output Evaluation Tests)
 
 ## Current Status
 
@@ -8,60 +8,41 @@
 | **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings |
-| **Tests** | 15,551 passing (323 files, 0 failures) |
+| **Tests** | 15,753 passing (329 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `feat/admin-monitoring-extras` / `main` |
-| **Production Status** | **VERIFIED** — Migration 026 applied manually, backend Cron Jobs and Extraction Health Historical views active. |
+| **Branch** | `claude/load-project-context-yjssq` |
+| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine NOT yet activated (feature flag off) |
 
 ---
 
 ## Session Summary
 
-**Post-Deploy Verification (Completed):**
-- **Applied Migration 026** manually via `psql` to production Supabase for `pg_cron` secure views (due to `supabase db push` linkage issues).
-- **Admin Settings Panels** for Cron Jobs and Market Benchmarks render correctly.
-- **Processing Log CSV Export** generates valid download payloads.
-- **Extraction Health Historical Trends** pulls accurate aggregations using backend daily grouping.
-- **Dependencies** `recharts` and `date-fns` integrated into `package.json` without bundle bloat issues.
+### 1. Modular Actuarial Engine (`dc6beae`)
+New 4-layer actuarial evaluation engine at `src/lib/actuarial-engine/` (4,916 lines, 17 files):
 
-**Previous Features Implemented:**
-### 1. Extraction Health Alerting System
-- **`server/services/extraction-alert-service.ts`** (new) — Evaluates extraction health metrics against configurable thresholds (error rate warning/critical, per-provider latency). In-memory cooldown prevents alert flooding. Fires admin notifications + optional email.
-- Alert evaluation throttled to once per 5 minutes in `recordExtractionEvent()` (`server/routes/ai.ts`)
-- `GET /api/admin/monitoring/alerts/status` endpoint returns cooldown state
+- **Layer A** — Semantic exclusion analysis + evidence pointer validation
+- **Layer B** — Compliance gates (SEDDK 2025/2026 traffic limits, DASK 2% deductible, "Tam Kasko" product name validation)
+- **Layer C** — Monte Carlo EOOP simulation (10,000 iterations, lognormal/Pareto loss models, deterministic Mulberry32 PRNG)
+- **Layer D** — TOPSIS MCDA ranking + weight sensitivity analysis + XAI natural-language summaries
 
-### 2. Admin-Configurable Retention
-- **`supabase/migrations/025_monitoring_retention_config.sql`** (new) — Seeds 7 monitoring + 2 retention config rows, creates configurable PL/pgSQL cleanup functions, reschedules pg_cron jobs
-- **`server/services/config-service.ts`** — `getMonitoringConfig()` and `getRetentionConfig()` with 5-min cache
-- **`src/lib/config/types.ts`** — `MonitoringConfig` (7 fields), `RetentionConfig` (2 fields), `ConfigCategory` extended
-- **`src/lib/config/configuration-service.ts`** — Client-side mirror for admin UI
-- **`MonitoringAlertsPanel.tsx`** (366 lines) — Alert threshold config, email toggle, alert status display
-- **`RetentionSettingsPanel.tsx`** (260 lines) — Retention day inputs, manual cleanup trigger
-- Both panels registered in `SettingsTab.tsx` navigation
+Key functions: `runFullEvaluation(policy)` for single policy, `evaluateAndRankPolicies([...])` for multi-policy comparison.
 
-### 3. E2E Tests
-- 7 new Playwright API-level tests in `e2e/admin-flows.spec.ts` covering extraction-health, alerts/status, processing-logs, and settings endpoints
+Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature flag `actuarial_engine_enabled` = false.
 
-### 4. Admin Tooling & Bundle Optimization (Premium/Coverage Market Benchmarks)
-- **`MarketBenchmarksPanel.tsx`** (new) — Admin interface to manage Coverage Market Benchmarks.
-- **`BenchmarksTab.tsx`** — Existing component used to manage Premium Benchmarks.
-- Added comprehensive unit tests for both panels ensuring API integrations and UI rendering.
-- Fixed bundle size issue by successfully putting `xlsx` in its own async chunk.
+**Not yet integrated** into the production pipeline — requires adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`.
 
-### 5. Historical Trend Charts (Extraction Health)
-- **`server/services/extraction-metrics-service.ts`** — Added `getDBExtractionHealthHistorical` to group and aggregate statistics per day.
-- **`server/routes/admin/monitoring.ts`** — Exposed `/api/admin/monitoring/extraction-health/historical`.
-- **`src/components/admin/tabs/ExtractionHealthTab.tsx`** — Updated with a Live vs Historical toggle, embedding a new `recharts`-based chart visualization inline.
+### 2. Railway Deployment Hardening (`1f34759`, `acc190f`)
+- Created `nixpacks.toml` with `providers = ["node"]` to disable Caddy/Chromium auto-detection that caused port conflicts
+- Fixed invalid Nix package names (`nodejs_22` → extend-defaults `"..."`)
+- Added `healthcheckPath: "/api/health"` + `healthcheckTimeout: 60` to `railway.json`
+- Fixed `content.ts` CSV export column alignment (server-side field names) and `monitoring.ts` import errors
 
-### 6. Processing Logs Export
-- **`server/routes/admin/content.ts`** — Added the `/api/admin/processing-logs/export` endpoint for exporting complete filtered logs as CSV, bypassing pagination.
-- **`src/components/admin/tabs/ProcessingLogsTab.tsx`** — Export button updated to trigger native browser download from the backend endpoint.
-
-### 7. Cron Job Monitoring UI
-- **`026_cron_monitoring_views.sql`** — Secure views (`vw_cron_jobs`, `vw_cron_job_runs`) around `pg_cron` extensions.
-- **`/api/admin/monitoring/cron-jobs`** — New endpoint fetching background jobs and 5 most recent executions.
-- **`CronJobsPanel.tsx`** — New UI rendering job status, command logic, and run history. Added to `SettingsTab.tsx`.
+### 3. Output Evaluation Tests (`c19118c`)
+162 new tests across 3 files validating AI extraction and policy evaluation output quality:
+- `evaluation-scoring-sample-data.test.ts` (63 tests) — Coverage scoring, grade thresholds, recommendations
+- `extraction-output-quality.test.ts` (38 tests) — Extraction field validation, completeness, format
+- `sample-policy-output-evaluation.test.ts` (61 tests) — End-to-end evaluation of all 5 sample policy types
 
 ---
 
@@ -71,52 +52,58 @@
 - **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
 - **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
 
-### Gotcha: Supabase DB Push linkage & Manual Migrations
-- Running `npx supabase db push` can fail if the local remote project isn't linked via `npx supabase link`. If encountering blockers applying migrations from terminal, fallback strictly to manually applying the file over PostgreSQL: `psql $SUPABASE_URL -f supabase/migrations/xxx.sql`. Make sure `psql` is actually installed locally first (`sudo apt-get install postgresql-client`).
+### Gotcha: Supabase DB Push & Manual Migrations
+- `npx supabase db push` requires `npx supabase link` first. Fallback: apply SQL via `psql $SUPABASE_URL -f supabase/migrations/xxx.sql` or Supabase Dashboard SQL Editor.
 
-### Gotcha: Multiple DOM Elements in Tests (`BenchmarksTab.test.tsx`)
-- The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
-- **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
+### Gotcha: BenchmarksTab Multiple DOM Elements in Tests
+- `getByText(/4\.?500/)` matches both table data and informational text. Use `getAllByText(...)[0]`.
 
 ### Gotcha: Alert Service Test Mocks
-- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js` (specifically `getMonitoringConfig`)
-- Without these mocks, the throttled alert check causes real config fetches in tests
+- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js`.
 
-### Incomplete: Alert Email Not Wired
-- `MonitoringAlertsPanel.tsx` has email toggle + address fields → saves to `app_settings` correctly
-- `extraction-alert-service.ts` defines `enableEmailAlerts`/`alertEmailAddresses` in `MonitoringConfig` interface but does NOT read them — `fireAlert()` only calls `createNotification()`, no email logic exists
-- `checkIntervalMs` config is similarly seeded/displayed but unused — throttle in `ai.ts` is hardcoded `300000` ms
-- **Action**: If email alerts are needed, add `sendAdminAlertEmail()` inside `fireAlert()` gated by `config.enableEmailAlerts`
+### Gotcha: Nixpacks Auto-Detection
+- Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`.
+- `nixpacks.toml` and `railway.json` must stay in sync on install/build/start commands.
 
-### Subtle: Per-Provider Latency Minimum Threshold
-- `evaluateAndDispatchAlerts()` only fires latency alerts when `stats.total >= 3` — prevents false alerts from 1-2 slow requests
-- This guard is NOT configurable via admin UI (hardcoded in `extraction-alert-service.ts:78`)
+### Gotcha: Actuarial Engine Not Wired
+- `actuarial_engine_enabled` flag exists but flipping it to `true` has no effect until the adapter layer is built.
+- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — not directly compatible with `Coverage`/`AnalyzedPolicy`.
+- Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
 
 ---
 
 ## Configuration Requirements
 
 ### No New Environment Variables
-No new env vars needed for this session's features.
+No new env vars needed. Migration 028 creates tables and seeds a feature flag but does not require runtime configuration changes.
+
+### Migration 028 (Not Yet Applied)
+`supabase/migrations/028_actuarial_engine_schema.sql` creates 5 tables + feature flag seed. Apply to production **only when ready to enable the actuarial engine**. Idempotent (`CREATE TABLE IF NOT EXISTS`).
 
 ---
 
 ## Priority Next Steps
 
-### P1 — Post-Deployment Review & Monitoring
-1. Keep an eye on the `Extraction Health` admin tab to ensure production traces remain stable.
-2. Monitor Railway logs for any unexpected edge-case errors coming from alert evaluation logic (`extraction-alert-service.ts`).
+### P1 — Deploy & Monitor
+1. Verify Railway deployment with new `nixpacks.toml` and healthcheck configuration
+2. Confirm healthcheck endpoint `/api/health` responds correctly for Railway's liveness probe
+3. Monitor build logs for any Caddy/Chromium auto-detection regressions
 
-### P2 — Next Features to Implement
-(All P2 features from previous sessions have been implemented.)
+### P2 — Actuarial Engine Integration
+1. **Adapter layer**: Build `AnalyzedPolicy` → `ActuarialPolicyInput` converter that maps:
+   - `Coverage[]` → `CanonicalCoverage[]` (using coverage code standardization)
+   - `exclusions: string[]` → semantic exclusion analysis input
+   - `startDate`/`expiryDate` → `effectiveDate`/`expiryDate` (Date objects)
+   - `raw_data.indemnity` → `IndemnityMechanics` (parts standard, repair network, rayiç method)
+2. **Apply migration 028** to production Supabase
+3. **Admin UI**: Add actuarial config management panel (scenario frequencies, TOPSIS weights, Monte Carlo params)
+4. **Compare page**: Integrate TOPSIS ranking into `ComparePolicies.tsx` (display closeness scores, sensitivity analysis)
+5. **Policy detail**: Show EOOP breakdown and compliance gate results in `PolicyDetailView.tsx`
 
----
-
-## Architecture Notes
-
-- **No new architectural patterns** — The Cron Jobs API and Historical Trends implementation extend the existing `admin/monitoring.ts` controller layer and established React querying idioms. Using `pg_cron` secure views is consistent with previous `app_settings` and metric dashboard strategies. 
-- A new library `date-fns` was introduced temporarily to simplify manual date aggregation on the frontend for Cron Jobs, and `recharts` was brought in explicitly for the Historical Trend chart.
-- CSV export endpoints bypass pagination arrays by stripping limit params, sending native `text/csv` through `res.attachment()`.
+### P3 — Quality & Observability
+1. Add actuarial engine metrics to extraction health monitoring
+2. Build evidence coverage dashboard for admin panel
+3. Expand golden regression tests for health/life/business policy types (currently only kasko/traffic/dask/zas)
 
 ---
 
@@ -128,5 +115,7 @@ No new env vars needed for this session's features.
 | Feb 25 late | Extraction health dashboard, Excel export, comparison enhancements, DB metrics | `claude/load-project-context-3VUJ2` |
 | Feb 26 early | Extraction health hourly chart, processing log cleanup, ExtractionHealthTab tests | `claude/load-project-context-e6OeC` |
 | Feb 26 late | Extraction health alerting, configurable retention, Benchmark UI builds | `claude/load-project-context-6D3KI` |
-| Feb 26 (Now) | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
-| **Feb 26 (Latest)** | **Historical Trend Charts, CSV Export, Cron Job Monitoring** | **`feat/admin-monitoring-extras`** |
+| Feb 26 | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
+| Feb 26 | Historical Trend Charts, CSV Export, Cron Job Monitoring | `feat/admin-monitoring-extras` |
+| Feb 27 | Alert email wiring, configurable checkIntervalMs + minRequests, migration 027 | `claude/load-project-context-yjssq` |
+| **Feb 28 (Current)** | **Actuarial engine (4-layer), deployment hardening (nixpacks), output eval tests (162)** | **`claude/load-project-context-yjssq`** |

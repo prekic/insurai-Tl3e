@@ -70,8 +70,9 @@ interface ExtractionEvent {
 const EXTRACTION_BUFFER_SIZE = 200
 const extractionMetrics: ExtractionEvent[] = []
 
-// Alert check throttling — at most once per 5 minutes
+// Alert check throttling — interval is self-updating from DB config
 let lastAlertCheckTime = 0
+let cachedCheckIntervalMs = 300000 // default 5 min; updated from MonitoringConfig on each check
 
 function recordExtractionEvent(event: ExtractionEvent): void {
   extractionMetrics.push(event)
@@ -93,13 +94,16 @@ function recordExtractionEvent(event: ExtractionEvent): void {
     })
   )
 
-  // Throttled alert check — at most once per checkIntervalMs (5min fallback)
+  // Throttled alert check — interval self-updates from DB config
   const now = Date.now()
-  if (now - lastAlertCheckTime > 300000) {
+  if (now - lastAlertCheckTime > cachedCheckIntervalMs) {
     lastAlertCheckTime = now
     // Fire-and-forget: get snapshot + config, then evaluate
     Promise.all([getExtractionHealthSnapshot(), getMonitoringConfig()])
-      .then(([snapshot, config]) => evaluateAndDispatchAlerts(snapshot, config))
+      .then(([snapshot, config]) => {
+        cachedCheckIntervalMs = config.checkIntervalMs
+        return evaluateAndDispatchAlerts(snapshot, config)
+      })
       .catch((err) =>
         log.warn('Alert dispatch failed', {
           error: err instanceof Error ? err.message : String(err),

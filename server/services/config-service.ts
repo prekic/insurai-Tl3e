@@ -77,6 +77,7 @@ export interface MonitoringConfig {
   alertCooldownMinutes: number
   enableEmailAlerts: boolean
   alertEmailAddresses: string
+  minProviderRequestsForLatencyAlert: number
 }
 
 export interface RetentionConfig {
@@ -147,6 +148,7 @@ const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
   alertCooldownMinutes: 15,
   enableEmailAlerts: false,
   alertEmailAddresses: '',
+  minProviderRequestsForLatencyAlert: 3,
 }
 
 const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
@@ -217,6 +219,7 @@ const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
   alert_cooldown_minutes: 'alertCooldownMinutes',
   enable_email_alerts: 'enableEmailAlerts',
   alert_email_addresses: 'alertEmailAddresses',
+  min_provider_requests_for_latency_alert: 'minProviderRequestsForLatencyAlert',
 }
 
 const RETENTION_KEY_MAP: Record<string, keyof RetentionConfig> = {

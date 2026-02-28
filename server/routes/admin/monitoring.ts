@@ -10,6 +10,7 @@ import {
   authenticateAdmin,
   requireSuperAdmin,
   logAdminAction,
+  getSupabaseWithError,
   monitoring,
   qstr,
   logger,
@@ -494,7 +495,7 @@ router.get(
   '/monitoring/cron-jobs',
   authenticateAdmin,
   requireSuperAdmin,
-  async (req: AuthenticatedRequest, res: Response) => {
+  async (_req: AuthenticatedRequest, res: Response) => {
     try {
       const { client: supabase, error: supabaseError } = getSupabaseWithError()
 
@@ -525,9 +526,11 @@ router.get(
       }
 
       // Aggregate data
-      const aggregatedJobs = jobs.map((job) => ({
+      const aggregatedJobs = jobs.map((job: Record<string, unknown>) => ({
         ...job,
-        recent_runs: runs.filter((run) => run.jobid === job.jobid).slice(0, 5), // Keep top 5 latest runs per job
+        recent_runs: runs
+          .filter((run: Record<string, unknown>) => run.jobid === job.jobid)
+          .slice(0, 5),
       }))
 
       res.json({ success: true, data: aggregatedJobs })

@@ -1,6 +1,16 @@
 # Nixpacks configuration for Railway deployment
 # See: https://nixpacks.com/docs/configuration/file
 
+# Only use Node.js provider — disable auto-detected Caddy and Chromium
+# Express already serves static files, so Caddy is not needed
+providers = ["node"]
+
+[phases.setup]
+# Extend default packages, add only non-Node extras
+# Node.js version is auto-detected from .nvmrc (22)
+# NPM is bundled with Node.js — no need to specify separately
+nixPkgs = ["...", "openssl"]
+
 [phases.install]
 cmds = ["npm ci --include=dev"]
 

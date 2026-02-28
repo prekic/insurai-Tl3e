@@ -10,6 +10,7 @@
 
 import { logger } from '../lib/logger.js'
 import { createNotification } from './admin-notification-service.js'
+import { sendAdminAlertEmail } from './email-service.js'
 
 const svcLog = logger.child('extraction-alert-service')
 
@@ -34,6 +35,7 @@ interface MonitoringConfig {
   alertCooldownMinutes: number
   enableEmailAlerts: boolean
   alertEmailAddresses: string
+  minProviderRequestsForLatencyAlert: number
 }
 
 interface HealthSnapshot {
@@ -55,17 +57,19 @@ export async function evaluateAndDispatchAlerts(
     // Skip if no extraction data in the window
     if (snapshot.last_24h.total === 0) return
 
+    const minRequests = config.minProviderRequestsForLatencyAlert ?? 3
+
     // 1. Overall error rate check
     const errorRate = snapshot.last_24h.error_rate
     if (errorRate >= config.errorRateCriticalThreshold) {
-      await fireAlert('error_rate_critical', cooldownMs, {
+      await fireAlert('error_rate_critical', cooldownMs, config, {
         type: 'error' as const,
         category: 'performance' as const,
         title: 'Critical: High Extraction Error Rate',
         message: `Error rate is ${(errorRate * 100).toFixed(1)}% (threshold: ${(config.errorRateCriticalThreshold * 100).toFixed(1)}%)`,
       })
     } else if (errorRate >= config.errorRateWarningThreshold) {
-      await fireAlert('error_rate_warning', cooldownMs, {
+      await fireAlert('error_rate_warning', cooldownMs, config, {
         type: 'warning' as const,
         category: 'performance' as const,
         title: 'Warning: Elevated Extraction Error Rate',
@@ -75,8 +79,8 @@ export async function evaluateAndDispatchAlerts(
 
     // 2. Per-provider latency check
     for (const [provider, stats] of Object.entries(snapshot.by_provider)) {
-      if (stats.avg_latency_ms > config.avgLatencyCriticalMs && stats.total >= 3) {
-        await fireAlert(`latency_critical:${provider}`, cooldownMs, {
+      if (stats.avg_latency_ms > config.avgLatencyCriticalMs && stats.total >= minRequests) {
+        await fireAlert(`latency_critical:${provider}`, cooldownMs, config, {
           type: 'warning' as const,
           category: 'performance' as const,
           title: `Slow Extraction: ${provider}`,
@@ -94,6 +98,7 @@ export async function evaluateAndDispatchAlerts(
 async function fireAlert(
   alertKey: string,
   cooldownMs: number,
+  config: MonitoringConfig,
   notification: {
     type: 'error' | 'warning' | 'info'
     category: 'performance'
@@ -116,6 +121,29 @@ async function fireAlert(
       error: err instanceof Error ? err.message : String(err),
     })
   )
+
+  // Email notifications (optional)
+  if (config.enableEmailAlerts && config.alertEmailAddresses.trim().length > 0) {
+    const addresses = config.alertEmailAddresses
+      .split(',')
+      .map((e) => e.trim())
+      .filter(Boolean)
+
+    for (const email of addresses) {
+      sendAdminAlertEmail(email, {
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        details: { alertKey, timestamp: new Date().toISOString() },
+      }).catch((err) =>
+        svcLog.warn('Failed to send admin alert email', {
+          email,
+          alertKey,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      )
+    }
+  }
 
   svcLog.warn('Extraction health alert fired', {
     alertKey,

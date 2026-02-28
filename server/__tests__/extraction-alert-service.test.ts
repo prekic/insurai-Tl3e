@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-const { mockCreateNotification, mockWarn } = vi.hoisted(() => ({
+const { mockCreateNotification, mockSendAdminAlertEmail, mockWarn } = vi.hoisted(() => ({
   mockCreateNotification: vi.fn().mockResolvedValue(undefined),
+  mockSendAdminAlertEmail: vi.fn().mockResolvedValue({ success: true }),
   mockWarn: vi.fn(),
 }))
 
 vi.mock('../services/admin-notification-service.js', () => ({
   createNotification: mockCreateNotification,
+}))
+
+vi.mock('../services/email-service.js', () => ({
+  sendAdminAlertEmail: mockSendAdminAlertEmail,
 }))
 
 vi.mock('../lib/logger.js', () => ({
@@ -27,6 +32,7 @@ const defaultConfig = {
   alertCooldownMinutes: 15,
   enableEmailAlerts: false,
   alertEmailAddresses: '',
+  minProviderRequestsForLatencyAlert: 3,
 }
 
 const emptySnapshot = { last_24h: { total: 0, error_rate: 0 }, by_provider: {} }
@@ -35,6 +41,7 @@ describe('extraction-alert-service', () => {
   beforeEach(() => {
     resetAlertState()
     mockCreateNotification.mockClear()
+    mockSendAdminAlertEmail.mockClear()
     mockWarn.mockClear()
   })
 
@@ -109,5 +116,88 @@ describe('extraction-alert-service', () => {
     expect(Object.keys(getAlertState()).length).toBeGreaterThan(0)
     resetAlertState()
     expect(getAlertState()).toEqual({})
+  })
+
+  // ── Email dispatch tests ──────────────────────────────────────────
+
+  it('sends email alert when enableEmailAlerts is true', async () => {
+    const config = {
+      ...defaultConfig,
+      enableEmailAlerts: true,
+      alertEmailAddresses: 'admin@test.com, ops@test.com',
+    }
+    const snapshot = { last_24h: { total: 100, error_rate: 0.25 }, by_provider: {} }
+    await evaluateAndDispatchAlerts(snapshot, config)
+
+    // Should send to both addresses
+    expect(mockSendAdminAlertEmail).toHaveBeenCalledTimes(2)
+    expect(mockSendAdminAlertEmail).toHaveBeenCalledWith(
+      'admin@test.com',
+      expect.objectContaining({
+        type: 'error',
+        title: expect.stringContaining('Critical'),
+      })
+    )
+    expect(mockSendAdminAlertEmail).toHaveBeenCalledWith(
+      'ops@test.com',
+      expect.objectContaining({
+        type: 'error',
+        title: expect.stringContaining('Critical'),
+      })
+    )
+  })
+
+  it('does not send email when enableEmailAlerts is false', async () => {
+    const config = {
+      ...defaultConfig,
+      enableEmailAlerts: false,
+      alertEmailAddresses: 'admin@test.com',
+    }
+    const snapshot = { last_24h: { total: 100, error_rate: 0.25 }, by_provider: {} }
+    await evaluateAndDispatchAlerts(snapshot, config)
+
+    expect(mockCreateNotification).toHaveBeenCalledOnce() // DB notification still fires
+    expect(mockSendAdminAlertEmail).not.toHaveBeenCalled()
+  })
+
+  it('does not send email when alertEmailAddresses is empty', async () => {
+    const config = {
+      ...defaultConfig,
+      enableEmailAlerts: true,
+      alertEmailAddresses: '  ',
+    }
+    const snapshot = { last_24h: { total: 100, error_rate: 0.25 }, by_provider: {} }
+    await evaluateAndDispatchAlerts(snapshot, config)
+
+    expect(mockCreateNotification).toHaveBeenCalledOnce()
+    expect(mockSendAdminAlertEmail).not.toHaveBeenCalled()
+  })
+
+  // ── Configurable minProviderRequestsForLatencyAlert ───────────────
+
+  it('uses minProviderRequestsForLatencyAlert from config', async () => {
+    const config = {
+      ...defaultConfig,
+      minProviderRequestsForLatencyAlert: 5,
+    }
+
+    // 4 requests — below threshold of 5, should NOT fire
+    const snapshot4 = {
+      last_24h: { total: 10, error_rate: 0 },
+      by_provider: { openai: { total: 4, failed: 0, avg_latency_ms: 15000 } },
+    }
+    await evaluateAndDispatchAlerts(snapshot4, config)
+    expect(mockCreateNotification).not.toHaveBeenCalled()
+
+    // 5 requests — at threshold, SHOULD fire
+    const snapshot5 = {
+      last_24h: { total: 10, error_rate: 0 },
+      by_provider: { openai: { total: 5, failed: 0, avg_latency_ms: 15000 } },
+    }
+    await evaluateAndDispatchAlerts(snapshot5, config)
+    expect(mockCreateNotification).toHaveBeenCalledOnce()
+    expect(mockCreateNotification).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Slow Extraction: openai' })
+    )
   })
 })
