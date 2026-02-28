@@ -11,8 +11,8 @@
 | **Tests** | 15,753 passing (329 files, 0 failures) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `claude/load-project-context-yjssq` |
-| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine NOT yet activated (feature flag off) |
+| **Branch** | `gemini20260228` |
+| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine UI integrations implemented (adapter, ComparePolicies, PolicyDetailView) |
 
 ---
 
@@ -30,7 +30,16 @@ Key functions: `runFullEvaluation(policy)` for single policy, `evaluateAndRankPo
 
 Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature flag `actuarial_engine_enabled` = false.
 
-**Not yet integrated** into the production pipeline — requires adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`.
+**Integrated** into the production pipeline — built adapter `mapAnalyzedToActuarialInput` from `AnalyzedPolicy` → `ActuarialPolicyInput` and added UI displays.
+- **ComparePolicies.tsx**: Shows TOPSIS Closeness Score and Grade.
+- **PolicyDetailView.tsx**: Shows Expected Out-of-Pocket (EOOP) details and Contract Quality bounds.
+- **`src/lib/policy-evaluation/types.ts`**: Added `actuarialRank`, `actuarialCloseness`, `actuarialGrade` fields to `PolicyComparison` type.
+- **`src/lib/policy-evaluation/comparator.ts`**: Lint auto-format (arrow function parentheses) + TOPSIS score integration into comparison results.
+
+### 1b. Actuarial Engine Admin Configuration UI
+- Added Admin Dashboard tab "Actuarial Engine" (`ActuarialTab.tsx`) for managing engine parameters.
+- Backend API (`server/routes/admin/actuarial.ts`): `GET /api/admin/actuarial/configs` and `POST /api/admin/actuarial/configs/:name/version`.
+- Supports editing Monte Carlo simulation params, TOPSIS criteria weights, Kasko risk scenarios, and compliance rules via JSON editor with versioning.
 
 ### 2. Railway Deployment Hardening (`1f34759`, `acc190f`)
 - Created `nixpacks.toml` with `providers = ["node"]` to disable Caddy/Chromium auto-detection that caused port conflicts
@@ -65,10 +74,10 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 - Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`.
 - `nixpacks.toml` and `railway.json` must stay in sync on install/build/start commands.
 
-### Gotcha: Actuarial Engine Not Wired
-- `actuarial_engine_enabled` flag exists but flipping it to `true` has no effect until the adapter layer is built.
-- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — not directly compatible with `Coverage`/`AnalyzedPolicy`.
+### Gotcha: Actuarial Engine Integration
+- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `src/lib/actuarial-engine/adapter.ts` converts from `Policy`/`Coverage`.
 - Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
+- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
 
 ---
 
@@ -89,16 +98,11 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 2. Confirm healthcheck endpoint `/api/health` responds correctly for Railway's liveness probe
 3. Monitor build logs for any Caddy/Chromium auto-detection regressions
 
-### P2 — Actuarial Engine Integration
-1. **Adapter layer**: Build `AnalyzedPolicy` → `ActuarialPolicyInput` converter that maps:
-   - `Coverage[]` → `CanonicalCoverage[]` (using coverage code standardization)
-   - `exclusions: string[]` → semantic exclusion analysis input
-   - `startDate`/`expiryDate` → `effectiveDate`/`expiryDate` (Date objects)
-   - `raw_data.indemnity` → `IndemnityMechanics` (parts standard, repair network, rayiç method)
-2. **Apply migration 028** to production Supabase
-3. **Admin UI**: Add actuarial config management panel (scenario frequencies, TOPSIS weights, Monte Carlo params)
-4. **Compare page**: Integrate TOPSIS ranking into `ComparePolicies.tsx` (display closeness scores, sensitivity analysis)
-5. **Policy detail**: Show EOOP breakdown and compliance gate results in `PolicyDetailView.tsx`
+### P2 — Actuarial Engine Production Enablement
+1. **Database**: Apply `028_actuarial_engine_schema.sql` to production Supabase when ready to enable the engine (idempotent, safe to run)
+2. **Feature Flag**: Flip `actuarial_engine_enabled` to `true` after migration is applied
+3. **Admin UI** ✅ (completed this session): Config panel at Admin Dashboard → "Actuarial Engine" tab for scenario frequencies, TOPSIS weights, Monte Carlo params
+
 
 ### P3 — Quality & Observability
 1. Add actuarial engine metrics to extraction health monitoring
@@ -118,4 +122,4 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 | Feb 26 | Production Extraction Health Verification, App_Settings Debugging, E2E Rollout | `gemini20260226` |
 | Feb 26 | Historical Trend Charts, CSV Export, Cron Job Monitoring | `feat/admin-monitoring-extras` |
 | Feb 27 | Alert email wiring, configurable checkIntervalMs + minRequests, migration 027 | `claude/load-project-context-yjssq` |
-| **Feb 28 (Current)** | **Actuarial engine (4-layer), deployment hardening (nixpacks), output eval tests (162)** | **`claude/load-project-context-yjssq`** |
+| **Feb 28 (Current)** | **Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162), free-trial restriction** | **`gemini20260228`** |

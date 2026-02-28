@@ -88,7 +88,13 @@ export interface ComplianceIssue {
 
 export interface Recommendation {
   priority: 'critical' | 'high' | 'medium' | 'low'
-  type: 'increase_coverage' | 'reduce_deductible' | 'add_coverage' | 'review_premium' | 'compliance' | 'optimize'
+  type:
+    | 'increase_coverage'
+    | 'reduce_deductible'
+    | 'add_coverage'
+    | 'review_premium'
+    | 'compliance'
+    | 'optimize'
   title: string
   titleTR: string
   description: string
@@ -151,6 +157,11 @@ export interface PolicyComparison {
     premiumRank: number
     coverageRank: number
     valueRank: number
+
+    // Actuarial Engine Integration
+    actuarialRank?: number
+    actuarialCloseness?: number
+    actuarialGrade?: string
   }[]
 
   // Analysis summary
@@ -274,18 +285,16 @@ export const DEFAULT_STATUS_THRESHOLDS: StatusThresholds = {
 /**
  * Convert flat database config to evaluator's EvaluationConfig format
  */
-export function convertDatabaseConfigToEvaluatorConfig(
-  dbConfig: {
-    weightPremium?: number
-    weightCoverage?: number
-    weightDeductible?: number
-    weightCompliance?: number
-    weightValue?: number
-    strictCompliance?: boolean
-    includeOptionalCoverages?: boolean
-    useRegionalBenchmarks?: boolean
-  }
-): Partial<EvaluationConfig> {
+export function convertDatabaseConfigToEvaluatorConfig(dbConfig: {
+  weightPremium?: number
+  weightCoverage?: number
+  weightDeductible?: number
+  weightCompliance?: number
+  weightValue?: number
+  strictCompliance?: boolean
+  includeOptionalCoverages?: boolean
+  useRegionalBenchmarks?: boolean
+}): Partial<EvaluationConfig> {
   const config: Partial<EvaluationConfig> = {}
 
   // Convert flat weights to nested structure

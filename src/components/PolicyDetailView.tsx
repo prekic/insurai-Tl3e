@@ -53,6 +53,8 @@ import { getShortCompanyName } from '@/lib/insurance-display'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import { usePdfExport } from '@/hooks/usePdfExport'
 import { exportSinglePolicyToCSV, exportSinglePolicyToExcel } from '@/lib/export'
+import { evaluateAndRankPolicies } from '@/lib/actuarial-engine/engine'
+import { mapAnalyzedToActuarialInput } from '@/lib/actuarial-engine/adapter'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -1049,6 +1051,25 @@ export function PolicyDetailView() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [exportMenuOpen])
 
+  // Actuarial Engine Integration
+  const actuarialResult = useMemo(() => {
+    if (!policy) return null
+    if (isTrialResult) return null
+
+    // Beta Actuarial engine currently only supports specific policy types
+    const supportedTypes = ['kasko', 'traffic', 'dask', 'zas']
+    if (!supportedTypes.includes(policy.type)) return null
+
+    try {
+      const input = mapAnalyzedToActuarialInput(policy)
+      const results = evaluateAndRankPolicies([input])
+      return results[0]
+    } catch (err) {
+      console.error('Failed to run beta Actuarial Engine', err)
+      return null
+    }
+  }, [policy, isTrialResult])
+
   // Export handlers
   const handleExportPdf = useCallback(async () => {
     if (!policy) return
@@ -2000,6 +2021,76 @@ export function PolicyDetailView() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* Beta Actuarial Engine Insights */}
+            {actuarialResult && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 rounded-xl p-4 sm:p-5 mt-6 border border-blue-100">
+                <div className="flex items-center gap-2 mb-3">
+                  <BarChart3 className="text-blue-600 w-5 h-5" />
+                  <h3 className="font-semibold text-gray-900">Beta Actuarial Engine (EOOP)</h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-white rounded-lg p-4 border border-blue-50">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                      Expected Out Of Pocket
+                    </p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString(
+                        locale === 'tr' ? 'tr-TR' : 'en-US'
+                      )}{' '}
+                      TL
+                    </p>
+                    <p className="text-sm text-gray-600 mt-2">
+                      Premium:{' '}
+                      <span className="font-medium">
+                        {actuarialResult.expectedOutOfPocket.premium.amount.toLocaleString(
+                          locale === 'tr' ? 'tr-TR' : 'en-US'
+                        )}{' '}
+                        TL
+                      </span>
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Expected Uncovered Loss:{' '}
+                      <span className="font-medium text-amber-600">
+                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.amount.toLocaleString(
+                          locale === 'tr' ? 'tr-TR' : 'en-US'
+                        )}{' '}
+                        TL
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="bg-white rounded-lg p-4 border border-blue-50">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
+                      Contract Quality Score
+                    </p>
+                    <div className="flex items-end gap-2">
+                      <p className="text-2xl font-bold text-gray-900">
+                        {Math.round(actuarialResult.contractQualityScore)}
+                      </p>
+                      <span className="text-sm font-medium text-gray-500 mb-1">/ 100</span>
+                    </div>
+
+                    <p className="text-sm text-gray-600 mt-2">
+                      Parts Standard:{' '}
+                      <span className="font-medium capitalize">
+                        {actuarialResult.indemnityMechanics?.partsStandard?.value || 'Unspecified'}
+                      </span>
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      Repair Network:{' '}
+                      <span className="font-medium capitalize">
+                        {actuarialResult.indemnityMechanics?.repairNetworkRule?.value?.replace(
+                          '_',
+                          ' '
+                        ) || 'Unspecified'}
+                      </span>
+                    </p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </div>

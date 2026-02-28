@@ -1,6 +1,19 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, X, AlertTriangle, Lightbulb, Scale, ChevronDown, ChevronUp, Download, FileText, FileSpreadsheet, BarChart3, TrendingUp } from 'lucide-react'
+import {
+  Plus,
+  X,
+  AlertTriangle,
+  Lightbulb,
+  Scale,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileText,
+  FileSpreadsheet,
+  BarChart3,
+  TrendingUp,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { cn, formatCurrency } from '@/lib/utils'
@@ -39,10 +52,12 @@ export function ComparePolicies() {
 
   // Validate IDs against available policies
   const { validIds, invalidIds, selectedPolicies } = useMemo(() => {
-    const policyMap = new Map(policies.map(p => [p.id, p]))
-    const valid = urlIds.filter(id => policyMap.has(id))
-    const invalid = urlIds.filter(id => !policyMap.has(id))
-    const selected = valid.map(id => policyMap.get(id)).filter((p): p is AnalyzedPolicy => p !== undefined)
+    const policyMap = new Map(policies.map((p) => [p.id, p]))
+    const valid = urlIds.filter((id) => policyMap.has(id))
+    const invalid = urlIds.filter((id) => !policyMap.has(id))
+    const selected = valid
+      .map((id) => policyMap.get(id))
+      .filter((p): p is AnalyzedPolicy => p !== undefined)
     return { validIds: valid, invalidIds: invalid, selectedPolicies: selected }
   }, [urlIds, policies])
 
@@ -102,7 +117,7 @@ export function ComparePolicies() {
   // Toggle policy selection
   const togglePolicy = (policyId: string) => {
     if (validIds.includes(policyId)) {
-      updateUrl(validIds.filter(id => id !== policyId))
+      updateUrl(validIds.filter((id) => id !== policyId))
     } else if (validIds.length < 4) {
       updateUrl([...validIds, policyId])
     }
@@ -110,7 +125,7 @@ export function ComparePolicies() {
 
   // Remove policy from selection
   const removePolicy = (policyId: string) => {
-    updateUrl(validIds.filter(id => id !== policyId))
+    updateUrl(validIds.filter((id) => id !== policyId))
   }
 
   // Clear all selections
@@ -129,16 +144,17 @@ export function ComparePolicies() {
   }, [selectedPolicies.length, showSelector])
 
   const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }))
   }
 
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center" dir={isRTL ? 'rtl' : 'ltr'}>
-        <div className="animate-pulse text-gray-500">
-          {t.common.loading}
-        </div>
+      <div
+        className="min-h-screen bg-slate-50 flex items-center justify-center"
+        dir={isRTL ? 'rtl' : 'ltr'}
+      >
+        <div className="animate-pulse text-gray-500">{t.common.loading}</div>
       </div>
     )
   }
@@ -149,12 +165,8 @@ export function ComparePolicies() {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              {t.comparison.title}
-            </h1>
-            <p className="text-gray-600">
-              {t.comparison.subtitle}
-            </p>
+            <h1 className="text-3xl font-bold text-gray-900">{t.comparison.title}</h1>
+            <p className="text-gray-600">{t.comparison.subtitle}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {selectedPolicies.length > 0 && (
@@ -165,7 +177,11 @@ export function ComparePolicies() {
             )}
             {comparison && (
               <div className="relative" ref={exportMenuRef}>
-                <Button variant="outline" onClick={() => setExportMenuOpen(!exportMenuOpen)} className="gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setExportMenuOpen(!exportMenuOpen)}
+                  className="gap-2"
+                >
                   <Download className="w-4 h-4" />
                   <span className="hidden sm:inline">{t.comparison.exportComparison}</span>
                 </Button>
@@ -176,14 +192,18 @@ export function ComparePolicies() {
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
                     >
                       <FileText size={16} className="text-red-500 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-900">{t.comparison.exportPdf}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {t.comparison.exportPdf}
+                      </span>
                     </button>
                     <button
                       onClick={handleExportCsv}
                       className="w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
                     >
                       <FileSpreadsheet size={16} className="text-green-600 flex-shrink-0" />
-                      <span className="text-sm font-medium text-gray-900">{t.comparison.exportCsv}</span>
+                      <span className="text-sm font-medium text-gray-900">
+                        {t.comparison.exportCsv}
+                      </span>
                     </button>
                   </div>
                 )}
@@ -213,9 +233,7 @@ export function ComparePolicies() {
               <p className="font-medium text-amber-800">
                 {t.comparison.policiesNoLongerExist.replace('{count}', String(invalidIds.length))}
               </p>
-              <p className="text-sm text-amber-700 mt-1">
-                {t.comparison.policiesDeletedOrMoved}
-              </p>
+              <p className="text-sm text-amber-700 mt-1">{t.comparison.policiesDeletedOrMoved}</p>
             </div>
           </div>
         )}
@@ -235,9 +253,7 @@ export function ComparePolicies() {
             {policies.length === 0 ? (
               <div className="text-center py-8">
                 <Scale className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">
-                  {t.comparison.uploadFirst}
-                </p>
+                <p className="text-gray-600 mb-4">{t.comparison.uploadFirst}</p>
                 <Button onClick={() => navigate('/upload?autoOpen=true')}>
                   {t.comparison.uploadPolicy}
                 </Button>
@@ -272,7 +288,9 @@ export function ComparePolicies() {
                   <span className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center">
                     {index + 1}
                   </span>
-                  <span className="text-lg" aria-hidden="true">{policy.logo}</span>
+                  <span className="text-lg" aria-hidden="true">
+                    {policy.logo}
+                  </span>
                   <span className="font-medium text-gray-900">{policy.provider}</span>
                   <button
                     onClick={() => removePolicy(policy.id)}
@@ -300,9 +318,7 @@ export function ComparePolicies() {
         {!isValid && validationMessage && (
           <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-xl text-center">
             <Scale className="w-12 h-12 text-blue-400 mx-auto mb-4" />
-            <p className="text-blue-800 font-medium">
-              {t.comparison.selectMinTwo}
-            </p>
+            <p className="text-blue-800 font-medium">{t.comparison.selectMinTwo}</p>
           </div>
         )}
 
@@ -311,9 +327,7 @@ export function ComparePolicies() {
           <div className="mb-8 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium text-red-800">
-                {t.comparison.comparisonError}
-              </p>
+              <p className="font-medium text-red-800">{t.comparison.comparisonError}</p>
               <p className="text-sm text-red-700 mt-1">{error.message}</p>
             </div>
           </div>
@@ -379,7 +393,13 @@ export function ComparePolicies() {
                 </h2>
                 <div className="space-y-4">
                   {comparison.analysis.tradeoffs.map((tradeoff, index) => (
-                    <TradeoffCard key={index} tradeoff={tradeoff} policies={comparison.policies} locale={locale} t={t} />
+                    <TradeoffCard
+                      key={index}
+                      tradeoff={tradeoff}
+                      policies={comparison.policies}
+                      locale={locale}
+                      t={t}
+                    />
                   ))}
                 </div>
               </section>
@@ -394,27 +414,35 @@ export function ComparePolicies() {
             >
               <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-6 border border-amber-200">
                 <p className="text-gray-800 leading-relaxed">
-                  {locale === 'tr' ? comparison.analysis.recommendationTR : comparison.analysis.recommendation}
+                  {locale === 'tr'
+                    ? comparison.analysis.recommendationTR
+                    : comparison.analysis.recommendation}
                 </p>
 
                 {/* Winner highlight */}
                 {comparison.winners.overallBest && (
                   <div className="mt-4 pt-4 border-t border-amber-200 flex items-center gap-3">
                     {(() => {
-                      const winner = comparison.policies.find(p => p.policy.id === comparison.winners.overallBest)
+                      const winner = comparison.policies.find(
+                        (p) => p.policy.id === comparison.winners.overallBest
+                      )
                       if (!winner) return null
                       return (
                         <>
                           <span className="text-2xl">{winner.policy.logo}</span>
                           <div>
-                            <p className="font-semibold text-gray-900">{winner.label || winner.policy.provider}</p>
+                            <p className="font-semibold text-gray-900">
+                              {winner.label || winner.policy.provider}
+                            </p>
                             <p className="text-sm text-gray-600">
                               {t.comparison.recommendedChoice}
                             </p>
                           </div>
                           <div className="ml-auto flex items-center gap-2">
                             <GradeBadge grade={winner.evaluation.grade} size="lg" />
-                            <span className="text-2xl font-bold text-gray-900">{winner.evaluation.overallScore}</span>
+                            <span className="text-2xl font-bold text-gray-900">
+                              {winner.evaluation.overallScore}
+                            </span>
                           </div>
                         </>
                       )
@@ -425,7 +453,9 @@ export function ComparePolicies() {
 
               {/* Recommendations from winner policy */}
               {(() => {
-                const winner = comparison.policies.find(p => p.policy.id === comparison.winners.overallBest)
+                const winner = comparison.policies.find(
+                  (p) => p.policy.id === comparison.winners.overallBest
+                )
                 if (!winner || winner.evaluation.recommendations.length === 0) return null
                 return (
                   <div className="mt-6">
@@ -457,7 +487,13 @@ interface CollapsibleSectionProps {
   children: React.ReactNode
 }
 
-function CollapsibleSection({ title, expanded, onToggle, icon, children }: CollapsibleSectionProps) {
+function CollapsibleSection({
+  title,
+  expanded,
+  onToggle,
+  icon,
+  children,
+}: CollapsibleSectionProps) {
   return (
     <section className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <button
@@ -541,7 +577,7 @@ interface TradeoffCardProps {
 }
 
 function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
-  const getPolicy = (id: string) => policies.find(p => p.policy.id === id)
+  const getPolicy = (id: string) => policies.find((p) => p.policy.id === id)
   const policy1 = getPolicy(tradeoff.option1.policyId)
   const policy2 = getPolicy(tradeoff.option2.policyId)
 
@@ -553,7 +589,9 @@ function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
             <>
               <span className="text-xl">{policy1.policy.logo}</span>
               <div>
-                <p className="font-medium text-gray-900">{policy1.label || policy1.policy.provider}</p>
+                <p className="font-medium text-gray-900">
+                  {policy1.label || policy1.policy.provider}
+                </p>
                 <p className="text-sm text-gray-600">
                   {locale === 'tr' ? tradeoff.option1.advantageTR : tradeoff.option1.advantage}
                 </p>
@@ -566,7 +604,9 @@ function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
             <>
               <span className="text-xl">{policy2.policy.logo}</span>
               <div>
-                <p className="font-medium text-gray-900">{policy2.label || policy2.policy.provider}</p>
+                <p className="font-medium text-gray-900">
+                  {policy2.label || policy2.policy.provider}
+                </p>
                 <p className="text-sm text-gray-600">
                   {locale === 'tr' ? tradeoff.option2.advantageTR : tradeoff.option2.advantage}
                 </p>
@@ -589,22 +629,47 @@ function TradeoffCard({ tradeoff, policies, locale, t }: TradeoffCardProps) {
 
 interface QuickStatsCardProps {
   comparison: PolicyComparisonType
-  t: { comparison: { quickStats: string; avgScore: string; avgPremium: string; totalCoverage: string; policiesCompared: string } }
+  t: {
+    comparison: {
+      quickStats: string
+      avgScore: string
+      avgPremium: string
+      totalCoverage: string
+      policiesCompared: string
+    }
+  }
 }
 
 function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
   const avgScore = Math.round(
-    comparison.policies.reduce((sum, p) => sum + p.evaluation.overallScore, 0) / comparison.policies.length
+    comparison.policies.reduce((sum, p) => sum + p.evaluation.overallScore, 0) /
+      comparison.policies.length
   )
   const avgPremium =
     comparison.policies.reduce((sum, p) => sum + p.policy.premium, 0) / comparison.policies.length
   const totalCoverage = comparison.policies.reduce((sum, p) => sum + p.policy.coverage, 0)
 
   const stats = [
-    { label: t.comparison.policiesCompared, value: String(comparison.policies.length), icon: <Scale className="w-5 h-5 text-blue-500" /> },
-    { label: t.comparison.avgScore, value: `${avgScore}/100`, icon: <BarChart3 className="w-5 h-5 text-emerald-500" /> },
-    { label: t.comparison.avgPremium, value: formatCurrency(avgPremium), icon: <TrendingUp className="w-5 h-5 text-amber-500" /> },
-    { label: t.comparison.totalCoverage, value: formatCurrency(totalCoverage), icon: <TrendingUp className="w-5 h-5 text-purple-500" /> },
+    {
+      label: t.comparison.policiesCompared,
+      value: String(comparison.policies.length),
+      icon: <Scale className="w-5 h-5 text-blue-500" />,
+    },
+    {
+      label: t.comparison.avgScore,
+      value: `${avgScore}/100`,
+      icon: <BarChart3 className="w-5 h-5 text-emerald-500" />,
+    },
+    {
+      label: t.comparison.avgPremium,
+      value: formatCurrency(avgPremium),
+      icon: <TrendingUp className="w-5 h-5 text-amber-500" />,
+    },
+    {
+      label: t.comparison.totalCoverage,
+      value: formatCurrency(totalCoverage),
+      icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
+    },
   ]
 
   return (
@@ -615,7 +680,10 @@ function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
         {stats.map((stat) => (
-          <div key={stat.label} className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-100">
+          <div
+            key={stat.label}
+            className="bg-gradient-to-br from-gray-50 to-white p-3 sm:p-4 rounded-xl border border-gray-100"
+          >
             <div className="flex items-center gap-2 mb-1">
               {stat.icon}
               <span className="text-xs text-gray-500 truncate">{stat.label}</span>
@@ -634,7 +702,18 @@ function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
 
 interface ScoreComparisonChartProps {
   comparison: PolicyComparisonType
-  t: { comparison: { scoreChart: string; premium: string; coverage: string; deductible: string; compliance: string; value: string; overall: string; best: string } }
+  t: {
+    comparison: {
+      scoreChart: string
+      premium: string
+      coverage: string
+      deductible: string
+      compliance: string
+      value: string
+      overall: string
+      best: string
+    }
+  }
 }
 
 function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
@@ -658,13 +737,23 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 mb-4">
-        {comparison.policies.map((p, i) => (
-          <div key={p.policy.id} className="flex items-center gap-2 text-sm">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: policyColors[i] }} />
-            <span className="font-medium text-gray-700">{p.label || p.policy.provider}</span>
-            <GradeBadge grade={p.evaluation.grade} size="sm" />
-          </div>
-        ))}
+        {comparison.policies.map((p, i) => {
+          const rankInfo = comparison.rankings.find((r) => r.policyId === p.policy.id)
+          const topsisGrade = rankInfo?.actuarialGrade
+
+          return (
+            <div key={p.policy.id} className="flex items-center gap-2 text-sm">
+              <div className="w-3 h-3 rounded-full" style={{ backgroundColor: policyColors[i] }} />
+              <span className="font-medium text-gray-700">{p.label || p.policy.provider}</span>
+              <GradeBadge grade={p.evaluation.grade} size="sm" />
+              {topsisGrade && (
+                <span className="ml-1 px-1.5 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                  Actuarial: {topsisGrade}
+                </span>
+              )}
+            </div>
+          )
+        })}
       </div>
 
       {/* Category bars */}
@@ -677,22 +766,32 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
             <div key={cat}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-sm font-medium text-gray-700">{categoryLabels[cat]}</span>
-                <span className="text-xs text-gray-400">{t.comparison.best}: {maxScore}</span>
+                <span className="text-xs text-gray-400">
+                  {t.comparison.best}: {maxScore}
+                </span>
               </div>
               <div className="space-y-1.5">
                 {comparison.policies.map((p, i) => {
                   const score = p.evaluation.scoreBreakdown[cat].score
-                  const isBest = score === maxScore && scores.filter(s => s === maxScore).length === 1
+                  const isBest =
+                    score === maxScore && scores.filter((s) => s === maxScore).length === 1
                   return (
                     <div key={p.policy.id} className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">{p.label || p.policy.provider}</span>
+                      <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">
+                        {p.label || p.policy.provider}
+                      </span>
                       <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden relative">
                         <div
                           className="h-full rounded-full transition-all duration-700 ease-out"
                           style={{ width: `${score}%`, backgroundColor: policyColors[i] }}
                         />
                       </div>
-                      <span className={cn('text-xs font-medium w-8 text-right', isBest ? 'text-emerald-600' : 'text-gray-600')}>
+                      <span
+                        className={cn(
+                          'text-xs font-medium w-8 text-right',
+                          isBest ? 'text-emerald-600' : 'text-gray-600'
+                        )}
+                      >
                         {score}
                       </span>
                     </div>
@@ -703,7 +802,7 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
           )
         })}
 
-        {/* Overall */}
+        {/* Overall Classic */}
         <div className="pt-3 border-t border-gray-200">
           <div className="flex items-center justify-between mb-1.5">
             <span className="text-sm font-bold text-gray-900">{t.comparison.overall}</span>
@@ -714,15 +813,68 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
               const isBest = p.policy.id === comparison.winners.overallBest
               return (
                 <div key={p.policy.id} className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">{p.label || p.policy.provider}</span>
+                  <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">
+                    {p.label || p.policy.provider}
+                  </span>
                   <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden relative">
                     <div
-                      className={cn('h-full rounded-full transition-all duration-700 ease-out', isBest && 'ring-2 ring-offset-1 ring-emerald-400')}
+                      className={cn(
+                        'h-full rounded-full transition-all duration-700 ease-out',
+                        isBest && 'ring-2 ring-offset-1 ring-emerald-400'
+                      )}
                       style={{ width: `${score}%`, backgroundColor: policyColors[i] }}
                     />
                   </div>
-                  <span className={cn('text-sm font-bold w-8 text-right', isBest ? 'text-emerald-600' : 'text-gray-700')}>
+                  <span
+                    className={cn(
+                      'text-sm font-bold w-8 text-right',
+                      isBest ? 'text-emerald-600' : 'text-gray-700'
+                    )}
+                  >
                     {score}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Overall Actuarial (TOPSIS) */}
+        <div className="pt-3 border-t border-gray-200">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-sm font-bold text-blue-900">Actuarial TOPSIS Score</span>
+            <span className="text-xs text-gray-500 text-right">Beta Engine</span>
+          </div>
+          <div className="space-y-1.5">
+            {comparison.policies.map((p, i) => {
+              const rankInfo = comparison.rankings.find((r) => r.policyId === p.policy.id)
+              // Calculate 0-100 closeness
+              const closenessScore = Math.round((rankInfo?.actuarialCloseness || 0) * 100)
+              const topsisRank = rankInfo?.actuarialRank || 99
+              // find best by looking for rank 1
+              const isBest = topsisRank === 1
+
+              return (
+                <div key={p.policy.id} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-16 sm:w-20 truncate">
+                    {p.label || p.policy.provider}
+                  </span>
+                  <div className="flex-1 h-6 bg-blue-50 rounded-full overflow-hidden relative">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-700 ease-out',
+                        isBest && 'ring-2 ring-offset-1 ring-blue-400'
+                      )}
+                      style={{ width: `${closenessScore}%`, backgroundColor: policyColors[i] }}
+                    />
+                  </div>
+                  <span
+                    className={cn(
+                      'text-sm font-bold w-12 text-right',
+                      isBest ? 'text-blue-700' : 'text-gray-700'
+                    )}
+                  >
+                    #{topsisRank} ({closenessScore})
                   </span>
                 </div>
               )
@@ -758,7 +910,10 @@ function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatri
               {locale === 'tr' ? 'Teminat' : 'Coverage'}
             </th>
             {comparison.policies.map((p) => (
-              <th key={p.policy.id} className="text-center py-2 px-2 font-medium text-gray-600 whitespace-nowrap">
+              <th
+                key={p.policy.id}
+                className="text-center py-2 px-2 font-medium text-gray-600 whitespace-nowrap"
+              >
                 {p.label || p.policy.provider}
               </th>
             ))}
@@ -766,25 +921,25 @@ function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatri
         </thead>
         <tbody>
           {comparison.coverageMatrix.map((row) => {
-            const limits = row.policies.map(p => p.limit)
-            const maxLimit = Math.max(...limits.filter(l => l > 0))
-            const allIncluded = row.policies.every(p => p.included)
-            const noneIncluded = row.policies.every(p => !p.included)
+            const limits = row.policies.map((p) => p.limit)
+            const maxLimit = Math.max(...limits.filter((l) => l > 0))
+            const allIncluded = row.policies.every((p) => p.included)
+            const noneIncluded = row.policies.every((p) => !p.included)
             const hasDiff = !allIncluded && !noneIncluded
 
             return (
               <tr
                 key={row.coverageName}
-                className={cn(
-                  'border-b border-gray-100',
-                  hasDiff && 'bg-amber-50/50'
-                )}
+                className={cn('border-b border-gray-100', hasDiff && 'bg-amber-50/50')}
               >
                 <td className="py-2 px-3 font-medium text-gray-800 sticky left-0 bg-inherit whitespace-nowrap">
                   {locale === 'tr' ? row.coverageNameTR : row.coverageName}
                 </td>
                 {row.policies.map((p) => {
-                  const isBest = p.limit === maxLimit && maxLimit > 0 && limits.filter(l => l === maxLimit).length === 1
+                  const isBest =
+                    p.limit === maxLimit &&
+                    maxLimit > 0 &&
+                    limits.filter((l) => l === maxLimit).length === 1
                   return (
                     <td
                       key={p.policyId}
@@ -796,18 +951,24 @@ function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatri
                     >
                       {p.included ? (
                         <div>
-                          <span className={cn(
-                            'font-medium',
-                            isBest ? 'text-emerald-700' : 'text-gray-900'
-                          )}>
+                          <span
+                            className={cn(
+                              'font-medium',
+                              isBest ? 'text-emerald-700' : 'text-gray-900'
+                            )}
+                          >
                             {p.limit > 0 ? formatCurrency(p.limit) : t.comparison.included}
                           </span>
                           {isBest && (
-                            <span className="ml-1 text-[10px] text-emerald-600 font-semibold">{t.comparison.best}</span>
+                            <span className="ml-1 text-[10px] text-emerald-600 font-semibold">
+                              {t.comparison.best}
+                            </span>
                           )}
                         </div>
                       ) : (
-                        <span className="text-red-500 text-xs font-medium">{t.comparison.notIncluded}</span>
+                        <span className="text-red-500 text-xs font-medium">
+                          {t.comparison.notIncluded}
+                        </span>
                       )}
                     </td>
                   )
