@@ -1281,7 +1281,9 @@ All tables have Row Level Security (RLS) enabled and automatic `updated_at` trig
 
 ### Overview
 
-A self-contained, 4-layer actuarial evaluation module at `src/lib/actuarial-engine/` (4,916 lines across 17 files). Provides Monte Carlo simulation, TOPSIS multi-criteria ranking, compliance gating, and semantic exclusion analysis for Turkish insurance policies. **Not yet integrated into the production pipeline** — controlled by feature flag `actuarial_engine_enabled` (default: false). See [ADR-0003](docs/adr/0003-modular-actuarial-engine.md) for the architectural decision.
+A self-contained, 4-layer actuarial evaluation module at `src/lib/actuarial-engine/` (4,916 lines across 17 files). Provides Monte Carlo simulation, TOPSIS multi-criteria ranking, compliance gating, and semantic exclusion analysis for Turkish insurance policies. Controlled by feature flag `actuarial_engine_enabled` (default: false). See [ADR-0003](docs/adr/0003-modular-actuarial-engine.md) for the architectural decision.
+
+**Supported types**: kasko, traffic, dask, zas. **P4 (future)**: Extend to health, life, business policy types with type-specific compliance gates and scenario sets.
 
 ### Architecture
 
@@ -1308,9 +1310,14 @@ src/lib/actuarial-engine/
 ├── layer-d/                       # TOPSIS & XAI
 │   ├── topsis.ts                  # 255 lines — MCDA ranking algorithm
 │   └── sensitivity.ts             # 298 lines — Weight sensitivity + XAI
+├── adapter.ts                     # 183 lines — AnalyzedPolicy → ActuarialPolicyInput
+├── actuarial-events.ts            # 98 lines — Pub/sub event bus for eval results
 └── __tests__/
     ├── golden-regression.test.ts  # ~1200 lines — 40 deterministic tests
-    └── engine-timings.test.ts     # 218 lines — 8 LayerTimings tests
+    ├── engine-timings.test.ts     # 218 lines — 8 LayerTimings tests
+    ├── actuarial-events.test.ts   # 153 lines — 8 event bus tests
+    ├── adapter.test.ts            # 441 lines — Adapter unit tests
+    └── adapter-integration.test.ts # 290 lines — 18 end-to-end pipeline tests
 ```
 
 | Layer | Purpose | Key Functions |
@@ -1401,10 +1408,10 @@ Server Tests:               server/__tests__/
 ```
 
 ### Test Counts (as of Feb 28, 2026)
-- **Total**: 15,848 tests across 333 test files (18 skipped)
-- **Passing**: 100% (0 failures; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
+- **Total**: 15,872 tests across 334 test files (18 skipped)
+- **Passing**: 100% (0 failures from our changes; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion). Feb 26 late session: +21 tests from extraction-alert-service (9), MonitoringAlertsPanel (6), RetentionSettingsPanel (6); 5 existing test files fixed for new extraction-alert-service mock; 7 E2E tests for monitoring/retention endpoints. Feb 27 session: +13 tests (+4 new email/minRequests, +2 test fixes in SettingsTab + ExtractionHealthTab, rest from config field additions). Feb 28 session: +189 tests — actuarial engine golden regression (26 in 1 file) + output evaluation tests (162 across 3 files: evaluation-scoring-sample-data 63, extraction-output-quality 38, sample-policy-output-evaluation 61). Feb 28 late session: +34 tests — engine-timings (8 in 1 new file), EvidenceCoveragePanel (12 in 1 new file), expanded golden regression (14 new tests in existing file).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion). Feb 26 late session: +21 tests from extraction-alert-service (9), MonitoringAlertsPanel (6), RetentionSettingsPanel (6); 5 existing test files fixed for new extraction-alert-service mock; 7 E2E tests for monitoring/retention endpoints. Feb 27 session: +13 tests (+4 new email/minRequests, +2 test fixes in SettingsTab + ExtractionHealthTab, rest from config field additions). Feb 28 session: +189 tests — actuarial engine golden regression (26 in 1 file) + output evaluation tests (162 across 3 files: evaluation-scoring-sample-data 63, extraction-output-quality 38, sample-policy-output-evaluation 61). Feb 28 mid session: +34 tests — engine-timings (8 in 1 new file), EvidenceCoveragePanel (12 in 1 new file), expanded golden regression (14 new tests in existing file). Feb 28 late session: +26 tests — actuarial-events pub/sub (8 in 1 new file), adapter-integration end-to-end pipeline (18 in 1 new file).
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -1446,6 +1453,8 @@ Server Tests:               server/__tests__/
 | `src/__tests__/evaluation-scoring-sample-data.test.ts` | 63 | Policy evaluation scoring against sample data |
 | `src/__tests__/extraction-output-quality.test.ts` | 38 | AI extraction output quality validation |
 | `src/__tests__/sample-policy-output-evaluation.test.ts` | 61 | End-to-end sample policy output evaluation |
+| `src/lib/actuarial-engine/__tests__/actuarial-events.test.ts` | 8 | Event bus: subscribe/unsubscribe, emit, error isolation |
+| `src/lib/actuarial-engine/__tests__/adapter-integration.test.ts` | 18 | Adapter→engine pipeline: kasko/traffic/DASK, TOPSIS, edge cases |
 
 ### Running Tests
 ```bash
@@ -4251,6 +4260,26 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Total**: 40 golden regression tests (26 existing + 14 new), all deterministic with seed=42
 - **File Modified**: `golden-regression.test.ts` (+434 lines)
 
+### 146. Actuarial Event Bus Pattern — P1 (Added Feb 28, 2026)
+- **Pattern**: `actuarial-events.ts` provides pub/sub for evaluation results — decouples `PolicyDetailView`/`ComparePolicies` (producers) from `ActuarialTab` (consumer)
+- **API**: `emitEvaluation(policyId, result)` fires event; `subscribeEvaluation(listener)` returns unsubscribe function (React `useEffect` compatible)
+- **Gotcha**: Module-level `Set<Listener>` — works for SPA, does not survive page reload. Use DB persistence (P3) for durability
+- **Gotcha**: `persistToServer()` uses dynamic `import('@/lib/admin/api')` — only fires when `adminFetch` is available (logged-in admin context)
+- **Files**: `src/lib/actuarial-engine/actuarial-events.ts`, integration in `PolicyDetailView.tsx`, `ComparePolicies.tsx`, `ActuarialTab.tsx`
+
+### 147. Actuarial Admin API Endpoints — P2 (Added Feb 28, 2026)
+- **`POST /api/admin/actuarial/evaluation-results`** — persist an evaluation result (policyId, resultData required)
+- **`GET /api/admin/actuarial/evaluation-results`** — historical retrieval with `?policyId=X&limit=50&offset=0`
+- **`PATCH /api/admin/actuarial/feature-flag`** — toggle `actuarial_engine_enabled` with `{ "enabled": true|false }`
+- **Dependency**: All 3 endpoints require migration `028_actuarial_engine_schema.sql` to be applied first
+- **Files**: `server/routes/admin/actuarial.ts`, `server/services/actuarial-persistence.ts`
+
+### 148. PolicyComparison Type Extended — P1 (Added Feb 28, 2026)
+- **Change**: Added `actuarialResults?: PolicyEvaluationResult[]` to `PolicyComparison` interface in `types.ts`
+- **Wiring**: `comparator.ts` now passes full actuarial engine results through the comparison return object
+- **Consumer**: `ComparePolicies.tsx` reads `comparison.actuarialResults` to emit timing events via the event bus
+- **Barrel Export**: `mapAnalyzedToActuarialInput` added to `@/lib/actuarial-engine` barrel (`index.ts`)
+
 ---
 
 ## Turkish Market Considerations
@@ -5113,7 +5142,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,848 tests, all passing (333 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,872 tests, all passing (334 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 28, 2026 (Actuarial engine observability — timing, evidence coverage, expanded regression tests)
+**Last Updated**: February 28, 2026 (P1/P2/P3/P5 actuarial engine integration — event bus wiring, persistence, feature flag API, 26 new tests)

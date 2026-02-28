@@ -32,6 +32,7 @@ import {
 import { exportComparisonToCSV, exportComparisonToPDF } from '@/lib/export'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { PolicyComparison as PolicyComparisonType } from '@/lib/policy-evaluation/types'
+import { emitEvaluation } from '@/lib/actuarial-engine'
 
 /**
  * ComparePolicies page for side-by-side policy comparison.
@@ -102,6 +103,16 @@ export function ComparePolicies() {
 
   // Run comparison
   const { comparison, isValid, validationMessage, error } = usePolicyComparison(selectedPolicies)
+
+  // P1: Emit actuarial timing events for each evaluated policy
+  useEffect(() => {
+    if (!comparison?.actuarialResults) return
+    comparison.actuarialResults.forEach((result, index) => {
+      if (result.layerTimings && selectedPolicies[index]) {
+        emitEvaluation(selectedPolicies[index].id, result)
+      }
+    })
+  }, [comparison?.actuarialResults, selectedPolicies])
 
   // Update URL when selection changes
   const updateUrl = (ids: string[]) => {

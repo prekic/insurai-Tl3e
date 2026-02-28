@@ -156,4 +156,108 @@ router.post('/configs/:name/version', async (req: Request, res: Response) => {
   }
 })
 
+/**
+ * POST /api/admin/actuarial/evaluation-results
+ * Persists an evaluation result to the database (P2 + P3).
+ */
+router.post('/evaluation-results', async (req: Request, res: Response) => {
+  try {
+    const { persistEvaluationResult } = await import('../../services/actuarial-persistence.js')
+    const body = req.body
+
+    if (!body.policyId || !body.resultData) {
+      return res.status(400).json({ success: false, error: 'policyId and resultData are required' })
+    }
+
+    const resultId = await persistEvaluationResult({
+      policyId: body.policyId,
+      resultData: body.resultData,
+      eligible: body.eligible ?? false,
+      blockingReasonCount: body.blockingReasonCount ?? 0,
+      warningCount: body.warningCount ?? 0,
+      expectedOopAmount: body.expectedOopAmount,
+      contractQualityScore: body.contractQualityScore,
+      topsisCloseness: body.topsisCloseness,
+      topsisRank: body.topsisRank,
+      topsisGrade: body.topsisGrade,
+      needsReview: body.needsReview ?? false,
+      durationMs: body.durationMs,
+    })
+
+    if (resultId) {
+      res.json({ success: true, data: { id: resultId } })
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to persist evaluation result' })
+    }
+  } catch (error) {
+    log.error('Error persisting evaluation result', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ success: false, error: 'Server error persisting evaluation result' })
+  }
+})
+
+/**
+ * GET /api/admin/actuarial/evaluation-results
+ * Retrieves historical evaluation results with optional filtering (P3).
+ */
+router.get('/evaluation-results', async (_req: Request, res: Response) => {
+  try {
+    const { getEvaluationHistory } = await import('../../services/actuarial-persistence.js')
+
+    const policyId = typeof _req.query.policyId === 'string' ? _req.query.policyId : undefined
+    const limit = Number(_req.query.limit) || 50
+    const offset = Number(_req.query.offset) || 0
+
+    const result = await getEvaluationHistory({ policyId, limit, offset })
+
+    if (result) {
+      res.json({ success: true, data: result.data, total: result.total })
+    } else {
+      res.status(500).json({ success: false, error: 'Failed to fetch evaluation history' })
+    }
+  } catch (error) {
+    log.error('Error fetching evaluation history', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ success: false, error: 'Server error fetching history' })
+  }
+})
+
+/**
+ * PATCH /api/admin/actuarial/feature-flag
+ * Toggles the actuarial_engine_enabled feature flag (P2).
+ */
+router.patch('/feature-flag', async (req: Request, res: Response) => {
+  try {
+    const { enabled } = req.body
+
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'enabled must be a boolean' })
+    }
+
+    const { client: supabase, error: dbError } = getSupabaseWithError()
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+    }
+
+    const { error: updateError } = await supabase
+      .from('feature_flags')
+      .update({ enabled, updated_at: new Date().toISOString() })
+      .eq('key', 'actuarial_engine_enabled')
+
+    if (updateError) {
+      throw updateError
+    }
+
+    log.info('Actuarial engine feature flag updated', { enabled })
+    res.json({ success: true, data: { enabled } })
+  } catch (error) {
+    log.error('Error updating feature flag', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ success: false, error: 'Failed to update feature flag' })
+  }
+})
+
 export default router
