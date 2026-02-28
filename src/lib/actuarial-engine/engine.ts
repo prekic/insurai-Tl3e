@@ -17,6 +17,7 @@ import type {
   MonteCarloConfig,
   SemanticExclusionImpact,
   Money,
+  LayerTimings,
 } from './types'
 import { executeComplianceGate } from './layer-b/compliance-gate'
 import { analyzeExclusions } from './layer-a/semantic-exclusions'
@@ -49,8 +50,10 @@ export function runFullEvaluation(
   options?: ActuarialEvaluationOptions
 ): PolicyEvaluationResult {
   const now = new Date()
+  const evalStart = performance.now()
 
   // ── Layer A: Semantic Exclusion Analysis ─────────────────────────────
+  const layerAStart = performance.now()
   let semanticExclusions: SemanticExclusionImpact[]
 
   if (options?.skipSemanticAnalysis && policy.semanticExclusions) {
@@ -65,13 +68,17 @@ export function runFullEvaluation(
 
   // Quick review check
   const reviewCheck = quickReviewCheck(policy, semanticExclusions)
+  const layerA_ms = performance.now() - layerAStart
 
   // ── Layer B: Compliance Gate ─────────────────────────────────────────
+  const layerBStart = performance.now()
   const checkDate = options?.effectiveDate ?? now
   const { compliance, productMismatches } = executeComplianceGate(policy, checkDate)
+  const layerB_ms = performance.now() - layerBStart
 
   // If not eligible, return early with blocking result
   if (!compliance.eligible) {
+    const total_ms = performance.now() - evalStart
     return buildBlockedResult({
       policy,
       compliance,
@@ -80,10 +87,12 @@ export function runFullEvaluation(
       evidenceCoverage,
       needsReview: reviewCheck.needsReview,
       now,
+      layerTimings: { layerA_ms, layerB_ms, layerC_ms: 0, total_ms },
     })
   }
 
   // ── Layer C: Monte Carlo EOOP ────────────────────────────────────────
+  const layerCStart = performance.now()
   const mcConfig: MonteCarloConfig = {
     ...DEFAULT_MONTE_CARLO_CONFIG,
     ...options?.monteCarloConfig,
@@ -92,6 +101,7 @@ export function runFullEvaluation(
   const scenarios = options?.scenarioOverrides ?? getScenariosForPolicyType(policy.policyType)
 
   const eoopResult = calculateEOOP(policy, scenarios, mcConfig, semanticExclusions)
+  const layerC_ms = performance.now() - layerCStart
 
   // Compute supporting scores for TOPSIS
   const contractQualityScore = policy.indemnityMechanics
@@ -125,6 +135,8 @@ export function runFullEvaluation(
     }
   }
 
+  const total_ms = performance.now() - evalStart
+
   return {
     eligible: true,
     blockingReasons: [],
@@ -137,6 +149,7 @@ export function runFullEvaluation(
     scenarioScores,
     expectedOutOfPocket: eoopResult,
     contractQualityScore,
+    layerTimings: { layerA_ms, layerB_ms, layerC_ms, total_ms },
     configSnapshot: {
       ruleset: compliance.rulesetVersion,
       monteCarlo: `mc-${mcConfig.numSimulations}-seed${mcConfig.seed ?? 'random'}`,
@@ -221,7 +234,9 @@ export function evaluateAndRankPolicies(
   })
 
   // Step 4: Run TOPSIS
+  const layerDStart = performance.now()
   const topsisResults = rankPolicies(topsisInputs, DEFAULT_TOPSIS_CRITERIA)
+  const layerD_ms = performance.now() - layerDStart
 
   // Step 5: Map TOPSIS results back to evaluations
   for (const topsisResult of topsisResults) {
@@ -231,6 +246,11 @@ export function evaluateAndRankPolicies(
         topsisCloseness: topsisResult.closeness,
         rank: topsisResult.rank,
         grade: closenessToGrade(topsisResult.closeness),
+      }
+      // Add Layer D timing to each eligible evaluation
+      const timings = evaluations[ep.index].layerTimings
+      if (timings) {
+        timings.layerD_ms = layerD_ms
       }
     }
   }
@@ -250,6 +270,7 @@ function buildBlockedResult(params: {
   evidenceCoverage: PolicyEvaluationResult['evidenceCoverage']
   needsReview: boolean
   now: Date
+  layerTimings: LayerTimings
 }): PolicyEvaluationResult {
   const zeroCost: Money = { currency: params.policy.premium.currency, amount: 0 }
 
@@ -273,6 +294,7 @@ function buildBlockedResult(params: {
       contractQualityFactor: 1,
     },
     contractQualityScore: 0,
+    layerTimings: params.layerTimings,
     configSnapshot: {
       ruleset: params.compliance.rulesetVersion,
     },

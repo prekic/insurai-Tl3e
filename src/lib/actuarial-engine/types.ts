@@ -361,6 +361,24 @@ export interface EvidenceCoverageReport {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// LAYER TIMINGS
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Performance timing breakdown for each evaluation layer. */
+export interface LayerTimings {
+  /** Layer A: Semantic exclusion analysis + evidence tracking (ms). */
+  layerA_ms: number
+  /** Layer B: Compliance gate (ms). */
+  layerB_ms: number
+  /** Layer C: Monte Carlo EOOP simulation (ms). */
+  layerC_ms: number
+  /** Layer D: TOPSIS ranking (ms). Only present for multi-policy evaluations. */
+  layerD_ms?: number
+  /** Total wall-clock time for the full evaluation (ms). */
+  total_ms: number
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FULL EVALUATION RESULT
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -414,6 +432,9 @@ export interface PolicyEvaluationResult {
    * Keyed by config set type (e.g., "ruleset", "scenarios", "weights").
    */
   configSnapshot: Record<string, UUID>
+
+  /** Performance timing breakdown for each layer. */
+  layerTimings?: LayerTimings
 
   /** Whether any part of the evaluation needs human review. */
   needsReview: boolean
