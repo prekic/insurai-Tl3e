@@ -12,7 +12,7 @@
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
 | **Branch** | `claude/load-project-context-yjssq` |
-| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine NOT yet activated (feature flag off) |
+| **Production Status** | Nixpacks + healthcheck config deployed; actuarial engine UI integrations implemented (adapter, ComparePolicies, PolicyDetailView) |
 
 ---
 
@@ -30,7 +30,9 @@ Key functions: `runFullEvaluation(policy)` for single policy, `evaluateAndRankPo
 
 Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature flag `actuarial_engine_enabled` = false.
 
-**Not yet integrated** into the production pipeline — requires adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`.
+**Integrated** into the production pipeline — built adapter `mapAnalyzedToActuarialInput` from `AnalyzedPolicy` → `ActuarialPolicyInput` and added UI displays.
+- **ComparePolicies.tsx**: Shows TOPSIS Closeness Score and Grade.
+- **PolicyDetailView.tsx**: Shows Expected Out-of-Pocket (EOOP) details and Contract Quality bounds.
 
 ### 2. Railway Deployment Hardening (`1f34759`, `acc190f`)
 - Created `nixpacks.toml` with `providers = ["node"]` to disable Caddy/Chromium auto-detection that caused port conflicts
@@ -65,8 +67,8 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 - Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`.
 - `nixpacks.toml` and `railway.json` must stay in sync on install/build/start commands.
 
-### Gotcha: Actuarial Engine Not Wired
-- `actuarial_engine_enabled` flag exists but flipping it to `true` has no effect until the adapter layer is built.
+### Gotcha: Actuarial Engine Integration
+- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `src/lib/actuarial-engine/adapter.ts` converts from `Policy`/`Coverage`.
 - Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — not directly compatible with `Coverage`/`AnalyzedPolicy`.
 - Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
 
@@ -89,16 +91,10 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 2. Confirm healthcheck endpoint `/api/health` responds correctly for Railway's liveness probe
 3. Monitor build logs for any Caddy/Chromium auto-detection regressions
 
-### P2 — Actuarial Engine Integration
-1. **Adapter layer**: Build `AnalyzedPolicy` → `ActuarialPolicyInput` converter that maps:
-   - `Coverage[]` → `CanonicalCoverage[]` (using coverage code standardization)
-   - `exclusions: string[]` → semantic exclusion analysis input
-   - `startDate`/`expiryDate` → `effectiveDate`/`expiryDate` (Date objects)
-   - `raw_data.indemnity` → `IndemnityMechanics` (parts standard, repair network, rayiç method)
-2. **Apply migration 028** to production Supabase
-3. **Admin UI**: Add actuarial config management panel (scenario frequencies, TOPSIS weights, Monte Carlo params)
-4. **Compare page**: Integrate TOPSIS ranking into `ComparePolicies.tsx` (display closeness scores, sensitivity analysis)
-5. **Policy detail**: Show EOOP breakdown and compliance gate results in `PolicyDetailView.tsx`
+### P2 — Actuarial Engine Configuration UI (Next steps)
+1. **Admin UI**: Add actuarial config management panel (scenario frequencies, TOPSIS weights, Monte Carlo params)
+2. **Database**: Apply `028_actuarial_engine_schema.sql` to production when turning on feature flag.
+
 
 ### P3 — Quality & Observability
 1. Add actuarial engine metrics to extraction health monitoring

@@ -18,6 +18,10 @@ import type {
 } from './types'
 import { evaluatePolicy } from './evaluator'
 import { getPremiumBenchmark } from '@/data'
+import { evaluateAndRankPolicies } from '../actuarial-engine/engine'
+import { mapAnalyzedToActuarialInput } from '../actuarial-engine/adapter'
+import type { AnalyzedPolicy } from '@/types/policy'
+import type { ActuarialPolicyInput } from '../actuarial-engine/types'
 
 // =============================================================================
 // MAIN COMPARISON FUNCTION
@@ -52,8 +56,20 @@ export function comparePolicies(
   // Generate coverage matrix
   const coverageMatrix = generateCoverageMatrix(comparisonPolicies)
 
+  // Generate Actuarial Rankings (only for supported types)
+  const supportedTypes = ['kasko', 'traffic', 'dask', 'zas']
+  let actuarialResults: ReturnType<typeof evaluateAndRankPolicies> = []
+  let actuarialInputs: ActuarialPolicyInput[] = []
+
+  // Only evaluate via Actuarial Engine if all compared policies are supported
+  const allSupported = policies.every((p) => supportedTypes.includes(p.type))
+  if (allSupported) {
+    actuarialInputs = policies.map((p) => mapAnalyzedToActuarialInput(p as AnalyzedPolicy))
+    actuarialResults = evaluateAndRankPolicies(actuarialInputs)
+  }
+
   // Generate rankings
-  const rankings = generateRankings(comparisonPolicies)
+  const rankings = generateRankings(comparisonPolicies, actuarialInputs, actuarialResults)
 
   // Generate analysis
   const analysis = generateAnalysis(comparisonPolicies, winners, coverageMatrix)
@@ -91,12 +107,17 @@ function determineWinners(policies: ComparisonPolicy[]): PolicyComparison['winne
 
   // Find best value (highest value score)
   const bestValue = policies.reduce((best, current) =>
-    current.evaluation.scoreBreakdown.value.score > best.evaluation.scoreBreakdown.value.score ? current : best
+    current.evaluation.scoreBreakdown.value.score > best.evaluation.scoreBreakdown.value.score
+      ? current
+      : best
   )
 
   // Find best compliance (highest compliance score)
   const bestCompliance = policies.reduce((best, current) =>
-    current.evaluation.scoreBreakdown.compliance.score > best.evaluation.scoreBreakdown.compliance.score ? current : best
+    current.evaluation.scoreBreakdown.compliance.score >
+    best.evaluation.scoreBreakdown.compliance.score
+      ? current
+      : best
   )
 
   return {
@@ -116,7 +137,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   const metrics: ComparisonMetric[] = []
 
   // Premium comparison
-  const premiums = policies.map(p => p.policy.premium)
+  const premiums = policies.map((p) => p.policy.premium)
   const minPremium = Math.min(...premiums)
   const maxPremium = Math.max(...premiums)
 
@@ -124,7 +145,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Annual Premium',
     nameTR: 'Yıllık Prim',
     unit: 'TRY',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.policy.premium,
       isBest: p.policy.premium === minPremium,
@@ -139,17 +160,19 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Monthly Premium',
     nameTR: 'Aylık Prim',
     unit: 'TRY',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.policy.monthlyPremium,
-      isBest: p.policy.monthlyPremium === Math.min(...policies.map(pp => pp.policy.monthlyPremium)),
-      isWorst: p.policy.monthlyPremium === Math.max(...policies.map(pp => pp.policy.monthlyPremium)),
+      isBest:
+        p.policy.monthlyPremium === Math.min(...policies.map((pp) => pp.policy.monthlyPremium)),
+      isWorst:
+        p.policy.monthlyPremium === Math.max(...policies.map((pp) => pp.policy.monthlyPremium)),
     })),
     higherIsBetter: false,
   })
 
   // Total coverage
-  const coverages = policies.map(p => p.policy.coverage)
+  const coverages = policies.map((p) => p.policy.coverage)
   const maxCoverage = Math.max(...coverages)
   const minCoverage = Math.min(...coverages)
 
@@ -157,7 +180,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Total Coverage',
     nameTR: 'Toplam Teminat',
     unit: 'TRY',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.policy.coverage,
       isBest: p.policy.coverage === maxCoverage,
@@ -168,7 +191,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   })
 
   // Deductible
-  const deductibles = policies.map(p => p.policy.deductible)
+  const deductibles = policies.map((p) => p.policy.deductible)
   const minDeductible = Math.min(...deductibles)
   const maxDeductible = Math.max(...deductibles)
 
@@ -176,7 +199,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Deductible',
     nameTR: 'Muafiyet',
     unit: 'TRY',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.policy.deductible,
       isBest: p.policy.deductible === minDeductible,
@@ -186,7 +209,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   })
 
   // Coverage-to-Premium Ratio
-  const ratios = policies.map(p => p.policy.coverage / p.policy.premium)
+  const ratios = policies.map((p) => p.policy.coverage / p.policy.premium)
   const maxRatio = Math.max(...ratios)
   const minRatio = Math.min(...ratios)
 
@@ -204,7 +227,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   })
 
   // Number of coverages
-  const coverageCounts = policies.map(p => p.policy.coverages.filter(c => c.included).length)
+  const coverageCounts = policies.map((p) => p.policy.coverages.filter((c) => c.included).length)
   const maxCount = Math.max(...coverageCounts)
   const minCount = Math.min(...coverageCounts)
 
@@ -222,7 +245,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
   })
 
   // Overall Score
-  const scores = policies.map(p => p.evaluation.overallScore)
+  const scores = policies.map((p) => p.evaluation.overallScore)
   const maxScore = Math.max(...scores)
   const minScore = Math.min(...scores)
 
@@ -230,7 +253,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Overall Score',
     nameTR: 'Genel Puan',
     unit: '/100',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.evaluation.overallScore,
       isBest: p.evaluation.overallScore === maxScore,
@@ -244,7 +267,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     name: 'Grade',
     nameTR: 'Not',
     unit: '',
-    values: policies.map(p => ({
+    values: policies.map((p) => ({
       policyId: p.policy.id,
       value: p.evaluation.grade,
       isBest: p.evaluation.grade === 'A',
@@ -259,7 +282,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
     firstPolicy.policy.type === 'traffic' ? 'zmss' : firstPolicy.policy.type
   )
   if (benchmark) {
-    const premiumMetric = metrics.find(m => m.name === 'Annual Premium')
+    const premiumMetric = metrics.find((m) => m.name === 'Annual Premium')
     if (premiumMetric) {
       premiumMetric.marketBenchmark = benchmark.avgPremium
     }
@@ -269,7 +292,7 @@ function generateMetrics(policies: ComparisonPolicy[]): ComparisonMetric[] {
 }
 
 function calculatePercentile(value: number, allValues: number[], higherIsBetter: boolean): number {
-  const sorted = [...allValues].sort((a, b) => higherIsBetter ? b - a : a - b)
+  const sorted = [...allValues].sort((a, b) => (higherIsBetter ? b - a : a - b))
   const rank = sorted.indexOf(value)
   return Math.round((1 - rank / (sorted.length - 1 || 1)) * 100)
 }
@@ -296,8 +319,8 @@ function generateCoverageMatrix(policies: ComparisonPolicy[]): CoverageCompariso
   const comparisons: CoverageComparison[] = []
 
   for (const [key, names] of allCoverageNames) {
-    const coverageData = policies.map(p => {
-      const coverage = p.policy.coverages.find(c => c.name.toLowerCase() === key)
+    const coverageData = policies.map((p) => {
+      const coverage = p.policy.coverages.find((c) => c.name.toLowerCase() === key)
       return {
         policyId: p.policy.id,
         included: coverage?.included ?? false,
@@ -308,14 +331,14 @@ function generateCoverageMatrix(policies: ComparisonPolicy[]): CoverageCompariso
     })
 
     // Find best and worst
-    const includedPolicies = coverageData.filter(d => d.included)
+    const includedPolicies = coverageData.filter((d) => d.included)
 
     let bestPolicyId = ''
     let worstPolicyId = ''
 
     if (includedPolicies.length > 0) {
-      const best = includedPolicies.reduce((a, b) => a.score > b.score ? a : b)
-      const worst = includedPolicies.reduce((a, b) => a.score < b.score ? a : b)
+      const best = includedPolicies.reduce((a, b) => (a.score > b.score ? a : b))
+      const worst = includedPolicies.reduce((a, b) => (a.score < b.score ? a : b))
       bestPolicyId = best.policyId
       worstPolicyId = worst.policyId
     }
@@ -331,8 +354,8 @@ function generateCoverageMatrix(policies: ComparisonPolicy[]): CoverageCompariso
 
   // Sort by how many policies include the coverage (most common first)
   comparisons.sort((a, b) => {
-    const aIncluded = a.policies.filter(p => p.included).length
-    const bIncluded = b.policies.filter(p => p.included).length
+    const aIncluded = a.policies.filter((p) => p.included).length
+    const bIncluded = b.policies.filter((p) => p.included).length
     return bIncluded - aIncluded
   })
 
@@ -364,22 +387,40 @@ function calculateCoverageScore(coverage: Coverage | undefined): number {
 // GENERATE RANKINGS
 // =============================================================================
 
-function generateRankings(policies: ComparisonPolicy[]): PolicyComparison['rankings'] {
+function generateRankings(
+  policies: ComparisonPolicy[],
+  actuarialInputs: ActuarialPolicyInput[],
+  actuarialResults: ReturnType<typeof evaluateAndRankPolicies>
+): PolicyComparison['rankings'] {
   // Sort by different criteria
-  const byOverall = [...policies].sort((a, b) => b.evaluation.overallScore - a.evaluation.overallScore)
+  const byOverall = [...policies].sort(
+    (a, b) => b.evaluation.overallScore - a.evaluation.overallScore
+  )
   const byPremium = [...policies].sort((a, b) => a.policy.premium - b.policy.premium)
   const byCoverage = [...policies].sort((a, b) => b.policy.coverage - a.policy.coverage)
-  const byValue = [...policies].sort((a, b) =>
-    b.evaluation.scoreBreakdown.value.score - a.evaluation.scoreBreakdown.value.score
+  const byValue = [...policies].sort(
+    (a, b) => b.evaluation.scoreBreakdown.value.score - a.evaluation.scoreBreakdown.value.score
   )
 
-  return policies.map(p => ({
-    policyId: p.policy.id,
-    overallRank: byOverall.findIndex(pp => pp.policy.id === p.policy.id) + 1,
-    premiumRank: byPremium.findIndex(pp => pp.policy.id === p.policy.id) + 1,
-    coverageRank: byCoverage.findIndex(pp => pp.policy.id === p.policy.id) + 1,
-    valueRank: byValue.findIndex(pp => pp.policy.id === p.policy.id) + 1,
-  }))
+  return policies.map((p) => {
+    // Find matching actuarial result index from inputs
+    const actuarialIndex = actuarialInputs.findIndex((inp) => inp.policyId === p.policy.id)
+    const actuarialInfo =
+      actuarialIndex >= 0 ? actuarialResults[actuarialIndex]?.ranking : undefined
+
+    return {
+      policyId: p.policy.id,
+      overallRank: byOverall.findIndex((pp) => pp.policy.id === p.policy.id) + 1,
+      premiumRank: byPremium.findIndex((pp) => pp.policy.id === p.policy.id) + 1,
+      coverageRank: byCoverage.findIndex((pp) => pp.policy.id === p.policy.id) + 1,
+      valueRank: byValue.findIndex((pp) => pp.policy.id === p.policy.id) + 1,
+
+      // Actuarial Engine Integration
+      actuarialRank: actuarialInfo?.rank,
+      actuarialCloseness: actuarialInfo?.topsisCloseness,
+      actuarialGrade: actuarialInfo?.grade,
+    }
+  })
 }
 
 // =============================================================================
@@ -395,7 +436,7 @@ function generateAnalysis(
   const tradeoffs = identifyTradeoffs(policies, winners)
 
   // Generate main recommendation
-  const bestPolicy = policies.find(p => p.policy.id === winners.overallBest)!
+  const bestPolicy = policies.find((p) => p.policy.id === winners.overallBest)!
   const recommendation = generateMainRecommendation(bestPolicy, policies, winners)
 
   return {
@@ -413,46 +454,49 @@ function identifyKeyDifferences(
   const differences: KeyDifference[] = []
 
   // Premium difference
-  const premiums = policies.map(p => p.policy.premium)
+  const premiums = policies.map((p) => p.policy.premium)
   const premiumRange = Math.max(...premiums) - Math.min(...premiums)
   const avgPremium = premiums.reduce((a, b) => a + b, 0) / premiums.length
 
   if (premiumRange / avgPremium > 0.3) {
-    const cheapest = policies.reduce((a, b) => a.policy.premium < b.policy.premium ? a : b)
+    const cheapest = policies.reduce((a, b) => (a.policy.premium < b.policy.premium ? a : b))
     differences.push({
       aspect: 'Premium',
       aspectTR: 'Prim',
-      description: `Premium varies by ${Math.round(premiumRange / avgPremium * 100)}% across policies`,
-      descriptionTR: `Prim poliçeler arasında %${Math.round(premiumRange / avgPremium * 100)} farklılık gösteriyor`,
+      description: `Premium varies by ${Math.round((premiumRange / avgPremium) * 100)}% across policies`,
+      descriptionTR: `Prim poliçeler arasında %${Math.round((premiumRange / avgPremium) * 100)} farklılık gösteriyor`,
       significance: premiumRange / avgPremium > 0.5 ? 'major' : 'moderate',
       favoredPolicy: cheapest.policy.id,
     })
   }
 
   // Coverage difference
-  const coverages = policies.map(p => p.policy.coverage)
+  const coverages = policies.map((p) => p.policy.coverage)
   const coverageRange = Math.max(...coverages) - Math.min(...coverages)
   const avgCoverage = coverages.reduce((a, b) => a + b, 0) / coverages.length
 
   if (coverageRange / avgCoverage > 0.2) {
-    const highest = policies.reduce((a, b) => a.policy.coverage > b.policy.coverage ? a : b)
+    const highest = policies.reduce((a, b) => (a.policy.coverage > b.policy.coverage ? a : b))
     differences.push({
       aspect: 'Coverage Amount',
       aspectTR: 'Teminat Tutarı',
-      description: `Coverage varies by ${Math.round(coverageRange / avgCoverage * 100)}% across policies`,
-      descriptionTR: `Teminat poliçeler arasında %${Math.round(coverageRange / avgCoverage * 100)} farklılık gösteriyor`,
+      description: `Coverage varies by ${Math.round((coverageRange / avgCoverage) * 100)}% across policies`,
+      descriptionTR: `Teminat poliçeler arasında %${Math.round((coverageRange / avgCoverage) * 100)} farklılık gösteriyor`,
       significance: coverageRange / avgCoverage > 0.4 ? 'major' : 'moderate',
       favoredPolicy: highest.policy.id,
     })
   }
 
   // Coverage breadth difference
-  const coverageCounts = policies.map(p => p.policy.coverages.filter(c => c.included).length)
+  const coverageCounts = policies.map((p) => p.policy.coverages.filter((c) => c.included).length)
   const countRange = Math.max(...coverageCounts) - Math.min(...coverageCounts)
 
   if (countRange >= 3) {
     const mostCoverages = policies.reduce((a, b) =>
-      a.policy.coverages.filter(c => c.included).length > b.policy.coverages.filter(c => c.included).length ? a : b
+      a.policy.coverages.filter((c) => c.included).length >
+      b.policy.coverages.filter((c) => c.included).length
+        ? a
+        : b
     )
     differences.push({
       aspect: 'Coverage Breadth',
@@ -465,14 +509,14 @@ function identifyKeyDifferences(
   }
 
   // Unique coverages
-  const uniqueCoverages = coverageMatrix.filter(c => {
-    const includedCount = c.policies.filter(p => p.included).length
+  const uniqueCoverages = coverageMatrix.filter((c) => {
+    const includedCount = c.policies.filter((p) => p.included).length
     return includedCount === 1
   })
 
   if (uniqueCoverages.length > 0) {
     for (const coverage of uniqueCoverages.slice(0, 3)) {
-      const policyWithCoverage = coverage.policies.find(p => p.included)
+      const policyWithCoverage = coverage.policies.find((p) => p.included)
       if (policyWithCoverage) {
         differences.push({
           aspect: 'Unique Coverage',
@@ -497,8 +541,8 @@ function identifyTradeoffs(
 
   // Check if different policies win different categories
   if (winners.bestPremium !== winners.bestCoverage) {
-    const cheapest = policies.find(p => p.policy.id === winners.bestPremium)!
-    const mostCoverage = policies.find(p => p.policy.id === winners.bestCoverage)!
+    const cheapest = policies.find((p) => p.policy.id === winners.bestPremium)!
+    const mostCoverage = policies.find((p) => p.policy.id === winners.bestCoverage)!
 
     tradeoffs.push({
       option1: {
@@ -517,8 +561,8 @@ function identifyTradeoffs(
   }
 
   if (winners.bestValue !== winners.overallBest) {
-    const bestValue = policies.find(p => p.policy.id === winners.bestValue)!
-    const overallBest = policies.find(p => p.policy.id === winners.overallBest)!
+    const bestValue = policies.find((p) => p.policy.id === winners.bestValue)!
+    const overallBest = policies.find((p) => p.policy.id === winners.overallBest)!
 
     tradeoffs.push({
       option1: {
@@ -568,7 +612,7 @@ function generateMainRecommendation(
   }
 
   // No clear winner
-  const scores = allPolicies.map(p => p.evaluation.overallScore)
+  const scores = allPolicies.map((p) => p.evaluation.overallScore)
   const scoreDiff = Math.max(...scores) - Math.min(...scores)
 
   if (scoreDiff < 10) {
@@ -597,7 +641,7 @@ export function quickCompare(policies: Policy[]): {
   premiumRange: { min: number; max: number; diff: number }
   coverageRange: { min: number; max: number; diff: number }
 } {
-  const evaluations = policies.map(p => ({
+  const evaluations = policies.map((p) => ({
     policy: p,
     evaluation: evaluatePolicy(p),
   }))
@@ -606,12 +650,12 @@ export function quickCompare(policies: Policy[]): {
     a.evaluation.overallScore > b.evaluation.overallScore ? a : b
   )
 
-  const premiums = policies.map(p => p.premium)
-  const coverages = policies.map(p => p.coverage)
+  const premiums = policies.map((p) => p.premium)
+  const coverages = policies.map((p) => p.coverage)
 
   return {
     winner: winner.policy.id,
-    scores: evaluations.map(e => ({
+    scores: evaluations.map((e) => ({
       policyId: e.policy.id,
       score: e.evaluation.overallScore,
     })),
@@ -631,15 +675,19 @@ export function quickCompare(policies: Policy[]): {
 /**
  * Compare specific coverage across policies
  */
-export function compareCoverage(policies: Policy[], coverageName: string): {
+export function compareCoverage(
+  policies: Policy[],
+  coverageName: string
+): {
   available: { policyId: string; limit: number; deductible: number }[]
   notAvailable: string[]
   best: string | null
 } {
-  const results = policies.map(p => {
-    const coverage = p.coverages.find(c =>
-      c.name.toLowerCase().includes(coverageName.toLowerCase()) ||
-      c.nameTr?.toLowerCase().includes(coverageName.toLowerCase())
+  const results = policies.map((p) => {
+    const coverage = p.coverages.find(
+      (c) =>
+        c.name.toLowerCase().includes(coverageName.toLowerCase()) ||
+        c.nameTr?.toLowerCase().includes(coverageName.toLowerCase())
     )
     return {
       policyId: p.id,
@@ -648,25 +696,24 @@ export function compareCoverage(policies: Policy[], coverageName: string): {
   })
 
   const available = results
-    .filter(r => r.coverage?.included)
-    .map(r => ({
+    .filter((r) => r.coverage?.included)
+    .map((r) => ({
       policyId: r.policyId,
       limit: r.coverage?.limit ?? 0,
       deductible: r.coverage?.deductible ?? 0,
     }))
 
-  const notAvailable = results
-    .filter(r => !r.coverage?.included)
-    .map(r => r.policyId)
+  const notAvailable = results.filter((r) => !r.coverage?.included).map((r) => r.policyId)
 
-  const best = available.length > 0
-    ? available.reduce((a, b) => {
-        // Best = highest limit with lowest deductible
-        const aScore = a.limit - a.deductible * 2
-        const bScore = b.limit - b.deductible * 2
-        return aScore > bScore ? a : b
-      }).policyId
-    : null
+  const best =
+    available.length > 0
+      ? available.reduce((a, b) => {
+          // Best = highest limit with lowest deductible
+          const aScore = a.limit - a.deductible * 2
+          const bScore = b.limit - b.deductible * 2
+          return aScore > bScore ? a : b
+        }).policyId
+      : null
 
   return { available, notAvailable, best }
 }
