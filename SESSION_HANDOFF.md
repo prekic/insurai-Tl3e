@@ -98,9 +98,10 @@ No new env vars needed. Migration 028 creates tables and seeds a feature flag bu
 2. Confirm healthcheck endpoint `/api/health` responds correctly for Railway's liveness probe
 3. Monitor build logs for any Caddy/Chromium auto-detection regressions
 
-### P2 — Actuarial Engine Configuration UI (Next steps)
-1. **Admin UI**: Add actuarial config management panel (scenario frequencies, TOPSIS weights, Monte Carlo params)
-2. **Database**: Apply `028_actuarial_engine_schema.sql` to production when turning on feature flag.
+### P2 — Actuarial Engine Production Enablement
+1. **Database**: Apply `028_actuarial_engine_schema.sql` to production Supabase when ready to enable the engine (idempotent, safe to run)
+2. **Feature Flag**: Flip `actuarial_engine_enabled` to `true` after migration is applied
+3. **Admin UI** ✅ (completed this session): Config panel at Admin Dashboard → "Actuarial Engine" tab for scenario frequencies, TOPSIS weights, Monte Carlo params
 
 
 ### P3 — Quality & Observability
