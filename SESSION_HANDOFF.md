@@ -85,6 +85,13 @@
 - `_setLastEvalResult` is a placeholder — needs external callers to pass evaluation results to the evidence panel
 - Both are ready for wiring but require a follow-up to connect the data flow
 
+### Gotcha: adapter.ts Exclusions Defensive Cast
+- `adapter.ts` uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` because `AnalyzedPolicy.exclusions` is typed `string[]` but some test data/extractions pass objects with `.text`
+- The proper long-term fix is to normalize exclusions in `policy-extractor.ts` at extraction time
+
+### Gotcha: EvidenceCoveragePanel Path
+- `EvidenceCoveragePanel.tsx` lives at `src/components/admin/tabs/settings/` (alongside other settings panels) but is imported by `ActuarialTab.tsx`, not SettingsTab
+
 ### Gotcha: Alert Service Test Mocks
 - Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js`
 
