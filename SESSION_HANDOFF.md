@@ -71,6 +71,7 @@ Database: Migration `028_actuarial_engine_schema.sql` creates 5 tables. Feature 
 - Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `src/lib/actuarial-engine/adapter.ts` converts from `Policy`/`Coverage`.
 - Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — not directly compatible with `Coverage`/`AnalyzedPolicy`.
 - Always import from `@/lib/actuarial-engine` barrel, never from individual layer files.
+- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
 
 ---
 

@@ -4979,6 +4979,7 @@ connectSrc: [
 - The actuarial engine at `src/lib/actuarial-engine/` is complete and tested but NOT wired into the production extraction/evaluation pipeline
 - Feature flag `actuarial_engine_enabled` is seeded as `false` — flipping it to `true` has no effect until an adapter is built
 - Integration requires: (1) adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`, (2) UI components to display EOOP/TOPSIS results, (3) migration 028 applied to production Supabase
+- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via a check on `isTrialResult` in the component level (`PolicyDetailView.tsx` and protected routes).
 - The engine uses its own type system (`CanonicalCoverage` with string codes like `"COLLISION"`, `"THEFT"`, not the existing `Coverage` interface) — mapping is needed
 - Do NOT import from individual layer files — always import from `@/lib/actuarial-engine` (the barrel export in `index.ts`)
 
