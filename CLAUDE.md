@@ -9,9 +9,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**.
-- **Production Readiness**: ~9.5/10 (15,560+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 27, 2026 (Alert email wiring, configurable alert thresholds, migration 027)
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**.
+- **Production Readiness**: ~9.5/10 (15,750+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
+- **Last Updated**: February 28, 2026 (Actuarial engine, deployment hardening, output evaluation tests)
 
 ---
 
@@ -59,6 +59,7 @@ insurai/
 │   │   ├── privacy/         # GDPR/KVKK compliance utilities
 │   │   ├── pdf-export/      # PDF generation for reports
 │   │   ├── ml/              # Machine learning utilities
+│   │   ├── actuarial-engine/ # 4-layer actuarial eval (Monte Carlo, TOPSIS)
 │   │   └── security/        # Audit logging, sanitization
 │   ├── hooks/               # Custom React hooks
 │   ├── types/               # TypeScript definitions
@@ -1276,6 +1277,117 @@ All tables have Row Level Security (RLS) enabled and automatic `updated_at` trig
 
 ---
 
+## Actuarial Engine (Added Feb 28, 2026)
+
+### Overview
+
+A self-contained, 4-layer actuarial evaluation module at `src/lib/actuarial-engine/` (4,916 lines across 17 files). Provides Monte Carlo simulation, TOPSIS multi-criteria ranking, compliance gating, and semantic exclusion analysis for Turkish insurance policies. **Not yet integrated into the production pipeline** — controlled by feature flag `actuarial_engine_enabled` (default: false). See [ADR-0003](docs/adr/0003-modular-actuarial-engine.md) for the architectural decision.
+
+### Architecture
+
+```
+src/lib/actuarial-engine/
+├── types.ts                       # 498 lines — All core interfaces
+├── engine.ts                      # 320 lines — Main orchestrator
+├── index.ts                       # 144 lines — Public API exports
+├── config/
+│   └── defaults.ts                # 229 lines — Turkish market default parameters
+├── layer-a/                       # Semantic Analysis
+│   ├── semantic-exclusions.ts     # 341 lines — Exclusion pattern matching
+│   └── evidence-tracker.ts        # 227 lines — Evidence pointer validation
+├── layer-b/                       # Compliance Gates
+│   ├── compliance-gate.ts         # 235 lines — Gate orchestrator
+│   ├── seddk-rules.ts             # 226 lines — SEDDK 2025/2026 traffic limits
+│   ├── dask-rules.ts              # 314 lines — DASK/ZAS deductible rules
+│   └── product-rules.ts           # 187 lines — "Tam Kasko" product validation
+├── layer-c/                       # Monte Carlo EOOP
+│   ├── monte-carlo.ts             # 356 lines — EOOP simulation loop
+│   ├── scenario-library.ts        # 262 lines — Turkish risk scenarios
+│   ├── loss-model.ts              # 170 lines — Lognormal/Pareto distributions
+│   └── rng.ts                     # 69 lines — Mulberry32 seeded PRNG
+├── layer-d/                       # TOPSIS & XAI
+│   ├── topsis.ts                  # 255 lines — MCDA ranking algorithm
+│   └── sensitivity.ts             # 298 lines — Weight sensitivity + XAI
+└── __tests__/
+    └── golden-regression.test.ts  # 785 lines — 26 deterministic tests
+```
+
+| Layer | Purpose | Key Functions |
+|-------|---------|---------------|
+| **A — Semantic Analysis** | Exclusion pattern matching, evidence pointer validation | `analyzeExclusions()`, `validateEvidence()`, `quickReviewCheck()` |
+| **B — Compliance Gates** | Hard pass/fail: SEDDK limits, DASK 2% deductible, product name validation | `executeComplianceGate()`, `getSEDDKLimitsForDate()`, `checkDASKCompliance()` |
+| **C — Monte Carlo EOOP** | Stochastic loss simulation (EOOP = P + Σ(ρⱼ × Eⱼ(Lⱼ, Dⱼ, Cⱼ))) | `calculateEOOP()`, `getScenariosForPolicyType()`, `sampleLognormal()` |
+| **D — TOPSIS & XAI** | Multi-criteria decision ranking, weight sensitivity analysis | `rankPolicies()`, `analyzeSensitivity()`, `generateXAISummary()` |
+
+### Key Functions
+
+```typescript
+import { runFullEvaluation, evaluateAndRankPolicies } from '@/lib/actuarial-engine'
+
+// Single policy: runs all 4 layers
+const result = runFullEvaluation(policy, options?)
+// result.eligible, result.eoop, result.complianceResult, result.needsReview
+
+// Multi-policy: runs all 4 layers + TOPSIS ranking
+const results = evaluateAndRankPolicies([policyA, policyB])
+// results[0].ranking.closeness, results[0].ranking.rank
+```
+
+### Policy Types Supported
+
+`ActuarialPolicyType = 'kasko' | 'traffic' | 'dask' | 'zas'`
+
+### Monte Carlo Configuration
+
+```typescript
+const DEFAULT_MONTE_CARLO_CONFIG = {
+  numSimulations: 10_000,
+  seed: 42,
+  confidenceInterval: 0.95,
+}
+// Tests use TEST_MONTE_CARLO_CONFIG with 1,000 simulations for speed
+```
+
+### Risk Scenarios (Turkish Market Defaults)
+
+| Code | Label | Frequency (ρ) | Distribution | Typical Loss |
+|------|-------|---------------|-------------|-------------|
+| `SCN_PARTIAL_COLLISION` | Partial collision | 0.06 | Lognormal(9.2, 0.8) | ~₺15K |
+| `SCN_TOTAL_LOSS` | Total loss | 0.015 | Lognormal(11.5, 0.6) | ~₺120K |
+| `SCN_THEFT` | Vehicle theft | 0.008 | Lognormal(11.0, 0.7) | ~₺80K |
+| `SCN_FLOOD` | Flood damage | 0.012 | Lognormal(10.0, 1.0) | ~₺30K |
+| `SCN_EARTHQUAKE` | Earthquake | 0.005 | Pareto(2.5, 50K) | Catastrophic tail |
+| `SCN_FIRE` | Fire damage | 0.003 | Lognormal(10.5, 1.2) | ~₺50K |
+
+### Database
+
+Migration `028_actuarial_engine_schema.sql` creates 5 tables:
+- `policy_extractions` — Normalized extraction run metadata + JSONB
+- `extraction_evidence` — Field-level evidence pointers (page, snippet, confidence)
+- `actuarial_config_sets` / `actuarial_config_set_versions` — Versioned config containers
+- `actuarial_evaluation_runs` — Ties policy → extraction → config snapshot
+- `evaluation_results` — Full evaluation JSONB output
+
+Feature flag `actuarial_engine_enabled` seeded as `false` in `feature_flags` table.
+
+### Tests
+
+26 golden regression tests in `__tests__/golden-regression.test.ts` using deterministic seed (42):
+1. Kasko Basic — core perils only, NOT penalized for missing flood/EQ
+2. Tam Kasko Mismatch — "Tam Kasko" but missing flood/EQ → blocked
+3. Semantic Exclusion — flood included but underground water exclusion → drops score
+4. Rayiç Ambiguity — rayicMethod = "unspecified" → contract quality penalty
+5. Indemnity Quality — equivalent parts + insurer network → lower vs OEM/choice
+6. Expired Policy — Layer B gate → eligible = false
+7. Traffic 2026 — below SEDDK 2026 minimums → eligible = false
+8. DASK/ZAS — deductible ≠ 2% → critical blocking
+9. Deductible Adequacy — high deductible → higher EOOP
+10. Premium Percentiles — lower premium → lower EOOP
+11. Sensitivity Flip — weight perturbation → winner can change
+12. Evidence Enforcement — missing EvidencePointer → needsReview = true
+
+---
+
 ## Testing Strategy
 
 ### Test Organization
@@ -1287,11 +1399,11 @@ E2E Tests (Playwright):     e2e/
 Server Tests:               server/__tests__/
 ```
 
-### Test Counts (as of Feb 26, 2026)
-- **Total**: 15,564 tests across 323 test files (18 skipped)
+### Test Counts (as of Feb 28, 2026)
+- **Total**: 15,753 tests across 329 test files (18 skipped)
 - **Passing**: 100% (0 failures; 1 pre-existing flaky from React 19 timer teardown race — passes individually)
 - **Coverage**: ~91.67% statements, ~85.91% branches, ~88.77% functions, ~92.5% lines
-- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion). Feb 26 late session: +21 tests from extraction-alert-service (9), MonitoringAlertsPanel (6), RetentionSettingsPanel (6); 5 existing test files fixed for new extraction-alert-service mock; 7 E2E tests for monitoring/retention endpoints. Feb 27 session: +13 tests (+4 new email/minRequests, +2 test fixes in SettingsTab + ExtractionHealthTab, rest from config field additions).
+- **Note**: Massive coverage push across Feb 18-19 sessions added ~8,200 tests across 109 new test files. Branch coverage improvement session (Feb 19 late) added 464 tests across 4 new files targeting highest-impact uncovered branches. Known Issue #116 resolved Feb 20 with 8 focused test files targeting settings.ts, policy-extractor.ts, and ai.ts (+2.22pp branches). Feb 20-21 session added PWA push notification tests (5 files, ~112 tests) raising total to 15,428 across 317 files. Feb 22 TR translations lazy-load session: net −1 test (translations.test.ts PRELOADED_TRANSLATIONS tests replaced with named export presence checks). Feb 25 session: +59 tests from new ExtractionHealthTab, enhanced export.test.ts, updated processing-log-api assertions. Feb 26 session: +26 ExtractionHealthTab comprehensive tests (charts, auto-refresh, provider stats, error expansion). Feb 26 late session: +21 tests from extraction-alert-service (9), MonitoringAlertsPanel (6), RetentionSettingsPanel (6); 5 existing test files fixed for new extraction-alert-service mock; 7 E2E tests for monitoring/retention endpoints. Feb 27 session: +13 tests (+4 new email/minRequests, +2 test fixes in SettingsTab + ExtractionHealthTab, rest from config field additions). Feb 28 session: +189 tests — actuarial engine golden regression (26 in 1 file) + output evaluation tests (162 across 3 files: evaluation-scoring-sample-data 63, extraction-output-quality 38, sample-policy-output-evaluation 61).
 
 ### Key Test Files
 | File | Tests | Purpose |
@@ -1327,6 +1439,10 @@ Server Tests:               server/__tests__/
 | `src/components/medium-coverage-branches.test.tsx` | 123 | Multi-component branch coverage (EmailPrefs, GlobalNav, ScoreBreakdown, etc.) |
 | `src/components/PolicyDashboard-branches.test.tsx` | 102 | PolicyDashboard branch coverage (sort, filter, stats, compare) |
 | `src/lib/library-branches.test.tsx` | 67 | Library module branch coverage (PolicyContext, Consensus, Config, Cache) |
+| `src/lib/actuarial-engine/__tests__/golden-regression.test.ts` | 26 | Actuarial engine: Monte Carlo, TOPSIS, compliance, exclusions |
+| `src/__tests__/evaluation-scoring-sample-data.test.ts` | 63 | Policy evaluation scoring against sample data |
+| `src/__tests__/extraction-output-quality.test.ts` | 38 | AI extraction output quality validation |
+| `src/__tests__/sample-policy-output-evaluation.test.ts` | 61 | End-to-end sample policy output evaluation |
 
 ### Running Tests
 ```bash
@@ -4061,6 +4177,35 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Migration**: `supabase/migrations/027_monitoring_min_requests_config.sql` — seeds `min_provider_requests_for_latency_alert` default `3` in `app_settings`
 - **Files Changed**: `extraction-alert-service.ts`, `ai.ts`, `config-service.ts`, `types.ts`, `configuration-service.ts`, `MonitoringAlertsPanel.tsx`, `SettingsTab.tsx`, `ExtractionHealthTab.tsx`, `SettingsTab.test.tsx`, `ExtractionHealthTab.test.tsx`, `extraction-alert-service.test.ts`
 
+### 140. Modular Actuarial Engine (Added Feb 28, 2026)
+- **Feature**: Self-contained 4-layer actuarial evaluation engine for Turkish insurance policies
+- **Architecture**: Layer A (Semantic exclusion analysis + evidence tracking) → Layer B (Compliance gates: SEDDK, DASK, product rules) → Layer C (Monte Carlo EOOP simulation with lognormal/Pareto loss models) → Layer D (TOPSIS MCDA ranking + weight sensitivity XAI)
+- **Scope**: 4,916 lines across 17 files in `src/lib/actuarial-engine/`, plus migration 028 (395 lines)
+- **Status**: Complete and tested but **NOT integrated into production pipeline** — controlled by feature flag `actuarial_engine_enabled` (default: false)
+- **No new dependencies added**: Uses only built-in math (custom Mulberry32 PRNG, Box-Muller transform, inverse CDF Pareto sampling)
+- **Key Functions**: `runFullEvaluation(policy, options?)` for single policy, `evaluateAndRankPolicies([...])` for multi-policy comparison with TOPSIS ranking
+- **Policy Types**: `'kasko' | 'traffic' | 'dask' | 'zas'`
+- **Database**: Migration `028_actuarial_engine_schema.sql` creates 5 tables (`policy_extractions`, `extraction_evidence`, `actuarial_config_sets`/`versions`, `actuarial_evaluation_runs`, `evaluation_results`)
+- **Tests**: 26 golden regression tests with deterministic seed (42), all passing
+- **Integration Path**: Requires adapter from `AnalyzedPolicy` → `ActuarialPolicyInput` (the engine uses its own canonical type system with `CanonicalCoverage` codes, `EvidencePointer` tracking, and `IndemnityMechanics`)
+- **Files**: `src/lib/actuarial-engine/` (17 files), `supabase/migrations/028_actuarial_engine_schema.sql`
+- **Commits**: `dc6beae`
+
+### 141. Nixpacks Configuration for Railway Deployment (Fixed Feb 28, 2026)
+- **Problem**: Railway's Nixpacks builder auto-detected Caddy web server (from `index.html` in `dist/`) and Chromium (from Playwright in devDependencies), causing port conflicts since Express already serves static files, and bloating the production image by 400+ MB
+- **Root Cause**: Without explicit `providers` configuration, Nixpacks scans the project and provisions all detected services. Also used invalid Nix package names (`nodejs_22`, `npm-9_x`) that don't exist in nixpkgs.
+- **Solution**: Created `nixpacks.toml` with `providers = ["node"]` to disable auto-detection, used extend-defaults pattern (`"..."`) for packages with only `openssl` added explicitly, and added `healthcheckPath = "/api/health"` with `healthcheckTimeout = 60` to `railway.json`
+- **Files**: `nixpacks.toml` (new, 22 lines), `railway.json` (updated with healthcheck config)
+- **Commits**: `1f34759`, `acc190f`
+
+### 142. Server-Side CSV Export and Monitoring Import Fixes (Fixed Feb 28, 2026)
+- **Problem**: Two server TypeScript build errors preventing Railway deployment:
+  1. `server/routes/admin/content.ts` CSV export had misaligned column headers vs row data — used client-side field names (`file_name`, `ocrEngine`) instead of server-side `DocumentProcessingLog` fields (`filename`, `ocr_engine`, `total_duration_ms`). Also `escapeCSV()` only accepted `string` but received `number`/`boolean` values.
+  2. `server/routes/admin/monitoring.ts` had missing `getSupabaseWithError` import, unused `req` parameter, and missing type annotations on JSON response objects.
+- **Solution**: Aligned CSV headers with actual server-side DB fields, widened `escapeCSV` param type to `string | number | boolean | null | undefined` with nullish check (preserves `0` and `false` as values), fixed monitoring imports and types.
+- **Files Changed**: `server/routes/admin/content.ts`, `server/routes/admin/monitoring.ts`
+- **Commit**: `acc190f`
+
 ---
 
 ## Turkish Market Considerations
@@ -4253,6 +4398,7 @@ Railway hosts both frontend and backend as a single service. The Express server 
 
 **Configuration Files:**
 - `railway.json` - Build and deploy configuration
+- `nixpacks.toml` - Nixpacks provider/phase configuration
 - `server/index.ts` - Serves static files in production
 
 **railway.json:**
@@ -4265,10 +4411,29 @@ Railway hosts both frontend and backend as a single service. The Express server 
   },
   "deploy": {
     "startCommand": "NODE_ENV=production node dist-server/index.js",
+    "healthcheckPath": "/api/health",
+    "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
 }
+```
+
+**nixpacks.toml:**
+```toml
+providers = ["node"]    # Disable Caddy/Chromium auto-detection
+
+[phases.setup]
+nixPkgs = ["...", "openssl"]  # Extend defaults, add openssl only
+
+[phases.install]
+cmds = ["npm ci --include=dev"]
+
+[phases.build]
+cmds = ["npm run build && npm run build:server"]
+
+[start]
+cmd = "NODE_ENV=production node dist-server/index.js"
 ```
 
 **Environment Variables on Railway:**
@@ -4803,6 +4968,20 @@ connectSrc: [
 - The `BenchmarksTab` component includes informational text at the bottom that uses example currency formatting (e.g., `4.500₺`). When asserting against table values using `getByText(/4\.?500/)`, it will fail with `TestingLibraryElementError: Found multiple elements`.
 - **Workaround:** Use `getAllByText(...)[0]` or more specific DOM queries when testing table data in this component.
 
+**Nixpacks Caddy Auto-Detection on Railway (Fixed Feb 28, 2026):**
+- Railway's Nixpacks builder auto-detects `index.html` in `dist/` and provisions Caddy as a web server, causing port conflicts with Express
+- Also auto-detects Playwright/Chromium test dependencies in `devDependencies` and adds ~400 MB of browser binaries to the production image
+- **Solution**: `nixpacks.toml` with `providers = ["node"]` disables all auto-detection; only the Node.js provider is used
+- If Railway builds suddenly start including unexpected services or become much larger, check `nixpacks.toml` first
+- The `nixpacks.toml` and `railway.json` must stay in sync — both define install/build/start commands. `nixpacks.toml` takes precedence when present.
+
+**Actuarial Engine — Not Yet Integrated (Feb 28, 2026):**
+- The actuarial engine at `src/lib/actuarial-engine/` is complete and tested but NOT wired into the production extraction/evaluation pipeline
+- Feature flag `actuarial_engine_enabled` is seeded as `false` — flipping it to `true` has no effect until an adapter is built
+- Integration requires: (1) adapter from `AnalyzedPolicy` → `ActuarialPolicyInput`, (2) UI components to display EOOP/TOPSIS results, (3) migration 028 applied to production Supabase
+- The engine uses its own type system (`CanonicalCoverage` with string codes like `"COLLISION"`, `"THEFT"`, not the existing `Coverage` interface) — mapping is needed
+- Do NOT import from individual layer files — always import from `@/lib/actuarial-engine` (the barrel export in `index.ts`)
+
 ---
 
 ## CI/CD
@@ -4870,7 +5049,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,564 tests, all passing (323 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,753 tests, all passing (329 test files), ~92.5% line coverage, ~85.91% branch coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 27, 2026 (Alert email wiring, configurable alert thresholds, migration 027)
+**Last Updated**: February 28, 2026 (Actuarial engine, deployment hardening, output evaluation tests)
