@@ -6,8 +6,10 @@
 providers = ["node"]
 
 [phases.setup]
-# Only install what we need — no Chromium (Playwright is dev-only)
-nixPkgs = ["nodejs_22", "npm-9_x", "openssl"]
+# Extend default packages, add only non-Node extras
+# Node.js version is auto-detected from .nvmrc (22)
+# NPM is bundled with Node.js — no need to specify separately
+nixPkgs = ["...", "openssl"]
 
 [phases.install]
 cmds = ["npm ci --include=dev"]
