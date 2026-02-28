@@ -4211,7 +4211,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files**: `nixpacks.toml` (new, 22 lines), `railway.json` (updated with healthcheck config)
 - **Commits**: `1f34759`, `acc190f`
 
-### 142. Server-Side CSV Export and Monitoring Import Fixes (Fixed Feb 28, 2026)
+### 142b. Server-Side CSV Export and Monitoring Import Fixes (Fixed Feb 28, 2026)
 - **Problem**: Two server TypeScript build errors preventing Railway deployment:
   1. `server/routes/admin/content.ts` CSV export had misaligned column headers vs row data — used client-side field names (`file_name`, `ocrEngine`) instead of server-side `DocumentProcessingLog` fields (`filename`, `ocr_engine`, `total_duration_ms`). Also `escapeCSV()` only accepted `string` but received `number`/`boolean` values.
   2. `server/routes/admin/monitoring.ts` had missing `getSupabaseWithError` import, unused `req` parameter, and missing type annotations on JSON response objects.
