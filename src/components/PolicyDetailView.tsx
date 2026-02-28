@@ -1054,6 +1054,7 @@ export function PolicyDetailView() {
   // Actuarial Engine Integration
   const actuarialResult = useMemo(() => {
     if (!policy) return null
+    if (isTrialResult) return null
 
     // Beta Actuarial engine currently only supports specific policy types
     const supportedTypes = ['kasko', 'traffic', 'dask', 'zas']
@@ -1067,7 +1068,7 @@ export function PolicyDetailView() {
       console.error('Failed to run beta Actuarial Engine', err)
       return null
     }
-  }, [policy])
+  }, [policy, isTrialResult])
 
   // Export handlers
   const handleExportPdf = useCallback(async () => {
