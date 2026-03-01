@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**.
 - **Production Readiness**: ~9.5/10 (15,848+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: February 28, 2026 (Actuarial engine observability — timing instrumentation, evidence coverage dashboard, expanded regression tests)
+- **Last Updated**: March 1, 2026 (Actuarial engine production deployment + adapter exclusion cleanup)
 
 ---
 
@@ -5056,18 +5056,16 @@ connectSrc: [
 - Feature flag `actuarial_engine_enabled` is **enabled** (rollout_percentage: 100).
 - **100% Admin API Coverage**: All routes in `server/routes/admin/actuarial.ts` covered by 26 passing tests.
 
-**Actuarial Timing Ring Buffer — Not Yet Wired (Feb 28, 2026):**
-- `recordEvaluationTiming()` is exported from `ActuarialTab.tsx` but not yet called from `ComparePolicies.tsx` or `PolicyDetailView.tsx`
-- The ring buffer (max 50 entries) collects `LayerTimings` data for the `PerformanceTimingsCard` display, but without callers it stays empty
-- Wiring requires calling `recordEvaluationTiming(result.layerTimings)` after `runFullEvaluation()` or `evaluateAndRankPolicies()` returns
-- `_setLastEvalResult` in `ActuarialTab.tsx` is a placeholder — needs external callers to pass evaluation results to the evidence coverage panel
-- Both are ready for wiring but require a follow-up to connect the data flow from evaluation call sites
+**~~Actuarial Timing Ring Buffer — Not Yet Wired~~ ✅ RESOLVED (Mar 1, 2026):**
+- `recordEvaluationTiming()` is now called internally via the event bus subscriber in `ActuarialTab.tsx` (line 59)
+- `setLastEvalResult` is now wired to real evaluation data from the event bus subscriber (line 62)
+- Data flow: `PolicyDetailView`/`ComparePolicies` call `emitEvaluation()` → event bus → `ActuarialTab` subscriber calls `recordEvaluationTiming()` + `setLastEvalResult()`
+- No direct calls from components needed — the pub/sub pattern handles it
 
-**Actuarial adapter.ts Exclusions — Defensive `unknown` Cast (Feb 28, 2026):**
-- `adapter.ts` maps `policy.exclusions` to `exclusionTexts: string[]`
-- `AnalyzedPolicy.exclusions` is typed as `string[]`, but some test data and real extractions pass objects with `.text` property
-- The mapping uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` to handle both formats
-- If this pattern causes issues with future type changes, the proper fix is to normalize exclusions in `policy-extractor.ts` at extraction time
+**~~Actuarial adapter.ts Exclusions — Defensive `unknown` Cast~~ ✅ RESOLVED (Mar 1, 2026):**
+- Removed the defensive `(e: unknown)` cast from `adapter.ts:176` — `AnalyzedPolicy.exclusions` is typed `string[]` and `policy-extractor.ts` always produces `string[]`
+- Fixed test data in `adapter.test.ts` that violated the type contract by passing objects instead of strings
+- Adapter now uses direct passthrough: `exclusionTexts: policy.exclusions || []`
 
 **Actuarial Test Mock Path Quirk (Added Mar 1, 2026):**
 - Tests in `server/__tests__/admin-actuarial-routes.test.ts` must mock `../services/actuarial-persistence.js`.
@@ -5149,4 +5147,4 @@ npm run build:analyze
 **Tests**: 15,888 tests, 15,886 passing (335 test files), 1 known flaky failure in `extraction-retry-branches.test.ts:1057`, ~92.5% line coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: March 1, 2026 (Actuarial Engine Production Deployment: applied migration 028, enabled feature flag, 14 new admin API tests)
+**Last Updated**: March 1, 2026 (Actuarial engine production deployment, adapter exclusion cleanup, follow-up review confirming event bus wiring complete)
