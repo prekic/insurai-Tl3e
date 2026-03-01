@@ -31,6 +31,8 @@
 - **Historical Analysis UI**:
   - Developed the `PolicyActuarialHistoryChart` Recharts component displaying EOOP boundary bounds.
   - Embedded the chart directly inside the `PolicyDetailView` results panel.
+  - Fixed an unauthenticated data fetch bug by routing requests through `adminFetch`.
+  - Added a secondary Y-axis with `Intl.NumberFormat` compact formatting to prevent UI clipping on large values.
 
 ---
 
@@ -38,11 +40,11 @@
 
 | File | Change |
 |--------------|--------|
-| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle and iteration slider |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle and scalable iteration slider (up to 250k) |
 | `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** — DB config map and Historical confidence columns |
 | `src/lib/config/types.ts` | **UPDATED** — Added worker configuration properties |
 | `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Wired worker config properties mapping for dynamic async evaluations |
-| `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **NEW** — Recharts evaluation visualization UI component |
+| `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **UPDATED** — Recharts visualization with dual-axis mapping and adminFetch integration |
 | `src/components/PolicyDetailView.tsx` | **UPDATED** — Embedded PolicyActuarialHistoryChart |
 | `src/lib/persistence/evaluation.ts` | **UPDATED** — Confidence bounds DB insertion mapping |
 | `src/components/ui/*.tsx` | **NEW** — switch, label, skeleton primitives from shadcn |
@@ -61,6 +63,9 @@
 
 ### Gotcha: Shadcn NPM Cache Pollution
 - The shadcn ui command installation (`npx shadcn@latest add ...`) failed due to an `ERR_MODULE_NOT_FOUND` via npm cache pollution containing broken global mappings. Fix is using `npm cache clean --force` or manual implementation of radix primitive wrappers as done for switch, label, and skeleton components.
+
+### Gotcha: Admin API Endpoint Native Fetching Bug
+- Components under the `/admin/*` routing umbrella or any page relying on admin-only data must ALWAYS use the `adminFetch` utility from `@/lib/admin/api`. Standard `fetch` calls will fail with `401 Unauthorized` randomly because they do not correctly hook the supabase JWT bearer tokens into the request headers. Do NOT use `fetch()` for internal admin API calls.
 
 ### Gotcha: Actuarial Test Mock Path Quirk
 - Tests in `server/__tests__/admin-actuarial-routes.test.ts` must mock `../services/actuarial-persistence.js`. Using `../../services/...` (relative to the router it tests) will fail silently in Vitest and bubble up as mysterious 500 errors.
