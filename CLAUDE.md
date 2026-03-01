@@ -95,7 +95,6 @@ insurai/
 │   ├── adr/                 # Architecture Decision Records
 │   ├── architecture/        # System architectural overviews
 │   ├── development/         # Developer guides, testing core playbook
-│   ├── database/            # Schema and RLS definitions
 │   └── runbooks/            # Operational troubleshooting guides
 ├── supabase/                # Database schema & migrations
 ├── scripts/                 # Utility scripts (load-test, ai-extraction)
@@ -3788,7 +3787,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `packages/rule-packs/src/index.ts` — 2 warnings (`!locale!` → `!locale`; throw on missing fallback)
   - `src/lib/policy-evaluation/comparator.ts` — 2 warnings (`?.` + `?? 0` after `.filter()` chain)
   - `services/layout-svc/src/index.ts` — 1 warning (extract to `const regionChildren`; removed `eslint-disable-next-line` comment)
-- **Result**: ESLint now at **0 errors, 0 warnings** across entire codebase
+- **Result**: ESLint now at **0 errors, 0 `no-non-null-assertion` warnings** in targeted files. Note: `package.json` lint script allows `--max-warnings 47` — some non-critical warnings may remain in files outside the cleanup scope (e.g., `services/`, `packages/`)
 
 ### 118. Residual ESLint Warnings Cleared — 9 Warnings in Branch (Fixed Feb 20, 2026)
 - **Problem**: 9 ESLint warnings persisted in `claude/review-handoff-docs-JGCWm` branch that were not covered by Known Issue #117 (those fixes targeted different files)
@@ -3802,7 +3801,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   - `src/lib/ai/policy-extractor.ts:786` — `no-non-null-assertion`: `ocrFormFields!` inside inner closure → capture narrowed value as `const narrowedFormFields`
   - `src/lib/pipeline/ocr-sanitizer.ts:45` — `no-non-null-assertion`: `codePointAt(0)!` → `?? 0`
   - `src/lib/pipeline/ocr-stats.ts:648` — `no-non-null-assertion`: `groups.get(key)!.push()` → extract to `const group`, guard with `if (group)`
-- **Result**: ESLint **0 errors, 0 warnings** — consistent with CLAUDE.md claim from Known Issue #117
+- **Result**: ESLint **0 errors** in fixed files. Build lint passes with `--max-warnings 47` threshold (see `package.json` line 20)
 
 ### 119. PWA Push Notification Architecture (Added Feb 20, 2026)
 - **Feature**: Full browser push notification system using Web Push API (VAPID)
@@ -3865,7 +3864,7 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files**:
   - `supabase/functions/notify-expiring/index.ts` — Deno Edge Function using `npm:web-push` and `@supabase/supabase-js`
   - `supabase/functions/notify-expiring/deno.json` — Deno config
-  - `supabase/migrations/022_setup_pg_cron.sql` — enables `pg_cron` + `pg_net`, schedules daily invocation at 08:00 UTC
+  - `supabase/migrations/20260223191019_setup_pg_cron.sql` — enables `pg_cron` + `pg_net`, schedules daily invocation at 08:00 UTC
 - **Idempotent**: each policy matches exactly one window per day (expires in exactly N days) — safe to run multiple times
 - **Graceful degradation**: skips with `console.warn` if VAPID keys not set; never crashes
 - **Required Supabase Edge Secrets** (set via `npx supabase secrets set`):
@@ -4420,7 +4419,7 @@ cat > .env << 'EOF'
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 VITE_API_PROXY_URL=https://YOUR-CODESPACE-NAME-4001.app.github.dev
-
+- The Edge Function lives at `supabase/functions/notify-expiring/index.ts` and is scheduled via `pg_cron` (migration `20260223191019_setup_pg_cron.sql`)
 # Backend - CORS must allow Codespaces frontend URL
 API_PORT=4001
 FRONTEND_URL=https://YOUR-CODESPACE-NAME-5173.app.github.dev
@@ -4810,7 +4809,7 @@ connectSrc: [
 **ESLint in Test Files After Coverage Push (Resolved Feb 19, 2026):**
 - The Feb 18-19 coverage push introduced 33+47=80 ESLint errors — all in test files (unused mock variables like `mockSelect`, `mockInsert`, etc.)
 - **All 80 errors resolved** in commits `3172796`, `b31547b`, `0856102` — prefixed unused mocks with `_`
-- Current ESLint status: **0 errors, 0 warnings** — all `no-non-null-assertion` warnings resolved in Feb 20 session (see Known Issue #117)
+- Current ESLint status: **0 errors**; lint script uses `--max-warnings 47` threshold (`package.json` line 20). Core `src/` and `server/` files have 0 warnings after the Feb 20 session. Remaining tolerated warnings are in `services/`, `packages/`, or edge cases. If you reduce warnings further, update the `--max-warnings` value accordingly.
 
 **Two TypeScript Closure-Narrowing Patterns (no-non-null-assertion root causes):**
 - **Pattern 1 — `let` assigned in async callback**: TypeScript cannot narrow a `let x: T` variable that is assigned inside `await runStage(..., async () => { x = result })`. The assignment happens in a callback, not on the main control-flow path. Fix: declare with a **definite-assignment assertion**: `let x!: T`. This is NOT flagged by ESLint's `no-non-null-assertion` rule (which targets postfix expression `x!`, not declaration-level `let x!: T`).
@@ -4848,7 +4847,7 @@ connectSrc: [
 
 **Policy Expiry Scheduler — Supabase Edge Function (Migrated Feb 24, 2026):**
 - The policy expiry notification scheduler has been migrated from GitHub Actions + Railway endpoint to a Supabase Edge Function
-- The Edge Function lives at `supabase/functions/notify-expiring/index.ts` and is scheduled via `pg_cron` (migration `022_setup_pg_cron.sql`)
+- The Edge Function lives at `supabase/functions/notify-expiring/index.ts` and is scheduled via `pg_cron` (migration `20260223191019_setup_pg_cron.sql`)
 - VAPID keys must be set as **Supabase Edge Secrets**: `npx supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=...`
 - `CRON_SECRET` and `PRODUCTION_SERVER_URL` GitHub Secrets are no longer needed (old architecture removed)
 - Verify cron schedule: `SELECT * FROM cron.job;` in Supabase SQL Editor
