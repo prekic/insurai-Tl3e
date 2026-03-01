@@ -35,7 +35,7 @@ function makeDaskPolicy(): AnalyzedPolicy {
     coverage: 640000,
     premium: 800,
     monthlyPremium: 67,
-    deductible: 12800, // 2% of coverage
+    deductible: 12800,
     startDate: '2024-01-01',
     expiryDate: '2025-01-01',
     status: 'active',
@@ -43,9 +43,99 @@ function makeDaskPolicy(): AnalyzedPolicy {
     coverages: [
       { name: 'Earthquake', nameTr: 'Deprem', limit: 640000, deductible: 12800, included: true },
     ],
-    exclusions: ['War and terrorism', 'Nuclear events'],
+    exclusions: ['War and terrorism'],
     aiConfidence: 0.96,
     aiInsights: ['Standard DASK coverage'],
+  }
+}
+
+function makeHealthPolicy(): AnalyzedPolicy {
+  const now = new Date()
+  const nextYear = new Date()
+  nextYear.setFullYear(now.getFullYear() + 1)
+
+  return {
+    id: 'health-001',
+    policyNumber: 'HEALTH-2024-001',
+    provider: 'Allianz',
+    logo: '🔵',
+    type: 'sağlık',
+    typeTr: 'Tamamlayıcı Sağlık',
+    coverage: 0,
+    premium: 12000,
+    monthlyPremium: 1000,
+    startDate: now.toISOString().split('T')[0],
+    expiryDate: nextYear.toISOString().split('T')[0],
+    status: 'active',
+    insuredPerson: 'Test User',
+    coverages: [
+      {
+        name: 'Inpatient Stay',
+        nameTr: 'Yatarak Tedavi',
+        limit: 0,
+        isUnlimited: true,
+        included: true,
+      },
+      { name: 'Outpatient Treatment', nameTr: 'Ayakta Tedavi', limit: 5000, included: true },
+    ],
+    exclusions: ['Existing conditions'],
+    aiConfidence: 0.98,
+    aiInsights: ['Comprehensive health plan'],
+  }
+}
+
+function makeLifePolicy(): AnalyzedPolicy {
+  const now = new Date()
+  const nextYear = new Date()
+  nextYear.setFullYear(now.getFullYear() + 1)
+
+  return {
+    id: 'life-001',
+    policyNumber: 'LIFE-2024-001',
+    provider: 'Anadolu Hayat',
+    logo: '🟢',
+    type: 'hayat',
+    typeTr: 'Hayat Sigortası',
+    coverage: 1000000,
+    premium: 2400,
+    monthlyPremium: 200,
+    startDate: now.toISOString().split('T')[0],
+    expiryDate: nextYear.toISOString().split('T')[0],
+    status: 'active',
+    insuredPerson: 'Test User',
+    coverages: [
+      { name: 'Death Benefit', nameTr: 'Vefat Teminatı', limit: 1000000, included: true },
+    ],
+    exclusions: ['Extreme sports'],
+    aiConfidence: 0.95,
+  }
+}
+
+function makeBusinessPolicy(): AnalyzedPolicy {
+  const now = new Date()
+  const nextYear = new Date()
+  nextYear.setFullYear(now.getFullYear() + 1)
+
+  return {
+    id: 'business-001',
+    policyNumber: 'BIZ-2024-001',
+    provider: 'Aksigorta',
+    logo: '🏢',
+    type: 'business',
+    typeTr: 'İşyeri Sigortası',
+    coverage: 5000000,
+    premium: 15000,
+    monthlyPremium: 1250,
+    startDate: now.toISOString().split('T')[0],
+    expiryDate: nextYear.toISOString().split('T')[0],
+    status: 'active',
+    insuredPerson: 'Business Corp',
+    coverages: [
+      { name: 'Fire', nameTr: 'Yangın', limit: 5000000, included: true },
+      { name: 'Liability', nameTr: 'Sorumluluk', limit: 1000000, included: true },
+    ],
+    exclusions: ['Industrial strike'],
+    aiConfidence: 0.97,
   }
 }
 
@@ -104,6 +194,39 @@ describe('Adapter → Engine Integration', () => {
       expect(result.expectedOutOfPocket).toBeDefined()
       expect(result.layerTimings).toBeDefined()
       expect(result.layerTimings!.total_ms).toBeGreaterThan(0)
+    })
+
+    it('processes a Health policy through the full pipeline', () => {
+      const healthPolicy = makeHealthPolicy()
+      const input = mapAnalyzedToActuarialInput(healthPolicy)
+      const result = runFullEvaluation(input)
+
+      expect(result.eligible).toBe(true)
+      expect(input.policyType).toBe('health')
+      expect(input.coverages.some((c) => c.code === 'INPATIENT')).toBe(true)
+      expect(result.expectedOutOfPocket.scenarioBreakdown).toContainEqual(
+        expect.objectContaining({ scenarioCode: 'HOSPITALIZATION_STAY' })
+      )
+    })
+
+    it('processes a Life policy through the full pipeline', () => {
+      const lifePolicy = makeLifePolicy()
+      const input = mapAnalyzedToActuarialInput(lifePolicy)
+      const result = runFullEvaluation(input)
+
+      expect(result.eligible).toBe(true)
+      expect(input.policyType).toBe('life')
+      expect(input.coverages.some((c) => c.code === 'DEATH_BENEFIT')).toBe(true)
+    })
+
+    it('processes a Business policy through the full pipeline', () => {
+      const businessPolicy = makeBusinessPolicy()
+      const input = mapAnalyzedToActuarialInput(businessPolicy)
+      const result = runFullEvaluation(input)
+
+      expect(result.eligible).toBe(true)
+      expect(input.policyType).toBe('business')
+      expect(input.coverages.some((c) => c.code === 'FIRE')).toBe(true)
     })
 
     it('produces eligible result with valid EOOP for kasko', () => {
@@ -351,11 +474,26 @@ describe('Adapter → Engine Integration', () => {
     })
 
     it('maps all supported policy types correctly', () => {
-      const types = ['kasko', 'traffic', 'dask', 'zas'] as const
-      for (const type of types) {
-        const policy: AnalyzedPolicy = { ...kaskoPolicy, id: `type-${type}`, type }
+      const typeMappings = [
+        { raw: 'kasko', expected: 'kasko' },
+        { raw: 'trafik', expected: 'traffic' },
+        { raw: 'dask', expected: 'dask' },
+        { raw: 'zas', expected: 'zas' },
+        { raw: 'sağlık', expected: 'health' },
+        { raw: 'health', expected: 'health' },
+        { raw: 'hayat', expected: 'life' },
+        { raw: 'life', expected: 'life' },
+        { raw: 'isyeri', expected: 'business' },
+        { raw: 'business', expected: 'business' },
+      ]
+      for (const mapping of typeMappings) {
+        const policy: AnalyzedPolicy = {
+          ...kaskoPolicy,
+          id: `type-${mapping.raw}`,
+          type: mapping.raw,
+        }
         const input = mapAnalyzedToActuarialInput(policy)
-        expect(input.policyType).toBe(type)
+        expect(input.policyType).toBe(mapping.expected)
       }
     })
   })

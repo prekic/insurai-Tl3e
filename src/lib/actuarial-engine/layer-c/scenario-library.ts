@@ -168,31 +168,69 @@ export const DASK_SCENARIOS: RiskScenario[] = [
 
 export const ZAS_SCENARIOS: RiskScenario[] = [
   {
-    code: 'SCN_ZAS_FLOOD',
-    label: 'Flood (ZAS)',
-    labelTr: 'Sel (ZAS)',
-    frequency: 0.015,
-    lossDistribution: { type: 'lognormal', mu: 10.5, sigma: 1.0 },
+    code: 'FLOOD_MAJOR',
+    label: 'Major Flood Event',
+    labelTr: 'Büyük Sel Felaketi',
+    frequency: 0.005,
+    lossDistribution: { type: 'pareto', alpha: 1.2, xMin: 200_000 },
     affectedCoverages: ['FLOOD', 'FLOOD_INUNDATION'],
-    description: 'Residential flood damage under ZAS framework',
+  },
+]
+
+export const HEALTH_SCENARIOS: RiskScenario[] = [
+  {
+    code: 'HOSPITALIZATION_STAY',
+    label: 'Inpatient Hospitalization',
+    labelTr: 'Yatarak Hastane Tedavisi',
+    frequency: 0.08,
+    lossDistribution: { type: 'lognormal', mu: 9.5, sigma: 1.2 }, // Mean ~20k
+    affectedCoverages: ['INPATIENT', 'HOSPITALIZATION'],
   },
   {
-    code: 'SCN_ZAS_STORM',
-    label: 'Storm (ZAS)',
-    labelTr: 'Fırtına (ZAS)',
-    frequency: 0.01,
-    lossDistribution: { type: 'lognormal', mu: 9.8, sigma: 0.9 },
-    affectedCoverages: ['STORM', 'WINDSTORM'],
-    description: 'Storm/windstorm damage under ZAS framework',
+    code: 'OUTPATIENT_EXAM',
+    label: 'Outpatient Examination & Meds',
+    labelTr: 'Ayakta Muayene ve İlaç',
+    frequency: 3.5,
+    lossDistribution: { type: 'uniform', min: 500, max: 5000 },
+    affectedCoverages: ['OUTPATIENT'],
   },
+]
+
+export const LIFE_SCENARIOS: RiskScenario[] = [
   {
-    code: 'SCN_ZAS_WILDFIRE',
-    label: 'Wildfire (ZAS)',
-    labelTr: 'Orman Yangını (ZAS)',
+    code: 'NATURAL_DEATH',
+    label: 'Natural Death',
+    labelTr: 'Vefat (Doğal Nedenler)',
     frequency: 0.004,
-    lossDistribution: { type: 'pareto', alpha: 2.5, xMin: 60000 },
-    affectedCoverages: ['WILDFIRE', 'FIRE_FOREST'],
-    description: 'Wildfire damage under ZAS framework',
+    lossDistribution: { type: 'uniform', min: 1_000_000, max: 1_000_000 }, // Full sum assured
+    affectedCoverages: ['DEATH_BENEFIT', 'TERM_LIFE'],
+  },
+  {
+    code: 'CRITICAL_ILLNESS',
+    label: 'Critical Illness Diagnosis',
+    labelTr: 'Tehlikeli Hastalık Teşhisi',
+    frequency: 0.002,
+    lossDistribution: { type: 'uniform', min: 500_000, max: 500_000 },
+    affectedCoverages: ['CRITICAL_ILLNESS'],
+  },
+]
+
+export const BUSINESS_SCENARIOS: RiskScenario[] = [
+  {
+    code: 'COMMERCIAL_FIRE',
+    label: 'Commercial Property Fire',
+    labelTr: 'Ticari Yangın Hasarı',
+    frequency: 0.003,
+    lossDistribution: { type: 'pareto', alpha: 1.1, xMin: 500_000 },
+    affectedCoverages: ['FIRE', 'FIRE_COMMERCIAL'],
+  },
+  {
+    code: 'BUSINESS_LIABILITY_CLAIM',
+    label: 'Third-Party Liability Claim',
+    labelTr: '3. Şahıs Sorumluluk Tazminatı',
+    frequency: 0.015,
+    lossDistribution: { type: 'lognormal', mu: 11, sigma: 1.5 },
+    affectedCoverages: ['TPL', 'LIABILITY'],
   },
 ]
 
@@ -208,17 +246,21 @@ import type { ActuarialPolicyType } from '../types'
 export function getScenariosForPolicyType(policyType: ActuarialPolicyType): RiskScenario[] {
   switch (policyType) {
     case 'kasko':
-      return [...KASKO_SCENARIOS]
+      return KASKO_SCENARIOS
     case 'traffic':
-      return [...TRAFFIC_SCENARIOS]
+      return TRAFFIC_SCENARIOS
     case 'dask':
-      return [...DASK_SCENARIOS]
+      return DASK_SCENARIOS
     case 'zas':
-      return [...ZAS_SCENARIOS, ...DASK_SCENARIOS] // ZAS extends DASK
-    default: {
-      const _exhaustive: never = policyType
-      throw new Error(`Unknown policy type: ${_exhaustive}`)
-    }
+      return [...DASK_SCENARIOS, ...ZAS_SCENARIOS]
+    case 'health':
+      return HEALTH_SCENARIOS
+    case 'life':
+      return LIFE_SCENARIOS
+    case 'business':
+      return BUSINESS_SCENARIOS
+    default:
+      return []
   }
 }
 
@@ -227,7 +269,15 @@ export function getScenariosForPolicyType(policyType: ActuarialPolicyType): Risk
  * Useful for configuration UIs showing the full scenario library.
  */
 export function getAllScenarios(): RiskScenario[] {
-  return [...KASKO_SCENARIOS, ...TRAFFIC_SCENARIOS, ...DASK_SCENARIOS, ...ZAS_SCENARIOS]
+  return [
+    ...KASKO_SCENARIOS,
+    ...TRAFFIC_SCENARIOS,
+    ...DASK_SCENARIOS,
+    ...ZAS_SCENARIOS,
+    ...HEALTH_SCENARIOS,
+    ...LIFE_SCENARIOS,
+    ...BUSINESS_SCENARIOS,
+  ]
 }
 
 /**

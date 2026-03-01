@@ -13,21 +13,16 @@ import type {
 /**
  * Maps standard API policy type to Actuarial Policy Type
  */
-function mapPolicyType(type: string): ActuarialPolicyType {
-  switch (type) {
-    case 'kasko':
-      return 'kasko'
-    case 'traffic':
-      return 'traffic'
-    case 'dask':
-      return 'dask'
-    case 'zas':
-      return 'zas'
-    default:
-      // Fallback for non-actuarial types (e.g., home, health).
-      // The Engine will still run but compliance gates may fail or skip.
-      return type as ActuarialPolicyType
-  }
+export function mapPolicyType(type: string): ActuarialPolicyType {
+  const t = type.toLowerCase()
+  if (t.includes('kasko')) return 'kasko'
+  if (t.includes('trafik') || t.includes('zmms')) return 'traffic'
+  if (t.includes('dask')) return 'dask'
+  if (t.includes('zas')) return 'zas'
+  if (t.includes('sağlık') || t.includes('health')) return 'health'
+  if (t.includes('hayat') || t.includes('life')) return 'life'
+  if (t.includes('isyeri') || t.includes('business') || t.includes('ticari')) return 'business'
+  return type as ActuarialPolicyType // Pass through for unsupported types
 }
 
 /**
@@ -62,44 +57,42 @@ function mapCoverageToCanonical(c: Coverage): CanonicalCoverage {
   // Attempt to match to KASKO_COVERAGE_WEIGHTS codes where applicable
   if (searchStr.includes('çarpışma') || searchStr.includes('collision')) {
     code = 'COLLISION'
+  } else if (searchStr.includes('yatarak') || searchStr.includes('inpatient')) {
+    code = 'INPATIENT'
+  } else if (searchStr.includes('ayakta') || searchStr.includes('outpatient')) {
+    code = 'OUTPATIENT'
   } else if (
-    searchStr.includes('çalınma') ||
-    searchStr.includes('theft') ||
-    searchStr.includes('hırsızlık')
+    searchStr.includes('ilaç') ||
+    searchStr.includes('pharmacy') ||
+    searchStr.includes('medication')
   ) {
-    code = 'THEFT'
-  } else if (
-    searchStr.includes('yanma') ||
-    searchStr.includes('yangın') ||
-    searchStr.includes('fire')
-  ) {
+    code = 'PHARMACY'
+  } else if (searchStr.includes('vefat') || searchStr.includes('death')) {
+    code = 'DEATH_BENEFIT'
+  } else if (searchStr.includes('maluliyet') || searchStr.includes('disability')) {
+    code = 'DISABILITY'
+  } else if (searchStr.includes('tehlikeli hastalık') || searchStr.includes('critical illness')) {
+    code = 'CRITICAL_ILLNESS'
+  } else if (searchStr.includes('yangın') || searchStr.includes('fire')) {
     code = 'FIRE'
+  } else if (searchStr.includes('hırsızlık') || searchStr.includes('theft')) {
+    code = 'THEFT'
   } else if (searchStr.includes('deprem') || searchStr.includes('earthquake')) {
     code = 'EARTHQUAKE'
-  } else if (searchStr.includes('sel') || searchStr.includes('su') || searchStr.includes('flood')) {
+  } else if (searchStr.includes('sel') || searchStr.includes('flood')) {
     code = 'FLOOD'
-  } else if (searchStr.includes('doğal afet') || searchStr.includes('natural disaster')) {
-    code = 'NATURAL_DISASTER'
   } else if (searchStr.includes('cam') || searchStr.includes('glass')) {
     code = 'GLASS'
-  } else if (
-    searchStr.includes('ihtiyari') ||
-    searchStr.includes('sorumluluk') ||
-    searchStr.includes('liability')
-  ) {
-    code = 'THIRD_PARTY_LIABILITY'
-  } else if (
-    searchStr.includes('koltuk') ||
-    searchStr.includes('ferdi kaza') ||
-    searchStr.includes('personal accident')
-  ) {
+  } else if (searchStr.includes('ferdi kaza') || searchStr.includes('personal accident')) {
     code = 'PERSONAL_ACCIDENT'
-  } else if (
-    searchStr.includes('hukuksal') ||
-    searchStr.includes('koruma') ||
-    searchStr.includes('legal protection')
-  ) {
+  } else if (searchStr.includes('hukuksal') || searchStr.includes('legal')) {
     code = 'LEGAL_PROTECTION'
+  } else if (searchStr.includes('ihtiyari mali') || searchStr.includes('third party liability')) {
+    code = 'THIRD_PARTY_LIABILITY'
+  } else if (searchStr.includes('doğal afet') || searchStr.includes('natural disaster')) {
+    code = 'NATURAL_DISASTER'
+  } else if (searchStr.includes('sorumluluk') || searchStr.includes('liability')) {
+    code = 'LIABILITY'
   } else {
     // Standardize whatever label we have for unknown coverages into uppercase snake case
     code =
