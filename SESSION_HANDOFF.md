@@ -47,8 +47,13 @@
 | `src/lib/persistence/evaluation.ts` | **UPDATED** — Confidence bounds DB insertion mapping |
 | `src/components/ui/*.tsx` | **NEW** — switch, label, skeleton primitives from shadcn |
 | `server/routes/admin/actuarial.ts` | **UPDATED** — Modified data route handler for trend analytics |
+| `docs/adr/015-...` & `016-...` | **NEW** — Architecture records for Web Worker & Historical Viz |
+| `scripts/profile-actuarial-engine.ts` | **NEW** — Optimization profiling script for node environment |
+| `src/lib/actuarial-engine/actuarial.worker.ts` | **NEW** — Web worker implementation for Monte Carlo |
+| `src/lib/actuarial-engine/layer-b/*-rules.ts` | **NEW** — Life, Health, and Business specific rule gates |
+| `server/__tests__/admin-actuarial-routes.test.ts` | **UPDATED** — Syncing integration tests with confidence bounds |
 | `CLAUDE.md` | Updated status, highlighted the new Recharts visualizations and web worker UI |
-| `SESSION_HANDOFF.md` | Documenting Phase 9 architecture and visualization completion |
+| `SESSION_HANDOFF.md` | Documenting Phase 8/9 architecture and visualization completion |
 
 ---
 
@@ -56,6 +61,12 @@
 
 ### Gotcha: Shadcn NPM Cache Pollution
 - The shadcn ui command installation (`npx shadcn@latest add ...`) failed due to an `ERR_MODULE_NOT_FOUND` via npm cache pollution containing broken global mappings. Fix is using `npm cache clean --force` or manual implementation of radix primitive wrappers as done for switch, label, and skeleton components.
+
+### Gotcha: Actuarial Test Mock Path Quirk
+- Tests in `server/__tests__/admin-actuarial-routes.test.ts` must mock `../services/actuarial-persistence.js`. Using `../../services/...` (relative to the router it tests) will fail silently in Vitest and bubble up as mysterious 500 errors.
+
+### Gotcha: Nixpacks Caddy Auto-Detection on Railway (Deployment)
+- Railway's Nixpacks builder auto-detects `index.html` in `dist/` and provisions Caddy, causing port conflicts. It also natively pulls Playwright deps bloating the image. Fix requires strictly defining `providers = ["node"]` within `nixpacks.toml`.
 
 ---
 
