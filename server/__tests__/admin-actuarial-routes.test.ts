@@ -24,12 +24,14 @@ const {
   mockLimit,
   _mockSingle,
   mockInsert,
+  mockUpdate,
 } = vi.hoisted(() => {
   const _mockSingle = vi.fn()
   const mockLimit = vi.fn().mockReturnValue({ single: _mockSingle })
   const mockOrder = vi.fn().mockReturnValue({ limit: mockLimit })
   const mockEq = vi.fn()
   const mockInsert = vi.fn()
+  const mockUpdate = vi.fn()
   const mockSelect = vi.fn()
   const mockFrom = vi.fn()
 
@@ -45,8 +47,20 @@ const {
     mockLimit,
     _mockSingle,
     mockInsert,
+    mockUpdate,
   }
 })
+
+// Mock persistence service
+const { mockPersistEvaluationResult, mockGetEvaluationHistory } = vi.hoisted(() => ({
+  mockPersistEvaluationResult: vi.fn(),
+  mockGetEvaluationHistory: vi.fn(),
+}))
+
+vi.mock('../services/actuarial-persistence.js', () => ({
+  persistEvaluationResult: mockPersistEvaluationResult,
+  getEvaluationHistory: mockGetEvaluationHistory,
+}))
 
 // Mock logger
 vi.mock('../lib/logger.js', () => {
@@ -471,5 +485,193 @@ describe('POST /configs/:name/version', () => {
     expect(res.status).toBe(500)
     expect(res.body.success).toBe(false)
     expect(mockLogError).toHaveBeenCalled()
+  })
+})
+
+describe('POST /evaluation-results', () => {
+  let app: express.Express
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    app = createApp()
+  })
+
+  it('persists evaluation result and returns ID', async () => {
+    mockPersistEvaluationResult.mockResolvedValue('result-uuid-123')
+
+    const res = await request(app)
+      .post('/evaluation-results')
+      .send({
+        policyId: 'policy-123',
+        resultData: { score: 0.95 },
+        eligible: true,
+      })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.data.id).toBe('result-uuid-123')
+    expect(mockPersistEvaluationResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyId: 'policy-123',
+        resultData: { score: 0.95 },
+        eligible: true,
+      })
+    )
+  })
+
+  it('returns 400 when policyId is missing', async () => {
+    const res = await request(app)
+      .post('/evaluation-results')
+      .send({ resultData: { score: 0.95 } })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('policyId and resultData are required')
+  })
+
+  it('returns 400 when resultData is missing', async () => {
+    const res = await request(app).post('/evaluation-results').send({ policyId: 'policy-123' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toContain('policyId and resultData are required')
+  })
+
+  it('returns 500 when persistence fails', async () => {
+    mockPersistEvaluationResult.mockResolvedValue(null)
+
+    const res = await request(app)
+      .post('/evaluation-results')
+      .send({ policyId: 'policy-123', resultData: { score: 0.95 } })
+
+    expect(res.status).toBe(500)
+    expect(res.body.success).toBe(false)
+  })
+
+  it('handles server error during persistence', async () => {
+    mockPersistEvaluationResult.mockRejectedValue(new Error('DB Error'))
+
+    const res = await request(app)
+      .post('/evaluation-results')
+      .send({ policyId: 'policy-123', resultData: { score: 0.95 } })
+
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('Server error persisting evaluation result')
+  })
+})
+
+describe('GET /evaluation-results', () => {
+  let app: express.Express
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    app = createApp()
+  })
+
+  it('returns evaluation history with total count', async () => {
+    const mockData = [{ id: '1', policy_id: 'p1' }]
+    mockGetEvaluationHistory.mockResolvedValue({ data: mockData, total: 1 })
+
+    const res = await request(app).get('/evaluation-results')
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(res.body.data).toEqual(mockData)
+    expect(res.body.total).toBe(1)
+  })
+
+  it('filters by policyId', async () => {
+    mockGetEvaluationHistory.mockResolvedValue({ data: [], total: 0 })
+
+    await request(app).get('/evaluation-results?policyId=p123')
+
+    expect(mockGetEvaluationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        policyId: 'p123',
+      })
+    )
+  })
+
+  it('passes pagination parameters', async () => {
+    mockGetEvaluationHistory.mockResolvedValue({ data: [], total: 0 })
+
+    await request(app).get('/evaluation-results?limit=10&offset=20')
+
+    expect(mockGetEvaluationHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        limit: 10,
+        offset: 20,
+      })
+    )
+  })
+
+  it('returns 500 when history retrieval fails', async () => {
+    mockGetEvaluationHistory.mockResolvedValue(null)
+
+    const res = await request(app).get('/evaluation-results')
+
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('Failed to fetch evaluation history')
+  })
+})
+
+describe('PATCH /feature-flag', () => {
+  let app: express.Express
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    app = createApp()
+  })
+
+  it('updates the feature flag', async () => {
+    const mockUpdateChain = {
+      eq: vi.fn().mockResolvedValue({ error: null }),
+    }
+    mockUpdate.mockReturnValue(mockUpdateChain)
+    mockFrom.mockReturnValue({ update: mockUpdate })
+
+    const res = await request(app).patch('/feature-flag').send({ enabled: true })
+
+    expect(res.status).toBe(200)
+    expect(res.body.success).toBe(true)
+    expect(mockFrom).toHaveBeenCalledWith('feature_flags')
+    expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ enabled: true }))
+    expect(mockUpdateChain.eq).toHaveBeenCalledWith('key', 'actuarial_engine_enabled')
+  })
+
+  it('returns 400 for non-boolean enabled', async () => {
+    const res = await request(app).patch('/feature-flag').send({ enabled: 'true' })
+
+    expect(res.status).toBe(400)
+    expect(res.body.error).toBe('enabled must be a boolean')
+  })
+
+  it('returns 400 when enabled is missing', async () => {
+    const res = await request(app).patch('/feature-flag').send({})
+
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 503 when DB not configured', async () => {
+    const { getSupabaseWithError } = await import('../routes/admin/shared.js')
+    vi.mocked(getSupabaseWithError).mockReturnValueOnce({
+      client: null,
+      error: 'DB Down',
+    })
+
+    const res = await request(app).patch('/feature-flag').send({ enabled: true })
+
+    expect(res.status).toBe(503)
+  })
+
+  it('returns 500 on update error', async () => {
+    const mockUpdateChain = {
+      eq: vi.fn().mockResolvedValue({ error: { message: 'Update failed' } }),
+    }
+    mockUpdate.mockReturnValue(mockUpdateChain)
+    mockFrom.mockReturnValue({ update: mockUpdate })
+
+    const res = await request(app).patch('/feature-flag').send({ enabled: true })
+
+    expect(res.status).toBe(500)
+    expect(res.body.error).toBe('Failed to update feature flag')
   })
 })

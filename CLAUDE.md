@@ -5049,13 +5049,13 @@ connectSrc: [
 - If Railway builds suddenly start including unexpected services or become much larger, check `nixpacks.toml` first
 - The `nixpacks.toml` and `railway.json` must stay in sync — both define install/build/start commands. `nixpacks.toml` takes precedence when present.
 
-**Actuarial Engine — Integrated, DB Not Yet Applied (Feb 28, 2026):**
-- The actuarial engine at `src/lib/actuarial-engine/` is complete, tested, and integrated into the UI pipeline via `adapter.ts`, `ComparePolicies.tsx`, and `PolicyDetailView.tsx`
-- Feature flag `actuarial_engine_enabled` is seeded as `false` — migration `028_actuarial_engine_schema.sql` must be applied to production Supabase before enabling
-- Admin configuration UI available at Admin Dashboard → "Actuarial Engine" tab (`ActuarialTab.tsx`) for Monte Carlo, TOPSIS, scenario, and compliance parameter management
-- **Trial Restriction**: The actuarial engine's UI (TOPSIS ranking, EOOP calculation, Contract Quality metrics) is explicitly hidden from anonymous/free trial users via `isTrialResult` check in `PolicyDetailView.tsx`
-- The engine uses its own type system (`CanonicalCoverage` with string codes like `"COLLISION"`, `"THEFT"`) — the adapter (`adapter.ts`) handles mapping from `AnalyzedPolicy`
-- Do NOT import from individual layer files — always import from `@/lib/actuarial-engine` (the barrel export in `index.ts`)
+**Actuarial Engine — Deployed & Enabled (Mar 1, 2026):**
+- Migration `028_actuarial_engine_schema.sql` applied to production Supabase: 6 tables created, 4 config sets seeded
+- Feature flag `actuarial_engine_enabled` is **enabled** (rollout_percentage: 100)
+- The actuarial engine at `src/lib/actuarial-engine/` is fully operational and integrated into the UI pipeline
+- Admin configuration UI available at Admin Dashboard → "Actuarial Engine" tab (`ActuarialTab.tsx`)
+- **Trial Restriction**: The actuarial engine's UI is explicitly hidden from anonymous/free trial users via `isTrialResult` check in `PolicyDetailView.tsx`
+- **100% Admin API Coverage**: All actuarial admin routes in `server/routes/admin/actuarial.ts` are covered by 26 passing tests in `admin-actuarial-routes.test.ts`
 
 **Actuarial Timing Ring Buffer — Not Yet Wired (Feb 28, 2026):**
 - `recordEvaluationTiming()` is exported from `ActuarialTab.tsx` but not yet called from `ComparePolicies.tsx` or `PolicyDetailView.tsx`
@@ -5142,7 +5142,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,872 tests, all passing (334 test files), ~92.5% line coverage, ~85.91% branch coverage
+**Tests**: 15,888 tests, 15,886 passing (335 test files), 1 known flaky failure in `extraction-retry-branches.test.ts:1057`, ~92.5% line coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: February 28, 2026 (P1/P2/P3/P5 actuarial engine integration — event bus wiring, persistence, feature flag API, 26 new tests)
+**Last Updated**: March 1, 2026 (Actuarial Engine Production Deployment: applied migration 028, enabled feature flag, 14 new admin API tests)
