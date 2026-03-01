@@ -1,4 +1,4 @@
-# Session Handoff — March 1, 2026 (Phase 8 Optimization & Cleanup)
+# Session Handoff — March 1, 2026 (Phase 9 Actuarial Admin UI & Data Visualization)
 
 ## Current Status
 
@@ -7,34 +7,30 @@
 | **Build** | Passing |
 | **TypeCheck** | 0 errors (frontend + server) |
 | **ESLint Errors** | 0 errors |
-| **ESLint Warnings** | 1 warning (worker `any`) |
+| **ESLint Warnings** | 0 warnings (worker `any` fixed) |
 | **Tests** | 15,960 tests (15,958 passing, 335 files, 1 pre-existing flaky failure) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
 | **Branch** | `gemini20260301` |
-| **Production Status** | **Actuarial Engine Deployed & Optimized**; Health/Life/Business Support Integrated; Web Worker offloading functional; 100K iter simulation verified. |
+| **Production Status** | **Actuarial Engine Admin UI & DB Integration Complete**; Web Worker iteration config wired to Admin Settings UI; Monte Carlo confidence bounds tracking added to DB; Historical Trend Chart (Recharts) integrated seamlessly into PolicyDetailView. |
 
 ---
 
 ## Session Summary
 
-### Phase 8 — Optimization & Expansion (March 1, 2026)
-- **New Policy Type Integration**:
-  - Implemented support for `health`, `life`, and `business` policy types in the actuarial engine.
-  - Created type-specific compliance gates (`health-rules.ts`, `life-rules.ts`, `business-rules.ts`).
-  - Expanded `scenario-library.ts` with dedicated risk scenarios for all new policy types.
-- **Monte Carlo Performance Optimization**:
-  - Implemented **Web Worker** (`actuarial.worker.ts`) for asynchronous simulation offloading.
-  - Optimized engine to handle up to **100,000 iterations** efficiently.
-  - Added async evaluation path in `engine.ts` with graceful fallback to main-thread.
-- **Adapter & Mapping Hardening**:
-  - Extended `adapter.ts` to map Turkish insurance terms (e.g., 'Yatarak Tedavi' → `INPATIENT`) and complex policy types.
-  - **Cleanup**: Removed unnecessary defensive `(e: unknown)` cast from `adapter.ts:176`. Fixed test data in `adapter.test.ts` that violated the type contract.
-  - Fixed regressions in `ZAS/DASK` scenario mapping and policy type passthrough.
-- **Testing & Verification**:
-  - Created 21 new integration tests in `adapter-integration.test.ts`.
-  - Added unit tests for new policy rules and Web Worker message passing.
-  - Verified 15,960 tests are passing (including 112 in the actuarial engine suite).
+### Phase 9 — Admin Config & Historical Visualization (March 1, 2026)
+- **Database Tracking**:
+  - `029_actuarial_worker_settings.sql` migration to store `monte_carlo_lower_bound` and `monte_carlo_upper_bound` top-level.
+  - Initialized boolean `actuarial.workerEnabled` and numerical `actuarial.workerIterations` in `app_settings`.
+- **Backend & Engine Config Wiring**:
+  - Dynamically mapped config to `engine.ts` instead of hardcoded simulation limits.
+  - `server/routes/admin/actuarial.ts` and persistence logic extracts bounds natively for DB save.
+- **Admin Configuration Web UI**:
+  - Expanded `EvaluationSettingsPanel` injecting the Performance Settings card for precise Web Worker switching and iteration control via a slider.
+  - Added new shadcn UI dependencies (`switch`, `label`, `skeleton`) safely bypassing a polluted npm cache.
+- **Historical Analysis UI**:
+  - Developed the `PolicyActuarialHistoryChart` Recharts component displaying EOOP boundary bounds.
+  - Embedded the chart directly inside the `PolicyDetailView` results panel.
 
 ---
 
@@ -42,44 +38,35 @@
 
 | File | Change |
 |--------------|--------|
-| `src/lib/actuarial-engine/types.ts` | Expanded `ActuarialPolicyType` and coverage interfaces |
-| `src/lib/actuarial-engine/adapter.ts` | **UPDATED** — Mapping logic for new types and Turkish coverages; simplified exclusions |
-| `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Integrated Web Worker and async evaluation logic |
-| `src/lib/actuarial-engine/actuarial.worker.ts` | **NEW** — Worker entry point for Monte Carlo simulations |
-| `src/lib/actuarial-engine/layer-c/scenario-library.ts` | **UPDATED** — Added scenarios for Health (8), Life (5), Business (9) |
-| `src/lib/actuarial-engine/layer-c/compliance-gate.ts` | **UPDATED** — Integrated new type-specific rule sets |
-| `src/lib/actuarial-engine/layer-b/rules/*` | **NEW** — `health-rules.ts`, `life-rules.ts`, `business-rules.ts`, `dask-rules.ts`, `seddk-rules.ts` |
-| `scripts/profile-actuarial-engine.ts` | **NEW** — Benchmarking script for Monte Carlo performance |
-| `src/lib/actuarial-engine/__tests__/*` | **NEW/UPDATED** — Integration and regression test suites |
-| `docs/adr/015-actuarial-engine-web-worker.md` | **NEW** — ADR documenting the worker implementation |
-| `CLAUDE.md` | Updated status, marked timing ring buffer and adapter exclusion gotchas as resolved |
-| `SESSION_HANDOFF.md` | Combined cleanup and Phase 8 documentation |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle and iteration slider |
+| `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** — DB config map and Historical confidence columns |
+| `src/lib/config/types.ts` | **UPDATED** — Added worker configuration properties |
+| `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Wired worker config properties mapping for dynamic async evaluations |
+| `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **NEW** — Recharts evaluation visualization UI component |
+| `src/components/PolicyDetailView.tsx` | **UPDATED** — Embedded PolicyActuarialHistoryChart |
+| `src/lib/persistence/evaluation.ts` | **UPDATED** — Confidence bounds DB insertion mapping |
+| `src/components/ui/*.tsx` | **NEW** — switch, label, skeleton primitives from shadcn |
+| `server/routes/admin/actuarial.ts` | **UPDATED** — Modified data route handler for trend analytics |
+| `CLAUDE.md` | Updated status, highlighted the new Recharts visualizations and web worker UI |
+| `SESSION_HANDOFF.md` | Documenting Phase 9 architecture and visualization completion |
 
 ---
 
 ## Known Issues
 
-### Gotcha: Worker Environment
-- Web Worker requires `Vite` worker bundling. Local `vitest` mocks the worker but production uses the real worker thread.
-- **Date Handling**: Tests revealed expired policy dates can break scoring; `mockPolicy` generators now use dynamic dates relative to `new Date()`.
-
-### Gotcha: Coverage Passthrough
-- `adapter.ts` now passes through unrecognized coverage types instead of dropping them, which improves "Evidence Coverage" metrics for edge cases.
-
-### Gotcha: Event Bus Module-Level State
-- The timing ring buffer and `lastEvalResult` use module-level state in `ActuarialTab.tsx` — works for the admin SPA but does not survive page reload.
+### Gotcha: Shadcn NPM Cache Pollution
+- The shadcn ui command installation (`npx shadcn@latest add ...`) failed due to an `ERR_MODULE_NOT_FOUND` via npm cache pollution containing broken global mappings. Fix is using `npm cache clean --force` or manual implementation of radix primitive wrappers as done for switch, label, and skeleton components.
 
 ---
 
 ## Priority Next Steps
 
-### P1 — Admin Dashboard Integration
-1. Wire the Web Worker iteration count setting to the Admin Configuration UI.
-2. Add "Simulation Mode" toggle (Main Thread vs Worker) in Admin Settings.
+### P1 — Analytics & Fine-Tuning
+1. Monitor Actuarial Engine Web Worker performance via the newly added Admin Settings UI sliders on production.
+2. Observe EOOP precision improvements mapping to `PolicyActuarialHistoryChart` bounds inside the details page over multiple evaluations.
 
-### P2 — Historical Result Visualization
-1. Implement trend charts for actuarial evaluation scores in the Policy Detail view.
-2. Store Monte Carlo confidence intervals in the database for better UI visualization.
+### P2 — Ongoing Optimization
+1. Refine the UX of the chart axis ticks if large iterations (100k+) trigger display clipping scenarios in edge cases on smaller devices.
 
 ---
 
@@ -87,8 +74,8 @@
 
 | Session | Key Deliverables | Branch |
 |---------|-----------------|--------|
-| Feb 28 early | Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162) | `gemini20260228` |
 | Feb 28 mid | P3 observability: LayerTimings instrumentation, evidence coverage dashboard | `claude/load-project-context-uRxsB` |
 | Feb 28 late | P1/P2/P3/P5: Event bus wiring, persistence service, feature flag API | `gemini202602281715` |
 | Mar 1 early | Phase 7: Production deployment (Migration 028 + Feature Flag) | `gemini202603010814` |
-| **Mar 1 late** | **Phase 8: Optimization (Web Worker) & Expansion (Health/Life/Business Policy Support)** | **`gemini20260301`** |
+| Mar 1 late | Phase 8: Optimization (Web Worker) & Expansion (Health/Life/Business Policy Support) | `gemini20260301` |
+| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini20260301`** |

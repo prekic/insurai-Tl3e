@@ -58,6 +58,7 @@ import {
   mapAnalyzedToActuarialInput,
   emitEvaluation,
 } from '@/lib/actuarial-engine'
+import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryChart'
 
 /**
  * Format coverage limit with special handling for unlimited and market value
@@ -2102,6 +2103,11 @@ export function PolicyDetailView() {
                 </div>
               </div>
             )}
+
+            {/* Historical Score Trend */}
+            <div className="mt-6">
+              <PolicyActuarialHistoryChart policyId={policy.id} />
+            </div>
           </div>
         </div>
       </div>

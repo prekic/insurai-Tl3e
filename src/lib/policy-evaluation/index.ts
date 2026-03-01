@@ -31,7 +31,7 @@
 
 // Main functions
 export { evaluatePolicy, type EvaluatePolicyOptions } from './evaluator'
-export { comparePolicies, quickCompare, compareCoverage } from './comparator'
+export { comparePolicies, comparePoliciesAsync, quickCompare, compareCoverage } from './comparator'
 
 // Benchmark service for database-driven premium benchmarks
 export {
@@ -88,11 +88,7 @@ export {
 // =============================================================================
 
 import type { Policy } from '@/types/policy'
-import type {
-  PolicyEvaluation,
-  PolicyComparison,
-  EvaluationConfig,
-} from './types'
+import type { PolicyEvaluation, PolicyComparison, EvaluationConfig } from './types'
 import { evaluatePolicy } from './evaluator'
 import { comparePolicies, quickCompare, compareCoverage } from './comparator'
 
@@ -119,7 +115,7 @@ export class PolicyEvaluationService {
    * Evaluate multiple policies and return evaluations
    */
   evaluateMultiple(policies: Policy[]): PolicyEvaluation[] {
-    return policies.map(p => evaluatePolicy(p, this.config))
+    return policies.map((p) => evaluatePolicy(p, this.config))
   }
 
   /**
@@ -147,7 +143,7 @@ export class PolicyEvaluationService {
    * Get the best policy from a list
    */
   getBest(policies: Policy[]): { policy: Policy; evaluation: PolicyEvaluation } {
-    const evaluations = policies.map(p => ({
+    const evaluations = policies.map((p) => ({
       policy: p,
       evaluation: evaluatePolicy(p, this.config),
     }))
@@ -162,7 +158,7 @@ export class PolicyEvaluationService {
    */
   sortByScore(policies: Policy[]): { policy: Policy; evaluation: PolicyEvaluation }[] {
     return policies
-      .map(p => ({
+      .map((p) => ({
         policy: p,
         evaluation: evaluatePolicy(p, this.config),
       }))
@@ -173,7 +169,7 @@ export class PolicyEvaluationService {
    * Filter policies by minimum score
    */
   filterByMinScore(policies: Policy[], minScore: number): Policy[] {
-    return policies.filter(p => {
+    return policies.filter((p) => {
       const evaluation = evaluatePolicy(p, this.config)
       return evaluation.overallScore >= minScore
     })
@@ -183,7 +179,7 @@ export class PolicyEvaluationService {
    * Get policies with critical compliance issues
    */
   getNonCompliant(policies: Policy[]): Policy[] {
-    return policies.filter(p => {
+    return policies.filter((p) => {
       const evaluation = evaluatePolicy(p, this.config)
       return !evaluation.compliance.isCompliant
     })
@@ -202,23 +198,23 @@ export class PolicyEvaluationService {
     avgCoverage: number
     gradeDistribution: Record<string, number>
   } {
-    const evaluations = policies.map(p => ({
+    const evaluations = policies.map((p) => ({
       policy: p,
       evaluation: evaluatePolicy(p, this.config),
     }))
 
-    const scores = evaluations.map(e => e.evaluation.overallScore)
-    const grades = evaluations.map(e => e.evaluation.grade)
+    const scores = evaluations.map((e) => e.evaluation.overallScore)
+    const grades = evaluations.map((e) => e.evaluation.grade)
 
     const gradeDistribution: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0 }
-    grades.forEach(g => gradeDistribution[g]++)
+    grades.forEach((g) => gradeDistribution[g]++)
 
     return {
       count: policies.length,
       avgScore: Math.round(scores.reduce((a, b) => a + b, 0) / scores.length),
       minScore: Math.min(...scores),
       maxScore: Math.max(...scores),
-      compliantCount: evaluations.filter(e => e.evaluation.compliance.isCompliant).length,
+      compliantCount: evaluations.filter((e) => e.evaluation.compliance.isCompliant).length,
       avgPremium: Math.round(policies.reduce((a, p) => a + p.premium, 0) / policies.length),
       avgCoverage: Math.round(policies.reduce((a, p) => a + p.coverage, 0) / policies.length),
       gradeDistribution,
@@ -228,24 +224,41 @@ export class PolicyEvaluationService {
   /**
    * Generate comparison report
    */
-  generateReport(policies: Policy[], labels?: string[]): {
+  generateReport(
+    policies: Policy[],
+    labels?: string[]
+  ): {
     comparison: PolicyComparison
     summary: string
     summaryTR: string
   } {
     const comparison = comparePolicies(policies, labels, this.config)
 
-    const winner = comparison.policies.find(p => p.policy.id === comparison.winners.overallBest)!
+    const winner = comparison.policies.find((p) => p.policy.id === comparison.winners.overallBest)!
 
-    const summary = `Comparison of ${policies.length} policies: ${winner.label} is recommended ` +
+    const summary =
+      `Comparison of ${policies.length} policies: ${winner.label} is recommended ` +
       `with a score of ${winner.evaluation.overallScore}/100 (${winner.evaluation.grade}). ` +
-      `Key differences include premium (${comparison.metrics.find(m => m.name === 'Annual Premium')?.values.map(v => `${v.value.toLocaleString('tr-TR')} TL`).join(' vs ')}) ` +
-      `and coverage (${comparison.metrics.find(m => m.name === 'Total Coverage')?.values.map(v => `${v.value.toLocaleString('tr-TR')} TL`).join(' vs ')}).`
+      `Key differences include premium (${comparison.metrics
+        .find((m) => m.name === 'Annual Premium')
+        ?.values.map((v) => `${v.value.toLocaleString('tr-TR')} TL`)
+        .join(' vs ')}) ` +
+      `and coverage (${comparison.metrics
+        .find((m) => m.name === 'Total Coverage')
+        ?.values.map((v) => `${v.value.toLocaleString('tr-TR')} TL`)
+        .join(' vs ')}).`
 
-    const summaryTR = `${policies.length} poliçenin karşılaştırması: ${winner.label} ` +
+    const summaryTR =
+      `${policies.length} poliçenin karşılaştırması: ${winner.label} ` +
       `${winner.evaluation.overallScore}/100 puanıyla (${winner.evaluation.grade}) önerilir. ` +
-      `Temel farklılıklar: prim (${comparison.metrics.find(m => m.name === 'Annual Premium')?.values.map(v => `${v.value.toLocaleString('tr-TR')} TL`).join(' - ')}) ` +
-      `ve teminat (${comparison.metrics.find(m => m.name === 'Total Coverage')?.values.map(v => `${v.value.toLocaleString('tr-TR')} TL`).join(' - ')}).`
+      `Temel farklılıklar: prim (${comparison.metrics
+        .find((m) => m.name === 'Annual Premium')
+        ?.values.map((v) => `${v.value.toLocaleString('tr-TR')} TL`)
+        .join(' - ')}) ` +
+      `ve teminat (${comparison.metrics
+        .find((m) => m.name === 'Total Coverage')
+        ?.values.map((v) => `${v.value.toLocaleString('tr-TR')} TL`)
+        .join(' - ')}).`
 
     return { comparison, summary, summaryTR }
   }

@@ -31,7 +31,9 @@ self.onmessage = (event: MessageEvent<ActuarialWorkerMessage>) => {
     const { policy, scenarios, config, semanticExclusions } = event.data
     const result = calculateEOOP(policy, scenarios, config, semanticExclusions)
     self.postMessage({ result } as ActuarialWorkerResponse)
-  } catch (err: any) {
-    self.postMessage({ error: err.message } as ActuarialWorkerResponse)
+  } catch (err: unknown) {
+    self.postMessage({
+      error: err instanceof Error ? err.message : String(err),
+    } as ActuarialWorkerResponse)
   }
 }

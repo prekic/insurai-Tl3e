@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**.
 - **Production Readiness**: ~9.5/10 (15,848+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: March 1, 2026 (Actuarial engine optimization — Web Worker support, 100K iter simulation, Health/Life/Business policy integration, adapter cleanup)
+- **Last Updated**: March 1, 2026 (Actuarial engine Web Worker admin UI, confidence interval DB storage, and Recharts historical trend visualization)
 
 ---
 
@@ -163,6 +163,7 @@ insurai/
 | `src/components/PolicyDiffViewer.tsx` | Visual diff for policy changes |
 | `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | **UPDATED** Main nav with Globe language picker, auth state, direct upload |
+| `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **NEW** Recharts-based actuarial score historical trend visualization |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
 | `src/components/TryAnalysis.tsx` | **UPDATED** Anonymous free trial analysis with ProcessingLogger (Feb 25, 2026) |
 | `src/components/WelcomeOnboarding.tsx` | **NEW** First-time user onboarding with 3-step guide and drag-drop upload (Feb 25, 2026) |
@@ -305,6 +306,7 @@ insurai/
 | `supabase/migrations/024_processing_log_cleanup_cron.sql` | **NEW** pg_cron job for 90-day processing log auto-cleanup |
 | `supabase/migrations/025_monitoring_retention_config.sql` | **NEW** Monitoring/retention config seeds + configurable pg_cron cleanup functions |
 | `supabase/migrations/026_cron_monitoring_views.sql` | **NEW** Secure views around pg_cron extensions for UI monitoring |
+| `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** Actuarial Web Worker settings and historical confidence bounds |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -5076,6 +5078,10 @@ connectSrc: [
 - It is imported and rendered inside `ActuarialTab.tsx`, not the SettingsTab
 - Import path: `import EvidenceCoveragePanel from './settings/EvidenceCoveragePanel'`
 
+**Shadcn NPM Cache Pollution (Gotcha Mar 1, 2026):**
+- When attempting to install `shadcn-ui` components like `switch` and `label`, NPM cache pollution or missing registry configurations can cause failures requiring `--legacy-peer-deps` or manual component file creation.
+- **Workaround:** For standard primitive components without complex third-party dependencies, copying the raw component `tsx` logic into `src/components/ui/*.tsx` avoids registry download locks and completes the task cleanly.
+
 ---
 
 ## CI/CD
@@ -5143,7 +5149,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,888 tests, 15,886 passing (335 test files), 1 known flaky failure in `extraction-retry-branches.test.ts:1057`, ~92.5% line coverage
+**Tests**: 15,960 tests, 15,958 passing (335 test files), 1 known pre-existing flaky failure, ~91.67% statements coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: March 1, 2026 (Actuarial engine production deployment, adapter exclusion cleanup, follow-up review confirming event bus wiring complete)
+**Last Updated**: March 1, 2026 (Actuarial UI Admin Integration, Web Worker Settings wired, Historical Trend CI Chart components merged, 0 warnings)

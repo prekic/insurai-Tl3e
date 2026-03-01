@@ -258,6 +258,103 @@ export function evaluateAndRankPolicies(
   return evaluations
 }
 
+/**
+ * Evaluates and ranks multiple policies asynchronously using the full pipeline + TOPSIS.
+ * Utilizes Web Workers for Monte Carlo simulations if enabled.
+ *
+ * @param policies - Array of actuarial policy inputs
+ * @param options - Evaluation options (optional)
+ * @returns Promise resolving to an array of PolicyEvaluationResult with TOPSIS rankings
+ */
+export async function evaluateAndRankPoliciesAsync(
+  policies: ActuarialPolicyInput[],
+  options?: ActuarialEvaluationOptions
+): Promise<PolicyEvaluationResult[]> {
+  // Step 1: Evaluate each policy individually (in parallel)
+  const evalPromises = policies.map((policy) => runFullEvaluationAsync(policy, options))
+  const evaluations = await Promise.all(evalPromises)
+
+  // Step 2: Build TOPSIS inputs for eligible policies
+  const eligiblePolicies: Array<{
+    index: number
+    evaluation: PolicyEvaluationResult
+    policy: ActuarialPolicyInput
+  }> = []
+
+  for (let i = 0; i < evaluations.length; i++) {
+    if (evaluations[i].eligible) {
+      eligiblePolicies.push({
+        index: i,
+        evaluation: evaluations[i],
+        policy: policies[i],
+      })
+    }
+  }
+
+  if (eligiblePolicies.length <= 1 || options?.skipRanking) {
+    // Single policy or ranking skipped — return without TOPSIS
+    return evaluations
+  }
+
+  // Step 3: Build TOPSIS decision matrix
+  const topsisInputs: TOPSISPolicyInput[] = eligiblePolicies.map(({ policy, evaluation }) => {
+    const includedCodes = new Set(policy.coverages.filter((c) => c.included).map((c) => c.code))
+
+    const coverageBreadth = computeCoverageBreadthScore(includedCodes)
+
+    const deductibleExposure = computeDeductibleExposure(
+      policy.coverages.map((c) => ({
+        code: c.code,
+        deductibleAmount: resolveDeductibleAmount(c.deductible?.value),
+        limitAmount: resolveLimitAmount(c.limit?.value),
+        included: c.included,
+      }))
+    )
+
+    const complianceScore = computeComplianceScore(
+      evaluation.eligible,
+      evaluation.warnings.length,
+      evaluation.blockingReasons.length
+    )
+
+    return {
+      policyId: policy.policyId,
+      values: {
+        eoop: evaluation.expectedOutOfPocket.expectedCost.amount,
+        premium: policy.premium.amount,
+        coverage_breadth: coverageBreadth,
+        compliance_score: complianceScore,
+        contract_quality: evaluation.contractQualityScore,
+        deductible_exposure: deductibleExposure,
+      },
+    }
+  })
+
+  // Step 4: Run TOPSIS
+  const layerDStart = performance.now()
+  const topsisResults = rankPolicies(topsisInputs, DEFAULT_TOPSIS_CRITERIA)
+  const layerD_ms = performance.now() - layerDStart
+
+  // Step 5: Map TOPSIS results back to evaluations
+  for (const topsisResult of topsisResults) {
+    const ep = eligiblePolicies.find(({ policy }) => policy.policyId === topsisResult.policyId)
+    if (ep) {
+      evaluations[ep.index].ranking = {
+        topsisCloseness: topsisResult.closeness,
+        rank: topsisResult.rank,
+        grade: closenessToGrade(topsisResult.closeness),
+      }
+      // Add Layer D timing to each eligible evaluation
+      const timings = evaluations[ep.index].layerTimings
+      if (timings) {
+        timings.layerD_ms = layerD_ms
+      }
+    }
+  }
+
+  return evaluations
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────────────
