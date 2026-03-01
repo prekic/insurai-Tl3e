@@ -182,6 +182,10 @@ router.post('/evaluation-results', async (req: Request, res: Response) => {
       topsisGrade: body.topsisGrade,
       needsReview: body.needsReview ?? false,
       durationMs: body.durationMs,
+      layerAMs: body.layerAMs,
+      layerBMs: body.layerBMs,
+      layerCMs: body.layerCMs,
+      layerDMs: body.layerDMs,
       monteCarloLowerBound: body.monteCarloLowerBound,
       monteCarloUpperBound: body.monteCarloUpperBound,
     })
@@ -259,6 +263,59 @@ router.patch('/feature-flag', async (req: Request, res: Response) => {
       error: error instanceof Error ? error.message : String(error),
     })
     res.status(500).json({ success: false, error: 'Failed to update feature flag' })
+  }
+})
+
+/**
+ * GET /api/admin/actuarial/performance-metrics
+ * Retrieves metrics such as average Monte Carlo execution time over the last 24h.
+ */
+router.get('/performance-metrics', async (_req: Request, res: Response) => {
+  try {
+    const { client: supabase, error: dbError } = getSupabaseWithError()
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+    }
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+    const { data, error } = await supabase
+      .from('actuarial_evaluation_runs')
+      .select('layer_c_ms, duration_ms')
+      .gte('completed_at', twentyFourHoursAgo)
+      .not('layer_c_ms', 'is', null)
+
+    if (error) throw error
+
+    let totalLayerCMs = 0
+    let totalDurationMs = 0
+    let count = 0
+
+    for (const run of data || []) {
+      if (run.layer_c_ms != null) {
+        totalLayerCMs += Number(run.layer_c_ms)
+        totalDurationMs += Number(run.duration_ms) || 0
+        count++
+      }
+    }
+
+    const avgLayerCMs = count > 0 ? Math.round(totalLayerCMs / count) : null
+    const avgDurationMs = count > 0 ? Math.round(totalDurationMs / count) : null
+
+    res.json({
+      success: true,
+      data: {
+        avgLayerCMs,
+        avgDurationMs,
+        sampleSize: count,
+        timeframe: '24h',
+      },
+    })
+  } catch (error) {
+    log.error('Error fetching performance metrics', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ success: false, error: 'Failed to fetch performance metrics' })
   }
 })
 

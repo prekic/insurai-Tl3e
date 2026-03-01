@@ -36,6 +36,14 @@ export interface PersistEvaluationInput {
   monteCarloLowerBound?: number
   /** Monte Carlo 95th percentile upper bound */
   monteCarloUpperBound?: number
+  /** Layer A Duration */
+  layerAMs?: number
+  /** Layer B Duration */
+  layerBMs?: number
+  /** Layer C Duration */
+  layerCMs?: number
+  /** Layer D Duration */
+  layerDMs?: number
 }
 
 /**
@@ -61,6 +69,10 @@ export async function persistEvaluationResult(
         policy_id: input.policyId,
         status: 'completed',
         duration_ms: input.durationMs,
+        layer_a_ms: input.layerAMs,
+        layer_b_ms: input.layerBMs,
+        layer_c_ms: input.layerCMs,
+        layer_d_ms: input.layerDMs,
         completed_at: new Date().toISOString(),
       })
       .select('id')

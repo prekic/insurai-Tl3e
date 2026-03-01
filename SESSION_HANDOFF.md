@@ -12,7 +12,7 @@
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
 | **Branch** | `gemini20260301` |
-| **Production Status** | **Actuarial Engine Admin UI & DB Integration Complete**; Web Worker iteration config wired to Admin Settings UI; Monte Carlo confidence bounds tracking added to DB; Historical Trend Chart (Recharts) integrated seamlessly into PolicyDetailView. |
+| **Production Status** | **Actuarial Engine Admin UI & DB Integration Complete**; Web Worker iteration config wired to Admin Settings UI; Historical Trend Chart (Recharts) integrated; **Granular layer timings natively persisted to DB and integrated into Admin Settings UI for real-time visualization.** |
 
 ---
 
@@ -33,6 +33,11 @@
   - Embedded the chart directly inside the `PolicyDetailView` results panel.
   - Fixed an unauthenticated data fetch bug by routing requests through `adminFetch`.
   - Added a secondary Y-axis with `Intl.NumberFormat` compact formatting to prevent UI clipping on large values.
+- **Performance Profiling & Telemetry**:
+  - `20260301170937_actuarial_layer_timings.sql` added `layer_a_ms` through `layer_d_ms` to `actuarial_evaluation_runs`.
+  - `GET /api/admin/actuarial/performance-metrics` created to fetch rolling average evaluation duration metrics over the last 24h.
+  - `EvaluationSettingsPanel` now reads and displays actual worker simulation timings directly next to the iteration slider using the new metrics endpoint.
+  - `ProcessingLogger` completely wired to log the `actuarial_evaluation` stage during standard policy document ingestion flows.
 
 ---
 
@@ -40,8 +45,8 @@
 
 | File | Change |
 |--------------|--------|
-| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle and scalable iteration slider (up to 250k) |
-| `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** — DB config map and Historical confidence columns |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle, scalable iteration slider, and real-time performance feedback |
+| `supabase/migrations/20260301170937_actuarial_layer_timings.sql` | **NEW** — Granular layer timings for actuarial evaluation |
 | `src/lib/config/types.ts` | **UPDATED** — Added worker configuration properties |
 | `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Wired worker config properties mapping for dynamic async evaluations |
 | `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **UPDATED** — Recharts visualization with dual-axis mapping and adminFetch integration |
@@ -94,4 +99,4 @@
 | Feb 28 late | P1/P2/P3/P5: Event bus wiring, persistence service, feature flag API | `gemini202602281715` |
 | Mar 1 early | Phase 7: Production deployment (Migration 028 + Feature Flag) | `gemini202603010814` |
 | Mar 1 late | Phase 8: Optimization (Web Worker) & Expansion (Health/Life/Business Policy Support) | `gemini20260301` |
-| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini20260301`** |
+| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini202603011952`** |
