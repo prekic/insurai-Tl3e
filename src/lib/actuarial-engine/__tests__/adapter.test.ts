@@ -45,7 +45,7 @@ function makePolicy(overrides: Partial<AnalyzedPolicy> = {}): AnalyzedPolicy {
         included: true,
       },
     ],
-    exclusions: [{ text: 'Racing excluded', severity: 'critical' }],
+    exclusions: ['Racing excluded'],
     aiConfidence: 0.92,
     aiInsights: ['Good coverage'],
     ...overrides,
@@ -268,12 +268,9 @@ describe('mapAnalyzedToActuarialInput', () => {
   // ---------------------------------------------------------------------------
 
   describe('exclusions', () => {
-    it('maps exclusion text strings correctly', () => {
+    it('maps exclusion strings correctly', () => {
       const policy = makePolicy({
-        exclusions: [
-          { text: 'Racing excluded', severity: 'critical' },
-          { text: 'War excluded', severity: 'normal' },
-        ],
+        exclusions: ['Racing excluded', 'War excluded'],
       })
 
       const result = mapAnalyzedToActuarialInput(policy)

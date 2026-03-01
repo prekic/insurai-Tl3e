@@ -62,9 +62,10 @@
 - `recordEvaluationTiming()` is now called via event bus from both `PolicyDetailView` and `ComparePolicies`
 - `setLastEvalResult` is now wired to real evaluation data from the event bus
 
-### Gotcha: adapter.ts Exclusions Defensive Cast
-- `adapter.ts` uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` because `AnalyzedPolicy.exclusions` is typed `string[]` but some test data/extractions pass objects with `.text`
-- The proper long-term fix is to normalize exclusions in `policy-extractor.ts` at extraction time
+### ~~Gotcha: adapter.ts Exclusions Defensive Cast~~ ✅ RESOLVED
+- Removed defensive `(e: unknown)` cast from `adapter.ts` — `AnalyzedPolicy.exclusions` is typed `string[]` and `policy-extractor.ts` always produces `string[]`
+- Fixed test data in `adapter.test.ts` that violated the type contract by passing objects instead of strings
+- Adapter now uses direct passthrough `policy.exclusions || []`
 
 ### Gotcha: Event Bus Module-Level State
 - The timing ring buffer and `lastEvalResult` use module-level state in `ActuarialTab.tsx` — works for the admin SPA but does not survive page reload
