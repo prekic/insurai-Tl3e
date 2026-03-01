@@ -50,6 +50,7 @@
   - Wired `checkActuarialHealth` into `server/services/notification-service.ts`.
   - Polled natively from the Admin `/api/admin/monitoring/health` pulse endpoints.
   - Automatically dispatches Push Notifications to Admin devices if rolling 24h failure rates exceed 5%.
+  - Added debounce timers (5m DB check, 1h alert span) to prevent WebPush spamming.
 - **Admin Configuration Web UI & Trend Analytics**:
   - Implemented the `ActuarialAnalyticsTab` UI using Recharts for daily latency vs. completion bounds.
 

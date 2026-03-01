@@ -5087,6 +5087,10 @@ connectSrc: [
 **Admin API Endpoint Native Fetching Bug (Gotcha Mar 1, 2026):**
 - Components under the `/admin/*` routing umbrella or any page relying on admin-only data must ALWAYS use the `adminFetch` utility from `@/lib/admin/api`. Standard `fetch` calls will fail with `401 Unauthorized` randomly because they do not correctly hook the supabase JWT bearer tokens into the request headers. Do NOT use `fetch()` for internal admin API calls.
 
+**Notification Spam via Monitoring Polling (Gotcha Mar 1, 2026):**
+- System health limits like `/api/admin/monitoring/health` are hit very frequently by LoadBalancers or the UI. Triggering actions like PUSH notifications (`checkActuarialHealth`) inline with these endpoints will spam users and thrash the Database without internal debounce state tracking.
+- **Workaround:** Implemented memory-based debounce checkpoints `ACTUARIAL_CHECK_COOLDOWN_MS` (5m DB caching) and `ACTUARIAL_ALERT_COOLDOWN_MS` (1h notification cap).
+
 ---
 
 ## CI/CD
