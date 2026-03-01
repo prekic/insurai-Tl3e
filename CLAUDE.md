@@ -5050,12 +5050,11 @@ connectSrc: [
 - The `nixpacks.toml` and `railway.json` must stay in sync — both define install/build/start commands. `nixpacks.toml` takes precedence when present.
 
 **Actuarial Engine — Deployed & Enabled (Mar 1, 2026):**
-- Migration `028_actuarial_engine_schema.sql` applied to production Supabase: 6 tables created, 4 config sets seeded
-- Feature flag `actuarial_engine_enabled` is **enabled** (rollout_percentage: 100)
-- The actuarial engine at `src/lib/actuarial-engine/` is fully operational and integrated into the UI pipeline
-- Admin configuration UI available at Admin Dashboard → "Actuarial Engine" tab (`ActuarialTab.tsx`)
-- **Trial Restriction**: The actuarial engine's UI is explicitly hidden from anonymous/free trial users via `isTrialResult` check in `PolicyDetailView.tsx`
-- **100% Admin API Coverage**: All actuarial admin routes in `server/routes/admin/actuarial.ts` are covered by 26 passing tests in `admin-actuarial-routes.test.ts`
+- Migration `028_actuarial_engine_schema.sql` applied to production Supabase.
+- **6 tables created**: `policy_extractions`, `extraction_evidence`, `actuarial_config_sets`, `actuarial_config_set_versions`, `actuarial_evaluation_runs`, `actuarial_evaluation_results`.
+- 4 config sets seeded: `monte_carlo_defaults`, `topsis_criteria_defaults`, `kasko_scenarios`, `compliance_rules`.
+- Feature flag `actuarial_engine_enabled` is **enabled** (rollout_percentage: 100).
+- **100% Admin API Coverage**: All routes in `server/routes/admin/actuarial.ts` covered by 26 passing tests.
 
 **Actuarial Timing Ring Buffer — Not Yet Wired (Feb 28, 2026):**
 - `recordEvaluationTiming()` is exported from `ActuarialTab.tsx` but not yet called from `ComparePolicies.tsx` or `PolicyDetailView.tsx`
@@ -5069,6 +5068,11 @@ connectSrc: [
 - `AnalyzedPolicy.exclusions` is typed as `string[]`, but some test data and real extractions pass objects with `.text` property
 - The mapping uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` to handle both formats
 - If this pattern causes issues with future type changes, the proper fix is to normalize exclusions in `policy-extractor.ts` at extraction time
+
+**Actuarial Test Mock Path Quirk (Added Mar 1, 2026):**
+- Tests in `server/__tests__/admin-actuarial-routes.test.ts` must mock `../services/actuarial-persistence.js`.
+- Using `../../services/...` (relative to the router it tests) will fail in Vitest since the mock must match the path *relative to the test file itself*.
+- Always verify mock resolution if `AssertionError: expected 500 to be 200` occurs in admin route tests.
 
 **EvidenceCoveragePanel — Nested Under `/settings/` Path (Feb 28, 2026):**
 - `EvidenceCoveragePanel.tsx` lives at `src/components/admin/tabs/settings/EvidenceCoveragePanel.tsx` (alongside other settings panels), NOT directly in `tabs/`

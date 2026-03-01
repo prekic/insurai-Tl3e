@@ -20,6 +20,7 @@
 
 ### Phase 7 — Production Deployment (March 1, 2026)
 - **Applied Migration 028**: Successfully applied `028_actuarial_engine_schema.sql` to the production Supabase instance (`exykhfulkbwzatpesruv`).
+  - **6 tables created**: `policy_extractions`, `extraction_evidence`, `actuarial_config_sets`, `actuarial_config_set_versions`, `actuarial_evaluation_runs`, `actuarial_evaluation_results`.
 - **Feature Flag Enabled**: Enabled `actuarial_engine_enabled` with `rollout_percentage: 100` via direct database update.
 - **Database Verification**: Confirmed presence of 6 new tables and verification of seeded configuration sets.
 - **Test Coverage Extension**: Added 14 new tests to `server/__tests__/admin-actuarial-routes.test.ts`, achieving 100% endpoint coverage for actuarial admin routes (26 tests total).
