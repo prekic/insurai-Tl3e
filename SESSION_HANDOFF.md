@@ -1,4 +1,4 @@
-# Session Handoff — March 1, 2026 (Actuarial Engine Production Deployment)
+# Session Handoff — March 1, 2026 (Follow-Up Review & Adapter Cleanup)
 
 ## Current Status
 
@@ -11,38 +11,39 @@
 | **Tests** | 15,888 tests (15,886 passing, 335 files, 1 pre-existing flaky failure) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini202603010814` |
-| **Production Status** | **Actuarial Engine Deployed & Enabled**; 028 applied; feature flag flipped; full admin API test coverage. |
+| **Branch** | `claude/load-project-context-x62uW` |
+| **Production Status** | **Actuarial Engine Deployed & Enabled**; migration 028 applied; feature flag enabled at 100%; all follow-up items resolved. |
 
 ---
 
 ## Session Summary
 
-### Phase 7 — Production Deployment (March 1, 2026)
-- **Applied Migration 028**: Successfully applied `028_actuarial_engine_schema.sql` to the production Supabase instance (`exykhfulkbwzatpesruv`).
-  - **6 tables created**: `policy_extractions`, `extraction_evidence`, `actuarial_config_sets`, `actuarial_config_set_versions`, `actuarial_evaluation_runs`, `actuarial_evaluation_results`.
-- **Feature Flag Enabled**: Enabled `actuarial_engine_enabled` with `rollout_percentage: 100` via direct database update.
-- **Database Verification**: Confirmed presence of 6 new tables and verification of seeded configuration sets.
-- **Test Coverage Extension**: Added 14 new tests to `server/__tests__/admin-actuarial-routes.test.ts`, achieving 100% endpoint coverage for actuarial admin routes (26 tests total).
-- **Full Validation**: Executed `npm run validate` confirming 15,886 tests pass across 335 test files.
+### Follow-Up Review & Adapter Cleanup (March 1, 2026)
+
+Investigated 4 follow-up items flagged in the previous session's handoff. Found 1 actionable cleanup and 3 items already complete:
+
+1. **adapter.ts Exclusions Cleanup** ✅ — Removed unnecessary defensive `(e: unknown)` cast from `adapter.ts:176`. `AnalyzedPolicy.exclusions` is typed `string[]` and `policy-extractor.ts` always produces `string[]`. Fixed test data in `adapter.test.ts` that violated the type contract by passing objects instead of strings. Adapter now uses direct passthrough `policy.exclusions || []`.
+
+2. **Timing Ring Buffer Wiring** — Already complete. `recordEvaluationTiming()` is called internally via the event bus subscriber in `ActuarialTab.tsx` (line 59). `setLastEvalResult` is wired to real evaluation data from the same subscriber (line 62). Data flow: `PolicyDetailView`/`ComparePolicies` → `emitEvaluation()` → event bus → `ActuarialTab` subscriber.
+
+3. **ComparePolicies / PolicyDetailView Timing Calls** — Already complete. Both components call `emitEvaluation()` after evaluation, which triggers the ActuarialTab subscriber that internally handles timing recording. Direct calls to `recordEvaluationTiming()` are unnecessary.
+
+4. **Admin Actuarial Routes Mock Path** — Correct, no bug. The mock path `../services/actuarial-persistence.js` resolves correctly relative to the test file. All 26 tests pass.
+
+### P4 & P6 — Noted as Future Roadmap
+- **P4 (Health/Life/Business Policy Support)**: Extend actuarial engine to support health, life, business policy types with type-specific compliance gates and scenario sets. Not started.
+- **P6 (Monte Carlo Performance Benchmarking)**: Profile simulation at 1K/10K/100K iterations; Web Worker offloading for UI responsiveness. Feasibility confirmed (engine is pure JS, zero DOM/React deps, JSON-serializable I/O). Not started.
 
 ---
 
-## Files Modified/Created This Session
+## Files Modified This Session
 
 | File | Change |
 |------|--------|
-| `src/lib/actuarial-engine/actuarial-events.ts` | **NEW** — Pub/sub event bus + fire-and-forget persistence |
-| `src/lib/actuarial-engine/index.ts` | Added `mapAnalyzedToActuarialInput` to barrel export |
-| `src/lib/actuarial-engine/__tests__/actuarial-events.test.ts` | **NEW** — 8 tests for event bus |
-| `src/lib/actuarial-engine/__tests__/adapter-integration.test.ts` | **NEW** — 18 integration tests |
-| `src/lib/policy-evaluation/types.ts` | Added `actuarialResults?: PolicyEvaluationResult[]` to `PolicyComparison` |
-| `src/lib/policy-evaluation/comparator.ts` | Pass `actuarialResults` through on return object |
-| `src/components/PolicyDetailView.tsx` | Import from barrel, emit evaluation events via `useEffect` |
-| `src/components/ComparePolicies.tsx` | Import `emitEvaluation`, emit timing events per compared policy |
-| `src/components/admin/tabs/ActuarialTab.tsx` | Subscribe to event bus, replace `_setLastEvalResult` with real data flow |
-| `server/services/actuarial-persistence.ts` | **NEW** — Persist evaluation results to DB |
-| `server/routes/admin/actuarial.ts` | 3 new endpoints: POST/GET evaluation-results, PATCH feature-flag |
+| `src/lib/actuarial-engine/adapter.ts` | Simplified exclusion mapping: removed `(e: unknown)` cast, now `policy.exclusions \|\| []` |
+| `src/lib/actuarial-engine/__tests__/adapter.test.ts` | Fixed `makePolicy()` helper to use `string[]` exclusions; fixed exclusion test data |
+| `SESSION_HANDOFF.md` | Updated to reflect resolved gotchas |
+| `CLAUDE.md` | Marked timing ring buffer and adapter exclusion gotchas as resolved |
 
 ---
 
@@ -57,14 +58,6 @@
 - Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `adapter.ts` converts from `AnalyzedPolicy`
 - Always import from `@/lib/actuarial-engine` barrel, never from individual layer files
 - **Trial Restriction**: Actuarial UI hidden from anonymous/free trial users via `isTrialResult` check
-
-### ~~Gotcha: Timing Ring Buffer Not Yet Wired~~ ✅ RESOLVED
-- `recordEvaluationTiming()` is now called via event bus from both `PolicyDetailView` and `ComparePolicies`
-- `setLastEvalResult` is now wired to real evaluation data from the event bus
-
-### Gotcha: adapter.ts Exclusions Defensive Cast
-- `adapter.ts` uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` because `AnalyzedPolicy.exclusions` is typed `string[]` but some test data/extractions pass objects with `.text`
-- The proper long-term fix is to normalize exclusions in `policy-extractor.ts` at extraction time
 
 ### Gotcha: Event Bus Module-Level State
 - The timing ring buffer and `lastEvalResult` use module-level state in `ActuarialTab.tsx` — works for the admin SPA but does not survive page reload
@@ -87,14 +80,14 @@ No new env vars needed. All changes extend existing actuarial engine infrastruct
 
 ## Priority Next Steps
 
-### P4 — Health/Life/Business Policy Support
+### P4 — Health/Life/Business Policy Support (Future)
 1. Add policy type support for health, life, business in actuarial engine
 2. Create type-specific compliance gates and scenario sets
-3. Extend adapter.ts coverage mapping for non-motor types
+3. Extend `adapter.ts` coverage mapping for non-motor types
 
-### P6 — Monte Carlo Performance Benchmarking
+### P6 — Monte Carlo Performance Benchmarking (Future)
 1. Profile Monte Carlo simulation with varying iteration counts (1K, 10K, 100K)
-2. Consider Web Worker offloading for large multi-policy comparisons
+2. Web Worker offloading for large multi-policy comparisons (feasibility confirmed — engine is pure JS, zero DOM deps)
 
 ---
 
@@ -110,4 +103,5 @@ No new env vars needed. All changes extend existing actuarial engine infrastruct
 | Feb 28 early | Actuarial engine (4-layer), admin config UI, deployment hardening, output eval tests (162) | `gemini20260228` |
 | Feb 28 mid | P3 observability: LayerTimings instrumentation, evidence coverage dashboard, 14 new regression tests | `claude/load-project-context-uRxsB` |
 | Feb 28 late | P1/P2/P3/P5: Event bus wiring, persistence service, feature flag API, 26 tests | `gemini202602281715` |
-| **Mar 1 (Current)** | **Phase 7: Production deployment (Migration 028 + Feature Flag), 26 passing actuarial tests** | **`gemini202603010814`** |
+| Mar 1 early | Phase 7: Production deployment (Migration 028 + Feature Flag), 26 passing actuarial tests | `gemini202603010814` |
+| **Mar 1 late (Current)** | **Follow-up review: adapter exclusion cleanup, confirmed event bus wiring complete, P4/P6 noted as roadmap** | **`claude/load-project-context-x62uW`** |

@@ -173,9 +173,7 @@ export function mapAnalyzedToActuarialInput(policy: AnalyzedPolicy): ActuarialPo
     effectiveDate: policy.startDate,
     expiryDate: policy.expiryDate,
     coverages: policy.coverages.map(mapCoverageToCanonical),
-    exclusionTexts: (policy.exclusions || []).map((e: unknown) =>
-      typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))
-    ),
+    exclusionTexts: policy.exclusions || [],
     indemnityMechanics,
     insuredValue: insuredValueAmount > 0 ? toMoney(insuredValueAmount, policy.currency) : undefined,
   }
