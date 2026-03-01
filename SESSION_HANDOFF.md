@@ -1,4 +1,4 @@
-# Session Handoff — March 1, 2026 (Actuarial Engine Production Deployment)
+# Session Handoff — March 1, 2026 (Actuarial Engine Optimization & Expansion)
 
 ## Current Status
 
@@ -7,74 +7,63 @@
 | **Build** | Passing |
 | **TypeCheck** | 0 errors (frontend + server) |
 | **ESLint Errors** | 0 errors |
-| **ESLint Warnings** | 0 warnings |
-| **Tests** | 15,888 tests (15,886 passing, 335 files, 1 pre-existing flaky failure) |
-| **Coverage** | ~91.67% statements, ~85.91% branches |
-| **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini202603010814` |
-| **Production Status** | **Actuarial Engine Deployed & Enabled**; 028 applied; feature flag flipped; full admin API test coverage. |
+| **ESLint Warnings** | 1 warning (worker `any`) |
+| **Tests** | 112 tests passing (src/lib/actuarial-engine) |
+| **Coverage** | 100% endpoint coverage for actuarial admin routes |
+| **Branch** | `202603011045` |
+| **State** | **Health/Life/Business Support Integrated**; Web Worker offloading functional; 100K iter simulation verified. |
 
 ---
 
 ## Session Summary
 
-### Phase 7 — Production Deployment (March 1, 2026)
-- **Applied Migration 028**: Successfully applied `028_actuarial_engine_schema.sql` to the production Supabase instance (`exykhfulkbwzatpesruv`).
-  - **6 tables created**: `policy_extractions`, `extraction_evidence`, `actuarial_config_sets`, `actuarial_config_set_versions`, `actuarial_evaluation_runs`, `actuarial_evaluation_results`.
-- **Feature Flag Enabled**: Enabled `actuarial_engine_enabled` with `rollout_percentage: 100` via direct database update.
-- **Database Verification**: Confirmed presence of 6 new tables and verification of seeded configuration sets.
-- **Test Coverage Extension**: Added 14 new tests to `server/__tests__/admin-actuarial-routes.test.ts`, achieving 100% endpoint coverage for actuarial admin routes (26 tests total).
-- **Full Validation**: Executed `npm run validate` confirming 15,886 tests pass across 335 test files.
+### Phase 8 — Optimization & Expansion (March 1, 2026)
+- **New Policy Type Integration**:
+  - Implemented support for `health`, `life`, and `business` policy types in the actuarial engine.
+  - Created type-specific compliance gates (`health-rules.ts`, `life-rules.ts`, `business-rules.ts`).
+  - Expanded `scenario-library.ts` with dedicated risk scenarios for all new policy types.
+- **Monte Carlo Performance Optimization**:
+  - Implemented **Web Worker** (`actuarial.worker.ts`) for asynchronous simulation offloading.
+  - Optimized engine to handle up to **100,000 iterations** efficiently.
+  - Added async evaluation path in `engine.ts` with graceful fallback to main-thread.
+- **Adapter & Mapping Hardening**:
+  - Extended `adapter.ts` to map Turkish insurance terms (e.g., 'Yatarak Tedavi' → `INPATIENT`) and complex policy types.
+  - Fixed regressions in `ZAS/DASK` scenario mapping and policy type passthrough.
+- **Testing & Verification**:
+  - Created 21 new integration tests in `adapter-integration.test.ts`.
+  - Added unit tests for new policy rules and Web Worker message passing.
+  - Verified 112 total tests in the actuarial engine suite are passing.
 
 ---
 
 ## Files Modified/Created This Session
 
 | File | Change |
-|------|--------|
-| `src/lib/actuarial-engine/actuarial-events.ts` | **NEW** — Pub/sub event bus + fire-and-forget persistence |
-| `src/lib/actuarial-engine/index.ts` | Added `mapAnalyzedToActuarialInput` to barrel export |
-| `src/lib/actuarial-engine/__tests__/actuarial-events.test.ts` | **NEW** — 8 tests for event bus |
-| `src/lib/actuarial-engine/__tests__/adapter-integration.test.ts` | **NEW** — 18 integration tests |
-| `src/lib/policy-evaluation/types.ts` | Added `actuarialResults?: PolicyEvaluationResult[]` to `PolicyComparison` |
-| `src/lib/policy-evaluation/comparator.ts` | Pass `actuarialResults` through on return object |
-| `src/components/PolicyDetailView.tsx` | Import from barrel, emit evaluation events via `useEffect` |
-| `src/components/ComparePolicies.tsx` | Import `emitEvaluation`, emit timing events per compared policy |
-| `src/components/admin/tabs/ActuarialTab.tsx` | Subscribe to event bus, replace `_setLastEvalResult` with real data flow |
-| `server/services/actuarial-persistence.ts` | **NEW** — Persist evaluation results to DB |
-| `server/routes/admin/actuarial.ts` | 3 new endpoints: POST/GET evaluation-results, PATCH feature-flag |
+|--------------|
+| `src/lib/actuarial-engine/types.ts` | Expanded `ActuarialPolicyType` and coverage interfaces |
+| `src/lib/actuarial-engine/adapter.ts` | **UPDATED** — Mapping logic for new types and Turkish coverages |
+| `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Integrated Web Worker and async evaluation logic |
+| `src/lib/actuarial-engine/actuarial.worker.ts` | **NEW** — Worker entry point for Monte Carlo simulations |
+| `src/lib/actuarial-engine/layer-c/scenario-library.ts` | **UPDATED** — Added scenarios for Health (8), Life (5), Business (9) |
+| `src/lib/actuarial-engine/layer-c/compliance-gate.ts` | **UPDATED** — Integrated new type-specific rule sets |
+| `src/lib/actuarial-engine/layer-b/rules/*` | **NEW** — `health-rules.ts`, `life-rules.ts`, `business-rules.ts`, `dask-rules.ts`, `seddk-rules.ts` |
+| `scripts/profile-actuarial-engine.ts` | **NEW** — Benchmarking script for Monte Carlo performance |
+| `src/lib/actuarial-engine/__tests__/*` | **NEW/UPDATED** — Integration and regression test suites |
+| `docs/adr/015-actuarial-engine-web-worker.md` | **NEW** — ADR documenting the worker implementation |
 
 ---
 
 ## Known Issues
 
-### Pre-Existing (unchanged)
-- **Flaky `window is not defined`**: React 19 + Vitest concurrency race in `PolicyUpload.test.tsx` — passes individually, harmless in parallel
-- **Service worker cache**: After deploying, users may need hard refresh. Current `CACHE_VERSION = v20`
-- **Flaky `PolicyUpload-coverage.test.tsx:1057`**: `toHaveBeenCalledTimes(4)` assertion intermittently fails — pre-existing, unrelated to actuarial changes
+### Gotcha: Worker Environment
+- Web Worker requires `Vite` worker bundling. Local `vitest` mocks the worker but production uses the real worker thread.
+- **Date Handling**: Tests revealed expired policy dates can break scoring; `mockPolicy` generators now use dynamic dates relative to `new Date()`.
 
-### Gotcha: Actuarial Engine Integration
-- Engine uses its own type system (`CanonicalCoverage` codes, `EvidencePointer`, `IndemnityMechanics`) — `adapter.ts` converts from `AnalyzedPolicy`
-- Always import from `@/lib/actuarial-engine` barrel, never from individual layer files
-- **Trial Restriction**: Actuarial UI hidden from anonymous/free trial users via `isTrialResult` check
+### Gotcha: ZAS vs DASK Mapping
+- `ZAS` (Mandatory Earthquake Insurance for small businesses) now correctly inherits `DASK` scenarios in addition to its own.
 
-### ~~Gotcha: Timing Ring Buffer Not Yet Wired~~ ✅ RESOLVED
-- `recordEvaluationTiming()` is now called via event bus from both `PolicyDetailView` and `ComparePolicies`
-- `setLastEvalResult` is now wired to real evaluation data from the event bus
-
-### Gotcha: adapter.ts Exclusions Defensive Cast
-- `adapter.ts` uses `(e: unknown) => typeof e === 'string' ? e : ((e as { text?: string })?.text ?? String(e))` because `AnalyzedPolicy.exclusions` is typed `string[]` but some test data/extractions pass objects with `.text`
-- The proper long-term fix is to normalize exclusions in `policy-extractor.ts` at extraction time
-
-### Gotcha: Event Bus Module-Level State
-- The timing ring buffer and `lastEvalResult` use module-level state in `ActuarialTab.tsx` — works for the admin SPA but does not survive page reload
-- `persistToServer()` in the event bus sends data to DB, enabling historical retrieval via the admin API
-
-### Gotcha: Alert Service Test Mocks
-- Any test importing `server/routes/ai.ts` must mock `server/services/extraction-alert-service.js` and `server/services/config-service.js`
-
-### Gotcha: Nixpacks Auto-Detection
-- Without `nixpacks.toml`, Railway provisions Caddy and Chromium automatically. Always keep `providers = ["node"]`
+### Gotcha: Coverage Passthrough
+- `adapter.ts` now passes through unrecognized coverage types instead of dropping them, which improves "Evidence Coverage" metrics for edge cases.
 
 ---
 
@@ -87,14 +76,13 @@ No new env vars needed. All changes extend existing actuarial engine infrastruct
 
 ## Priority Next Steps
 
-### P4 — Health/Life/Business Policy Support
-1. Add policy type support for health, life, business in actuarial engine
-2. Create type-specific compliance gates and scenario sets
-3. Extend adapter.ts coverage mapping for non-motor types
+### P1 — Admin Dashboard Integration
+1. Wire the Web Worker iteration count setting to the Admin Configuration UI.
+2. Add "Simulation Mode" toggle (Main Thread vs Worker) in Admin Settings.
 
-### P6 — Monte Carlo Performance Benchmarking
-1. Profile Monte Carlo simulation with varying iteration counts (1K, 10K, 100K)
-2. Consider Web Worker offloading for large multi-policy comparisons
+### P2 — Historical Result Visualization
+1. Implement trend charts for actuarial evaluation scores in the Policy Detail view.
+2. Store Monte Carlo confidence intervals in the database for better UI visualization.
 
 ---
 
