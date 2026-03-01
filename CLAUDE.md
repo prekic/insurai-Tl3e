@@ -164,6 +164,7 @@ insurai/
 | `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | **UPDATED** Main nav with Globe language picker, auth state, direct upload |
 | `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **NEW** Recharts-based actuarial score historical trend visualization |
+| `src/components/admin/tabs/ActuarialAnalyticsTab.tsx` | **NEW** Dual-chart (Volume/Latency) Actuarial performance tracking dashboard |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
 | `src/components/TryAnalysis.tsx` | **UPDATED** Anonymous free trial analysis with ProcessingLogger (Feb 25, 2026) |
 | `src/components/WelcomeOnboarding.tsx` | **NEW** First-time user onboarding with 3-step guide and drag-drop upload (Feb 25, 2026) |
@@ -231,8 +232,9 @@ insurai/
 | `server/routes/admin/users.ts` | **NEW** User management routes |
 | `server/routes/admin/prompts.ts` | **NEW** Prompt template CRUD routes |
 | `server/routes/admin/operations.ts` | **NEW** Audit logs, security events routes |
-| `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes |
+| `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes (Actuarial 5% Spikes) |
 | `server/routes/admin/content.ts` | **NEW** Content management routes |
+| `server/routes/admin/actuarial.ts` | **NEW** Real-world Actuarial analytics evaluation metrics backend API |
 | `server/routes/admin/cost.ts` | **NEW** Cost tracking routes |
 | `server/routes/admin/shared.ts` | **NEW** Shared utilities (Supabase client, helpers) |
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |

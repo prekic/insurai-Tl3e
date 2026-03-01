@@ -11,8 +11,8 @@
 | **Tests** | 15,960 tests (15,958 passing, 335 files, 1 pre-existing flaky failure) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini20260301` |
-| **Production Status** | **Actuarial Engine Admin UI & DB Integration Complete**; Web Worker iteration config wired to Admin Settings UI; Historical Trend Chart (Recharts) integrated; **Granular layer timings natively persisted to DB and integrated into Admin Settings UI for real-time visualization.** |
+| **Branch** | `gemini202603011952` |
+| **Production Status** | **Actuarial Engine Analytics & Admin Observability Complete**; Layer A AI Memoization/Caching implemented; Automated E2E Analytics Tests passing; P1 Error Spikes (5% thresholds) bound to Push Notifications; Web Worker iteration config wired to Admin Settings UI; Historical Trend Chart (Recharts) integrated. |
 
 ---
 
@@ -38,6 +38,20 @@
   - `GET /api/admin/actuarial/performance-metrics` created to fetch rolling average evaluation duration metrics over the last 24h.
   - `EvaluationSettingsPanel` now reads and displays actual worker simulation timings directly next to the iteration slider using the new metrics endpoint.
   - `ProcessingLogger` completely wired to log the `actuarial_evaluation` stage during standard policy document ingestion flows.
+
+### Phase 10 — Actuarial Engine Analytics & Observability (March 1, 2026)
+- **Automated E2E Monitoring Coverage**:
+  - `e2e/actuarial-analytics.spec.ts` written using Playwright to test API aggregation functions.
+  - Snapshot bounds asserting `< 5000ms` total latencies and `< 3000ms` layer-specific benchmarks.
+- **Data Caching & Memoization**:
+  - Implemented an LRU `Map` cache inside `layer-a/semantic-exclusions.ts` using `crypto.createHash('sha256')`.
+  - Memoizes duplicate exclusions to bypass redundant evaluations entirely.
+- **Actionable Alarm Subscriptions**:
+  - Wired `checkActuarialHealth` into `server/services/notification-service.ts`.
+  - Polled natively from the Admin `/api/admin/monitoring/health` pulse endpoints.
+  - Automatically dispatches Push Notifications to Admin devices if rolling 24h failure rates exceed 5%.
+- **Admin Configuration Web UI & Trend Analytics**:
+  - Implemented the `ActuarialAnalyticsTab` UI using Recharts for daily latency vs. completion bounds.
 
 ---
 
@@ -84,10 +98,11 @@
 
 ### P1 — General Analytics & Fine-Tuning
 - Actuarial Engine visual components and Web Worker configurations are now fully stable up to 250,000 iterations.
-- Next priority is real-world performance monitoring as users invoke evaluations to assess server stability and cost limitations.
+- Real-world performance monitoring APIs (`/api/admin/actuarial/analytics`) are live.
+- Next priority: Wait for production user data to stream in and monitor the >5% spike push notifications.
 
 ### P2 — Ongoing Optimization
-- Review evaluation logs in Datadog/Supabase to observe average duration bounds.
+- Review evaluation logs in Datadog/Supabase to observe if Layer A hits cache memory accurately or if it requires DB-persistence (Postgres text search vs Node maps).
 
 ---
 

@@ -319,4 +319,109 @@ router.get('/performance-metrics', async (_req: Request, res: Response) => {
   }
 })
 
+/**
+ * GET /api/admin/actuarial/analytics
+ * Retrieves historical analytics including daily buckets and component latencies.
+ */
+router.get('/analytics', async (req: Request, res: Response) => {
+  try {
+    const { client: supabase, error: dbError } = getSupabaseWithError()
+    if (!supabase) {
+      return res.status(503).json({ success: false, error: dbError || 'Database not configured' })
+    }
+
+    const days = Number(req.query.days) || 7
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
+
+    const { data: runs, error } = await supabase
+      .from('actuarial_evaluation_runs')
+      .select(
+        'eligible, status, duration_ms, layer_a_ms, layer_b_ms, layer_c_ms, layer_d_ms, completed_at'
+      )
+      .gte('completed_at', startDate)
+      .order('completed_at', { ascending: true })
+
+    if (error) throw error
+
+    // Process data into daily buckets
+    const dailyBucketsMap = new Map<string, any>()
+    let totalSuccess = 0
+    let totalFailed = 0
+
+    for (const run of runs || []) {
+      if (!run.completed_at) continue
+
+      const dateStr = run.completed_at.split('T')[0]
+      if (!dailyBucketsMap.has(dateStr)) {
+        dailyBucketsMap.set(dateStr, {
+          date: dateStr,
+          total: 0,
+          success: 0,
+          failed: 0,
+          totalDuration: 0,
+          totalA: 0,
+          totalB: 0,
+          totalC: 0,
+          totalD: 0,
+          validDCount: 0,
+        })
+      }
+
+      const bucket = dailyBucketsMap.get(dateStr)
+      bucket.total += 1
+      if (run.eligible) {
+        bucket.success += 1
+        totalSuccess += 1
+      } else {
+        bucket.failed += 1
+        totalFailed += 1
+      }
+
+      bucket.totalDuration += run.duration_ms || 0
+      bucket.totalA += run.layer_a_ms || 0
+      bucket.totalB += run.layer_b_ms || 0
+      bucket.totalC += run.layer_c_ms || 0
+
+      if (run.layer_d_ms != null) {
+        bucket.totalD += run.layer_d_ms
+        bucket.validDCount += 1
+      }
+    }
+
+    const daily_buckets = Array.from(dailyBucketsMap.values()).map((b) => ({
+      date: b.date,
+      total: b.total,
+      success: b.success,
+      failed: b.failed,
+      avg_latency_ms: b.total > 0 ? Math.round(b.totalDuration / b.total) : 0,
+      avg_layer_a_ms: b.total > 0 ? Math.round(b.totalA / b.total) : 0,
+      avg_layer_b_ms: b.total > 0 ? Math.round(b.totalB / b.total) : 0,
+      avg_layer_c_ms: b.total > 0 ? Math.round(b.totalC / b.total) : 0,
+      avg_layer_d_ms: b.validDCount > 0 ? Math.round(b.totalD / b.validDCount) : null,
+    }))
+
+    const totalRuns = runs?.length || 0
+    const overall = {
+      total: totalRuns,
+      success: totalSuccess,
+      failed: totalFailed,
+      error_rate: totalRuns > 0 ? totalFailed / totalRuns : 0,
+    }
+
+    res.json({
+      success: true,
+      data: {
+        overall,
+        daily_buckets,
+        buffer_size: totalRuns,
+      },
+    })
+  } catch (error) {
+    log.error('Error fetching actuarial analytics', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    res.status(500).json({ success: false, error: 'Failed to fetch analytics' })
+  }
+})
+
 export default router

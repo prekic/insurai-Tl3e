@@ -53,6 +53,12 @@ router.get(
 router.get('/monitoring/health', async (_req: Request, res: Response) => {
   try {
     const health = await monitoring.runHealthChecks()
+
+    // Also poll actuarial bounds silently
+    import('../../services/notification-service.js')
+      .then((m) => m.checkActuarialHealth())
+      .catch((err) => log.error('Failed to run actuarial health check', { error: err.message }))
+
     res.json({ success: true, data: health })
   } catch (error) {
     log.error('Failed to run health checks', {
