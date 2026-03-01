@@ -584,7 +584,7 @@ export function EvaluationSettingsPanel({
                 <input
                   type="range"
                   min="1000"
-                  max="50000"
+                  max="250000"
                   step="1000"
                   className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                   value={Number(
@@ -600,7 +600,7 @@ export function EvaluationSettingsPanel({
                   }
                   disabled={!editingPerformance}
                 />
-                <span className="text-sm text-gray-500">50,000</span>
+                <span className="text-sm text-gray-500">250,000</span>
               </div>
             </div>
 
