@@ -75,8 +75,20 @@
 | `src/lib/actuarial-engine/layer-b/*-rules.ts` | **NEW** — Life, Health, and Business specific rule gates |
 | `server/__tests__/admin-actuarial-routes.test.ts` | **UPDATED** — Syncing integration tests with confidence bounds |
 | `docs/adr/017-actuarial-observability-caching.md` | **NEW** — Architecture record for Web Worker layer memoization, caching, and polling alerts |
-| `CLAUDE.md` | Updated status, highlighted the new Recharts visualizations and web worker UI |
-| `SESSION_HANDOFF.md` | Documenting Phase 8/9 architecture and visualization completion |
+| `e2e/actuarial-analytics.spec.ts` | **NEW** — End-to-end latency constraint snapshot tests |
+| `server/__tests__/admin-actuarial-analytics.test.ts` | **NEW** — Backend integration tests for layer analytics |
+| `server/routes/admin/monitoring.ts` | **UPDATED** — Wired actuarial health polling |
+| `server/services/actuarial-persistence.ts` | **UPDATED** — Persistence logic extracts layer bounds natively |
+| `server/services/notification-service.ts` | **UPDATED** — 5% rolling failure alert bounds and debounce checks |
+| `src/components/admin/AdminDashboard.tsx` | **UPDATED** — Added ActuarialAnalyticsTab |
+| `src/components/admin/DocumentJourneyViewer.tsx` | **UPDATED** — Actuarial component execution logging |
+| `src/components/admin/tabs/ActuarialAnalyticsTab.tsx` | **NEW** — Volume/Latency Recharts visualization |
+| `src/lib/actuarial-engine/layer-a/semantic-exclusions.ts` | **UPDATED** — SHA-256 LRU memoization caching |
+| `src/lib/actuarial-engine/actuarial-events.ts` | **UPDATED** — Client emitter for timing extraction |
+| `src/types/admin.ts` | **UPDATED** — Analytics type definitions |
+| `src/types/processing-log.ts` | **UPDATED** — Actuarial log pipeline staging |
+| `CLAUDE.md` | **UPDATED** — Synced new Recharts visualizations and gotchas |
+| `SESSION_HANDOFF.md` | **UPDATED** — Documenting Phase 9/10 analytics completion |
 
 ---
 
