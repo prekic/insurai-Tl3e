@@ -73,6 +73,7 @@
 | `src/lib/actuarial-engine/actuarial.worker.ts` | **NEW** — Web worker implementation for Monte Carlo |
 | `src/lib/actuarial-engine/layer-b/*-rules.ts` | **NEW** — Life, Health, and Business specific rule gates |
 | `server/__tests__/admin-actuarial-routes.test.ts` | **UPDATED** — Syncing integration tests with confidence bounds |
+| `docs/adr/017-actuarial-observability-caching.md` | **NEW** — Architecture record for Web Worker layer memoization, caching, and polling alerts |
 | `CLAUDE.md` | Updated status, highlighted the new Recharts visualizations and web worker UI |
 | `SESSION_HANDOFF.md` | Documenting Phase 8/9 architecture and visualization completion |
 
