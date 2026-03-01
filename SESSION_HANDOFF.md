@@ -72,12 +72,12 @@
 
 ## Priority Next Steps
 
-### P1 — Analytics & Fine-Tuning
-1. Monitor Actuarial Engine Web Worker performance via the newly added Admin Settings UI sliders on production.
-2. Observe EOOP precision improvements mapping to `PolicyActuarialHistoryChart` bounds inside the details page over multiple evaluations.
+### P1 — General Analytics & Fine-Tuning
+- Actuarial Engine visual components and Web Worker configurations are now fully stable up to 250,000 iterations.
+- Next priority is real-world performance monitoring as users invoke evaluations to assess server stability and cost limitations.
 
 ### P2 — Ongoing Optimization
-1. Refine the UX of the chart axis ticks if large iterations (100k+) trigger display clipping scenarios in edge cases on smaller devices.
+- Review evaluation logs in Datadog/Supabase to observe average duration bounds.
 
 ---
 

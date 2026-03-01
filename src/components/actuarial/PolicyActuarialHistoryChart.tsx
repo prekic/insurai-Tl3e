@@ -12,6 +12,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { adminFetch } from '@/lib/admin/api'
 
 interface HistoricalResult {
   id: string
@@ -37,8 +38,8 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
         setIsLoading(true)
         setError(null)
         // We use the admin endpoint, typically this would be a user-facing endpoint but we're reusing it here
-        const res = await fetch(
-          `/ api / admin / actuarial / evaluation - results ? policyId = ${policyId}& limit=20`
+        const res = await adminFetch(
+          `/api/admin/actuarial/evaluation-results?policyId=${policyId}&limit=20`
         )
         if (!res.ok) {
           throw new Error('Failed to fetch history')
@@ -151,11 +152,25 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
                 axisLine={false}
               />
               <YAxis
+                yAxisId="left"
                 domain={[0, 100]}
                 tick={{ fontSize: 12, fill: '#6B7280' }}
                 tickLine={false}
                 axisLine={false}
                 tickFormatter={(value) => `${value} `}
+              />
+              <YAxis
+                yAxisId="right"
+                orientation="right"
+                tick={{ fontSize: 12, fill: '#6B7280' }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(value) =>
+                  Intl.NumberFormat('en-US', {
+                    notation: 'compact',
+                    compactDisplay: 'short',
+                  }).format(value)
+                }
               />
               <Tooltip
                 content={({ active, payload }) => {
@@ -184,6 +199,7 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
               {/* Confidence Interval Band */}
               {hasConfidenceIntervals && (
                 <Area
+                  yAxisId="right"
                   type="monotone"
                   dataKey="confidenceArea"
                   fill="#93C5FD"
@@ -196,6 +212,7 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
 
               {/* Main Score Line */}
               <Line
+                yAxisId="left"
                 type="monotone"
                 dataKey="score"
                 stroke="#3B82F6"
