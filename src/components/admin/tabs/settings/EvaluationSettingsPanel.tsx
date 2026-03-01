@@ -9,25 +9,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
-import {
-  validateGradeThresholds,
-  type ValidationResult,
-} from '@/lib/admin/settings-validation'
-import {
-  Save,
-  Scale,
-  Trophy,
-  Target,
-  AlertCircle,
-  Info,
-  BarChart3,
-} from 'lucide-react'
+import { validateGradeThresholds, type ValidationResult } from '@/lib/admin/settings-validation'
+import { Save, Scale, Trophy, Target, AlertCircle, Info, BarChart3, Cpu } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import type { SettingValue } from '../SettingsTab'
 
 interface EvaluationSettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
-  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
+  onBatchUpdate?: (
+    updates: Array<{ key: string; value: unknown }>,
+    reason?: string
+  ) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }
@@ -58,6 +52,8 @@ export function EvaluationSettingsPanel({
   const [editingGrades, setEditingGrades] = useState(false)
   const [tempWeights, setTempWeights] = useState<Record<string, number>>({})
   const [tempGrades, setTempGrades] = useState<Record<string, number>>({})
+  const [editingPerformance, setEditingPerformance] = useState(false)
+  const [tempPerformance, setTempPerformance] = useState<Record<string, unknown>>({})
   const [editReason, setEditReason] = useState('')
 
   // Calculate current weight values
@@ -78,6 +74,18 @@ export function EvaluationSettingsPanel({
       grades[key] = setting ? Number(setting.value) : 0
     })
     return grades
+  }, [settings])
+
+  // Calculate current performance settings
+  const currentPerformance = useMemo(() => {
+    const workerEnabled = settings.find((s) => s.key === 'worker_enabled')
+    const workerIterations = settings.find((s) => s.key === 'worker_iterations')
+    return {
+      worker_enabled: workerEnabled
+        ? workerEnabled.value === 'true' || workerEnabled.value === true
+        : true,
+      worker_iterations: workerIterations ? Number(workerIterations.value) : 10000,
+    }
   }, [settings])
 
   const totalWeight = useMemo(() => {
@@ -265,9 +273,7 @@ export function EvaluationSettingsPanel({
             </div>
             <div className="flex justify-between mt-1 text-xs text-gray-500">
               <span>0%</span>
-              <span
-                className={totalWeight !== 100 ? 'text-red-500 font-medium' : 'text-green-500'}
-              >
+              <span className={totalWeight !== 100 ? 'text-red-500 font-medium' : 'text-green-500'}>
                 Total: {totalWeight}%
               </span>
               <span>100%</span>
@@ -357,9 +363,7 @@ export function EvaluationSettingsPanel({
                 <Trophy className="h-5 w-5 text-yellow-500" />
                 Grade Thresholds
               </CardTitle>
-              <CardDescription>
-                Set the minimum score required for each grade level
-              </CardDescription>
+              <CardDescription>Set the minimum score required for each grade level</CardDescription>
             </div>
             {!editingGrades ? (
               <Button onClick={startEditingGrades}>Edit Thresholds</Button>
@@ -471,8 +475,144 @@ export function EvaluationSettingsPanel({
               <strong>How grades work:</strong> A policy with a score of 85 would receive grade B
               (if B threshold is 80 and A threshold is 90). Score below D threshold gets grade F.
               <br />
-              <strong>Note:</strong> Thresholds must be in descending order (A {">"} B {">"} C {">"} D).
+              <strong>Note:</strong> Thresholds must be in descending order (A {'>'} B {'>'} C {'>'}{' '}
+              D).
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Performance Settings */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Cpu className="h-5 w-5 text-purple-500" />
+                Performance Settings
+              </CardTitle>
+              <CardDescription>Configure background Web Worker evaluation limits</CardDescription>
+            </div>
+            {!editingPerformance ? (
+              <Button
+                onClick={() => {
+                  setTempPerformance({ ...currentPerformance })
+                  setEditingPerformance(true)
+                  setEditReason('')
+                }}
+              >
+                Edit Settings
+              </Button>
+            ) : (
+              <div className="flex gap-2">
+                <Button
+                  onClick={async () => {
+                    const changedEntries = Object.entries(tempPerformance).filter(
+                      ([key, value]) =>
+                        String(value) !==
+                        String(currentPerformance[key as keyof typeof currentPerformance])
+                    )
+                    const reason = editReason || 'Updated via performance settings'
+
+                    if (changedEntries.length > 0 && onBatchUpdate) {
+                      await onBatchUpdate(
+                        changedEntries.map(([key, value]) => ({ key, value: String(value) })),
+                        reason
+                      )
+                    } else {
+                      for (const [key, value] of changedEntries) {
+                        await onUpdate(key, String(value), reason)
+                      }
+                    }
+                    setEditingPerformance(false)
+                  }}
+                  disabled={isSaving}
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+                <Button variant="outline" onClick={() => setEditingPerformance(false)}>
+                  Cancel
+                </Button>
+              </div>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-100">
+              <div className="space-y-1">
+                <Label className="text-base font-medium">Use Web Workers</Label>
+                <p className="text-sm text-gray-500">
+                  Run heavy Monte Carlo actuarial simulations in the background, keeping the UI
+                  responsive.
+                </p>
+              </div>
+              <Switch
+                checked={Boolean(
+                  editingPerformance
+                    ? tempPerformance.worker_enabled
+                    : currentPerformance.worker_enabled
+                )}
+                onCheckedChange={(checked: boolean) =>
+                  setTempPerformance((prev) => ({ ...prev, worker_enabled: checked }))
+                }
+                disabled={!editingPerformance}
+              />
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+              <div className="flex justify-between items-center mb-4">
+                <div className="space-y-1">
+                  <Label className="text-base font-medium">Worker Iterations</Label>
+                  <p className="text-sm text-gray-500">
+                    Number of Monte Carlo simulations per evaluation. Higher is more accurate but
+                    slower.
+                  </p>
+                </div>
+                <div className="font-mono bg-white px-3 py-1 rounded text-lg font-semibold border shadow-sm">
+                  {Number(
+                    editingPerformance
+                      ? tempPerformance.worker_iterations
+                      : currentPerformance.worker_iterations
+                  ).toLocaleString()}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <span className="text-sm text-gray-500">1,000</span>
+                <input
+                  type="range"
+                  min="1000"
+                  max="50000"
+                  step="1000"
+                  className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  value={Number(
+                    editingPerformance
+                      ? tempPerformance.worker_iterations
+                      : currentPerformance.worker_iterations
+                  )}
+                  onChange={(e) =>
+                    setTempPerformance((prev) => ({
+                      ...prev,
+                      worker_iterations: Number(e.target.value),
+                    }))
+                  }
+                  disabled={!editingPerformance}
+                />
+                <span className="text-sm text-gray-500">50,000</span>
+              </div>
+            </div>
+
+            {editingPerformance && (
+              <div className="mt-4">
+                <Input
+                  placeholder="Reason for performance change (optional)"
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -491,7 +631,10 @@ export function EvaluationSettingsPanel({
             {settings
               .filter(
                 (s) =>
-                  !WEIGHT_KEYS.includes(s.key) && !GRADE_KEYS.includes(s.key)
+                  !WEIGHT_KEYS.includes(s.key) &&
+                  !GRADE_KEYS.includes(s.key) &&
+                  s.key !== 'worker_enabled' &&
+                  s.key !== 'worker_iterations'
               )
               .map((setting) => (
                 <div

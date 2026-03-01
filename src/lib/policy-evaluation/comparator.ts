@@ -18,7 +18,7 @@ import type {
 } from './types'
 import { evaluatePolicy } from './evaluator'
 import { getPremiumBenchmark } from '@/data'
-import { evaluateAndRankPolicies } from '../actuarial-engine/engine'
+import { evaluateAndRankPolicies, evaluateAndRankPoliciesAsync } from '../actuarial-engine/engine'
 import { mapAnalyzedToActuarialInput } from '../actuarial-engine/adapter'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { ActuarialPolicyInput } from '../actuarial-engine/types'
@@ -66,6 +66,69 @@ export function comparePolicies(
   if (allSupported) {
     actuarialInputs = policies.map((p) => mapAnalyzedToActuarialInput(p as AnalyzedPolicy))
     actuarialResults = evaluateAndRankPolicies(actuarialInputs)
+  }
+
+  // Generate rankings
+  const rankings = generateRankings(comparisonPolicies, actuarialInputs, actuarialResults)
+
+  // Generate analysis
+  const analysis = generateAnalysis(comparisonPolicies, winners, coverageMatrix)
+
+  return {
+    comparedAt: new Date().toISOString(),
+    policies: comparisonPolicies,
+    winners,
+    metrics,
+    coverageMatrix,
+    rankings,
+    analysis,
+    actuarialResults: actuarialResults.length > 0 ? actuarialResults : undefined,
+  }
+}
+
+export async function comparePoliciesAsync(
+  policies: Policy[],
+  labels?: string[],
+  config?: Partial<EvaluationConfig>
+): Promise<PolicyComparison> {
+  // Validate input
+  if (policies.length < 2) {
+    throw new Error('At least 2 policies are required for comparison')
+  }
+  if (policies.length > 4) {
+    throw new Error('Maximum 4 policies can be compared at once')
+  }
+
+  // Evaluate each policy
+  const comparisonPolicies: ComparisonPolicy[] = policies.map((policy, index) => ({
+    policy,
+    evaluation: evaluatePolicy(policy, config),
+    label: labels?.[index] || `Policy ${index + 1}`,
+  }))
+
+  // Determine winners
+  const winners = determineWinners(comparisonPolicies)
+
+  // Generate comparison metrics
+  const metrics = generateMetrics(comparisonPolicies)
+
+  // Generate coverage matrix
+  const coverageMatrix = generateCoverageMatrix(comparisonPolicies)
+
+  // Generate Actuarial Rankings (only for supported types)
+  const supportedTypes = ['kasko', 'traffic', 'dask', 'zas']
+  let actuarialResults: ReturnType<typeof evaluateAndRankPolicies> = []
+  let actuarialInputs: ActuarialPolicyInput[] = []
+
+  // Only evaluate via Actuarial Engine if all compared policies are supported
+  const allSupported = policies.every((p) => supportedTypes.includes(p.type))
+  if (allSupported) {
+    actuarialInputs = policies.map((p) => mapAnalyzedToActuarialInput(p as AnalyzedPolicy))
+    actuarialResults = await evaluateAndRankPoliciesAsync(actuarialInputs, {
+      monteCarloConfig: {
+        numSimulations: config?.workerIterations || 10000,
+      },
+    })
   }
 
   // Generate rankings

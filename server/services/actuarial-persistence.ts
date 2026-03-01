@@ -32,6 +32,10 @@ export interface PersistEvaluationInput {
   needsReview: boolean
   /** Duration in milliseconds */
   durationMs?: number
+  /** Monte Carlo 5th percentile lower bound */
+  monteCarloLowerBound?: number
+  /** Monte Carlo 95th percentile upper bound */
+  monteCarloUpperBound?: number
 }
 
 /**
@@ -86,6 +90,8 @@ export async function persistEvaluationResult(
         topsis_rank: input.topsisRank,
         topsis_grade: input.topsisGrade,
         result_data: input.resultData,
+        monte_carlo_lower_bound: input.monteCarloLowerBound,
+        monte_carlo_upper_bound: input.monteCarloUpperBound,
       })
       .select('id')
       .single()

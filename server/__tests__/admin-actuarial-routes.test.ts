@@ -505,6 +505,8 @@ describe('POST /evaluation-results', () => {
         policyId: 'policy-123',
         resultData: { score: 0.95 },
         eligible: true,
+        monteCarloLowerBound: 4500,
+        monteCarloUpperBound: 5500,
       })
 
     expect(res.status).toBe(200)
@@ -515,6 +517,8 @@ describe('POST /evaluation-results', () => {
         policyId: 'policy-123',
         resultData: { score: 0.95 },
         eligible: true,
+        monteCarloLowerBound: 4500,
+        monteCarloUpperBound: 5500,
       })
     )
   })

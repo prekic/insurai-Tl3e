@@ -85,6 +85,8 @@ async function persistToServer(event: EvaluationEvent): Promise<void> {
         topsisGrade: event.result.ranking?.grade,
         needsReview: event.result.needsReview,
         durationMs: event.result.layerTimings?.total_ms,
+        monteCarloLowerBound: event.result.expectedOutOfPocket?.percentiles?.p5,
+        monteCarloUpperBound: event.result.expectedOutOfPocket?.percentiles?.p95,
       }),
     })
   } catch {

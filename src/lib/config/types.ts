@@ -150,6 +150,9 @@ export interface EvaluationConfig {
   strictCompliance: boolean
   includeOptionalCoverages: boolean
   useRegionalBenchmarks: boolean
+  // Worker Settings
+  workerEnabled: boolean
+  workerIterations: number
 }
 
 export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
@@ -169,6 +172,8 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
   strictCompliance: true,
   includeOptionalCoverages: true,
   useRegionalBenchmarks: true,
+  workerEnabled: true,
+  workerIterations: 10000,
 }
 
 // =============================================================================

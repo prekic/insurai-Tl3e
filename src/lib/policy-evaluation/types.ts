@@ -237,6 +237,10 @@ export interface EvaluationConfig {
   // Market comparison settings
   useRegionalBenchmarks: boolean
   region?: string
+
+  // Actuarial Engine settings
+  workerEnabled?: boolean
+  workerIterations?: number
 }
 
 export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
@@ -250,6 +254,8 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
   strictCompliance: true,
   includeOptionalCoverages: true,
   useRegionalBenchmarks: true,
+  workerEnabled: true,
+  workerIterations: 10000,
 }
 
 /**
@@ -298,6 +304,8 @@ export function convertDatabaseConfigToEvaluatorConfig(dbConfig: {
   strictCompliance?: boolean
   includeOptionalCoverages?: boolean
   useRegionalBenchmarks?: boolean
+  workerEnabled?: boolean
+  workerIterations?: number
 }): Partial<EvaluationConfig> {
   const config: Partial<EvaluationConfig> = {}
 
@@ -327,6 +335,12 @@ export function convertDatabaseConfigToEvaluatorConfig(dbConfig: {
   }
   if (dbConfig.useRegionalBenchmarks !== undefined) {
     config.useRegionalBenchmarks = dbConfig.useRegionalBenchmarks
+  }
+  if (dbConfig.workerEnabled !== undefined) {
+    config.workerEnabled = dbConfig.workerEnabled
+  }
+  if (dbConfig.workerIterations !== undefined) {
+    config.workerIterations = dbConfig.workerIterations
   }
 
   return config

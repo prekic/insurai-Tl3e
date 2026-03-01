@@ -20,7 +20,14 @@
 export type UUID = string
 
 /** Policy types supported by the actuarial engine. */
-export type ActuarialPolicyType = 'kasko' | 'traffic' | 'dask' | 'zas'
+export type ActuarialPolicyType =
+  | 'kasko'
+  | 'traffic'
+  | 'dask'
+  | 'zas'
+  | 'health'
+  | 'life'
+  | 'business'
 
 /** Severity levels for issues, gaps, and exclusion impacts. */
 export type Severity = 'info' | 'low' | 'medium' | 'high' | 'critical' | 'blocking'

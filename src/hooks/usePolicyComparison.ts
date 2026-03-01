@@ -1,7 +1,12 @@
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState, useEffect } from 'react'
 import type { Policy } from '@/types/policy'
 import type { PolicyComparison, EvaluationConfig } from '@/lib/policy-evaluation/types'
-import { comparePolicies } from '@/lib/policy-evaluation'
+import {
+  comparePoliciesAsync,
+  convertDatabaseConfigToEvaluatorConfig,
+} from '@/lib/policy-evaluation'
+import { configService } from '@/lib/config'
+import type { EvaluationConfig as DatabaseEvaluationConfig } from '@/lib/config/types'
 
 interface UsePolicyComparisonOptions {
   config?: Partial<EvaluationConfig>
@@ -50,44 +55,108 @@ export function usePolicyComparison(
     return { isValid: true, message: null }
   }, [policies.length])
 
+  const [dbConfig, setDbConfig] = useState<DatabaseEvaluationConfig | null>(null)
+  const [configLoading, setConfigLoading] = useState(true)
+
+  // Fetch database configuration
+  useEffect(() => {
+    let mounted = true
+    configService
+      .getEvaluationConfig()
+      .then((config) => {
+        if (mounted) {
+          setDbConfig(config)
+          setConfigLoading(false)
+        }
+      })
+      .catch(() => {
+        // Fall back to defaults on error
+        if (mounted) {
+          setConfigLoading(false)
+        }
+      })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   // Create a stable hash for memoization
   const policiesHash = useMemo(() => {
     return policies
-      .map(p => `${p.id}:${p.premium}:${p.coverage}`)
+      .map((p) => `${p.id}:${p.premium}:${p.coverage}`)
       .sort()
       .join('|')
   }, [policies])
 
-  const result = useMemo<UsePolicyComparisonResult>(() => {
+  // Merge database config with provided config
+  const mergedConfig = useMemo(() => {
+    if (!dbConfig) return config
+
+    // Convert database config to evaluator format
+    const evaluatorConfig = convertDatabaseConfigToEvaluatorConfig(dbConfig)
+
+    // Merge: provided config overrides database config
+    return { ...evaluatorConfig, ...config }
+  }, [dbConfig, config])
+
+  const [result, setResult] = useState<UsePolicyComparisonResult>({
+    comparison: null,
+    isLoading: true,
+    error: null,
+    isValid: true,
+    validationMessage: null,
+  })
+
+  useEffect(() => {
+    let mounted = true
+
+    if (configLoading) {
+      setResult((prev) => ({ ...prev, isLoading: true }))
+      return
+    }
+
     if (!validation.isValid) {
-      return {
+      setResult({
         comparison: null,
         isLoading: false,
         error: null,
         isValid: false,
         validationMessage: validation.message,
-      }
+      })
+      return
     }
 
-    try {
-      const comparison = comparePolicies(policies, labels, config)
-      return {
-        comparison,
-        isLoading: false,
-        error: null,
-        isValid: true,
-        validationMessage: null,
-      }
-    } catch (e) {
-      return {
-        comparison: null,
-        isLoading: false,
-        error: e instanceof Error ? e : new Error('Failed to compare policies'),
-        isValid: true,
-        validationMessage: null,
-      }
+    setResult((prev) => ({ ...prev, isLoading: true, error: null }))
+
+    comparePoliciesAsync(policies, labels, mergedConfig)
+      .then((comparison) => {
+        if (mounted) {
+          setResult({
+            comparison,
+            isLoading: false,
+            error: null,
+            isValid: true,
+            validationMessage: null,
+          })
+        }
+      })
+      .catch((e) => {
+        if (mounted) {
+          setResult({
+            comparison: null,
+            isLoading: false,
+            error: e instanceof Error ? e : new Error('Failed to compare policies'),
+            isValid: true,
+            validationMessage: null,
+          })
+        }
+      })
+
+    return () => {
+      mounted = false
     }
-  }, [policiesHash, labels, config, validation]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [policiesHash, labels, mergedConfig, validation, configLoading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return result
 }
@@ -117,38 +186,47 @@ export function usePolicyComparison(
 export function useCompareSelection(maxPolicies: number = 4) {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
 
-  const togglePolicy = useCallback((policyId: string) => {
-    setSelectedIds(prev => {
-      if (prev.includes(policyId)) {
-        return prev.filter(id => id !== policyId)
-      }
-      if (prev.length >= maxPolicies) {
-        return prev // Don't add if at max
-      }
-      return [...prev, policyId]
-    })
-  }, [maxPolicies])
+  const togglePolicy = useCallback(
+    (policyId: string) => {
+      setSelectedIds((prev) => {
+        if (prev.includes(policyId)) {
+          return prev.filter((id) => id !== policyId)
+        }
+        if (prev.length >= maxPolicies) {
+          return prev // Don't add if at max
+        }
+        return [...prev, policyId]
+      })
+    },
+    [maxPolicies]
+  )
 
-  const addPolicy = useCallback((policyId: string) => {
-    setSelectedIds(prev => {
-      if (prev.includes(policyId) || prev.length >= maxPolicies) {
-        return prev
-      }
-      return [...prev, policyId]
-    })
-  }, [maxPolicies])
+  const addPolicy = useCallback(
+    (policyId: string) => {
+      setSelectedIds((prev) => {
+        if (prev.includes(policyId) || prev.length >= maxPolicies) {
+          return prev
+        }
+        return [...prev, policyId]
+      })
+    },
+    [maxPolicies]
+  )
 
   const removePolicy = useCallback((policyId: string) => {
-    setSelectedIds(prev => prev.filter(id => id !== policyId))
+    setSelectedIds((prev) => prev.filter((id) => id !== policyId))
   }, [])
 
   const clearSelection = useCallback(() => {
     setSelectedIds([])
   }, [])
 
-  const setSelection = useCallback((ids: string[]) => {
-    setSelectedIds(ids.slice(0, maxPolicies))
-  }, [maxPolicies])
+  const setSelection = useCallback(
+    (ids: string[]) => {
+      setSelectedIds(ids.slice(0, maxPolicies))
+    },
+    [maxPolicies]
+  )
 
   const canAdd = selectedIds.length < maxPolicies
   const canCompare = selectedIds.length >= 2
@@ -197,40 +275,44 @@ export function useCompareUrlState(policies: Policy[]) {
 
   // Validate IDs against available policies
   const validIds = useMemo(() => {
-    const policyIds = new Set(policies.map(p => p.id))
-    return urlIds.filter(id => policyIds.has(id))
+    const policyIds = new Set(policies.map((p) => p.id))
+    return urlIds.filter((id) => policyIds.has(id))
   }, [urlIds, policies])
 
   // Get invalid IDs (policies that were deleted)
   const invalidIds = useMemo(() => {
-    const policyIds = new Set(policies.map(p => p.id))
-    return urlIds.filter(id => !policyIds.has(id))
+    const policyIds = new Set(policies.map((p) => p.id))
+    return urlIds.filter((id) => !policyIds.has(id))
   }, [urlIds, policies])
 
   // Get selected policies
   const selectedPolicies = useMemo(() => {
-    const policyMap = new Map(policies.map(p => [p.id, p]))
-    return validIds.map(id => policyMap.get(id)).filter((p): p is Policy => p !== undefined)
+    const policyMap = new Map(policies.map((p) => [p.id, p]))
+    return validIds.map((id) => policyMap.get(id)).filter((p): p is Policy => p !== undefined)
   }, [validIds, policies])
 
   // Update URL
-  const setSelectedIds = useCallback((ids: string[]) => {
-    const newParams = new URLSearchParams(searchParams)
-    if (ids.length > 0) {
-      newParams.set('ids', ids.join(','))
-    } else {
-      newParams.delete('ids')
-    }
-    setSearchParams(newParams)
+  const setSelectedIds = useCallback(
+    (ids: string[]) => {
+      const newParams = new URLSearchParams(searchParams)
+      if (ids.length > 0) {
+        newParams.set('ids', ids.join(','))
+      } else {
+        newParams.delete('ids')
+      }
+      setSearchParams(newParams)
 
-    // Update browser URL without reload
-    if (typeof window !== 'undefined') {
-      const newUrl = ids.length > 0
-        ? `${window.location.pathname}?${newParams.toString()}`
-        : window.location.pathname
-      window.history.replaceState({}, '', newUrl)
-    }
-  }, [searchParams])
+      // Update browser URL without reload
+      if (typeof window !== 'undefined') {
+        const newUrl =
+          ids.length > 0
+            ? `${window.location.pathname}?${newParams.toString()}`
+            : window.location.pathname
+        window.history.replaceState({}, '', newUrl)
+      }
+    },
+    [searchParams]
+  )
 
   const clearSelection = useCallback(() => {
     setSelectedIds([])

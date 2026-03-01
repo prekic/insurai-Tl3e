@@ -182,6 +182,8 @@ router.post('/evaluation-results', async (req: Request, res: Response) => {
       topsisGrade: body.topsisGrade,
       needsReview: body.needsReview ?? false,
       durationMs: body.durationMs,
+      monteCarloLowerBound: body.monteCarloLowerBound,
+      monteCarloUpperBound: body.monteCarloUpperBound,
     })
 
     if (resultId) {

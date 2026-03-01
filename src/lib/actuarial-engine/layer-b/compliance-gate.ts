@@ -19,6 +19,9 @@ import type {
   ComplianceWarning,
   ProductMismatch,
 } from '../types'
+import { checkHealthCompliance } from './health-rules'
+import { checkLifeCompliance } from './life-rules'
+import { checkBusinessCompliance } from './business-rules'
 import { checkTrafficLimits, extractTrafficLimitsFromCoverages } from './seddk-rules'
 import { checkDASKCompliance, checkZASCompliance } from './dask-rules'
 import { validateProductName } from './product-rules'
@@ -204,6 +207,27 @@ export function executeComplianceGate(
           })
         }
       }
+      break
+    }
+
+    case 'health': {
+      const healthResult = checkHealthCompliance(policy.coverages, effectiveCheckDate)
+      allBlockingReasons.push(...healthResult.blockingReasons)
+      allWarnings.push(...healthResult.warnings)
+      break
+    }
+
+    case 'life': {
+      const lifeResult = checkLifeCompliance(policy.coverages, effectiveCheckDate)
+      allBlockingReasons.push(...lifeResult.blockingReasons)
+      allWarnings.push(...lifeResult.warnings)
+      break
+    }
+
+    case 'business': {
+      const businessResult = checkBusinessCompliance(policy.coverages, effectiveCheckDate)
+      allBlockingReasons.push(...businessResult.blockingReasons)
+      allWarnings.push(...businessResult.warnings)
       break
     }
   }

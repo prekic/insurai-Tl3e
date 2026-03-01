@@ -124,6 +124,8 @@ const EVALUATION_KEY_MAP: Record<string, keyof EvaluationConfig> = {
   strict_compliance: 'strictCompliance',
   include_optional_coverages: 'includeOptionalCoverages',
   use_regional_benchmarks: 'useRegionalBenchmarks',
+  worker_enabled: 'workerEnabled',
+  worker_iterations: 'workerIterations',
 }
 
 const RATE_LIMITS_KEY_MAP: Record<string, keyof RateLimitsConfig> = {
