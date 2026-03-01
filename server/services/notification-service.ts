@@ -225,12 +225,28 @@ export async function sendPolicyExpiryNotification(
 // Actuarial Health Monitoring
 // ---------------------------------------------------------------------------
 
+let lastActuarialCheckTime = 0
+const ACTUARIAL_CHECK_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
+
+const lastActuarialAlertTime = 0
+const ACTUARIAL_ALERT_COOLDOWN_MS = 60 * 60 * 1000 // 1 hour
+
 /**
  * Checks the actuarial evaluation 24-hour error bounds.
  * If the failure rate exceeds 5% (0.05), a push notification is dispatched
  * to all admin users alerting them of an API instability spike.
  */
 export async function checkActuarialHealth(): Promise<void> {
+  const now = Date.now()
+
+  // If we recently alerted, don't spam admins and don't bother checking DB
+  if (now - lastActuarialAlertTime < ACTUARIAL_ALERT_COOLDOWN_MS) return
+
+  // Rate limit the DB checks to once every 5 minutes
+  if (now - lastActuarialCheckTime < ACTUARIAL_CHECK_COOLDOWN_MS) return
+
+  lastActuarialCheckTime = now
+
   const db = getSupabase()
   if (!db) return
 
