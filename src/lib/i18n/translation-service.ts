@@ -178,7 +178,10 @@ export async function getTranslations(
         progress: 100,
         message: 'Translations loaded from cache',
       })
-      return cached
+      const safeBase = preloaded
+        ? mergeTranslations(SKELETON_TRANSLATIONS, preloaded)
+        : SKELETON_TRANSLATIONS
+      return mergeTranslations(safeBase, cached)
     }
 
     // Cache is stale or missing — fetch from API
@@ -188,13 +191,15 @@ export async function getTranslations(
       message: 'Fetching latest translations...',
     })
 
-    const { translations: apiTranslations, version: apiVersion } = await fetchTranslationsFromAPI(normalizedLocale)
+    const { translations: apiTranslations, version: apiVersion } =
+      await fetchTranslationsFromAPI(normalizedLocale)
 
     if (apiTranslations) {
       // Merge with preloaded to ensure no missing keys
-      const merged = preloaded
-        ? mergeTranslations(preloaded, apiTranslations)
-        : apiTranslations
+      const safeBase = preloaded
+        ? mergeTranslations(SKELETON_TRANSLATIONS, preloaded)
+        : SKELETON_TRANSLATIONS
+      const merged = mergeTranslations(safeBase, apiTranslations)
 
       // Update cache
       setCachedTranslations(normalizedLocale, merged)
@@ -218,7 +223,10 @@ export async function getTranslations(
       progress: 100,
       message: 'Translations loaded from cache',
     })
-    return cached
+    const safeBase = preloaded
+      ? mergeTranslations(SKELETON_TRANSLATIONS, preloaded)
+      : SKELETON_TRANSLATIONS
+    return mergeTranslations(safeBase, cached)
   }
 
   if (preloaded) {
@@ -296,7 +304,7 @@ export function getLocaleName(locale: string): string {
 
   // Check API locales cache
   if (apiLocalesCache) {
-    const apiLocale = apiLocalesCache.locales.find(l => l.code === normalized)
+    const apiLocale = apiLocalesCache.locales.find((l) => l.code === normalized)
     if (apiLocale) return apiLocale.nativeName
   }
 
@@ -309,7 +317,7 @@ export function isRTLLocale(locale: string): boolean {
 
   // Check API locales cache first
   if (apiLocalesCache) {
-    const apiLocale = apiLocalesCache.locales.find(l => l.code === normalized)
+    const apiLocale = apiLocalesCache.locales.find((l) => l.code === normalized)
     if (apiLocale) return apiLocale.isRtl
   }
 
@@ -324,7 +332,7 @@ export function getLocaleInfo(locale: string) {
   const common = COMMON_LOCALES[normalized as keyof typeof COMMON_LOCALES]
 
   // Check API locales cache
-  const apiLocale = apiLocalesCache?.locales.find(l => l.code === normalized)
+  const apiLocale = apiLocalesCache?.locales.find((l) => l.code === normalized)
 
   return {
     code: normalized,
