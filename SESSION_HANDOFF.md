@@ -11,7 +11,7 @@
 | **Tests** | 15,960 tests (15,958 passing, 335 files, 1 pre-existing flaky failure) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini202603011952` |
+| **Branch** | `gemini202604020525` |
 | **Production Status** | **Actuarial Engine Analytics & Admin Observability Complete**; Layer A AI Memoization/Caching implemented; Automated E2E Analytics Tests passing; P1 Error Spikes (5% thresholds) bound to Push Notifications; Web Worker iteration config wired to Admin Settings UI; Historical Trend Chart (Recharts) integrated. |
 
 ---
@@ -53,6 +53,11 @@
   - Added debounce timers (5m DB check, 1h alert span) to prevent WebPush spamming.
 - **Admin Configuration Web UI & Trend Analytics**:
   - Implemented the `ActuarialAnalyticsTab` UI using Recharts for daily latency vs. completion bounds.
+
+### Phase 11 — Maintenance & Optimization (March 2, 2026)
+- **Caching Strategy**: Analyzed `semantic-exclusions.ts` and settled on keeping the Node LRU map memory-cache over a Postgres DB integration until production telemetry proves a high miss rate penalty.
+- **Flaky Tests**: Found and fixed a `.cursorrules` violation where `admin-actuarial-routes.test.ts` was leaking the Supabase client mock into other test files. Added `vi.resetModules()` inside all six `beforeEach()` blocks in the suite. Also fixed the pre-existing React 19 timer teardown race condition in `PolicyUpload.test.tsx` by adding an `isMounted` ref to safely terminate async background loops post-unmount.
+- **Housekeeping**: Removed `new-table.md` scratchpad.
 
 ---
 
@@ -108,6 +113,11 @@
 
 ---
 
+### Gotcha: Unhandled Rejections in React 19 / Vitest Teardown (Testing)
+- Async state updates or loops inside components can outlive testing environments, leading to `ReferenceError: window is not defined` unhandled rejections during test teardown. The fix requires explicit checking of component mount states via an `isMounted` ref when tracking async background operations (e.g. `isMounted.current = false` inside `useEffect` cleanup) to abort gracefully.
+
+---
+
 ## Priority Next Steps
 
 ### P1 — General Analytics & Fine-Tuning
@@ -115,8 +125,9 @@
 - Real-world performance monitoring APIs (`/api/admin/actuarial/analytics`) are live.
 - Next priority: Wait for production user data to stream in and monitor the >5% spike push notifications.
 
-### P2 — Ongoing Optimization
-- Review evaluation logs in Datadog/Supabase to observe if Layer A hits cache memory accurately or if it requires DB-persistence (Postgres text search vs Node maps).
+### P2 — Maintain Test Stability & Caching
+- **Flaky Tests / Leaks**: Test stability has been restored by enforcing `vi.resetModules()` in `admin-actuarial-routes.test.ts` and squashing async teardown races via `isMounted` in `PolicyUpload.test.tsx`. Continue auditing suites for similar `.cursorrules` violations if flaky behavior returns.
+- **Caching**: The LRU cache in `semantic-exclusions.ts` was retained over a Postgres migration. Monitor its cache miss rates in production under high loads to see if a DB persistence step is warranted later.
 
 ---
 
@@ -128,4 +139,5 @@
 | Feb 28 late | P1/P2/P3/P5: Event bus wiring, persistence service, feature flag API | `gemini202602281715` |
 | Mar 1 early | Phase 7: Production deployment (Migration 028 + Feature Flag) | `gemini202603010814` |
 | Mar 1 late | Phase 8: Optimization (Web Worker) & Expansion (Health/Life/Business Policy Support) | `gemini20260301` |
-| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini202603011952`** |
+| Mar 1 End | Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations | `gemini202603011952` |
+| **Mar 2** | **Phase 10: Flaky test cleanup, Vitest memory leak fixes, and caching strategy analysis** | **`gemini202604020525`** |

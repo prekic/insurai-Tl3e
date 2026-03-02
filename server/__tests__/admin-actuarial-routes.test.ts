@@ -171,6 +171,7 @@ describe('GET /configs', () => {
   let app: express.Express
 
   beforeEach(() => {
+    vi.resetModules()
     vi.clearAllMocks()
     app = createApp()
   })
@@ -265,6 +266,7 @@ describe('POST /configs/:name/version', () => {
   let app: express.Express
 
   beforeEach(() => {
+    vi.resetModules()
     vi.clearAllMocks()
     app = createApp()
   })
@@ -492,6 +494,7 @@ describe('POST /evaluation-results', () => {
   let app: express.Express
 
   beforeEach(() => {
+    vi.resetModules()
     vi.clearAllMocks()
     app = createApp()
   })
@@ -566,6 +569,7 @@ describe('GET /evaluation-results', () => {
   let app: express.Express
 
   beforeEach(() => {
+    vi.resetModules()
     vi.clearAllMocks()
     app = createApp()
   })
@@ -621,6 +625,7 @@ describe('PATCH /feature-flag', () => {
   let app: express.Express
 
   beforeEach(() => {
+    vi.resetModules()
     vi.clearAllMocks()
     app = createApp()
   })
