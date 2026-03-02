@@ -56,7 +56,7 @@
 
 ### Phase 11 — Maintenance & Optimization (March 2, 2026)
 - **Caching Strategy**: Analyzed `semantic-exclusions.ts` and settled on keeping the Node LRU map memory-cache over a Postgres DB integration until production telemetry proves a high miss rate penalty.
-- **Flaky Tests**: Found and fixed a `.cursorrules` violation where `admin-actuarial-routes.test.ts` was leaking the Supabase client mock into other test files. Added `vi.resetModules()` inside all six `beforeEach()` blocks in the suite.
+- **Flaky Tests**: Found and fixed a `.cursorrules` violation where `admin-actuarial-routes.test.ts` was leaking the Supabase client mock into other test files. Added `vi.resetModules()` inside all six `beforeEach()` blocks in the suite. Also fixed the pre-existing React 19 timer teardown race condition in `PolicyUpload.test.tsx` by adding an `isMounted` ref to safely terminate async background loops post-unmount.
 - **Housekeeping**: Removed `new-table.md` scratchpad.
 
 ---
@@ -113,6 +113,11 @@
 
 ---
 
+### Gotcha: Unhandled Rejections in React 19 / Vitest Teardown (Testing)
+- Async state updates or loops inside components can outlive testing environments, leading to `ReferenceError: window is not defined` unhandled rejections during test teardown. The fix requires explicit checking of component mount states via an `isMounted` ref when tracking async background operations (e.g. `isMounted.current = false` inside `useEffect` cleanup) to abort gracefully.
+
+---
+
 ## Priority Next Steps
 
 ### P1 — General Analytics & Fine-Tuning
@@ -120,8 +125,9 @@
 - Real-world performance monitoring APIs (`/api/admin/actuarial/analytics`) are live.
 - Next priority: Wait for production user data to stream in and monitor the >5% spike push notifications.
 
-### P2 — Flaky Test Cleanup
-- Fixed the previous flaky failure caused by a Supabase module cache memory leak in `admin-actuarial-routes.test.ts` by ensuring `vi.resetModules()` is rigorously applied in `beforeEach()`. We should continue auditing other suites for this exact `.cursorrules` violation.
+### P2 — Maintain Test Stability & Caching
+- **Flaky Tests / Leaks**: Test stability has been restored by enforcing `vi.resetModules()` in `admin-actuarial-routes.test.ts` and squashing async teardown races via `isMounted` in `PolicyUpload.test.tsx`. Continue auditing suites for similar `.cursorrules` violations if flaky behavior returns.
+- **Caching**: The LRU cache in `semantic-exclusions.ts` was retained over a Postgres migration. Monitor its cache miss rates in production under high loads to see if a DB persistence step is warranted later.
 
 ---
 

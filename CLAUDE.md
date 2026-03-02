@@ -4877,12 +4877,10 @@ connectSrc: [
   2. Because `vi.mock()` is hoisted, any variables referenced inside it must ALSO be hoisted.
   3. Pattern: `const { mockClient } = vi.hoisted(() => ({ mockClient: { from: vi.fn(), ... } })); vi.mock('@supabase/supabase-js', () => ({ createClient: vi.fn(() => mockClient) }));`
 
-**Unhandled Rejection Warning in Full Test Suite:**
-- When running the full test suite (`npm test`), Vitest may report "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`
-- This is a **pre-existing race condition** between JSDOM teardown and async React setState when tests run in parallel
-- All 319 test files pass; `PolicyUpload.test.tsx` passes when run individually
-- The error has **zero impact on test results** — Vitest explicitly says "This might cause false positive tests"
-- Not introduced by any session; it's a known React 19 + Vitest concurrency issue
+**Unhandled Rejection Warning in Full Test Suite (FIXED March 2026):**
+- **Symptom**: When running the full test suite (`npm test`), Vitest reported "1 error" — an unhandled rejection: `ReferenceError: window is not defined` from `PolicyUpload.test.tsx`.
+- **Root Cause**: A race condition between JSDOM teardown and async React `setState`/effects when tests unmount before async upload simulation loops finish.
+- **Fix**: Added `isMounted` ref tracking to `PolicyUpload.tsx` to explicitly abort internal async `processFileAsync` loops and `toast.error` calls when the component unmounts. This is the standard React solution to prevent state updates on unmounted components and avoids the `window` reference error during JSDOM teardown.
 
 **Latent Bug — sortPolicies() Status Ordering (FIXED Feb 20, 2026):**
 - `PolicyDashboard.tsx` `sortPolicies()` used `statusOrder[a.status] || 4` as fallback
@@ -5090,6 +5088,10 @@ connectSrc: [
 **Notification Spam via Monitoring Polling (Gotcha Mar 1, 2026):**
 - System health limits like `/api/admin/monitoring/health` are hit very frequently by LoadBalancers or the UI. Triggering actions like PUSH notifications (`checkActuarialHealth`) inline with these endpoints will spam users and thrash the Database without internal debounce state tracking.
 - **Workaround:** Implemented memory-based debounce checkpoints `ACTUARIAL_CHECK_COOLDOWN_MS` (5m DB caching) and `ACTUARIAL_ALERT_COOLDOWN_MS` (1h notification cap).
+
+**React 19 / Vitest Teardown Race Conditions (Gotcha Mar 2, 2026):**
+- Async state updates or background processing loops inside components can outlive the testing environment's DOM teardown phase, leading to `ReferenceError: window is not defined` unhandled rejections during test suite execution. 
+- **Workaround:** The fix requires explicit checking of component mount states via an `isMounted` ref when tracking async background operations (e.g. `isMounted.current = false` inside `useEffect` cleanup) to abort gracefully before they interact with a destroyed `window` or `document` object.
 
 ---
 
