@@ -4,7 +4,7 @@ import type { TranslationDictionary } from './translations'
 
 const CACHE_KEY_PREFIX = 'insurai_i18n_'
 const CACHE_VERSION_PREFIX = 'insurai_i18n_ver_'
-const CACHE_SCHEMA_VERSION = 2 // Increment when cache structure changes
+const CACHE_SCHEMA_VERSION = 3 // Increment when cache structure changes
 
 interface CacheEntry {
   version: number

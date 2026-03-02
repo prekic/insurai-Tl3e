@@ -218,21 +218,23 @@ const EXCLUSION_PATTERNS: ExclusionPattern[] = [
 // PUBLIC API
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { createHash } from 'crypto'
-
 /**
  * In-memory LRU-style cache for semantic exclusion texts.
- * Maps SHA-256 hash of the exclusion text to its SemanticExclusionImpact.
+ * Maps hash of the exclusion text to its SemanticExclusionImpact.
  * This prevents re-analyzing identical policy exclusions across thousands of evaluations.
  */
 const EXCLUSION_MEMO_CACHE = new Map<string, SemanticExclusionImpact>()
 const MAX_CACHE_SIZE = 10000
 
 /**
- * Generates a SHA-256 hash of the exclusion text for fast cache lookups.
+ * Generates a fast non-cryptographic hash (djb2) of the exclusion text for fast cache lookups.
  */
 function hashExclusion(text: string): string {
-  return createHash('sha256').update(text).digest('hex')
+  let hash = 5381
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash * 33) ^ text.charCodeAt(i)
+  }
+  return (hash >>> 0).toString(16)
 }
 
 /**
