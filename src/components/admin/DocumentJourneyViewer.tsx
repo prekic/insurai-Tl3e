@@ -49,6 +49,7 @@ import {
   Info,
   Lightbulb,
   Target,
+  Calculator,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type {
@@ -79,23 +80,74 @@ const STAGE_ICONS: Record<ProcessingStage, LucideIcon> = {
   duplicate_check: Copy,
   conflict_resolution: GitMerge,
   database_save: Database,
+  actuarial_evaluation: Calculator,
 }
 
 // Stage labels
 const STAGE_LABELS: Record<ProcessingStage, { en: string; tr: string; description: string }> = {
   upload: { en: 'Upload', tr: 'Yükleme', description: 'File received and validated in browser' },
-  pdf_extraction: { en: 'PDF Extraction', tr: 'PDF Metin Çıkarma', description: 'Text extracted from PDF using pdf.js' },
-  ocr_decision: { en: 'OCR Decision', tr: 'OCR Karar Motoru', description: 'Analyzing document quality to determine if OCR is needed (language, policy type, text quality)' },
-  ocr_check: { en: 'OCR Check', tr: 'OCR Kontrolü', description: 'Checking text density to determine if OCR is needed' },
-  ocr_processing: { en: 'OCR Processing', tr: 'OCR İşleme', description: 'Optical character recognition for scanned documents' },
-  text_preprocessing: { en: 'Text Preprocessing', tr: 'Metin Ön İşleme', description: 'Text normalization, Turkish OCR cleanup, spacing fixes' },
-  ai_extraction: { en: 'AI Extraction', tr: 'AI Çıkarma', description: 'Structured data extraction using AI (GPT-4o/Claude)' },
-  form_field_enhancement: { en: 'Form Fields', tr: 'Form Alanları', description: 'Enhancement using Document AI form field detection' },
-  table_parsing: { en: 'Table Parsing', tr: 'Tablo Ayrıştırma', description: 'Coverage table extraction and parsing' },
-  validation: { en: 'Validation', tr: 'Doğrulama', description: 'Data validation, business rules, Turkish pattern matching' },
-  duplicate_check: { en: 'Duplicate Check', tr: 'Mükerrer Kontrol', description: 'Checking for existing similar policies with fuzzy matching' },
-  conflict_resolution: { en: 'Conflict Resolution', tr: 'Çakışma Çözümü', description: 'User resolved duplicate/amendment conflict' },
+  pdf_extraction: {
+    en: 'PDF Extraction',
+    tr: 'PDF Metin Çıkarma',
+    description: 'Text extracted from PDF using pdf.js',
+  },
+  ocr_decision: {
+    en: 'OCR Decision',
+    tr: 'OCR Karar Motoru',
+    description:
+      'Analyzing document quality to determine if OCR is needed (language, policy type, text quality)',
+  },
+  ocr_check: {
+    en: 'OCR Check',
+    tr: 'OCR Kontrolü',
+    description: 'Checking text density to determine if OCR is needed',
+  },
+  ocr_processing: {
+    en: 'OCR Processing',
+    tr: 'OCR İşleme',
+    description: 'Optical character recognition for scanned documents',
+  },
+  text_preprocessing: {
+    en: 'Text Preprocessing',
+    tr: 'Metin Ön İşleme',
+    description: 'Text normalization, Turkish OCR cleanup, spacing fixes',
+  },
+  ai_extraction: {
+    en: 'AI Extraction',
+    tr: 'AI Çıkarma',
+    description: 'Structured data extraction using AI (GPT-4o/Claude)',
+  },
+  form_field_enhancement: {
+    en: 'Form Fields',
+    tr: 'Form Alanları',
+    description: 'Enhancement using Document AI form field detection',
+  },
+  table_parsing: {
+    en: 'Table Parsing',
+    tr: 'Tablo Ayrıştırma',
+    description: 'Coverage table extraction and parsing',
+  },
+  validation: {
+    en: 'Validation',
+    tr: 'Doğrulama',
+    description: 'Data validation, business rules, Turkish pattern matching',
+  },
+  duplicate_check: {
+    en: 'Duplicate Check',
+    tr: 'Mükerrer Kontrol',
+    description: 'Checking for existing similar policies with fuzzy matching',
+  },
+  conflict_resolution: {
+    en: 'Conflict Resolution',
+    tr: 'Çakışma Çözümü',
+    description: 'User resolved duplicate/amendment conflict',
+  },
   database_save: { en: 'Save', tr: 'Kayıt', description: 'Policy saved to database' },
+  actuarial_evaluation: {
+    en: 'Actuarial Evaluation',
+    tr: 'Aktüeryal Değerlendirme',
+    description: 'Actuarial scoring (Monte Carlo & TOPSIS)',
+  },
 }
 
 // Status colors and icons
@@ -229,18 +281,19 @@ function DataSection({
         <Icon size={14} />
         {title}
       </h4>
-      <JsonViewer
-        data={data}
-        label={label}
-        id={id}
-      />
+      <JsonViewer data={data} label={label} id={id} />
     </div>
   )
 }
 
 // OCR Decision section component
-function OCRDecisionSection({ stage }: { stage: ProcessingStageRecord }): React.ReactElement | null {
-  const shouldShow = stage.metadata &&
+function OCRDecisionSection({
+  stage,
+}: {
+  stage: ProcessingStageRecord
+}): React.ReactElement | null {
+  const shouldShow =
+    stage.metadata &&
     (stage.stage === 'ocr_check' || stage.stage === 'ocr_processing') &&
     (stage.metadata.document_classification || stage.metadata.analysis)
 
@@ -294,7 +347,10 @@ function calculateMetrics(stage: ProcessingStageRecord): StageMetrics {
     if ('text_length' in stage.output && typeof stage.output.text_length === 'number') {
       metrics.outputSize = stage.output.text_length
     }
-    if ('processed_text_length' in stage.output && typeof stage.output.processed_text_length === 'number') {
+    if (
+      'processed_text_length' in stage.output &&
+      typeof stage.output.processed_text_length === 'number'
+    ) {
       metrics.outputSize = stage.output.processed_text_length
     }
     if ('chars_changed' in stage.output && typeof stage.output.chars_changed === 'number') {
@@ -309,7 +365,10 @@ function calculateMetrics(stage: ProcessingStageRecord): StageMetrics {
     if ('validation_errors' in stage.output && typeof stage.output.validation_errors === 'number') {
       metrics.errorCount = stage.output.validation_errors
     }
-    if ('validation_warnings' in stage.output && typeof stage.output.validation_warnings === 'number') {
+    if (
+      'validation_warnings' in stage.output &&
+      typeof stage.output.validation_warnings === 'number'
+    ) {
       metrics.warningCount = stage.output.validation_warnings
     }
   }
@@ -326,7 +385,7 @@ function calculateMetrics(stage: ProcessingStageRecord): StageMetrics {
       metrics.tokens = {
         input: usage.input_tokens as number,
         output: usage.output_tokens as number,
-        total: (usage.input_tokens as number || 0) + (usage.output_tokens as number || 0),
+        total: ((usage.input_tokens as number) || 0) + ((usage.output_tokens as number) || 0),
       }
     }
     if ('cost' in stage.metadata && typeof stage.metadata.cost === 'number') {
@@ -465,7 +524,7 @@ function TextContentViewer({
       {/* Header - always visible, clickable to expand */}
       <div
         className={cn(
-          'flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-150',
+          'flex items-center justify-between px-3 py-2 bg-gray-100 border-b border-gray-200 cursor-pointer hover:bg-gray-150'
         )}
         onClick={() => setExpanded(!expanded)}
       >
@@ -503,10 +562,12 @@ function TextContentViewer({
       {/* Content - shown when expanded */}
       {expanded && (
         <div className="relative">
-          <pre className={cn(
-            'p-3 text-xs overflow-auto bg-gray-50 font-mono whitespace-pre-wrap break-words',
-            showFullText ? 'max-h-[70vh]' : 'max-h-96'
-          )}>
+          <pre
+            className={cn(
+              'p-3 text-xs overflow-auto bg-gray-50 font-mono whitespace-pre-wrap break-words',
+              showFullText ? 'max-h-[70vh]' : 'max-h-96'
+            )}
+          >
             {showFullText ? text : previewText}
             {!showFullText && hasMore && '\n...'}
           </pre>
@@ -578,26 +639,42 @@ function DiffSummaryViewer({
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-green-700">+{formatNumber(diffSummary.characters_added)}</div>
+            <div className="text-lg font-bold text-green-700">
+              +{formatNumber(diffSummary.characters_added)}
+            </div>
             <div className="text-xs text-green-600">Characters Added</div>
           </div>
           <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-            <div className="text-lg font-bold text-red-700">-{formatNumber(diffSummary.characters_removed)}</div>
+            <div className="text-lg font-bold text-red-700">
+              -{formatNumber(diffSummary.characters_removed)}
+            </div>
             <div className="text-xs text-red-600">Characters Removed</div>
           </div>
-          <div className={cn(
-            'border rounded-lg p-3 text-center',
-            netChange >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
-          )}>
-            <div className={cn('text-lg font-bold', netChange >= 0 ? 'text-blue-700' : 'text-amber-700')}>
-              {netChange >= 0 ? '+' : ''}{formatNumber(netChange)}
+          <div
+            className={cn(
+              'border rounded-lg p-3 text-center',
+              netChange >= 0 ? 'bg-blue-50 border-blue-200' : 'bg-amber-50 border-amber-200'
+            )}
+          >
+            <div
+              className={cn(
+                'text-lg font-bold',
+                netChange >= 0 ? 'text-blue-700' : 'text-amber-700'
+              )}
+            >
+              {netChange >= 0 ? '+' : ''}
+              {formatNumber(netChange)}
             </div>
-            <div className={cn('text-xs', netChange >= 0 ? 'text-blue-600' : 'text-amber-600')}>Net Change</div>
+            <div className={cn('text-xs', netChange >= 0 ? 'text-blue-600' : 'text-amber-600')}>
+              Net Change
+            </div>
           </div>
         </div>
 
         <div className="bg-gray-50 rounded-lg p-3">
-          <div className="text-sm font-medium text-gray-700 mb-1">Lines Changed: {formatNumber(diffSummary.lines_changed)}</div>
+          <div className="text-sm font-medium text-gray-700 mb-1">
+            Lines Changed: {formatNumber(diffSummary.lines_changed)}
+          </div>
         </div>
 
         {/* Major changes */}
@@ -623,7 +700,8 @@ function DiffSummaryViewer({
               </div>
               <pre className="p-2 text-xs max-h-64 overflow-auto bg-gray-50 font-mono whitespace-pre-wrap">
                 {inputText.substring(0, 5000)}
-                {inputText.length > 5000 && `\n\n... (${formatNumber(inputText.length - 5000)} more characters)`}
+                {inputText.length > 5000 &&
+                  `\n\n... (${formatNumber(inputText.length - 5000)} more characters)`}
               </pre>
             </div>
             <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -632,7 +710,8 @@ function DiffSummaryViewer({
               </div>
               <pre className="p-2 text-xs max-h-64 overflow-auto bg-gray-50 font-mono whitespace-pre-wrap">
                 {outputText.substring(0, 5000)}
-                {outputText.length > 5000 && `\n\n... (${formatNumber(outputText.length - 5000)} more characters)`}
+                {outputText.length > 5000 &&
+                  `\n\n... (${formatNumber(outputText.length - 5000)} more characters)`}
               </pre>
             </div>
           </div>
@@ -665,11 +744,16 @@ function DecisionContextViewer({ context }: { context: StageDecisionContext }) {
   // Format threshold comparison for display
   const getComparisonSymbol = (comparison: string): string => {
     switch (comparison) {
-      case 'less_than': return '<'
-      case 'greater_than': return '>'
-      case 'equals': return '='
-      case 'not_equals': return '≠'
-      default: return comparison
+      case 'less_than':
+        return '<'
+      case 'greater_than':
+        return '>'
+      case 'equals':
+        return '='
+      case 'not_equals':
+        return '≠'
+      default:
+        return comparison
     }
   }
 
@@ -711,9 +795,13 @@ function DecisionContextViewer({ context }: { context: StageDecisionContext }) {
                 Decision Threshold
               </div>
               <div className="bg-white rounded px-3 py-2 border border-purple-100 font-mono text-sm">
-                {formatValue(context.threshold.name)} {getComparisonSymbol(context.threshold.comparison)} {formatValue(context.threshold.value)}
+                {formatValue(context.threshold.name)}{' '}
+                {getComparisonSymbol(context.threshold.comparison)}{' '}
+                {formatValue(context.threshold.value)}
                 {context.threshold.unit && (
-                  <span className="text-gray-500 ml-1">({formatValue(context.threshold.unit)})</span>
+                  <span className="text-gray-500 ml-1">
+                    ({formatValue(context.threshold.unit)})
+                  </span>
                 )}
               </div>
             </div>
@@ -777,70 +865,75 @@ function DecisionContextViewer({ context }: { context: StageDecisionContext }) {
 }
 
 // OCR Decision Viewer - displays comprehensive OCR decision analysis
-function OCRDecisionViewer({
-  metadata,
-}: {
-  metadata: Record<string, unknown>
-}) {
+function OCRDecisionViewer({ metadata }: { metadata: Record<string, unknown> }) {
   const [expanded, setExpanded] = useState(true)
 
   // Extract OCR decision data from metadata
-  const documentClassification = metadata.document_classification as {
-    detected_language?: { locale_code: string; confidence: number; method: string }
-    detected_policy_type?: {
-      policy_type_id: string
-      policy_type_name: string
-      category: string
-      confidence: number
-      matched_terms: string[]
-    }
-  } | undefined
-
-  const analysis = metadata.analysis as {
-    density?: {
-      total_pages: number
-      total_characters: number
-      average_chars_per_page: number
-      threshold_used: number
-      pages_below_threshold: number[]
-      min_chars_page?: { page: number; chars: number }
-      max_chars_page?: { page: number; chars: number }
-    }
-    text_quality?: {
-      quality_score: number
-      terms_found: number
-      terms_checked: number
-      found_terms_sample?: string[]
-      encoding_issues: boolean
-      locale_used: string
-    }
-    field_extraction?: {
-      fields_checked: number
-      fields_found: number
-      required_fields_found: number
-      required_fields_total: number
-      extraction_rate: number
-      field_results?: Record<string, { found: boolean; value: string | null; required: boolean }>
-    }
-    confidence_breakdown?: {
-      overall: number
-      component_scores: {
-        char_density: number
-        text_quality: number
-        page_variance: number
-        encoding_check: number
-        field_extraction: number
+  const documentClassification = metadata.document_classification as
+    | {
+        detected_language?: { locale_code: string; confidence: number; method: string }
+        detected_policy_type?: {
+          policy_type_id: string
+          policy_type_name: string
+          category: string
+          confidence: number
+          matched_terms: string[]
+        }
       }
-      weights_used: Record<string, number>
-    }
-  } | undefined
+    | undefined
+
+  const analysis = metadata.analysis as
+    | {
+        density?: {
+          total_pages: number
+          total_characters: number
+          average_chars_per_page: number
+          threshold_used: number
+          pages_below_threshold: number[]
+          min_chars_page?: { page: number; chars: number }
+          max_chars_page?: { page: number; chars: number }
+        }
+        text_quality?: {
+          quality_score: number
+          terms_found: number
+          terms_checked: number
+          found_terms_sample?: string[]
+          encoding_issues: boolean
+          locale_used: string
+        }
+        field_extraction?: {
+          fields_checked: number
+          fields_found: number
+          required_fields_found: number
+          required_fields_total: number
+          extraction_rate: number
+          field_results?: Record<
+            string,
+            { found: boolean; value: string | null; required: boolean }
+          >
+        }
+        confidence_breakdown?: {
+          overall: number
+          component_scores: {
+            char_density: number
+            text_quality: number
+            page_variance: number
+            encoding_check: number
+            field_extraction: number
+          }
+          weights_used: Record<string, number>
+        }
+      }
+    | undefined
 
   const reasoning = metadata.reasoning as string[] | undefined
-  const configurationsUsed = metadata.configurations_used as {
-    locale_config?: string
-    policy_config?: string
-    ocr_settings_version?: string
-  } | undefined
+  const configurationsUsed = metadata.configurations_used as
+    | {
+        locale_config?: string
+        policy_config?: string
+        ocr_settings_version?: string
+      }
+    | undefined
 
   if (!documentClassification && !analysis) return null
 
@@ -882,12 +975,16 @@ function OCRDecisionViewer({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Confidence:</span>
-                      <span className={cn(
-                        'font-bold',
-                        documentClassification.detected_language.confidence >= 0.8 ? 'text-green-700' :
-                        documentClassification.detected_language.confidence >= 0.6 ? 'text-amber-700' :
-                        'text-red-700'
-                      )}>
+                      <span
+                        className={cn(
+                          'font-bold',
+                          documentClassification.detected_language.confidence >= 0.8
+                            ? 'text-green-700'
+                            : documentClassification.detected_language.confidence >= 0.6
+                              ? 'text-amber-700'
+                              : 'text-red-700'
+                        )}
+                      >
                         {(documentClassification.detected_language.confidence * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -923,12 +1020,16 @@ function OCRDecisionViewer({
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-gray-600">Confidence:</span>
-                      <span className={cn(
-                        'font-bold',
-                        documentClassification.detected_policy_type.confidence >= 0.8 ? 'text-green-700' :
-                        documentClassification.detected_policy_type.confidence >= 0.6 ? 'text-amber-700' :
-                        'text-red-700'
-                      )}>
+                      <span
+                        className={cn(
+                          'font-bold',
+                          documentClassification.detected_policy_type.confidence >= 0.8
+                            ? 'text-green-700'
+                            : documentClassification.detected_policy_type.confidence >= 0.6
+                              ? 'text-amber-700'
+                              : 'text-red-700'
+                        )}
+                      >
                         {(documentClassification.detected_policy_type.confidence * 100).toFixed(0)}%
                       </span>
                     </div>
@@ -936,14 +1037,21 @@ function OCRDecisionViewer({
                       <div>
                         <span className="text-xs text-gray-500">Matched terms:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {documentClassification.detected_policy_type.matched_terms.slice(0, 5).map((term, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs">
-                              {term}
-                            </span>
-                          ))}
+                          {documentClassification.detected_policy_type.matched_terms
+                            .slice(0, 5)
+                            .map((term, i) => (
+                              <span
+                                key={i}
+                                className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded text-xs"
+                              >
+                                {term}
+                              </span>
+                            ))}
                           {documentClassification.detected_policy_type.matched_terms.length > 5 && (
                             <span className="text-xs text-gray-500">
-                              +{documentClassification.detected_policy_type.matched_terms.length - 5} more
+                              +
+                              {documentClassification.detected_policy_type.matched_terms.length - 5}{' '}
+                              more
                             </span>
                           )}
                         </div>
@@ -961,34 +1069,50 @@ function OCRDecisionViewer({
               <div className="flex items-center gap-2 text-sm font-medium text-green-700 mb-3">
                 <Target size={14} />
                 Confidence Breakdown
-                <span className={cn(
-                  'ml-auto px-2 py-1 rounded text-sm font-bold',
-                  analysis.confidence_breakdown.overall >= 0.85 ? 'bg-green-100 text-green-800' :
-                  analysis.confidence_breakdown.overall >= 0.6 ? 'bg-amber-100 text-amber-800' :
-                  'bg-red-100 text-red-800'
-                )}>
+                <span
+                  className={cn(
+                    'ml-auto px-2 py-1 rounded text-sm font-bold',
+                    analysis.confidence_breakdown.overall >= 0.85
+                      ? 'bg-green-100 text-green-800'
+                      : analysis.confidence_breakdown.overall >= 0.6
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-red-100 text-red-800'
+                  )}
+                >
                   Overall: {(analysis.confidence_breakdown.overall * 100).toFixed(0)}%
                 </span>
               </div>
               <div className="grid grid-cols-5 gap-2">
-                {Object.entries(analysis.confidence_breakdown.component_scores).map(([key, value]) => (
-                  <div key={key} className="text-center p-2 bg-gray-50 rounded">
-                    <div className={cn(
-                      'text-lg font-bold',
-                      value >= 0.8 ? 'text-green-600' :
-                      value >= 0.6 ? 'text-amber-600' :
-                      'text-red-600'
-                    )}>
-                      {(value * 100).toFixed(0)}%
+                {Object.entries(analysis.confidence_breakdown.component_scores).map(
+                  ([key, value]) => (
+                    <div key={key} className="text-center p-2 bg-gray-50 rounded">
+                      <div
+                        className={cn(
+                          'text-lg font-bold',
+                          value >= 0.8
+                            ? 'text-green-600'
+                            : value >= 0.6
+                              ? 'text-amber-600'
+                              : 'text-red-600'
+                        )}
+                      >
+                        {(value * 100).toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-gray-500 capitalize">
+                        {key.replace(/_/g, ' ')}
+                      </div>
+                      <div className="text-[10px] text-gray-400">
+                        weight:{' '}
+                        {(
+                          (analysis.confidence_breakdown?.weights_used?.[
+                            key as keyof typeof analysis.confidence_breakdown.weights_used
+                          ] || 0) * 100
+                        ).toFixed(0)}
+                        %
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 capitalize">
-                      {key.replace(/_/g, ' ')}
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      weight: {((analysis.confidence_breakdown?.weights_used?.[key as keyof typeof analysis.confidence_breakdown.weights_used] || 0) * 100).toFixed(0)}%
-                    </div>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             </div>
           )}
@@ -1006,30 +1130,44 @@ function OCRDecisionViewer({
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Quality Score:</span>
-                      <span className="font-bold">{(analysis.text_quality.quality_score * 100).toFixed(0)}%</span>
+                      <span className="font-bold">
+                        {(analysis.text_quality.quality_score * 100).toFixed(0)}%
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Terms Found:</span>
-                      <span>{analysis.text_quality.terms_found}/{analysis.text_quality.terms_checked}</span>
+                      <span>
+                        {analysis.text_quality.terms_found}/{analysis.text_quality.terms_checked}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Encoding Issues:</span>
-                      <span className={analysis.text_quality.encoding_issues ? 'text-red-600 font-bold' : 'text-green-600'}>
+                      <span
+                        className={
+                          analysis.text_quality.encoding_issues
+                            ? 'text-red-600 font-bold'
+                            : 'text-green-600'
+                        }
+                      >
                         {analysis.text_quality.encoding_issues ? 'Yes' : 'No'}
                       </span>
                     </div>
-                    {analysis.text_quality.found_terms_sample && analysis.text_quality.found_terms_sample.length > 0 && (
-                      <div>
-                        <span className="text-xs text-gray-500">Sample terms found:</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {analysis.text_quality.found_terms_sample.slice(0, 6).map((term, i) => (
-                            <span key={i} className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs">
-                              {term}
-                            </span>
-                          ))}
+                    {analysis.text_quality.found_terms_sample &&
+                      analysis.text_quality.found_terms_sample.length > 0 && (
+                        <div>
+                          <span className="text-xs text-gray-500">Sample terms found:</span>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {analysis.text_quality.found_terms_sample.slice(0, 6).map((term, i) => (
+                              <span
+                                key={i}
+                                className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-xs"
+                              >
+                                {term}
+                              </span>
+                            ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </div>
               )}
@@ -1052,12 +1190,18 @@ function OCRDecisionViewer({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Avg Chars/Page:</span>
-                      <span className={cn(
-                        'font-bold',
-                        analysis.density.average_chars_per_page >= analysis.density.threshold_used * 5 ? 'text-green-600' :
-                        analysis.density.average_chars_per_page >= analysis.density.threshold_used ? 'text-amber-600' :
-                        'text-red-600'
-                      )}>
+                      <span
+                        className={cn(
+                          'font-bold',
+                          analysis.density.average_chars_per_page >=
+                            analysis.density.threshold_used * 5
+                            ? 'text-green-600'
+                            : analysis.density.average_chars_per_page >=
+                                analysis.density.threshold_used
+                              ? 'text-amber-600'
+                              : 'text-red-600'
+                        )}
+                      >
                         {formatNumber(analysis.density.average_chars_per_page)}
                       </span>
                     </div>
@@ -1082,40 +1226,51 @@ function OCRDecisionViewer({
               <div className="flex items-center gap-2 text-sm font-medium text-teal-700 mb-3">
                 <FormInput size={14} />
                 Field Extraction Test
-                <span className={cn(
-                  'ml-auto px-2 py-1 rounded text-xs font-bold',
-                  analysis.field_extraction.extraction_rate >= 0.75 ? 'bg-green-100 text-green-800' :
-                  analysis.field_extraction.extraction_rate >= 0.5 ? 'bg-amber-100 text-amber-800' :
-                  'bg-red-100 text-red-800'
-                )}>
-                  {analysis.field_extraction.required_fields_found}/{analysis.field_extraction.required_fields_total} Required ({(analysis.field_extraction.extraction_rate * 100).toFixed(0)}%)
+                <span
+                  className={cn(
+                    'ml-auto px-2 py-1 rounded text-xs font-bold',
+                    analysis.field_extraction.extraction_rate >= 0.75
+                      ? 'bg-green-100 text-green-800'
+                      : analysis.field_extraction.extraction_rate >= 0.5
+                        ? 'bg-amber-100 text-amber-800'
+                        : 'bg-red-100 text-red-800'
+                  )}
+                >
+                  {analysis.field_extraction.required_fields_found}/
+                  {analysis.field_extraction.required_fields_total} Required (
+                  {(analysis.field_extraction.extraction_rate * 100).toFixed(0)}%)
                 </span>
               </div>
               {analysis.field_extraction.field_results && (
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {Object.entries(analysis.field_extraction.field_results).map(([field, result]) => (
-                    <div key={field} className={cn(
-                      'p-2 rounded border text-xs',
-                      result.found ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-                    )}>
-                      <div className="flex items-center gap-1 font-medium">
-                        {result.found ? (
-                          <CheckCircle size={12} className="text-green-600" />
-                        ) : (
-                          <XCircle size={12} className="text-red-600" />
+                  {Object.entries(analysis.field_extraction.field_results).map(
+                    ([field, result]) => (
+                      <div
+                        key={field}
+                        className={cn(
+                          'p-2 rounded border text-xs',
+                          result.found ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
                         )}
-                        <span className={result.found ? 'text-green-800' : 'text-red-800'}>
-                          {field.replace(/_/g, ' ')}
-                        </span>
-                        {result.required && <span className="text-red-500">*</span>}
-                      </div>
-                      {result.found && result.value && (
-                        <div className="mt-1 text-gray-600 truncate" title={result.value}>
-                          {result.value.substring(0, 30)}...
+                      >
+                        <div className="flex items-center gap-1 font-medium">
+                          {result.found ? (
+                            <CheckCircle size={12} className="text-green-600" />
+                          ) : (
+                            <XCircle size={12} className="text-red-600" />
+                          )}
+                          <span className={result.found ? 'text-green-800' : 'text-red-800'}>
+                            {field.replace(/_/g, ' ')}
+                          </span>
+                          {result.required && <span className="text-red-500">*</span>}
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {result.found && result.value && (
+                          <div className="mt-1 text-gray-600 truncate" title={result.value}>
+                            {result.value.substring(0, 30)}...
+                          </div>
+                        )}
+                      </div>
+                    )
+                  )}
                 </div>
               )}
             </div>
@@ -1144,7 +1299,11 @@ function OCRDecisionViewer({
             <div className="bg-slate-50 rounded-lg border border-slate-200 p-3">
               <div className="flex items-center gap-2 text-xs text-slate-600">
                 <FileJson size={12} />
-                <span>Configs: {configurationsUsed.locale_config || 'default'} | {configurationsUsed.policy_config || 'generic'} | v{configurationsUsed.ocr_settings_version || '1.0'}</span>
+                <span>
+                  Configs: {configurationsUsed.locale_config || 'default'} |{' '}
+                  {configurationsUsed.policy_config || 'generic'} | v
+                  {configurationsUsed.ocr_settings_version || '1.0'}
+                </span>
               </div>
             </div>
           )}
@@ -1165,21 +1324,33 @@ function StageDetailsPanel({
   const statusInfo = getStatusInfo(stage.status)
   const StageIcon = STAGE_ICONS[stage.stage as ProcessingStage] || FileText
   const StatusIcon = statusInfo.icon
-  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage, description: '' }
+  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || {
+    en: stage.stage,
+    tr: stage.stage,
+    description: '',
+  }
   const metrics = calculateMetrics(stage)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className={cn('flex items-center justify-between px-6 py-4 border-b', statusInfo.bgColor)}>
+        <div
+          className={cn('flex items-center justify-between px-6 py-4 border-b', statusInfo.bgColor)}
+        >
           <div className="flex items-center gap-3">
-            <div className={cn('w-12 h-12 rounded-lg flex items-center justify-center',
-              stage.status === 'completed' ? 'bg-green-200' :
-              stage.status === 'failed' ? 'bg-red-200' :
-              stage.status === 'running' ? 'bg-blue-200' :
-              'bg-gray-200'
-            )}>
+            <div
+              className={cn(
+                'w-12 h-12 rounded-lg flex items-center justify-center',
+                stage.status === 'completed'
+                  ? 'bg-green-200'
+                  : stage.status === 'failed'
+                    ? 'bg-red-200'
+                    : stage.status === 'running'
+                      ? 'bg-blue-200'
+                      : 'bg-gray-200'
+              )}
+            >
               <StageIcon className={statusInfo.color} size={24} />
             </div>
             <div>
@@ -1192,7 +1363,10 @@ function StageDetailsPanel({
           </div>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <StatusIcon className={cn(statusInfo.color, stage.status === 'running' && 'animate-spin')} size={20} />
+              <StatusIcon
+                className={cn(statusInfo.color, stage.status === 'running' && 'animate-spin')}
+                size={20}
+              />
               <span className={cn('font-medium', statusInfo.color)}>{statusInfo.label}</span>
             </div>
             <button
@@ -1230,12 +1404,18 @@ function StageDetailsPanel({
               icon={Zap}
               label="Status"
               value={statusInfo.label}
-              color={stage.status === 'completed' ? 'green' : stage.status === 'failed' ? 'red' : 'gray'}
+              color={
+                stage.status === 'completed' ? 'green' : stage.status === 'failed' ? 'red' : 'gray'
+              }
             />
           </div>
 
           {/* Metrics Section */}
-          {(metrics.inputSize || metrics.outputSize || metrics.tokens || metrics.cost || metrics.confidence) && (
+          {(metrics.inputSize ||
+            metrics.outputSize ||
+            metrics.tokens ||
+            metrics.cost ||
+            metrics.confidence) && (
             <div>
               <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <Hash size={14} />
@@ -1265,8 +1445,12 @@ function StageDetailsPanel({
                     icon={metrics.charsDelta >= 0 ? ArrowUp : ArrowDown}
                     label="Chars Changed"
                     value={`${metrics.charsDelta >= 0 ? '+' : ''}${formatNumber(metrics.charsDelta)}`}
-                    subValue={metrics.charsPercent ? `${metrics.charsPercent.toFixed(1)}%` : undefined}
-                    color={metrics.charsDelta > 0 ? 'green' : metrics.charsDelta < 0 ? 'amber' : 'gray'}
+                    subValue={
+                      metrics.charsPercent ? `${metrics.charsPercent.toFixed(1)}%` : undefined
+                    }
+                    color={
+                      metrics.charsDelta > 0 ? 'green' : metrics.charsDelta < 0 ? 'amber' : 'gray'
+                    }
                   />
                 )}
                 {metrics.confidence !== undefined && (
@@ -1274,7 +1458,13 @@ function StageDetailsPanel({
                     icon={Zap}
                     label="Confidence"
                     value={`${(metrics.confidence * 100).toFixed(0)}%`}
-                    color={metrics.confidence >= 0.8 ? 'green' : metrics.confidence >= 0.6 ? 'amber' : 'red'}
+                    color={
+                      metrics.confidence >= 0.8
+                        ? 'green'
+                        : metrics.confidence >= 0.6
+                          ? 'amber'
+                          : 'red'
+                    }
                   />
                 )}
                 {metrics.tokens?.total !== undefined && (
@@ -1442,10 +1632,15 @@ function StageCard({
   const statusInfo = getStatusInfo(stage.status)
   const StageIcon = STAGE_ICONS[stage.stage as ProcessingStage] || FileText
   const StatusIcon = statusInfo.icon
-  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || { en: stage.stage, tr: stage.stage, description: '' }
+  const labels = STAGE_LABELS[stage.stage as ProcessingStage] || {
+    en: stage.stage,
+    tr: stage.stage,
+    description: '',
+  }
   const metrics = calculateMetrics(stage)
 
-  const hasDetails = stage.input || stage.output || stage.metadata || stage.error || stage.decision_context
+  const hasDetails =
+    stage.input || stage.output || stage.metadata || stage.error || stage.decision_context
 
   // Calculate quick summary metrics for collapsed view
   const quickMetrics = useMemo(() => {
@@ -1463,7 +1658,7 @@ function StageCard({
       items.push({
         label: 'Delta',
         value: `${metrics.charsDelta >= 0 ? '+' : ''}${formatNumber(metrics.charsDelta)}`,
-        color: metrics.charsDelta > 0 ? 'text-green-600' : 'text-amber-600'
+        color: metrics.charsDelta > 0 ? 'text-green-600' : 'text-amber-600',
       })
     }
 
@@ -1471,7 +1666,7 @@ function StageCard({
       items.push({
         label: 'Conf',
         value: `${(metrics.confidence * 100).toFixed(0)}%`,
-        color: metrics.confidence >= 0.8 ? 'text-green-600' : 'text-amber-600'
+        color: metrics.confidence >= 0.8 ? 'text-green-600' : 'text-amber-600',
       })
     }
 
@@ -1493,16 +1688,14 @@ function StageCard({
   return (
     <div className="relative">
       {/* Connecting line */}
-      {!isLast && (
-        <div className="absolute left-6 top-14 bottom-0 w-0.5 bg-gray-200" />
-      )}
+      {!isLast && <div className="absolute left-6 top-14 bottom-0 w-0.5 bg-gray-200" />}
 
       {/* Stage card */}
       <div
         className={cn(
           'relative border rounded-lg transition-all',
           statusInfo.bgColor,
-          statusInfo.borderColor,
+          statusInfo.borderColor
         )}
       >
         {/* Header row - Always clickable to expand */}
@@ -1517,10 +1710,13 @@ function StageCard({
           <div
             className={cn(
               'w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0',
-              stage.status === 'completed' ? 'bg-green-100' :
-              stage.status === 'failed' ? 'bg-red-100' :
-              stage.status === 'running' ? 'bg-blue-100' :
-              'bg-gray-100'
+              stage.status === 'completed'
+                ? 'bg-green-100'
+                : stage.status === 'failed'
+                  ? 'bg-red-100'
+                  : stage.status === 'running'
+                    ? 'bg-blue-100'
+                    : 'bg-gray-100'
             )}
           >
             <StageIcon className={statusInfo.color} size={20} />
@@ -1556,10 +1752,7 @@ function StageCard({
           {/* Status and actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
             <StatusIcon
-              className={cn(
-                statusInfo.color,
-                stage.status === 'running' && 'animate-spin'
-              )}
+              className={cn(statusInfo.color, stage.status === 'running' && 'animate-spin')}
               size={20}
             />
             <span className={cn('text-sm font-medium hidden sm:inline', statusInfo.color)}>
@@ -1602,9 +1795,14 @@ function StageCard({
             {quickMetrics.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {quickMetrics.map((m, i) => (
-                  <div key={i} className="flex items-center gap-1 px-2 py-1 bg-white rounded border border-gray-200 text-xs">
+                  <div
+                    key={i}
+                    className="flex items-center gap-1 px-2 py-1 bg-white rounded border border-gray-200 text-xs"
+                  >
                     <span className="text-gray-500">{m.label}:</span>
-                    <span className={cn('font-semibold', m.color || 'text-gray-900')}>{m.value}</span>
+                    <span className={cn('font-semibold', m.color || 'text-gray-900')}>
+                      {m.value}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -1681,14 +1879,14 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
 
   // Calculate overall stats
   const stats = useMemo(() => {
-    const completedStages = log.stages.filter(s => s.status === 'completed').length
-    const failedStages = log.stages.filter(s => s.status === 'failed').length
-    const skippedStages = log.stages.filter(s => s.status === 'skipped').length
+    const completedStages = log.stages.filter((s) => s.status === 'completed').length
+    const failedStages = log.stages.filter((s) => s.status === 'failed').length
+    const skippedStages = log.stages.filter((s) => s.status === 'skipped').length
 
     let totalTokens = 0
     let totalCost = 0
 
-    log.stages.forEach(stage => {
+    log.stages.forEach((stage) => {
       const m = calculateMetrics(stage)
       if (m.tokens?.total) totalTokens += m.tokens.total
       if (m.cost) totalCost += m.cost
@@ -1705,19 +1903,22 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
           <div>
             <h3 className="text-lg font-semibold text-gray-900">{log.filename}</h3>
             <div className="flex items-center gap-4 mt-2 text-sm text-gray-500 flex-wrap">
-              {log.file_size && (
-                <span>{formatBytes(log.file_size)}</span>
-              )}
+              {log.file_size && <span>{formatBytes(log.file_size)}</span>}
               {log.page_count && (
-                <span>{log.page_count} page{log.page_count !== 1 ? 's' : ''}</span>
+                <span>
+                  {log.page_count} page{log.page_count !== 1 ? 's' : ''}
+                </span>
               )}
-              {log.mime_type && (
-                <span>{log.mime_type}</span>
-              )}
+              {log.mime_type && <span>{log.mime_type}</span>}
             </div>
           </div>
 
-          <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full', overallStatusInfo.bgColor)}>
+          <div
+            className={cn(
+              'flex items-center gap-2 px-3 py-1.5 rounded-full',
+              overallStatusInfo.bgColor
+            )}
+          >
             <OverallStatusIcon className={overallStatusInfo.color} size={16} />
             <span className={cn('text-sm font-medium', overallStatusInfo.color)}>
               {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
@@ -1753,9 +1954,7 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
 
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="text-sm text-gray-500">AI Provider</div>
-            <div className="text-lg font-semibold text-gray-900">
-              {log.ai_provider || '-'}
-            </div>
+            <div className="text-lg font-semibold text-gray-900">{log.ai_provider || '-'}</div>
           </div>
 
           {log.extraction_route && (
@@ -1821,12 +2020,14 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {log.fallback_chain.map((step, i) => (
                 <div key={i} className="flex items-center gap-2">
                   {i > 0 && <span className="text-amber-400">&rarr;</span>}
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
-                    step.success
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full ${step.success ? 'bg-green-500' : 'bg-red-500'}`} />
+                  <div
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${
+                      step.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}
+                  >
+                    <span
+                      className={`w-2 h-2 rounded-full ${step.success ? 'bg-green-500' : 'bg-red-500'}`}
+                    />
                     {step.provider}
                     {step.duration_ms != null && (
                       <span className="text-xs opacity-70">({step.duration_ms}ms)</span>
@@ -1849,13 +2050,17 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {log.extracted_summary.policy_number && (
                 <div>
                   <span className="text-blue-600">Policy #:</span>{' '}
-                  <span className="text-blue-900 font-medium">{log.extracted_summary.policy_number}</span>
+                  <span className="text-blue-900 font-medium">
+                    {log.extracted_summary.policy_number}
+                  </span>
                 </div>
               )}
               {log.extracted_summary.provider && (
                 <div>
                   <span className="text-blue-600">Provider:</span>{' '}
-                  <span className="text-blue-900 font-medium">{log.extracted_summary.provider}</span>
+                  <span className="text-blue-900 font-medium">
+                    {log.extracted_summary.provider}
+                  </span>
                 </div>
               )}
               {log.extracted_summary.type_tr && (
@@ -1867,19 +2072,25 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {log.extracted_summary.insured_person && (
                 <div>
                   <span className="text-blue-600">Insured:</span>{' '}
-                  <span className="text-blue-900 font-medium">{log.extracted_summary.insured_person}</span>
+                  <span className="text-blue-900 font-medium">
+                    {log.extracted_summary.insured_person}
+                  </span>
                 </div>
               )}
               {log.extracted_summary.premium && (
                 <div>
                   <span className="text-blue-600">Premium:</span>{' '}
-                  <span className="text-blue-900 font-medium">₺{formatNumber(log.extracted_summary.premium)}</span>
+                  <span className="text-blue-900 font-medium">
+                    ₺{formatNumber(log.extracted_summary.premium)}
+                  </span>
                 </div>
               )}
               {log.extracted_summary.coverage && (
                 <div>
                   <span className="text-blue-600">Coverage:</span>{' '}
-                  <span className="text-blue-900 font-medium">₺{formatNumber(log.extracted_summary.coverage)}</span>
+                  <span className="text-blue-900 font-medium">
+                    ₺{formatNumber(log.extracted_summary.coverage)}
+                  </span>
                 </div>
               )}
             </div>
@@ -1904,7 +2115,9 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
             <div className="p-4 space-y-4">
               {/* Error Message */}
               <div>
-                <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Error Message</div>
+                <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">
+                  Error Message
+                </div>
                 <div className="bg-white border border-red-200 rounded p-3 font-mono text-sm text-red-900">
                   {log.error_message}
                 </div>
@@ -1913,7 +2126,9 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {/* Error Type */}
               {log.error_type && (
                 <div>
-                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Error Type</div>
+                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">
+                    Error Type
+                  </div>
                   <div className="inline-flex px-2 py-1 bg-red-100 text-red-800 rounded text-sm font-medium">
                     {log.error_type}
                   </div>
@@ -1923,30 +2138,40 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               {/* Error Context Grid */}
               {log.error_context && (
                 <div>
-                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-2">Error Context</div>
+                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-2">
+                    Error Context
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                     {log.error_context.extraction_provider && (
                       <div className="bg-white border border-red-200 rounded p-2">
                         <div className="text-xs text-gray-500">Provider</div>
-                        <div className="font-medium text-gray-900">{log.error_context.extraction_provider}</div>
+                        <div className="font-medium text-gray-900">
+                          {log.error_context.extraction_provider}
+                        </div>
                       </div>
                     )}
                     {log.error_context.document_length !== undefined && (
                       <div className="bg-white border border-red-200 rounded p-2">
                         <div className="text-xs text-gray-500">Document Length</div>
-                        <div className="font-medium text-gray-900">{log.error_context.document_length.toLocaleString()} chars</div>
+                        <div className="font-medium text-gray-900">
+                          {log.error_context.document_length.toLocaleString()} chars
+                        </div>
                       </div>
                     )}
                     {log.error_context.last_successful_stage && (
                       <div className="bg-white border border-red-200 rounded p-2">
                         <div className="text-xs text-gray-500">Last OK Stage</div>
-                        <div className="font-medium text-gray-900">{log.error_context.last_successful_stage}</div>
+                        <div className="font-medium text-gray-900">
+                          {log.error_context.last_successful_stage}
+                        </div>
                       </div>
                     )}
                     {log.error_context.ocr_used !== undefined && (
                       <div className="bg-white border border-red-200 rounded p-2">
                         <div className="text-xs text-gray-500">OCR Used</div>
-                        <div className="font-medium text-gray-900">{log.error_context.ocr_used ? 'Yes' : 'No'}</div>
+                        <div className="font-medium text-gray-900">
+                          {log.error_context.ocr_used ? 'Yes' : 'No'}
+                        </div>
                       </div>
                     )}
                     {log.error_context.timestamp && (
@@ -1970,14 +2195,17 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
               )}
 
               {/* Data at Failure */}
-              {log.error_context?.data_at_failure && Object.keys(log.error_context.data_at_failure).length > 0 && (
-                <div>
-                  <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">Data at Failure</div>
-                  <pre className="bg-white border border-red-200 rounded p-3 text-xs overflow-x-auto max-h-40">
-                    {JSON.stringify(log.error_context.data_at_failure, null, 2)}
-                  </pre>
-                </div>
-              )}
+              {log.error_context?.data_at_failure &&
+                Object.keys(log.error_context.data_at_failure).length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-red-700 uppercase tracking-wide mb-1">
+                      Data at Failure
+                    </div>
+                    <pre className="bg-white border border-red-200 rounded p-3 text-xs overflow-x-auto max-h-40">
+                      {JSON.stringify(log.error_context.data_at_failure, null, 2)}
+                    </pre>
+                  </div>
+                )}
 
               {/* Stack Trace (Collapsible) */}
               {log.error_stack && (
@@ -2043,9 +2271,7 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
         </div>
 
         {log.stages.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            No processing stages recorded yet.
-          </div>
+          <div className="text-center py-8 text-gray-500">No processing stages recorded yet.</div>
         )}
       </div>
 
@@ -2083,10 +2309,7 @@ export function DocumentJourneyViewer({ log, className }: DocumentJourneyViewerP
 
       {/* Stage Details Modal */}
       {selectedStage && (
-        <StageDetailsPanel
-          stage={selectedStage}
-          onClose={() => setSelectedStage(null)}
-        />
+        <StageDetailsPanel stage={selectedStage} onClose={() => setSelectedStage(null)} />
       )}
     </div>
   )

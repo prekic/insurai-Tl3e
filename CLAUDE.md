@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**.
 - **Production Readiness**: ~9.5/10 (15,848+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: March 1, 2026 (Actuarial engine Web Worker admin UI bounds increased, confidence interval DB storage, dual-axis UX fixes, and Recharts historical trend visualization)
+- **Last Updated**: March 1, 2026 (Actuarial engine Web Worker admin UI, historical trend visualization, and granular actuarial performance profiling with layer timings)
 
 ---
 
@@ -164,6 +164,7 @@ insurai/
 | `src/components/ConflictResolutionDialog.tsx` | Duplicate/amendment resolution UI |
 | `src/components/GlobalNavigation.tsx` | **UPDATED** Main nav with Globe language picker, auth state, direct upload |
 | `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **NEW** Recharts-based actuarial score historical trend visualization |
+| `src/components/admin/tabs/ActuarialAnalyticsTab.tsx` | **NEW** Dual-chart (Volume/Latency) Actuarial performance tracking dashboard |
 | `src/components/ComparePolicies.tsx` | Side-by-side policy comparison |
 | `src/components/TryAnalysis.tsx` | **UPDATED** Anonymous free trial analysis with ProcessingLogger (Feb 25, 2026) |
 | `src/components/WelcomeOnboarding.tsx` | **NEW** First-time user onboarding with 3-step guide and drag-drop upload (Feb 25, 2026) |
@@ -177,7 +178,7 @@ insurai/
 ### Admin Components (Updated Jan 25, 2026)
 | File | Purpose |
 |------|---------|
-| `src/components/admin/DocumentJourneyViewer.tsx` | **ENHANCED** Full pipeline visualization with content capture and decision context |
+| `src/components/admin/DocumentJourneyViewer.tsx` | **ENHANCED** Full pipeline visualization with content capture, decision context, and actuarial evaluation logging |
 | `src/components/admin/AdminDashboard.tsx` | Main admin dashboard with tabbed interface |
 | `src/components/admin/AdminLogin.tsx` | Admin login page |
 | `src/components/admin/tabs/PromptsTab.tsx` | Manage AI prompt templates |
@@ -231,8 +232,9 @@ insurai/
 | `server/routes/admin/users.ts` | **NEW** User management routes |
 | `server/routes/admin/prompts.ts` | **NEW** Prompt template CRUD routes |
 | `server/routes/admin/operations.ts` | **NEW** Audit logs, security events routes |
-| `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes |
+| `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes (Actuarial 5% Spikes) |
 | `server/routes/admin/content.ts` | **NEW** Content management routes |
+| `server/routes/admin/actuarial.ts` | **NEW** Real-world Actuarial analytics evaluation metrics backend API |
 | `server/routes/admin/cost.ts` | **NEW** Cost tracking routes |
 | `server/routes/admin/shared.ts` | **NEW** Shared utilities (Supabase client, helpers) |
 | `server/middleware/admin-auth.ts` | JWT auth middleware for admin routes |
@@ -5084,6 +5086,10 @@ connectSrc: [
 
 **Admin API Endpoint Native Fetching Bug (Gotcha Mar 1, 2026):**
 - Components under the `/admin/*` routing umbrella or any page relying on admin-only data must ALWAYS use the `adminFetch` utility from `@/lib/admin/api`. Standard `fetch` calls will fail with `401 Unauthorized` randomly because they do not correctly hook the supabase JWT bearer tokens into the request headers. Do NOT use `fetch()` for internal admin API calls.
+
+**Notification Spam via Monitoring Polling (Gotcha Mar 1, 2026):**
+- System health limits like `/api/admin/monitoring/health` are hit very frequently by LoadBalancers or the UI. Triggering actions like PUSH notifications (`checkActuarialHealth`) inline with these endpoints will spam users and thrash the Database without internal debounce state tracking.
+- **Workaround:** Implemented memory-based debounce checkpoints `ACTUARIAL_CHECK_COOLDOWN_MS` (5m DB caching) and `ACTUARIAL_ALERT_COOLDOWN_MS` (1h notification cap).
 
 ---
 

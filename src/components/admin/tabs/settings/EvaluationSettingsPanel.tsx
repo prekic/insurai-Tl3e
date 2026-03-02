@@ -3,7 +3,7 @@
  * Configure policy scoring weights and grade thresholds
  */
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import { Save, Scale, Trophy, Target, AlertCircle, Info, BarChart3, Cpu } from '
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import type { SettingValue } from '../SettingsTab'
+import { adminFetch } from '@/lib/admin/api'
 
 interface EvaluationSettingsPanelProps {
   settings: SettingValue[]
@@ -55,6 +56,25 @@ export function EvaluationSettingsPanel({
   const [editingPerformance, setEditingPerformance] = useState(false)
   const [tempPerformance, setTempPerformance] = useState<Record<string, unknown>>({})
   const [editReason, setEditReason] = useState('')
+  const [metrics, setMetrics] = useState<{ avgLayerCMs: number | null; sampleSize: number } | null>(
+    null
+  )
+
+  useEffect(() => {
+    async function loadMetrics() {
+      try {
+        const res = await adminFetch('/api/admin/actuarial/performance-metrics')
+        if (!res.ok) return
+        const json = await res.json()
+        if (json.success && json.data) {
+          setMetrics(json.data)
+        }
+      } catch (err) {
+        console.error('Failed to load performance metrics', err)
+      }
+    }
+    loadMetrics()
+  }, [])
 
   // Calculate current weight values
   const currentWeights = useMemo(() => {
@@ -569,6 +589,12 @@ export function EvaluationSettingsPanel({
                     Number of Monte Carlo simulations per evaluation. Higher is more accurate but
                     slower.
                   </p>
+                  {metrics && metrics.sampleSize > 0 && (
+                    <p className="text-xs text-blue-600 font-medium">
+                      Average simulation time: {metrics.avgLayerCMs}ms (last {metrics.sampleSize}{' '}
+                      runs)
+                    </p>
+                  )}
                 </div>
                 <div className="font-mono bg-white px-3 py-1 rounded text-lg font-semibold border shadow-sm">
                   {Number(

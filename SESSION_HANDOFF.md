@@ -11,8 +11,8 @@
 | **Tests** | 15,960 tests (15,958 passing, 335 files, 1 pre-existing flaky failure) |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
-| **Branch** | `gemini20260301` |
-| **Production Status** | **Actuarial Engine Admin UI & DB Integration Complete**; Web Worker iteration config wired to Admin Settings UI; Monte Carlo confidence bounds tracking added to DB; Historical Trend Chart (Recharts) integrated seamlessly into PolicyDetailView. |
+| **Branch** | `gemini202603011952` |
+| **Production Status** | **Actuarial Engine Analytics & Admin Observability Complete**; Layer A AI Memoization/Caching implemented; Automated E2E Analytics Tests passing; P1 Error Spikes (5% thresholds) bound to Push Notifications; Web Worker iteration config wired to Admin Settings UI; Historical Trend Chart (Recharts) integrated. |
 
 ---
 
@@ -33,6 +33,26 @@
   - Embedded the chart directly inside the `PolicyDetailView` results panel.
   - Fixed an unauthenticated data fetch bug by routing requests through `adminFetch`.
   - Added a secondary Y-axis with `Intl.NumberFormat` compact formatting to prevent UI clipping on large values.
+- **Performance Profiling & Telemetry**:
+  - `20260301170937_actuarial_layer_timings.sql` added `layer_a_ms` through `layer_d_ms` to `actuarial_evaluation_runs`.
+  - `GET /api/admin/actuarial/performance-metrics` created to fetch rolling average evaluation duration metrics over the last 24h.
+  - `EvaluationSettingsPanel` now reads and displays actual worker simulation timings directly next to the iteration slider using the new metrics endpoint.
+  - `ProcessingLogger` completely wired to log the `actuarial_evaluation` stage during standard policy document ingestion flows.
+
+### Phase 10 — Actuarial Engine Analytics & Observability (March 1, 2026)
+- **Automated E2E Monitoring Coverage**:
+  - `e2e/actuarial-analytics.spec.ts` written using Playwright to test API aggregation functions.
+  - Snapshot bounds asserting `< 5000ms` total latencies and `< 3000ms` layer-specific benchmarks.
+- **Data Caching & Memoization**:
+  - Implemented an LRU `Map` cache inside `layer-a/semantic-exclusions.ts` using `crypto.createHash('sha256')`.
+  - Memoizes duplicate exclusions to bypass redundant evaluations entirely.
+- **Actionable Alarm Subscriptions**:
+  - Wired `checkActuarialHealth` into `server/services/notification-service.ts`.
+  - Polled natively from the Admin `/api/admin/monitoring/health` pulse endpoints.
+  - Automatically dispatches Push Notifications to Admin devices if rolling 24h failure rates exceed 5%.
+  - Added debounce timers (5m DB check, 1h alert span) to prevent WebPush spamming.
+- **Admin Configuration Web UI & Trend Analytics**:
+  - Implemented the `ActuarialAnalyticsTab` UI using Recharts for daily latency vs. completion bounds.
 
 ---
 
@@ -40,8 +60,8 @@
 
 | File | Change |
 |--------------|--------|
-| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle and scalable iteration slider (up to 250k) |
-| `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** — DB config map and Historical confidence columns |
+| `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` | **UPDATED** — Added Web Workers toggle, scalable iteration slider, and real-time performance feedback |
+| `supabase/migrations/20260301170937_actuarial_layer_timings.sql` | **NEW** — Granular layer timings for actuarial evaluation |
 | `src/lib/config/types.ts` | **UPDATED** — Added worker configuration properties |
 | `src/lib/actuarial-engine/engine.ts` | **UPDATED** — Wired worker config properties mapping for dynamic async evaluations |
 | `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **UPDATED** — Recharts visualization with dual-axis mapping and adminFetch integration |
@@ -54,8 +74,21 @@
 | `src/lib/actuarial-engine/actuarial.worker.ts` | **NEW** — Web worker implementation for Monte Carlo |
 | `src/lib/actuarial-engine/layer-b/*-rules.ts` | **NEW** — Life, Health, and Business specific rule gates |
 | `server/__tests__/admin-actuarial-routes.test.ts` | **UPDATED** — Syncing integration tests with confidence bounds |
-| `CLAUDE.md` | Updated status, highlighted the new Recharts visualizations and web worker UI |
-| `SESSION_HANDOFF.md` | Documenting Phase 8/9 architecture and visualization completion |
+| `docs/adr/017-actuarial-observability-caching.md` | **NEW** — Architecture record for Web Worker layer memoization, caching, and polling alerts |
+| `e2e/actuarial-analytics.spec.ts` | **NEW** — End-to-end latency constraint snapshot tests |
+| `server/__tests__/admin-actuarial-analytics.test.ts` | **NEW** — Backend integration tests for layer analytics |
+| `server/routes/admin/monitoring.ts` | **UPDATED** — Wired actuarial health polling |
+| `server/services/actuarial-persistence.ts` | **UPDATED** — Persistence logic extracts layer bounds natively |
+| `server/services/notification-service.ts` | **UPDATED** — 5% rolling failure alert bounds and debounce checks |
+| `src/components/admin/AdminDashboard.tsx` | **UPDATED** — Added ActuarialAnalyticsTab |
+| `src/components/admin/DocumentJourneyViewer.tsx` | **UPDATED** — Actuarial component execution logging |
+| `src/components/admin/tabs/ActuarialAnalyticsTab.tsx` | **NEW** — Volume/Latency Recharts visualization |
+| `src/lib/actuarial-engine/layer-a/semantic-exclusions.ts` | **UPDATED** — SHA-256 LRU memoization caching |
+| `src/lib/actuarial-engine/actuarial-events.ts` | **UPDATED** — Client emitter for timing extraction |
+| `src/types/admin.ts` | **UPDATED** — Analytics type definitions |
+| `src/types/processing-log.ts` | **UPDATED** — Actuarial log pipeline staging |
+| `CLAUDE.md` | **UPDATED** — Synced new Recharts visualizations and gotchas |
+| `SESSION_HANDOFF.md` | **UPDATED** — Documenting Phase 9/10 analytics completion |
 
 ---
 
@@ -79,10 +112,11 @@
 
 ### P1 — General Analytics & Fine-Tuning
 - Actuarial Engine visual components and Web Worker configurations are now fully stable up to 250,000 iterations.
-- Next priority is real-world performance monitoring as users invoke evaluations to assess server stability and cost limitations.
+- Real-world performance monitoring APIs (`/api/admin/actuarial/analytics`) are live.
+- Next priority: Wait for production user data to stream in and monitor the >5% spike push notifications.
 
 ### P2 — Ongoing Optimization
-- Review evaluation logs in Datadog/Supabase to observe average duration bounds.
+- Review evaluation logs in Datadog/Supabase to observe if Layer A hits cache memory accurately or if it requires DB-persistence (Postgres text search vs Node maps).
 
 ---
 
@@ -94,4 +128,4 @@
 | Feb 28 late | P1/P2/P3/P5: Event bus wiring, persistence service, feature flag API | `gemini202602281715` |
 | Mar 1 early | Phase 7: Production deployment (Migration 028 + Feature Flag) | `gemini202603010814` |
 | Mar 1 late | Phase 8: Optimization (Web Worker) & Expansion (Health/Life/Business Policy Support) | `gemini20260301` |
-| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini20260301`** |
+| **Mar 1 End** | **Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations** | **`gemini202603011952`** |

@@ -218,9 +218,27 @@ const EXCLUSION_PATTERNS: ExclusionPattern[] = [
 // PUBLIC API
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { createHash } from 'crypto'
+
+/**
+ * In-memory LRU-style cache for semantic exclusion texts.
+ * Maps SHA-256 hash of the exclusion text to its SemanticExclusionImpact.
+ * This prevents re-analyzing identical policy exclusions across thousands of evaluations.
+ */
+const EXCLUSION_MEMO_CACHE = new Map<string, SemanticExclusionImpact>()
+const MAX_CACHE_SIZE = 10000
+
+/**
+ * Generates a SHA-256 hash of the exclusion text for fast cache lookups.
+ */
+function hashExclusion(text: string): string {
+  return createHash('sha256').update(text).digest('hex')
+}
+
 /**
  * Analyzes exclusion texts using pattern-based classification.
  * This is the deterministic fallback — no LLM required.
+ * Accelerated with SHA-256 caching for frequently seen identical clauses.
  *
  * @param exclusionTexts - Raw exclusion text strings from the policy
  * @param evidence - Optional evidence pointers for each exclusion text
@@ -235,6 +253,19 @@ export function analyzeExclusions(
   for (let i = 0; i < exclusionTexts.length; i++) {
     const text = exclusionTexts[i]
     const textEvidence = evidence?.[i] ?? []
+
+    // Check cache first to bypass expensive regex scanning
+    const hash = hashExclusion(text)
+    const cachedItem = EXCLUSION_MEMO_CACHE.get(hash)
+    if (cachedItem) {
+      // Return a copy but map the new evidence pointers if applicable
+      results.push({
+        ...cachedItem,
+        evidence: textEvidence,
+        needsReview: textEvidence.length === 0,
+      })
+      continue
+    }
 
     const matchedPatterns = findMatchingPatterns(text)
 
@@ -268,14 +299,24 @@ export function analyzeExclusions(
       rationales.push(pattern.rationale)
     }
 
-    results.push({
+    const impact: SemanticExclusionImpact = {
       exclusionText: text,
       affectedScenarios: [...allScenarios],
       severity: maxSeverity,
       rationale: rationales.join('; '),
       evidence: textEvidence,
       needsReview: textEvidence.length === 0,
-    })
+    }
+
+    // Evict oldest item if we exceed max size (basic FIFO mechanism)
+    if (EXCLUSION_MEMO_CACHE.size >= MAX_CACHE_SIZE) {
+      const firstKey = EXCLUSION_MEMO_CACHE.keys().next().value
+      if (firstKey) EXCLUSION_MEMO_CACHE.delete(firstKey)
+    }
+
+    // Store in cache without specific evidence (evidence is mapped on recovery)
+    EXCLUSION_MEMO_CACHE.set(hash, { ...impact, evidence: [] })
+    results.push(impact)
   }
 
   return results

@@ -37,7 +37,7 @@ export function configureWebPush(): void {
 
   if (!publicKey || !privateKey) {
     log.warn('VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY not set — push notifications disabled', {
-      hint: 'Generate keys: node -e "const wp=require(\'web-push\'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"'
+      hint: 'Generate keys: node -e "const wp=require(\'web-push\'); console.log(JSON.stringify(wp.generateVAPIDKeys(),null,2))"',
     })
     return
   }
@@ -48,7 +48,7 @@ export function configureWebPush(): void {
     log.info('Web push VAPID configured successfully')
   } catch (error) {
     log.warn('Failed to configure web push VAPID', {
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     })
   }
 }
@@ -97,10 +97,7 @@ export interface PushPayload {
  *
  * @returns number of successful sends (0 if push not configured or no subscriptions)
  */
-export async function sendPushNotification(
-  userId: string,
-  payload: PushPayload
-): Promise<number> {
+export async function sendPushNotification(userId: string, payload: PushPayload): Promise<number> {
   if (!webPushConfigured) return 0
 
   const db = getSupabase()
@@ -141,7 +138,8 @@ export async function sendPushNotification(
         if (statusCode === 410 || statusCode === 404) {
           // Subscription is gone — browser unsubscribed or push service removed it
           log.info('Push subscription expired, marking for removal', {
-            userId, endpoint: sub.endpoint.substring(0, 50) + '...'
+            userId,
+            endpoint: sub.endpoint.substring(0, 50) + '...',
           })
           staleEndpoints.push(sub.endpoint)
         } else {
@@ -158,17 +156,17 @@ export async function sendPushNotification(
   // Clean up stale subscriptions (non-blocking)
   if (staleEndpoints.length > 0) {
     Promise.resolve(
-      db.from('push_subscriptions')
-        .delete()
-        .eq('user_id', userId)
-        .in('endpoint', staleEndpoints)
-    ).then(() => {
-      log.info('Removed stale push subscriptions', { userId, count: staleEndpoints.length })
-    }).catch((err: unknown) => {
-      log.warn('Failed to remove stale push subscriptions', {
-        userId, error: err instanceof Error ? err.message : String(err)
+      db.from('push_subscriptions').delete().eq('user_id', userId).in('endpoint', staleEndpoints)
+    )
+      .then(() => {
+        log.info('Removed stale push subscriptions', { userId, count: staleEndpoints.length })
       })
-    })
+      .catch((err: unknown) => {
+        log.warn('Failed to remove stale push subscriptions', {
+          userId,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      })
   }
 
   return successCount
@@ -188,9 +186,7 @@ export async function sendExtractionCompleteNotification(
   policyType: string,
   policyNumber: string | null
 ): Promise<void> {
-  const policyLabel = policyNumber
-    ? `${policyType} – ${policyNumber}`
-    : policyType
+  const policyLabel = policyNumber ? `${policyType} – ${policyNumber}` : policyType
 
   await sendPushNotification(userId, {
     title: 'Analiz tamamlandı ✓',
@@ -212,9 +208,7 @@ export async function sendPolicyExpiryNotification(
   policyNumber: string | null,
   daysUntilExpiry: number
 ): Promise<void> {
-  const policyLabel = policyNumber
-    ? `${policyType} – ${policyNumber}`
-    : policyType
+  const policyLabel = policyNumber ? `${policyType} – ${policyNumber}` : policyType
 
   await sendPushNotification(userId, {
     title: `Poliçe bitiyor: ${daysUntilExpiry} gün`,
@@ -225,4 +219,75 @@ export async function sendPolicyExpiryNotification(
       { action: 'dismiss', title: 'Kapat' },
     ],
   })
+}
+
+// ---------------------------------------------------------------------------
+// Actuarial Health Monitoring
+// ---------------------------------------------------------------------------
+
+let lastActuarialCheckTime = 0
+const ACTUARIAL_CHECK_COOLDOWN_MS = 5 * 60 * 1000 // 5 minutes
+
+const lastActuarialAlertTime = 0
+const ACTUARIAL_ALERT_COOLDOWN_MS = 60 * 60 * 1000 // 1 hour
+
+/**
+ * Checks the actuarial evaluation 24-hour error bounds.
+ * If the failure rate exceeds 5% (0.05), a push notification is dispatched
+ * to all admin users alerting them of an API instability spike.
+ */
+export async function checkActuarialHealth(): Promise<void> {
+  const now = Date.now()
+
+  // If we recently alerted, don't spam admins and don't bother checking DB
+  if (now - lastActuarialAlertTime < ACTUARIAL_ALERT_COOLDOWN_MS) return
+
+  // Rate limit the DB checks to once every 5 minutes
+  if (now - lastActuarialCheckTime < ACTUARIAL_CHECK_COOLDOWN_MS) return
+
+  lastActuarialCheckTime = now
+
+  const db = getSupabase()
+  if (!db) return
+
+  // 24 hour lookback
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: runs, error } = await db
+    .from('actuarial_evaluation_runs')
+    .select('status')
+    .gte('created_at', yesterday)
+
+  if (error || !runs || runs.length === 0) return
+
+  const total = runs.length
+  const failed = runs.filter(
+    (r: { status: string }) => r.status === 'failed' || r.status === 'blocked'
+  ).length
+  const errorRate = failed / total
+
+  if (total > 10 && errorRate > 0.05) {
+    // Need at least 10 runs to signify a spike vs 1 bad attempt
+    const percentStr = (errorRate * 100).toFixed(1) + '%'
+    log.warn(`Actuarial error spike detected: ${percentStr} failure rate over last 24h`)
+
+    // Fetch admins to alert
+    const { data: admins } = await db.from('profiles').select('id').eq('role', 'admin')
+
+    if (admins) {
+      await Promise.all(
+        admins.map((admin: { id: string }) =>
+          sendPushNotification(admin.id, {
+            title: '⚠️ Actuarial Engine Spike',
+            body: `Engine failure rate hit ${percentStr} over the last 24h.`,
+            url: `${APP_URL}/admin?tab=actuarial_analytics`,
+            actions: [
+              { action: 'view', title: 'Analytics' },
+              { action: 'dismiss', title: 'Dismiss' },
+            ],
+          })
+        )
+      )
+    }
+  }
 }

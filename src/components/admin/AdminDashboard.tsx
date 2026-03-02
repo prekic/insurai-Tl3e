@@ -31,6 +31,7 @@ import { BenchmarksTab } from './tabs/BenchmarksTab'
 import { TranslationsTab } from './tabs/TranslationsTab'
 import { ExtractionHealthTab } from './tabs/ExtractionHealthTab'
 import { ActuarialTab } from './tabs/ActuarialTab'
+import { ActuarialAnalyticsTab } from './tabs/ActuarialAnalyticsTab'
 
 import { cn } from '@/lib/utils'
 
@@ -60,6 +61,7 @@ import {
   Menu,
   X,
   Calculator,
+  LineChart as LineChartIcon,
 } from 'lucide-react'
 
 const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
@@ -81,6 +83,11 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
   { id: 'alerts', label: 'Alerts', icon: <Bell className="h-4 w-4" /> },
   { id: 'extraction_health', label: 'Extraction Health', icon: <Activity className="h-4 w-4" /> },
   { id: 'actuarial', label: 'Actuarial Engine', icon: <Calculator className="h-4 w-4" /> },
+  {
+    id: 'actuarial_analytics',
+    label: 'Actuarial Analytics',
+    icon: <LineChartIcon className="h-4 w-4" />,
+  },
 ]
 
 export function AdminDashboard() {
@@ -231,6 +238,8 @@ export function AdminDashboard() {
         return <ExtractionHealthTab />
       case 'actuarial':
         return <ActuarialTab />
+      case 'actuarial_analytics':
+        return <ActuarialAnalyticsTab />
       default:
         return <OverviewTab systemHealth={systemHealth} />
     }

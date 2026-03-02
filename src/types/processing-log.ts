@@ -21,6 +21,7 @@ export type ProcessingStage =
   | 'duplicate_check' // Duplicate/amendment detection
   | 'conflict_resolution' // User resolved duplicate conflict
   | 'database_save' // Save to Supabase
+  | 'actuarial_evaluation' // Post-extraction actuarial engine evaluation
 
 /**
  * Status of a processing stage
@@ -312,6 +313,15 @@ export const STAGE_CONFIGS: Record<ProcessingStage, StageConfig> = {
     icon: 'Database',
     color: 'green',
   },
+  actuarial_evaluation: {
+    name: 'actuarial_evaluation',
+    label: 'Actuarial Evaluation',
+    labelTr: 'Aktüeryal Değerlendirme',
+    description: 'Actuarial scoring (Monte Carlo & TOPSIS)',
+    descriptionTr: 'Aktüeryal skorlama (Monte Carlo ve TOPSIS)',
+    icon: 'Calculator',
+    color: 'teal',
+  },
 }
 
 /**
@@ -331,4 +341,5 @@ export const PIPELINE_STAGES: ProcessingStage[] = [
   'duplicate_check',
   'conflict_resolution',
   'database_save',
+  'actuarial_evaluation',
 ]
