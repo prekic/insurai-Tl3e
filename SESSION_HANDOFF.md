@@ -111,6 +111,9 @@
 ### Gotcha: Nixpacks Caddy Auto-Detection on Railway (Deployment)
 - Railway's Nixpacks builder auto-detects `index.html` in `dist/` and provisions Caddy, causing port conflicts. It also natively pulls Playwright deps bloating the image. Fix requires strictly defining `providers = ["node"]` within `nixpacks.toml`.
 
+### Gotcha: Nixpacks Vite Cache Poisoning (Deployment)
+- Nixpacks mounts `node_modules/.cache` as a persistent cache volume across Docker builds. If a file causes a Rollup/Vite error and is later fixed, the old cached AST might still break future builds with false-positive stale errors. The fix is to prepend `rm -rf node_modules/.cache node_modules/.vite` to the `build` script in `package.json`.
+
 ---
 
 ### Gotcha: Unhandled Rejections in React 19 / Vitest Teardown (Testing)
