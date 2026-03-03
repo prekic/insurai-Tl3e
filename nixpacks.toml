@@ -5,11 +5,17 @@
 # Express already serves static files, so Caddy is not needed
 providers = ["node"]
 
+[variables]
+# Suppress Caddy SPA auto-detection (triggered by index.html in project root)
+NIXPACKS_SPA_CADDY = "false"
+# Skip Playwright browser downloads during npm install (not needed in production)
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
 [phases.setup]
-# Extend default packages, add only non-Node extras
-# Node.js version is auto-detected from .nvmrc (22)
-# NPM is bundled with Node.js — no need to specify separately
+# Extend Node defaults (nodejs + npm auto-detected from .nvmrc) with openssl
 nixPkgs = ["...", "openssl"]
+# Do NOT install Chromium or browser system deps — only needed for E2E testing
+aptPkgs = []
 
 [phases.install]
 cmds = ["npm ci --include=dev"]
