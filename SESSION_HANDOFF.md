@@ -145,3 +145,4 @@
 | Mar 1 End | Phase 9: Actuarial Engine DB Trackers & Admin Performance Dashboards / Visualizations | `gemini202603011952` |
 | Mar 2 | Phase 10: Flaky test cleanup, Vitest memory leak fixes, and caching strategy analysis | `gemini202604020525` |
 | **Mar 2** | **Phase 11: Fix `pdfSuccess` i18n crash and Node `crypto` import build breaker** | **`gemini202603021907`** |
+| **Mar 3** | **Phase 12: Fix UI flashing on initial load and resolve mixed localizations rendering in PolicyDetailView** | **`gemini20260303_fixes`** |

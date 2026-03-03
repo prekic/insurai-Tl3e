@@ -31,9 +31,7 @@ const PolicyChat = lazy(() =>
 const MyAccount = lazy(() =>
   import('./components/MyAccount').then((m) => ({ default: m.MyAccount }))
 )
-const Settings = lazy(() =>
-  import('./components/Settings').then((m) => ({ default: m.Settings }))
-)
+const Settings = lazy(() => import('./components/Settings').then((m) => ({ default: m.Settings })))
 const HelpCenter = lazy(() =>
   import('./components/HelpCenter').then((m) => ({ default: m.HelpCenter }))
 )
@@ -43,12 +41,8 @@ const AllSamplesDemo = lazy(() =>
 const ComparePolicies = lazy(() =>
   import('./components/ComparePolicies').then((m) => ({ default: m.ComparePolicies }))
 )
-const NotFound = lazy(() =>
-  import('./components/NotFound').then((m) => ({ default: m.NotFound }))
-)
-const AuthPage = lazy(() =>
-  import('./components/AuthPage').then((m) => ({ default: m.AuthPage }))
-)
+const NotFound = lazy(() => import('./components/NotFound').then((m) => ({ default: m.NotFound })))
+const AuthPage = lazy(() => import('./components/AuthPage').then((m) => ({ default: m.AuthPage })))
 const TryAnalysis = lazy(() =>
   import('./components/TryAnalysis').then((m) => ({ default: m.TryAnalysis }))
 )
@@ -69,10 +63,10 @@ const AdminLogin = lazy(() =>
 const ROUTES = {
   home: '/',
   auth: '/auth',
-  try: '/try',  // Free trial analysis (no auth required)
-  trialPolicy: '/policy/trial',  // Trial analysis result view (no auth required)
-  share: '/share/:shareId',  // Shared trial result (no auth required)
-  unsubscribe: '/unsubscribe',  // Email unsubscribe (no auth required)
+  try: '/try', // Free trial analysis (no auth required)
+  trialPolicy: '/policy/trial', // Trial analysis result view (no auth required)
+  share: '/share/:shareId', // Shared trial result (no auth required)
+  unsubscribe: '/unsubscribe', // Email unsubscribe (no auth required)
   upload: '/upload',
   dashboard: '/dashboard',
   policy: '/policy/:id',
@@ -104,7 +98,7 @@ export default function App() {
 // Inner app content that handles routing
 function AppContent() {
   const location = useLocation()
-  const { t } = useI18n()
+  const { t, isLoading } = useI18n()
   const isLandingPage = location.pathname === '/'
   const isAuthPage = location.pathname === '/auth'
   const isAdminPage = location.pathname.startsWith('/admin')
@@ -138,9 +132,7 @@ function AppContent() {
       if (synced > 0) {
         const label = synced === 1 ? t.upload.analysisComplete : t.upload.analysisComplete
         toast.success(label, {
-          description: synced === 1
-            ? t.upload.savedToCloud
-            : `${synced} ${t.upload.savedToCloud}`,
+          description: synced === 1 ? t.upload.savedToCloud : `${synced} ${t.upload.savedToCloud}`,
         })
       }
     })
@@ -165,12 +157,12 @@ function AppContent() {
       {!hideNavigation && <GlobalNavigation />}
 
       <main id="main-content" tabIndex={-1} className="w-full max-w-[100vw] overflow-x-hidden">
-        <Suspense fallback={<PageLoader />}>
+        {isLoading ? (
+          <PageLoader />
+        ) : (
+          <Suspense fallback={<PageLoader />}>
             <Routes location={location}>
-              <Route
-                path="/"
-                element={<LandingPage />}
-              />
+              <Route path="/" element={<LandingPage />} />
               <Route
                 path="/auth"
                 element={
@@ -324,7 +316,8 @@ function AppContent() {
                 }
               />
             </Routes>
-        </Suspense>
+          </Suspense>
+        )}
       </main>
     </ErrorBoundary>
   )

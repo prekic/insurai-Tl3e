@@ -1,4 +1,18 @@
-import { Shield, LayoutDashboard, MessageSquare, User, Settings, HelpCircle, Upload, Bell, ChevronDown, LogOut, LogIn, Scale, Globe } from 'lucide-react'
+import {
+  Shield,
+  LayoutDashboard,
+  MessageSquare,
+  User,
+  Settings,
+  HelpCircle,
+  Upload,
+  Bell,
+  ChevronDown,
+  LogOut,
+  LogIn,
+  Scale,
+  Globe,
+} from 'lucide-react'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -8,7 +22,7 @@ import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { useTranslation, useLanguageSelector } from '@/lib/i18n/i18n-context'
 
 export function GlobalNavigation() {
-  const { t } = useTranslation()
+  const { t, isLoading } = useTranslation()
   const { currentLocale: locale, locales: availableLocales, setLocale } = useLanguageSelector()
   const location = useLocation()
   const navigate = useNavigate()
@@ -26,43 +40,46 @@ export function GlobalNavigation() {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Handle file upload directly from navigation
-  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFiles = Array.from(e.target.files || [])
-    if (selectedFiles.length === 0) return
+  const handleFileSelect = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const selectedFiles = Array.from(e.target.files || [])
+      if (selectedFiles.length === 0) return
 
-    // Validate files
-    const { valid, errors } = validateFiles(selectedFiles)
+      // Validate files
+      const { valid, errors } = validateFiles(selectedFiles)
 
-    // Show error toasts for invalid files
-    errors.forEach((error) => {
-      const errorInfo = getErrorMessage(error.code)
-      toast.error(errorInfo.title, {
-        description: error.details || errorInfo.description,
-        duration: 5000,
+      // Show error toasts for invalid files
+      errors.forEach((error) => {
+        const errorInfo = getErrorMessage(error.code)
+        toast.error(errorInfo.title, {
+          description: error.details || errorInfo.description,
+          duration: 5000,
+        })
       })
-    })
 
-    if (valid.length > 0) {
-      // Navigate to upload page with the files
-      // Store files in sessionStorage temporarily
-      const fileData = valid.map(f => ({
-        name: f.name,
-        size: f.size,
-        type: f.type,
-      }))
-      sessionStorage.setItem('pendingUploadFiles', JSON.stringify(fileData))
+      if (valid.length > 0) {
+        // Navigate to upload page with the files
+        // Store files in sessionStorage temporarily
+        const fileData = valid.map((f) => ({
+          name: f.name,
+          size: f.size,
+          type: f.type,
+        }))
+        sessionStorage.setItem('pendingUploadFiles', JSON.stringify(fileData))
 
-      // Create a global event to pass the actual files
-      const event = new CustomEvent('filesSelected', { detail: valid })
-      window.dispatchEvent(event)
+        // Create a global event to pass the actual files
+        const event = new CustomEvent('filesSelected', { detail: valid })
+        window.dispatchEvent(event)
 
-      // Navigate to upload page (it will pick up the files)
-      navigate('/upload', { state: { filesReady: true } })
-    }
+        // Navigate to upload page (it will pick up the files)
+        navigate('/upload', { state: { filesReady: true } })
+      }
 
-    // Reset input
-    e.target.value = ''
-  }, [navigate])
+      // Reset input
+      e.target.value = ''
+    },
+    [navigate]
+  )
 
   const triggerFileUpload = useCallback(() => {
     fileInputRef.current?.click()
@@ -143,6 +160,12 @@ export function GlobalNavigation() {
       // Navigate anyway on error
       navigate('/')
     }
+  }
+
+  if (isLoading) {
+    return (
+      <nav className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm w-full h-16" />
+    )
   }
 
   return (
@@ -237,7 +260,10 @@ export function GlobalNavigation() {
                     {availableLocales.map((l) => (
                       <button
                         key={l.code}
-                        onClick={() => { setLocale(l.code); setShowLanguagePicker(false) }}
+                        onClick={() => {
+                          setLocale(l.code)
+                          setShowLanguagePicker(false)
+                        }}
                         role="radio"
                         aria-checked={locale === l.code}
                         className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
@@ -283,7 +309,9 @@ export function GlobalNavigation() {
                       aria-label="Notifications"
                     >
                       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-                        <span className="font-semibold text-gray-900 text-sm">{t.nav.notifications}</span>
+                        <span className="font-semibold text-gray-900 text-sm">
+                          {t.nav.notifications}
+                        </span>
                       </div>
                       <div className="py-8 text-center text-sm text-gray-500">
                         <Bell size={24} className="mx-auto mb-2 text-gray-300" />
@@ -333,9 +361,7 @@ export function GlobalNavigation() {
                   setShowProfileMenu(!showProfileMenu)
                 }}
                 className={`flex items-center gap-2 p-1.5 rounded-full transition-all focus-ring ${
-                  showProfileMenu
-                    ? 'bg-blue-50 ring-2 ring-blue-500'
-                    : 'hover:bg-gray-100'
+                  showProfileMenu ? 'bg-blue-50 ring-2 ring-blue-500' : 'hover:bg-gray-100'
                 }`}
                 aria-expanded={showProfileMenu}
                 aria-haspopup="menu"
@@ -344,7 +370,12 @@ export function GlobalNavigation() {
                 <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-sm">
                   {user?.user_metadata?.full_name ? (
                     <span className="text-white font-semibold text-sm">
-                      {user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                      {user.user_metadata.full_name
+                        .split(' ')
+                        .map((n: string) => n[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase()}
                     </span>
                   ) : user?.email ? (
                     <span className="text-white font-semibold text-sm">
@@ -381,7 +412,12 @@ export function GlobalNavigation() {
                         <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-md">
                           {user?.user_metadata?.full_name ? (
                             <span className="text-white font-bold text-base">
-                              {user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                              {user.user_metadata.full_name
+                                .split(' ')
+                                .map((n: string) => n[0])
+                                .join('')
+                                .slice(0, 2)
+                                .toUpperCase()}
                             </span>
                           ) : user?.email ? (
                             <span className="text-white font-bold text-base">
@@ -393,9 +429,13 @@ export function GlobalNavigation() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 truncate">
-                            {user?.user_metadata?.full_name || user?.email?.split('@')[0] || t.landing.guest}
+                            {user?.user_metadata?.full_name ||
+                              user?.email?.split('@')[0] ||
+                              t.landing.guest}
                           </p>
-                          <p className="text-sm text-gray-500 truncate">{user?.email || t.landing.notSignedIn}</p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {user?.email || t.landing.notSignedIn}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -409,7 +449,11 @@ export function GlobalNavigation() {
                           role="menuitem"
                         >
                           <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                            <User size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                            <User
+                              size={16}
+                              className="text-gray-500 group-hover:text-blue-600"
+                              aria-hidden="true"
+                            />
                           </div>
                           <div>
                             <span className="font-medium">{t.nav.myAccount}</span>
@@ -422,7 +466,11 @@ export function GlobalNavigation() {
                         role="menuitem"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                          <Settings size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                          <Settings
+                            size={16}
+                            className="text-gray-500 group-hover:text-blue-600"
+                            aria-hidden="true"
+                          />
                         </div>
                         <div>
                           <span className="font-medium">{t.nav.settings}</span>
@@ -434,7 +482,11 @@ export function GlobalNavigation() {
                         role="menuitem"
                       >
                         <div className="w-8 h-8 rounded-lg bg-gray-100 group-hover:bg-blue-100 flex items-center justify-center transition-colors">
-                          <HelpCircle size={16} className="text-gray-500 group-hover:text-blue-600" aria-hidden="true" />
+                          <HelpCircle
+                            size={16}
+                            className="text-gray-500 group-hover:text-blue-600"
+                            aria-hidden="true"
+                          />
                         </div>
                         <div>
                           <span className="font-medium">{t.nav.helpCenter}</span>

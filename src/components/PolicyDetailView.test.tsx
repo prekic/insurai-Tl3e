@@ -217,8 +217,8 @@ describe('PolicyDetailView', () => {
     it('should render Policy Overview section', () => {
       renderPolicyDetailView()
 
-      // Mobile-first design uses locale-dependent labels (Turkish by default)
-      expect(screen.getByText(/Policy Overview|Poliçe Özeti/)).toBeInTheDocument()
+      // Mobile-first design uses locale-dependent labels
+      expect(screen.getByText(/Policy Summary|Poliçe Özeti/i)).toBeInTheDocument()
     })
 
     it('should display policy type', () => {
@@ -297,8 +297,8 @@ describe('PolicyDetailView', () => {
     it('should render Coverage Details section', () => {
       renderPolicyDetailView()
 
-      // Now using hardcoded Turkish: "Teminat Detayları"
-      expect(screen.getByText('Teminat Detayları')).toBeInTheDocument()
+      // Coverage Details section check
+      expect(screen.getByText(/Coverage Details|Teminat Detayları/i)).toBeInTheDocument()
     })
 
     it('should display included coverages', () => {
@@ -338,7 +338,7 @@ describe('PolicyDetailView', () => {
 
       // The component uses various bg classes for coverage items
       // Just verify the coverage section renders
-      const coverageSection = screen.getByText('Teminat Detayları')
+      const coverageSection = screen.getByText(/Coverage Details|Teminat Detayları/i)
       expect(coverageSection).toBeInTheDocument()
     })
 
@@ -384,16 +384,16 @@ describe('PolicyDetailView', () => {
       mockGetPolicyById.mockReturnValue({ ...mockPolicy, status: 'expiring' })
       renderPolicyDetailView()
 
-      // Now using hardcoded Turkish: "Bitiyor"
-      expect(screen.getByText('Bitiyor')).toBeInTheDocument()
+      // Check localized expiring string
+      expect(screen.getAllByText(/Expiring Soon|Bitiyor/i).length).toBeGreaterThan(0)
     })
 
     it('should display start and expiry dates', () => {
       renderPolicyDetailView()
 
-      // Now using hardcoded Turkish: "Başlangıç:" and "Bitiş:"
-      expect(screen.getByText('Başlangıç:')).toBeInTheDocument()
-      expect(screen.getByText('Bitiş:')).toBeInTheDocument()
+      // Locales check for start and expiry date labels
+      expect(screen.getByText(/Start:|Başlangıç:/i)).toBeInTheDocument()
+      expect(screen.getByText(/End:|Bitiş:/i)).toBeInTheDocument()
     })
   })
 
@@ -508,8 +508,8 @@ describe('PolicyDetailView Edge Cases', () => {
     mockGetPolicyById.mockReturnValue({ ...mockPolicy, coverages: [] })
     renderPolicyDetailView()
 
-    // Now using hardcoded Turkish: "Teminat Detayları"
-    expect(screen.getByText('Teminat Detayları')).toBeInTheDocument()
+    // Coverage Details fallback check
+    expect(screen.getByText(/Coverage Details|Teminat Detayları/i)).toBeInTheDocument()
   })
 
   it('should handle policy with no exclusions', () => {
@@ -518,7 +518,7 @@ describe('PolicyDetailView Edge Cases', () => {
 
     // Exclusions section may use Turkish or English, or may be hidden when empty
     // Just verify the component renders without error
-    expect(screen.getByText(/Teminat Detayları/)).toBeInTheDocument()
+    expect(screen.getByText(/Coverage Details|Teminat Detayları/i)).toBeInTheDocument()
   })
 
   it('should handle policy with no AI insights', () => {
