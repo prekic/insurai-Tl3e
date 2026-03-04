@@ -652,6 +652,7 @@ interface QuickStatsCardProps {
 }
 
 function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
+  const { locale } = useI18n()
   const avgScore = Math.round(
     comparison.policies.reduce((sum, p) => sum + p.evaluation.overallScore, 0) /
       comparison.policies.length
@@ -673,12 +674,12 @@ function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
     },
     {
       label: t.comparison.avgPremium,
-      value: formatCurrency(avgPremium),
+      value: formatCurrency(avgPremium, 'TRY', locale),
       icon: <TrendingUp className="w-5 h-5 text-amber-500" />,
     },
     {
       label: t.comparison.totalCoverage,
-      value: formatCurrency(totalCoverage),
+      value: formatCurrency(totalCoverage, 'TRY', locale),
       icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
     },
   ]
@@ -968,7 +969,9 @@ function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatri
                               isBest ? 'text-emerald-700' : 'text-gray-900'
                             )}
                           >
-                            {p.limit > 0 ? formatCurrency(p.limit) : t.comparison.included}
+                            {p.limit > 0
+                              ? formatCurrency(p.limit, 'TRY', locale)
+                              : t.comparison.included}
                           </span>
                           {isBest && (
                             <span className="ml-1 text-[10px] text-emerald-600 font-semibold">

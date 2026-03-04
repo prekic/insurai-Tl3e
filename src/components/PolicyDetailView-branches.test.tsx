@@ -500,10 +500,10 @@ describe('PolicyDetailView Branch Coverage', () => {
   // Policy Overview branches
   // =====================================================================
   describe('Policy Overview display', () => {
-    it('displays "Arac Rayic Bedeli" for kasko type coverage', () => {
+    it('displays "Vehicle Market Value" for kasko type coverage', () => {
       renderComponent()
       // Kasko shows market value text instead of numeric coverage
-      expect(screen.getAllByText(/Araç Rayiç Bedeli/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Vehicle Market Value/).length).toBeGreaterThan(0)
     })
 
     it('displays numeric coverage for non-kasko type', () => {
@@ -512,10 +512,10 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getAllByText(/₺350,000/).length).toBeGreaterThan(0)
     })
 
-    it('shows "Belirtilmemis" for zero premium', () => {
+    it('shows "Not specified" for zero premium', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ premium: 0 }))
       renderComponent()
-      expect(screen.getByText('Belirtilmemiş')).toBeInTheDocument()
+      expect(screen.getByText('Not specified')).toBeInTheDocument()
     })
 
     it('shows formatted premium for positive premium', () => {
@@ -523,10 +523,10 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getAllByText('₺8,500').length).toBeGreaterThan(0)
     })
 
-    it('shows "Yok" for zero deductible', () => {
+    it('shows "None" for zero deductible', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ deductible: 0 }))
       renderComponent()
-      expect(screen.getByText('Yok')).toBeInTheDocument()
+      expect(screen.getByText('None')).toBeInTheDocument()
     })
 
     it('shows formatted deductible for positive value', () => {
@@ -555,38 +555,38 @@ describe('PolicyDetailView Branch Coverage', () => {
 
     it('does NOT show location for kasko policy', () => {
       renderComponent()
-      // The location field specifically under "Konum" label should not exist for kasko
-      const konumLabels = screen.queryAllByText('Konum')
-      expect(konumLabels.length).toBe(0)
+      // The location field specifically under "Location" label should not exist for kasko
+      const locationLabels = screen.queryAllByText('Location')
+      expect(locationLabels.length).toBe(0)
     })
 
     it('does NOT show location for traffic policy', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ type: 'traffic', typeTr: 'Trafik' }))
       renderComponent()
-      const konumLabels = screen.queryAllByText('Konum')
-      expect(konumLabels.length).toBe(0)
+      const locationLabels = screen.queryAllByText('Location')
+      expect(locationLabels.length).toBe(0)
     })
 
     it('shows active status badge', () => {
       renderComponent()
-      expect(screen.getAllByText('Aktif').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Active').length).toBeGreaterThan(0)
     })
 
     it('shows expiring status badge', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ status: 'expiring' }))
       renderComponent()
-      expect(screen.getByText('Bitiyor')).toBeInTheDocument()
+      expect(screen.getAllByText('Expiring Soon').length).toBeGreaterThan(0)
     })
 
     it('shows kasko subtitle text for market value explanation', () => {
       renderComponent()
-      expect(screen.getByText('Hasar anındaki piyasa değeri')).toBeInTheDocument()
+      expect(screen.getByText('Market value at the time of loss')).toBeInTheDocument()
     })
 
     it('does NOT show market value subtitle for non-kasko', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ type: 'home', typeTr: 'Konut' }))
       renderComponent()
-      expect(screen.queryByText('Hasar anındaki piyasa değeri')).not.toBeInTheDocument()
+      expect(screen.queryByText('Market value at the time of loss')).not.toBeInTheDocument()
     })
   })
 
@@ -1001,7 +1001,7 @@ describe('PolicyDetailView Branch Coverage', () => {
     it('collapses when header is clicked', async () => {
       renderComponent()
       // Find the coverages header toggle button
-      const coverageHeader = screen.getByText('Teminat Detayları')
+      const coverageHeader = screen.getByText('Coverage Details')
       await userEvent.setup().click(coverageHeader)
       // After collapse, should show prompt text
       expect(screen.getByText('Click to view details')).toBeInTheDocument()
@@ -1010,7 +1010,7 @@ describe('PolicyDetailView Branch Coverage', () => {
     it('re-expands when header is clicked again', async () => {
       const user = userEvent.setup()
       renderComponent()
-      const coverageHeader = screen.getByText('Teminat Detayları')
+      const coverageHeader = screen.getByText('Coverage Details')
       await user.click(coverageHeader) // collapse
       await user.click(coverageHeader) // expand
       expect(screen.queryByText('Click to view details')).not.toBeInTheDocument()
@@ -1214,10 +1214,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
     })
 
-    it('shows "Rayic Deger" for isMarketValue coverage', () => {
+    it('shows "Market Value" for isMarketValue coverage', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1234,10 +1234,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0)
     })
 
-    it('shows "Dahil" for zero-limit included coverage (ikame araç)', () => {
+    it('shows "Included" for zero-limit included coverage (ikame araç)', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1253,10 +1253,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Included').length).toBeGreaterThan(0)
     })
 
-    it('shows "Sinırsız" when shouldShowUnlimited returns true (artan mali)', () => {
+    it('shows "Unlimited" when shouldShowUnlimited returns true (artan mali)', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1272,7 +1272,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
     })
 
     it('shows formatted currency for positive limit', () => {
@@ -1280,7 +1280,7 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getAllByText('₺350,000').length).toBeGreaterThan(0)
     })
 
-    it('shows "Sınırsız" for zero-limit name containing "sınırsız"', () => {
+    it('shows "Unlimited" for zero-limit name containing "sınırsız"', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1296,10 +1296,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
     })
 
-    it('shows "Rayic Deger" for zero-limit name containing "rayiç"', () => {
+    it('shows "Market Value" for zero-limit name containing "rayiç"', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1315,10 +1315,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0)
     })
 
-    it('shows "Dahil" for zero-limit asistans service', () => {
+    it('shows "Included" for zero-limit asistans service', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1334,10 +1334,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Included').length).toBeGreaterThan(0)
     })
 
-    it('shows "Dahil" for zero-limit onarım service', () => {
+    it('shows "Included" for zero-limit onarım service', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1353,10 +1353,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Included').length).toBeGreaterThan(0)
     })
 
-    it('shows "Dahil" for zero-limit with name containing "market value"', () => {
+    it('shows "Market Value" for zero-limit with name containing "market value"', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1372,10 +1372,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Rayiç Değer').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Market Value').length).toBeGreaterThan(0)
     })
 
-    it('shows "Dahil" as default for zero-limit generic coverage', () => {
+    it('shows "Included" as default for zero-limit generic coverage', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1391,10 +1391,10 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Dahil').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Included').length).toBeGreaterThan(0)
     })
 
-    it('shows "Sınırsız" for zero-limit name containing "unlimited"', () => {
+    it('shows "Unlimited" for zero-limit name containing "unlimited"', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1410,7 +1410,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Sınırsız').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
     })
   })
 
@@ -1462,7 +1462,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/İhtiyari Mali|IMM/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/IMM/).length).toBeGreaterThan(0)
     })
 
     it('keeps zero-limit coverage with isMarketValue flag', () => {
@@ -1482,18 +1482,18 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/Rayiç/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Market Value/).length).toBeGreaterThan(0)
     })
 
     it('shows kasko implicit coverages note for kasko policy type', () => {
       renderComponent()
-      expect(screen.getByText('Temel Kasko Teminatları (Dahil)')).toBeInTheDocument()
+      expect(screen.getByText('Core Comprehensive Coverages (Included)')).toBeInTheDocument()
     })
 
     it('does NOT show kasko implicit coverages note for non-kasko', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ type: 'home', typeTr: 'Konut' }))
       renderComponent()
-      expect(screen.queryByText('Temel Kasko Teminatları (Dahil)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Core Comprehensive Coverages (Included)')).not.toBeInTheDocument()
     })
   })
 
@@ -1604,9 +1604,9 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      const sinirElements = screen.getAllByText('Sınırsız')
+      const unlimitedElements = screen.getAllByText('Unlimited')
       // At least one should have the blue styling
-      expect(sinirElements.length).toBeGreaterThan(0)
+      expect(unlimitedElements.length).toBeGreaterThan(0)
     })
   })
 
@@ -2057,7 +2057,7 @@ describe('PolicyDetailView Branch Coverage', () => {
     it('handles empty coverages array', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ coverages: [] }))
       renderComponent()
-      expect(screen.getByText('Teminat Detayları')).toBeInTheDocument()
+      expect(screen.getByText('Coverage Details')).toBeInTheDocument()
     })
 
     it('handles empty exclusions array', () => {
@@ -2351,16 +2351,16 @@ describe('PolicyDetailView Branch Coverage', () => {
   })
 
   describe('Policy overview zero/empty values', () => {
-    it('shows "Belirtilmemiş" when premium is 0', () => {
+    it('shows "Not specified" when premium is 0', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ premium: 0 }))
       renderComponent()
-      expect(screen.getByText('Belirtilmemiş')).toBeInTheDocument()
+      expect(screen.getByText('Not specified')).toBeInTheDocument()
     })
 
-    it('shows "Yok" when deductible is 0', () => {
+    it('shows "None" when deductible is 0', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ deductible: 0 }))
       renderComponent()
-      expect(screen.getByText('Yok')).toBeInTheDocument()
+      expect(screen.getByText('None')).toBeInTheDocument()
     })
 
     it('shows dash when insuredPerson is empty', () => {
@@ -2381,13 +2381,13 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getByText('Konum')).toBeInTheDocument()
+      expect(screen.getByText('Location')).toBeInTheDocument()
       expect(screen.getByText('Istanbul, Kadikoy')).toBeInTheDocument()
     })
 
     it('does not show location for kasko policy type', () => {
       renderComponent() // default is kasko
-      expect(screen.queryByText('Konum')).not.toBeInTheDocument()
+      expect(screen.queryByText('Location')).not.toBeInTheDocument()
     })
 
     it('does not show vehicle info section for non-kasko policy', () => {
@@ -2402,7 +2402,7 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.queryByText('Vehicle Information')).not.toBeInTheDocument()
     })
 
-    it('shows formatted coverage amount for non-kasko (not "Araç Rayiç Bedeli")', () => {
+    it('shows formatted coverage amount for non-kasko (not "Vehicle Market Value")', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           type: 'home',
@@ -2411,7 +2411,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.queryByText('Araç Rayiç Bedeli')).not.toBeInTheDocument()
+      expect(screen.queryByText('Vehicle Market Value')).not.toBeInTheDocument()
     })
   })
 
@@ -2627,7 +2627,7 @@ describe('PolicyDetailView Branch Coverage', () => {
   describe('Kasko implicit coverages note', () => {
     it('shows implicit coverages note for kasko policies', () => {
       renderComponent() // Default is kasko
-      expect(screen.getByText(/Temel Kasko Teminatları/)).toBeInTheDocument()
+      expect(screen.getByText(/Core Comprehensive Coverages/)).toBeInTheDocument()
     })
 
     it('does not show implicit coverages note for non-kasko policies', () => {
@@ -2638,7 +2638,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.queryByText(/Temel Kasko Teminatları/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/Core Comprehensive Coverages/)).not.toBeInTheDocument()
     })
   })
 

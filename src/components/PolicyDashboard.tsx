@@ -466,7 +466,7 @@ export function PolicyDashboard() {
                     <span className="text-xs text-gray-500">{t.policy.totalSumInsured}</span>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatCurrency(stats.totalSumInsured)}
+                    {formatCurrency(stats.totalSumInsured, 'TRY', locale)}
                   </p>
                 </div>
                 {/* Limit */}
@@ -478,7 +478,7 @@ export function PolicyDashboard() {
                     <span className="text-xs text-gray-500">{t.policy.totalLimit}</span>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatCurrency(stats.totalLimit)}
+                    {formatCurrency(stats.totalLimit, 'TRY', locale)}
                   </p>
                 </div>
                 {/* Expiring */}
@@ -931,10 +931,10 @@ export function PolicyDashboard() {
                               <div>
                                 <p className="font-medium text-gray-900 text-sm sm:text-base">
                                   <span className="sm:hidden">
-                                    {formatCurrencyCompact(displayValue)}
+                                    {formatCurrencyCompact(displayValue, 'TRY', locale)}
                                   </span>
                                   <span className="hidden sm:inline">
-                                    {formatCurrency(displayValue)}
+                                    {formatCurrency(displayValue, 'TRY', locale)}
                                   </span>
                                 </p>
                                 <p className="text-[10px] sm:text-xs text-gray-500">
@@ -950,13 +950,13 @@ export function PolicyDashboard() {
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
                               <span className="text-gray-900 text-sm">
-                                {formatCurrency(policy.premium)}
+                                {formatCurrency(policy.premium, 'TRY', locale)}
                                 <span className="text-gray-500">/yr</span>
                               </span>
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
                               <span className="text-gray-900 text-sm">
-                                {formatDate(policy.expiryDate)}
+                                {formatDate(policy.expiryDate, locale)}
                               </span>
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4">

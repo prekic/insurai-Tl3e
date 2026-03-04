@@ -45,26 +45,40 @@ export function PolicyCard({
   const { evaluation } = usePolicyEvaluation(showEvaluation ? policy : undefined)
 
   const policyTypeInfo = POLICY_TYPES[policy.type]
-  const typeLabel = locale === 'tr' ? policyTypeInfo?.labelTr || policy.typeTr : policyTypeInfo?.label || policy.type
+  const typeLabel =
+    locale === 'tr'
+      ? policyTypeInfo?.labelTr || policy.typeTr
+      : policyTypeInfo?.label || policy.type
 
   const isDuplicate = duplicateInfo !== null
 
-  const getStatusBadgeVariant = (status: string): 'success' | 'warning' | 'destructive' | 'default' => {
+  const getStatusBadgeVariant = (
+    status: string
+  ): 'success' | 'warning' | 'destructive' | 'default' => {
     switch (status) {
-      case 'active': return 'success'
-      case 'expiring': return 'warning'
-      case 'expired': return 'destructive'
-      default: return 'default'
+      case 'active':
+        return 'success'
+      case 'expiring':
+        return 'warning'
+      case 'expired':
+        return 'destructive'
+      default:
+        return 'default'
     }
   }
 
   const getStatusLabel = (status: string): string => {
     switch (status) {
-      case 'active': return t.policy.active
-      case 'expiring': return t.policy.expiring
-      case 'expired': return t.policy.expired
-      case 'pending': return t.policy.pending
-      default: return status
+      case 'active':
+        return t.policy.active
+      case 'expiring':
+        return t.policy.expiring
+      case 'expired':
+        return t.policy.expired
+      case 'pending':
+        return t.policy.pending
+      default:
+        return status
     }
   }
 
@@ -88,7 +102,9 @@ export function PolicyCard({
       <div
         className={cn(
           'bg-white rounded-xl border p-3 transition-all cursor-pointer relative',
-          isSelected ? 'border-blue-500 ring-2 ring-blue-200' : 'border-gray-200 hover:border-gray-300',
+          isSelected
+            ? 'border-blue-500 ring-2 ring-blue-200'
+            : 'border-gray-200 hover:border-gray-300',
           isNew && !isSelected && 'border-green-400 bg-green-50/30',
           isDuplicate && !isSelected && 'border-amber-400 bg-amber-50/30',
           className
@@ -131,7 +147,9 @@ export function PolicyCard({
           )}
 
           {/* Logo */}
-          <span className="text-2xl flex-shrink-0" aria-hidden="true">{policy.logo}</span>
+          <span className="text-2xl flex-shrink-0" aria-hidden="true">
+            {policy.logo}
+          </span>
 
           {/* Info */}
           <div className="flex-1 min-w-0">
@@ -140,9 +158,7 @@ export function PolicyCard({
           </div>
 
           {/* Grade */}
-          {evaluation && (
-            <GradeBadge grade={evaluation.grade} size="sm" />
-          )}
+          {evaluation && <GradeBadge grade={evaluation.grade} size="sm" />}
         </div>
       </div>
     )
@@ -163,7 +179,11 @@ export function PolicyCard({
       role={onSelect ? 'button' : 'article'}
       tabIndex={onSelect ? 0 : undefined}
       aria-pressed={onSelect ? isSelected : undefined}
-      aria-label={onSelect ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}` : undefined}
+      aria-label={
+        onSelect
+          ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}`
+          : undefined
+      }
     >
       {/* New/Duplicate indicator badges */}
       {(isNew || isDuplicate) && (
@@ -198,7 +218,9 @@ export function PolicyCard({
           )}
 
           {/* Logo and basic info */}
-          <span className="text-3xl flex-shrink-0" aria-hidden="true">{policy.logo}</span>
+          <span className="text-3xl flex-shrink-0" aria-hidden="true">
+            {policy.logo}
+          </span>
           <div className="flex-1 min-w-0 overflow-hidden">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 overflow-hidden">
@@ -234,11 +256,15 @@ export function PolicyCard({
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">{t.policy.coverage}</p>
-            <p className="text-lg font-semibold text-gray-900">{formatCurrency(policy.coverage)}</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {formatCurrency(policy.coverage, 'TRY', locale)}
+            </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">{t.policy.premium}</p>
-            <p className="text-lg font-semibold text-gray-900">{formatCurrency(policy.premium)}/yr</p>
+            <p className="text-lg font-semibold text-gray-900">
+              {formatCurrency(policy.premium, 'TRY', locale)}/yr
+            </p>
           </div>
         </div>
 
@@ -257,7 +283,7 @@ export function PolicyCard({
         {/* Expiry date */}
         <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-sm">
           <span className="text-gray-500">{t.policy.expiryDate}</span>
-          <span className="font-medium text-gray-900">{formatDate(policy.expiryDate)}</span>
+          <span className="font-medium text-gray-900">{formatDate(policy.expiryDate, locale)}</span>
         </div>
       </div>
 

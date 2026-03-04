@@ -57,9 +57,9 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
 
     switch (type) {
       case 'number':
-        return formatCurrency(Number(value))
+        return formatCurrency(Number(value), 'TRY', locale)
       case 'date':
-        return formatDate(String(value))
+        return formatDate(String(value), locale)
       case 'array':
         if (Array.isArray(value)) {
           return value.length > 0
@@ -137,12 +137,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
   }
 
   return (
-    <div
-      className={cn(
-        'rounded-lg border overflow-hidden',
-        config.borderColor
-      )}
-    >
+    <div className={cn('rounded-lg border overflow-hidden', config.borderColor)}>
       {/* Header */}
       <div className={cn('flex items-center gap-2 px-4 py-2', config.bgColor)}>
         <Icon className={cn('w-4 h-4', config.color)} />

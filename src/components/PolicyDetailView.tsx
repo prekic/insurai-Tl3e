@@ -101,7 +101,7 @@ function formatCoverageLimit(coverage: Coverage, locale: string): string {
     }
     return locale === 'tr' ? 'Dahil' : 'Included' // Default to "Dahil" instead of ₺0 for zero-limit coverages
   }
-  return formatCurrency(coverage.limit)
+  return formatCurrency(coverage.limit, 'TRY', locale)
 }
 
 /**
@@ -151,8 +151,8 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
   if (coverage.deductible && coverage.deductible > 0) {
     parts.push(
       locale === 'tr'
-        ? `Muafiyet: ${formatCurrency(coverage.deductible)}`
-        : `Deductible: ${formatCurrency(coverage.deductible)}`
+        ? `Muafiyet: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
+        : `Deductible: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
     )
   }
 
@@ -349,7 +349,7 @@ function CollapsibleCoverageCategory({
                           ? locale === 'tr'
                             ? 'Sınırsız'
                             : 'Unlimited'
-                          : formatCurrency(subLimit.limit)}
+                          : formatCurrency(subLimit.limit, 'TRY', locale)}
                       </span>
                     </div>
                   ))}
@@ -675,7 +675,7 @@ function ExclusionsSection({
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-green-700">
-                    {item.extractedLimit ? formatCurrency(item.extractedLimit) : ''}
+                    {item.extractedLimit ? formatCurrency(item.extractedLimit, 'TRY', locale) : ''}
                   </span>
                 </div>
               ))}
@@ -1126,15 +1126,15 @@ export function PolicyDetailView() {
       `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${getShortCompanyName(policy.provider)}`,
       `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
       `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
-      `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? 'Araç Rayiç Bedeli' : formatCurrency(policy.coverage)}`,
-      `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium)}`,
-      `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible)}`,
-      `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate)} - ${formatDate(policy.expiryDate)}`,
+      `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Vehicle Market Value') : formatCurrency(policy.coverage, 'TRY', locale)}`,
+      `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium, 'TRY', locale)}`,
+      `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible, 'TRY', locale)}`,
+      `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
       ...policy.coverages.map(
         (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit)}`
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit, 'TRY', locale)}`
       ),
       '',
       `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
@@ -1425,7 +1425,7 @@ export function PolicyDetailView() {
                         ? locale === 'tr'
                           ? 'Araç Rayiç Bedeli'
                           : 'Vehicle Market Value'
-                        : formatCurrency(policy.coverage)}
+                        : formatCurrency(policy.coverage, 'TRY', locale)}
                     </p>
                     {policy.type === 'kasko' && (
                       <p className="text-[10px] text-blue-500 mt-0.5">
@@ -1443,7 +1443,7 @@ export function PolicyDetailView() {
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {policy.premium > 0
-                        ? formatCurrency(policy.premium)
+                        ? formatCurrency(policy.premium, 'TRY', locale)
                         : locale === 'tr'
                           ? 'Belirtilmemiş'
                           : 'Not specified'}
@@ -1455,7 +1455,7 @@ export function PolicyDetailView() {
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {policy.deductible > 0
-                        ? formatCurrency(policy.deductible)
+                        ? formatCurrency(policy.deductible, 'TRY', locale)
                         : locale === 'tr'
                           ? 'Yok'
                           : 'None'}
@@ -1505,13 +1505,13 @@ export function PolicyDetailView() {
                       {locale === 'tr' ? 'Başlangıç:' : 'Start:'}
                     </span>{' '}
                     <span className="font-medium text-gray-700">
-                      {formatDate(policy.startDate)}
+                      {formatDate(policy.startDate, locale)}
                     </span>
                   </div>
                   <div className="truncate text-right">
                     <span className="text-gray-400">{locale === 'tr' ? 'Bitiş:' : 'End:'}</span>{' '}
                     <span className="font-medium text-gray-700">
-                      {formatDate(policy.expiryDate)}
+                      {formatDate(policy.expiryDate, locale)}
                     </span>
                   </div>
                 </div>
@@ -1689,10 +1689,10 @@ export function PolicyDetailView() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-sm text-gray-900">
-                          {formatCurrency(policy.premium)}
+                          {formatCurrency(policy.premium, 'TRY', locale)}
                         </span>
                         <span className="font-semibold text-sm text-gray-600">
-                          {formatCurrency(policy.marketComparison.averagePremium)}
+                          {formatCurrency(policy.marketComparison.averagePremium, 'TRY', locale)}
                         </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (
@@ -1909,13 +1909,13 @@ export function PolicyDetailView() {
                       <span className="text-gray-500">
                         {locale === 'tr' ? 'Başlangıç' : 'Start Date'}
                       </span>
-                      <span className="font-medium">{formatDate(policy.startDate)}</span>
+                      <span className="font-medium">{formatDate(policy.startDate, locale)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">
                         {locale === 'tr' ? 'Bitiş' : 'Expiry Date'}
                       </span>
-                      <span className="font-medium">{formatDate(policy.expiryDate)}</span>
+                      <span className="font-medium">{formatDate(policy.expiryDate, locale)}</span>
                     </div>
                   </div>
                 </div>
@@ -2029,10 +2029,10 @@ export function PolicyDetailView() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-gray-900">
-                          {formatCurrency(policy.premium)}
+                          {formatCurrency(policy.premium, 'TRY', locale)}
                         </span>
                         <span className="font-semibold text-gray-600">
-                          {formatCurrency(policy.marketComparison.averagePremium)}
+                          {formatCurrency(policy.marketComparison.averagePremium, 'TRY', locale)}
                         </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (

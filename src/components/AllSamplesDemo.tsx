@@ -1,5 +1,16 @@
 import { useState } from 'react'
-import { Eye, EyeOff, FileText, Shield, AlertTriangle, MapPin, User, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import {
+  Eye,
+  EyeOff,
+  FileText,
+  Shield,
+  AlertTriangle,
+  MapPin,
+  User,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
@@ -11,7 +22,7 @@ import { useI18n } from '@/lib/i18n'
 function translateInsight(
   insight: string,
   locale: string,
-  insightTranslations: Record<string, string>,
+  insightTranslations: Record<string, string>
 ): string {
   if (locale === 'en') return insight
 
@@ -33,7 +44,7 @@ export function AllSamplesDemo() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const toggleExpand = (id: string) => {
-    setExpandedId(prev => prev === id ? null : id)
+    setExpandedId((prev) => (prev === id ? null : id))
   }
 
   return (
@@ -61,7 +72,13 @@ export function AllSamplesDemo() {
                       </div>
                     </div>
                     <Badge variant={policy.status === 'active' ? 'success' : 'warning'}>
-                      {policy.status === 'active' ? t.policy.active : policy.status === 'expiring' ? t.policy.expiring : policy.status === 'expired' ? t.policy.expired : t.policy.pending}
+                      {policy.status === 'active'
+                        ? t.policy.active
+                        : policy.status === 'expiring'
+                          ? t.policy.expiring
+                          : policy.status === 'expired'
+                            ? t.policy.expired
+                            : t.policy.pending}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -75,11 +92,16 @@ export function AllSamplesDemo() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-500">{t.policy.coverage}</p>
-                        <p className="font-semibold text-gray-900">{formatCurrency(policy.coverage)}</p>
+                        <p className="font-semibold text-gray-900">
+                          {formatCurrency(policy.coverage, 'TRY', locale)}
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">{t.policy.premium}</p>
-                        <p className="font-semibold text-gray-900">{formatCurrency(policy.premium)}{t.policy.perYear}</p>
+                        <p className="font-semibold text-gray-900">
+                          {formatCurrency(policy.premium, 'TRY', locale)}
+                          {t.policy.perYear}
+                        </p>
                       </div>
                     </div>
 
@@ -87,11 +109,13 @@ export function AllSamplesDemo() {
                     <div className="pt-4 border-t border-gray-100">
                       <p className="text-sm text-gray-500 mb-2">{t.insights.aiInsights}</p>
                       <div className="space-y-1">
-                        {policy.aiInsights.slice(0, isExpanded ? undefined : 2).map((insight, i) => (
-                          <p key={i} className="text-sm text-gray-600">
-                            • {translateInsight(insight, locale, t.insightTranslations)}
-                          </p>
-                        ))}
+                        {policy.aiInsights
+                          .slice(0, isExpanded ? undefined : 2)
+                          .map((insight, i) => (
+                            <p key={i} className="text-sm text-gray-600">
+                              • {translateInsight(insight, locale, t.insightTranslations)}
+                            </p>
+                          ))}
                       </div>
                     </div>
 
@@ -102,19 +126,31 @@ export function AllSamplesDemo() {
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div className="flex items-center gap-2 text-gray-600">
                             <User size={14} />
-                            <span><span className="text-gray-400">{t.policy.insuredPerson}:</span> {policy.insuredPerson}</span>
+                            <span>
+                              <span className="text-gray-400">{t.policy.insuredPerson}:</span>{' '}
+                              {policy.insuredPerson}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-gray-600">
                             <MapPin size={14} />
-                            <span><span className="text-gray-400">{t.policy.location}:</span> {policy.location}</span>
+                            <span>
+                              <span className="text-gray-400">{t.policy.location}:</span>{' '}
+                              {policy.location}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-gray-600">
                             <Calendar size={14} />
-                            <span><span className="text-gray-400">{t.policy.period}:</span> {policy.startDate} — {policy.expiryDate}</span>
+                            <span>
+                              <span className="text-gray-400">{t.policy.period}:</span>{' '}
+                              {policy.startDate} — {policy.expiryDate}
+                            </span>
                           </div>
                           <div className="flex items-center gap-2 text-gray-600">
                             <Shield size={14} />
-                            <span><span className="text-gray-400">{t.policy.deductible}:</span> {formatCurrency(policy.deductible)}</span>
+                            <span>
+                              <span className="text-gray-400">{t.policy.deductible}:</span>{' '}
+                              {formatCurrency(policy.deductible, 'TRY', locale)}
+                            </span>
                           </div>
                         </div>
 
@@ -127,7 +163,9 @@ export function AllSamplesDemo() {
                               style={{ width: `${policy.aiConfidence * 100}%` }}
                             />
                           </div>
-                          <span className="text-sm font-medium text-green-600">{Math.round(policy.aiConfidence * 100)}%</span>
+                          <span className="text-sm font-medium text-green-600">
+                            {Math.round(policy.aiConfidence * 100)}%
+                          </span>
                         </div>
 
                         {/* Coverages */}
@@ -138,22 +176,30 @@ export function AllSamplesDemo() {
                           </h4>
                           <div className="space-y-1.5">
                             {policy.coverages.map((cov, i) => (
-                              <div key={i} className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5">
+                              <div
+                                key={i}
+                                className="flex items-center justify-between text-sm bg-gray-50 rounded px-3 py-1.5"
+                              >
                                 <span className="text-gray-700">
                                   {locale === 'tr' && cov.nameTr ? cov.nameTr : cov.name}
                                 </span>
                                 <div className="flex items-center gap-3">
                                   {cov.included ? (
                                     <>
-                                      <span className="text-gray-900 font-medium">{formatCurrency(cov.limit)}</span>
+                                      <span className="text-gray-900 font-medium">
+                                        {formatCurrency(cov.limit, 'TRY', locale)}
+                                      </span>
                                       {cov.deductible > 0 && (
                                         <span className="text-xs text-gray-400">
-                                          ({t.policy.deductible}: {formatCurrency(cov.deductible)})
+                                          ({t.policy.deductible}:{' '}
+                                          {formatCurrency(cov.deductible, 'TRY', locale)})
                                         </span>
                                       )}
                                     </>
                                   ) : (
-                                    <span className="text-red-400 text-xs">{t.policy.notIncluded}</span>
+                                    <span className="text-red-400 text-xs">
+                                      {t.policy.notIncluded}
+                                    </span>
                                   )}
                                 </div>
                               </div>
@@ -170,7 +216,10 @@ export function AllSamplesDemo() {
                             </h4>
                             <ul className="space-y-1">
                               {policy.exclusions.map((ex, i) => (
-                                <li key={i} className="text-sm text-red-600 flex items-start gap-1.5">
+                                <li
+                                  key={i}
+                                  className="text-sm text-red-600 flex items-start gap-1.5"
+                                >
                                   <span className="mt-0.5">✕</span>
                                   <span>{ex}</span>
                                 </li>
@@ -187,7 +236,10 @@ export function AllSamplesDemo() {
                             </h4>
                             <ul className="space-y-1">
                               {policy.specialConditions.map((cond, i) => (
-                                <li key={i} className="text-sm text-amber-700 flex items-start gap-1.5">
+                                <li
+                                  key={i}
+                                  className="text-sm text-amber-700 flex items-start gap-1.5"
+                                >
                                   <span className="mt-0.5">⚠</span>
                                   <span>{cond}</span>
                                 </li>

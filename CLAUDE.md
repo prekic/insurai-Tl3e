@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**.
 - **Production Readiness**: ~9.5/10 (15,848+ tests, 0 lint errors, 0 warnings, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: March 3, 2026 (Fixing UI flashing and mixed localizations in PolicyDetailView)
+- **Last Updated**: March 3, 2026 (locale-aware formatting functions, P1 Step 1+2 complete — formatCurrency/formatDate/formatNumber accept locale parameter, 10 caller files updated)
 
 ---
 
@@ -1640,16 +1640,21 @@ import { cn, formatCurrency, formatDate, formatNumber } from '@/lib/utils'
 cn("base-class", isActive && "active-class", className)
 // → Merges classes, handles conflicts
 
-// Turkish currency formatting
-formatCurrency(15000)      // "₺15.000"
-formatCurrency(15000.50)   // "₺15.001" (rounded)
+// Locale-aware currency formatting (defaults to 'tr' for backward compat)
+formatCurrency(15000)              // "₺15.000" (Turkish default)
+formatCurrency(15000, 'TRY', 'en') // "₺15,000" (English locale)
+formatCurrency(15000, 'USD', 'en') // "$15,000" (USD in English)
 
-// Turkish date formatting
-formatDate('2026-01-15')   // "15.01.2026"
-formatDate(new Date())     // "11.01.2026"
+// Locale-aware date formatting
+formatDate('2026-01-15')           // "15.01.2026" (Turkish default)
+formatDate('2026-01-15', 'en')     // "1/15/2026" (English locale)
 
-// Turkish number formatting
-formatNumber(1500000)      // "1.500.000"
+// Locale-aware number formatting
+formatNumber(1500000)              // "1.500.000" (Turkish default)
+formatNumber(1500000, 'en')        // "1,500,000" (English locale)
+
+// Locale mapping (extensible for future locales)
+// INTL_LOCALE_MAP: { tr: 'tr-TR', en: 'en-US', de: 'de-DE', fr: 'fr-FR' }
 ```
 
 ### Policy Utilities (`src/lib/policy-utils.ts`)
@@ -4283,6 +4288,19 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Consumer**: `ComparePolicies.tsx` reads `comparison.actuarialResults` to emit timing events via the event bus
 - **Barrel Export**: `mapAnalyzedToActuarialInput` added to `@/lib/actuarial-engine` barrel (`index.ts`)
 
+### 149. Locale-Aware Formatting Functions (Added Mar 3, 2026)
+- **Feature**: `formatCurrency`, `formatCurrencyCompact`, `formatDate`, `formatNumber` in `src/lib/utils.ts` now accept an optional `locale` parameter
+- **Caveat**: `formatCurrencyCompact` accepts `_locale` for API consistency but **silently ignores it** — uses a hardcoded `CURRENCY_SYMBOLS` lookup to produce compact output like `₺980M`. Update this function if locale-aware compact formatting is needed.
+- **Backward Compatible**: All default to `'tr'` — existing callers without locale continue working identically
+- **INTL_LOCALE_MAP**: Maps app locale codes to Intl locale strings: `{ tr: 'tr-TR', en: 'en-US', de: 'de-DE', fr: 'fr-FR' }` — extensible for future locales
+- **Callers Updated** (P1 Step 2, commit `93a9d0e`):
+  - Components: `PolicyCard`, `PolicyDashboard`, `PolicyDetailView`, `PolicyDiffViewer`, `ComparePolicies` (+ `QuickStatsCard`), `SharedResult`, `AllSamplesDemo`
+  - Non-React: `export.ts` (7 functions accept `locale` param), `pdf-export/templates.ts` (4 templates + `fieldHTML` helper derive locale from `options.language`)
+- **Pattern for React components**: `const { locale } = useI18n(); formatCurrency(amount, 'TRY', locale)`
+- **Pattern for non-React utilities**: Accept `locale: string = 'tr'` as function parameter; derive from `options.language` in template functions via `const locale = isTr ? 'tr' : 'en'`
+- **Files Changed**: `src/lib/utils.ts`, 7 component files, `src/lib/export.ts`, `src/lib/pdf-export/templates.ts`
+- **Commits**: `4c42c57` (Step 1 — functions), `93a9d0e` (Step 2 — callers)
+
 ---
 
 ## Turkish Market Considerations
@@ -4311,11 +4329,19 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 
 ### Currency Handling
 ```typescript
-new Intl.NumberFormat('tr-TR', {
-  style: 'currency',
-  currency: 'TRY',
-  minimumFractionDigits: 2
-}).format(15000.50)  // ₺15.000,50
+// Use the locale-aware formatCurrency from src/lib/utils.ts (NOT raw Intl.NumberFormat)
+import { formatCurrency } from '@/lib/utils'
+
+formatCurrency(15000.50, 'TRY', 'tr')  // "₺15.001" (Turkish)
+formatCurrency(15000.50, 'TRY', 'en')  // "₺15,001" (English)
+formatCurrency(15000.50, 'USD', 'en')  // "$15,001" (USD)
+
+// In React components: get locale from useI18n() hook
+const { locale } = useI18n()
+formatCurrency(amount, 'TRY', locale)
+
+// In non-React files (export.ts, templates.ts): accept locale as function parameter
+export function myExportFn(data: Data, locale: string = 'tr') { ... }
 ```
 
 ---
@@ -5090,8 +5116,32 @@ connectSrc: [
 - **Workaround:** Implemented memory-based debounce checkpoints `ACTUARIAL_CHECK_COOLDOWN_MS` (5m DB caching) and `ACTUARIAL_ALERT_COOLDOWN_MS` (1h notification cap).
 
 **React 19 / Vitest Teardown Race Conditions (Gotcha Mar 2, 2026):**
-- Async state updates or background processing loops inside components can outlive the testing environment's DOM teardown phase, leading to `ReferenceError: window is not defined` unhandled rejections during test suite execution. 
+- Async state updates or background processing loops inside components can outlive the testing environment's DOM teardown phase, leading to `ReferenceError: window is not defined` unhandled rejections during test suite execution.
 - **Workaround:** The fix requires explicit checking of component mount states via an `isMounted` ref when tracking async background operations (e.g. `isMounted.current = false` inside `useEffect` cleanup) to abort gracefully before they interact with a destroyed `window` or `document` object.
+
+**i18n Plan Incomplete — 103 Inline Ternaries Remain (Audited Mar 3, 2026):**
+- A comprehensive i18n plan exists at `/root/.claude/plans/warm-tickling-wilkes.md` with 10 steps covering S1 (4 un-internationalized components), S2 (5 components with inline ternaries), S3 (locale-aware formatting), and FX conversion
+- **Plan execution: ~20%** — P0 (test fixes) and P1 (locale-aware formatting + caller updates) are DONE. 103 `locale === 'tr'` ternaries remain across 5 S2 components, 3 of 4 S1 components untouched, no FX system created, most translation sections missing
+- `PolicyDetailView.tsx` has **124 additional ternaries** (not in plan scope but largest in codebase)
+- Components with existing `useI18n()` hooks but unmigrated ternaries: ConflictResolutionDialog (47), AIInsightsPanel (32), PolicyDiffViewer (18), PolicyCard (5), EmailPreferences (1)
+- Translation sections still needed: `conflictResolution` (~50 keys), `aiInsights` (~50 keys), `policyDiff` (~20 keys), `policyDocuments` (~12 keys), `emailPreferences` (~12 keys), `errorBoundary` (~7 keys), `notFound` (4 keys), `fx` (~8 keys)
+- See `SESSION_HANDOFF.md` for prioritized implementation steps (P2-P5)
+
+**Locale-Aware Formatting — Caller Update Pattern (Added Mar 3, 2026):**
+- All `formatCurrency`, `formatDate`, `formatNumber` calls should now pass `locale` from `useI18n()`: `formatCurrency(amount, 'TRY', locale)`
+- **Exception**: `formatCurrencyCompact` accepts `_locale` for API consistency but **silently ignores it** — uses a hardcoded `CURRENCY_SYMBOLS` map for compact output (`₺980M`, `$5.2K`). If locale-aware compact formatting is needed, this function must be updated.
+- **In React components**: `const { locale } = useI18n()` — pass to formatting calls
+- **In non-React files** (`export.ts`, `templates.ts`): Accept `locale: string = 'tr'` as function parameter
+- **In pdf-export templates**: Derive locale from `options.language`: `const locale = isTr ? 'tr' : 'en'`
+- If adding new formatting calls anywhere in the codebase, always pass locale — do NOT use bare `formatCurrency(amount)` without locale
+- Key pattern: test mocks set `locale: 'en'` but assertions check Turkish strings like `'Sınırsız'` instead of `'Unlimited'`
+
+**28 Pre-Existing Test Failures Across 6 Files (Updated Mar 4, 2026):**
+- ~~27 i18n-related (PolicyDetailView-branches)~~ — **FIXED** in commit `ab5ba59` (P0)
+- 7 translation cache/service (pre-existing — cache merge behavior changed)
+- 4-5 PolicyUpload-coverage (pre-existing — async timing)
+- 16 server route tests (pre-existing — actuarial/metrics mock drift)
+- 1 CDN dependency test (network timeout — environment, not code)
 
 ---
 
@@ -5160,7 +5210,7 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,960 tests, 15,958 passing (335 test files), 1 known pre-existing flaky failure, ~91.67% statements coverage
+**Tests**: 15,897 tests total (337 files): 15,869 passing, 28 failing (all pre-existing), 18 skipped, ~91.67% statements coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: March 1, 2026 (Actuarial UI Admin Integration, Web Worker Settings wired, Historical Trend CI Chart components merged, UX bugfixes resolved, 0 warnings)
+**Last Updated**: March 4, 2026 (QA audit — test counts corrected 56→28, formatCurrencyCompact locale caveat documented)

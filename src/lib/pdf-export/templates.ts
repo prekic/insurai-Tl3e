@@ -66,7 +66,16 @@ function getRiskScoreHTML(score: number): string {
   }
 
   const color = getColor(score)
-  const label = score <= 30 ? 'Low Risk' : score <= 50 ? 'Moderate' : score <= 70 ? 'Elevated' : score <= 85 ? 'High' : 'Critical'
+  const label =
+    score <= 30
+      ? 'Low Risk'
+      : score <= 50
+        ? 'Moderate'
+        : score <= 70
+          ? 'Elevated'
+          : score <= 85
+            ? 'High'
+            : 'Critical'
 
   return `
     <div class="risk-score-container">
@@ -92,8 +101,13 @@ function getRiskScoreHTML(score: number): string {
 /**
  * Generate field HTML
  */
-function fieldHTML(label: string, value: string | number, highlight = false): string {
-  const formattedValue = typeof value === 'number' ? formatCurrency(value) : value
+function fieldHTML(
+  label: string,
+  value: string | number,
+  highlight = false,
+  locale?: string
+): string {
+  const formattedValue = typeof value === 'number' ? formatCurrency(value, 'TRY', locale) : value
   return `
     <div class="field${highlight ? ' highlight-field' : ''}">
       <div class="field-label">${label}</div>
@@ -117,6 +131,7 @@ export function generatePolicyDetailHTML(
   const { policy, gapAnalysis: _gapAnalysis, marketBenchmark } = data
   const lang = options.language || 'en'
   const isTr = lang === 'tr' || lang === 'bilingual'
+  const locale = isTr ? 'tr' : 'en'
   const sections = options.sections || {}
 
   const title = options.title || (isTr ? 'Poliçe Detay Raporu' : 'Policy Detail Report')
@@ -138,21 +153,23 @@ export function generatePolicyDetailHTML(
   <div class="card highlight-card">
     <div class="stat-grid" style="grid-template-columns: repeat(3, 1fr);">
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(policy.coverage)}</div>
+        <div class="stat-value">${formatCurrency(policy.coverage, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Toplam Teminat' : 'Total Coverage'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(policy.premium)}</div>
+        <div class="stat-value">${formatCurrency(policy.premium, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Yıllık Prim' : 'Annual Premium'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(policy.deductible)}</div>
+        <div class="stat-value">${formatCurrency(policy.deductible, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Muafiyet' : 'Deductible'}</div>
       </div>
     </div>
   </div>
 
-  ${sections.showPolicyDetails !== false ? `
+  ${
+    sections.showPolicyDetails !== false
+      ? `
   <!-- Policy Details -->
   <h2>${isTr ? 'Poliçe Bilgileri' : 'Policy Details'}</h2>
   <div class="grid-2">
@@ -160,27 +177,39 @@ export function generatePolicyDetailHTML(
     ${fieldHTML(isTr ? 'Sigorta Şirketi' : 'Provider', policy.provider)}
     ${fieldHTML(isTr ? 'Poliçe Türü' : 'Policy Type', isTr ? policy.typeTr : policy.type)}
     ${fieldHTML(isTr ? 'Durum' : 'Status', getStatusBadge(policy.status))}
-    ${fieldHTML(isTr ? 'Başlangıç Tarihi' : 'Start Date', formatDate(policy.startDate))}
-    ${fieldHTML(isTr ? 'Bitiş Tarihi' : 'Expiry Date', formatDate(policy.expiryDate))}
+    ${fieldHTML(isTr ? 'Başlangıç Tarihi' : 'Start Date', formatDate(policy.startDate, locale), false, locale)}
+    ${fieldHTML(isTr ? 'Bitiş Tarihi' : 'Expiry Date', formatDate(policy.expiryDate, locale), false, locale)}
     ${policy.insuredPerson ? fieldHTML(isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson) : ''}
     ${policy.location ? fieldHTML(isTr ? 'Konum' : 'Location', policy.location) : ''}
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${sections.showRiskScore !== false && policy.riskScore ? `
+  ${
+    sections.showRiskScore !== false && policy.riskScore
+      ? `
   <!-- Risk Assessment -->
   <h2>${isTr ? 'Risk Değerlendirmesi' : 'Risk Assessment'}</h2>
   <div class="card">
     ${getRiskScoreHTML(policy.riskScore.overall)}
-    ${policy.riskScore.topIssue ? `
+    ${
+      policy.riskScore.topIssue
+        ? `
       <div style="margin-top: 12px; padding: 8px 12px; background: #fef3c7; border-radius: 4px;">
         <strong>${isTr ? 'Önemli Bulgu' : 'Key Finding'}:</strong> ${policy.riskScore.topIssue}
       </div>
-    ` : ''}
+    `
+        : ''
+    }
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${sections.showCoverages !== false && policy.coverages.length > 0 ? `
+  ${
+    sections.showCoverages !== false && policy.coverages.length > 0
+      ? `
   <!-- Coverages -->
   <h2>${isTr ? 'Teminatlar' : 'Coverages'}</h2>
   <table>
@@ -193,19 +222,27 @@ export function generatePolicyDetailHTML(
       </tr>
     </thead>
     <tbody>
-      ${policy.coverages.map(c => `
+      ${policy.coverages
+        .map(
+          (c) => `
         <tr>
           <td>${isTr ? c.nameTr : c.name}</td>
-          <td style="text-align: right;">${formatCurrency(c.limit)}</td>
-          <td style="text-align: right;">${formatCurrency(c.deductible)}</td>
+          <td style="text-align: right;">${formatCurrency(c.limit, 'TRY', locale)}</td>
+          <td style="text-align: right;">${formatCurrency(c.deductible, 'TRY', locale)}</td>
           <td style="text-align: center;">${c.included ? '✓' : '—'}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
     </tbody>
   </table>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${sections.showMarketComparison !== false && marketBenchmark ? `
+  ${
+    sections.showMarketComparison !== false && marketBenchmark
+      ? `
   <!-- Market Comparison -->
   <h2>${isTr ? 'Piyasa Karşılaştırması' : 'Market Comparison'}</h2>
   <div class="grid-3">
@@ -214,33 +251,43 @@ export function generatePolicyDetailHTML(
       <div class="stat-label">${isTr ? 'Piyasa Yüzdelik' : 'Market Percentile'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${formatCurrency(marketBenchmark.avgPremium)}</div>
+      <div class="stat-value">${formatCurrency(marketBenchmark.avgPremium, 'TRY', locale)}</div>
       <div class="stat-label">${isTr ? 'Ort. Prim' : 'Avg Premium'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${formatCurrency(marketBenchmark.avgCoverage)}</div>
+      <div class="stat-value">${formatCurrency(marketBenchmark.avgCoverage, 'TRY', locale)}</div>
       <div class="stat-label">${isTr ? 'Ort. Teminat' : 'Avg Coverage'}</div>
     </div>
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${sections.showExclusions !== false && policy.exclusions.length > 0 ? `
+  ${
+    sections.showExclusions !== false && policy.exclusions.length > 0
+      ? `
   <!-- Exclusions -->
   <h2>${isTr ? 'İstisnalar' : 'Exclusions'}</h2>
   <ul>
-    ${policy.exclusions.map(e => `<li>${e}</li>`).join('')}
+    ${policy.exclusions.map((e) => `<li>${e}</li>`).join('')}
   </ul>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${sections.showAiInsights !== false && policy.aiInsights && policy.aiInsights.length > 0 ? `
+  ${
+    sections.showAiInsights !== false && policy.aiInsights && policy.aiInsights.length > 0
+      ? `
   <!-- AI Insights -->
   <h2>${isTr ? 'AI Önerileri' : 'AI Insights'}</h2>
   <div class="card">
     <ul>
-      ${policy.aiInsights.map(i => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}
+      ${policy.aiInsights.map((i) => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}
     </ul>
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
   ${generateFooterHTML(branding, isTr ? 'tr' : 'en')}
 </body>
@@ -263,6 +310,7 @@ export function generateGapAnalysisHTML(
   const { policy, gapAnalysis, recommendations } = data
   const lang = options.language || 'en'
   const isTr = lang === 'tr' || lang === 'bilingual'
+  const locale = isTr ? 'tr' : 'en'
 
   const title = options.title || (isTr ? 'Teminat Açığı Analiz Raporu' : 'Gap Analysis Report')
   const subtitle = options.subtitle || `${policy.provider} - ${policy.policyNumber}`
@@ -275,7 +323,7 @@ export function generateGapAnalysisHTML(
       </div>
       <p style="font-size: 11px; margin-bottom: 8px;">${isTr ? gap.descriptionTr : gap.description}</p>
       <div style="display: flex; gap: 16px; font-size: 10px; color: var(--brand-text-light);">
-        <span>${isTr ? 'Potansiyel Kayıp' : 'Potential Loss'}: ${formatCurrency(gap.financialImpact.potentialLoss)}</span>
+        <span>${isTr ? 'Potansiyel Kayıp' : 'Potential Loss'}: ${formatCurrency(gap.financialImpact.potentialLoss, 'TRY', locale)}</span>
         <span>${isTr ? 'Güven' : 'Confidence'}: ${(gap.confidence * 100).toFixed(0)}%</span>
       </div>
     </div>
@@ -311,7 +359,7 @@ export function generateGapAnalysisHTML(
         <div class="stat-label">${isTr ? 'Kritik' : 'Critical'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss)}</div>
+        <div class="stat-value">${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Tahmini Kayıp' : 'Expected Loss'}</div>
       </div>
     </div>
@@ -321,58 +369,80 @@ export function generateGapAnalysisHTML(
   <h2>${isTr ? 'Yönetici Özeti' : 'Executive Summary'}</h2>
   <div class="card">
     <p style="margin-bottom: 12px;">
-      ${isTr
-        ? `Bu poliçede toplam <strong>${gapAnalysis.gapCount.total} teminat açığı</strong> tespit edilmiştir.
+      ${
+        isTr
+          ? `Bu poliçede toplam <strong>${gapAnalysis.gapCount.total} teminat açığı</strong> tespit edilmiştir.
            Bunların <strong>${gapAnalysis.gapCount.critical} tanesi kritik</strong> ve <strong>${gapAnalysis.gapCount.high} tanesi yüksek</strong> önceliklidir.`
-        : `A total of <strong>${gapAnalysis.gapCount.total} coverage gaps</strong> were identified in this policy.
+          : `A total of <strong>${gapAnalysis.gapCount.total} coverage gaps</strong> were identified in this policy.
            <strong>${gapAnalysis.gapCount.critical} are critical</strong> and <strong>${gapAnalysis.gapCount.high} are high</strong> priority.`
       }
     </p>
     <p>
-      ${isTr
-        ? `Tahmini toplam risk tutarı <strong>${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss)}</strong> olup,
-           önerilen iyileştirme maliyeti yaklaşık <strong>${formatCurrency(gapAnalysis.financialSummary.estimatedRemediationCost)}</strong>'dir.`
-        : `The estimated total risk exposure is <strong>${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss)}</strong>,
-           with an estimated remediation cost of approximately <strong>${formatCurrency(gapAnalysis.financialSummary.estimatedRemediationCost)}</strong>.`
+      ${
+        isTr
+          ? `Tahmini toplam risk tutarı <strong>${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss, 'TRY', locale)}</strong> olup,
+           önerilen iyileştirme maliyeti yaklaşık <strong>${formatCurrency(gapAnalysis.financialSummary.estimatedRemediationCost, 'TRY', locale)}</strong>'dir.`
+          : `The estimated total risk exposure is <strong>${formatCurrency(gapAnalysis.financialSummary.totalExpectedLoss, 'TRY', locale)}</strong>,
+           with an estimated remediation cost of approximately <strong>${formatCurrency(gapAnalysis.financialSummary.estimatedRemediationCost, 'TRY', locale)}</strong>.`
       }
     </p>
   </div>
 
-  ${gapAnalysis.gapCount.critical > 0 ? `
+  ${
+    gapAnalysis.gapCount.critical > 0
+      ? `
   <!-- Critical Gaps -->
   <h2 style="color: var(--brand-danger);">${isTr ? 'Kritik Açıklar' : 'Critical Gaps'}</h2>
   ${gapAnalysis.gapsBySeverity.critical.map(formatGapItem).join('')}
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${gapAnalysis.gapCount.high > 0 ? `
+  ${
+    gapAnalysis.gapCount.high > 0
+      ? `
   <!-- High Priority Gaps -->
   <h2 style="color: #f97316;">${isTr ? 'Yüksek Öncelikli Açıklar' : 'High Priority Gaps'}</h2>
   ${gapAnalysis.gapsBySeverity.high.map(formatGapItem).join('')}
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${gapAnalysis.gapCount.medium > 0 || gapAnalysis.gapCount.low > 0 ? `
+  ${
+    gapAnalysis.gapCount.medium > 0 || gapAnalysis.gapCount.low > 0
+      ? `
   <!-- Other Gaps -->
   <h2>${isTr ? 'Diğer Açıklar' : 'Other Gaps'}</h2>
   ${[...gapAnalysis.gapsBySeverity.medium, ...gapAnalysis.gapsBySeverity.low].map(formatGapItem).join('')}
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${recommendations && recommendations.length > 0 ? `
+  ${
+    recommendations && recommendations.length > 0
+      ? `
   <!-- Recommendations -->
   <div class="page-break"></div>
   <h2>${isTr ? 'Öneriler' : 'Recommendations'}</h2>
-  ${recommendations.map((rec, idx) => `
+  ${recommendations
+    .map(
+      (rec, idx) => `
     <div class="recommendation">
       <div class="recommendation-number">${idx + 1}</div>
       <div>
         <div style="font-weight: 600; margin-bottom: 4px;">${isTr ? rec.actionTr : rec.action}</div>
         <div style="font-size: 11px; color: var(--brand-text-light);">
           ${isTr ? rec.impactTr : rec.impact}
-          ${rec.estimatedCost ? ` • ${isTr ? 'Tahmini Maliyet' : 'Est. Cost'}: ${formatCurrency(rec.estimatedCost)}` : ''}
+          ${rec.estimatedCost ? ` • ${isTr ? 'Tahmini Maliyet' : 'Est. Cost'}: ${formatCurrency(rec.estimatedCost, 'TRY', locale)}` : ''}
         </div>
       </div>
     </div>
-  `).join('')}
-  ` : ''}
+  `
+    )
+    .join('')}
+  `
+      : ''
+  }
 
   ${generateFooterHTML(branding, isTr ? 'tr' : 'en')}
 </body>
@@ -395,9 +465,12 @@ export function generatePortfolioHTML(
   const { policies, summary, byType, gapSummary } = data
   const lang = options.language || 'en'
   const isTr = lang === 'tr' || lang === 'bilingual'
+  const locale = isTr ? 'tr' : 'en'
 
   const title = options.title || (isTr ? 'Portföy Analiz Raporu' : 'Portfolio Analysis Report')
-  const subtitle = options.subtitle || (isTr ? `${summary.totalPolicies} Poliçe` : `${summary.totalPolicies} Policies`)
+  const subtitle =
+    options.subtitle ||
+    (isTr ? `${summary.totalPolicies} Poliçe` : `${summary.totalPolicies} Policies`)
 
   return `
 <!DOCTYPE html>
@@ -423,47 +496,57 @@ export function generatePortfolioHTML(
         <div class="stat-label">${isTr ? 'Aktif' : 'Active'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(summary.totalCoverage)}</div>
+        <div class="stat-value">${formatCurrency(summary.totalCoverage, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Toplam Teminat' : 'Total Coverage'}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value">${formatCurrency(summary.totalPremium)}</div>
+        <div class="stat-value">${formatCurrency(summary.totalPremium, 'TRY', locale)}</div>
         <div class="stat-label">${isTr ? 'Toplam Prim' : 'Total Premium'}</div>
       </div>
     </div>
   </div>
 
-  ${summary.expiringPolicies > 0 ? `
+  ${
+    summary.expiringPolicies > 0
+      ? `
   <!-- Expiring Alert -->
   <div class="card" style="background: #fef3c7; border-color: #f59e0b;">
     <div style="display: flex; align-items: center; gap: 12px;">
       <span style="font-size: 24px;">⚠️</span>
       <div>
         <strong>${isTr ? 'Dikkat' : 'Attention'}:</strong>
-        ${isTr
-          ? `${summary.expiringPolicies} poliçenin süresi yakında doluyor.`
-          : `${summary.expiringPolicies} policies are expiring soon.`
+        ${
+          isTr
+            ? `${summary.expiringPolicies} poliçenin süresi yakında doluyor.`
+            : `${summary.expiringPolicies} policies are expiring soon.`
         }
       </div>
     </div>
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
-  ${gapSummary && gapSummary.criticalGaps > 0 ? `
+  ${
+    gapSummary && gapSummary.criticalGaps > 0
+      ? `
   <!-- Gap Alert -->
   <div class="card" style="background: #fee2e2; border-color: #ef4444;">
     <div style="display: flex; align-items: center; gap: 12px;">
       <span style="font-size: 24px;">🚨</span>
       <div>
         <strong>${isTr ? 'Kritik Açıklar' : 'Critical Gaps'}:</strong>
-        ${isTr
-          ? `Portföyünüzde ${gapSummary.criticalGaps} kritik teminat açığı bulunmaktadır. Tahmini risk tutarı: ${formatCurrency(gapSummary.estimatedExposure)}`
-          : `Your portfolio has ${gapSummary.criticalGaps} critical coverage gaps. Estimated exposure: ${formatCurrency(gapSummary.estimatedExposure)}`
+        ${
+          isTr
+            ? `Portföyünüzde ${gapSummary.criticalGaps} kritik teminat açığı bulunmaktadır. Tahmini risk tutarı: ${formatCurrency(gapSummary.estimatedExposure, 'TRY', locale)}`
+            : `Your portfolio has ${gapSummary.criticalGaps} critical coverage gaps. Estimated exposure: ${formatCurrency(gapSummary.estimatedExposure, 'TRY', locale)}`
         }
       </div>
     </div>
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
   <!-- Policy by Type -->
   <h2>${isTr ? 'Tür Bazında Poliçeler' : 'Policies by Type'}</h2>
@@ -477,14 +560,18 @@ export function generatePortfolioHTML(
       </tr>
     </thead>
     <tbody>
-      ${Object.entries(byType).map(([type, data]) => `
+      ${Object.entries(byType)
+        .map(
+          ([type, data]) => `
         <tr>
           <td>${type}</td>
           <td style="text-align: center;">${data.count}</td>
-          <td style="text-align: right;">${formatCurrency(data.totalCoverage)}</td>
-          <td style="text-align: right;">${formatCurrency(data.totalPremium)}</td>
+          <td style="text-align: right;">${formatCurrency(data.totalCoverage, 'TRY', locale)}</td>
+          <td style="text-align: right;">${formatCurrency(data.totalPremium, 'TRY', locale)}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
     </tbody>
   </table>
 
@@ -504,29 +591,37 @@ export function generatePortfolioHTML(
       </tr>
     </thead>
     <tbody>
-      ${policies.map(p => `
+      ${policies
+        .map(
+          (p) => `
         <tr>
           <td>${p.policyNumber}</td>
           <td>${p.provider}</td>
           <td>${isTr ? p.typeTr : p.type}</td>
           <td style="text-align: center;">${getStatusBadge(p.status)}</td>
-          <td style="text-align: right;">${formatCurrency(p.coverage)}</td>
-          <td style="text-align: right;">${formatCurrency(p.premium)}</td>
-          <td>${formatDate(p.expiryDate)}</td>
+          <td style="text-align: right;">${formatCurrency(p.coverage, 'TRY', locale)}</td>
+          <td style="text-align: right;">${formatCurrency(p.premium, 'TRY', locale)}</td>
+          <td>${formatDate(p.expiryDate, locale)}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
     </tbody>
   </table>
 
-  ${gapSummary && gapSummary.topIssues.length > 0 ? `
+  ${
+    gapSummary && gapSummary.topIssues.length > 0
+      ? `
   <!-- Top Issues -->
   <h2>${isTr ? 'Öncelikli Konular' : 'Top Issues'}</h2>
   <div class="card">
     <ol>
-      ${gapSummary.topIssues.map(issue => `<li style="margin-bottom: 8px;">${issue}</li>`).join('')}
+      ${gapSummary.topIssues.map((issue) => `<li style="margin-bottom: 8px;">${issue}</li>`).join('')}
     </ol>
   </div>
-  ` : ''}
+  `
+      : ''
+  }
 
   ${generateFooterHTML(branding, isTr ? 'tr' : 'en')}
 </body>
@@ -548,13 +643,14 @@ export function generatePolicySummaryHTML(
 ): string {
   const lang = options.language || 'en'
   const isTr = lang === 'tr' || lang === 'bilingual'
+  const locale = isTr ? 'tr' : 'en'
 
   const title = options.title || (isTr ? 'Poliçe Özet Raporu' : 'Policy Summary Report')
 
   const stats = {
     total: policies.length,
-    active: policies.filter(p => p.status === 'active').length,
-    expiring: policies.filter(p => p.status === 'expiring').length,
+    active: policies.filter((p) => p.status === 'active').length,
+    expiring: policies.filter((p) => p.status === 'expiring').length,
     totalCoverage: policies.reduce((sum, p) => sum + p.coverage, 0),
     totalPremium: policies.reduce((sum, p) => sum + p.premium, 0),
   }
@@ -582,11 +678,11 @@ export function generatePolicySummaryHTML(
       <div class="stat-label">${isTr ? 'Aktif' : 'Active'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${formatCurrency(stats.totalCoverage)}</div>
+      <div class="stat-value">${formatCurrency(stats.totalCoverage, 'TRY', locale)}</div>
       <div class="stat-label">${isTr ? 'Toplam Teminat' : 'Total Coverage'}</div>
     </div>
     <div class="stat-card">
-      <div class="stat-value">${formatCurrency(stats.totalPremium)}</div>
+      <div class="stat-value">${formatCurrency(stats.totalPremium, 'TRY', locale)}</div>
       <div class="stat-label">${isTr ? 'Toplam Prim' : 'Total Premium'}</div>
     </div>
   </div>
@@ -605,17 +701,21 @@ export function generatePolicySummaryHTML(
       </tr>
     </thead>
     <tbody>
-      ${policies.map(p => `
+      ${policies
+        .map(
+          (p) => `
         <tr>
           <td>${p.policyNumber}</td>
           <td>${p.provider}</td>
           <td>${isTr ? p.typeTr : p.type}</td>
           <td style="text-align: center;">${getStatusBadge(p.status)}</td>
-          <td style="text-align: right;">${formatCurrency(p.coverage)}</td>
-          <td style="text-align: right;">${formatCurrency(p.premium)}</td>
-          <td>${formatDate(p.expiryDate)}</td>
+          <td style="text-align: right;">${formatCurrency(p.coverage, 'TRY', locale)}</td>
+          <td style="text-align: right;">${formatCurrency(p.premium, 'TRY', locale)}</td>
+          <td>${formatDate(p.expiryDate, locale)}</td>
         </tr>
-      `).join('')}
+      `
+        )
+        .join('')}
     </tbody>
   </table>
 

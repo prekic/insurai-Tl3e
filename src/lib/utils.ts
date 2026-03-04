@@ -5,8 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatCurrency(amount: number, currency: string = 'TRY'): string {
-  return new Intl.NumberFormat('tr-TR', {
+// Locale mapping: app locale → Intl locale string
+const INTL_LOCALE_MAP: Record<string, string> = {
+  tr: 'tr-TR',
+  en: 'en-US',
+  de: 'de-DE',
+  fr: 'fr-FR',
+}
+
+function getIntlLocale(locale?: string): string {
+  return INTL_LOCALE_MAP[locale || 'tr'] || 'tr-TR'
+}
+
+export function formatCurrency(amount: number, currency: string = 'TRY', locale?: string): string {
+  return new Intl.NumberFormat(getIntlLocale(locale), {
     style: 'currency',
     currency,
     minimumFractionDigits: 0,
@@ -84,7 +96,11 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
 /**
  * Format currency in compact form for mobile (e.g., ₺980M, $5.2M)
  */
-export function formatCurrencyCompact(amount: number, currency: string = 'TRY'): string {
+export function formatCurrencyCompact(
+  amount: number,
+  currency: string = 'TRY',
+  _locale?: string
+): string {
   const symbol = CURRENCY_SYMBOLS[currency] || currency + ' '
 
   if (amount >= 1_000_000_000) {
@@ -132,17 +148,61 @@ export function validateCurrencyRegion(
 
   // Turkish address indicators
   const turkishIndicators = [
-    'türkiye', 'turkey', 'istanbul', 'ankara', 'izmir', 'antalya', 'bursa',
-    'adana', 'konya', 'gaziantep', 'mersin', 'kayseri', 'eskişehir',
-    'diyarbakır', 'samsun', 'denizli', 'şanlıurfa', 'adapazarı', 'malatya',
-    'trabzon', 'erzurum', 'van', 'batman', 'elazığ', 'sivas', 'manisa',
-    'kahramanmaraş', 'muğla', 'aydın', 'balıkesir', 'tekirdağ', 'kocaeli',
-    'sakarya', 'ordu', 'afyon', 'çorum', 'tokat', 'edirne', 'yozgat',
-    'çanakkale', 'isparta', 'zonguldak', 'rize', 'karaman', 'aksaray',
-    'giresun', 'niğde', 'muş', 'kırşehir', 'uşak', 'mardin', 'kilis',
+    'türkiye',
+    'turkey',
+    'istanbul',
+    'ankara',
+    'izmir',
+    'antalya',
+    'bursa',
+    'adana',
+    'konya',
+    'gaziantep',
+    'mersin',
+    'kayseri',
+    'eskişehir',
+    'diyarbakır',
+    'samsun',
+    'denizli',
+    'şanlıurfa',
+    'adapazarı',
+    'malatya',
+    'trabzon',
+    'erzurum',
+    'van',
+    'batman',
+    'elazığ',
+    'sivas',
+    'manisa',
+    'kahramanmaraş',
+    'muğla',
+    'aydın',
+    'balıkesir',
+    'tekirdağ',
+    'kocaeli',
+    'sakarya',
+    'ordu',
+    'afyon',
+    'çorum',
+    'tokat',
+    'edirne',
+    'yozgat',
+    'çanakkale',
+    'isparta',
+    'zonguldak',
+    'rize',
+    'karaman',
+    'aksaray',
+    'giresun',
+    'niğde',
+    'muş',
+    'kırşehir',
+    'uşak',
+    'mardin',
+    'kilis',
   ]
 
-  const isTurkishAddress = turkishIndicators.some(ind => addressLower.includes(ind))
+  const isTurkishAddress = turkishIndicators.some((ind) => addressLower.includes(ind))
 
   if (isTurkishAddress) {
     // Turkish addresses should typically use TRY, but USD/EUR are acceptable for international policies
@@ -150,63 +210,92 @@ export function validateCurrencyRegion(
     if (!acceptableCurrencies.includes(currency)) {
       return {
         valid: false,
-        warning: `Unusual currency ${currency} detected for Turkish address. Expected TRY, USD, or EUR.`
+        warning: `Unusual currency ${currency} detected for Turkish address. Expected TRY, USD, or EUR.`,
       }
     }
     // Warn if non-TRY but don't mark invalid
     if (currency !== 'TRY') {
       return {
         valid: true,
-        warning: `Foreign currency (${currency}) used for Turkish address. Verify this is intentional.`
+        warning: `Foreign currency (${currency}) used for Turkish address. Verify this is intentional.`,
       }
     }
   }
 
   // US address indicators
-  const usIndicators = ['usa', 'united states', 'america', 'new york', 'california', 'texas', 'florida']
-  const isUSAddress = usIndicators.some(ind => addressLower.includes(ind))
+  const usIndicators = [
+    'usa',
+    'united states',
+    'america',
+    'new york',
+    'california',
+    'texas',
+    'florida',
+  ]
+  const isUSAddress = usIndicators.some((ind) => addressLower.includes(ind))
 
   if (isUSAddress && currency !== 'USD') {
     return {
       valid: true,
-      warning: `Non-USD currency (${currency}) for US address. Verify this is intentional.`
+      warning: `Non-USD currency (${currency}) for US address. Verify this is intentional.`,
     }
   }
 
   // UK address indicators
-  const ukIndicators = ['uk', 'united kingdom', 'england', 'scotland', 'wales', 'london', 'manchester', 'birmingham']
-  const isUKAddress = ukIndicators.some(ind => addressLower.includes(ind))
+  const ukIndicators = [
+    'uk',
+    'united kingdom',
+    'england',
+    'scotland',
+    'wales',
+    'london',
+    'manchester',
+    'birmingham',
+  ]
+  const isUKAddress = ukIndicators.some((ind) => addressLower.includes(ind))
 
   if (isUKAddress && !['GBP', 'EUR', 'USD'].includes(currency)) {
     return {
       valid: true,
-      warning: `Unusual currency (${currency}) for UK address. Expected GBP, EUR, or USD.`
+      warning: `Unusual currency (${currency}) for UK address. Expected GBP, EUR, or USD.`,
     }
   }
 
   // Eurozone indicators
-  const eurozoneIndicators = ['germany', 'france', 'italy', 'spain', 'netherlands', 'belgium', 'austria', 'ireland', 'portugal', 'greece', 'finland']
-  const isEurozoneAddress = eurozoneIndicators.some(ind => addressLower.includes(ind))
+  const eurozoneIndicators = [
+    'germany',
+    'france',
+    'italy',
+    'spain',
+    'netherlands',
+    'belgium',
+    'austria',
+    'ireland',
+    'portugal',
+    'greece',
+    'finland',
+  ]
+  const isEurozoneAddress = eurozoneIndicators.some((ind) => addressLower.includes(ind))
 
   if (isEurozoneAddress && !['EUR', 'USD'].includes(currency)) {
     return {
       valid: true,
-      warning: `Unusual currency (${currency}) for Eurozone address. Expected EUR or USD.`
+      warning: `Unusual currency (${currency}) for Eurozone address. Expected EUR or USD.`,
     }
   }
 
   return { valid: true }
 }
 
-export function formatDate(date: string | Date): string {
+export function formatDate(date: string | Date, locale?: string): string {
   const d = typeof date === 'string' ? new Date(date) : date
-  return new Intl.DateTimeFormat('tr-TR', {
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
   }).format(d)
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('tr-TR').format(num)
+export function formatNumber(num: number, locale?: string): string {
+  return new Intl.NumberFormat(getIntlLocale(locale)).format(num)
 }

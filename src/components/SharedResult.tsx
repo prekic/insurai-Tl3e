@@ -19,8 +19,14 @@ import {
   Lock,
 } from 'lucide-react'
 import { Button } from './ui/button'
-import { getTrialResult, getShareId, getTrialTimeRemaining, formatTimeRemaining } from '@/lib/free-trial'
+import {
+  getTrialResult,
+  getShareId,
+  getTrialTimeRemaining,
+  formatTimeRemaining,
+} from '@/lib/free-trial'
 import { useI18n } from '@/lib/i18n'
+import { formatCurrency } from '@/lib/utils'
 import type { AnalyzedPolicy } from '@/types/policy'
 
 type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
@@ -28,7 +34,7 @@ type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
 export function SharedResult() {
   const { shareId } = useParams<{ shareId: string }>()
   const navigate = useNavigate()
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
   const [state, setState] = useState<ViewState>('loading')
   const [policy, setPolicy] = useState<AnalyzedPolicy | null>(null)
   const [fileName, setFileName] = useState<string>('')
@@ -88,12 +94,8 @@ export function SharedResult() {
             <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <FileText className="text-gray-400" size={32} />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {t.shared.analysisNotFound}
-            </h1>
-            <p className="text-gray-600 mb-6">
-              {t.shared.analysisNotFoundDesc}
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.shared.analysisNotFound}</h1>
+            <p className="text-gray-600 mb-6">{t.shared.analysisNotFoundDesc}</p>
             <div className="space-y-3">
               <Button
                 onClick={() => navigate('/try')}
@@ -120,12 +122,8 @@ export function SharedResult() {
             <div className="w-16 h-16 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
               <Clock className="text-amber-600" size={32} />
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              {t.shared.linkExpired}
-            </h1>
-            <p className="text-gray-600 mb-6">
-              {t.shared.linkExpiredDesc}
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{t.shared.linkExpired}</h1>
+            <p className="text-gray-600 mb-6">{t.shared.linkExpiredDesc}</p>
             <div className="space-y-3">
               <Button
                 onClick={() => navigate('/try')}
@@ -179,9 +177,7 @@ export function SharedResult() {
               <CheckCircle2 className="text-emerald-600" size={28} />
             </div>
             <div className="flex-1">
-              <h1 className="text-xl font-bold text-gray-900">
-                {t.shared.policyAnalysis}
-              </h1>
+              <h1 className="text-xl font-bold text-gray-900">{t.shared.policyAnalysis}</h1>
               <p className="text-gray-600 text-sm mt-1">
                 {fileName} • {policy.typeTr || policy.type} • {policy.provider}
               </p>
@@ -212,15 +208,19 @@ export function SharedResult() {
               <div className="p-4 bg-gray-50 rounded-xl">
                 <div className="text-sm text-gray-500">{t.shared.premium}</div>
                 <div className="font-semibold text-gray-900">
-                  ₺{policy.premium?.toLocaleString('tr-TR') || 'N/A'}
+                  {policy.premium ? formatCurrency(policy.premium, 'TRY', locale) : 'N/A'}
                 </div>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
                 <div className="text-sm text-gray-500">{t.shared.coverage}</div>
                 <div className="font-semibold text-gray-900">
-                  {policy.coverages?.some(c => c.isMarketValue)
-                    ? 'Rayiç Değer'
-                    : `₺${policy.coverage?.toLocaleString('tr-TR') || 'N/A'}`}
+                  {policy.coverages?.some((c) => c.isMarketValue)
+                    ? locale === 'tr'
+                      ? 'Rayiç Değer'
+                      : 'Market Value'
+                    : policy.coverage
+                      ? formatCurrency(policy.coverage, 'TRY', locale)
+                      : 'N/A'}
                 </div>
               </div>
             </div>
@@ -233,22 +233,34 @@ export function SharedResult() {
                 </h3>
                 <div className="space-y-2">
                   {policy.coverages.slice(0, 5).map((cov, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg"
+                    >
                       <span className="text-sm text-emerald-800">{cov.nameTr || cov.name}</span>
                       <span className="text-sm font-medium text-emerald-700">
                         {cov.isUnlimited
-                          ? 'Sınırsız'
+                          ? locale === 'tr'
+                            ? 'Sınırsız'
+                            : 'Unlimited'
                           : cov.isMarketValue
-                            ? 'Rayiç Değer'
+                            ? locale === 'tr'
+                              ? 'Rayiç Değer'
+                              : 'Market Value'
                             : cov.included && (!cov.limit || cov.limit === 0)
-                              ? '✓ Dahil'
-                              : `₺${cov.limit?.toLocaleString('tr-TR')}`}
+                              ? locale === 'tr'
+                                ? '✓ Dahil'
+                                : '✓ Included'
+                              : formatCurrency(cov.limit || 0, 'TRY', locale)}
                       </span>
                     </div>
                   ))}
                   {policy.coverages.length > 5 && (
                     <p className="text-sm text-gray-500 text-center py-2">
-                      {t.shared.moreCoverages.replace('{count}', String(policy.coverages.length - 5))}
+                      {t.shared.moreCoverages.replace(
+                        '{count}',
+                        String(policy.coverages.length - 5)
+                      )}
                     </p>
                   )}
                 </div>
@@ -258,9 +270,7 @@ export function SharedResult() {
             {/* Exclusions */}
             {policy.exclusions && policy.exclusions.length > 0 && (
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3">
-                  {t.shared.keyExclusions}
-                </h3>
+                <h3 className="font-semibold text-gray-900 mb-3">{t.shared.keyExclusions}</h3>
                 <div className="space-y-2">
                   {policy.exclusions.slice(0, 3).map((exc, i) => (
                     <div key={i} className="flex items-start gap-2 p-3 bg-red-50 rounded-lg">
@@ -296,12 +306,8 @@ export function SharedResult() {
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl p-6 mb-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-center md:text-left">
-              <h3 className="text-white font-bold text-lg mb-1">
-                {t.shared.wantToAnalyze}
-              </h3>
-              <p className="text-blue-100 text-sm">
-                {t.shared.wantToAnalyzeDesc}
-              </p>
+              <h3 className="text-white font-bold text-lg mb-1">{t.shared.wantToAnalyze}</h3>
+              <p className="text-blue-100 text-sm">{t.shared.wantToAnalyzeDesc}</p>
             </div>
             <Button
               onClick={() => navigate('/try')}
