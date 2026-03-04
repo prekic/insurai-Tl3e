@@ -14,12 +14,12 @@ interface PolicyDiffViewerProps {
  * Component to display policy field differences in a clear visual format
  */
 export function PolicyDiffViewer({ changes, className, compact = false }: PolicyDiffViewerProps) {
-  const { locale } = useI18n()
+  const { t } = useI18n()
 
   if (changes.length === 0) {
     return (
       <div className={cn('text-center py-4 text-gray-500', className)}>
-        {locale === 'tr' ? 'Degisiklik bulunamadi' : 'No changes detected'}
+        {t.policyDiff.noChanges}
       </div>
     )
   }
@@ -45,14 +45,14 @@ interface DiffRowProps {
 }
 
 function DiffRow({ change, compact = false }: DiffRowProps) {
-  const { locale } = useI18n()
+  const { t, locale } = useI18n()
 
   const label = locale === 'tr' ? change.fieldLabelTr : change.fieldLabel
 
   // Format values based on type
   const formatValue = (value: unknown, type: PolicyFieldDiff['type']): string => {
     if (value === null || value === undefined || value === '') {
-      return locale === 'tr' ? '(bos)' : '(empty)'
+      return t.policyDiff.empty
     }
 
     switch (type) {
@@ -62,11 +62,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
         return formatDate(String(value), locale)
       case 'array':
         if (Array.isArray(value)) {
-          return value.length > 0
-            ? `${value.length} ${locale === 'tr' ? 'madde' : 'item(s)'}`
-            : locale === 'tr'
-              ? '(bos)'
-              : '(empty)'
+          return value.length > 0 ? `${value.length} ${t.policyDiff.items}` : t.policyDiff.empty
         }
         return String(value)
       default:
@@ -85,7 +81,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
           color: 'text-red-600',
           bgColor: 'bg-red-50',
           borderColor: 'border-red-200',
-          label: locale === 'tr' ? 'Kritik' : 'Critical',
+          label: t.policyDiff.critical,
         }
       case 'major':
         return {
@@ -93,7 +89,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
           color: 'text-amber-600',
           bgColor: 'bg-amber-50',
           borderColor: 'border-amber-200',
-          label: locale === 'tr' ? 'Onemli' : 'Major',
+          label: t.policyDiff.major,
         }
       case 'moderate':
         return {
@@ -101,7 +97,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
           color: 'text-blue-600',
           bgColor: 'bg-blue-50',
           borderColor: 'border-blue-200',
-          label: locale === 'tr' ? 'Orta' : 'Moderate',
+          label: t.policyDiff.moderate,
         }
       case 'minor':
       default:
@@ -110,7 +106,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
           color: 'text-gray-500',
           bgColor: 'bg-gray-50',
           borderColor: 'border-gray-200',
-          label: locale === 'tr' ? 'Kucuk' : 'Minor',
+          label: t.policyDiff.minor,
         }
     }
   }
@@ -151,13 +147,13 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
       <div className="grid grid-cols-2 divide-x divide-gray-100">
         <div className="p-3 bg-white">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-            {locale === 'tr' ? 'Onceki Deger' : 'Previous Value'}
+            {t.policyDiff.previousValue}
           </div>
           <div className="text-gray-600 line-through">{oldValueStr}</div>
         </div>
         <div className="p-3 bg-white">
           <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-            {locale === 'tr' ? 'Yeni Deger' : 'New Value'}
+            {t.policyDiff.newValue}
           </div>
           <div className={cn('font-medium', config.color)}>{newValueStr}</div>
         </div>
@@ -177,7 +173,7 @@ interface ArrayDiffDetailProps {
 }
 
 function ArrayDiffDetail({ oldValue, newValue }: ArrayDiffDetailProps) {
-  const { locale } = useI18n()
+  const { t } = useI18n()
 
   const oldArray = Array.isArray(oldValue) ? oldValue : []
   const newArray = Array.isArray(newValue) ? newValue : []
@@ -197,9 +193,7 @@ function ArrayDiffDetail({ oldValue, newValue }: ArrayDiffDetailProps) {
     <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 space-y-2 text-sm">
       {removed.length > 0 && (
         <div>
-          <span className="text-red-600 font-medium">
-            {locale === 'tr' ? 'Kaldirilan:' : 'Removed:'}
-          </span>
+          <span className="text-red-600 font-medium">{t.policyDiff.removed}</span>
           <ul className="mt-1 space-y-1">
             {removed.slice(0, 5).map((item, i) => (
               <li key={i} className="text-gray-600 line-through pl-3">
@@ -208,7 +202,7 @@ function ArrayDiffDetail({ oldValue, newValue }: ArrayDiffDetailProps) {
             ))}
             {removed.length > 5 && (
               <li className="text-gray-400 pl-3">
-                +{removed.length - 5} {locale === 'tr' ? 'daha' : 'more'}
+                +{removed.length - 5} {t.policyDiff.more}
               </li>
             )}
           </ul>
@@ -216,9 +210,7 @@ function ArrayDiffDetail({ oldValue, newValue }: ArrayDiffDetailProps) {
       )}
       {added.length > 0 && (
         <div>
-          <span className="text-green-600 font-medium">
-            {locale === 'tr' ? 'Eklenen:' : 'Added:'}
-          </span>
+          <span className="text-green-600 font-medium">{t.policyDiff.added}</span>
           <ul className="mt-1 space-y-1">
             {added.slice(0, 5).map((item, i) => (
               <li key={i} className="text-gray-600 pl-3">
@@ -227,7 +219,7 @@ function ArrayDiffDetail({ oldValue, newValue }: ArrayDiffDetailProps) {
             ))}
             {added.length > 5 && (
               <li className="text-gray-400 pl-3">
-                +{added.length - 5} {locale === 'tr' ? 'daha' : 'more'}
+                +{added.length - 5} {t.policyDiff.more}
               </li>
             )}
           </ul>
@@ -247,7 +239,7 @@ export function PolicyDiffSummary({
   changes: PolicyFieldDiff[]
   className?: string
 }) {
-  const { locale } = useI18n()
+  const { t } = useI18n()
 
   const critical = changes.filter((c) => c.significance === 'critical').length
   const major = changes.filter((c) => c.significance === 'major').length
@@ -258,19 +250,19 @@ export function PolicyDiffSummary({
       {critical > 0 && (
         <span className="flex items-center gap-1 text-red-600">
           <AlertTriangle className="w-3.5 h-3.5" />
-          {critical} {locale === 'tr' ? 'kritik' : 'critical'}
+          {critical} {t.policyDiff.criticalCount}
         </span>
       )}
       {major > 0 && (
         <span className="flex items-center gap-1 text-amber-600">
           <AlertCircle className="w-3.5 h-3.5" />
-          {major} {locale === 'tr' ? 'onemli' : 'major'}
+          {major} {t.policyDiff.majorCount}
         </span>
       )}
       {other > 0 && (
         <span className="flex items-center gap-1 text-gray-500">
           <Info className="w-3.5 h-3.5" />
-          {other} {locale === 'tr' ? 'diger' : 'other'}
+          {other} {t.policyDiff.otherCount}
         </span>
       )}
     </div>

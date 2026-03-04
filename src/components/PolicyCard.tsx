@@ -114,7 +114,7 @@ export function PolicyCard({
         role="button"
         tabIndex={0}
         aria-pressed={isSelected}
-        aria-label={`${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}`}
+        aria-label={`${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ` - ${t.policy.new}` : ''}${isDuplicate ? ` - ${t.policy.duplicate}` : ''}`}
       >
         {/* New/Duplicate indicator badges */}
         {(isNew || isDuplicate) && (
@@ -122,13 +122,13 @@ export function PolicyCard({
             {isNew && (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-green-500 text-white rounded-full shadow-sm">
                 <Sparkles className="w-2.5 h-2.5" />
-                {locale === 'tr' ? 'Yeni' : 'New'}
+                {t.policy.new}
               </span>
             )}
             {isDuplicate && (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500 text-white rounded-full shadow-sm">
                 <Copy className="w-2.5 h-2.5" />
-                {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+                {t.policy.duplicate}
               </span>
             )}
           </div>
@@ -181,7 +181,7 @@ export function PolicyCard({
       aria-pressed={onSelect ? isSelected : undefined}
       aria-label={
         onSelect
-          ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ' - New' : ''}${isDuplicate ? ' - Duplicate' : ''}`
+          ? `${policy.provider} ${typeLabel}${isSelected ? ` - ${t.a11y.selected}` : ''}${isNew ? ` - ${t.policy.new}` : ''}${isDuplicate ? ` - ${t.policy.duplicate}` : ''}`
           : undefined
       }
     >
@@ -191,13 +191,13 @@ export function PolicyCard({
           {isNew && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-green-500 text-white rounded-full shadow-sm">
               <Sparkles className="w-3 h-3" />
-              {locale === 'tr' ? 'Yeni' : 'New'}
+              {t.policy.new}
             </span>
           )}
           {isDuplicate && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-amber-500 text-white rounded-full shadow-sm">
               <Copy className="w-3 h-3" />
-              {locale === 'tr' ? 'Kopya' : 'Duplicate'}
+              {t.policy.duplicate}
             </span>
           )}
         </div>

@@ -8,7 +8,10 @@ import { useId } from 'react'
 import { Mail, AlertCircle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card'
-import { useEmailPreferences, type EmailPreferences as EmailPrefsType } from '@/hooks/useEmailPreferences'
+import {
+  useEmailPreferences,
+  type EmailPreferences as EmailPrefsType,
+} from '@/hooks/useEmailPreferences'
 import { useI18n } from '@/lib/i18n'
 
 // Toggle Switch Component
@@ -32,12 +35,13 @@ function ToggleSwitch({ id, label, description, checked, onChange, disabled }: T
   return (
     <div className="flex items-start justify-between py-3">
       <div className="flex-1 pr-4">
-        <label htmlFor={id} className={`text-gray-700 cursor-pointer font-medium ${disabled ? 'opacity-50' : ''}`}>
+        <label
+          htmlFor={id}
+          className={`text-gray-700 cursor-pointer font-medium ${disabled ? 'opacity-50' : ''}`}
+        >
           {label}
         </label>
-        {description && (
-          <p className="text-sm text-gray-500 mt-0.5">{description}</p>
-        )}
+        {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
       </div>
       <button
         id={id}
@@ -63,7 +67,10 @@ function ToggleSwitch({ id, label, description, checked, onChange, disabled }: T
 }
 
 // Email preference labels and descriptions
-const EMAIL_PREF_CONFIG: Record<keyof EmailPrefsType, { label: string; labelTr: string; description: string; descriptionTr: string }> = {
+const EMAIL_PREF_CONFIG: Record<
+  keyof EmailPrefsType,
+  { label: string; labelTr: string; description: string; descriptionTr: string }
+> = {
   policy_alerts: {
     label: 'Policy Alerts',
     labelTr: 'Poliçe Bildirimleri',
@@ -92,23 +99,17 @@ const EMAIL_PREF_CONFIG: Record<keyof EmailPrefsType, { label: string; labelTr: 
 
 export function EmailPreferences() {
   const baseId = useId()
-  const { locale } = useI18n()
-  const {
-    preferences,
-    isLoading,
-    error,
-    updatePreference,
-    isConfigured,
-  } = useEmailPreferences()
+  const { t, locale } = useI18n()
+  const { preferences, isLoading, error, updatePreference, isConfigured } = useEmailPreferences()
 
   const isTurkish = locale === 'tr'
 
   const handleToggle = async (key: keyof EmailPrefsType, value: boolean) => {
     try {
       await updatePreference(key, value)
-      toast.success(isTurkish ? 'Tercih güncellendi' : 'Preference updated')
+      toast.success(t.emailPreferences.successMessage)
     } catch {
-      toast.error(isTurkish ? 'Tercih güncellenemedi' : 'Failed to update preference')
+      toast.error(t.emailPreferences.errorMessage)
     }
   }
 
@@ -118,17 +119,13 @@ export function EmailPreferences() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Mail className="text-blue-500" size={20} aria-hidden="true" />
-            {isTurkish ? 'Email Bildirimleri' : 'Email Notifications'}
+            {t.emailPreferences.title}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3 text-gray-500 text-sm">
             <AlertCircle size={16} />
-            <span>
-              {isTurkish
-                ? 'Email bildirimleri henüz yapılandırılmamış.'
-                : 'Email notifications are not configured yet.'}
-            </span>
+            <span>{t.emailPreferences.notConfigured}</span>
           </div>
         </CardContent>
       </Card>
@@ -140,14 +137,10 @@ export function EmailPreferences() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Mail className="text-blue-500" size={20} aria-hidden="true" />
-          {isTurkish ? 'Email Bildirimleri' : 'Email Notifications'}
+          {t.emailPreferences.title}
           {isLoading && <Loader2 size={16} className="animate-spin text-blue-500" />}
         </CardTitle>
-        <CardDescription>
-          {isTurkish
-            ? 'Hangi email bildirimlerini almak istediğinizi seçin'
-            : 'Choose which email notifications you want to receive'}
-        </CardDescription>
+        <CardDescription>{t.emailPreferences.description}</CardDescription>
       </CardHeader>
       <CardContent>
         {error && (
@@ -175,11 +168,7 @@ export function EmailPreferences() {
         </div>
 
         <div className="mt-4 pt-4 border-t border-gray-100">
-          <p className="text-xs text-gray-500">
-            {isTurkish
-              ? 'Not: Şifre sıfırlama gibi işlemsel emailler her zaman gönderilir.'
-              : 'Note: Transactional emails like password reset are always sent.'}
-          </p>
+          <p className="text-xs text-gray-500">{t.emailPreferences.transactionalNote}</p>
         </div>
       </CardContent>
     </Card>

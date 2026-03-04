@@ -26,10 +26,8 @@ export function NotFound() {
         </div>
 
         {/* Message */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-4">Page Not Found</h1>
-        <p className="text-gray-600 mb-8">
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
-        </p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-4">{t.notFound.title}</h1>
+        <p className="text-gray-600 mb-8">{t.notFound.description}</p>
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -38,7 +36,7 @@ export function NotFound() {
             className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-gray-300 bg-white text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-colors"
           >
             <ArrowLeft size={18} />
-            Go Back
+            {t.notFound.goBack}
           </button>
           <Link
             to="/"
@@ -51,7 +49,7 @@ export function NotFound() {
 
         {/* Helpful Links */}
         <div className="mt-12 pt-8 border-t border-gray-200">
-          <p className="text-sm text-gray-500 mb-4">Or try one of these pages:</p>
+          <p className="text-sm text-gray-500 mb-4">{t.notFound.tryThesePages}</p>
           <div className="flex flex-wrap gap-2 justify-center">
             <Link
               to="/dashboard"

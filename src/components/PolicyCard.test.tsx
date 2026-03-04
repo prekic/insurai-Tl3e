@@ -30,6 +30,8 @@ vi.mock('@/lib/i18n', () => ({
         expiring: 'Expiring',
         expired: 'Expired',
         pending: 'Pending',
+        new: 'New',
+        duplicate: 'Duplicate',
       },
       common: {
         view: 'View',
@@ -57,11 +59,56 @@ const mockEvaluation: PolicyEvaluation = {
   grade: 'B' as const,
   status: 'good' as const,
   scoreBreakdown: {
-    premium: { category: 'Premium', categoryTR: 'Prim', score: 80, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-    coverage: { category: 'Coverage', categoryTR: 'Teminat', score: 90, weight: 30, details: '', detailsTR: '', issues: [], issuesTR: [] },
-    deductible: { category: 'Deductible', categoryTR: 'Muafiyet', score: 75, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
-    compliance: { category: 'Compliance', categoryTR: 'Uyum', score: 85, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-    value: { category: 'Value', categoryTR: 'Deger', score: 88, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
+    premium: {
+      category: 'Premium',
+      categoryTR: 'Prim',
+      score: 80,
+      weight: 20,
+      details: '',
+      detailsTR: '',
+      issues: [],
+      issuesTR: [],
+    },
+    coverage: {
+      category: 'Coverage',
+      categoryTR: 'Teminat',
+      score: 90,
+      weight: 30,
+      details: '',
+      detailsTR: '',
+      issues: [],
+      issuesTR: [],
+    },
+    deductible: {
+      category: 'Deductible',
+      categoryTR: 'Muafiyet',
+      score: 75,
+      weight: 15,
+      details: '',
+      detailsTR: '',
+      issues: [],
+      issuesTR: [],
+    },
+    compliance: {
+      category: 'Compliance',
+      categoryTR: 'Uyum',
+      score: 85,
+      weight: 20,
+      details: '',
+      detailsTR: '',
+      issues: [],
+      issuesTR: [],
+    },
+    value: {
+      category: 'Value',
+      categoryTR: 'Deger',
+      score: 88,
+      weight: 15,
+      details: '',
+      detailsTR: '',
+      issues: [],
+      issuesTR: [],
+    },
   },
   marketComparison: {
     premiumPercentile: 60,
@@ -514,20 +561,16 @@ describe('PolicyCardGrid', () => {
 
   it('highlights selected policies', () => {
     const onSelect = vi.fn()
-    render(
-      <PolicyCardGrid policies={policies} onSelect={onSelect} selectedIds={['p2']} />
-    )
+    render(<PolicyCardGrid policies={policies} onSelect={onSelect} selectedIds={['p2']} />)
     const buttons = screen.getAllByRole('button')
     // p2 should be selected
-    const p2Button = buttons.find(b => b.getAttribute('aria-pressed') === 'true')
+    const p2Button = buttons.find((b) => b.getAttribute('aria-pressed') === 'true')
     expect(p2Button).toBeTruthy()
   })
 
   it('hides action buttons in selection mode', () => {
     const onSelect = vi.fn()
-    render(
-      <PolicyCardGrid policies={policies} onSelect={onSelect} onView={vi.fn()} />
-    )
+    render(<PolicyCardGrid policies={policies} onSelect={onSelect} onView={vi.fn()} />)
     // In grid with onSelect, showActions is false
     expect(screen.queryByRole('button', { name: /View/i })).not.toBeInTheDocument()
   })
@@ -558,9 +601,7 @@ describe('PolicyCardGrid', () => {
   })
 
   it('applies custom className to grid container', () => {
-    const { container } = render(
-      <PolicyCardGrid policies={policies} className="grid-custom" />
-    )
+    const { container } = render(<PolicyCardGrid policies={policies} className="grid-custom" />)
     expect(container.firstChild).toHaveClass('grid-custom')
   })
 })

@@ -11,6 +11,32 @@ import userEvent from '@testing-library/user-event'
 import { PolicyDocuments, PolicyDocumentsInline } from './PolicyDocuments'
 import type { UploadedDocument } from '@/hooks/useFileUpload'
 
+// Mock i18n
+vi.mock('@/lib/i18n', () => ({
+  useI18n: () => ({
+    t: {
+      policyDocuments: {
+        title: 'Documents',
+        loading: 'Loading documents...',
+        upload: 'Upload',
+        uploading: 'Uploading...',
+        uploadingProgress: 'Uploading... {percentage}%',
+        openInNewTab: 'Open in new tab',
+        refreshLink: 'Refresh download link',
+        download: 'Download',
+        confirmDelete: 'Click again to confirm',
+        deleteDoc: 'Delete',
+        noDocuments: 'No documents uploaded yet',
+        clickUpload: 'Click Upload to add policy documents',
+        documentCount: '{count} document',
+        documentsCount: '{count} documents',
+      },
+    },
+    locale: 'en',
+    isLoading: false,
+  }),
+}))
+
 // Mock data
 const mockDocuments: UploadedDocument[] = [
   {

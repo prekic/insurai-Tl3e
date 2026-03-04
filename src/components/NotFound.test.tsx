@@ -23,7 +23,15 @@ vi.mock('@/lib/i18n', () => ({
       help: {
         title: 'Help',
       },
+      notFound: {
+        title: 'Page Not Found',
+        description: "The page you're looking for doesn't exist or has been moved.",
+        goBack: 'Go Back',
+        tryThesePages: 'Or try one of these pages:',
+      },
     },
+    locale: 'en',
+    isLoading: false,
   }),
 }))
 

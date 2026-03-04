@@ -30,7 +30,11 @@ vi.mock('react-router-dom', async () => {
     ...actual,
     useNavigate: () => mockNavigate,
     useLocation: () => ({ state: null, pathname: '/test' }),
-    Link: ({ children, to, ...rest }: any) => <a href={to} {...rest}>{children}</a>,
+    Link: ({ children, to, ...rest }: any) => (
+      <a href={to} {...rest}>
+        {children}
+      </a>
+    ),
   }
 })
 
@@ -57,8 +61,20 @@ vi.mock('@/lib/i18n', () => ({
   useLanguageSelector: () => ({
     currentLocale: 'en',
     locales: [
-      { code: 'en', name: 'English', nativeName: 'English', flag: '\u{1F1EC}\u{1F1E7}', isActive: true },
-      { code: 'tr', name: 'Turkish', nativeName: 'Turkce', flag: '\u{1F1F9}\u{1F1F7}', isActive: false },
+      {
+        code: 'en',
+        name: 'English',
+        nativeName: 'English',
+        flag: '\u{1F1EC}\u{1F1E7}',
+        isActive: true,
+      },
+      {
+        code: 'tr',
+        name: 'Turkish',
+        nativeName: 'Turkce',
+        flag: '\u{1F1F9}\u{1F1F7}',
+        isActive: false,
+      },
     ],
     setLocale: mockSetLocale,
     isLoading: false,
@@ -72,8 +88,20 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
   useLanguageSelector: () => ({
     currentLocale: 'en',
     locales: [
-      { code: 'en', name: 'English', nativeName: 'English', flag: '\u{1F1EC}\u{1F1E7}', isActive: true },
-      { code: 'tr', name: 'Turkish', nativeName: 'Turkce', flag: '\u{1F1F9}\u{1F1F7}', isActive: false },
+      {
+        code: 'en',
+        name: 'English',
+        nativeName: 'English',
+        flag: '\u{1F1EC}\u{1F1E7}',
+        isActive: true,
+      },
+      {
+        code: 'tr',
+        name: 'Turkish',
+        nativeName: 'Turkce',
+        flag: '\u{1F1F9}\u{1F1F7}',
+        isActive: false,
+      },
     ],
     setLocale: vi.fn(),
   }),
@@ -198,13 +226,21 @@ describe('EmailPreferences', () => {
 
   it('renders transactional email note', () => {
     render(<EmailPreferences />)
-    expect(screen.getByText(/Transactional emails like password reset are always sent/)).toBeInTheDocument()
+    expect(
+      screen.getByText(/Transactional emails like password reset are always sent/)
+    ).toBeInTheDocument()
   })
 
   it('reflects current preference states in toggle checked state', () => {
     render(<EmailPreferences />)
-    expect(screen.getByRole('switch', { name: /policy alerts/i })).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByRole('switch', { name: /weekly digest/i })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: /policy alerts/i })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+    expect(screen.getByRole('switch', { name: /weekly digest/i })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    )
   })
 
   it('handles keyboard toggle with Enter', () => {
@@ -237,7 +273,9 @@ describe('EmailPreferences', () => {
 
   it('renders card description for configured state', () => {
     render(<EmailPreferences />)
-    expect(screen.getByText('Choose which email notifications you want to receive')).toBeInTheDocument()
+    expect(
+      screen.getByText('Choose which email notifications you want to receive')
+    ).toBeInTheDocument()
   })
 
   it('toggles marketing preference off when clicked', async () => {
@@ -296,10 +334,7 @@ describe('GlobalNavigation — branch coverage', () => {
       user_metadata: { full_name: 'Test User' },
     }
     mockPolicies.length = 0
-    mockPolicies.push(
-      { id: '1', policyNumber: 'P1' },
-      { id: '2', policyNumber: 'P2' },
-    )
+    mockPolicies.push({ id: '1', policyNumber: 'P1' }, { id: '2', policyNumber: 'P2' })
     mockSignOut.mockResolvedValue(undefined)
   })
 
@@ -452,24 +487,54 @@ describe('ScoreBreakdown', () => {
 
   const createBreakdown = (overrides: Partial<Record<string, any>> = {}) => ({
     premium: {
-      category: 'Premium', categoryTR: 'Prim', score: 85, weight: 20,
-      details: 'Good premium', detailsTR: 'Iyi prim', issues: [], issuesTR: [],
+      category: 'Premium',
+      categoryTR: 'Prim',
+      score: 85,
+      weight: 20,
+      details: 'Good premium',
+      detailsTR: 'Iyi prim',
+      issues: [],
+      issuesTR: [],
     },
     coverage: {
-      category: 'Coverage', categoryTR: 'Teminat', score: 45, weight: 30,
-      details: 'Low coverage', detailsTR: 'Dusuk teminat', issues: [], issuesTR: [],
+      category: 'Coverage',
+      categoryTR: 'Teminat',
+      score: 45,
+      weight: 30,
+      details: 'Low coverage',
+      detailsTR: 'Dusuk teminat',
+      issues: [],
+      issuesTR: [],
     },
     deductible: {
-      category: 'Deductible', categoryTR: 'Muafiyet', score: 92, weight: 15,
-      details: 'Excellent deductible', detailsTR: 'Mukemmel muafiyet', issues: [], issuesTR: [],
+      category: 'Deductible',
+      categoryTR: 'Muafiyet',
+      score: 92,
+      weight: 15,
+      details: 'Excellent deductible',
+      detailsTR: 'Mukemmel muafiyet',
+      issues: [],
+      issuesTR: [],
     },
     compliance: {
-      category: 'Compliance', categoryTR: 'Uyum', score: 60, weight: 20,
-      details: 'Fair compliance', detailsTR: 'Orta uyum', issues: [], issuesTR: [],
+      category: 'Compliance',
+      categoryTR: 'Uyum',
+      score: 60,
+      weight: 20,
+      details: 'Fair compliance',
+      detailsTR: 'Orta uyum',
+      issues: [],
+      issuesTR: [],
     },
     value: {
-      category: 'Value', categoryTR: 'Deger', score: 30, weight: 15,
-      details: 'Poor value', detailsTR: 'Kotu deger', issues: [], issuesTR: [],
+      category: 'Value',
+      categoryTR: 'Deger',
+      score: 30,
+      weight: 15,
+      details: 'Poor value',
+      detailsTR: 'Kotu deger',
+      issues: [],
+      issuesTR: [],
     },
     ...overrides,
   })
@@ -485,7 +550,9 @@ describe('ScoreBreakdown', () => {
     })
 
     it('shows weight percentages in full mode', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       // Weight text is split across elements, so check that weight values appear
       // The weight is rendered as e.g. (20%) in a span
       const weightSpans = container.querySelectorAll('.text-gray-400')
@@ -502,42 +569,54 @@ describe('ScoreBreakdown', () => {
       render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
       const progressBars = screen.getAllByRole('progressbar')
       expect(progressBars.length).toBe(5)
-      const premiumBar = progressBars.find(b => b.getAttribute('aria-valuenow') === '85')
+      const premiumBar = progressBars.find((b) => b.getAttribute('aria-valuenow') === '85')
       expect(premiumBar).toBeTruthy()
     })
 
     it('applies emerald color for scores >= 90', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       const emeraldTexts = container.querySelectorAll('.text-emerald-700')
       expect(emeraldTexts.length).toBeGreaterThanOrEqual(1)
     })
 
     it('applies blue color for scores >= 75 and < 90', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       const blueTexts = container.querySelectorAll('.text-blue-700')
       expect(blueTexts.length).toBeGreaterThanOrEqual(1)
     })
 
     it('applies amber color for scores >= 60 and < 75', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       const amberTexts = container.querySelectorAll('.text-amber-700')
       expect(amberTexts.length).toBeGreaterThanOrEqual(1)
     })
 
     it('applies orange color for scores >= 40 and < 60', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       const orangeTexts = container.querySelectorAll('.text-orange-700')
       expect(orangeTexts.length).toBeGreaterThanOrEqual(1)
     })
 
     it('applies red color for scores < 40', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       const redTexts = container.querySelectorAll('.text-red-700')
       expect(redTexts.length).toBeGreaterThanOrEqual(1)
     })
 
     it('applies correct progress bar bg colors', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       expect(container.querySelector('.bg-emerald-500')).toBeInTheDocument()
       expect(container.querySelector('.bg-blue-500')).toBeInTheDocument()
       expect(container.querySelector('.bg-amber-500')).toBeInTheDocument()
@@ -546,7 +625,9 @@ describe('ScoreBreakdown', () => {
     })
 
     it('applies correct background pill colors', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="full" />
+      )
       // These bg colors are used in full variant score rows
       expect(container.querySelector('.bg-gray-100')).toBeInTheDocument() // progress bar track
     })
@@ -554,8 +635,14 @@ describe('ScoreBreakdown', () => {
     it('renders rounded scores', () => {
       const breakdown = createBreakdown({
         premium: {
-          category: 'Premium', categoryTR: 'Prim', score: 85.7, weight: 20,
-          details: 'test', detailsTR: 'test', issues: [], issuesTR: [],
+          category: 'Premium',
+          categoryTR: 'Prim',
+          score: 85.7,
+          weight: 20,
+          details: 'test',
+          detailsTR: 'test',
+          issues: [],
+          issuesTR: [],
         },
       })
       render(<ScoreBreakdown breakdown={breakdown as any} variant="full" />)
@@ -563,7 +650,13 @@ describe('ScoreBreakdown', () => {
     })
 
     it('applies custom className to full variant', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="full" className="custom-full" />)
+      const { container } = render(
+        <ScoreBreakdown
+          breakdown={createBreakdown() as any}
+          variant="full"
+          className="custom-full"
+        />
+      )
       expect(container.firstChild).toHaveClass('custom-full')
     })
 
@@ -583,20 +676,30 @@ describe('ScoreBreakdown', () => {
     })
 
     it('renders as inline pills (flex container)', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />
+      )
       const wrapper = container.firstChild as HTMLElement
       expect(wrapper).toHaveClass('flex')
     })
 
     it('does not show weight percentages in mini mode', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />
+      )
       // Mini mode doesn't render weight spans
       const weightSpans = container.querySelectorAll('.text-gray-400')
       expect(weightSpans.length).toBe(0)
     })
 
     it('applies custom className', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" className="custom-mini" />)
+      const { container } = render(
+        <ScoreBreakdown
+          breakdown={createBreakdown() as any}
+          variant="mini"
+          className="custom-mini"
+        />
+      )
       expect(container.firstChild).toHaveClass('custom-mini')
     })
 
@@ -610,11 +713,15 @@ describe('ScoreBreakdown', () => {
       // Mini variant sets title={details} on pills
       const pills = screen.getAllByText('Coverage')
       const pill = pills[0].closest('span')
-      expect(pill?.getAttribute('title') || pill?.parentElement?.getAttribute('title')).toBeDefined()
+      expect(
+        pill?.getAttribute('title') || pill?.parentElement?.getAttribute('title')
+      ).toBeDefined()
     })
 
     it('applies correct background colors on mini pills', () => {
-      const { container } = render(<ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />)
+      const { container } = render(
+        <ScoreBreakdown breakdown={createBreakdown() as any} variant="mini" />
+      )
       // Coverage score 45 → orange bg, Premium 85 → blue bg
       const blueBg = container.querySelectorAll('.bg-blue-50')
       const orangeBg = container.querySelectorAll('.bg-orange-50')
@@ -724,10 +831,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('handles undefined newValue gracefully', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'notes', fieldLabel: 'Notes', fieldLabelTr: 'Notlar',
-          oldValue: 'old notes', newValue: undefined, type: 'string', significance: 'minor',
-        }]}
+        changes={[
+          {
+            field: 'notes',
+            fieldLabel: 'Notes',
+            fieldLabelTr: 'Notlar',
+            oldValue: 'old notes',
+            newValue: undefined,
+            type: 'string',
+            significance: 'minor',
+          },
+        ]}
       />
     )
     expect(screen.getByText('(empty)')).toBeInTheDocument()
@@ -736,10 +850,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('handles boolean values as string type', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'active', fieldLabel: 'Active', fieldLabelTr: 'Aktif',
-          oldValue: 'true', newValue: 'false', type: 'string', significance: 'moderate',
-        }]}
+        changes={[
+          {
+            field: 'active',
+            fieldLabel: 'Active',
+            fieldLabelTr: 'Aktif',
+            oldValue: 'true',
+            newValue: 'false',
+            type: 'string',
+            significance: 'moderate',
+          },
+        ]}
       />
     )
     expect(screen.getByText('true')).toBeInTheDocument()
@@ -749,10 +870,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('renders compact mode with colon after label', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'provider', fieldLabel: 'Provider', fieldLabelTr: 'Saglayici',
-          oldValue: 'Allianz', newValue: 'AXA', type: 'string', significance: 'critical',
-        }]}
+        changes={[
+          {
+            field: 'provider',
+            fieldLabel: 'Provider',
+            fieldLabelTr: 'Saglayici',
+            oldValue: 'Allianz',
+            newValue: 'AXA',
+            type: 'string',
+            significance: 'critical',
+          },
+        ]}
         compact
       />
     )
@@ -762,10 +890,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('formats number zero as currency', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'deductible', fieldLabel: 'Deductible', fieldLabelTr: 'Muafiyet',
-          oldValue: 0, newValue: 1000, type: 'number', significance: 'moderate',
-        }]}
+        changes={[
+          {
+            field: 'deductible',
+            fieldLabel: 'Deductible',
+            fieldLabelTr: 'Muafiyet',
+            oldValue: 0,
+            newValue: 1000,
+            type: 'number',
+            significance: 'moderate',
+          },
+        ]}
       />
     )
     expect(screen.getByText('TL0')).toBeInTheDocument()
@@ -775,10 +910,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('shows both added and removed items when array changed', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'exclusions', fieldLabel: 'Exclusions', fieldLabelTr: 'Istisnalar',
-          oldValue: ['war', 'nuclear'], newValue: ['war', 'flood'], type: 'array', significance: 'major',
-        }]}
+        changes={[
+          {
+            field: 'exclusions',
+            fieldLabel: 'Exclusions',
+            fieldLabelTr: 'Istisnalar',
+            oldValue: ['war', 'nuclear'],
+            newValue: ['war', 'flood'],
+            type: 'array',
+            significance: 'major',
+          },
+        ]}
       />
     )
     expect(screen.getByText('Added:')).toBeInTheDocument()
@@ -794,8 +936,24 @@ describe('PolicyDiffViewer — extra branches', () => {
     const { container } = render(
       <PolicyDiffViewer
         changes={[
-          { field: 'a', fieldLabel: 'Minor Field', fieldLabelTr: 'M', oldValue: 'x', newValue: 'y', type: 'string', significance: 'minor' },
-          { field: 'b', fieldLabel: 'Critical Field', fieldLabelTr: 'C', oldValue: 'x', newValue: 'y', type: 'string', significance: 'critical' },
+          {
+            field: 'a',
+            fieldLabel: 'Minor Field',
+            fieldLabelTr: 'M',
+            oldValue: 'x',
+            newValue: 'y',
+            type: 'string',
+            significance: 'minor',
+          },
+          {
+            field: 'b',
+            fieldLabel: 'Critical Field',
+            fieldLabelTr: 'C',
+            oldValue: 'x',
+            newValue: 'y',
+            type: 'string',
+            significance: 'critical',
+          },
         ]}
       />
     )
@@ -807,10 +965,17 @@ describe('PolicyDiffViewer — extra branches', () => {
   it('handles date type values', () => {
     render(
       <PolicyDiffViewer
-        changes={[{
-          field: 'expiryDate', fieldLabel: 'Expiry', fieldLabelTr: 'Bitis',
-          oldValue: '2025-01-01', newValue: '2026-01-01', type: 'date', significance: 'moderate',
-        }]}
+        changes={[
+          {
+            field: 'expiryDate',
+            fieldLabel: 'Expiry',
+            fieldLabelTr: 'Bitis',
+            oldValue: '2025-01-01',
+            newValue: '2026-01-01',
+            type: 'date',
+            significance: 'moderate',
+          },
+        ]}
       />
     )
     expect(screen.getByText('Expiry')).toBeInTheDocument()
@@ -825,9 +990,33 @@ describe('PolicyDiffViewer — extra branches', () => {
     render(
       <PolicyDiffSummary
         changes={[
-          { field: 'a', fieldLabel: 'A', fieldLabelTr: 'A', oldValue: 1, newValue: 2, type: 'number', significance: 'critical' },
-          { field: 'b', fieldLabel: 'B', fieldLabelTr: 'B', oldValue: 1, newValue: 2, type: 'number', significance: 'critical' },
-          { field: 'c', fieldLabel: 'C', fieldLabelTr: 'C', oldValue: 1, newValue: 2, type: 'number', significance: 'moderate' },
+          {
+            field: 'a',
+            fieldLabel: 'A',
+            fieldLabelTr: 'A',
+            oldValue: 1,
+            newValue: 2,
+            type: 'number',
+            significance: 'critical',
+          },
+          {
+            field: 'b',
+            fieldLabel: 'B',
+            fieldLabelTr: 'B',
+            oldValue: 1,
+            newValue: 2,
+            type: 'number',
+            significance: 'critical',
+          },
+          {
+            field: 'c',
+            fieldLabel: 'C',
+            fieldLabelTr: 'C',
+            oldValue: 1,
+            newValue: 2,
+            type: 'number',
+            significance: 'moderate',
+          },
         ]}
       />
     )
@@ -861,9 +1050,13 @@ describe('Settings — extra branches', () => {
     localStorage.clear()
     mockUser = { id: 'user-1', email: 'test@example.com', user_metadata: {} }
     mockPolicies.length = 0
-    mockPolicies.push(
-      { id: '1', policyNumber: 'POL-001', provider: 'Allianz', coverage: 100000, premium: 1000 },
-    )
+    mockPolicies.push({
+      id: '1',
+      policyNumber: 'POL-001',
+      provider: 'Allianz',
+      coverage: 100000,
+      premium: 1000,
+    })
     mockSignOut.mockResolvedValue(undefined)
     const mod = await import('./Settings')
     Settings = mod.Settings
@@ -935,7 +1128,9 @@ describe('Settings — extra branches', () => {
   it('toggles push notifications off', async () => {
     const user = userEvent.setup()
     renderSettings()
-    const pushToggle = screen.getByRole('switch', { name: EN_TRANSLATIONS.settings.pushNotifications })
+    const pushToggle = screen.getByRole('switch', {
+      name: EN_TRANSLATIONS.settings.pushNotifications,
+    })
     // Default is true
     expect(pushToggle).toHaveAttribute('aria-checked', 'true')
     await user.click(pushToggle)
@@ -984,7 +1179,9 @@ describe('Settings — extra branches', () => {
 
   it('shows storage type as Local Browser when Supabase not configured', () => {
     renderSettings()
-    expect(screen.getByText(EN_TRANSLATIONS.settings.storageLocal, { exact: false })).toBeInTheDocument()
+    expect(
+      screen.getByText(EN_TRANSLATIONS.settings.storageLocal, { exact: false })
+    ).toBeInTheDocument()
   })
 
   it('renders get key links for API providers', () => {
@@ -1045,7 +1242,15 @@ describe('ConflictResolutionDialog — extra branches', () => {
 
   it('shows loading state with spinner on amendment Track button', () => {
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3500, type: 'number' as const, significance: 'major' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3500,
+        type: 'number' as const,
+        significance: 'major' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1056,7 +1261,7 @@ describe('ConflictResolutionDialog — extra branches', () => {
       />
     )
     const allButtons = screen.getAllByRole('button')
-    const disabledCount = allButtons.filter(b => b.hasAttribute('disabled')).length
+    const disabledCount = allButtons.filter((b) => b.hasAttribute('disabled')).length
     expect(disabledCount).toBeGreaterThanOrEqual(3)
   })
 
@@ -1068,13 +1273,18 @@ describe('ConflictResolutionDialog — extra branches', () => {
         {...callbacks}
       />
     )
-    expect(screen.getByText((_: string, el: Element | null) => el?.textContent === '\u{1F4C4}')).toBeInTheDocument()
+    expect(
+      screen.getByText((_: string, el: Element | null) => el?.textContent === '\u{1F4C4}')
+    ).toBeInTheDocument()
   })
 
   it('does not show insuredPerson when empty', () => {
     render(
       <ConflictResolutionDialog
-        conflict={{ type: 'exactDuplicate', existingPolicy: { ...existingPolicy, insuredPerson: '' } }}
+        conflict={{
+          type: 'exactDuplicate',
+          existingPolicy: { ...existingPolicy, insuredPerson: '' },
+        }}
         newPolicy={newPolicy}
         {...callbacks}
       />
@@ -1111,23 +1321,44 @@ describe('ConflictResolutionDialog — extra branches', () => {
 
   it('renders amendment without verified flag and with only minor changes (no warning)', () => {
     const minorChanges = [
-      { field: 'notes', fieldLabel: 'Notes', fieldLabelTr: 'Notlar', oldValue: 'a', newValue: 'b', type: 'string' as const, significance: 'minor' as const },
+      {
+        field: 'notes',
+        fieldLabel: 'Notes',
+        fieldLabelTr: 'Notlar',
+        oldValue: 'a',
+        newValue: 'b',
+        type: 'string' as const,
+        significance: 'minor' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
-        conflict={{ type: 'amendment', existingPolicy, changes: minorChanges, isVerifiedAmendment: false }}
+        conflict={{
+          type: 'amendment',
+          existingPolicy,
+          changes: minorChanges,
+          isVerifiedAmendment: false,
+        }}
         newPolicy={newPolicy}
         {...callbacks}
       />
     )
     expect(screen.queryByText(/Significant differences detected/)).not.toBeInTheDocument()
-    expect(screen.getByText('Track as Amendment')).toBeInTheDocument()
+    expect(screen.getByText('Track Amendment')).toBeInTheDocument()
   })
 
   it('renders extraction variance Edit button and calls onEdit', () => {
     const onEdit = vi.fn()
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3300, type: 'number' as const, significance: 'minor' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3300,
+        type: 'number' as const,
+        significance: 'minor' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1137,7 +1368,7 @@ describe('ConflictResolutionDialog — extra branches', () => {
         onEdit={onEdit}
       />
     )
-    const editBtn = screen.getByText('Edit')
+    const editBtn = screen.getByText('Edit & Retry')
     fireEvent.click(editBtn)
     expect(onEdit).toHaveBeenCalled()
   })
@@ -1145,7 +1376,15 @@ describe('ConflictResolutionDialog — extra branches', () => {
   it('amendment with Edit button renders and works', () => {
     const onEdit = vi.fn()
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3500, type: 'number' as const, significance: 'major' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3500,
+        type: 'number' as const,
+        significance: 'major' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1155,14 +1394,22 @@ describe('ConflictResolutionDialog — extra branches', () => {
         onEdit={onEdit}
       />
     )
-    const editBtn = screen.getByText('Edit')
+    const editBtn = screen.getByText('Edit & Retry')
     fireEvent.click(editBtn)
     expect(onEdit).toHaveBeenCalled()
   })
 
   it('verified amendment uses primary variant for Track button', () => {
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3500, type: 'number' as const, significance: 'major' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3500,
+        type: 'number' as const,
+        significance: 'major' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1171,13 +1418,21 @@ describe('ConflictResolutionDialog — extra branches', () => {
         {...callbacks}
       />
     )
-    const trackBtn = screen.getByText('Track as Amendment').closest('button')!
+    const trackBtn = screen.getByText('Track Amendment').closest('button')!
     expect(trackBtn.className).toContain('bg-blue-600')
   })
 
   it('unverified amendment uses primary variant for Save Separately', () => {
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3500, type: 'number' as const, significance: 'major' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3500,
+        type: 'number' as const,
+        significance: 'major' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1192,8 +1447,24 @@ describe('ConflictResolutionDialog — extra branches', () => {
 
   it('shows details toggle and can expand/collapse', () => {
     const changes = [
-      { field: 'premium', fieldLabel: 'Premium', fieldLabelTr: 'Prim', oldValue: 3200, newValue: 3500, type: 'number' as const, significance: 'major' as const },
-      { field: 'coverage', fieldLabel: 'Coverage', fieldLabelTr: 'Teminat', oldValue: 500000, newValue: 600000, type: 'number' as const, significance: 'critical' as const },
+      {
+        field: 'premium',
+        fieldLabel: 'Premium',
+        fieldLabelTr: 'Prim',
+        oldValue: 3200,
+        newValue: 3500,
+        type: 'number' as const,
+        significance: 'major' as const,
+      },
+      {
+        field: 'coverage',
+        fieldLabel: 'Coverage',
+        fieldLabelTr: 'Teminat',
+        oldValue: 500000,
+        newValue: 600000,
+        type: 'number' as const,
+        significance: 'critical' as const,
+      },
     ]
     render(
       <ConflictResolutionDialog
@@ -1202,11 +1473,11 @@ describe('ConflictResolutionDialog — extra branches', () => {
         {...callbacks}
       />
     )
-    const toggleBtn = screen.getByText('Show All Differences')
+    const toggleBtn = screen.getByText('Show all differences')
     fireEvent.click(toggleBtn)
-    expect(screen.getByText('Hide Details')).toBeInTheDocument()
-    fireEvent.click(screen.getByText('Hide Details'))
-    expect(screen.getByText('Show All Differences')).toBeInTheDocument()
+    expect(screen.getByText('Hide details')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Hide details'))
+    expect(screen.getByText('Show all differences')).toBeInTheDocument()
   })
 
   it('returns null for noConflict type', () => {
@@ -1259,8 +1530,24 @@ describe('ConflictResolutionDialog — extra branches', () => {
 
   it('DuplicateWarningBanner for unverified amendment with change count', () => {
     const changes = [
-      { field: 'a', fieldLabel: 'A', fieldLabelTr: 'A', oldValue: 1, newValue: 2, type: 'number' as const, significance: 'minor' as const },
-      { field: 'b', fieldLabel: 'B', fieldLabelTr: 'B', oldValue: 1, newValue: 2, type: 'number' as const, significance: 'minor' as const },
+      {
+        field: 'a',
+        fieldLabel: 'A',
+        fieldLabelTr: 'A',
+        oldValue: 1,
+        newValue: 2,
+        type: 'number' as const,
+        significance: 'minor' as const,
+      },
+      {
+        field: 'b',
+        fieldLabel: 'B',
+        fieldLabelTr: 'B',
+        oldValue: 1,
+        newValue: 2,
+        type: 'number' as const,
+        significance: 'minor' as const,
+      },
     ]
     render(
       <DuplicateWarningBanner
@@ -1270,7 +1557,7 @@ describe('ConflictResolutionDialog — extra branches', () => {
       />
     )
     expect(screen.getByText('Possible change')).toBeInTheDocument()
-    expect(screen.getByText('- 2 diff(s)')).toBeInTheDocument()
+    expect(screen.getByText('- 2 differences')).toBeInTheDocument()
   })
 
   it('DuplicateWarningBanner calls onShowDialog when Resolve button clicked', () => {
@@ -1356,7 +1643,10 @@ describe('useEmailPreferences', () => {
 
   it('updatePreferences function is callable', async () => {
     await mockEmailHookReturn.updatePreferences({ marketing: false, weekly_digest: true })
-    expect(mockEmailHookReturn.updatePreferences).toHaveBeenCalledWith({ marketing: false, weekly_digest: true })
+    expect(mockEmailHookReturn.updatePreferences).toHaveBeenCalledWith({
+      marketing: false,
+      weekly_digest: true,
+    })
   })
 
   it('refresh function is callable', async () => {
@@ -1401,6 +1691,9 @@ describe('useEmailPreferences', () => {
 
   it('updates multiple preferences locally when no user', async () => {
     await mockEmailHookReturn.updatePreferences({ marketing: false, policy_alerts: false })
-    expect(mockEmailHookReturn.updatePreferences).toHaveBeenCalledWith({ marketing: false, policy_alerts: false })
+    expect(mockEmailHookReturn.updatePreferences).toHaveBeenCalledWith({
+      marketing: false,
+      policy_alerts: false,
+    })
   })
 })

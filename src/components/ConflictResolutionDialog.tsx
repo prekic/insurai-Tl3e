@@ -1,5 +1,16 @@
 import { useState } from 'react'
-import { X, AlertTriangle, Copy, GitMerge, FileX, Files, Loader2, RefreshCw, CheckCircle, Pencil } from 'lucide-react'
+import {
+  X,
+  AlertTriangle,
+  Copy,
+  GitMerge,
+  FileX,
+  Files,
+  Loader2,
+  RefreshCw,
+  CheckCircle,
+  Pencil,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import type { Policy } from '@/types/policy'
@@ -43,7 +54,7 @@ export function ConflictResolutionDialog({
 }: ConflictResolutionDialogProps) {
   // _newPolicy kept for potential future UI enhancements (showing side-by-side comparison)
   void _newPolicy
-  const { locale } = useI18n()
+  const { t } = useI18n()
   const [showDetails, setShowDetails] = useState(false)
 
   if (conflict.type === 'noConflict') {
@@ -55,7 +66,7 @@ export function ConflictResolutionDialog({
   const isAmendment = conflict.type === 'amendment'
   const isVerifiedAmendment = isAmendment && conflict.isVerifiedAmendment
   const existingPolicy = conflict.existingPolicy
-  const changes = (isAmendment || isExtractionVariance) ? conflict.changes : []
+  const changes = isAmendment || isExtractionVariance ? conflict.changes : []
 
   // Determine dialog style based on conflict type
   const getDialogStyle = () => {
@@ -80,47 +91,24 @@ export function ConflictResolutionDialog({
 
   // Get dialog title
   const getTitle = () => {
-    if (isExactDuplicate) {
-      return locale === 'tr' ? 'Ayni Police Bulundu' : 'Duplicate Policy Found'
-    }
-    if (isExtractionVariance) {
-      return locale === 'tr' ? 'Ayni Belge - Farkli Okuma' : 'Same Document - Extraction Variance'
-    }
-    if (isVerifiedAmendment) {
-      return locale === 'tr' ? 'Resmi Zeyilname Tespit Edildi' : 'Official Amendment (Zeyilname) Detected'
-    }
-    return locale === 'tr' ? 'Olasi Police Degisikligi' : 'Possible Policy Amendment'
+    if (isExactDuplicate) return t.conflictResolution.duplicateFound
+    if (isExtractionVariance) return t.conflictResolution.extractionVariance
+    if (isVerifiedAmendment) return t.conflictResolution.verifiedAmendment
+    return t.conflictResolution.possibleAmendment
   }
 
   // Get dialog description
   const getDescription = () => {
-    if (isExactDuplicate) {
-      return locale === 'tr'
-        ? 'Bu police veritabaninizda zaten mevcut.'
-        : 'This policy already exists in your database.'
-    }
-    if (isExtractionVariance) {
-      return locale === 'tr'
-        ? 'Ayni belge tekrar yuklendi. AI kucuk farkliliklar tespit etti (OCR/okuma farki).'
-        : 'Same document uploaded again. AI detected minor differences (OCR/extraction variance).'
-    }
-    if (isVerifiedAmendment) {
-      return locale === 'tr'
-        ? 'Bu belge resmi bir zeyilname (police degisikligi). Degisiklik numarasi tespit edildi.'
-        : 'This document is an official amendment (Zeyilname). Amendment number detected.'
-    }
-    return locale === 'tr'
-      ? 'Farkliliklar tespit edildi ancak zeyilname isaretleyicisi bulunamadi. Gercek degisiklik mi kontrol edin.'
-      : 'Differences detected but no amendment markers found. Verify if this is a real change.'
+    if (isExactDuplicate) return t.conflictResolution.duplicateDesc
+    if (isExtractionVariance) return t.conflictResolution.extractionVarianceDesc
+    if (isVerifiedAmendment) return t.conflictResolution.verifiedAmendmentDesc
+    return t.conflictResolution.possibleAmendmentDesc
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50"
-        onClick={!isLoading ? onClose : undefined}
-      />
+      <div className="absolute inset-0 bg-black/50" onClick={!isLoading ? onClose : undefined} />
 
       {/* Dialog - use dvh for mobile Safari compatibility */}
       <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl max-h-[calc(100dvh-2rem)] overflow-hidden flex flex-col mx-4">
@@ -133,20 +121,13 @@ export function ConflictResolutionDialog({
           )}
         >
           <div
-            className={cn(
-              'w-10 h-10 rounded-full flex items-center justify-center',
-              style.iconBg
-            )}
+            className={cn('w-10 h-10 rounded-full flex items-center justify-center', style.iconBg)}
           >
             {getIcon()}
           </div>
           <div className="flex-1">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {getTitle()}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {getDescription()}
-            </p>
+            <h2 className="text-lg font-semibold text-gray-900">{getTitle()}</h2>
+            <p className="text-sm text-gray-600">{getDescription()}</p>
           </div>
           <button
             onClick={onClose}
@@ -162,16 +143,20 @@ export function ConflictResolutionDialog({
           {/* Existing policy info */}
           <div className="mb-6">
             <h3 className="text-sm font-medium text-gray-500 mb-2">
-              {locale === 'tr' ? 'Mevcut Police' : 'Existing Policy'}
+              {t.conflictResolution.existingPolicy}
             </h3>
             <div className="bg-gray-50 rounded-lg p-4 flex items-center gap-3 sm:gap-4 overflow-hidden">
-              <span className="text-2xl sm:text-3xl flex-shrink-0">{existingPolicy.logo || '📄'}</span>
+              <span className="text-2xl sm:text-3xl flex-shrink-0">
+                {existingPolicy.logo || '📄'}
+              </span>
               <div className="flex-1 min-w-0 overflow-hidden">
                 <p className="font-medium text-gray-900 truncate">{existingPolicy.provider}</p>
                 <p className="text-sm text-gray-500 break-all">{existingPolicy.policyNumber}</p>
               </div>
               <div className="text-right flex-shrink-0 max-w-[100px] sm:max-w-[140px]">
-                <p className="text-sm text-gray-500 truncate">{existingPolicy.typeTr || existingPolicy.type}</p>
+                <p className="text-sm text-gray-500 truncate">
+                  {existingPolicy.typeTr || existingPolicy.type}
+                </p>
                 {existingPolicy.insuredPerson && (
                   <p className="text-xs text-gray-400 truncate">{existingPolicy.insuredPerson}</p>
                 )}
@@ -184,9 +169,10 @@ export function ConflictResolutionDialog({
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-medium text-gray-500">
-                  {locale === 'tr'
-                    ? `${changes.length} Fark Tespit Edildi`
-                    : `${changes.length} Difference(s) Detected`}
+                  {t.conflictResolution.differencesDetected.replace(
+                    '{count}',
+                    String(changes.length)
+                  )}
                 </h3>
                 <PolicyDiffSummary changes={changes} />
               </div>
@@ -196,9 +182,7 @@ export function ConflictResolutionDialog({
                 <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
                   <RefreshCw className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-amber-800">
-                    {locale === 'tr'
-                      ? 'Bu farklar muhtemelen AI\'nin ayni belgeyi farkli okumasi kaynakli (OCR varyasyonu). Gercek bir zeyilname degilse "Atla" secenegini kullanin.'
-                      : 'These differences are likely from AI reading the same document differently (OCR variance). If not a real amendment, use "Skip" option.'}
+                    {t.conflictResolution.extractionVarianceInfo}
                   </div>
                 </div>
               )}
@@ -207,23 +191,23 @@ export function ConflictResolutionDialog({
                 <div className="flex items-start gap-3 p-3 mb-4 bg-green-50 border border-green-200 rounded-lg">
                   <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
                   <div className="text-sm text-green-800">
-                    {locale === 'tr'
-                      ? 'Bu belgede resmi zeyilname isaretleyicileri bulundu. Degisiklikleri kaydederek surum gecmisini tutabilirsiniz.'
-                      : 'Official amendment markers found in this document. Track changes to maintain version history.'}
+                    {t.conflictResolution.verifiedAmendmentInfo}
                   </div>
                 </div>
               )}
 
-              {isAmendment && !isVerifiedAmendment && changes.some((c) => c.significance === 'critical' || c.significance === 'major') && (
-                <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                  <div className="text-sm text-amber-800">
-                    {locale === 'tr'
-                      ? 'Onemli farkliliklar tespit edildi ancak zeyilname isaretleyicisi yok. Gercek bir degisiklik mi yoksa ayni belgenin farkli okunmasi mi kontrol edin.'
-                      : 'Significant differences detected but no amendment markers. Verify if this is a real change or just extraction variance.'}
+              {isAmendment &&
+                !isVerifiedAmendment &&
+                changes.some(
+                  (c) => c.significance === 'critical' || c.significance === 'major'
+                ) && (
+                  <div className="flex items-start gap-3 p-3 mb-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      {t.conflictResolution.criticalDifferencesInfo}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Toggle for full details */}
               <button
@@ -231,12 +215,8 @@ export function ConflictResolutionDialog({
                 className="text-sm text-blue-600 hover:text-blue-700 mb-3"
               >
                 {showDetails
-                  ? locale === 'tr'
-                    ? 'Detaylari Gizle'
-                    : 'Hide Details'
-                  : locale === 'tr'
-                    ? 'Tum Farkliliklari Goster'
-                    : 'Show All Differences'}
+                  ? t.conflictResolution.hideDetails
+                  : t.conflictResolution.showAllDifferences}
               </button>
 
               {showDetails && (
@@ -256,11 +236,7 @@ export function ConflictResolutionDialog({
           {/* Duplicate info for exact match */}
           {isExactDuplicate && (
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-sm text-gray-600">
-                {locale === 'tr'
-                  ? 'Yeni yuklenen police mevcut kayitla tamamen ayni. Ne yapmak istersiniz?'
-                  : 'The uploaded policy is identical to an existing record. What would you like to do?'}
-              </p>
+              <p className="text-sm text-gray-600">{t.conflictResolution.duplicateIdentical}</p>
             </div>
           )}
         </div>
@@ -273,24 +249,24 @@ export function ConflictResolutionDialog({
               <>
                 <ActionButton
                   icon={FileX}
-                  label={locale === 'tr' ? 'Atla' : 'Skip'}
-                  description={locale === 'tr' ? 'Yeni policeyi kaydetme' : "Don't save the new policy"}
+                  label={t.conflictResolution.skip}
+                  description={t.conflictResolution.skipDesc}
                   onClick={onSkip}
                   disabled={isLoading}
                   variant="secondary"
                 />
                 <ActionButton
                   icon={Copy}
-                  label={locale === 'tr' ? 'Guncelle' : 'Update Existing'}
-                  description={locale === 'tr' ? 'Mevcut kaydi guncelle' : 'Replace with uploaded data'}
+                  label={t.conflictResolution.updateExisting}
+                  description={t.conflictResolution.updateDesc}
                   onClick={onReplace}
                   disabled={isLoading}
                   variant="primary"
                 />
                 <ActionButton
                   icon={Files}
-                  label={locale === 'tr' ? 'Ikisini de Sakla' : 'Keep Both'}
-                  description={locale === 'tr' ? 'Ayri kayitlar olarak sakla' : 'Save as separate records'}
+                  label={t.conflictResolution.keepBoth}
+                  description={t.conflictResolution.keepBothDesc}
                   onClick={onKeepBoth}
                   disabled={isLoading}
                   variant="secondary"
@@ -301,8 +277,8 @@ export function ConflictResolutionDialog({
               <>
                 <ActionButton
                   icon={FileX}
-                  label={locale === 'tr' ? 'Atla (Onerilen)' : 'Skip (Recommended)'}
-                  description={locale === 'tr' ? 'Ayni belge, kaydetme' : "Same document, don't save"}
+                  label={t.conflictResolution.skipRecommended}
+                  description={t.conflictResolution.skipRecommendedDesc}
                   onClick={onSkip}
                   disabled={isLoading}
                   variant="primary"
@@ -310,8 +286,8 @@ export function ConflictResolutionDialog({
                 {onEdit && (
                   <ActionButton
                     icon={Pencil}
-                    label={locale === 'tr' ? 'Duzenle' : 'Edit'}
-                    description={locale === 'tr' ? 'Verileri manuel duzelt' : 'Manually correct data'}
+                    label={t.conflictResolution.edit}
+                    description={t.conflictResolution.editDesc}
                     onClick={onEdit}
                     disabled={isLoading}
                     variant="secondary"
@@ -319,16 +295,16 @@ export function ConflictResolutionDialog({
                 )}
                 <ActionButton
                   icon={Copy}
-                  label={locale === 'tr' ? 'Yine de Guncelle' : 'Update Anyway'}
-                  description={locale === 'tr' ? 'Yeni okuma ile guncelle' : 'Replace with new extraction'}
+                  label={t.conflictResolution.updateAnyway}
+                  description={t.conflictResolution.updateAnywayDesc}
                   onClick={onReplace}
                   disabled={isLoading}
                   variant="secondary"
                 />
                 <ActionButton
                   icon={Files}
-                  label={locale === 'tr' ? 'Ayri Kaydet' : 'Save Separately'}
-                  description={locale === 'tr' ? 'Farkli belge ise' : 'If different document'}
+                  label={t.conflictResolution.saveSeparately}
+                  description={t.conflictResolution.saveSeparatelyDesc}
                   onClick={onKeepBoth}
                   disabled={isLoading}
                   variant="secondary"
@@ -339,8 +315,8 @@ export function ConflictResolutionDialog({
               <>
                 <ActionButton
                   icon={FileX}
-                  label={locale === 'tr' ? 'Atla' : 'Skip'}
-                  description={locale === 'tr' ? 'Degisiklikleri uygulama' : "Don't apply changes"}
+                  label={t.conflictResolution.skipAmendment}
+                  description={t.conflictResolution.skipAmendmentDesc}
                   onClick={onSkip}
                   disabled={isLoading}
                   variant="secondary"
@@ -348,8 +324,8 @@ export function ConflictResolutionDialog({
                 {onEdit && (
                   <ActionButton
                     icon={Pencil}
-                    label={locale === 'tr' ? 'Duzenle' : 'Edit'}
-                    description={locale === 'tr' ? 'Verileri manuel duzelt' : 'Manually correct data'}
+                    label={t.conflictResolution.edit}
+                    description={t.conflictResolution.editDesc}
                     onClick={onEdit}
                     disabled={isLoading}
                     variant="secondary"
@@ -357,12 +333,8 @@ export function ConflictResolutionDialog({
                 )}
                 <ActionButton
                   icon={GitMerge}
-                  label={locale === 'tr' ? 'Zeyilname Olarak Kaydet' : 'Track as Amendment'}
-                  description={
-                    locale === 'tr'
-                      ? 'Guncelle ve gecmisi sakla'
-                      : 'Update and keep version history'
-                  }
+                  label={t.conflictResolution.trackAmendment}
+                  description={t.conflictResolution.trackAmendmentDesc}
                   onClick={onTrackAmendment}
                   disabled={isLoading}
                   variant={isVerifiedAmendment ? 'primary' : 'secondary'}
@@ -370,8 +342,8 @@ export function ConflictResolutionDialog({
                 />
                 <ActionButton
                   icon={Files}
-                  label={locale === 'tr' ? 'Ayri Kaydet' : 'Save Separately'}
-                  description={locale === 'tr' ? 'Yeni kayit olarak ekle' : 'Add as new record'}
+                  label={t.conflictResolution.saveSeparately}
+                  description={t.conflictResolution.saveSeparatelyDesc}
                   onClick={onKeepBoth}
                   disabled={isLoading}
                   variant={isVerifiedAmendment ? 'secondary' : 'primary'}
@@ -417,18 +389,9 @@ function ActionButton({
           : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
       )}
     >
-      {loading ? (
-        <Loader2 className="w-5 h-5 animate-spin" />
-      ) : (
-        <Icon className="w-5 h-5" />
-      )}
+      {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Icon className="w-5 h-5" />}
       <span className="font-medium text-sm">{label}</span>
-      <span
-        className={cn(
-          'text-xs',
-          variant === 'primary' ? 'text-blue-100' : 'text-gray-500'
-        )}
-      >
+      <span className={cn('text-xs', variant === 'primary' ? 'text-blue-100' : 'text-gray-500')}>
         {description}
       </span>
     </button>
@@ -449,7 +412,7 @@ export function DuplicateWarningBanner({
   onShowDialog: () => void
   className?: string
 }) {
-  const { locale } = useI18n()
+  const { t } = useI18n()
 
   if (conflict.type === 'noConflict') {
     return null
@@ -463,12 +426,30 @@ export function DuplicateWarningBanner({
   // Determine styling based on type
   const getStyle = () => {
     if (isExactDuplicate || isExtractionVariance) {
-      return { bg: 'bg-amber-50', border: 'border-amber-200', buttonBg: 'bg-amber-100', buttonText: 'text-amber-700', buttonHover: 'hover:bg-amber-200' }
+      return {
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        buttonBg: 'bg-amber-100',
+        buttonText: 'text-amber-700',
+        buttonHover: 'hover:bg-amber-200',
+      }
     }
     if (isVerifiedAmendment) {
-      return { bg: 'bg-green-50', border: 'border-green-200', buttonBg: 'bg-green-100', buttonText: 'text-green-700', buttonHover: 'hover:bg-green-200' }
+      return {
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        buttonBg: 'bg-green-100',
+        buttonText: 'text-green-700',
+        buttonHover: 'hover:bg-green-200',
+      }
     }
-    return { bg: 'bg-blue-50', border: 'border-blue-200', buttonBg: 'bg-blue-100', buttonText: 'text-blue-700', buttonHover: 'hover:bg-blue-200' }
+    return {
+      bg: 'bg-blue-50',
+      border: 'border-blue-200',
+      buttonBg: 'bg-blue-100',
+      buttonText: 'text-blue-700',
+      buttonHover: 'hover:bg-blue-200',
+    }
   }
 
   const style = getStyle()
@@ -485,25 +466,25 @@ export function DuplicateWarningBanner({
   const getMessage = () => {
     if (isExactDuplicate) {
       return {
-        title: locale === 'tr' ? 'Kopya police' : 'Duplicate',
-        detail: locale === 'tr' ? '- Zaten mevcut' : '- Already exists',
+        title: t.conflictResolution.duplicate,
+        detail: `- ${t.conflictResolution.alreadyExists}`,
       }
     }
     if (isExtractionVariance) {
       return {
-        title: locale === 'tr' ? 'Okuma farki' : 'Extraction variance',
-        detail: locale === 'tr' ? '- Ayni belge, farkli okuma' : '- Same doc, different extraction',
+        title: t.conflictResolution.extractionVarianceShort,
+        detail: `- ${t.conflictResolution.sameDocDifferent}`,
       }
     }
     if (isVerifiedAmendment) {
       return {
-        title: locale === 'tr' ? 'Resmi zeyilname' : 'Official amendment',
-        detail: locale === 'tr' ? `- ${conflict.changes.length} degisiklik` : `- ${conflict.changes.length} change(s)`,
+        title: t.conflictResolution.officialAmendment,
+        detail: `- ${t.conflictResolution.changeCount.replace('{count}', String(conflict.changes.length))}`,
       }
     }
     return {
-      title: locale === 'tr' ? 'Olasi degisiklik' : 'Possible change',
-      detail: locale === 'tr' ? `- ${conflict.changes.length} fark` : `- ${conflict.changes.length} diff(s)`,
+      title: t.conflictResolution.possibleChange,
+      detail: `- ${t.conflictResolution.diffCount.replace('{count}', String(conflict.changes.length))}`,
     }
   }
 
@@ -532,7 +513,7 @@ export function DuplicateWarningBanner({
           style.buttonHover
         )}
       >
-        {locale === 'tr' ? 'Coz' : 'Resolve'}
+        {t.conflictResolution.resolve}
       </button>
       <button onClick={onDismiss} className="p-1 text-gray-400 hover:text-gray-600">
         <X className="w-4 h-4" />

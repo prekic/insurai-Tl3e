@@ -352,6 +352,8 @@ export interface TranslationDictionary {
     location: string
     period: string
     confidence: string
+    new: string
+    duplicate: string
   }
 
   // Export Menu (PolicyDetailView)
@@ -1067,6 +1069,167 @@ export interface TranslationDictionary {
     fileTooLarge: string
     skipForNow: string
     exploreSamples: string
+  }
+
+  // Not Found page
+  notFound: {
+    title: string
+    description: string
+    goBack: string
+    tryThesePages: string
+  }
+
+  // Error Boundary
+  errorBoundary: {
+    title: string
+    description: string
+    tryAgain: string
+    goHome: string
+    errorDetails: string
+    pageError: string
+    pageErrorDesc: string
+    reloadPage: string
+    backToHome: string
+    inlineError: string
+    inlineTryAgain: string
+  }
+
+  // Policy Documents
+  policyDocuments: {
+    title: string
+    loading: string
+    upload: string
+    uploading: string
+    uploadingProgress: string
+    openInNewTab: string
+    refreshLink: string
+    download: string
+    confirmDelete: string
+    deleteDoc: string
+    noDocuments: string
+    clickUpload: string
+    documentCount: string
+    documentsCount: string
+  }
+
+  // AI Insights Panel
+  aiInsightsPanel: {
+    title: string
+    confidence: string
+    description: string
+    excellentAnalysis: string
+    goodAnalysis: string
+    fairAnalysis: string
+    needsReview: string
+    coveragesDetected: string
+    detectedSummary: string
+    keyFindings: string
+    marketComparison: string
+    yourPremium: string
+    marketAvg: string
+    marketRank: string
+    lowest: string
+    highest: string
+    aboveMarket: string
+    belowMarket: string
+    riskAssessment: string
+    veryLowRisk: string
+    lowRisk: string
+    moderateRisk: string
+    highRisk: string
+    veryHighRisk: string
+    topIssue: string
+    recommendedActions: string
+    gapAnalysis: string
+    critical: string
+    high: string
+    other: string
+    topGap: string
+    financialExposure: string
+    remediationCost: string
+    knowledgeReferences: string
+    seddkTsb: string
+    marketData: string
+    generalConditions: string
+    haveQuestions: string
+    chatWithAI: string
+  }
+
+  // Conflict Resolution Dialog
+  conflictResolution: {
+    duplicateFound: string
+    extractionVariance: string
+    verifiedAmendment: string
+    possibleAmendment: string
+    duplicateDesc: string
+    extractionVarianceDesc: string
+    verifiedAmendmentDesc: string
+    possibleAmendmentDesc: string
+    existingPolicy: string
+    differencesDetected: string
+    extractionVarianceInfo: string
+    verifiedAmendmentInfo: string
+    criticalDifferencesInfo: string
+    showAllDifferences: string
+    hideDetails: string
+    duplicateIdentical: string
+    skip: string
+    skipDesc: string
+    updateExisting: string
+    updateDesc: string
+    keepBoth: string
+    keepBothDesc: string
+    skipRecommended: string
+    skipRecommendedDesc: string
+    edit: string
+    editDesc: string
+    updateAnyway: string
+    updateAnywayDesc: string
+    saveSeparately: string
+    saveSeparatelyDesc: string
+    trackAmendment: string
+    trackAmendmentDesc: string
+    skipAmendment: string
+    skipAmendmentDesc: string
+    // Banner
+    duplicate: string
+    alreadyExists: string
+    extractionVarianceShort: string
+    sameDocDifferent: string
+    officialAmendment: string
+    changeCount: string
+    possibleChange: string
+    diffCount: string
+    resolve: string
+  }
+
+  // Policy Diff Viewer
+  policyDiff: {
+    noChanges: string
+    empty: string
+    items: string
+    critical: string
+    major: string
+    moderate: string
+    minor: string
+    previousValue: string
+    newValue: string
+    removed: string
+    added: string
+    more: string
+    criticalCount: string
+    majorCount: string
+    otherCount: string
+  }
+
+  // Email Preferences
+  emailPreferences: {
+    title: string
+    description: string
+    successMessage: string
+    errorMessage: string
+    notConfigured: string
+    transactionalNote: string
   }
 
   // Coverage name translations (keyed by English name, value is locale-specific)

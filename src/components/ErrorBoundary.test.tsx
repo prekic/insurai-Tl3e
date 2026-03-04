@@ -8,6 +8,26 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ErrorBoundary, InlineError } from './ErrorBoundary'
 
+// Mock i18n
+vi.mock('@/lib/i18n', () => ({
+  useI18n: () => ({
+    t: {
+      errorBoundary: {
+        title: 'Something went wrong',
+        description:
+          "We're sorry, but something unexpected happened. Please try refreshing the page or go back to the home page.",
+        tryAgain: 'Try Again',
+        goHome: 'Go Home',
+        errorDetails: 'Details',
+        inlineError: 'Error',
+        inlineTryAgain: 'Try again',
+      },
+    },
+    locale: 'en',
+    isLoading: false,
+  }),
+}))
+
 // Mock sentry
 vi.mock('@/lib/sentry', () => ({
   captureError: vi.fn(() => 'test-event-id'),
@@ -213,9 +233,7 @@ describe('ErrorBoundary', () => {
         </ErrorBoundary>
       )
 
-      expect(
-        screen.getByText(/We're sorry, but something unexpected happened/)
-      ).toBeInTheDocument()
+      expect(screen.getByText(/We're sorry, but something unexpected happened/)).toBeInTheDocument()
     })
 
     it('should have proper button styling', () => {

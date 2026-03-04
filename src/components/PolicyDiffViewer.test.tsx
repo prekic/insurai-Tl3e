@@ -15,11 +15,12 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { PolicyDiffViewer, PolicyDiffSummary } from './PolicyDiffViewer'
 import type { PolicyFieldDiff } from '@/lib/policy-utils'
+import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 
 // Mock i18n
 vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({
-    t: {},
+    t: EN_TRANSLATIONS,
     locale: 'en',
     isLoading: false,
   }),
@@ -76,12 +77,12 @@ describe('PolicyDiffViewer', () => {
     render(<PolicyDiffViewer changes={changes} />)
 
     const labels = screen.getAllByText(/Field/)
-    const labelTexts = labels.map(el => el.textContent)
+    const labelTexts = labels.map((el) => el.textContent)
     // Critical should come before Major, Major before Moderate, Moderate before Minor
-    const criticalIdx = labelTexts.findIndex(t => t?.includes('Critical'))
-    const majorIdx = labelTexts.findIndex(t => t?.includes('Major'))
-    const moderateIdx = labelTexts.findIndex(t => t?.includes('Moderate'))
-    const minorIdx = labelTexts.findIndex(t => t?.includes('Minor'))
+    const criticalIdx = labelTexts.findIndex((t) => t?.includes('Critical'))
+    const majorIdx = labelTexts.findIndex((t) => t?.includes('Major'))
+    const moderateIdx = labelTexts.findIndex((t) => t?.includes('Moderate'))
+    const minorIdx = labelTexts.findIndex((t) => t?.includes('Minor'))
 
     expect(criticalIdx).toBeLessThan(majorIdx)
     expect(majorIdx).toBeLessThan(moderateIdx)
@@ -315,9 +316,7 @@ describe('PolicyDiffSummary', () => {
   })
 
   it('shows major count', () => {
-    const changes: PolicyFieldDiff[] = [
-      createChange({ significance: 'major' }),
-    ]
+    const changes: PolicyFieldDiff[] = [createChange({ significance: 'major' })]
     render(<PolicyDiffSummary changes={changes} />)
     expect(screen.getByText('1 major')).toBeInTheDocument()
   })
@@ -344,9 +343,7 @@ describe('PolicyDiffSummary', () => {
   })
 
   it('does not show categories with 0 count', () => {
-    const changes: PolicyFieldDiff[] = [
-      createChange({ significance: 'minor' }),
-    ]
+    const changes: PolicyFieldDiff[] = [createChange({ significance: 'minor' })]
     render(<PolicyDiffSummary changes={changes} />)
     expect(screen.queryByText(/critical/)).not.toBeInTheDocument()
     expect(screen.queryByText(/major/)).not.toBeInTheDocument()

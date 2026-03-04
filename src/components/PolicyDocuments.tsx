@@ -12,8 +12,14 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { Button } from './ui/button'
-import { useFileUpload, formatFileSize, getFileIcon, type UploadedDocument } from '@/hooks/useFileUpload'
+import {
+  useFileUpload,
+  formatFileSize,
+  getFileIcon,
+  type UploadedDocument,
+} from '@/hooks/useFileUpload'
 import { FILE_CONSTRAINTS } from '@/lib/errors'
+import { useI18n } from '@/lib/i18n'
 
 interface PolicyDocumentsProps {
   policyId: string
@@ -28,6 +34,7 @@ export function PolicyDocuments({
   allowUpload = true,
   showEmpty = true,
 }: PolicyDocumentsProps) {
+  const { t } = useI18n()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
@@ -103,7 +110,7 @@ export function PolicyDocuments({
       <div className={`bg-white rounded-xl border border-gray-200 p-6 ${className}`}>
         <div className="flex items-center justify-center gap-2 text-gray-500">
           <Loader2 size={20} className="animate-spin" />
-          <span>Loading documents...</span>
+          <span>{t.policyDocuments.loading}</span>
         </div>
       </div>
     )
@@ -120,26 +127,21 @@ export function PolicyDocuments({
         <div className="flex items-center gap-2">
           <FileText size={18} className="text-gray-500" />
           <h3 className="font-semibold text-gray-900">
-            Documents {documents.length > 0 && `(${documents.length})`}
+            {t.policyDocuments.title} {documents.length > 0 && `(${documents.length})`}
           </h3>
         </div>
         {allowUpload && (
           <>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleUploadClick}
-              disabled={isUploading}
-            >
+            <Button size="sm" variant="outline" onClick={handleUploadClick} disabled={isUploading}>
               {isUploading ? (
                 <>
                   <Loader2 size={14} className="mr-2 animate-spin" />
-                  Uploading...
+                  {t.policyDocuments.uploading}
                 </>
               ) : (
                 <>
                   <Upload size={14} className="mr-2" />
-                  Upload
+                  {t.policyDocuments.upload}
                 </>
               )}
             </Button>
@@ -160,7 +162,12 @@ export function PolicyDocuments({
         <div className="px-4 py-2 bg-blue-50 border-b border-blue-100">
           <div className="flex items-center gap-2 text-sm text-blue-700">
             <Loader2 size={14} className="animate-spin" />
-            <span>Uploading... {uploadProgress.percentage}%</span>
+            <span>
+              {t.policyDocuments.uploadingProgress.replace(
+                '{percentage}',
+                String(uploadProgress.percentage)
+              )}
+            </span>
           </div>
           <div className="mt-1 h-1.5 bg-blue-100 rounded-full overflow-hidden">
             <div
@@ -210,7 +217,7 @@ export function PolicyDocuments({
                     target="_blank"
                     rel="noopener noreferrer"
                     className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                    title="Open in new tab"
+                    title={t.policyDocuments.openInNewTab}
                   >
                     <ExternalLink size={16} />
                   </a>
@@ -218,7 +225,7 @@ export function PolicyDocuments({
                   <button
                     onClick={() => handleRefreshUrl(doc)}
                     className="p-2 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                    title="Refresh download link"
+                    title={t.policyDocuments.refreshLink}
                   >
                     <RefreshCw size={16} />
                   </button>
@@ -229,7 +236,7 @@ export function PolicyDocuments({
                     href={doc.signedUrl}
                     download={doc.fileName}
                     className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                    title="Download"
+                    title={t.policyDocuments.download}
                   >
                     <Download size={16} />
                   </a>
@@ -242,13 +249,13 @@ export function PolicyDocuments({
                       ? 'text-red-600 bg-red-100'
                       : 'text-gray-400 hover:text-red-600 hover:bg-red-50'
                   }`}
-                  title={confirmDelete === doc.id ? 'Click again to confirm' : 'Delete'}
+                  title={
+                    confirmDelete === doc.id
+                      ? t.policyDocuments.confirmDelete
+                      : t.policyDocuments.deleteDoc
+                  }
                 >
-                  {confirmDelete === doc.id ? (
-                    <AlertCircle size={16} />
-                  ) : (
-                    <Trash2 size={16} />
-                  )}
+                  {confirmDelete === doc.id ? <AlertCircle size={16} /> : <Trash2 size={16} />}
                 </button>
               </div>
             </div>
@@ -259,11 +266,9 @@ export function PolicyDocuments({
           <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
             <FileText className="text-gray-400" size={24} />
           </div>
-          <p className="text-gray-500 text-sm">No documents uploaded yet</p>
+          <p className="text-gray-500 text-sm">{t.policyDocuments.noDocuments}</p>
           {allowUpload && (
-            <p className="text-gray-400 text-xs mt-1">
-              Click Upload to add policy documents
-            </p>
+            <p className="text-gray-400 text-xs mt-1">{t.policyDocuments.clickUpload}</p>
           )}
         </div>
       )}
@@ -281,6 +286,7 @@ export function PolicyDocumentsInline({
   policyId: string
   className?: string
 }) {
+  const { t } = useI18n()
   const { documents, isLoadingDocuments, loadDocuments, isConfigured } = useFileUpload()
 
   useEffect(() => {
@@ -301,7 +307,9 @@ export function PolicyDocumentsInline({
     <div className={`flex items-center gap-2 ${className}`}>
       <FileText size={14} className="text-gray-400" />
       <span className="text-sm text-gray-500">
-        {documents.length} document{documents.length !== 1 ? 's' : ''}
+        {documents.length === 1
+          ? t.policyDocuments.documentCount.replace('{count}', '1')
+          : t.policyDocuments.documentsCount.replace('{count}', String(documents.length))}
       </span>
     </div>
   )

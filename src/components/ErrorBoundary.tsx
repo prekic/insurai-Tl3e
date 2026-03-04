@@ -2,11 +2,34 @@ import { Component, ReactNode } from 'react'
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react'
 import { Button } from './ui/button'
 import { captureError, addBreadcrumb } from '@/lib/sentry'
+import { useI18n } from '@/lib/i18n'
+
+interface TranslatedStrings {
+  title: string
+  description: string
+  tryAgain: string
+  goHome: string
+  errorDetails: string
+  inlineError: string
+  inlineTryAgain: string
+}
+
+const DEFAULT_STRINGS: TranslatedStrings = {
+  title: 'Something went wrong',
+  description:
+    "We're sorry, but something unexpected happened. Please try refreshing the page or go back to the home page.",
+  tryAgain: 'Try Again',
+  goHome: 'Go Home',
+  errorDetails: 'Details',
+  inlineError: 'Error',
+  inlineTryAgain: 'Try again',
+}
 
 interface Props {
   children: ReactNode
   fallback?: ReactNode
   onReset?: () => void
+  strings?: TranslatedStrings
 }
 
 interface State {
@@ -15,7 +38,7 @@ interface State {
   eventId: string | null
 }
 
-export class ErrorBoundary extends Component<Props, State> {
+export class ErrorBoundaryClass extends Component<Props, State> {
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false, error: null, eventId: null }
@@ -57,6 +80,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   render() {
+    const s = this.props.strings ?? DEFAULT_STRINGS
+
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback
@@ -69,13 +94,9 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="text-red-600" size={32} />
             </div>
 
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">
-              Something went wrong
-            </h1>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{s.title}</h1>
 
-            <p className="text-gray-600 mb-6">
-              We&apos;re sorry, but something unexpected happened. Please try refreshing the page or go back to the home page.
-            </p>
+            <p className="text-gray-600 mb-6">{s.description}</p>
 
             {this.state.error && (
               <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
@@ -84,7 +105,9 @@ export class ErrorBoundary extends Component<Props, State> {
                 </p>
                 {this.state.error.stack && (
                   <details className="mt-2">
-                    <summary className="text-xs text-gray-500 cursor-pointer">Details</summary>
+                    <summary className="text-xs text-gray-500 cursor-pointer">
+                      {s.errorDetails}
+                    </summary>
                     <pre className="text-xs text-gray-500 mt-1 whitespace-pre-wrap break-all max-h-40 overflow-auto">
                       {this.state.error.stack}
                     </pre>
@@ -96,11 +119,11 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Button onClick={this.handleReset} className="gap-2">
                 <RefreshCw size={18} />
-                Try Again
+                {s.tryAgain}
               </Button>
               <Button onClick={this.handleGoHome} variant="outline" className="gap-2">
                 <Home size={18} />
-                Go Home
+                {s.goHome}
               </Button>
             </div>
           </div>
@@ -112,6 +135,29 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
+/**
+ * i18n-aware ErrorBoundary wrapper that injects translated strings
+ */
+export function ErrorBoundary({ children, fallback, onReset }: Omit<Props, 'strings'>) {
+  const { t } = useI18n()
+
+  const strings: TranslatedStrings = {
+    title: t.errorBoundary.title,
+    description: t.errorBoundary.description,
+    tryAgain: t.errorBoundary.tryAgain,
+    goHome: t.errorBoundary.goHome,
+    errorDetails: t.errorBoundary.errorDetails,
+    inlineError: t.errorBoundary.inlineError,
+    inlineTryAgain: t.errorBoundary.inlineTryAgain,
+  }
+
+  return (
+    <ErrorBoundaryClass strings={strings} fallback={fallback} onReset={onReset}>
+      {children}
+    </ErrorBoundaryClass>
+  )
+}
+
 // Smaller inline error component for sections
 interface InlineErrorProps {
   title?: string
@@ -119,7 +165,10 @@ interface InlineErrorProps {
   onRetry?: () => void
 }
 
-export function InlineError({ title = 'Error', message, onRetry }: InlineErrorProps) {
+export function InlineError({ title, message, onRetry }: InlineErrorProps) {
+  const { t } = useI18n()
+  const displayTitle = title ?? t.errorBoundary.inlineError
+
   return (
     <div className="bg-red-50 border border-red-200 rounded-xl p-4">
       <div className="flex items-start gap-3">
@@ -127,7 +176,7 @@ export function InlineError({ title = 'Error', message, onRetry }: InlineErrorPr
           <AlertTriangle className="text-red-600" size={16} />
         </div>
         <div className="flex-1">
-          <h4 className="font-semibold text-red-800">{title}</h4>
+          <h4 className="font-semibold text-red-800">{displayTitle}</h4>
           <p className="text-sm text-red-600 mt-1">{message}</p>
           {onRetry && (
             <button
@@ -135,7 +184,7 @@ export function InlineError({ title = 'Error', message, onRetry }: InlineErrorPr
               className="mt-3 text-sm font-medium text-red-700 hover:text-red-800 flex items-center gap-1"
             >
               <RefreshCw size={14} />
-              Try again
+              {t.errorBoundary.inlineTryAgain}
             </button>
           )}
         </div>
