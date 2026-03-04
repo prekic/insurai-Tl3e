@@ -38,7 +38,7 @@ const mockLocalStorage = new Proxy(localStorageData, {
     }
     if (prop === 'clear') {
       return vi.fn(() => {
-        Object.keys(target).forEach(key => delete target[key])
+        Object.keys(target).forEach((key) => delete target[key])
       })
     }
     if (prop === 'key') {
@@ -81,7 +81,7 @@ describe('Translation Cache', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     // Clear localStorage data
-    Object.keys(localStorageData).forEach(key => delete localStorageData[key])
+    Object.keys(localStorageData).forEach((key) => delete localStorageData[key])
     // Reset navigator
     Object.defineProperty(global, 'navigator', {
       value: {
@@ -110,7 +110,7 @@ describe('Translation Cache', () => {
       } as TranslationDictionary
 
       localStorageData['insurai_i18n_en'] = JSON.stringify({
-        version: 2,
+        version: 3,
         timestamp: Date.now(),
         translations,
       })
@@ -153,7 +153,7 @@ describe('Translation Cache', () => {
 
       const stored = JSON.parse(localStorageData['insurai_i18n_tr'])
       expect(stored.translations).toEqual(translations)
-      expect(stored.version).toBe(2)
+      expect(stored.version).toBe(3)
       expect(stored.timestamp).toBeDefined()
     })
   })

@@ -4,7 +4,7 @@
  * Comprehensive tests targeting uncovered branches, functions, and statements.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PolicyUpload } from './PolicyUpload'
@@ -104,7 +104,9 @@ vi.mock('@/lib/policy-context', () => ({
 
 // Policy upload check mock
 const mockCheckPolicyBeforeUpload = vi.fn().mockResolvedValue({ type: 'noConflict' })
-const mockHandlePolicyAmendment = vi.fn().mockResolvedValue({ success: true, versionNumber: 2, changes: [{}] })
+const mockHandlePolicyAmendment = vi
+  .fn()
+  .mockResolvedValue({ success: true, versionNumber: 2, changes: [{}] })
 const mockHandleDuplicateResolution = vi.fn().mockResolvedValue({})
 vi.mock('@/lib/policy-upload-check', () => ({
   checkPolicyBeforeUpload: (...args: unknown[]) => mockCheckPolicyBeforeUpload(...args),
@@ -154,15 +156,41 @@ vi.mock('sonner', () => ({
 // Sample policies mock
 vi.mock('@/data/sample-policies', () => ({
   samplePolicies: [
-    { id: 'sample-1', policyNumber: 'S-001', provider: 'TestCo', type: 'home', typeTr: 'Konut', coverage: 100000, premium: 1000, deductible: 0, startDate: '2024-01-01', expiryDate: '2025-01-01', status: 'active', insuredPerson: 'Test', documentType: 'policy', uploadDate: '2024-01-01', logo: '', fileName: 'test.pdf', coverages: [], exclusions: [], specialConditions: [], insuranceLine: 'Property', aiConfidence: 0.9, aiInsights: [], monthlyPremium: 83 },
+    {
+      id: 'sample-1',
+      policyNumber: 'S-001',
+      provider: 'TestCo',
+      type: 'home',
+      typeTr: 'Konut',
+      coverage: 100000,
+      premium: 1000,
+      deductible: 0,
+      startDate: '2024-01-01',
+      expiryDate: '2025-01-01',
+      status: 'active',
+      insuredPerson: 'Test',
+      documentType: 'policy',
+      uploadDate: '2024-01-01',
+      logo: '',
+      fileName: 'test.pdf',
+      coverages: [],
+      exclusions: [],
+      specialConditions: [],
+      insuranceLine: 'Property',
+      aiConfidence: 0.9,
+      aiInsights: [],
+      monthlyPremium: 83,
+    },
   ],
 }))
 
 // File validation mock
 vi.mock('@/lib/errors', () => ({
   validateFiles: (files: File[]) => ({
-    valid: files.filter(f => f.name.endsWith('.pdf')),
-    errors: files.filter(f => !f.name.endsWith('.pdf')).map(f => ({ code: 'FILE_TYPE_UNSUPPORTED', details: `${f.name} is not a PDF` })),
+    valid: files.filter((f) => f.name.endsWith('.pdf')),
+    errors: files
+      .filter((f) => !f.name.endsWith('.pdf'))
+      .map((f) => ({ code: 'FILE_TYPE_UNSUPPORTED', details: `${f.name} is not a PDF` })),
   }),
   getErrorMessage: (code: string) => ({
     title: `Error: ${code}`,
@@ -182,14 +210,34 @@ vi.mock('@/lib/sanitize', () => ({
 
 // ConflictResolutionDialog mock
 vi.mock('./ConflictResolutionDialog', () => ({
-  ConflictResolutionDialog: ({ onSkip, onReplace, onKeepBoth, onTrackAmendment, onEdit, onClose, isLoading }: Record<string, unknown>) => (
+  ConflictResolutionDialog: ({
+    onSkip,
+    onReplace,
+    onKeepBoth,
+    onTrackAmendment,
+    onEdit,
+    onClose,
+    isLoading,
+  }: Record<string, unknown>) => (
     <div data-testid="conflict-dialog">
-      <button data-testid="conflict-skip" onClick={onSkip as () => void}>Skip</button>
-      <button data-testid="conflict-replace" onClick={onReplace as () => void}>Replace</button>
-      <button data-testid="conflict-keep-both" onClick={onKeepBoth as () => void}>Keep Both</button>
-      <button data-testid="conflict-track" onClick={onTrackAmendment as () => void}>Track Amendment</button>
-      <button data-testid="conflict-edit" onClick={onEdit as () => void}>Edit</button>
-      <button data-testid="conflict-close" onClick={onClose as () => void}>Close</button>
+      <button data-testid="conflict-skip" onClick={onSkip as () => void}>
+        Skip
+      </button>
+      <button data-testid="conflict-replace" onClick={onReplace as () => void}>
+        Replace
+      </button>
+      <button data-testid="conflict-keep-both" onClick={onKeepBoth as () => void}>
+        Keep Both
+      </button>
+      <button data-testid="conflict-track" onClick={onTrackAmendment as () => void}>
+        Track Amendment
+      </button>
+      <button data-testid="conflict-edit" onClick={onEdit as () => void}>
+        Edit
+      </button>
+      <button data-testid="conflict-close" onClick={onClose as () => void}>
+        Close
+      </button>
       {isLoading && <span data-testid="conflict-loading">Loading...</span>}
     </div>
   ),
@@ -226,7 +274,9 @@ function mockSuccessResult(overrides: Record<string, unknown> = {}) {
       ...overrides,
     },
     source: 'ai' as const,
-    extractedData: { confidence: { overall: 0.92, ...(overrides.confidence as Record<string, unknown> || {}) } },
+    extractedData: {
+      confidence: { overall: 0.92, ...((overrides.confidence as Record<string, unknown>) || {}) },
+    },
     lowConfidence: false,
     ...overrides,
   }
@@ -266,16 +316,28 @@ describe('PolicyUpload Coverage', () => {
     mockHandlePolicyAmendment.mockResolvedValue({ success: true, versionNumber: 2, changes: [{}] })
   })
 
+  afterEach(async () => {
+    // Flush pending async processing (upload progress loop uses 5×100ms setTimeout)
+    // to prevent timer leakage between tests
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700))
+    })
+  })
+
   // --- Error message categorization (10+ branches) ---
   describe('error message categorization', () => {
     it('shows AI not configured error (NO_AI_CONFIG)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('NO_AI_CONFIG: AI is not configured'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorAiNotConfigured,
-          expect.objectContaining({ description: expect.stringContaining(EN_TRANSLATIONS.upload.errorAiUnavailable) })
+          expect.objectContaining({
+            description: expect.stringContaining(EN_TRANSLATIONS.upload.errorAiUnavailable),
+          })
         )
       })
     })
@@ -283,7 +345,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows PDF timeout error (PDF_TIMEOUT)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('PDF_TIMEOUT: timed out'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorPdfTimeout,
@@ -295,7 +359,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows PDF worker error (PDF_WORKER_ERROR)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('PDF_WORKER_ERROR: worker failed'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorPdfWorker,
@@ -307,7 +373,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows file read error (FILE_READ_ERROR)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('FILE_READ_ERROR: Could not read'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorFileRead,
@@ -319,7 +387,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows PDF parse error (PDF_PARSE_ERROR)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('PDF_PARSE_ERROR: PDF processing failed'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorPdfParse,
@@ -331,7 +401,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows rate limit error (429)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('rate limit exceeded 429'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorRateLimit,
@@ -343,7 +415,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows network error (proxy/network/fetch)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('network error: fetch failed'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorNetwork,
@@ -355,7 +429,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows provider not configured error (PROVIDER_NOT_CONFIGURED)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('PROVIDER_NOT_CONFIGURED 503'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorProviderNotReady,
@@ -367,7 +443,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows low confidence error (LOW_CONFIDENCE)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('LOW_CONFIDENCE: extraction unreliable'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorLowConfidence,
@@ -379,7 +457,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows request timeout error (ETIMEDOUT)', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('timeout ETIMEDOUT'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorRequestTimeout,
@@ -391,7 +471,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows generic error for unknown error types', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('Something completely unexpected'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.errorAnalysisFailed,
@@ -403,7 +485,9 @@ describe('PolicyUpload Coverage', () => {
     it('handles non-Error thrown values', async () => {
       mockExtractPolicy.mockRejectedValueOnce('string error')
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalled()
       })
@@ -412,7 +496,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows error in file list for failed extraction', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('PDF_PARSE_ERROR: could not parse'))
       renderUpload()
-      await act(async () => { addPdfFile('broken.pdf') })
+      await act(async () => {
+        addPdfFile('broken.pdf')
+      })
       await waitFor(() => {
         expect(screen.getByText('broken.pdf')).toBeInTheDocument()
       })
@@ -424,20 +510,30 @@ describe('PolicyUpload Coverage', () => {
     it('shows AI extracted status with confidence percentage', async () => {
       mockExtractPolicy.mockResolvedValueOnce(mockSuccessResult())
       renderUpload()
-      await act(async () => { addPdfFile() })
-      await waitFor(() => {
-        expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
-        expect(screen.getByText('(92%)')).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile()
       })
+      await waitFor(
+        () => {
+          expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
+          expect(screen.getByText('(92%)')).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
     })
 
     it('shows demo data status for fallback source', async () => {
       mockExtractPolicy.mockResolvedValueOnce(mockSuccessResult({ source: 'fallback' }))
       renderUpload()
-      await act(async () => { addPdfFile() })
-      await waitFor(() => {
-        expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile()
       })
+      await waitFor(
+        () => {
+          expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
     })
   })
 
@@ -449,13 +545,20 @@ describe('PolicyUpload Coverage', () => {
         lowConfidence: true,
       })
       renderUpload()
-      await act(async () => { addPdfFile() })
-      await waitFor(() => {
-        expect(mockToast.warning).toHaveBeenCalledWith(
-          EN_TRANSLATIONS.upload.analysisCompleteLowConfidence,
-          expect.objectContaining({ description: expect.stringContaining(EN_TRANSLATIONS.upload.verifyData) })
-        )
+      await act(async () => {
+        addPdfFile()
       })
+      await waitFor(
+        () => {
+          expect(mockToast.warning).toHaveBeenCalledWith(
+            EN_TRANSLATIONS.upload.analysisCompleteLowConfidence,
+            expect.objectContaining({
+              description: expect.stringContaining(EN_TRANSLATIONS.upload.verifyData),
+            })
+          )
+        },
+        { timeout: 3000 }
+      )
     })
 
     it('shows low confidence status indicator', async () => {
@@ -464,7 +567,9 @@ describe('PolicyUpload Coverage', () => {
         lowConfidence: true,
       })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByText(/Low confidence/i)).toBeInTheDocument()
       })
@@ -486,7 +591,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -505,7 +612,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -522,7 +631,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile('skip-me.pdf') })
+      await act(async () => {
+        addPdfFile('skip-me.pdf')
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -543,7 +654,9 @@ describe('PolicyUpload Coverage', () => {
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       mockHandleDuplicateResolution.mockResolvedValueOnce({})
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -551,7 +664,11 @@ describe('PolicyUpload Coverage', () => {
         fireEvent.click(screen.getByTestId('conflict-replace'))
       })
       await waitFor(() => {
-        expect(mockHandleDuplicateResolution).toHaveBeenCalledWith('replace', 'ex-2', expect.any(Object))
+        expect(mockHandleDuplicateResolution).toHaveBeenCalledWith(
+          'replace',
+          'ex-2',
+          expect.any(Object)
+        )
         expect(mockRefreshPolicies).toHaveBeenCalled()
         expect(mockToast.success).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.policyUpdated,
@@ -568,7 +685,9 @@ describe('PolicyUpload Coverage', () => {
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       mockHandleDuplicateResolution.mockResolvedValueOnce({ error: 'Replace failed' })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -590,7 +709,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -615,7 +736,9 @@ describe('PolicyUpload Coverage', () => {
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       mockCreatePolicy.mockRejectedValueOnce(new Error('DB error'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -639,7 +762,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -647,7 +772,11 @@ describe('PolicyUpload Coverage', () => {
         fireEvent.click(screen.getByTestId('conflict-track'))
       })
       await waitFor(() => {
-        expect(mockHandlePolicyAmendment).toHaveBeenCalledWith('ex-6', expect.any(Object), expect.any(Array))
+        expect(mockHandlePolicyAmendment).toHaveBeenCalledWith(
+          'ex-6',
+          expect.any(Object),
+          expect.any(Array)
+        )
         expect(mockToast.success).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.amendmentTracked,
           expect.anything()
@@ -665,7 +794,9 @@ describe('PolicyUpload Coverage', () => {
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       mockHandlePolicyAmendment.mockResolvedValueOnce({ success: false, error: 'Amendment failed' })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -687,7 +818,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -707,7 +840,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
       })
@@ -722,7 +857,9 @@ describe('PolicyUpload Coverage', () => {
     it('continues if conflict check throws (fail open)', async () => {
       mockCheckPolicyBeforeUpload.mockRejectedValueOnce(new Error('Check failed'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       // Should still complete successfully (fail open)
       await waitFor(() => {
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
@@ -858,7 +995,9 @@ describe('PolicyUpload Coverage', () => {
       // We need a file to see the button - add a file that errors
       mockExtractPolicy.mockRejectedValueOnce(new Error('fail'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       // Wait for error state
       await waitFor(() => {
         expect(screen.getByText('test.pdf')).toBeInTheDocument()
@@ -869,10 +1008,15 @@ describe('PolicyUpload Coverage', () => {
 
     it('navigates to dashboard with replace for completed policies (local mode)', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /view analysis/i })).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile()
       })
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /view analysis/i })).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /view analysis/i }))
       })
@@ -885,10 +1029,15 @@ describe('PolicyUpload Coverage', () => {
       mockAuthConfigured = true
       mockIsSupabaseConfigured = true
       renderUpload()
-      await act(async () => { addPdfFile() })
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /view analysis/i })).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile()
       })
+      await waitFor(
+        () => {
+          expect(screen.getByRole('button', { name: /view analysis/i })).toBeInTheDocument()
+        },
+        { timeout: 3000 }
+      )
       await act(async () => {
         fireEvent.click(screen.getByRole('button', { name: /view analysis/i }))
       })
@@ -907,7 +1056,9 @@ describe('PolicyUpload Coverage', () => {
 
     it('saves policy to Supabase when authenticated', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockCreatePolicy).toHaveBeenCalled()
         expect(mockRefreshPolicies).toHaveBeenCalled()
@@ -917,11 +1068,15 @@ describe('PolicyUpload Coverage', () => {
 
     it('shows savedToCloud note in toast', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.success).toHaveBeenCalledWith(
           EN_TRANSLATIONS.upload.analysisComplete,
-          expect.objectContaining({ description: expect.stringContaining(EN_TRANSLATIONS.upload.savedToCloud) })
+          expect.objectContaining({
+            description: expect.stringContaining(EN_TRANSLATIONS.upload.savedToCloud),
+          })
         )
       })
     })
@@ -929,7 +1084,9 @@ describe('PolicyUpload Coverage', () => {
     it('continues if createPolicy fails', async () => {
       mockCreatePolicy.mockRejectedValueOnce(new Error('DB save error'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         // Should still show as complete
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
@@ -939,7 +1096,9 @@ describe('PolicyUpload Coverage', () => {
     it('continues if uploadPolicyDocument fails', async () => {
       mockUploadPolicyDocument.mockRejectedValueOnce(new Error('Storage error'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       })
@@ -950,10 +1109,14 @@ describe('PolicyUpload Coverage', () => {
   describe('local-only save flow', () => {
     it('completes stage with local_only_mode reason', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockCompleteStage).toHaveBeenCalledWith(
-          expect.objectContaining({ output: expect.objectContaining({ saved_to_cloud: false, reason: 'local_only_mode' }) })
+          expect.objectContaining({
+            output: expect.objectContaining({ saved_to_cloud: false, reason: 'local_only_mode' }),
+          })
         )
       })
     })
@@ -967,7 +1130,9 @@ describe('PolicyUpload Coverage', () => {
         error: { message: 'Extraction failed completely' },
       })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockToast.error).toHaveBeenCalled()
       })
@@ -978,7 +1143,9 @@ describe('PolicyUpload Coverage', () => {
   describe('file operations', () => {
     it('removes file from list', async () => {
       renderUpload()
-      await act(async () => { addPdfFile('removable.pdf') })
+      await act(async () => {
+        addPdfFile('removable.pdf')
+      })
       await waitFor(() => {
         expect(screen.getByText('removable.pdf')).toBeInTheDocument()
       })
@@ -1024,7 +1191,9 @@ describe('PolicyUpload Coverage', () => {
     it('extraction failure sets error state', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('fail'))
       renderUpload()
-      await act(async () => { addPdfFile('retry-me.pdf') })
+      await act(async () => {
+        addPdfFile('retry-me.pdf')
+      })
       // Extraction was called - use waitFor because addFiles is async fire-and-forget
       await waitFor(() => {
         expect(mockExtractPolicy).toHaveBeenCalled()
@@ -1035,17 +1204,32 @@ describe('PolicyUpload Coverage', () => {
       mockExtractPolicy.mockRejectedValue(new Error('fail'))
       renderUpload()
 
-      await act(async () => { addPdfFile('fail1.pdf') })
-      await waitFor(() => {
-        expect(screen.getByText('fail1.pdf')).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile('fail1.pdf')
       })
+      await waitFor(
+        () => {
+          expect(mockExtractPolicy).toHaveBeenCalledTimes(1)
+        },
+        { timeout: 3000 }
+      )
 
-      await act(async () => { addPdfFile('fail2.pdf') })
-      await waitFor(() => {
-        expect(screen.getByText('fail2.pdf')).toBeInTheDocument()
+      await act(async () => {
+        addPdfFile('fail2.pdf')
       })
+      await waitFor(
+        () => {
+          expect(mockExtractPolicy).toHaveBeenCalledTimes(2)
+        },
+        { timeout: 3000 }
+      )
 
-      const retryButton = await screen.findByText(EN_TRANSLATIONS.upload.retryAll)
+      // Wait for error status to render Retry All button
+      const retryButton = await screen.findByText(
+        EN_TRANSLATIONS.upload.retryAll,
+        {},
+        { timeout: 3000 }
+      )
       expect(retryButton).toBeInTheDocument()
 
       mockExtractPolicy.mockResolvedValue(mockSuccessResult())
@@ -1053,9 +1237,12 @@ describe('PolicyUpload Coverage', () => {
         fireEvent.click(retryButton)
       })
 
-      await waitFor(() => {
-        expect(mockExtractPolicy).toHaveBeenCalledTimes(4) // 2 fails + 2 retries
-      })
+      await waitFor(
+        () => {
+          expect(mockExtractPolicy).toHaveBeenCalledTimes(4) // 2 fails + 2 retries
+        },
+        { timeout: 5000 }
+      )
     })
   })
 
@@ -1079,7 +1266,9 @@ describe('PolicyUpload Coverage', () => {
   describe('view policy', () => {
     it('navigates to policy detail page with replace', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByLabelText('View policy details')).toBeInTheDocument()
       })
@@ -1094,7 +1283,9 @@ describe('PolicyUpload Coverage', () => {
   describe('processing logger', () => {
     it('sets up persist callback', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockSetPersistCallback).toHaveBeenCalled()
       })
@@ -1102,7 +1293,9 @@ describe('PolicyUpload Coverage', () => {
 
     it('starts upload and duplicate_check stages', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockStartStage).toHaveBeenCalledWith('upload', expect.any(Object))
         expect(mockStartStage).toHaveBeenCalledWith('duplicate_check', expect.any(Object))
@@ -1112,7 +1305,9 @@ describe('PolicyUpload Coverage', () => {
 
     it('calls logger.complete on successful extraction', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockComplete).toHaveBeenCalled()
       })
@@ -1121,7 +1316,9 @@ describe('PolicyUpload Coverage', () => {
     it('calls logger.fail on extraction error', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('fatal error'))
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockFail).toHaveBeenCalledWith('fatal error', expect.any(Object))
       })
@@ -1132,7 +1329,9 @@ describe('PolicyUpload Coverage', () => {
       mockAuthConfigured = true
       mockIsSupabaseConfigured = true
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(mockSetPolicyId).toHaveBeenCalledWith('pol-1')
       })
@@ -1143,14 +1342,18 @@ describe('PolicyUpload Coverage', () => {
   describe('drag and drop', () => {
     it('handles dragOver and sets isDragging', () => {
       renderUpload()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.upload.dropHere).closest('[class*="border-dashed"]')!
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.upload.dropHere)
+        .closest('[class*="border-dashed"]')!
       fireEvent.dragOver(dropZone, { dataTransfer: { files: [] } })
       expect(dropZone.className).toContain('border-blue-500')
     })
 
     it('handles dragLeave and resets isDragging', () => {
       renderUpload()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.upload.dropHere).closest('[class*="border-dashed"]')!
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.upload.dropHere)
+        .closest('[class*="border-dashed"]')!
       fireEvent.dragOver(dropZone, { dataTransfer: { files: [] } })
       fireEvent.dragLeave(dropZone)
       expect(dropZone.className).not.toContain('border-blue-500')
@@ -1158,7 +1361,9 @@ describe('PolicyUpload Coverage', () => {
 
     it('handles drop with file', async () => {
       renderUpload()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.upload.dropHere).closest('[class*="border-dashed"]')!
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.upload.dropHere)
+        .closest('[class*="border-dashed"]')!
       const file = new File(['%PDF'], 'dropped.pdf', { type: 'application/pdf' })
       fireEvent.drop(dropZone, { dataTransfer: { files: [file] } })
       await waitFor(() => {
@@ -1184,7 +1389,7 @@ describe('PolicyUpload Coverage', () => {
   describe('file status display', () => {
     it('shows uploading status with progress bar', async () => {
       // Make extraction hang
-      mockExtractPolicy.mockImplementationOnce(() => new Promise(() => { }))
+      mockExtractPolicy.mockImplementationOnce(() => new Promise(() => {}))
       renderUpload()
       addPdfFile('uploading.pdf')
       await waitFor(() => {
@@ -1195,7 +1400,12 @@ describe('PolicyUpload Coverage', () => {
     it('shows analyzing status', async () => {
       // Make extraction hang to catch the analyzing state
       let resolveExtraction: (v: unknown) => void
-      mockExtractPolicy.mockImplementationOnce(() => new Promise((resolve) => { resolveExtraction = resolve }))
+      mockExtractPolicy.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveExtraction = resolve
+          })
+      )
       renderUpload()
       addPdfFile('analyzing.pdf')
       await waitFor(() => {
@@ -1214,7 +1424,9 @@ describe('PolicyUpload Coverage', () => {
         existingPolicy: { id: 'ex', policyNumber: 'P' } as never,
       })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.upload.duplicateAwaiting)).toBeInTheDocument()
       })
@@ -1231,7 +1443,9 @@ describe('PolicyUpload Coverage', () => {
         isVerifiedAmendment: true,
       })
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.upload.amendmentAwaiting)).toBeInTheDocument()
       })
@@ -1240,7 +1454,9 @@ describe('PolicyUpload Coverage', () => {
     it('shows error status in file list', async () => {
       mockExtractPolicy.mockRejectedValueOnce(new Error('Something went wrong'))
       renderUpload()
-      await act(async () => { addPdfFile('error-file.pdf') })
+      await act(async () => {
+        addPdfFile('error-file.pdf')
+      })
       await waitFor(() => {
         // File should be displayed with error icon (AlertTriangle)
         expect(screen.getByText('error-file.pdf')).toBeInTheDocument()
@@ -1253,7 +1469,9 @@ describe('PolicyUpload Coverage', () => {
       const input = document.querySelector('input[type="file"]') as HTMLInputElement
       const f1 = new File(['%PDF'], 'e1.pdf', { type: 'application/pdf' })
       Object.defineProperty(input, 'files', { value: [f1], configurable: true })
-      await act(async () => { fireEvent.change(input) })
+      await act(async () => {
+        fireEvent.change(input)
+      })
       await waitFor(() => {
         expect(screen.getByText(EN_TRANSLATIONS.upload.clickRetryOrRemove)).toBeInTheDocument()
       })
@@ -1272,7 +1490,9 @@ describe('PolicyUpload Coverage', () => {
       }
       mockCheckPolicyBeforeUpload.mockResolvedValueOnce(conflict)
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       // Close the auto-opened dialog first
       await waitFor(() => {
         expect(screen.getByTestId('conflict-dialog')).toBeInTheDocument()
@@ -1295,7 +1515,9 @@ describe('PolicyUpload Coverage', () => {
   describe('file counts', () => {
     it('addPdfFile triggers extraction', async () => {
       renderUpload()
-      await act(async () => { addPdfFile('processing.pdf') })
+      await act(async () => {
+        addPdfFile('processing.pdf')
+      })
       await waitFor(() => {
         expect(mockExtractPolicy).toHaveBeenCalled()
       })
@@ -1303,7 +1525,9 @@ describe('PolicyUpload Coverage', () => {
 
     it('shows completed count in header', async () => {
       renderUpload()
-      await act(async () => { addPdfFile() })
+      await act(async () => {
+        addPdfFile()
+      })
       await waitFor(() => {
         expect(screen.getByText(/1\/1/)).toBeInTheDocument()
       })

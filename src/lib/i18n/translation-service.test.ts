@@ -38,6 +38,25 @@ const MOCK_TR_TRANSLATIONS = {
   common: { save: 'Kaydet', cancel: 'İptal' },
 } as unknown as import('./translations').TranslationDictionary
 
+vi.mock('./translations-skeleton', () => ({
+  SKELETON_TRANSLATIONS: {},
+}))
+
+// Mock dynamic imports for lazy-loaded translations (EN and TR)
+vi.mock('./translations-en', () => ({
+  EN_TRANSLATIONS: {
+    nav: { home: 'Home', dashboard: 'Dashboard' },
+    common: { save: 'Save', cancel: 'Cancel' },
+  },
+}))
+
+vi.mock('./translations-tr', () => ({
+  TR_TRANSLATIONS: {
+    nav: { home: 'Ana Sayfa', dashboard: 'Panel' },
+    common: { save: 'Kaydet', cancel: 'İptal' },
+  },
+}))
+
 vi.mock('./translations', () => ({
   EN_TRANSLATIONS: {
     nav: { home: 'Home', dashboard: 'Dashboard' },
@@ -125,10 +144,7 @@ function createLocalesResponse(locales: APILocale[], version = '5') {
   }
 }
 
-function createTranslationsResponse(
-  translations: Record<string, unknown>,
-  version = '5'
-) {
+function createTranslationsResponse(translations: Record<string, unknown>, version = '5') {
   return {
     ok: true,
     json: async () => ({
@@ -181,9 +197,7 @@ describe('translation-service', () => {
       expect(result.locales[0].code).toBe('tr')
       expect(result.locales[1].code).toBe('en')
       expect(result.version).toBe('7')
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/translations/locales'
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/translations/locales')
     })
 
     it('should use in-memory cache on second call within TTL', async () => {
@@ -293,9 +307,7 @@ describe('translation-service', () => {
   describe('invalidateLocalesCache', () => {
     it('should force refetch on next call', async () => {
       // Populate cache
-      mockFetch.mockResolvedValueOnce(
-        createLocalesResponse([createMockAPILocale()], '5')
-      )
+      mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
       await fetchAvailableLocales()
       expect(mockFetch).toHaveBeenCalledTimes(1)
 
@@ -303,9 +315,7 @@ describe('translation-service', () => {
       invalidateLocalesCache()
 
       // Next call should fetch again
-      mockFetch.mockResolvedValueOnce(
-        createLocalesResponse([createMockAPILocale()], '6')
-      )
+      mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '6'))
       const result = await fetchAvailableLocales()
       expect(result.version).toBe('6')
       expect(mockFetch).toHaveBeenCalledTimes(2)
@@ -339,30 +349,29 @@ describe('translation-service', () => {
         mockGetCachedVersion.mockReturnValue('5')
 
         // API returns same version
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
 
         const result = await getTranslations('tr')
 
-        expect(result).toEqual(cachedData)
+        // Result is a merge of preloaded TR + cached — cached values override preloaded
+        const rec = result as Record<string, Record<string, string>>
+        expect(rec.nav.home).toBe('Cached Home')
+        expect(rec.common.save).toBe('Cached Save')
+        // Preloaded values fill gaps where cache has no entry
+        expect(rec.nav.dashboard).toBe('Panel')
+        expect(rec.common.cancel).toBe('İptal')
         // Should only call locales endpoint (version check), not translations endpoint
         expect(mockFetch).toHaveBeenCalledTimes(1)
-        expect(mockFetch).toHaveBeenCalledWith(
-          'http://localhost:4001/api/translations/locales'
-        )
+        expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/translations/locales')
       })
 
       it('should invoke progress callbacks: loading -> complete for cache hit', async () => {
         mockGetCachedTranslations.mockReturnValue(MOCK_TR_TRANSLATIONS)
         mockGetCachedVersion.mockReturnValue('5')
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
 
         const progressUpdates: TranslationProgress[] = []
-        const onProgress = (p: TranslationProgress) =>
-          progressUpdates.push({ ...p })
+        const onProgress = (p: TranslationProgress) => progressUpdates.push({ ...p })
 
         await getTranslations('tr', onProgress)
 
@@ -382,9 +391,7 @@ describe('translation-service', () => {
       it('should not update localStorage cache when cache hit occurs', async () => {
         mockGetCachedTranslations.mockReturnValue(MOCK_TR_TRANSLATIONS)
         mockGetCachedVersion.mockReturnValue('5')
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
 
         await getTranslations('tr')
 
@@ -407,24 +414,15 @@ describe('translation-service', () => {
         }
 
         // First fetch: locales with version 5 (differs from cached 3)
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         // Second fetch: translations
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('tr')
 
         expect(mockFetch).toHaveBeenCalledTimes(2)
-        expect(mockFetch).toHaveBeenNthCalledWith(
-          2,
-          'http://localhost:4001/api/translations/tr'
-        )
-        expect(
-          (result as Record<string, Record<string, string>>).nav.home
-        ).toBe('API Ana Sayfa')
+        expect(mockFetch).toHaveBeenNthCalledWith(2, 'http://localhost:4001/api/translations/tr')
+        expect((result as Record<string, Record<string, string>>).nav.home).toBe('API Ana Sayfa')
       })
 
       it('should fetch from API when no cache exists', async () => {
@@ -436,12 +434,8 @@ describe('translation-service', () => {
           common: { save: 'Fresh Save', cancel: 'Fresh Cancel' },
         }
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('en')
         const rec = result as Record<string, Record<string, string>>
@@ -460,19 +454,12 @@ describe('translation-service', () => {
           common: { save: 'New Save' },
         }
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '10')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '10')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '10'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '10'))
 
         await getTranslations('tr')
 
-        expect(mockSetCachedTranslations).toHaveBeenCalledWith(
-          'tr',
-          expect.any(Object)
-        )
+        expect(mockSetCachedTranslations).toHaveBeenCalledWith('tr', expect.any(Object))
         expect(mockSetCachedVersion).toHaveBeenCalledWith('tr', '10')
       })
 
@@ -480,61 +467,34 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(
-            { nav: { home: 'X' }, common: { save: 'Y' } },
-            '5'
-          )
+          createTranslationsResponse({ nav: { home: 'X' }, common: { save: 'Y' } }, '5')
         )
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('en', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('en', (p) => progressUpdates.push({ ...p }))
 
-        expect(
-          progressUpdates.some(
-            (p) => p.status === 'loading' && p.progress === 0
-          )
-        ).toBe(true)
-        expect(
-          progressUpdates.some(
-            (p) => p.status === 'loading' && p.progress === 50
-          )
-        ).toBe(true)
-        expect(
-          progressUpdates.some(
-            (p) => p.status === 'complete' && p.progress === 100
-          )
-        ).toBe(true)
+        expect(progressUpdates.some((p) => p.status === 'loading' && p.progress === 0)).toBe(true)
+        expect(progressUpdates.some((p) => p.status === 'loading' && p.progress === 50)).toBe(true)
+        expect(progressUpdates.some((p) => p.status === 'complete' && p.progress === 100)).toBe(
+          true
+        )
       })
 
       it('should invoke progress at 50% with message about fetching latest', async () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse({ nav: { home: 'X' } }, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse({ nav: { home: 'X' } }, '5'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('tr', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('tr', (p) => progressUpdates.push({ ...p }))
 
-        const fetchingUpdate = progressUpdates.find(
-          (p) => p.progress === 50
-        )
+        const fetchingUpdate = progressUpdates.find((p) => p.progress === 50)
         expect(fetchingUpdate).toBeDefined()
-        expect(fetchingUpdate!.message).toBe(
-          'Fetching latest translations...'
-        )
+        expect(fetchingUpdate!.message).toBe('Fetching latest translations...')
       })
     })
 
@@ -551,12 +511,8 @@ describe('translation-service', () => {
           nav: { home: 'DB Ana Sayfa' },
         }
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('tr')
         const rec = result as Record<string, Record<string, string>>
@@ -579,12 +535,8 @@ describe('translation-service', () => {
           brand_new_section: { key1: 'value1', key2: 'value2' },
         }
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('en')
         const rec = result as Record<string, Record<string, string>>
@@ -606,14 +558,9 @@ describe('translation-service', () => {
         }
 
         mockFetch.mockResolvedValueOnce(
-          createLocalesResponse(
-            [createMockAPILocale({ code: 'de' })],
-            '5'
-          )
+          createLocalesResponse([createMockAPILocale({ code: 'de' })], '5')
         )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('de')
         const rec = result as Record<string, Record<string, string>>
@@ -632,12 +579,8 @@ describe('translation-service', () => {
           nav: { home: 'DB Home' },
         }
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         await getTranslations('tr')
 
@@ -667,7 +610,10 @@ describe('translation-service', () => {
 
         const result = await getTranslations('tr')
 
-        expect(result).toEqual(cachedData)
+        // Result is a merge of preloaded TR + cached — cached values override
+        const rec = result as Record<string, Record<string, string>>
+        expect(rec.nav.home).toBe('Cached')
+        expect(rec.common.save).toBe('Cached Save')
       })
 
       it('should fall back to preloaded translations when API fails and no cache', async () => {
@@ -704,9 +650,7 @@ describe('translation-service', () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('xx', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('xx', (p) => progressUpdates.push({ ...p }))
 
         const lastUpdate = progressUpdates[progressUpdates.length - 1]
         expect(lastUpdate.status).toBe('error')
@@ -721,9 +665,7 @@ describe('translation-service', () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('tr', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('tr', (p) => progressUpdates.push({ ...p }))
 
         const lastUpdate = progressUpdates[progressUpdates.length - 1]
         expect(lastUpdate.status).toBe('complete')
@@ -740,9 +682,7 @@ describe('translation-service', () => {
         mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('tr', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('tr', (p) => progressUpdates.push({ ...p }))
 
         const lastUpdate = progressUpdates[progressUpdates.length - 1]
         expect(lastUpdate.status).toBe('complete')
@@ -759,9 +699,7 @@ describe('translation-service', () => {
         mockGetCachedVersion.mockReturnValue('2')
 
         // Locales returns newer version
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         // Translation API returns success: false (no translations)
         mockFetch.mockResolvedValueOnce({
           ok: true,
@@ -770,16 +708,16 @@ describe('translation-service', () => {
 
         const result = await getTranslations('tr')
 
-        expect(result).toEqual(cachedData)
+        // Result is a merge of preloaded TR + cached — cached values override
+        const rec = result as Record<string, Record<string, string>>
+        expect(rec.nav.home).toBe('CachedVal')
       })
 
       it('should fall back to preloaded when API returns null translations and no cache', async () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         mockFetch.mockResolvedValueOnce({
           ok: true,
           json: async () => ({ success: false }),
@@ -813,9 +751,7 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         mockFetch.mockRejectedValueOnce(new Error('Fetch failed'))
 
         const result = await getTranslations('en')
@@ -869,19 +805,12 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse({ nav: { home: 'X' } }, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse({ nav: { home: 'X' } }, '5'))
 
         await getTranslations('EN-US')
 
-        expect(mockFetch).toHaveBeenNthCalledWith(
-          2,
-          'http://localhost:4001/api/translations/en'
-        )
+        expect(mockFetch).toHaveBeenNthCalledWith(2, 'http://localhost:4001/api/translations/en')
       })
     })
 
@@ -899,9 +828,7 @@ describe('translation-service', () => {
         mockFetch.mockRejectedValueOnce(new Error('No network'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('en', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('en', (p) => progressUpdates.push({ ...p }))
 
         expect(progressUpdates[0]).toEqual({
           status: 'loading',
@@ -914,17 +841,11 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(null)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse({ nav: { home: 'X' } }, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse({ nav: { home: 'X' } }, '5'))
 
         const progressUpdates: TranslationProgress[] = []
-        await getTranslations('tr', (p) =>
-          progressUpdates.push({ ...p })
-        )
+        await getTranslations('tr', (p) => progressUpdates.push({ ...p }))
 
         // At minimum: loading(0%) -> loading(50%) -> complete(100%)
         expect(progressUpdates.length).toBeGreaterThanOrEqual(3)
@@ -939,13 +860,9 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(MOCK_TR_TRANSLATIONS)
         mockGetCachedVersion.mockReturnValue(null)
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '5')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
         const apiTranslations = { nav: { home: 'API value' } }
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(apiTranslations, '5')
-        )
+        mockFetch.mockResolvedValueOnce(createTranslationsResponse(apiTranslations, '5'))
 
         const result = await getTranslations('tr')
         const rec = result as Record<string, Record<string, string>>
@@ -959,29 +876,24 @@ describe('translation-service', () => {
         mockGetCachedTranslations.mockReturnValue(MOCK_TR_TRANSLATIONS)
         mockGetCachedVersion.mockReturnValue('0')
 
-        mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '0')
-        )
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '0'))
 
         const result = await getTranslations('tr')
 
-        // '0' === '0', should use cache
+        // '0' === '0', should use cache (merged with preloaded)
         expect(mockFetch).toHaveBeenCalledTimes(1)
-        expect(result).toEqual(MOCK_TR_TRANSLATIONS)
+        const rec = result as Record<string, Record<string, string>>
+        expect(rec.nav.home).toBe('Ana Sayfa')
+        expect(rec.common.save).toBe('Kaydet')
       })
 
       it('should detect version change from 0 to 1 as stale', async () => {
         mockGetCachedTranslations.mockReturnValue(MOCK_TR_TRANSLATIONS)
         mockGetCachedVersion.mockReturnValue('0')
 
+        mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '1'))
         mockFetch.mockResolvedValueOnce(
-          createLocalesResponse([createMockAPILocale()], '1')
-        )
-        mockFetch.mockResolvedValueOnce(
-          createTranslationsResponse(
-            { nav: { home: 'Updated' } },
-            '1'
-          )
+          createTranslationsResponse({ nav: { home: 'Updated' } }, '1')
         )
 
         const result = await getTranslations('tr')
@@ -1349,14 +1261,9 @@ describe('translation-service', () => {
       mockGetCachedVersion.mockReturnValue(null)
 
       // Both calls will hit API
-      mockFetch.mockResolvedValue(
-        createLocalesResponse([createMockAPILocale()], '5')
-      )
+      mockFetch.mockResolvedValue(createLocalesResponse([createMockAPILocale()], '5'))
 
-      const [result1, result2] = await Promise.all([
-        getTranslations('tr'),
-        getTranslations('en'),
-      ])
+      const [result1, result2] = await Promise.all([getTranslations('tr'), getTranslations('en')])
 
       expect(result1).toBeDefined()
       expect(result2).toBeDefined()
@@ -1421,15 +1328,11 @@ describe('translation-service', () => {
 
   describe('API base URL', () => {
     it('should prepend proxyUrl to API paths', async () => {
-      mockFetch.mockResolvedValueOnce(
-        createLocalesResponse([createMockAPILocale()], '5')
-      )
+      mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
 
       await fetchAvailableLocales()
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:4001/api/translations/locales'
-      )
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:4001/api/translations/locales')
     })
 
     it('should work with empty proxyUrl (relative paths)', async () => {
@@ -1438,9 +1341,7 @@ describe('translation-service', () => {
       envModule.default.proxyUrl = null as unknown as string
 
       invalidateLocalesCache()
-      mockFetch.mockResolvedValueOnce(
-        createLocalesResponse([createMockAPILocale()], '5')
-      )
+      mockFetch.mockResolvedValueOnce(createLocalesResponse([createMockAPILocale()], '5'))
 
       await fetchAvailableLocales()
 
@@ -1459,9 +1360,13 @@ describe('translation-service', () => {
   describe('TranslationProgress types', () => {
     it('should have valid status values in TranslationStatus union', () => {
       // Compile-time check: these are all valid TranslationStatus values
-      const validStatuses: Array<
-        'idle' | 'loading' | 'translating' | 'complete' | 'error'
-      > = ['idle', 'loading', 'translating', 'complete', 'error']
+      const validStatuses: Array<'idle' | 'loading' | 'translating' | 'complete' | 'error'> = [
+        'idle',
+        'loading',
+        'translating',
+        'complete',
+        'error',
+      ]
 
       validStatuses.forEach((status) => {
         expect(typeof status).toBe('string')
@@ -1472,9 +1377,7 @@ describe('translation-service', () => {
       mockFetch.mockRejectedValueOnce(new Error('No network'))
 
       const progressUpdates: TranslationProgress[] = []
-      await getTranslations('en', (p) =>
-        progressUpdates.push({ ...p })
-      )
+      await getTranslations('en', (p) => progressUpdates.push({ ...p }))
 
       for (const update of progressUpdates) {
         expect(update).toHaveProperty('status')

@@ -138,6 +138,15 @@ vi.mock('@/lib/i18n', () => ({
       errors: {
         unknownError: 'Unknown error',
       },
+      emailPreferences: {
+        title: 'Email Preferences',
+        description: 'Manage your email notification settings',
+        errorMessage: 'Failed to update email preferences',
+        notConfigured: 'Email preferences not configured',
+        successMessage: 'Email preferences updated',
+        transactionalNote:
+          'Transactional emails will still be sent regardless of your preferences.',
+      },
     },
     isRTL: false,
   }),
@@ -428,9 +437,7 @@ describe('Settings', () => {
 
       // Click the confirm button in the dialog
       const confirmButtons = screen.getAllByRole('button', { name: /sign out/i })
-      const dialogConfirmButton = confirmButtons.find(
-        (btn) => btn.closest('[role="dialog"]')
-      )
+      const dialogConfirmButton = confirmButtons.find((btn) => btn.closest('[role="dialog"]'))
       if (dialogConfirmButton) {
         await user.click(dialogConfirmButton)
       }
@@ -473,9 +480,7 @@ describe('Settings', () => {
       })
 
       const confirmButtons = screen.getAllByRole('button', { name: /sign out/i })
-      const dialogConfirmButton = confirmButtons.find(
-        (btn) => btn.closest('[role="dialog"]')
-      )
+      const dialogConfirmButton = confirmButtons.find((btn) => btn.closest('[role="dialog"]'))
       if (dialogConfirmButton) {
         await user.click(dialogConfirmButton)
       }
@@ -495,33 +500,76 @@ describe('Settings - RTL Support', () => {
       useI18n: () => ({
         t: {
           settings: {
-            title: 'Settings', appearance: 'Appearance', theme: 'Theme',
-            light: 'Light', dark: 'Dark', system: 'System',
-            notifications: 'Notifications', emailNotifications: 'Email Notifications',
-            pushNotifications: 'Push Notifications', renewalReminders: 'Renewal Reminders',
-            marketUpdates: 'Market Updates', language: 'Language', security: 'Security',
-            changePassword: 'Change Password', twoFactor: 'Two-Factor Authentication',
-            aiConfiguration: 'AI Configuration', openaiLabel: 'OpenAI API Key (GPT-4)',
-            claudeLabel: 'Claude API Key (Anthropic)', googleCloudLabel: 'Google Cloud API Key (OCR)',
-            configured: 'Configured', notConfigured: 'Not configured', getKey: 'Get key',
-            openaiDescription: 'Primary AI.', claudeDescription: 'Backup AI.',
-            googleCloudDescription: 'For OCR.', extraction: 'Extraction', consensus: 'Consensus',
-            ocr: 'OCR', on: 'On', off: 'Off', demo: 'Demo',
-            apiKeysPrivacy: 'API keys stored locally.', languageInfo: 'Any language.',
-            dataExport: 'Data & Export', exportCSV: 'Export to Excel (CSV)', exportPDF: 'Export to PDF',
-            exportDescription: 'Export your {count} policies.', storageCloud: 'Cloud',
-            storageLocal: 'Local Browser', storageLabel: 'Storage', clearAllData: 'Clear All Data',
-            accountSection: 'Account', signedIn: 'Signed in',
-            openaiKeySaved: 'Saved', openaiKeySavedDesc: '', openaiKeyRemoved: 'Removed',
-            claudeKeySaved: 'Saved', claudeKeySavedDesc: '', claudeKeyRemoved: 'Removed',
-            googleKeySaved: 'Saved', googleKeySavedDesc: '', googleKeyRemoved: 'Removed',
-            noPoliciesExport: 'No policies', policiesExported: 'Exported', policiesExportedDesc: '{count} exported',
-            pdfGenerated: 'PDF generated', pdfGeneratedDesc: '', allDataCleared: 'Cleared',
-            allDataClearedDesc: '', languageChanged: 'Changed to {name}',
-            removeOpenaiTitle: 'Remove', removeOpenaiDesc: 'Remove?',
-            removeClaudeTitle: 'Remove', removeClaudeDesc: 'Remove?',
-            removeGoogleTitle: 'Remove', removeGoogleDesc: 'Remove?',
-            removeKey: 'Remove Key', save: 'Save', cancel: 'Cancel', edit: 'Edit',
+            title: 'Settings',
+            appearance: 'Appearance',
+            theme: 'Theme',
+            light: 'Light',
+            dark: 'Dark',
+            system: 'System',
+            notifications: 'Notifications',
+            emailNotifications: 'Email Notifications',
+            pushNotifications: 'Push Notifications',
+            renewalReminders: 'Renewal Reminders',
+            marketUpdates: 'Market Updates',
+            language: 'Language',
+            security: 'Security',
+            changePassword: 'Change Password',
+            twoFactor: 'Two-Factor Authentication',
+            aiConfiguration: 'AI Configuration',
+            openaiLabel: 'OpenAI API Key (GPT-4)',
+            claudeLabel: 'Claude API Key (Anthropic)',
+            googleCloudLabel: 'Google Cloud API Key (OCR)',
+            configured: 'Configured',
+            notConfigured: 'Not configured',
+            getKey: 'Get key',
+            openaiDescription: 'Primary AI.',
+            claudeDescription: 'Backup AI.',
+            googleCloudDescription: 'For OCR.',
+            extraction: 'Extraction',
+            consensus: 'Consensus',
+            ocr: 'OCR',
+            on: 'On',
+            off: 'Off',
+            demo: 'Demo',
+            apiKeysPrivacy: 'API keys stored locally.',
+            languageInfo: 'Any language.',
+            dataExport: 'Data & Export',
+            exportCSV: 'Export to Excel (CSV)',
+            exportPDF: 'Export to PDF',
+            exportDescription: 'Export your {count} policies.',
+            storageCloud: 'Cloud',
+            storageLocal: 'Local Browser',
+            storageLabel: 'Storage',
+            clearAllData: 'Clear All Data',
+            accountSection: 'Account',
+            signedIn: 'Signed in',
+            openaiKeySaved: 'Saved',
+            openaiKeySavedDesc: '',
+            openaiKeyRemoved: 'Removed',
+            claudeKeySaved: 'Saved',
+            claudeKeySavedDesc: '',
+            claudeKeyRemoved: 'Removed',
+            googleKeySaved: 'Saved',
+            googleKeySavedDesc: '',
+            googleKeyRemoved: 'Removed',
+            noPoliciesExport: 'No policies',
+            policiesExported: 'Exported',
+            policiesExportedDesc: '{count} exported',
+            pdfGenerated: 'PDF generated',
+            pdfGeneratedDesc: '',
+            allDataCleared: 'Cleared',
+            allDataClearedDesc: '',
+            languageChanged: 'Changed to {name}',
+            removeOpenaiTitle: 'Remove',
+            removeOpenaiDesc: 'Remove?',
+            removeClaudeTitle: 'Remove',
+            removeClaudeDesc: 'Remove?',
+            removeGoogleTitle: 'Remove',
+            removeGoogleDesc: 'Remove?',
+            removeKey: 'Remove Key',
+            save: 'Save',
+            cancel: 'Cancel',
+            edit: 'Edit',
           },
           common: { back: 'Back' },
           nav: { signOut: 'Sign Out' },
@@ -621,9 +669,7 @@ describe('Settings - Clear Data with Confirmation Dialog', () => {
 
     // Confirm button should be disabled initially
     const confirmButtons = screen.getAllByRole('button', { name: /clear all data/i })
-    const dialogConfirmButton = confirmButtons.find(
-      (btn) => btn.closest('[role="dialog"]')
-    )
+    const dialogConfirmButton = confirmButtons.find((btn) => btn.closest('[role="dialog"]'))
     expect(dialogConfirmButton).toBeDisabled()
   })
 
@@ -643,9 +689,7 @@ describe('Settings - Clear Data with Confirmation Dialog', () => {
 
     // Click confirm button in dialog
     const confirmButtons = screen.getAllByRole('button', { name: /clear all data/i })
-    const dialogConfirmButton = confirmButtons.find(
-      (btn) => btn.closest('[role="dialog"]')
-    )
+    const dialogConfirmButton = confirmButtons.find((btn) => btn.closest('[role="dialog"]'))
     if (dialogConfirmButton) {
       await user.click(dialogConfirmButton)
     }
