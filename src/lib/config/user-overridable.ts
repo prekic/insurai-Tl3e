@@ -33,6 +33,7 @@ export function isUserOverridableCategory(category: string): category is UserOve
  */
 export const USER_OVERRIDABLE_KEYS: Record<UserOverridableCategory, string[]> = {
   ui: [
+    'display_currency',
     'toast_success_duration_ms',
     'toast_error_duration_ms',
     'toast_warning_duration_ms',
@@ -68,7 +69,8 @@ export interface PreferenceFieldMeta {
   labelTr: string
   description: string
   descriptionTr: string
-  type: 'number' | 'boolean' | 'array'
+  type: 'number' | 'boolean' | 'array' | 'string'
+  options?: Array<{ value: string; label: string; labelTr: string }>
   min?: number
   max?: number
 }
@@ -78,6 +80,20 @@ export interface PreferenceFieldMeta {
  */
 export const PREFERENCE_FIELDS: Record<UserOverridableCategory, PreferenceFieldMeta[]> = {
   ui: [
+    {
+      key: 'display_currency',
+      label: 'Display currency',
+      labelTr: 'Görüntüleme para birimi',
+      description: 'Currency to display monetary values in',
+      descriptionTr: 'Parasal değerlerin gösterileceği para birimi',
+      type: 'string',
+      options: [
+        { value: 'TRY', label: 'Turkish Lira (₺)', labelTr: 'Türk Lirası (₺)' },
+        { value: 'USD', label: 'US Dollar ($)', labelTr: 'Amerikan Doları ($)' },
+        { value: 'EUR', label: 'Euro (€)', labelTr: 'Euro (€)' },
+        { value: 'GBP', label: 'British Pound (£)', labelTr: 'İngiliz Sterlini (£)' },
+      ],
+    },
     {
       key: 'default_items_per_page',
       label: 'Items per page',

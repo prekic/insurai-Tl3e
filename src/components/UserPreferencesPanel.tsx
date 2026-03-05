@@ -99,9 +99,7 @@ export function UserPreferencesPanel() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">{t.preferences.title}</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {t.preferences.subtitle}
-          </p>
+          <p className="text-sm text-gray-500 mt-1">{t.preferences.subtitle}</p>
         </div>
         <Button onClick={savePreferences} disabled={isSaving || !hasAnyModifications}>
           {isSaving ? (
@@ -260,12 +258,7 @@ function PreferenceField({
       </div>
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        {field.type === 'boolean' && (
-          <BooleanInput
-            value={value as boolean}
-            onChange={onChange}
-          />
-        )}
+        {field.type === 'boolean' && <BooleanInput value={value as boolean} onChange={onChange} />}
 
         {field.type === 'number' && (
           <NumberInput
@@ -276,12 +269,11 @@ function PreferenceField({
           />
         )}
 
-        {field.type === 'array' && (
-          <ArrayInput
-            value={value as number[]}
-            onChange={onChange}
-          />
+        {field.type === 'string' && field.options && (
+          <StringSelectInput value={value as string} options={field.options} onChange={onChange} />
         )}
+
+        {field.type === 'array' && <ArrayInput value={value as number[]} onChange={onChange} />}
 
         {isOverridden && (
           <button
@@ -349,13 +341,32 @@ function NumberInput({
   )
 }
 
-function ArrayInput({
+function StringSelectInput({
   value,
+  options,
   onChange,
 }: {
-  value: number[]
-  onChange: (v: number[]) => void
+  value: string
+  options: NonNullable<PreferenceFieldMeta['options']>
+  onChange: (v: string) => void
 }) {
+  const { locale } = useTranslation()
+  return (
+    <select
+      value={value ?? ''}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-48 rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
+    >
+      {options.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {locale === 'tr' ? opt.labelTr : opt.label}
+        </option>
+      ))}
+    </select>
+  )
+}
+
+function ArrayInput({ value, onChange }: { value: number[]; onChange: (v: number[]) => void }) {
   const { t } = useTranslation()
   const [inputValue, setInputValue] = useState('')
 
@@ -402,7 +413,13 @@ function ArrayInput({
           placeholder={t.preferences.add}
           className="w-16 rounded-md border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
-        <Button variant="outline" size="sm" onClick={handleAdd} disabled={!inputValue} className="h-6 px-2 text-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleAdd}
+          disabled={!inputValue}
+          className="h-6 px-2 text-xs"
+        >
           +
         </Button>
       </div>

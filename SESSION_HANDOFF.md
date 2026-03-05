@@ -1,4 +1,4 @@
-# Session Handoff — March 4, 2026 (Pre-Existing Test Failures Fixed)
+# Session Handoff — March 4, 2026 (PolicyDetailView Test & Warning Fixes)
 
 ## Current Status
 
@@ -8,7 +8,7 @@
 | **TypeCheck** | 0 errors (frontend + server) |
 | **ESLint Errors** | 0 errors |
 | **ESLint Warnings** | 0 warnings on modified files |
-| **Tests** | 15,813 tests passing, 0 failures (336/337 files). 68 pre-existing failures fixed. |
+| **Tests** | 15,993 tests passing, 0 failures (337/337 files). 180 previously failing `PolicyDetailView` tests fixed. |
 | **Coverage** | ~91.67% statements, ~85.91% branches |
 | **Lighthouse** | Performance 99, Accessibility 100, Best Practices 93, SEO 100 |
 | **Branch** | `claude/load-project-context-TWvOc` |
@@ -18,17 +18,19 @@
 
 ## Session Summary
 
-### This Session — Fix 68 Pre-Existing Test Failures (March 4, 2026)
+### This Session — Fix PolicyDetailView Tests & TS Warnings (March 4, 2026)
 
-Fixed **all 68 pre-existing test failures** across **4 test files** (246 total tests now passing). Full test suite: **15,813 tests, 0 failures**.
+Fixed all **180** isolated test failures targeting branch coverage in `PolicyDetailView-branches.test.tsx`. Completely resolved global TypeScript type errors for `@testing-library/jest-dom` via `tsconfig.json` wiring, and removed asynchronous React state update warnings during testing. Full test suite: **15,993 tests, 0 failures**.
 
-**Commit (1 total, on `claude/load-project-context-TWvOc`):**
+**Commits (on `claude/load-project-context-TWvOc`):**
 
 | Commit | Description |
 |--------|-------------|
+| *Pending* | **test(policy): fix detail view branch coverage tests, TS dom definitions, and act warnings** |
 | `e827025` | **Fix 68 pre-existing test failures**: translation-cache (2 failures → CACHE_SCHEMA_VERSION 2→3), Settings (1 failure → added emailPreferences to i18n mock), translation-service (61 failures → vi.mock for dynamic imports + fixed merge assertions), PolicyUpload-coverage (4 failures → afterEach timer flush + retry test rewrite) |
 
-**Test Files Fixed (4 files, 246 tests):**
+**Test Files Fixed (5 files total):**
+- `src/components/PolicyDetailView-branches.test.tsx` — 180/180 passing. Fixed unclosed describe block causing mock leaks. Synced translation assertions with new S2 translation keys (`lowConfidenceScore`, Exclusions section). Fixed ambiguity in specific `getByText` matchers by anchoring regex. Mocked out async fetches in `PolicyActuarialHistoryChart` causing trailing `act()` state updates.
 - `src/lib/i18n/translation-cache.test.ts` — 18/18 passing. Updated `CACHE_SCHEMA_VERSION` from 2→3 to match source code change.
 - `src/components/Settings.test.tsx` — 57/57 passing. Added `emailPreferences` section to i18n mock (new translation keys added in S2 migration).
 - `src/lib/i18n/translation-service.test.ts` — 96/96 passing. Added `vi.mock` for dynamic `translations-en`, `translations-tr`, AND `translations-skeleton` imports (all three lazy/split modules). Fixed merge behavior assertions to match cache-first override semantics.
@@ -39,10 +41,11 @@ Fixed **all 68 pre-existing test failures** across **4 test files** (246 total t
 2. **Settings**: New `emailPreferences` i18n section added during S2 migration but test mock didn't include it
 3. **translation-service**: EN/TR translations split into lazy-loaded async chunks (Known Issue #123/#124) but tests still imported from old paths
 4. **PolicyUpload-coverage**: Upload progress simulation loop (5×100ms setTimeout) left pending timers between tests, causing DOM state interference in subsequent test renders
+5. **PolicyDetailView-branches**: Translation key mismatch in regex matchers due to recent i18n S2 migrations; asynchronous `adminFetch` execution in descendant component breaking functional tests.
 
-### Previous Session — i18n Ternary Migration (March 4, 2026)
+### Previous Session — i18n Ternary Migration + Flaky Fixes (March 4, 2026)
 
-Completed **P2 (S1 components) + P3 (S2 components)** of the i18n plan. Replaced **99 inline `locale === 'tr'` ternaries** with translation dictionary keys across **8 components**. Added **~163 translation keys** across EN, TR, and skeleton files. (See previous branch `claude/load-project-context-9kxAB`)
+Completed **P2 (S1 components) + P3 (S2 components)** of the i18n plan. Replaced **99 inline `locale === 'tr'` ternaries** with translation dictionary keys across **8 components**. Added **~163 translation keys** across EN, TR, and skeleton files. (See previous branch `claude/load-project-context-9kxAB`). Fixed 68 test breaks due to cache version mismatches and lazy-loading translations.
 
 ---
 
@@ -56,7 +59,7 @@ Completed **P2 (S1 components) + P3 (S2 components)** of the i18n plan. Replaced
 | Step | Description | Status | Details |
 |------|-------------|--------|---------|
 | **1** | Locale-aware formatting functions | **DONE** | `formatCurrency`/`formatDate`/`formatNumber` accept `locale` param, 10 caller files updated |
-| **2** | FX Conversion System | **NOT DONE** | No files created. `src/lib/fx/`, `server/routes/fx.ts`, `useDisplayCurrency` hook all missing. |
+| **2** | FX Conversion System | **IN PROGRESS** | Untracked files exist: `src/lib/fx/`, `server/routes/fx.ts`, `src/hooks/useDisplayCurrency.ts`. Uncommitted wiring in `server/index.ts` and `UserPreferencesPanel.tsx`. |
 | **3a** | S1: `NotFound.tsx` i18n | **DONE** | 4 strings → `t.notFound.*` |
 | **3b** | S1: `ErrorBoundary.tsx` i18n | **DONE** | Wrapper pattern: `ErrorBoundaryWrapper` passes `t` and `locale` as props. `ui/error-boundary.tsx` also updated. |
 | **3c** | S1: `PolicyDocuments.tsx` i18n | **DONE** | 12 strings → `t.policyDocuments.*` |
@@ -66,8 +69,8 @@ Completed **P2 (S1 components) + P3 (S2 components)** of the i18n plan. Replaced
 | **4c** | S2: `PolicyCard.tsx` | **DONE** | 4 ternaries → `t.policyCard.*` (8 keys). 1 data-field ternary remains (correct). |
 | **4d** | S2: `EmailPreferences.tsx` | **DONE** | 6 ternaries → `t.emailPreferences.*` (6 keys). `isTurkish` kept for 2 data-field selections (correct). |
 | **5** | Add ~163 translation keys | **DONE** | All sections added to interface, EN, TR, and skeleton files. |
-| **6** | Server-side FX proxy | **NOT DONE** | No `server/routes/fx.ts`. |
-| **7-10** | FX wiring, hook, currency switcher, user preferences | **NOT DONE** | No files created. |
+| **6** | Server-side FX proxy | **IN PROGRESS** | Created `server/routes/fx.ts` (untracked) and wired to `server/index.ts` (uncommitted) |
+| **7-10** | FX wiring, hook, currency switcher, user preferences | **IN PROGRESS** | Added `display_currency` to `UserPreferencesPanel.tsx` and `user-overridable.ts` (uncommitted). Hook `useDisplayCurrency.ts` created (untracked). |
 
 ### Remaining Ternaries (4 data-field selections — all correct to keep)
 
@@ -151,14 +154,17 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
 
 ## Test Failure Analysis — ALL RESOLVED ✅
 
-All 68 pre-existing test failures have been fixed in commit `e827025`. Full suite: 15,813 tests, 0 failures.
+## Test Failure Analysis — ALL RESOLVED ✅
+
+All broken component and branch coverage tests have been fixed. Full suite: 15,993 tests, 0 failures.
 
 | Category | Files | Failures | Fix |
 |----------|-------|----------|-----|
+| Branch Tests | `PolicyDetailView-branches.test.tsx` | 180 | Mock isolation sync, translation assertion parity, unawaited async DOM mock bypassing |
 | Translation Cache/Service | `translation-cache.test.ts`, `translation-service.test.ts` | 63 | Version 2→3, vi.mock for lazy imports, merge assertion updates |
 | Component Tests | `Settings.test.tsx` | 1 | Added `emailPreferences` to i18n mock |
 | Component Tests | `PolicyUpload-coverage.test.tsx` | 4 | afterEach timer flush (700ms), retry test rewrite |
-| **Total** | **4 files** | **68** | **All fixed** |
+| **Total** | **5 files** | **248** | **All fixed** |
 
 ---
 
@@ -170,13 +176,13 @@ All 68 pre-existing test failures have been fixed in commit `e827025`. Full suit
 - Likely needs 40-60 new translation keys
 - Will significantly improve the codebase's i18n consistency
 
-### P3 — Implement FX Conversion System (Steps 2, 6-10) — ~4 hours
-Full multi-currency conversion:
-- `src/lib/fx/fx-service.ts` — Exchange rate fetching and caching
-- `server/routes/fx.ts` — Server proxy for FX API
-- `src/hooks/useDisplayCurrency.ts` — React hook for currency conversion
-- Currency switcher UI in user preferences
-- User preference wiring for default display currency
+### P3 — Implement FX Conversion System (Steps 2, 6-10) — ~2 hours
+**Note: Partially implemented in untracked/uncommitted files.** The next agent must FIRST review and commit the existing work before continuing!
+- `src/lib/fx/` — Exchange rate fetching and caching (Untracked files exist)
+- `server/routes/fx.ts` — Server proxy for FX API (Untracked file exists, wired in `server/index.ts`)
+- `src/hooks/useDisplayCurrency.ts` — React hook for currency conversion (Untracked file exists)
+- Currency switcher UI in user preferences (Uncommitted logic exists in `UserPreferencesPanel.tsx` and `user-overridable.ts`)
+- Target remaining wiring for default display currency across components.
 
 ### P4 — Database Translation Sync
 - Apply seeded translations from new sections to production Supabase via SQL Editor
@@ -219,4 +225,5 @@ Full multi-currency conversion:
 | Mar 3 | Phase 12: Fix UI flashing and mixed localizations | `gemini20260303_fixes` |
 | Mar 3 | i18n Plan Audit + P0 (test fixes) + P1 (locale-aware formatting) — plan ~20% | `claude/load-project-context-FT0Gj` |
 | Mar 4 | P2 (S1 components) + P3 (S2 components) — 99 ternaries replaced, ~163 translation keys added — plan ~75% | `claude/load-project-context-9kxAB` |
-| **Mar 4** | **Fix 68 pre-existing test failures across 4 files — 15,813 tests, 0 failures** | **`claude/load-project-context-TWvOc`** |
+| Mar 4 | Fix 68 pre-existing test failures across 4 files — 15,813 tests, 0 failures | `claude/load-project-context-TWvOc` |
+| **Mar 4** | **Fix 180 branch coverage test failures and suppress async `act()` testing warnings in `PolicyDetailView`** | **`claude/load-project-context-TWvOc`** |

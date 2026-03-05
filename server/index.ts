@@ -25,23 +25,16 @@ import aiRoutes from './routes/ai.js'
 import adminRoutes from './routes/admin/index.js'
 import pdfRoutes from './routes/pdf.js'
 import emailRoutes from './routes/email.js'
+import fxRoutes from './routes/fx.js'
 import settingsRoutes from './routes/settings.js'
 import webhookRoutes from './routes/webhooks.js'
 import driftRoutes from './routes/drift.js'
 import translationRoutes from './routes/translations.js'
 import notificationRoutes from './routes/notifications.js'
 import { configureWebPush } from './services/notification-service.js'
-import {
-  generalLimiter,
-  healthLimiter,
-  rateLimitConfig,
-} from './middleware/rate-limit.js'
+import { generalLimiter, healthLimiter, rateLimitConfig } from './middleware/rate-limit.js'
 import { authenticateAdmin } from './middleware/admin-auth.js'
-import {
-  initServerSentry,
-  setupSentryErrorHandler,
-  captureServerError,
-} from './lib/sentry.js'
+import { initServerSentry, setupSentryErrorHandler, captureServerError } from './lib/sentry.js'
 import logger from './lib/logger.js'
 import { apiMetrics } from './middleware/api-metrics.js'
 import { initializeDefaultAlertRules } from './middleware/monitoring.js'
@@ -176,9 +169,7 @@ app.use(
       reportOnly: false,
     },
     // Additional security headers
-    strictTransportSecurity: IS_PRODUCTION
-      ? { maxAge: 31536000, includeSubDomains: true }
-      : false,
+    strictTransportSecurity: IS_PRODUCTION ? { maxAge: 31536000, includeSubDomains: true } : false,
     crossOriginEmbedderPolicy: false, // Disable for Supabase compatibility
     crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' },
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -190,23 +181,28 @@ if (IS_PRODUCTION) {
   const distPath = path.join(__dirname, '..', 'dist')
 
   // Hashed assets (/assets/*) — cache aggressively (1 year), filenames change on each build
-  app.use('/assets', express.static(path.join(distPath, 'assets'), {
-    maxAge: '365d',
-    immutable: true,
-    etag: false,
-  }))
+  app.use(
+    '/assets',
+    express.static(path.join(distPath, 'assets'), {
+      maxAge: '365d',
+      immutable: true,
+      etag: false,
+    })
+  )
 
   // Non-hashed files (index.html, sw.js, manifest.json, icons) — never cache
   // index.html must always be fresh because it references hashed chunk filenames
-  app.use(express.static(distPath, {
-    maxAge: 0,
-    etag: true,
-    setHeaders: (res, filePath) => {
-      if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
-        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
-      }
-    },
-  }))
+  app.use(
+    express.static(distPath, {
+      maxAge: 0,
+      etag: true,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html') || filePath.endsWith('sw.js')) {
+          res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+        }
+      },
+    })
+  )
 }
 
 // CORS configuration
@@ -343,6 +339,9 @@ app.use('/api/admin/drift', authenticateAdmin, driftRoutes)
 // PDF extraction routes (with longer timeout for large files)
 app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)
 
+// FX (Currency conversion) routes
+app.use('/api/fx', fxRoutes)
+
 // Email notification routes
 app.use('/api/email', emailRoutes)
 
@@ -406,11 +405,15 @@ const missingEnv = Object.entries(REQUIRED_ENV)
   .map(([key]) => key)
 
 if (missingEnv.length > 0) {
-  log.warn(`Missing environment variables: ${missingEnv.join(', ')} — some features will be unavailable`)
+  log.warn(
+    `Missing environment variables: ${missingEnv.join(', ')} — some features will be unavailable`
+  )
 }
 
 if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-  log.warn('No AI provider configured (OPENAI_API_KEY or ANTHROPIC_API_KEY) — extraction will not work')
+  log.warn(
+    'No AI provider configured (OPENAI_API_KEY or ANTHROPIC_API_KEY) — extraction will not work'
+  )
 }
 
 // Configure Web Push VAPID for browser push notifications
@@ -477,7 +480,9 @@ async function gracefulShutdown(signal: string): Promise<void> {
 
   // Set a timeout for graceful shutdown
   const shutdownTimeout = setTimeout(() => {
-    log.error('Graceful shutdown timed out, forcing exit', { timeoutMs: SERVER_CONFIG.SHUTDOWN_TIMEOUT })
+    log.error('Graceful shutdown timed out, forcing exit', {
+      timeoutMs: SERVER_CONFIG.SHUTDOWN_TIMEOUT,
+    })
     // Force close remaining connections
     activeConnections.forEach((socket) => {
       socket.destroy()

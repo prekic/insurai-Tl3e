@@ -44,6 +44,19 @@ export interface TranslationDictionary {
     userMenu: string
   }
 
+  // Global (used across many components)
+  global: {
+    unlimited: string
+    marketValue: string
+    included: string
+    unspecified: string
+    critical: string
+    important: string
+    standard: string
+    info: string
+    none: string
+  }
+
   // Common UI
   common: {
     loading: string
@@ -64,12 +77,17 @@ export interface TranslationDictionary {
     no: string
     all: string
     none: string
-    search: string
     filter: string
     sort: string
     more: string
     less: string
+    showLess: string
     actions: string
+    share: string
+    shareFailed: string
+    linkCopied: string
+    copy: string
+    copied: string
   }
 
   // Landing Page
@@ -354,6 +372,98 @@ export interface TranslationDictionary {
     confidence: string
     new: string
     duplicate: string
+
+    // Policy Detail View specific
+    criticalCoverage: string
+    paidByMarketValue: string
+    noUpperLimit: string
+    showFullText: string
+    textStats: string
+    policySummary: string
+    keyFeatures: string
+    advantages: string
+    disadvantages: string
+    policyEvaluation: string
+    overallScore: string
+    scoreBreakdown: string
+    coverageQuality: string
+    priceValue: string
+    reliability: string
+    recommendations: string
+    highPriority: string
+    mediumPriority: string
+    actuarialInsights: string
+    betaFeature: string
+    marketComparison: string
+    percentile: string
+    expectedOutOfPocket: string
+    premiumLabel: string
+    expectedUncoveredLoss: string
+    contractQualityScore: string
+    partsStandard: string
+    repairNetwork: string
+    additionalCoverageLimited: string
+    exclusionsTitle: string
+    exclusionsDescription: string
+    examples: string
+    askInsurer: string
+    askInsurerDesc: string
+    clarifyWithInsurer: string
+    notSpecifiedInPolicy: string
+    rawText: string
+    documentText: string
+    processed: string
+    raw: string
+    noDeductible: string
+    hasDeductible: string
+    aboveAverage: string
+    belowAverage: string
+    marketPercentile: string
+    aiInsightsTitle: string
+    confidenceLabel: string
+    yourPremium: string
+    marketAvg: string
+    activeStatus: string
+    aiInsightsTitleExport: string
+    clickToViewDetails: string
+    copied: string
+    copy: string
+    coverageLabel: string
+    coveragesTitleExport: string
+    dates: {
+      start: string
+      end: string
+    }
+    deductibleLabel: string
+    endDate: string
+    exclusionsAndQuestions: string
+    exclusionsDesc: string
+    exclusionsTitleExport: string
+    expiringSoonStatus: string
+    freeTrialResult: string
+    goBack: string
+    goToDashboard: string
+    linkCopied: string
+    lowConfidenceScore: string
+    make: string
+    marketValueHelp: string
+    model: string
+    modelYear: string
+    moreInsights: string
+    moreRecommendations: string
+    notSpecified: string
+    policyNotFound: string
+    policyNotFoundDesc: string
+    policyNumberLabel: string
+    share: string
+    shareFailed: string
+    showLess: string
+    signUpAndSave: string
+    usageType: string
+    vehicleClass: string
+    vehicleInfoTitle: string
+    vehicleMarketValue: string
+    verifyImportantFields: string
   }
 
   // Export Menu (PolicyDetailView)

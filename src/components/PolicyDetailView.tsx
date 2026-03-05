@@ -64,31 +64,31 @@ import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryC
  * Format coverage limit with special handling for unlimited and market value
  * Uses kasko knowledge hub for intelligent detection
  */
-function formatCoverageLimit(coverage: Coverage, locale: string): string {
+function formatCoverageLimit(coverage: Coverage, locale: string, t: any): string {
   // Explicit flags take priority
   if (coverage.isUnlimited) {
-    return locale === 'tr' ? 'Sınırsız' : 'Unlimited'
+    return t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited')
   }
   if (coverage.isMarketValue) {
-    return locale === 'tr' ? 'Rayiç Değer' : 'Market Value'
+    return t.global?.marketValue || (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
   }
 
   // Use kasko knowledge hub for intelligent detection
   if (shouldShowUnlimited(coverage.name, coverage.limit)) {
-    return locale === 'tr' ? 'Sınırsız' : 'Unlimited'
+    return t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited')
   }
   if (shouldShowIncluded(coverage.name, coverage.limit)) {
-    return locale === 'tr' ? 'Dahil' : 'Included'
+    return t.global?.included || (locale === 'tr' ? 'Dahil' : 'Included')
   }
 
   // Legacy fallback checks
   if (coverage.limit === 0) {
     const nameLower = coverage.name.toLowerCase()
     if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
-      return locale === 'tr' ? 'Sınırsız' : 'Unlimited'
+      return t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited')
     }
     if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
-      return locale === 'tr' ? 'Rayiç Değer' : 'Market Value'
+      return t.global?.marketValue || (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
     }
     // Services without numeric limits
     if (
@@ -97,9 +97,9 @@ function formatCoverageLimit(coverage: Coverage, locale: string): string {
       nameLower.includes('ikame') ||
       nameLower.includes('onarım')
     ) {
-      return locale === 'tr' ? 'Dahil' : 'Included'
+      return t.global?.included || (locale === 'tr' ? 'Dahil' : 'Included')
     }
-    return locale === 'tr' ? 'Dahil' : 'Included' // Default to "Dahil" instead of ₺0 for zero-limit coverages
+    return t.global?.included || (locale === 'tr' ? 'Dahil' : 'Included') // Default to "Dahil" instead of ₺0 for zero-limit coverages
   }
   return formatCurrency(coverage.limit, 'TRY', locale)
 }
@@ -144,15 +144,20 @@ function getCategoryInfo(category: CoverageCategory) {
 /**
  * Get additional info text for a coverage item
  */
-function getCoverageInfoText(coverage: Coverage, locale: string): string | null {
+function getCoverageInfoText(coverage: Coverage, locale: string, t: any): string | null {
   const parts: string[] = []
 
   // Add deductible info if applicable
   if (coverage.deductible && coverage.deductible > 0) {
     parts.push(
-      locale === 'tr'
-        ? `Muafiyet: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
-        : `Deductible: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
+      t.policy?.coverageDeductible
+        ? t.policy.coverageDeductible.replace(
+            '{amount}',
+            formatCurrency(coverage.deductible, 'TRY', locale)
+          )
+        : locale === 'tr'
+          ? `Muafiyet: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
+          : `Deductible: ${formatCurrency(coverage.deductible, 'TRY', locale)}`
     )
   }
 
@@ -163,20 +168,25 @@ function getCoverageInfoText(coverage: Coverage, locale: string): string | null 
 
   // Add importance info
   if (coverage.importance === 'critical') {
-    parts.push(locale === 'tr' ? '⚠️ Kritik teminat' : '⚠️ Critical coverage')
+    parts.push(
+      t.policy?.criticalCoverage || (locale === 'tr' ? '⚠️ Kritik teminat' : '⚠️ Critical coverage')
+    )
   }
 
   // Add info about special values
   if (coverage.isMarketValue) {
     parts.push(
-      locale === 'tr'
-        ? 'Hasar anındaki piyasa değeri üzerinden ödenir'
-        : 'Paid based on market value at time of loss'
+      t.policy?.paidByMarketValue ||
+        (locale === 'tr'
+          ? 'Hasar anındaki piyasa değeri üzerinden ödenir'
+          : 'Paid based on market value at time of loss')
     )
   }
 
   if (coverage.isUnlimited) {
-    parts.push(locale === 'tr' ? 'Limit üst sınırı yoktur' : 'No upper limit')
+    parts.push(
+      t.policy?.noUpperLimit || (locale === 'tr' ? 'Limit üst sınırı yoktur' : 'No upper limit')
+    )
   }
 
   return parts.length > 0 ? parts.join(' • ') : null
@@ -281,6 +291,7 @@ function CollapsibleCoverageCategory({
   CategoryIcon,
   coverages,
   locale,
+  t,
   coverageNames,
   defaultExpanded = false,
 }: {
@@ -290,6 +301,7 @@ function CollapsibleCoverageCategory({
   CategoryIcon: React.ElementType
   coverages: GroupedCoverage[]
   locale: string
+  t: any
   defaultExpanded?: boolean
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
@@ -346,9 +358,7 @@ function CollapsibleCoverageCategory({
                         className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
                       >
                         {subLimit.isUnlimited
-                          ? locale === 'tr'
-                            ? 'Sınırsız'
-                            : 'Unlimited'
+                          ? t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited')
                           : formatCurrency(subLimit.limit, 'TRY', locale)}
                       </span>
                     </div>
@@ -360,14 +370,17 @@ function CollapsibleCoverageCategory({
 
           // Regular coverage - with click-to-expand info
           const coverage = groupedCoverage as unknown as Coverage
-          const limitDisplay = formatCoverageLimit(coverage, locale)
+          // Pass t in here eventually but we need to pipe it from CoveragesByCategory
+          const limitDisplay = formatCoverageLimit(coverage, locale, t)
           const isSpecialValue =
             coverage.isUnlimited ||
             coverage.isMarketValue ||
-            limitDisplay === (locale === 'tr' ? 'Dahil' : 'Included') ||
-            limitDisplay === (locale === 'tr' ? 'Sınırsız' : 'Unlimited') ||
-            limitDisplay === (locale === 'tr' ? 'Rayiç Değer' : 'Market Value')
-          const infoText = getCoverageInfoText(coverage, locale)
+            limitDisplay === (t.global?.included || (locale === 'tr' ? 'Dahil' : 'Included')) ||
+            limitDisplay ===
+              (t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited')) ||
+            limitDisplay ===
+              (t.global?.marketValue || (locale === 'tr' ? 'Rayiç Değer' : 'Market Value'))
+          const infoText = getCoverageInfoText(coverage, locale, t)
           const isCoverageExpanded = expandedCoverageIndex === i
           const hasInfo = !!infoText
 
@@ -568,6 +581,7 @@ function CoveragesByCategory({
             CategoryIcon={CategoryIcon}
             coverages={categoryCoverages}
             locale={locale}
+            t={t}
             coverageNames={t.coverageNames}
             defaultExpanded={index === 0} // First category expanded by default
           />
@@ -593,6 +607,8 @@ function ExclusionsSection({
   locale: string
 }) {
   const [expandedExclusion, setExpandedExclusion] = useState<number | null>(null)
+
+  const { t } = useTranslation()
 
   // Analyze exclusions comprehensively
   const analysis = useMemo(
@@ -640,13 +656,13 @@ function ExclusionsSection({
   const getSeverityLabel = (severity: AnalyzedExclusion['severity']) => {
     switch (severity) {
       case 'critical':
-        return locale === 'tr' ? 'Kritik' : 'Critical'
+        return t.global?.critical || (locale === 'tr' ? 'Kritik' : 'Critical')
       case 'important':
-        return locale === 'tr' ? 'Önemli' : 'Important'
+        return t.global?.important || (locale === 'tr' ? 'Önemli' : 'Important')
       case 'standard':
-        return locale === 'tr' ? 'Standart' : 'Standard'
+        return t.global?.standard || (locale === 'tr' ? 'Standart' : 'Standard')
       default:
-        return locale === 'tr' ? 'Bilgi' : 'Info'
+        return t.global?.info || (locale === 'tr' ? 'Bilgi' : 'Info')
     }
   }
 
@@ -658,7 +674,8 @@ function ExclusionsSection({
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <ShieldCheck className="text-green-600" size={18} />
-              {locale === 'tr' ? 'Ek Teminatlar (Limitli)' : 'Additional Coverage (Limited)'}
+              {t.policy?.additionalCoverageLimited ||
+                (locale === 'tr' ? 'Ek Teminatlar (Limitli)' : 'Additional Coverage (Limited)')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -689,12 +706,14 @@ function ExclusionsSection({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <AlertTriangle className="text-amber-500" size={20} />
-            {locale === 'tr' ? 'İstisnalar (Kapsam Dışı)' : 'Exclusions'}
+            {t.policy?.exclusionsTitle ||
+              (locale === 'tr' ? 'İstisnalar (Kapsam Dışı)' : 'Exclusions')}
           </CardTitle>
           <p className="text-sm text-gray-500 mt-1">
-            {locale === 'tr'
-              ? 'Bu durumlar sigorta kapsamı dışındadır. Detaylı açıklama için tıklayın.'
-              : 'These situations are not covered. Click for detailed explanation.'}
+            {t.policy?.exclusionsDescription ||
+              (locale === 'tr'
+                ? 'Bu durumlar sigorta kapsamı dışındadır. Detaylı açıklama için tıklayın.'
+                : 'These situations are not covered. Click for detailed explanation.')}
           </p>
         </CardHeader>
         <CardContent>
@@ -734,12 +753,15 @@ function ExclusionsSection({
                           <div className="mt-3 p-3 bg-white/70 rounded-md border border-gray-200">
                             <p className="text-sm text-gray-700 mb-2">
                               <Info className="inline mr-1 text-blue-500" size={14} />
-                              {locale === 'tr' ? exclusion.explanation : exclusion.explanationEn}
+                              {locale === 'tr'
+                                ? exclusion.explanation
+                                : exclusion.explanationEn || exclusion.explanation}
                             </p>
                             {exclusion.examples && exclusion.examples.length > 0 && (
                               <div className="mt-2">
                                 <p className="text-xs font-medium text-gray-500 mb-1">
-                                  {locale === 'tr' ? 'Örnekler:' : 'Examples:'}
+                                  {t.policy?.examples ||
+                                    (locale === 'tr' ? 'Örnekler:' : 'Examples:')}
                                 </p>
                                 <ul className="text-xs text-gray-600 space-y-1">
                                   {exclusion.examples.map((ex, j) => (
@@ -770,12 +792,13 @@ function ExclusionsSection({
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base text-blue-900">
               <HelpCircle className="text-blue-600" size={18} />
-              {locale === 'tr' ? 'Sigortanıza Sorun' : 'Ask Your Insurer'}
+              {t.policy?.askInsurer || (locale === 'tr' ? 'Sigortanıza Sorun' : 'Ask Your Insurer')}
             </CardTitle>
             <p className="text-sm text-blue-700 mt-1">
-              {locale === 'tr'
-                ? 'Bu konuları sigorta şirketinizle netleştirmenizi öneririz.'
-                : 'We recommend clarifying these points with your insurance company.'}
+              {t.policy?.clarifyWithInsurer ||
+                (locale === 'tr'
+                  ? 'Bu konuları sigorta şirketinizle netleştirmenizi öneririz.'
+                  : 'We recommend clarifying these points with your insurance company.')}
             </p>
           </CardHeader>
           <CardContent>
@@ -789,7 +812,7 @@ function ExclusionsSection({
                   <p className="text-sm font-medium text-gray-800 mb-1">{item.item}</p>
                   <p className="text-sm text-blue-700 flex items-center gap-1">
                     <HelpCircle size={12} />
-                    {locale === 'tr' ? item.question : item.questionEn}
+                    {locale === 'tr' ? item.question : item.questionEn || item.question}
                   </p>
                 </div>
               ))}
@@ -805,7 +828,8 @@ function ExclusionsSection({
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-gray-800">{item.name}</span>
                       <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
-                        {locale === 'tr' ? 'Poliçede belirtilmemiş' : 'Not specified'}
+                        {t.policy?.notSpecifiedInPolicy ||
+                          (locale === 'tr' ? 'Poliçede belirtilmemiş' : 'Not specified')}
                       </Badge>
                     </div>
                     <p className="text-sm text-blue-700 flex items-center gap-1">
@@ -836,13 +860,15 @@ function RawExtractedTextSection({
   processedText?: string
   locale: string
 }) {
-  const [isExpanded, setIsExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
+
+  const { t } = useTranslation()
 
   // Use processed text by default if available, otherwise fall back to raw
   const hasProcessedText = processedText && processedText !== extractedText
   const displayText = showRaw || !processedText ? extractedText : processedText
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const handleCopy = async () => {
     try {
@@ -878,13 +904,9 @@ function RawExtractedTextSection({
           <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
             <FileText className="text-gray-600 flex-shrink-0" size={18} />
             <span className="truncate">
-              {locale === 'tr'
-                ? showRaw
-                  ? 'Ham Metin'
-                  : 'Poliçe Metni'
-                : showRaw
-                  ? 'Raw Text'
-                  : 'Document'}
+              {showRaw
+                ? t.policy?.rawText || (locale === 'tr' ? 'Ham Metin' : 'Raw Text')
+                : t.policy?.documentText || (locale === 'tr' ? 'Poliçe Metni' : 'Document')}
             </span>
             {!showRaw && hasProcessedText && (
               <Badge variant="success" className="text-xs flex-shrink-0">
@@ -903,12 +925,8 @@ function RawExtractedTextSection({
                 {showRaw ? <Sparkles size={12} /> : <Code size={12} />}
                 <span className="hidden sm:inline">
                   {showRaw
-                    ? locale === 'tr'
-                      ? 'İşlenmiş'
-                      : 'Processed'
-                    : locale === 'tr'
-                      ? 'Ham'
-                      : 'Raw'}
+                    ? t.policy?.processed || (locale === 'tr' ? 'İşlenmiş' : 'Processed')
+                    : t.policy?.raw || (locale === 'tr' ? 'Ham' : 'Raw')}
                 </span>
               </Button>
             )}
@@ -921,12 +939,8 @@ function RawExtractedTextSection({
               {copied ? <CheckCircle className="text-green-600" size={14} /> : <Copy size={14} />}
               <span className="hidden sm:inline">
                 {copied
-                  ? locale === 'tr'
-                    ? 'Kopyalandı'
-                    : 'Copied'
-                  : locale === 'tr'
-                    ? 'Kopyala'
-                    : 'Copy'}
+                  ? t.common?.copied || (locale === 'tr' ? 'Kopyalandı' : 'Copied')
+                  : t.common?.copy || (locale === 'tr' ? 'Kopyala' : 'Copy')}
               </span>
             </Button>
             <Button
@@ -938,20 +952,20 @@ function RawExtractedTextSection({
               {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
               <span className="hidden sm:inline">
                 {isExpanded
-                  ? locale === 'tr'
-                    ? 'Küçült'
-                    : 'Less'
-                  : locale === 'tr'
-                    ? 'Genişlet'
-                    : 'More'}
+                  ? t.common?.less || (locale === 'tr' ? 'Küçült' : 'Less')
+                  : t.common?.more || (locale === 'tr' ? 'Genişlet' : 'More')}
               </span>
             </Button>
           </div>
         </div>
         <p className="text-xs sm:text-sm text-gray-500 mt-2">
-          {locale === 'tr'
-            ? `${lineCount} satır • ${wordCount.toLocaleString()} kelime`
-            : `${lineCount} lines • ${wordCount.toLocaleString()} words`}
+          {t.policy?.textStats
+            ? t.policy.textStats
+                .replace('{lines}', lineCount.toString())
+                .replace('{words}', wordCount.toLocaleString())
+            : locale === 'tr'
+              ? `${lineCount} satır • ${wordCount.toLocaleString()} kelime`
+              : `${lineCount} lines • ${wordCount.toLocaleString()} words`}
         </p>
       </CardHeader>
       <CardContent>
@@ -972,9 +986,11 @@ function RawExtractedTextSection({
             className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
           >
             <ChevronDown size={14} />
-            {locale === 'tr'
-              ? `Tamamını göster (${(charCount - 500).toLocaleString()} karakter daha)`
-              : `Show full text (${(charCount - 500).toLocaleString()} more chars)`}
+            {t.policy?.showFullText
+              ? t.policy.showFullText.replace('{chars}', (charCount - 500).toLocaleString())
+              : locale === 'tr'
+                ? `Tamamını göster (${(charCount - 500).toLocaleString()} karakter daha)`
+                : `Show full text (${(charCount - 500).toLocaleString()} more chars)`}
           </button>
         )}
       </CardContent>
@@ -1122,25 +1138,25 @@ export function PolicyDetailView() {
     if (!policy) return
     setExportMenuOpen(false)
     const summary = [
-      `${locale === 'tr' ? 'Poliçe' : 'Policy'}: ${policy.policyNumber}`,
-      `${locale === 'tr' ? 'Şirket' : 'Provider'}: ${getShortCompanyName(policy.provider)}`,
-      `${locale === 'tr' ? 'Tür' : 'Type'}: ${policy.typeTr}`,
-      `${locale === 'tr' ? 'Sigortalı' : 'Insured'}: ${policy.insuredPerson}`,
-      `${locale === 'tr' ? 'Teminat' : 'Coverage'}: ${policy.type === 'kasko' ? (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Vehicle Market Value') : formatCurrency(policy.coverage, 'TRY', locale)}`,
-      `${locale === 'tr' ? 'Prim' : 'Premium'}: ${formatCurrency(policy.premium, 'TRY', locale)}`,
-      `${locale === 'tr' ? 'Muafiyet' : 'Deductible'}: ${formatCurrency(policy.deductible, 'TRY', locale)}`,
-      `${locale === 'tr' ? 'Dönem' : 'Period'}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
+      `${t.policy?.policy || (locale === 'tr' ? 'Poliçe' : 'Policy')}: ${policy.policyNumber}`,
+      `${t.policy?.provider || (locale === 'tr' ? 'Şirket' : 'Provider')}: ${getShortCompanyName(policy.provider)}`,
+      `${t.policy?.type || (locale === 'tr' ? 'Tür' : 'Type')}: ${policy.typeTr}`,
+      `${t.policy?.insured || (locale === 'tr' ? 'Sigortalı' : 'Insured')}: ${policy.insuredPerson}`,
+      `${t.policy?.coverageLabel || (locale === 'tr' ? 'Teminat' : 'Coverage')}: ${policy.type === 'kasko' ? t.policy?.vehicleMarketValue || (locale === 'tr' ? 'Araç Rayiç Bedeli' : 'Vehicle Market Value') : formatCurrency(policy.coverage, 'TRY', locale)}`,
+      `${t.policy?.premiumLabel || (locale === 'tr' ? 'Prim' : 'Premium')}: ${formatCurrency(policy.premium, 'TRY', locale)}`,
+      `${t.policy?.deductibleLabel || (locale === 'tr' ? 'Muafiyet' : 'Deductible')}: ${formatCurrency(policy.deductible, 'TRY', locale)}`,
+      `${t.policy?.period || (locale === 'tr' ? 'Dönem' : 'Period')}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
-      `=== ${locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES'} ===`,
+      `=== ${t.policy?.coveragesTitleExport || (locale === 'tr' ? 'TEMİNATLAR' : 'COVERAGES')} ===`,
       ...policy.coverages.map(
         (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit, 'TRY', locale)}`
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? t.global?.unlimited || (locale === 'tr' ? 'Sınırsız' : 'Unlimited') : formatCurrency(c.limit, 'TRY', locale)}`
       ),
       '',
-      `=== ${locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS'} ===`,
+      `=== ${t.policy?.exclusionsTitleExport || (locale === 'tr' ? 'İSTİSNALAR' : 'EXCLUSIONS')} ===`,
       ...policy.exclusions.map((e) => `• ${e}`),
       '',
-      `=== ${locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS'} ===`,
+      `=== ${t.policy?.aiInsightsTitleExport || (locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI INSIGHTS')} ===`,
       ...policy.aiInsights.map(
         (_, i) => `• ${getLocalizedInsight(policy, i, locale, t.insightTranslations)}`
       ),
@@ -1175,15 +1191,18 @@ export function PolicyDetailView() {
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found'}
+            {t.policy?.policyNotFound ||
+              (locale === 'tr' ? 'Poliçe bulunamadı' : 'Policy not found')}
           </h2>
           <p className="text-gray-600 mb-4">
-            {locale === 'tr'
-              ? 'Aradığınız poliçe mevcut değil.'
-              : "The policy you're looking for doesn't exist."}
+            {t.policy?.policyNotFoundDesc ||
+              (locale === 'tr'
+                ? 'Aradığınız poliçe mevcut değil.'
+                : "The policy you're looking for doesn't exist.")}
           </p>
           <Button onClick={() => navigate('/dashboard')}>
-            {locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard'}
+            {t.policy?.goToDashboard ||
+              (locale === 'tr' ? 'Kontrol Paneline Git' : 'Go to Dashboard')}
           </Button>
         </div>
       </div>
@@ -1200,7 +1219,8 @@ export function PolicyDetailView() {
             <div className="flex items-center gap-2">
               <Sparkles size={18} />
               <span className="text-sm font-medium">
-                {locale === 'tr' ? 'Ücretsiz Analiz Sonucu' : 'Free Trial Result'}
+                {t.policy?.freeTrialResult ||
+                  (locale === 'tr' ? 'Ücretsiz Analiz Sonucu' : 'Free Trial Result')}
               </span>
             </div>
             <Button
@@ -1209,7 +1229,8 @@ export function PolicyDetailView() {
               className="bg-white text-blue-600 hover:bg-blue-50"
               onClick={() => navigate('/auth?mode=signup')}
             >
-              {locale === 'tr' ? 'Kayıt Ol ve Kaydet' : 'Sign Up & Save'}
+              {t.policy?.signUpAndSave ||
+                (locale === 'tr' ? 'Kayıt Ol ve Kaydet' : 'Sign Up & Save')}
             </Button>
           </div>
         </div>
@@ -1220,14 +1241,20 @@ export function PolicyDetailView() {
             <AlertTriangle size={18} className="text-amber-600 flex-shrink-0" />
             <div className="flex-1">
               <span className="text-sm font-medium text-amber-800">
-                {locale === 'tr'
-                  ? `Düşük güven skoru (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Bazı veriler hatalı olabilir`
-                  : `Low confidence extraction (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Some data may be inaccurate`}
+                {t.policy?.lowConfidenceScore
+                  ? t.policy.lowConfidenceScore.replace(
+                      '{score}',
+                      (confidenceScore ? Math.round(confidenceScore * 100) : '?').toString()
+                    )
+                  : locale === 'tr'
+                    ? `Düşük güven skoru (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Bazı veriler hatalı olabilir`
+                    : `Low confidence extraction (${confidenceScore ? Math.round(confidenceScore * 100) : '?'}%) — Some data may be inaccurate`}
               </span>
               <span className="text-xs text-amber-600 ml-2">
-                {locale === 'tr'
-                  ? 'Lütfen önemli alanları doğrulayın.'
-                  : 'Please verify important fields.'}
+                {t.policy?.verifyImportantFields ||
+                  (locale === 'tr'
+                    ? 'Lütfen önemli alanları doğrulayın.'
+                    : 'Please verify important fields.')}
               </span>
             </div>
           </div>
@@ -1241,7 +1268,7 @@ export function PolicyDetailView() {
             <button
               onClick={() => (isTrialResult ? navigate('/') : navigate(-1))}
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-              aria-label={locale === 'tr' ? 'Geri' : 'Go back'}
+              aria-label={t.common?.back || (locale === 'tr' ? 'Geri' : 'Go back')}
             >
               <ArrowLeft size={18} className="sm:w-5 sm:h-5" />
             </button>
@@ -1287,16 +1314,22 @@ export function PolicyDetailView() {
                       })
                     } else {
                       await navigator.clipboard.writeText(shareUrl)
-                      toast.success(locale === 'tr' ? 'Bağlantı kopyalandı' : 'Link copied')
+                      toast.success(
+                        t.common?.linkCopied ||
+                          (locale === 'tr' ? 'Bağlantı kopyalandı' : 'Link copied')
+                      )
                     }
                   } catch (err) {
                     if ((err as Error).name !== 'AbortError') {
-                      toast.error(locale === 'tr' ? 'Paylaşım başarısız' : 'Share failed')
+                      toast.error(
+                        t.common?.shareFailed ||
+                          (locale === 'tr' ? 'Paylaşım başarısız' : 'Share failed')
+                      )
                     }
                   }
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                aria-label={locale === 'tr' ? 'Paylaş' : 'Share'}
+                aria-label={t.common?.share || (locale === 'tr' ? 'Paylaş' : 'Share')}
               >
                 <Share2 size={18} className="text-gray-600" />
               </button>
@@ -1395,7 +1428,8 @@ export function PolicyDetailView() {
                   <span className="flex items-center gap-2 text-sm sm:text-base font-semibold text-gray-800 truncate">
                     <Shield className="text-blue-600 flex-shrink-0" size={16} />
                     <span className="truncate">
-                      {locale === 'tr' ? 'Poliçe Özeti' : 'Policy Summary'}
+                      {t.policy?.policySummary ||
+                        (locale === 'tr' ? 'Poliçe Özeti' : 'Policy Summary')}
                     </span>
                   </span>
                   <Badge
@@ -1403,12 +1437,9 @@ export function PolicyDetailView() {
                     className="text-xs flex-shrink-0"
                   >
                     {policy.status === 'active'
-                      ? locale === 'tr'
-                        ? 'Aktif'
-                        : 'Active'
-                      : locale === 'tr'
-                        ? 'Bitiyor'
-                        : 'Expiring Soon'}
+                      ? t.policy?.activeStatus || (locale === 'tr' ? 'Aktif' : 'Active')
+                      : t.policy?.expiringSoonStatus ||
+                        (locale === 'tr' ? 'Bitiyor' : 'Expiring Soon')}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -1418,7 +1449,7 @@ export function PolicyDetailView() {
                   {/* Coverage - stacked vertically to prevent overflow */}
                   <div className="col-span-2 p-2.5 sm:p-3 bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
                     <p className="text-xs text-blue-600 font-medium mb-1">
-                      {locale === 'tr' ? 'Teminat' : 'Coverage'}
+                      {t.policy?.coverageLabel || (locale === 'tr' ? 'Teminat' : 'Coverage')}
                     </p>
                     <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
                       {policy.type === 'kasko'
@@ -1429,9 +1460,10 @@ export function PolicyDetailView() {
                     </p>
                     {policy.type === 'kasko' && (
                       <p className="text-[10px] text-blue-500 mt-0.5">
-                        {locale === 'tr'
-                          ? 'Hasar anındaki piyasa değeri'
-                          : 'Market value at the time of loss'}
+                        {t.policy?.marketValueHelp ||
+                          (locale === 'tr'
+                            ? 'Hasar anındaki piyasa değeri'
+                            : 'Market value at the time of loss')}
                       </p>
                     )}
                   </div>
@@ -1439,33 +1471,30 @@ export function PolicyDetailView() {
                   {/* Premium & Deductible row */}
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {locale === 'tr' ? 'Prim' : 'Premium'}
+                      {t.policy?.premiumLabel || (locale === 'tr' ? 'Prim' : 'Premium')}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {policy.premium > 0
                         ? formatCurrency(policy.premium, 'TRY', locale)
-                        : locale === 'tr'
-                          ? 'Belirtilmemiş'
-                          : 'Not specified'}
+                        : t.policy?.notSpecified ||
+                          (locale === 'tr' ? 'Belirtilmemiş' : 'Not specified')}
                     </p>
                   </div>
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {locale === 'tr' ? 'Muafiyet' : 'Deductible'}
+                      {t.policy?.deductibleLabel || (locale === 'tr' ? 'Muafiyet' : 'Deductible')}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {policy.deductible > 0
                         ? formatCurrency(policy.deductible, 'TRY', locale)
-                        : locale === 'tr'
-                          ? 'Yok'
-                          : 'None'}
+                        : t.global?.none || (locale === 'tr' ? 'Yok' : 'None')}
                     </p>
                   </div>
 
                   {/* Insured - full width for long names */}
                   <div className="col-span-2 p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {locale === 'tr' ? 'Sigortalı' : 'Insured'}
+                      {t.policy?.insured || (locale === 'tr' ? 'Sigortalı' : 'Insured')}
                     </p>
                     <p
                       className="text-sm font-semibold text-gray-900 truncate"
@@ -1478,7 +1507,7 @@ export function PolicyDetailView() {
                   {/* Policy number */}
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                      {locale === 'tr' ? 'Poliçe No' : 'Policy No'}
+                      {t.policy?.policyNumberLabel || (locale === 'tr' ? 'Poliçe No' : 'Policy No')}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
                       {policy.policyNumber}
@@ -1486,10 +1515,21 @@ export function PolicyDetailView() {
                   </div>
 
                   {/* Location for non-vehicle policies */}
+                  {(() => {
+                    if (policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location) {
+                      console.log(
+                        'Rendering Location block. type:',
+                        policy.type,
+                        'location:',
+                        policy.location
+                      )
+                    }
+                    return null
+                  })()}
                   {policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location && (
                     <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                       <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
-                        {locale === 'tr' ? 'Konum' : 'Location'}
+                        {t.policy?.location || (locale === 'tr' ? 'Konum' : 'Location')}
                       </p>
                       <p className="text-sm font-semibold text-gray-900 truncate">
                         {policy.location}
@@ -1502,14 +1542,16 @@ export function PolicyDetailView() {
                 <div className="grid grid-cols-2 gap-2 mt-2.5 pt-2.5 border-t text-xs text-gray-500">
                   <div className="truncate">
                     <span className="text-gray-400">
-                      {locale === 'tr' ? 'Başlangıç:' : 'Start:'}
+                      {t.policy?.dates?.start || (locale === 'tr' ? 'Başlangıç:' : 'Start:')}
                     </span>{' '}
                     <span className="font-medium text-gray-700">
                       {formatDate(policy.startDate, locale)}
                     </span>
                   </div>
                   <div className="truncate text-right">
-                    <span className="text-gray-400">{locale === 'tr' ? 'Bitiş:' : 'End:'}</span>{' '}
+                    <span className="text-gray-400">
+                      {t.policy?.dates?.end || (locale === 'tr' ? 'Bitiş:' : 'End:')}
+                    </span>{' '}
                     <span className="font-medium text-gray-700">
                       {formatDate(policy.expiryDate, locale)}
                     </span>
@@ -1525,7 +1567,8 @@ export function PolicyDetailView() {
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                     <BarChart3 className="text-blue-600 flex-shrink-0" size={18} />
                     <span className="truncate">
-                      {locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}
+                      {t.policy?.policyEvaluation ||
+                        (locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation')}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -1551,7 +1594,8 @@ export function PolicyDetailView() {
                       className="flex items-center justify-between w-full text-left mb-2"
                     >
                       <p className="text-xs sm:text-sm font-medium text-gray-700">
-                        {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
+                        {t.policy?.scoreBreakdown ||
+                          (locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown')}
                       </p>
                       <ChevronDown
                         size={16}
@@ -1569,7 +1613,8 @@ export function PolicyDetailView() {
                   {evaluation.recommendations.length > 0 && (
                     <div className="pt-2 border-t">
                       <p className="text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                        {locale === 'tr' ? 'Öneriler' : 'Recommendations'}
+                        {t.policy?.recommendations ||
+                          (locale === 'tr' ? 'Öneriler' : 'Recommendations')}
                       </p>
                       <div className="space-y-2">
                         {(recommendationsExpanded
@@ -1587,12 +1632,14 @@ export function PolicyDetailView() {
                           {recommendationsExpanded ? (
                             <>
                               <ChevronUp size={14} />
-                              {locale === 'tr' ? 'Daha az göster' : 'Show less'}
+                              {t.common?.showLess ||
+                                (locale === 'tr' ? 'Daha az göster' : 'Show less')}
                             </>
                           ) : (
                             <>
                               <ChevronDown size={14} />+{evaluation.recommendations.length - 2}{' '}
-                              {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                              {t.policy?.moreRecommendations ||
+                                (locale === 'tr' ? 'daha fazla öneri' : 'more recommendations')}
                             </>
                           )}
                         </button>
@@ -1609,7 +1656,8 @@ export function PolicyDetailView() {
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
                   <span className="truncate">
-                    {locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}
+                    {t.policy?.aiInsightsTitle ||
+                      (locale === 'tr' ? 'YAPAY ZEKA GÖRÜŞLERİ' : 'AI Insights')}
                   </span>
                   <Badge
                     variant="outline"
@@ -1651,12 +1699,13 @@ export function PolicyDetailView() {
                       {insightsExpanded ? (
                         <>
                           <ChevronUp size={14} />
-                          {locale === 'tr' ? 'Daha az göster' : 'Show less'}
+                          {t.common?.showLess || (locale === 'tr' ? 'Daha az göster' : 'Show less')}
                         </>
                       ) : (
                         <>
                           <ChevronDown size={14} />+{policy.aiInsights.length - 3}{' '}
-                          {locale === 'tr' ? 'daha fazla içgörü' : 'more insights'}
+                          {t.policy?.moreInsights ||
+                            (locale === 'tr' ? 'daha fazla içgörü' : 'more insights')}
                         </>
                       )}
                     </button>
@@ -1672,7 +1721,8 @@ export function PolicyDetailView() {
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
                     <TrendingUp className="text-blue-600 flex-shrink-0" size={18} />
                     <span className="truncate">
-                      {locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}
+                      {t.policy?.marketComparison ||
+                        (locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison')}
                     </span>
                   </CardTitle>
                 </CardHeader>
@@ -1681,10 +1731,10 @@ export function PolicyDetailView() {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs text-gray-500">
-                          {locale === 'tr' ? 'Priminiz' : 'Your Premium'}
+                          {t.policy?.yourPremium || (locale === 'tr' ? 'Priminiz' : 'Your Premium')}
                         </span>
                         <span className="text-xs text-gray-500">
-                          {locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}
+                          {t.policy?.marketAvg || (locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -1702,7 +1752,9 @@ export function PolicyDetailView() {
                             {Math.round(
                               (1 - policy.premium / policy.marketComparison.averagePremium) * 100
                             )}
-                            % {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                            %{' '}
+                            {t.policy?.belowAverage ||
+                              (locale === 'tr' ? 'ortalamanın altında' : 'below average')}
                           </span>
                         </div>
                       )}
@@ -1713,14 +1765,17 @@ export function PolicyDetailView() {
                             {Math.round(
                               (policy.premium / policy.marketComparison.averagePremium - 1) * 100
                             )}
-                            % {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                            %{' '}
+                            {t.policy?.aboveAverage ||
+                              (locale === 'tr' ? 'ortalamanın üstünde' : 'above average')}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="pt-2 border-t">
                       <p className="text-xs text-gray-500 mb-1">
-                        {locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}
+                        {t.policy?.marketPercentile ||
+                          (locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile')}
                       </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -1745,44 +1800,59 @@ export function PolicyDetailView() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Car className="text-blue-600" size={20} />
-                    {locale === 'tr' ? 'Araç Bilgileri' : 'Vehicle Information'}
+                    {t.policy?.vehicleInfoTitle ||
+                      (locale === 'tr' ? 'Araç Bilgileri' : 'Vehicle Information')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="grid md:grid-cols-2 gap-4">
                     {policy.vehicleInfo.plate && (
                       <div>
-                        <p className="text-sm text-gray-500">Plaka</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.plate || (locale === 'tr' ? 'Plaka' : 'Plate')}
+                        </p>
                         <p className="font-semibold text-gray-900">{policy.vehicleInfo.plate}</p>
                       </div>
                     )}
                     {policy.vehicleInfo.make && (
                       <div>
-                        <p className="text-sm text-gray-500">Marka</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.make || (locale === 'tr' ? 'Marka' : 'Make')}
+                        </p>
                         <p className="font-semibold text-gray-900">{policy.vehicleInfo.make}</p>
                       </div>
                     )}
                     {policy.vehicleInfo.model && (
                       <div>
-                        <p className="text-sm text-gray-500">Model</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.model || (locale === 'tr' ? 'Model' : 'Model')}
+                        </p>
                         <p className="font-semibold text-gray-900">{policy.vehicleInfo.model}</p>
                       </div>
                     )}
                     {policy.vehicleInfo.year && (
                       <div>
-                        <p className="text-sm text-gray-500">Model Yılı</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.modelYear || (locale === 'tr' ? 'Model Yılı' : 'Model Year')}
+                        </p>
                         <p className="font-semibold text-gray-900">{policy.vehicleInfo.year}</p>
                       </div>
                     )}
                     {policy.vehicleInfo.usage && (
                       <div>
-                        <p className="text-sm text-gray-500">Kullanım Şekli</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.usageType ||
+                            (locale === 'tr' ? 'Kullanım Şekli' : 'Usage Type')}
+                        </p>
                         <p className="font-semibold text-gray-900">{policy.vehicleInfo.usage}</p>
                       </div>
                     )}
                     {policy.vehicleInfo.vehicleClass && (
                       <div>
-                        <p className="text-sm text-gray-500">Araç Sınıfı</p>
+                        <p className="text-sm text-gray-500">
+                          {t.policy?.vehicleClass ||
+                            (locale === 'tr' ? 'Araç Sınıfı' : 'Vehicle Class')}
+                        </p>
                         <p className="font-semibold text-gray-900">
                           {policy.vehicleInfo.vehicleClass}
                         </p>
@@ -1802,7 +1872,8 @@ export function PolicyDetailView() {
                 >
                   <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                     <Shield className="text-blue-600" size={20} />
-                    {locale === 'tr' ? 'Teminat Detayları' : 'Coverage Details'}
+                    {t.policy?.coverageDetails ||
+                      (locale === 'tr' ? 'Teminat Detayları' : 'Coverage Details')}
                     <Badge variant="outline" className="text-xs ml-1">
                       {policy.coverages.length}
                     </Badge>
@@ -1825,7 +1896,10 @@ export function PolicyDetailView() {
               {!coveragesExpanded && (
                 <CardContent className="pt-0 pb-3">
                   <p className="text-sm text-gray-500">
-                    {locale === 'tr' ? 'Detayları görmek için tıklayın' : 'Click to view details'}
+                    {t.policy?.clickToViewDetails ||
+                      (locale === 'tr'
+                        ? 'Detayları görmek için tıklayın'
+                        : 'Click to view details')}
                   </p>
                 </CardContent>
               )}
@@ -1840,7 +1914,8 @@ export function PolicyDetailView() {
                 >
                   <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
                     <AlertTriangle className="text-amber-500" size={20} />
-                    {locale === 'tr' ? 'İstisnalar & Sorular' : 'Exclusions & Questions'}
+                    {t.policy?.exclusionsAndQuestions ||
+                      (locale === 'tr' ? 'İstisnalar & Sorular' : 'Exclusions & Questions')}
                     <Badge variant="outline" className="text-xs ml-1">
                       {policy.exclusions.length}
                     </Badge>
@@ -1863,9 +1938,10 @@ export function PolicyDetailView() {
               ) : (
                 <CardContent className="pt-0 pb-3">
                   <p className="text-sm text-gray-500">
-                    {locale === 'tr'
-                      ? 'Kapsam dışı durumlar ve sigortacıya sorulacak konular'
-                      : 'Uncovered situations and questions for your insurer'}
+                    {t.policy?.exclusionsDesc ||
+                      (locale === 'tr'
+                        ? 'Kapsam dışı durumlar ve sigortacıya sorulacak konular'
+                        : 'Uncovered situations and questions for your insurer')}
                   </p>
                 </CardContent>
               )}
@@ -1897,23 +1973,20 @@ export function PolicyDetailView() {
                     className="mb-4"
                   >
                     {policy.status === 'active'
-                      ? locale === 'tr'
-                        ? 'Aktif'
-                        : 'Active'
-                      : locale === 'tr'
-                        ? 'Bitiyor'
-                        : 'Expiring Soon'}
+                      ? t.policy?.activeStatus || (locale === 'tr' ? 'Aktif' : 'Active')
+                      : t.policy?.expiringSoonStatus ||
+                        (locale === 'tr' ? 'Bitiyor' : 'Expiring Soon')}
                   </Badge>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">
-                        {locale === 'tr' ? 'Başlangıç' : 'Start Date'}
+                        {t.policy?.startDate || (locale === 'tr' ? 'Başlangıç' : 'Start Date')}
                       </span>
                       <span className="font-medium">{formatDate(policy.startDate, locale)}</span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gray-500">
-                        {locale === 'tr' ? 'Bitiş' : 'Expiry Date'}
+                        {t.policy?.endDate || (locale === 'tr' ? 'Bitiş' : 'Expiry Date')}
                       </span>
                       <span className="font-medium">{formatDate(policy.expiryDate, locale)}</span>
                     </div>
@@ -1928,7 +2001,8 @@ export function PolicyDetailView() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <BarChart3 className="text-blue-600" size={20} />
-                    {locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation'}
+                    {t.policy?.policyEvaluation ||
+                      (locale === 'tr' ? 'Poliçe Değerlendirmesi' : 'Policy Evaluation')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1949,7 +2023,8 @@ export function PolicyDetailView() {
                   {/* Score Breakdown */}
                   <div className="pt-2 border-t">
                     <p className="text-sm font-medium text-gray-700 mb-2">
-                      {locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown'}
+                      {t.policy?.scoreBreakdown ||
+                        (locale === 'tr' ? 'Puan Dağılımı' : 'Score Breakdown')}
                     </p>
                     <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
                   </div>
@@ -1958,7 +2033,8 @@ export function PolicyDetailView() {
                   {evaluation.recommendations.length > 0 && (
                     <div className="pt-2 border-t">
                       <p className="text-sm font-medium text-gray-700 mb-2">
-                        {locale === 'tr' ? 'Öneriler' : 'Recommendations'}
+                        {t.policy?.recommendations ||
+                          (locale === 'tr' ? 'Öneriler' : 'Recommendations')}
                       </p>
                       <div className="space-y-2">
                         {evaluation.recommendations.slice(0, 2).map((rec, i) => (
@@ -1968,7 +2044,8 @@ export function PolicyDetailView() {
                       {evaluation.recommendations.length > 2 && (
                         <p className="text-xs text-gray-500 mt-2 text-center">
                           +{evaluation.recommendations.length - 2}{' '}
-                          {locale === 'tr' ? 'daha fazla öneri' : 'more recommendations'}
+                          {t.policy?.moreRecommendations ||
+                            (locale === 'tr' ? 'daha fazla öneri' : 'more recommendations')}
                         </p>
                       )}
                     </div>
@@ -1985,14 +2062,15 @@ export function PolicyDetailView() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-900">
                   <Sparkles className="text-purple-600" size={20} />
-                  {locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights'}
+                  {t.policy?.aiInsightsTitle ||
+                    (locale === 'tr' ? 'Yapay Zeka Görüşleri' : 'AI Insights')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm">
                     <span className="text-purple-600">
-                      {locale === 'tr' ? 'Güven:' : 'Confidence:'}
+                      {t.policy?.confidenceLabel || (locale === 'tr' ? 'Güven:' : 'Confidence:')}
                     </span>
                     <span className="font-semibold text-purple-900">
                       {Math.round(policy.aiConfidence * 100)}%
@@ -2013,7 +2091,8 @@ export function PolicyDetailView() {
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <TrendingUp className="text-blue-600" size={18} />
-                    {locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison'}
+                    {t.policy?.marketComparison ||
+                      (locale === 'tr' ? 'Piyasa Karşılaştırması' : 'Market Comparison')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -2021,10 +2100,10 @@ export function PolicyDetailView() {
                     <div>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs sm:text-sm text-gray-500">
-                          {locale === 'tr' ? 'Priminiz' : 'Your Premium'}
+                          {t.policy?.yourPremium || (locale === 'tr' ? 'Priminiz' : 'Your Premium')}
                         </span>
                         <span className="text-xs sm:text-sm text-gray-500">
-                          {locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg'}
+                          {t.policy?.marketAvg || (locale === 'tr' ? 'Piyasa Ort.' : 'Market Avg')}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -2042,7 +2121,9 @@ export function PolicyDetailView() {
                             {Math.round(
                               (1 - policy.premium / policy.marketComparison.averagePremium) * 100
                             )}
-                            % {locale === 'tr' ? 'ortalamanın altında' : 'below average'}
+                            %{' '}
+                            {t.policy?.belowAverage ||
+                              (locale === 'tr' ? 'ortalamanın altında' : 'below average')}
                           </span>
                         </div>
                       )}
@@ -2053,14 +2134,17 @@ export function PolicyDetailView() {
                             {Math.round(
                               (policy.premium / policy.marketComparison.averagePremium - 1) * 100
                             )}
-                            % {locale === 'tr' ? 'ortalamanın üstünde' : 'above average'}
+                            %{' '}
+                            {t.policy?.aboveAverage ||
+                              (locale === 'tr' ? 'ortalamanın üstünde' : 'above average')}
                           </span>
                         </div>
                       )}
                     </div>
                     <div className="pt-2 border-t">
                       <p className="text-xs sm:text-sm text-gray-500 mb-1">
-                        {locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile'}
+                        {t.policy?.marketPercentile ||
+                          (locale === 'tr' ? 'Piyasa Yüzdeliği' : 'Market Percentile')}
                       </p>
                       <div className="flex items-center gap-2">
                         <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
@@ -2090,37 +2174,36 @@ export function PolicyDetailView() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="bg-white rounded-lg p-4 border border-blue-50">
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-                      Expected Out Of Pocket
+                      {t.policy?.expectedOutOfPocket ||
+                        (locale === 'tr' ? 'Beklenen Cepten Ödeme' : 'Expected Out Of Pocket')}
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString(
-                        locale === 'tr' ? 'tr-TR' : 'en-US'
-                      )}{' '}
-                      TL
+                      {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString()}{' '}
+                      {actuarialResult.expectedOutOfPocket.expectedCost.currency}
                     </p>
                     <p className="text-sm text-gray-600 mt-2">
-                      Premium:{' '}
+                      {t.policy?.premiumLabel || (locale === 'tr' ? 'Prim:' : 'Premium:')}{' '}
                       <span className="font-medium">
-                        {actuarialResult.expectedOutOfPocket.premium.amount.toLocaleString(
-                          locale === 'tr' ? 'tr-TR' : 'en-US'
-                        )}{' '}
-                        TL
+                        {actuarialResult.expectedOutOfPocket.premium.amount.toLocaleString()}{' '}
+                        {actuarialResult.expectedOutOfPocket.premium.currency}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      Expected Uncovered Loss:{' '}
+                      {t.policy?.expectedUncoveredLoss ||
+                        (locale === 'tr'
+                          ? 'Beklenen Kapsanmayan Hasar:'
+                          : 'Expected Uncovered Loss:')}{' '}
                       <span className="font-medium text-amber-600">
-                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.amount.toLocaleString(
-                          locale === 'tr' ? 'tr-TR' : 'en-US'
-                        )}{' '}
-                        TL
+                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.amount.toLocaleString()}{' '}
+                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.currency}
                       </span>
                     </p>
                   </div>
 
                   <div className="bg-white rounded-lg p-4 border border-blue-50">
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
-                      Contract Quality Score
+                      {t.policy?.contractQualityScore ||
+                        (locale === 'tr' ? 'Sözleşme Kalite Puanı' : 'Contract Quality Score')}
                     </p>
                     <div className="flex items-end gap-2">
                       <p className="text-2xl font-bold text-gray-900">
@@ -2130,18 +2213,24 @@ export function PolicyDetailView() {
                     </div>
 
                     <p className="text-sm text-gray-600 mt-2">
-                      Parts Standard:{' '}
+                      {t.policy?.partsStandard ||
+                        (locale === 'tr' ? 'Parça Standardı:' : 'Parts Standard:')}{' '}
                       <span className="font-medium capitalize">
-                        {actuarialResult.indemnityMechanics?.partsStandard?.value || 'Unspecified'}
+                        {actuarialResult.indemnityMechanics?.partsStandard?.value ||
+                          t.global?.unspecified ||
+                          (locale === 'tr' ? 'Belirtilmemiş' : 'Unspecified')}
                       </span>
                     </p>
                     <p className="text-sm text-gray-600">
-                      Repair Network:{' '}
+                      {t.policy?.repairNetwork ||
+                        (locale === 'tr' ? 'Onarım Ağı:' : 'Repair Network:')}{' '}
                       <span className="font-medium capitalize">
                         {actuarialResult.indemnityMechanics?.repairNetworkRule?.value?.replace(
                           '_',
                           ' '
-                        ) || 'Unspecified'}
+                        ) ||
+                          t.global?.unspecified ||
+                          (locale === 'tr' ? 'Belirtilmemiş' : 'Unspecified')}
                       </span>
                     </p>
                   </div>
