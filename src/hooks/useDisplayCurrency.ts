@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { fxService, type SupportedCurrency } from '@/lib/fx/fx-service'
 import { useUserPreferences } from './useUserPreferences'
 import { formatCurrency } from '@/lib/utils'
-import { useTranslation } from '@/lib/i18n/i18n-context'
+import { useI18n } from '@/lib/i18n'
 
 export function useDisplayCurrency() {
   const { preferences } = useUserPreferences()
-  const { locale } = useTranslation()
+  const { locale } = useI18n()
   const [isReady, setIsReady] = useState(false)
 
   // Explicitly cast to the SupportedCurrency type as preferences could be string
@@ -21,7 +21,7 @@ export function useDisplayCurrency() {
     (amount: number, fromBase: SupportedCurrency = 'TRY') => {
       return fxService.convertSync(amount, fromBase, displayCurrency)
     },
-    [displayCurrency, isReady]
+    [displayCurrency]
   )
 
   const formatConverted = useCallback(
@@ -29,7 +29,7 @@ export function useDisplayCurrency() {
       const convertedValue = fxService.convertSync(amount, fromBase, displayCurrency)
       return formatCurrency(convertedValue, displayCurrency, locale)
     },
-    [displayCurrency, locale, isReady]
+    [displayCurrency, locale]
   )
 
   return {

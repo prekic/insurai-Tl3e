@@ -464,6 +464,10 @@ export interface TranslationDictionary {
     vehicleInfoTitle: string
     vehicleMarketValue: string
     verifyImportantFields: string
+    coreKaskoCoverages: string
+    coreKaskoCoveragesDesc: string
+    coreKaskoCoveragesNote: string
+    coverageDeductible: string
   }
 
   // Export Menu (PolicyDetailView)

@@ -149,7 +149,7 @@ describe('PolicyDetailView', () => {
 
       // Wait for async fetch to complete
       expect(await screen.findByText('Policy not found')).toBeInTheDocument()
-      expect(screen.getByText("The policy you're looking for doesn't exist.")).toBeInTheDocument()
+      expect(screen.getByText(/The policy you're looking for/)).toBeInTheDocument()
     })
 
     it('should show Go to Dashboard button when policy not found', async () => {
@@ -206,7 +206,7 @@ describe('PolicyDetailView', () => {
       renderPolicyDetailView()
 
       // Find back button by aria-label (mobile-first header uses localized aria-label)
-      const backButton = screen.getByRole('button', { name: /geri|go back/i })
+      const backButton = screen.getByRole('button', { name: /geri|go back|^back$/i })
       await user.click(backButton)
 
       expect(mockNavigate).toHaveBeenCalledWith(-1)

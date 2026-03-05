@@ -448,8 +448,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     moreInsights: 'Daha Fazla Görüş',
     moreRecommendations: 'Daha Fazla Öneri',
     notSpecified: 'Belirtilmedi',
-    policyNotFound: 'Poliçe analizi bulunamadı.',
-    policyNotFoundDesc: 'Poliçe bulunamadı veya analiz edilemedi.',
+    policyNotFound: 'Poliçe bulunamadı',
+    policyNotFoundDesc: 'Aradığınız poliçe bulunamadı veya erişim yetkiniz yok.',
     policyNumberLabel: 'Poliçe Numarası',
     share: 'Paylaş',
     shareFailed: 'Bağlantı kopyalanamadı.',
@@ -460,6 +460,12 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     vehicleInfoTitle: 'Araç Bilgileri',
     vehicleMarketValue: 'Araç Piyasa Değeri',
     verifyImportantFields: 'Satın almadan önce bu poliçeyi dikkatlice inceleyin.',
+    coreKaskoCoverages: 'Temel Kasko Teminatları (Dahil)',
+    coreKaskoCoveragesDesc:
+      'Çarpma/Çarpışma, Hırsızlık, Yangın, Doğal Afetler (deprem, sel, dolu, fırtına) araç rayiç bedeli üzerinden teminat altındadır.',
+    coreKaskoCoveragesNote:
+      'Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.',
+    coverageDeductible: 'Muafiyet: {amount}',
   },
 
   exportMenu: {

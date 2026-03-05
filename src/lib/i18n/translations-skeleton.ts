@@ -412,6 +412,10 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     vehicleInfoTitle: '',
     vehicleMarketValue: '',
     verifyImportantFields: '',
+    coreKaskoCoverages: '',
+    coreKaskoCoveragesDesc: '',
+    coreKaskoCoveragesNote: '',
+    coverageDeductible: '',
   },
 
   exportMenu: {

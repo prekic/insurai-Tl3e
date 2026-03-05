@@ -442,8 +442,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     moreInsights: 'More Insights',
     moreRecommendations: 'More Recommendations',
     notSpecified: 'Not Specified',
-    policyNotFound: 'Policy analysis not found.',
-    policyNotFoundDesc: 'The policy could not be found or could not be analyzed.',
+    policyNotFound: 'Policy not found',
+    policyNotFoundDesc: "The policy you're looking for doesn't exist or you don't have access.",
     policyNumberLabel: 'Policy Number',
     share: 'Share',
     shareFailed: 'Failed to copy link.',
@@ -454,6 +454,12 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     vehicleInfoTitle: 'Vehicle Information',
     vehicleMarketValue: 'Vehicle Market Value',
     verifyImportantFields: 'Review this policy carefully before purchasing.',
+    coreKaskoCoverages: 'Core Comprehensive Coverages (Included)',
+    coreKaskoCoveragesDesc:
+      'Collision, Theft, Fire, and Natural Disasters (earthquake, flood, hail, storm) are covered up to the vehicle market value.',
+    coreKaskoCoveragesNote:
+      'Please check your policy for deductibles, depreciation, and special conditions.',
+    coverageDeductible: 'Deductible: {amount}',
   },
 
   exportMenu: {

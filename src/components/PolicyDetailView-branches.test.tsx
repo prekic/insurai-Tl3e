@@ -433,14 +433,14 @@ describe('PolicyDetailView Branch Coverage', () => {
       mockGetPolicyById.mockReturnValue(undefined)
       mockFetchPolicyById.mockResolvedValue(null)
       renderComponent()
-      expect(await screen.findByText(/Policy analysis not found./i)).toBeInTheDocument()
+      expect(await screen.findByText(/Policy not found/i)).toBeInTheDocument()
     })
 
     it('shows "Policy not found" when fetch rejects', async () => {
       mockGetPolicyById.mockReturnValue(undefined)
       mockFetchPolicyById.mockRejectedValue(new Error('DB error'))
       renderComponent()
-      expect(await screen.findByText(/Policy analysis not found./i)).toBeInTheDocument()
+      expect(await screen.findByText(/Policy not found/i)).toBeInTheDocument()
     })
 
     it('navigates to dashboard from not-found view', async () => {
@@ -1696,10 +1696,16 @@ describe('PolicyDetailView Branch Coverage', () => {
 
     it('returns nameTr for tr locale when different from name', async () => {
       // Need to change the mock locale to tr
-      vi.mocked(await import('@/lib/i18n/i18n-context')).useTranslation = () => ({
+      const i18nModule = await import('@/lib/i18n/i18n-context')
+      vi.mocked(i18nModule).useI18n = () => ({
         t: EN_TRANSLATIONS,
         locale: 'tr',
         isLoading: false,
+        translate: (key: string) => key,
+        setLocale: vi.fn(),
+        availableLocales: ['en', 'tr'],
+        dynamicLocales: [],
+        progress: { loaded: 1, total: 1 },
       })
 
       mockGetPolicyById.mockReturnValue(
@@ -1720,10 +1726,15 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getAllByText(/Çarpma/).length).toBeGreaterThan(0)
 
       // Restore en locale
-      vi.mocked(await import('@/lib/i18n/i18n-context')).useTranslation = () => ({
+      vi.mocked(i18nModule).useI18n = () => ({
         t: EN_TRANSLATIONS,
         locale: 'en',
         isLoading: false,
+        translate: (key: string) => key,
+        setLocale: vi.fn(),
+        availableLocales: ['en', 'tr'],
+        dynamicLocales: [],
+        progress: { loaded: 1, total: 1 },
       })
     })
   })

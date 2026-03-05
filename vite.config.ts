@@ -59,6 +59,10 @@ export default defineConfig({
           if (id.includes('node_modules/pdf-lib')) {
             return 'vendor-pdflib'
           }
+          // Recharts + d3 dependencies (large, only used in admin/actuarial charts)
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) {
+            return 'vendor-recharts'
+          }
           // Let Vite handle the rest automatically to avoid initialization errors
         },
       },
