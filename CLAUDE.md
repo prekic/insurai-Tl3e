@@ -11,7 +11,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**.
 - **Production Readiness**: ~9.5/10 (15,844+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: March 6, 2026 (useDisplayCurrency wired into all 12 React components, formatConverted useCallback dep fix — 15,844 tests, 0 failures across 337 files)
+- **Last Updated**: March 6, 2026 (FX production API integration with exchangerate.host, CHF/SAR/AED currencies, PolicyDetailView & fx.ts TypeScript build fixes — deployed to Railway)
 
 ---
 
@@ -409,6 +409,9 @@ ADMIN_JWT_SECRET=your-random-64-char-hex-secret
 VAPID_PUBLIC_KEY=your-vapid-public-key-here
 VAPID_PRIVATE_KEY=your-vapid-private-key-here
 VAPID_SUBJECT=mailto:contact@insurai.com
+
+# FX Exchange Rates — OPTIONAL (free tier works without key, lower rate limits)
+EXCHANGERATE_API_KEY=your-exchangerate-host-api-key
 ```
 
 **CRITICAL RULES**:
@@ -713,6 +716,8 @@ xl: 1280px  /* Large desktop */
 | `/api/admin/processing-logs/export` | GET | **NEW** Export complete filtered processing logs as CSV bypassing pagination | Admin |
 | `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
 | `/api/admin/processing-logs/cleanup` | POST | Trigger manual processing log cleanup (default 90 days) | SuperAdmin |
+| `/api/fx/rates` | GET | FX exchange rates (base=TRY, 6h cache, exchangerate.host) | 30/min |
+| `/api/fx/status` | GET | FX service health (source, cache age, supported currencies) | 30/min |
 
 ### Request/Response Examples
 
@@ -1595,6 +1600,8 @@ Base components built with Tailwind CSS, following shadcn/ui patterns:
 | `usePdfExport` | Export policy to PDF | `{ exportPdf, isExporting }` |
 | `useCostTracking` | Track AI API costs | `{ costs, addCost }` |
 | `useUserPreferences` | Three-tier config override | `{ preferences, updatePreference }` |
+| `useDisplayCurrency` | FX-aware currency formatting | `{ displayCurrency, convert, formatConverted, formatConvertedCompact, isReady }` |
+| `usePushNotifications` | Browser push notification management | `{ isSupported, permission, isSubscribed, subscribe, unsubscribe }` |
 
 > **Removed (Feb 8, 2026)**: `useAnalytics`, `usePrivacy`, `useMarketData`, `useIndustryRisk`, `usePolicyTemplates` — zero production imports, functionality served by other modules (see Known Issue #75).
 
@@ -4327,15 +4334,17 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
   ```
 - **Commit**: `e827025`
 
-### 151. FX Conversion System (Added Mar 5, 2026)
+### 151. FX Conversion System (Added Mar 5, 2026; Production API Mar 6, 2026)
 - **Feature**: Multi-currency display support with server-side FX proxy and client-side conversion hook
-- **Server**: `server/routes/fx.ts` — `GET /api/fx/rates?base=TRY` proxy to exchangerate.host with 1-hour cache
-- **Client Service**: `src/lib/fx/fx-service.ts` — Singleton FX service with `convertSync()`, `formatConverted()`, background rate refresh
-- **Client Hook**: `src/hooks/useDisplayCurrency.ts` — `useDisplayCurrency()` returns `{ displayCurrency, convert, formatConverted, isReady }`
-- **User Preference**: `display_currency` added to `user-overridable.ts` — persisted per-user, selectable in `UserPreferencesPanel.tsx`
+- **Server**: `server/routes/fx.ts` — `GET /api/fx/rates?base=TRY` proxy to exchangerate.host with 6-hour server cache, `GET /api/fx/status` health check
+- **Live API**: exchangerate.host with optional `EXCHANGERATE_API_KEY` env var. Graceful fallback to hardcoded rates when API unavailable or key not set
+- **Supported Currencies**: TRY (base), USD, EUR, GBP, CHF, SAR, AED (7 total, added Mar 6)
+- **Client Service**: `src/lib/fx/fx-service.ts` — Singleton FX service with `convertSync()`, `formatConverted()`, 4-hour client cache, background rate refresh
+- **Client Hook**: `src/hooks/useDisplayCurrency.ts` — `useDisplayCurrency()` returns `{ displayCurrency, convert, formatConverted, formatConvertedCompact, isReady }`
+- **User Preference**: `display_currency` added to `user-overridable.ts` — persisted per-user, selectable in `UserPreferencesPanel.tsx` with `CurrentRateHint` showing live rate
 - **Barrel Export**: `src/lib/fx/index.ts` re-exports service + types
-- **Tests**: 33 tests (22 client + 11 server)
-- **Commit**: `8b25910`
+- **Tests**: 60 tests (22 client + 27 server + 11 service)
+- **Commits**: `8b25910`, `5660d4b`, `c8f74cb`, `e6c0132`
 
 ### 152. PolicyDetailView Full i18n Migration (Added Mar 5, 2026)
 - **Feature**: Migrated 132 `locale === 'tr'` ternaries to translation keys in `PolicyDetailView.tsx`
@@ -4368,6 +4377,36 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Bug Fix**: `formatConverted` was missing from `useCallback` dependency array in PolicyDetailView text export — added to prevent stale closure
 - **Files Changed**: 16 files (+162/−68 lines)
 - **Commits**: `d48f1ed`, `7bc19b4`
+
+### 156. FX Production API Integration with exchangerate.host (Added Mar 6, 2026)
+- **Feature**: Live exchange rate fetching from exchangerate.host with API key support, graceful fallback, and expanded currency list
+- **Problem**: FX endpoint used placeholder implementation without live API; only 4 currencies supported
+- **Solution**:
+  - `server/routes/fx.ts` — Full exchangerate.host integration with `EXCHANGERATE_API_KEY` env var, 6-hour server cache TTL, `GET /api/fx/status` health endpoint
+  - `src/lib/fx/fx-service.ts` — Added CHF, SAR, AED (7 currencies total); 4-hour client cache
+  - `src/lib/config/user-overridable.ts` — Added CHF/SAR/AED to currency picker options
+  - `src/components/UserPreferencesPanel.tsx` — Added `CurrentRateHint` component showing live rate beneath currency picker
+  - `src/components/admin/tabs/BenchmarksTab.tsx` — Removed hardcoded `₺` symbols, uses dynamic currency formatting
+- **Graceful Fallback**: If API key not set or API unavailable, falls back to hardcoded rates with `source: 'fallback'` in response
+- **New Env Var**: `EXCHANGERATE_API_KEY` (optional — free tier works without key but has lower rate limits)
+- **Tests**: 27 server tests covering live API, caching, fallback, error handling, status endpoint
+- **Commit**: `5660d4b`
+
+### 157. PolicyDetailView TypeScript Build Errors (Fixed Mar 6, 2026)
+- **Problem**: 5 TypeScript errors in `PolicyDetailView.tsx` blocking Railway frontend build (`tsc -b`)
+- **Root Causes**:
+  1. Unused `locale` params in `formatCoverageLimit` and `getCoverageInfoText` (TS6133)
+  2. `formatConverted` referenced in `CollapsibleCoverageCategory` and `ExclusionsSection` but the components receive `formatAmount` as prop name (TS2304)
+  3. `ExclusionsSection` was missing `useDisplayCurrency()` hook entirely
+  4. `item.questionEn` accessed on `missingImportantExclusions` type which only has `{ name, nameEn, question, importance }` — no `questionEn` field (TS2339)
+- **Solution**: Prefixed unused params with `_`, used correct prop name `formatAmount`, added missing hook, removed invalid property access
+- **Commit**: `c8f74cb`
+
+### 158. fx.ts Type Assertion for exchangerate.host Response (Fixed Mar 6, 2026)
+- **Problem**: 5 TypeScript errors in `server/routes/fx.ts` blocking Railway server build (`tsc -p server/tsconfig.json`)
+- **Root Cause**: `response.json()` returns `unknown` under the server's stricter TypeScript config; accessing `.success`, `.quotes`, `.error` on `unknown` is disallowed
+- **Solution**: Added explicit type assertion: `(await response.json()) as { success?: boolean; quotes?: Record<string, number>; error?: unknown }`
+- **Commit**: `e6c0132`
 
 ---
 
@@ -4638,6 +4677,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 # Optional overrides
 # LOG_LEVEL=info          # Default in production; set to 'warn' to reduce noise
 # UNSUBSCRIBE_SECRET=xxx  # Falls back to ADMIN_JWT_SECRET if not set
+# EXCHANGERATE_API_KEY=xxx  # Optional: exchangerate.host API key for higher rate limits
 
 # NOT needed - auto-detected from window.location.origin
 # VITE_API_PROXY_URL is automatically set in production
@@ -5257,6 +5297,31 @@ connectSrc: [
 - Missing it causes stale closures where the old currency format is used after the user switches currency
 - ESLint `react-hooks/exhaustive-deps` will warn about this, but only if the function is directly referenced (not if called via intermediate variable)
 
+**FX Server Route — `response.json()` Returns `unknown` in Server tsconfig (Gotcha Mar 6, 2026):**
+- The server tsconfig (`server/tsconfig.json`) is stricter than the frontend — `fetch().then(r => r.json())` returns `unknown`, not `any`
+- Accessing `.success`, `.quotes` etc. on `unknown` causes TS18046 errors
+- **Fix**: Always cast external API responses: `(await response.json()) as { success?: boolean; quotes?: Record<string, number> }`
+- This pattern applies to ANY new server-side `fetch` call to external APIs, not just exchangerate.host
+
+**FX exchangerate.host API — Free Tier vs Paid (Gotcha Mar 6, 2026):**
+- Without `EXCHANGERATE_API_KEY`, the free tier works but has lower rate limits and may block requests during high traffic
+- The server has a 6-hour cache (`FX_CACHE_TTL_MS = 21_600_000`) so API calls are infrequent (~4/day)
+- If `EXCHANGERATE_API_KEY` is set, it's appended as `?access_key=` query parameter
+- Fallback rates are hardcoded in `FALLBACK_RATES` — update these periodically if drift from real rates is a concern
+- Verify production FX health: `GET /api/fx/status` returns `{ source, cacheAge, supportedCurrencies, rates }`
+
+**PolicyDetailView Prop Naming — `formatAmount` Not `formatConverted` (Gotcha Mar 6, 2026):**
+- `CollapsibleCoverageCategory` and `ExclusionsSection` receive currency formatting as a prop named `formatAmount`, NOT `formatConverted`
+- The parent `PolicyDetailView` destructures `useDisplayCurrency()` as `{ formatConverted: formatAmount }` and passes `formatAmount` as the prop
+- If you see TS2304 `Cannot find name 'formatConverted'` inside these sub-components, use `formatAmount` instead
+- The `ExclusionsSection` must have its own `useDisplayCurrency()` hook call — it's a separate component, not a closure over the parent's variables
+
+**PolicyDetailView Knowledge Types — `missingImportantExclusions` vs `clarificationNeeded` (Gotcha Mar 6, 2026):**
+- `clarificationNeeded` type: `{ item: string, question: string, questionEn: string }` — HAS `questionEn`
+- `missingImportantExclusions` type: `{ name: string, nameEn: string, question: string, importance: string }` — NO `questionEn` field
+- Accessing `item.questionEn` on `missingImportantExclusions` compiles in dev (lenient tsconfig) but fails in Railway's strict server build
+- These types come from `src/lib/knowledge/kasko-knowledge.ts` (lines 1386-1397)
+
 ---
 
 ## CI/CD
@@ -5324,7 +5389,8 @@ npm run build:analyze
 
 **Ports**: Frontend=5173, Backend=4001
 **Branch**: Develop on feature branches, merge to main via PR
-**Tests**: 15,813 tests, 0 failures (336 files, 18 skipped), ~91.67% statements, ~85.91% branches coverage
+**Tests**: 15,844+ tests, 0 failures (337 files, 18 skipped), ~91.67% statements, ~85.91% branches coverage
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
-**Last Updated**: March 4, 2026 (68 pre-existing test failures fixed — 15,813 tests, 0 failures)
+**FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
+**Last Updated**: March 6, 2026 (FX production API, CHF/SAR/AED, PolicyDetailView & fx.ts build fixes — deployed to Railway)

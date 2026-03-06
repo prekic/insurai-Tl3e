@@ -56,7 +56,11 @@ async function fetchLiveRates(): Promise<Record<string, number> | null> {
       return null
     }
 
-    const data = await response.json()
+    const data = (await response.json()) as {
+      success?: boolean
+      quotes?: Record<string, number>
+      error?: unknown
+    }
 
     if (!data.success || !data.quotes) {
       log.warn('exchangerate.host returned unsuccessful response', {
