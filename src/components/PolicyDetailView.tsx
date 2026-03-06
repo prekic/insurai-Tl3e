@@ -67,7 +67,7 @@ import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryC
  */
 function formatCoverageLimit(
   coverage: Coverage,
-  locale: string,
+  _locale: string,
   t: any,
   fmt: (amount: number) => string = (a) => String(a)
 ): string {
@@ -152,7 +152,7 @@ function getCategoryInfo(category: CoverageCategory) {
  */
 function getCoverageInfoText(
   coverage: Coverage,
-  locale: string,
+  _locale: string,
   t: any,
   fmt: (amount: number) => string = (a) => String(a)
 ): string | null {
@@ -352,9 +352,7 @@ function CollapsibleCoverageCategory({
                       <span
                         className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
                       >
-                        {subLimit.isUnlimited
-                          ? t.global.unlimited
-                          : formatConverted(subLimit.limit)}
+                        {subLimit.isUnlimited ? t.global.unlimited : formatAmount(subLimit.limit)}
                       </span>
                     </div>
                   ))}
@@ -593,6 +591,7 @@ function ExclusionsSection({
   const [expandedExclusion, setExpandedExclusion] = useState<number | null>(null)
 
   const { t } = useI18n()
+  const { formatConverted: formatAmount } = useDisplayCurrency()
 
   // Analyze exclusions comprehensively
   const analysis = useMemo(
@@ -675,7 +674,7 @@ function ExclusionsSection({
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-green-700">
-                    {item.extractedLimit ? formatConverted(item.extractedLimit) : ''}
+                    {item.extractedLimit ? formatAmount(item.extractedLimit) : ''}
                   </span>
                 </div>
               ))}
@@ -804,7 +803,7 @@ function ExclusionsSection({
                     </div>
                     <p className="text-sm text-blue-700 flex items-center gap-1">
                       <HelpCircle size={12} />
-                      {locale === 'tr' ? item.question : item.questionEn || item.question}
+                      {item.question}
                     </p>
                   </div>
                 ))}
