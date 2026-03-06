@@ -5,7 +5,7 @@
  * These preferences override admin defaults for the UI and email categories.
  */
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 import type { TranslationDictionary } from '@/lib/i18n/translations'
@@ -22,6 +22,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import type { UserOverridableCategory, PreferenceFieldMeta } from '@/lib/config/user-overridable'
+import { fxService, type SupportedCurrency } from '@/lib/fx'
 
 export function UserPreferencesPanel() {
   const {
@@ -270,7 +271,16 @@ function PreferenceField({
         )}
 
         {field.type === 'string' && field.options && (
-          <StringSelectInput value={value as string} options={field.options} onChange={onChange} />
+          <div className="flex flex-col items-end gap-1">
+            <StringSelectInput
+              value={value as string}
+              options={field.options}
+              onChange={onChange}
+            />
+            {field.key === 'display_currency' && (value as string) !== 'TRY' && (
+              <CurrentRateHint currency={value as string} />
+            )}
+          </div>
         )}
 
         {field.type === 'array' && <ArrayInput value={value as number[]} onChange={onChange} />}
@@ -424,6 +434,51 @@ function ArrayInput({ value, onChange }: { value: number[]; onChange: (v: number
         </Button>
       </div>
     </div>
+  )
+}
+
+// =============================================================================
+// FX RATE HINT
+// =============================================================================
+
+function CurrentRateHint({ currency }: { currency: string }) {
+  const [rate, setRate] = useState<number | null>(null)
+  const [source, setSource] = useState<'api' | 'fallback' | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fxService.getRates().then((data) => {
+      if (cancelled) return
+      const r = data.rates[currency as SupportedCurrency]
+      if (r && r !== 1) {
+        setRate(Math.round(r * 100) / 100)
+      }
+    })
+
+    // Also check the source from the server status endpoint
+    fetch('/api/fx/status')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled && data.lastFetchSource) {
+          setSource(data.lastFetchSource)
+        }
+      })
+      .catch(() => {
+        // Ignore — non-critical
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [currency])
+
+  if (!rate) return null
+
+  return (
+    <span className="text-xs text-gray-400">
+      1 {currency} ≈ {rate.toLocaleString('tr-TR')} TRY
+      {source === 'fallback' && ' (approx.)'}
+    </span>
   )
 }
 

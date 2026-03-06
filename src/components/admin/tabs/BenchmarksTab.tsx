@@ -25,6 +25,7 @@ import {
   TrendingUp,
   AlertTriangle,
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
 
 interface PremiumBenchmark {
   id: string
@@ -51,7 +52,11 @@ interface PremiumBenchmark {
 }
 
 const COMPARISON_METHODS = [
-  { value: 'direct_premium', label: 'Direkt Prim Karşılaştırması', labelEn: 'Direct Premium Comparison' },
+  {
+    value: 'direct_premium',
+    label: 'Direkt Prim Karşılaştırması',
+    labelEn: 'Direct Premium Comparison',
+  },
   { value: 'value_based', label: 'Değer Bazlı (% Oran)', labelEn: 'Value Based (% Rate)' },
 ]
 
@@ -117,7 +122,7 @@ export function BenchmarksTab() {
   }, [fetchBenchmarks])
 
   const toggleType = (type: string) => {
-    setExpandedTypes(prev => {
+    setExpandedTypes((prev) => {
       const next = new Set(prev)
       if (next.has(type)) {
         next.delete(type)
@@ -152,7 +157,7 @@ export function BenchmarksTab() {
 
       const data = await response.json()
       if (data.success) {
-        setBenchmarks(benchmarks.map(b => b.id === editingId ? data.data : b))
+        setBenchmarks(benchmarks.map((b) => (b.id === editingId ? data.data : b)))
         setEditingId(null)
         setEditData({})
       } else {
@@ -192,7 +197,7 @@ export function BenchmarksTab() {
           is_active: true,
         })
         // Expand the type to show new benchmark
-        setExpandedTypes(prev => new Set([...prev, data.data.insurance_type]))
+        setExpandedTypes((prev) => new Set([...prev, data.data.insurance_type]))
       } else {
         setError(data.error || 'Failed to create benchmark')
       }
@@ -205,7 +210,7 @@ export function BenchmarksTab() {
   }
 
   const deleteBenchmark = async (id: string) => {
-    if (!confirm('Bu benchmark\'ı silmek istediğinizden emin misiniz?')) return
+    if (!confirm("Bu benchmark'ı silmek istediğinizden emin misiniz?")) return
 
     try {
       const response = await adminFetch(`/api/admin/benchmarks/${id}`, {
@@ -214,7 +219,7 @@ export function BenchmarksTab() {
 
       const data = await response.json()
       if (data.success) {
-        setBenchmarks(benchmarks.filter(b => b.id !== id))
+        setBenchmarks(benchmarks.filter((b) => b.id !== id))
       } else {
         setError(data.error || 'Failed to delete benchmark')
       }
@@ -230,7 +235,11 @@ export function BenchmarksTab() {
       return
     }
 
-    if (!confirm(`Tüm ${bulkUpdateData.insurance_type || 'sigorta'} benchmark'larını ${bulkUpdateData.multiplier}x çarpanı ile güncellemek istediğinizden emin misiniz?`)) {
+    if (
+      !confirm(
+        `Tüm ${bulkUpdateData.insurance_type || 'sigorta'} benchmark'larını ${bulkUpdateData.multiplier}x çarpanı ile güncellemek istediğinizden emin misiniz?`
+      )
+    ) {
       return
     }
 
@@ -259,20 +268,21 @@ export function BenchmarksTab() {
   }
 
   // Group benchmarks by insurance type
-  const groupedBenchmarks = benchmarks.reduce((acc, benchmark) => {
-    if (!acc[benchmark.insurance_type]) {
-      acc[benchmark.insurance_type] = {
-        label: benchmark.insurance_type_tr,
-        benchmarks: [],
+  const groupedBenchmarks = benchmarks.reduce(
+    (acc, benchmark) => {
+      if (!acc[benchmark.insurance_type]) {
+        acc[benchmark.insurance_type] = {
+          label: benchmark.insurance_type_tr,
+          benchmarks: [],
+        }
       }
-    }
-    acc[benchmark.insurance_type].benchmarks.push(benchmark)
-    return acc
-  }, {} as Record<string, { label: string; benchmarks: PremiumBenchmark[] }>)
+      acc[benchmark.insurance_type].benchmarks.push(benchmark)
+      return acc
+    },
+    {} as Record<string, { label: string; benchmarks: PremiumBenchmark[] }>
+  )
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(value)
-  }
+  const fmtCurrency = (value: number) => formatCurrency(value, 'TRY', 'tr')
 
   const formatPercent = (value: number | null) => {
     if (value === null) return '-'
@@ -333,7 +343,8 @@ export function BenchmarksTab() {
           <CardHeader>
             <CardTitle className="text-lg">Toplu Prim Güncellemesi</CardTitle>
             <CardDescription>
-              Yıllık enflasyon veya piyasa değişikliklerine göre tüm benchmark değerlerini güncelleyin
+              Yıllık enflasyon veya piyasa değişikliklerine göre tüm benchmark değerlerini
+              güncelleyin
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -343,11 +354,15 @@ export function BenchmarksTab() {
                 <select
                   className="w-full mt-1 px-3 py-2 border rounded-lg"
                   value={bulkUpdateData.insurance_type}
-                  onChange={e => setBulkUpdateData({ ...bulkUpdateData, insurance_type: e.target.value })}
+                  onChange={(e) =>
+                    setBulkUpdateData({ ...bulkUpdateData, insurance_type: e.target.value })
+                  }
                 >
                   <option value="">Tümü</option>
-                  {INSURANCE_TYPES_DEFAULT.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                  {INSURANCE_TYPES_DEFAULT.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -356,7 +371,9 @@ export function BenchmarksTab() {
                 <Input
                   type="number"
                   value={bulkUpdateData.year}
-                  onChange={e => setBulkUpdateData({ ...bulkUpdateData, year: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setBulkUpdateData({ ...bulkUpdateData, year: parseInt(e.target.value) })
+                  }
                 />
               </div>
               <div>
@@ -365,12 +382,18 @@ export function BenchmarksTab() {
                   type="number"
                   step="0.01"
                   value={bulkUpdateData.multiplier}
-                  onChange={e => setBulkUpdateData({ ...bulkUpdateData, multiplier: parseFloat(e.target.value) })}
+                  onChange={(e) =>
+                    setBulkUpdateData({ ...bulkUpdateData, multiplier: parseFloat(e.target.value) })
+                  }
                 />
               </div>
               <div className="flex items-end">
                 <Button onClick={runBulkUpdate} disabled={isSaving} className="w-full">
-                  {isSaving ? <RefreshCw className="animate-spin mr-2" size={16} /> : <TrendingUp size={16} className="mr-2" />}
+                  {isSaving ? (
+                    <RefreshCw className="animate-spin mr-2" size={16} />
+                  ) : (
+                    <TrendingUp size={16} className="mr-2" />
+                  )}
                   Güncelle
                 </Button>
               </div>
@@ -392,8 +415,8 @@ export function BenchmarksTab() {
                 <select
                   className="w-full mt-1 px-3 py-2 border rounded-lg"
                   value={newBenchmark.insurance_type || ''}
-                  onChange={e => {
-                    const selected = INSURANCE_TYPES_DEFAULT.find(t => t.value === e.target.value)
+                  onChange={(e) => {
+                    const selected = INSURANCE_TYPES_DEFAULT.find((t) => t.value === e.target.value)
                     setNewBenchmark({
                       ...newBenchmark,
                       insurance_type: e.target.value,
@@ -402,8 +425,10 @@ export function BenchmarksTab() {
                   }}
                 >
                   <option value="">Seçin...</option>
-                  {INSURANCE_TYPES_DEFAULT.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
+                  {INSURANCE_TYPES_DEFAULT.map((type) => (
+                    <option key={type.value} value={type.value}>
+                      {type.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -411,7 +436,9 @@ export function BenchmarksTab() {
                 <label className="text-sm font-medium">Sigorta Türü (TR)*</label>
                 <Input
                   value={newBenchmark.insurance_type_tr || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, insurance_type_tr: e.target.value })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, insurance_type_tr: e.target.value })
+                  }
                   placeholder="ör: Kasko"
                 />
               </div>
@@ -419,7 +446,7 @@ export function BenchmarksTab() {
                 <label className="text-sm font-medium">Alt Tür (EN)</label>
                 <Input
                   value={newBenchmark.sub_type || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, sub_type: e.target.value })}
+                  onChange={(e) => setNewBenchmark({ ...newBenchmark, sub_type: e.target.value })}
                   placeholder="ör: economy"
                 />
               </div>
@@ -427,7 +454,9 @@ export function BenchmarksTab() {
                 <label className="text-sm font-medium">Alt Tür (TR)</label>
                 <Input
                   value={newBenchmark.sub_type_tr || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, sub_type_tr: e.target.value })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, sub_type_tr: e.target.value })
+                  }
                   placeholder="ör: Ekonomik Araç"
                 />
               </div>
@@ -436,10 +465,17 @@ export function BenchmarksTab() {
                 <select
                   className="w-full mt-1 px-3 py-2 border rounded-lg"
                   value={newBenchmark.comparison_method || 'direct_premium'}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, comparison_method: e.target.value as 'direct_premium' | 'value_based' })}
+                  onChange={(e) =>
+                    setNewBenchmark({
+                      ...newBenchmark,
+                      comparison_method: e.target.value as 'direct_premium' | 'value_based',
+                    })
+                  }
                 >
-                  {COMPARISON_METHODS.map(method => (
-                    <option key={method.value} value={method.value}>{method.label}</option>
+                  {COMPARISON_METHODS.map((method) => (
+                    <option key={method.value} value={method.value}>
+                      {method.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -448,7 +484,9 @@ export function BenchmarksTab() {
                 <Input
                   type="number"
                   value={newBenchmark.year || new Date().getFullYear()}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, year: parseInt(e.target.value) })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, year: parseInt(e.target.value) })
+                  }
                 />
               </div>
 
@@ -458,7 +496,9 @@ export function BenchmarksTab() {
                 <Input
                   type="number"
                   value={newBenchmark.min_premium || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, min_premium: parseFloat(e.target.value) })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, min_premium: parseFloat(e.target.value) })
+                  }
                   placeholder="3000"
                 />
               </div>
@@ -467,7 +507,9 @@ export function BenchmarksTab() {
                 <Input
                   type="number"
                   value={newBenchmark.avg_premium || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, avg_premium: parseFloat(e.target.value) })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, avg_premium: parseFloat(e.target.value) })
+                  }
                   placeholder="4500"
                 />
               </div>
@@ -476,7 +518,9 @@ export function BenchmarksTab() {
                 <Input
                   type="number"
                   value={newBenchmark.max_premium || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, max_premium: parseFloat(e.target.value) })}
+                  onChange={(e) =>
+                    setNewBenchmark({ ...newBenchmark, max_premium: parseFloat(e.target.value) })
+                  }
                   placeholder="8000"
                 />
               </div>
@@ -490,7 +534,12 @@ export function BenchmarksTab() {
                       type="number"
                       step="0.001"
                       value={newBenchmark.value_min_rate ? newBenchmark.value_min_rate * 100 : ''}
-                      onChange={e => setNewBenchmark({ ...newBenchmark, value_min_rate: parseFloat(e.target.value) / 100 })}
+                      onChange={(e) =>
+                        setNewBenchmark({
+                          ...newBenchmark,
+                          value_min_rate: parseFloat(e.target.value) / 100,
+                        })
+                      }
                       placeholder="1.5"
                     />
                   </div>
@@ -500,7 +549,12 @@ export function BenchmarksTab() {
                       type="number"
                       step="0.001"
                       value={newBenchmark.value_avg_rate ? newBenchmark.value_avg_rate * 100 : ''}
-                      onChange={e => setNewBenchmark({ ...newBenchmark, value_avg_rate: parseFloat(e.target.value) / 100 })}
+                      onChange={(e) =>
+                        setNewBenchmark({
+                          ...newBenchmark,
+                          value_avg_rate: parseFloat(e.target.value) / 100,
+                        })
+                      }
                       placeholder="2.5"
                     />
                   </div>
@@ -510,7 +564,12 @@ export function BenchmarksTab() {
                       type="number"
                       step="0.001"
                       value={newBenchmark.value_max_rate ? newBenchmark.value_max_rate * 100 : ''}
-                      onChange={e => setNewBenchmark({ ...newBenchmark, value_max_rate: parseFloat(e.target.value) / 100 })}
+                      onChange={(e) =>
+                        setNewBenchmark({
+                          ...newBenchmark,
+                          value_max_rate: parseFloat(e.target.value) / 100,
+                        })
+                      }
                       placeholder="4.0"
                     />
                   </div>
@@ -521,7 +580,7 @@ export function BenchmarksTab() {
                 <label className="text-sm font-medium">Kaynak</label>
                 <Input
                   value={newBenchmark.source || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, source: e.target.value })}
+                  onChange={(e) => setNewBenchmark({ ...newBenchmark, source: e.target.value })}
                   placeholder="TSB Market Data"
                 />
               </div>
@@ -529,7 +588,7 @@ export function BenchmarksTab() {
                 <label className="text-sm font-medium">Kaynak (TR)</label>
                 <Input
                   value={newBenchmark.source_tr || ''}
-                  onChange={e => setNewBenchmark({ ...newBenchmark, source_tr: e.target.value })}
+                  onChange={(e) => setNewBenchmark({ ...newBenchmark, source_tr: e.target.value })}
                   placeholder="TSB Piyasa Verileri"
                 />
               </div>
@@ -540,7 +599,11 @@ export function BenchmarksTab() {
                 İptal
               </Button>
               <Button onClick={createBenchmark} disabled={isSaving}>
-                {isSaving ? <RefreshCw className="animate-spin mr-2" size={16} /> : <Plus size={16} className="mr-2" />}
+                {isSaving ? (
+                  <RefreshCw className="animate-spin mr-2" size={16} />
+                ) : (
+                  <Plus size={16} className="mr-2" />
+                )}
                 Ekle
               </Button>
             </div>
@@ -607,7 +670,7 @@ export function BenchmarksTab() {
                       </tr>
                     </thead>
                     <tbody>
-                      {typeBenchmarks.map(benchmark => (
+                      {typeBenchmarks.map((benchmark) => (
                         <tr key={benchmark.id} className="border-b hover:bg-gray-50">
                           {editingId === benchmark.id ? (
                             // Edit mode
@@ -615,7 +678,9 @@ export function BenchmarksTab() {
                               <td className="py-2 px-2">
                                 <Input
                                   value={editData.sub_type_tr || ''}
-                                  onChange={e => setEditData({ ...editData, sub_type_tr: e.target.value })}
+                                  onChange={(e) =>
+                                    setEditData({ ...editData, sub_type_tr: e.target.value })
+                                  }
                                   className="h-8"
                                 />
                               </td>
@@ -623,7 +688,12 @@ export function BenchmarksTab() {
                                 <Input
                                   type="number"
                                   value={editData.min_premium || ''}
-                                  onChange={e => setEditData({ ...editData, min_premium: parseFloat(e.target.value) })}
+                                  onChange={(e) =>
+                                    setEditData({
+                                      ...editData,
+                                      min_premium: parseFloat(e.target.value),
+                                    })
+                                  }
                                   className="h-8 w-24 text-right"
                                 />
                               </td>
@@ -631,7 +701,12 @@ export function BenchmarksTab() {
                                 <Input
                                   type="number"
                                   value={editData.avg_premium || ''}
-                                  onChange={e => setEditData({ ...editData, avg_premium: parseFloat(e.target.value) })}
+                                  onChange={(e) =>
+                                    setEditData({
+                                      ...editData,
+                                      avg_premium: parseFloat(e.target.value),
+                                    })
+                                  }
                                   className="h-8 w-24 text-right"
                                 />
                               </td>
@@ -639,7 +714,12 @@ export function BenchmarksTab() {
                                 <Input
                                   type="number"
                                   value={editData.max_premium || ''}
-                                  onChange={e => setEditData({ ...editData, max_premium: parseFloat(e.target.value) })}
+                                  onChange={(e) =>
+                                    setEditData({
+                                      ...editData,
+                                      max_premium: parseFloat(e.target.value),
+                                    })
+                                  }
                                   className="h-8 w-24 text-right"
                                 />
                               </td>
@@ -649,8 +729,17 @@ export function BenchmarksTab() {
                                     <Input
                                       type="number"
                                       step="0.001"
-                                      value={editData.value_min_rate ? (editData.value_min_rate * 100).toFixed(2) : ''}
-                                      onChange={e => setEditData({ ...editData, value_min_rate: parseFloat(e.target.value) / 100 })}
+                                      value={
+                                        editData.value_min_rate
+                                          ? (editData.value_min_rate * 100).toFixed(2)
+                                          : ''
+                                      }
+                                      onChange={(e) =>
+                                        setEditData({
+                                          ...editData,
+                                          value_min_rate: parseFloat(e.target.value) / 100,
+                                        })
+                                      }
                                       className="h-8 w-20 text-right"
                                     />
                                   </td>
@@ -658,8 +747,17 @@ export function BenchmarksTab() {
                                     <Input
                                       type="number"
                                       step="0.001"
-                                      value={editData.value_avg_rate ? (editData.value_avg_rate * 100).toFixed(2) : ''}
-                                      onChange={e => setEditData({ ...editData, value_avg_rate: parseFloat(e.target.value) / 100 })}
+                                      value={
+                                        editData.value_avg_rate
+                                          ? (editData.value_avg_rate * 100).toFixed(2)
+                                          : ''
+                                      }
+                                      onChange={(e) =>
+                                        setEditData({
+                                          ...editData,
+                                          value_avg_rate: parseFloat(e.target.value) / 100,
+                                        })
+                                      }
                                       className="h-8 w-20 text-right"
                                     />
                                   </td>
@@ -667,8 +765,17 @@ export function BenchmarksTab() {
                                     <Input
                                       type="number"
                                       step="0.001"
-                                      value={editData.value_max_rate ? (editData.value_max_rate * 100).toFixed(2) : ''}
-                                      onChange={e => setEditData({ ...editData, value_max_rate: parseFloat(e.target.value) / 100 })}
+                                      value={
+                                        editData.value_max_rate
+                                          ? (editData.value_max_rate * 100).toFixed(2)
+                                          : ''
+                                      }
+                                      onChange={(e) =>
+                                        setEditData({
+                                          ...editData,
+                                          value_max_rate: parseFloat(e.target.value) / 100,
+                                        })
+                                      }
                                       className="h-8 w-20 text-right"
                                     />
                                   </td>
@@ -678,20 +785,29 @@ export function BenchmarksTab() {
                                 <Input
                                   type="number"
                                   value={editData.year || ''}
-                                  onChange={e => setEditData({ ...editData, year: parseInt(e.target.value) })}
+                                  onChange={(e) =>
+                                    setEditData({ ...editData, year: parseInt(e.target.value) })
+                                  }
                                   className="h-8 w-20 text-right"
                                 />
                               </td>
                               <td className="py-2 px-2">
                                 <Input
                                   value={editData.source_tr || ''}
-                                  onChange={e => setEditData({ ...editData, source_tr: e.target.value })}
+                                  onChange={(e) =>
+                                    setEditData({ ...editData, source_tr: e.target.value })
+                                  }
                                   className="h-8"
                                 />
                               </td>
                               <td className="py-2 px-2 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <Button size="sm" variant="ghost" onClick={saveBenchmark} disabled={isSaving}>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={saveBenchmark}
+                                    disabled={isSaving}
+                                  >
                                     <Check size={14} className="text-green-600" />
                                   </Button>
                                   <Button size="sm" variant="ghost" onClick={cancelEditing}>
@@ -703,25 +819,49 @@ export function BenchmarksTab() {
                           ) : (
                             // View mode
                             <>
-                              <td className="py-2 px-2 font-medium">{benchmark.sub_type_tr || '-'}</td>
-                              <td className="py-2 px-2 text-right">{formatCurrency(benchmark.min_premium)}</td>
-                              <td className="py-2 px-2 text-right font-medium text-blue-600">{formatCurrency(benchmark.avg_premium)}</td>
-                              <td className="py-2 px-2 text-right">{formatCurrency(benchmark.max_premium)}</td>
+                              <td className="py-2 px-2 font-medium">
+                                {benchmark.sub_type_tr || '-'}
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                {fmtCurrency(benchmark.min_premium)}
+                              </td>
+                              <td className="py-2 px-2 text-right font-medium text-blue-600">
+                                {fmtCurrency(benchmark.avg_premium)}
+                              </td>
+                              <td className="py-2 px-2 text-right">
+                                {fmtCurrency(benchmark.max_premium)}
+                              </td>
                               {benchmark.comparison_method === 'value_based' && (
                                 <>
-                                  <td className="py-2 px-2 text-right text-gray-500">{formatPercent(benchmark.value_min_rate)}</td>
-                                  <td className="py-2 px-2 text-right font-medium text-purple-600">{formatPercent(benchmark.value_avg_rate)}</td>
-                                  <td className="py-2 px-2 text-right text-gray-500">{formatPercent(benchmark.value_max_rate)}</td>
+                                  <td className="py-2 px-2 text-right text-gray-500">
+                                    {formatPercent(benchmark.value_min_rate)}
+                                  </td>
+                                  <td className="py-2 px-2 text-right font-medium text-purple-600">
+                                    {formatPercent(benchmark.value_avg_rate)}
+                                  </td>
+                                  <td className="py-2 px-2 text-right text-gray-500">
+                                    {formatPercent(benchmark.value_max_rate)}
+                                  </td>
                                 </>
                               )}
                               <td className="py-2 px-2 text-right">{benchmark.year}</td>
-                              <td className="py-2 px-2 text-right text-gray-500 text-xs">{benchmark.source_tr || benchmark.source || '-'}</td>
+                              <td className="py-2 px-2 text-right text-gray-500 text-xs">
+                                {benchmark.source_tr || benchmark.source || '-'}
+                              </td>
                               <td className="py-2 px-2 text-right">
                                 <div className="flex justify-end gap-1">
-                                  <Button size="sm" variant="ghost" onClick={() => startEditing(benchmark)}>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => startEditing(benchmark)}
+                                  >
                                     <Edit2 size={14} />
                                   </Button>
-                                  <Button size="sm" variant="ghost" onClick={() => deleteBenchmark(benchmark.id)}>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => deleteBenchmark(benchmark.id)}
+                                  >
                                     <Trash2 size={14} className="text-red-500" />
                                   </Button>
                                 </div>
@@ -738,13 +878,15 @@ export function BenchmarksTab() {
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
                   {typeBenchmarks[0]?.comparison_method === 'value_based' ? (
                     <>
-                      <strong>Değer Bazlı Karşılaştırma:</strong> Prim, sigortalanan değerin yüzdesi olarak değerlendirilir.
-                      Örneğin, 500.000₺ değerindeki bir araç için %2.5 oran = 12.500₺ beklenen prim.
+                      <strong>Değer Bazlı Karşılaştırma:</strong> Prim, sigortalanan değerin yüzdesi
+                      olarak değerlendirilir. Örneğin, 500.000₺ değerindeki bir araç için %2.5 oran
+                      = 12.500₺ beklenen prim.
                     </>
                   ) : (
                     <>
-                      <strong>Direkt Prim Karşılaştırması:</strong> Prim doğrudan min/ort/max değerleriyle karşılaştırılır.
-                      Örneğin, 4.500₺ ortalama prim altındaki değerler iyi kabul edilir.
+                      <strong>Direkt Prim Karşılaştırması:</strong> Prim doğrudan min/ort/max
+                      değerleriyle karşılaştırılır. Örneğin, 4.500₺ ortalama prim altındaki değerler
+                      iyi kabul edilir.
                     </>
                   )}
                 </div>

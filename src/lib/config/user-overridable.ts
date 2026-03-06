@@ -92,6 +92,9 @@ export const PREFERENCE_FIELDS: Record<UserOverridableCategory, PreferenceFieldM
         { value: 'USD', label: 'US Dollar ($)', labelTr: 'Amerikan Doları ($)' },
         { value: 'EUR', label: 'Euro (€)', labelTr: 'Euro (€)' },
         { value: 'GBP', label: 'British Pound (£)', labelTr: 'İngiliz Sterlini (£)' },
+        { value: 'CHF', label: 'Swiss Franc (CHF)', labelTr: 'İsviçre Frangı (CHF)' },
+        { value: 'SAR', label: 'Saudi Riyal (SAR)', labelTr: 'Suudi Riyali (SAR)' },
+        { value: 'AED', label: 'UAE Dirham (AED)', labelTr: 'BAE Dirhemi (AED)' },
       ],
     },
     {

@@ -1,4 +1,4 @@
-export const SUPPORTED_CURRENCIES = ['TRY', 'USD', 'EUR', 'GBP'] as const
+export const SUPPORTED_CURRENCIES = ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED'] as const
 export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number]
 
 export const FALLBACK_RATES: Record<SupportedCurrency, number> = {
@@ -6,6 +6,9 @@ export const FALLBACK_RATES: Record<SupportedCurrency, number> = {
   USD: 33.5,
   EUR: 36.5,
   GBP: 42.5,
+  CHF: 38.0,
+  SAR: 8.9,
+  AED: 9.1,
 }
 
 export interface FXRates {

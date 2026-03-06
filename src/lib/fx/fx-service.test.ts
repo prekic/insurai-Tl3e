@@ -42,7 +42,7 @@ async function createFreshService() {
 }
 
 function mockSuccessResponse(
-  rates: Record<string, number> = { TRY: 1, USD: 34, EUR: 37, GBP: 43 }
+  rates: Record<string, number> = { TRY: 1, USD: 34, EUR: 37, GBP: 43, CHF: 39, SAR: 9, AED: 9.2 }
 ) {
   mockFetch.mockResolvedValueOnce({
     ok: true,
@@ -67,9 +67,9 @@ function mockNonOkResponse() {
 // =============================================================================
 
 describe('FXService Exports', () => {
-  it('exports SUPPORTED_CURRENCIES with TRY, USD, EUR, GBP', () => {
-    expect(SUPPORTED_CURRENCIES).toEqual(['TRY', 'USD', 'EUR', 'GBP'])
-    expect(SUPPORTED_CURRENCIES).toHaveLength(4)
+  it('exports SUPPORTED_CURRENCIES with all 7 currencies', () => {
+    expect(SUPPORTED_CURRENCIES).toEqual(['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED'])
+    expect(SUPPORTED_CURRENCIES).toHaveLength(7)
   })
 
   it('exports FALLBACK_RATES with TRY as base (1)', () => {
@@ -77,6 +77,9 @@ describe('FXService Exports', () => {
     expect(FALLBACK_RATES.USD).toBe(33.5)
     expect(FALLBACK_RATES.EUR).toBe(36.5)
     expect(FALLBACK_RATES.GBP).toBe(42.5)
+    expect(FALLBACK_RATES.CHF).toBe(38.0)
+    expect(FALLBACK_RATES.SAR).toBe(8.9)
+    expect(FALLBACK_RATES.AED).toBe(9.1)
   })
 
   it('FALLBACK_RATES has entries for all supported currencies', () => {
