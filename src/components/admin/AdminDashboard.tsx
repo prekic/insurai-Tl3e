@@ -32,6 +32,7 @@ import { TranslationsTab } from './tabs/TranslationsTab'
 import { ExtractionHealthTab } from './tabs/ExtractionHealthTab'
 import { ActuarialTab } from './tabs/ActuarialTab'
 import { ActuarialAnalyticsTab } from './tabs/ActuarialAnalyticsTab'
+import { FXDashboardTab } from './tabs/FXDashboardTab'
 
 import { cn } from '@/lib/utils'
 
@@ -88,6 +89,7 @@ const TABS: { id: AdminSection; label: string; icon: React.ReactNode }[] = [
     label: 'Actuarial Analytics',
     icon: <LineChartIcon className="h-4 w-4" />,
   },
+  { id: 'fx_rates', label: 'FX Rates', icon: <Activity className="h-4 w-4" /> },
 ]
 
 export function AdminDashboard() {
@@ -240,6 +242,8 @@ export function AdminDashboard() {
         return <ActuarialTab />
       case 'actuarial_analytics':
         return <ActuarialAnalyticsTab />
+      case 'fx_rates':
+        return <FXDashboardTab />
       default:
         return <OverviewTab systemHealth={systemHealth} />
     }

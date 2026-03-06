@@ -95,6 +95,9 @@ export const PREFERENCE_FIELDS: Record<UserOverridableCategory, PreferenceFieldM
         { value: 'CHF', label: 'Swiss Franc (CHF)', labelTr: 'İsviçre Frangı (CHF)' },
         { value: 'SAR', label: 'Saudi Riyal (SAR)', labelTr: 'Suudi Riyali (SAR)' },
         { value: 'AED', label: 'UAE Dirham (AED)', labelTr: 'BAE Dirhemi (AED)' },
+        { value: 'JPY', label: 'Japanese Yen (JPY)', labelTr: 'Japon Yeni (JPY)' },
+        { value: 'CAD', label: 'Canadian Dollar (CAD)', labelTr: 'Kanada Doları (CAD)' },
+        { value: 'AUD', label: 'Australian Dollar (AUD)', labelTr: 'Avustralya Doları (AUD)' },
       ],
     },
     {

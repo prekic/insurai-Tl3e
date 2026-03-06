@@ -94,28 +94,22 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
 }
 
 /**
- * Format currency in compact form for mobile (e.g., ₺980M, $5.2M)
+ * Format currency in compact form for mobile
+ * Uses native Intl.NumberFormat for locale-aware compact suffixes (e.g. M, K, Mio.)
  */
 export function formatCurrencyCompact(
   amount: number,
   currency: string = 'TRY',
-  _locale?: string
+  locale?: string
 ): string {
-  const symbol = CURRENCY_SYMBOLS[currency] || currency + ' '
-
-  if (amount >= 1_000_000_000) {
-    const value = amount / 1_000_000_000
-    return `${symbol}${value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')}B`
-  }
-  if (amount >= 1_000_000) {
-    const value = amount / 1_000_000
-    return `${symbol}${value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')}M`
-  }
-  if (amount >= 1_000) {
-    const value = amount / 1_000
-    return `${symbol}${value >= 10 ? Math.round(value) : value.toFixed(1).replace(/\.0$/, '')}K`
-  }
-  return `${symbol}${Math.round(amount)}`
+  // Use compact display with currency formatting
+  return new Intl.NumberFormat(getIntlLocale(locale), {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1, // Will show e.g. 5.2M, but drop trailing zeros like 5M
+    minimumFractionDigits: 0,
+  }).format(amount)
 }
 
 /**

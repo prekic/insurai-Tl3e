@@ -18,6 +18,7 @@ import costRouter from './cost.js'
 import monitoringRouter from './monitoring.js'
 import contentRouter from './content.js'
 import actuarialRouter from './actuarial.js'
+import fxMonitoringRouter from './fx-monitoring.js'
 
 const router = Router()
 
@@ -29,5 +30,6 @@ router.use('/', costRouter)
 router.use('/', monitoringRouter)
 router.use('/', contentRouter)
 router.use('/actuarial', actuarialRouter)
+router.use('/', fxMonitoringRouter)
 
 export default router

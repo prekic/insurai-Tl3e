@@ -384,6 +384,8 @@ export interface UIConfig {
   // File Upload
   maxFileSizeMb: number
   allowedFileExtensions: string[]
+  // Localization
+  displayCurrency: string
 }
 
 export const DEFAULT_UI_CONFIG: UIConfig = {
@@ -398,6 +400,7 @@ export const DEFAULT_UI_CONFIG: UIConfig = {
   maxRecommendationsPreview: 2,
   maxFileSizeMb: 10,
   allowedFileExtensions: ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'],
+  displayCurrency: 'TRY',
 }
 
 // =============================================================================

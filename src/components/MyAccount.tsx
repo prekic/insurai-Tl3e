@@ -29,6 +29,7 @@ import {
   fetchUserStats,
   type UserStats,
 } from '@/lib/supabase'
+import { UserPreferencesPanel } from './UserPreferencesPanel'
 
 // Local storage key for profile when not using Supabase
 const LOCAL_PROFILE_KEY = 'insurai_user_profile'
@@ -352,16 +353,22 @@ export function MyAccount() {
                     <Calendar size={14} />
                     <span>
                       {t.account.memberSince}{' '}
-                      {new Date(memberSince).toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US', {
-                        month: 'long',
-                        year: 'numeric',
-                      })}
+                      {new Date(memberSince).toLocaleDateString(
+                        locale === 'tr' ? 'tr-TR' : 'en-US',
+                        {
+                          month: 'long',
+                          year: 'numeric',
+                        }
+                      )}
                     </span>
                   </div>
                 </div>
               )}
             </CardContent>
           </Card>
+
+          {/* User Preferences (FX, Theme, Display Settings) */}
+          <UserPreferencesPanel />
 
           {/* Usage Stats */}
           <Card>
@@ -398,9 +405,7 @@ export function MyAccount() {
                     {useSupabase ? t.account.cloudStorage : t.account.localStorage}
                   </h3>
                   <p className="text-gray-600">
-                    {useSupabase
-                      ? t.account.dataSynced
-                      : t.account.signInToSync}
+                    {useSupabase ? t.account.dataSynced : t.account.signInToSync}
                   </p>
                 </div>
                 {!useSupabase && (

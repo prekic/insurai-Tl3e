@@ -43,6 +43,16 @@ export default defineConfig({
       '@': '/src',
     },
   },
+  server: {
+    proxy: {
+      '/api': {
+        target: 'http://localhost:4001',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Socket.io or realtime proxying info if needed could go here
+    },
+  },
   build: {
     // Generate hidden source maps for Sentry error tracking
     // 'hidden' means maps are generated and uploaded to Sentry but not referenced in bundles

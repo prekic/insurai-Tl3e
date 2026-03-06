@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import logger from '../lib/logger.js'
+import { getSupabaseWithError } from '../middleware/admin-auth.js'
 
 const router = Router()
 const log = logger.child('FX')
@@ -12,7 +13,18 @@ const fxLimiter = rateLimit({
 })
 
 // Currencies supported by the platform — TRY is always base = 1
-const SUPPORTED_SYMBOLS = ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED'] as const
+const SUPPORTED_SYMBOLS = [
+  'TRY',
+  'USD',
+  'EUR',
+  'GBP',
+  'CHF',
+  'SAR',
+  'AED',
+  'JPY',
+  'CAD',
+  'AUD',
+] as const
 
 // Fallback rates (approximate Q1 2026 values) used when API is unavailable
 const FALLBACK_RATES: Record<string, number> = {
@@ -23,6 +35,9 @@ const FALLBACK_RATES: Record<string, number> = {
   CHF: 38.0,
   SAR: 8.9,
   AED: 9.1,
+  JPY: 0.22,
+  CAD: 24.5,
+  AUD: 21.8,
 }
 
 let cachedRates: Record<string, number> = { ...FALLBACK_RATES }
@@ -34,7 +49,7 @@ const SERVER_CACHE_TTL = 1000 * 60 * 60 * 6 // 6 hours
  * Fetch live rates from exchangerate.host.
  * Returns null on failure so caller can fall back gracefully.
  */
-async function fetchLiveRates(): Promise<Record<string, number> | null> {
+export async function fetchLiveRates(): Promise<Record<string, number> | null> {
   const apiKey = process.env.EXCHANGERATE_API_KEY
   if (!apiKey) {
     log.info('EXCHANGERATE_API_KEY not set — using fallback rates')
@@ -94,6 +109,59 @@ async function fetchLiveRates(): Promise<Record<string, number> | null> {
       currencies: Object.keys(rates).length,
       sampleRate: `1 USD = ${rates.USD} TRY`,
     })
+
+    // FX Rate Deviation Alerts and History Storage
+    try {
+      const { client: supabase } = getSupabaseWithError()
+      if (supabase) {
+        const deviations: string[] = []
+        const historyRows = []
+
+        for (const [currency, newRate] of Object.entries(rates)) {
+          if (currency === 'TRY') continue
+
+          historyRows.push({
+            base_currency: 'TRY',
+            target_currency: currency,
+            rate: newRate,
+            source: 'api',
+          })
+
+          const oldRate = cachedRates[currency]
+          if (oldRate && oldRate > 0) {
+            const deviation = Math.abs(newRate - oldRate) / oldRate
+            if (deviation > 0.05) {
+              // 5% threshold
+              deviations.push(
+                `${currency}: ${(deviation * 100).toFixed(1)}% (from ${oldRate} to ${newRate})`
+              )
+            }
+          }
+        }
+
+        if (deviations.length > 0) {
+          log.warn('Significant FX rate deviation detected', { deviations })
+          await supabase.from('admin_notifications').insert([
+            {
+              type: 'warning',
+              category: 'system',
+              title: 'FX Rate Deviation Alert (>5%)',
+              message: `Significant FX rate deviations detected: ${deviations.join(', ')}`,
+              provider: 'exchangerate.host',
+              details: { deviations },
+            },
+          ])
+        }
+
+        if (historyRows.length > 0) {
+          await supabase.from('fx_rate_history').insert(historyRows)
+        }
+      }
+    } catch (dbErr) {
+      log.error('Failed to save FX rate history or dispatch alerts', {
+        error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+      })
+    }
 
     return rates
   } catch (error) {

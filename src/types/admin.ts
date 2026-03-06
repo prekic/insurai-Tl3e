@@ -830,6 +830,7 @@ export type AdminSection =
   | 'extraction_health'
   | 'actuarial'
   | 'actuarial_analytics'
+  | 'fx_rates'
 
 export interface AdminFilters {
   dateRange: {

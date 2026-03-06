@@ -16,9 +16,14 @@
 
 ---
 
-## Session Summary
+### This Session — FX Enhancements & Monitoring (March 6, 2026)
 
-### This Session — FX Production API + TypeScript Build Fixes (March 6, 2026)
+Completed **P3 Future Enhancements** across multiple files:
+
+1. **FX Dashboard & Monitoring** — Created new Supabase table `fx_rate_history` and `031_fx_rate_history.sql` migration. Added logic in `fetchLiveRates` to persist rates. Integrated new admin API endpoint `/api/admin/fx-monitoring` for historical data. Created `FXDashboardTab.tsx` component and added "FX Rates" tab to `AdminDashboard.tsx`.
+2. **Deviation Alerts** — Implemented detection of FX rate swings >5% in `server/routes/fx.ts` which inserts a warning directly to the `admin_notifications` table. Extended `fx-monitoring.test.ts` to assert this logic.
+3. **Currency Expansion** — Added support for `JPY`, `CAD`, and `AUD` across both `server/routes/fx.ts` and `src/lib/fx/fx-service.ts`.
+4. **Locale-Aware Formatting** — Refactored `formatCurrencyCompact` inside `src/lib/utils.ts` to use native `Intl.NumberFormat` for true locale-aware compact display instead of manual string replacement.
 
 Completed **3 items** across 4 commits:
 
@@ -84,17 +89,22 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 - PR title: `feat(fx): production FX API integration with exchangerate.host and expanded currency support`
 - Railway auto-deploys on main merge
 
+### ⚠️ URGENT INSTRUCTIONS FOR NEXT SESSION
+1. **Unfinished Tasks**: Pick up and work on any unfinished task that started, was touched, or was passed onto this session to work on in the following session.
+2. **Settings Pages**: Ensure the Settings page for **both User and Admin** are fully functional, styled, and complete. 
+3. **Cosmetic Sweep & Tests**: Run all tests again and ensure absolutely **no cosmetic item/flaw** is left anywhere in the application.
+
 ### P2 — Production Verification
 - Verify FX endpoint: `GET /api/fx/rates?base=TRY` — should return live rates
 - Verify status: `GET /api/fx/status` — should show `source: 'live'` (or `'fallback'` if no API key)
 - Optionally set `EXCHANGERATE_API_KEY` on Railway for higher rate limits
 - Test currency switching in user preferences UI
 
-### P3 — Future Enhancements
-- Admin FX rate monitoring dashboard (rates history, API health)
-- Locale-aware `formatCurrencyCompact()` (currently ignores locale parameter — uses hardcoded symbol map)
-- FX rate alerts when rates change significantly
-- More currencies on demand (add to `SUPPORTED_CURRENCIES` in `fx-service.ts` and `FALLBACK_RATES` in `fx.ts`)
+### Completed P3 Enhancements (This Session)
+- **Admin FX rate monitoring dashboard (rates history, API health)**: Completed via `FXDashboardTab.tsx`.
+- **Locale-aware `formatCurrencyCompact()`**: Completed via standard `Intl.NumberFormat` refactor.
+- **FX rate alerts when rates change significantly**: Completed (5% threshold triggering `admin_notifications`).
+- **More currencies on demand**: Added `JPY`, `CAD`, and `AUD`.
 
 ### P4 — Test Coverage Maintenance
 - Current: ~91.67% statements, ~85.91% branches — no regression from this session
@@ -108,7 +118,13 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 | Variable | Required | Where | Notes |
 |----------|----------|-------|-------|
 | `EXCHANGERATE_API_KEY` | Optional | Railway env vars | exchangerate.host API key for higher rate limits. Without it, free tier works but with lower limits. Server has 6h cache so only ~4 API calls/day. |
+### Architecture & Design Notes
+- FX Live Rates uses exchangerate.host on an hourly cached TTL basis preventing extreme load costs while capturing changes.
+- Rate history logs every hourly API ping to maintain historical analytics internally for `insurai`.
 
+### Bugs caught & squished:
+1. `react/no-unescaped-entities` in `FXDashboardTab.tsx` resolved cleanly.
+2. `UserPreferencesPanel` (displaying currency switcher component) was built but not wired properly to any layout; integrated it natively into the `MyAccount.tsx` component, fixing UI visibility problems completely.
 All other env vars unchanged from previous sessions.
 
 ---

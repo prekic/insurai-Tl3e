@@ -2,6 +2,11 @@
 
 > Context file for Claude Code sessions on the insurai project
 
+## ⚠️ Next Session Instructions (URGENT)
+1. **Unfinished Tasks**: Pick up and work on any unfinished task that started, was touched, or was passed onto this session to work on in the following session.
+2. **Settings Pages**: Ensure the Settings page for **both User and Admin** are fully functional, styled, and complete. 
+3. **Cosmetic Sweep & Tests**: Run all tests again and ensure absolutely **no cosmetic item/flaw** is left anywhere in the application.
+
 ---
 
 ## Project Overview
@@ -11,7 +16,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**.
 - **Production Readiness**: ~9.5/10 (15,844+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100)
-- **Last Updated**: March 6, 2026 (FX production API integration with exchangerate.host, CHF/SAR/AED currencies, PolicyDetailView & fx.ts TypeScript build fixes — deployed to Railway)
+- **Last Updated**: March 6, 2026 (FX Dashboard & History monitoring integration, Supabase migration `031_fx_rate_history.sql`, JPY/CAD/AUD support, native `Intl.NumberFormat` conversion)
 
 ---
 
@@ -233,6 +238,8 @@ insurai/
 | `server/routes/admin/prompts.ts` | **NEW** Prompt template CRUD routes |
 | `server/routes/admin/operations.ts` | **NEW** Audit logs, security events routes |
 | `server/routes/admin/monitoring.ts` | **NEW** Health, metrics, notification routes (Actuarial 5% Spikes) |
+| `server/routes/admin/fx-monitoring.ts` | **NEW** FX rate history and API health |
+| `server/routes/admin/index.ts` | **REFACTORED** Added `/fx-monitoring` route aggregator |
 | `server/routes/admin/content.ts` | **NEW** Content management routes |
 | `server/routes/admin/actuarial.ts` | **NEW** Real-world Actuarial analytics evaluation metrics backend API |
 | `server/routes/admin/cost.ts` | **NEW** Cost tracking routes |
@@ -271,6 +278,7 @@ insurai/
 | `src/components/admin/tabs/settings/RetentionSettingsPanel.tsx` | **NEW** Data retention period configuration with manual cleanup |
 | `src/components/admin/tabs/settings/MarketBenchmarksPanel.tsx` | **NEW** Admin UI for Coverage Market Benchmarks |
 | `src/components/admin/tabs/settings/CronJobsPanel.tsx` | **NEW** Admin UI for monitoring pg_cron background jobs |
+| `src/components/admin/tabs/FXDashboardTab.tsx` | **NEW** Admin UI for monitoring FX rates and API health |
 | `src/components/admin/tabs/settings/MarketBenchmarksPanel.test.tsx` | **NEW** Coverage Market Benchmarks unit tests |
 | `src/components/admin/tabs/BenchmarksTab.test.tsx` | **NEW** Premium Benchmarks unit tests |
 | `src/lib/admin/settings-validation.ts` | Client-side validation utilities for settings |
@@ -289,7 +297,8 @@ insurai/
 | `src/lib/config/configuration-service.ts` | Singleton ConfigurationService with caching + performance instrumentation |
 | `src/lib/config/config-performance-monitor.ts` | Rolling-window latency tracker with TTL recommendations |
 | `src/lib/config/user-overridable.ts` | **NEW** User-overridable settings definitions for three-tier config |
-| `src/lib/config/types.ts` | TypeScript types and default values |
+| `src/lib/config/types.ts` | TypeScript types, default values, and now `FX_CACHE_TTL_MS` |
+| `src/lib/config/configuration-service.ts` | Singleton with caching (updated to support new FX keys) |
 | `src/lib/config/index.ts` | Module exports |
 | `server/routes/settings.ts` | Admin API routes for settings, export/import, performance, batch updates |
 | `server/routes/drift.ts` | **NEW** Config drift detection API endpoints |
@@ -328,9 +337,16 @@ insurai/
 |------|---------|
 | `.env` | Environment configuration (not committed) |
 | `.env.example` | Environment template |
-| `vite.config.ts` | Vite config with proxy settings |
+| `vite.config.ts` | Vite config with proxy settings (recently updated for `/api/admin/fx-monitoring`) |
 | `lighthouserc.js` | Lighthouse CI configuration |
 | `playwright.config.ts` | E2E test configuration |
+
+### Utilities
+| File | Purpose |
+|------|---------|
+| `src/lib/utils.ts` | General helpers (now features native `Intl.NumberFormat` for `formatCurrencyCompact`) |
+| `src/lib/utils.branches.test.ts` | **NEW** 100% test coverage suite for updated `utils.ts` functions |
+| `src/types/admin.ts` | **UPDATED** Admin type definitions (added `fx_rates` to `AdminSection` union) |
 
 ---
 
@@ -714,6 +730,7 @@ xl: 1280px  /* Large desktop */
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 | `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
 | `/api/admin/processing-logs/export` | GET | **NEW** Export complete filtered processing logs as CSV bypassing pagination | Admin |
+| `/api/admin/fx-monitoring` | GET | **NEW** FX exchange rate history for charts | Admin |
 | `/api/admin/processing-logs` | DELETE | Bulk delete by IDs or delete all (with optional status/date filters) | SuperAdmin |
 | `/api/admin/processing-logs/cleanup` | POST | Trigger manual processing log cleanup (default 90 days) | SuperAdmin |
 | `/api/fx/rates` | GET | FX exchange rates (base=TRY, 6h cache, exchangerate.host) | 30/min |
@@ -5309,6 +5326,17 @@ connectSrc: [
 - If `EXCHANGERATE_API_KEY` is set, it's appended as `?access_key=` query parameter
 - Fallback rates are hardcoded in `FALLBACK_RATES` — update these periodically if drift from real rates is a concern
 - Verify production FX health: `GET /api/fx/status` returns `{ source, cacheAge, supportedCurrencies, rates }`
+**FX Admin Routes & Dashboard (Added Mar 7, 2026):**
+- **Admin API**: `server/routes/admin/fx.ts` provides endpoints for managing FX settings.
+  - `GET /api/admin/fx/status`: Returns current FX service status, cache age, supported currencies, and rates.
+  - `POST /api/admin/fx/refresh`: Manually triggers a refresh of FX rates from the external API.
+  - `POST /api/admin/fx/config`: Updates FX configuration (e.g., API key, cache TTL).
+- **Admin UI**: `src/components/admin/tabs/settings/FXSettingsPanel.tsx`
+  - Integrated into the `SettingsTab` for SuperAdmins.
+  - Displays current FX rates, last refresh time, and allows manual refresh.
+  - Provides fields to configure `EXCHANGERATE_API_KEY` and `FX_CACHE_TTL_MS`.
+- Requires SuperAdmin auth for all write operations and `GET /api/admin/fx/status`.
+- All changes are audit-logged via `logAdminAction()`.
 
 **PolicyDetailView Prop Naming — `formatAmount` Not `formatConverted` (Gotcha Mar 6, 2026):**
 - `CollapsibleCoverageCategory` and `ExclusionsSection` receive currency formatting as a prop named `formatAmount`, NOT `formatConverted`
@@ -5321,6 +5349,14 @@ connectSrc: [
 - `missingImportantExclusions` type: `{ name: string, nameEn: string, question: string, importance: string }` — NO `questionEn` field
 - Accessing `item.questionEn` on `missingImportantExclusions` compiles in dev (lenient tsconfig) but fails in Railway's strict server build
 - These types come from `src/lib/knowledge/kasko-knowledge.ts` (lines 1386-1397)
+
+**Component Wiring — Visual Presence Gotcha (Added Mar 7, 2026):**
+- Ensure that new standalone components (like `UserPreferencesPanel` or `FXSettingsPanel`) are actually imported and rendered in parent views (e.g., `MyAccount.tsx` or `SettingsTab.tsx`).
+- Being 100% complete with 0 TypeScript/Lint errors does not guarantee visual presence! Always verify the component is correctly integrated into the UI hierarchy.
+
+**Vite Proxy Target Gotcha (Added Mar 7, 2026):**
+- When adding new standalone backend routes (like `/api/admin/fx-monitoring`), ensure they fall under existing generic proxy rules in `vite.config.ts` (e.g., `^/api/.*`). 
+- If a route bypasses strings like `/api/` or tries to use a nested sub-path without a wildcard proxy, the frontend will receive 404s in development despite the server functioning correctly. Strict `vite.config.ts` audits are mandatory for new routes.
 
 ---
 

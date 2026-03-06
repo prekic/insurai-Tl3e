@@ -214,6 +214,7 @@ const UI_KEY_MAP: Record<string, keyof UIConfig> = {
   max_recommendations_preview: 'maxRecommendationsPreview',
   max_file_size_mb: 'maxFileSizeMb',
   allowed_file_extensions: 'allowedFileExtensions',
+  display_currency: 'displayCurrency',
 }
 
 const EMAIL_KEY_MAP: Record<string, keyof EmailConfig> = {

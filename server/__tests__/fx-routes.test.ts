@@ -44,6 +44,9 @@ const EXPECTED_FALLBACK_RATES = {
   CHF: 38.0,
   SAR: 8.9,
   AED: 9.1,
+  JPY: 0.22,
+  CAD: 24.5,
+  AUD: 21.8,
 }
 
 async function buildApp() {
@@ -199,8 +202,19 @@ describe('GET /api/fx/status', () => {
     const app = await buildApp()
     const res = await request(app).get('/api/fx/status').expect(200)
 
-    expect(res.body.supportedCurrencies).toEqual(['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED'])
-    expect(res.body.supportedCurrencies).toHaveLength(7)
+    expect(res.body.supportedCurrencies).toEqual([
+      'TRY',
+      'USD',
+      'EUR',
+      'GBP',
+      'CHF',
+      'SAR',
+      'AED',
+      'JPY',
+      'CAD',
+      'AUD',
+    ])
+    expect(res.body.supportedCurrencies).toHaveLength(10)
   })
 
   it('returns null lastFetchTime before any rates request', async () => {
@@ -368,6 +382,9 @@ describe('GET /api/fx/rates — exchangerate.host integration', () => {
     expect(res.body.rates.CHF).toBe(38.0)
     expect(res.body.rates.SAR).toBe(8.9)
     expect(res.body.rates.AED).toBe(9.1)
+    expect(res.body.rates.JPY).toBe(0.22)
+    expect(res.body.rates.CAD).toBe(24.5)
+    expect(res.body.rates.AUD).toBe(21.8)
   })
 
   it('caches API results and does not re-fetch within TTL', async () => {
