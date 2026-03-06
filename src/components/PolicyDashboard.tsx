@@ -24,8 +24,9 @@ import {
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
-import { formatCurrency, formatCurrencyCompact, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { usePolicies, useDashboardPolicies } from '@/lib/policy-context'
 import { sanitizeSearchQuery, sanitizeId } from '@/lib/sanitize'
 import { PolicyCardGrid } from './PolicyCard'
@@ -68,6 +69,7 @@ type SortDirection = 'asc' | 'desc'
 export function PolicyDashboard() {
   const navigate = useNavigate()
   const { t, isRTL, locale } = useI18n()
+  const { formatConverted, formatConvertedCompact } = useDisplayCurrency()
   const {
     policies: fullPolicies,
     deletePolicy,
@@ -466,7 +468,7 @@ export function PolicyDashboard() {
                     <span className="text-xs text-gray-500">{t.policy.totalSumInsured}</span>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatCurrency(stats.totalSumInsured, 'TRY', locale)}
+                    {formatConverted(stats.totalSumInsured)}
                   </p>
                 </div>
                 {/* Limit */}
@@ -478,7 +480,7 @@ export function PolicyDashboard() {
                     <span className="text-xs text-gray-500">{t.policy.totalLimit}</span>
                   </div>
                   <p className="text-xl font-bold text-gray-900">
-                    {formatCurrency(stats.totalLimit, 'TRY', locale)}
+                    {formatConverted(stats.totalLimit)}
                   </p>
                 </div>
                 {/* Expiring */}
@@ -931,10 +933,10 @@ export function PolicyDashboard() {
                               <div>
                                 <p className="font-medium text-gray-900 text-sm sm:text-base">
                                   <span className="sm:hidden">
-                                    {formatCurrencyCompact(displayValue, 'TRY', locale)}
+                                    {formatConvertedCompact(displayValue)}
                                   </span>
                                   <span className="hidden sm:inline">
-                                    {formatCurrency(displayValue, 'TRY', locale)}
+                                    {formatConverted(displayValue)}
                                   </span>
                                 </p>
                                 <p className="text-[10px] sm:text-xs text-gray-500">
@@ -950,7 +952,7 @@ export function PolicyDashboard() {
                             </td>
                             <td className="px-3 sm:px-6 py-3 sm:py-4 hidden sm:table-cell">
                               <span className="text-gray-900 text-sm">
-                                {formatCurrency(policy.premium, 'TRY', locale)}
+                                {formatConverted(policy.premium)}
                                 <span className="text-gray-500">/yr</span>
                               </span>
                             </td>

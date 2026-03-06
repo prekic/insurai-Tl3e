@@ -36,7 +36,8 @@ import { Button } from './ui/button'
 import { Badge } from './ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { PolicyDocuments } from './PolicyDocuments'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { Coverage, CoverageCategory } from '@/types/policy'
 import {
   KASKO_COVERAGE_CATEGORIES,
@@ -64,7 +65,12 @@ import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryC
  * Format coverage limit with special handling for unlimited and market value
  * Uses kasko knowledge hub for intelligent detection
  */
-function formatCoverageLimit(coverage: Coverage, locale: string, t: any): string {
+function formatCoverageLimit(
+  coverage: Coverage,
+  locale: string,
+  t: any,
+  fmt: (amount: number) => string = (a) => String(a)
+): string {
   // Explicit flags take priority
   if (coverage.isUnlimited) {
     return t.global.unlimited
@@ -101,7 +107,7 @@ function formatCoverageLimit(coverage: Coverage, locale: string, t: any): string
     }
     return t.global.included // Default to "Dahil" instead of ₺0 for zero-limit coverages
   }
-  return formatCurrency(coverage.limit, 'TRY', locale)
+  return fmt(coverage.limit)
 }
 
 /**
@@ -144,17 +150,17 @@ function getCategoryInfo(category: CoverageCategory) {
 /**
  * Get additional info text for a coverage item
  */
-function getCoverageInfoText(coverage: Coverage, locale: string, t: any): string | null {
+function getCoverageInfoText(
+  coverage: Coverage,
+  locale: string,
+  t: any,
+  fmt: (amount: number) => string = (a) => String(a)
+): string | null {
   const parts: string[] = []
 
   // Add deductible info if applicable
   if (coverage.deductible && coverage.deductible > 0) {
-    parts.push(
-      t.policy.coverageDeductible.replace(
-        '{amount}',
-        formatCurrency(coverage.deductible, 'TRY', locale)
-      )
-    )
+    parts.push(t.policy.coverageDeductible.replace('{amount}', fmt(coverage.deductible)))
   }
 
   // Add description if available
@@ -281,6 +287,7 @@ function CollapsibleCoverageCategory({
   t,
   coverageNames,
   defaultExpanded = false,
+  formatAmount,
 }: {
   categoryKey: string // Used for React key prop
   categoryLabel: string
@@ -290,6 +297,7 @@ function CollapsibleCoverageCategory({
   locale: string
   t: any
   defaultExpanded?: boolean
+  formatAmount: (amount: number) => string
 }) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [expandedCoverageIndex, setExpandedCoverageIndex] = useState<number | null>(null)
@@ -346,7 +354,7 @@ function CollapsibleCoverageCategory({
                       >
                         {subLimit.isUnlimited
                           ? t.global.unlimited
-                          : formatCurrency(subLimit.limit, 'TRY', locale)}
+                          : formatConverted(subLimit.limit)}
                       </span>
                     </div>
                   ))}
@@ -358,14 +366,14 @@ function CollapsibleCoverageCategory({
           // Regular coverage - with click-to-expand info
           const coverage = groupedCoverage as unknown as Coverage
           // Pass t in here eventually but we need to pipe it from CoveragesByCategory
-          const limitDisplay = formatCoverageLimit(coverage, locale, t)
+          const limitDisplay = formatCoverageLimit(coverage, locale, t, formatAmount)
           const isSpecialValue =
             coverage.isUnlimited ||
             coverage.isMarketValue ||
             limitDisplay === t.global.included ||
             limitDisplay === t.global.unlimited ||
             limitDisplay === t.global.marketValue
-          const infoText = getCoverageInfoText(coverage, locale, t)
+          const infoText = getCoverageInfoText(coverage, locale, t, formatAmount)
           const isCoverageExpanded = expandedCoverageIndex === i
           const hasInfo = !!infoText
 
@@ -452,6 +460,7 @@ function CoveragesByCategory({
   locale: string
 }) {
   const { t } = useI18n()
+  const { formatConverted: formatAmount } = useDisplayCurrency()
   // Filter and prepare coverages
   const filteredCoverages = coverages.filter((coverage) => {
     // Always keep coverages with limits, unlimited flag, or market value flag
@@ -558,6 +567,7 @@ function CoveragesByCategory({
             t={t}
             coverageNames={t.coverageNames}
             defaultExpanded={index === 0} // First category expanded by default
+            formatAmount={formatAmount}
           />
         )
       })}
@@ -665,7 +675,7 @@ function ExclusionsSection({
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-green-700">
-                    {item.extractedLimit ? formatCurrency(item.extractedLimit, 'TRY', locale) : ''}
+                    {item.extractedLimit ? formatConverted(item.extractedLimit) : ''}
                   </span>
                 </div>
               ))}
@@ -794,7 +804,7 @@ function ExclusionsSection({
                     </div>
                     <p className="text-sm text-blue-700 flex items-center gap-1">
                       <HelpCircle size={12} />
-                      {locale === 'tr' ? item.question : item.question}
+                      {locale === 'tr' ? item.question : item.questionEn || item.question}
                     </p>
                   </div>
                 ))}
@@ -955,6 +965,7 @@ export function PolicyDetailView() {
   const { id } = useParams<{ id: string }>()
   const { getPolicyById, fetchPolicyById } = usePolicies()
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
 
   // Check for policy passed via location state (for trial results)
   const locationState = location.state as LocationState | null
@@ -1078,15 +1089,15 @@ export function PolicyDetailView() {
       `${t.policy.provider}: ${getShortCompanyName(policy.provider)}`,
       `${t.policy.type}: ${policy.typeTr}`,
       `${t.policy.insured}: ${policy.insuredPerson}`,
-      `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatCurrency(policy.coverage, 'TRY', locale)}`,
-      `${t.policy.premiumLabel}: ${formatCurrency(policy.premium, 'TRY', locale)}`,
-      `${t.policy.deductibleLabel}: ${formatCurrency(policy.deductible, 'TRY', locale)}`,
+      `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
+      `${t.policy.premiumLabel}: ${formatConverted(policy.premium)}`,
+      `${t.policy.deductibleLabel}: ${formatConverted(policy.deductible)}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${t.policy.coveragesTitleExport} ===`,
       ...policy.coverages.map(
         (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? t.global.unlimited : formatCurrency(c.limit, 'TRY', locale)}`
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? t.global.unlimited : formatConverted(c.limit)}`
       ),
       '',
       `=== ${t.policy.exclusionsTitleExport} ===`,
@@ -1108,7 +1119,7 @@ export function PolicyDetailView() {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success(t.exportMenu.textSuccess)
-  }, [policy, locale, t])
+  }, [policy, locale, t, formatConverted])
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -1356,7 +1367,7 @@ export function PolicyDetailView() {
                     <p className="text-lg sm:text-xl font-bold text-blue-700 truncate">
                       {policy.type === 'kasko'
                         ? t.policy.vehicleMarketValue
-                        : formatCurrency(policy.coverage, 'TRY', locale)}
+                        : formatConverted(policy.coverage)}
                     </p>
                     {policy.type === 'kasko' && (
                       <p className="text-[10px] text-blue-500 mt-0.5">{t.policy.marketValueHelp}</p>
@@ -1369,9 +1380,7 @@ export function PolicyDetailView() {
                       {t.policy.premiumLabel}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.premium > 0
-                        ? formatCurrency(policy.premium, 'TRY', locale)
-                        : t.policy.notSpecified}
+                      {policy.premium > 0 ? formatConverted(policy.premium) : t.policy.notSpecified}
                     </p>
                   </div>
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
@@ -1379,9 +1388,7 @@ export function PolicyDetailView() {
                       {t.policy.deductibleLabel}
                     </p>
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.deductible > 0
-                        ? formatCurrency(policy.deductible, 'TRY', locale)
-                        : t.global.none}
+                      {policy.deductible > 0 ? formatConverted(policy.deductible) : t.global.none}
                     </p>
                   </div>
 
@@ -1611,10 +1618,10 @@ export function PolicyDetailView() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-sm text-gray-900">
-                          {formatCurrency(policy.premium, 'TRY', locale)}
+                          {formatConverted(policy.premium)}
                         </span>
                         <span className="font-semibold text-sm text-gray-600">
-                          {formatCurrency(policy.marketComparison.averagePremium, 'TRY', locale)}
+                          {formatConverted(policy.marketComparison.averagePremium)}
                         </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (
@@ -1931,10 +1938,10 @@ export function PolicyDetailView() {
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-gray-900">
-                          {formatCurrency(policy.premium, 'TRY', locale)}
+                          {formatConverted(policy.premium)}
                         </span>
                         <span className="font-semibold text-gray-600">
-                          {formatCurrency(policy.marketComparison.averagePremium, 'TRY', locale)}
+                          {formatConverted(policy.marketComparison.averagePremium)}
                         </span>
                       </div>
                       {policy.premium < policy.marketComparison.averagePremium && (

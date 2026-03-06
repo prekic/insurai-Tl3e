@@ -1,6 +1,7 @@
 import { cn } from '@/lib/utils'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { AlertTriangle, AlertCircle, Info, ArrowRight } from 'lucide-react'
 import type { PolicyFieldDiff } from '@/lib/policy-utils'
 
@@ -46,6 +47,7 @@ interface DiffRowProps {
 
 function DiffRow({ change, compact = false }: DiffRowProps) {
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
 
   const label = locale === 'tr' ? change.fieldLabelTr : change.fieldLabel
 
@@ -57,7 +59,7 @@ function DiffRow({ change, compact = false }: DiffRowProps) {
 
     switch (type) {
       case 'number':
-        return formatCurrency(Number(value), 'TRY', locale)
+        return formatConverted(Number(value))
       case 'date':
         return formatDate(String(value), locale)
       case 'array':

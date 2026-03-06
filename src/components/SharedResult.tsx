@@ -26,7 +26,7 @@ import {
   formatTimeRemaining,
 } from '@/lib/free-trial'
 import { useI18n } from '@/lib/i18n'
-import { formatCurrency } from '@/lib/utils'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
 
 type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
@@ -35,6 +35,7 @@ export function SharedResult() {
   const { shareId } = useParams<{ shareId: string }>()
   const navigate = useNavigate()
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
   const [state, setState] = useState<ViewState>('loading')
   const [policy, setPolicy] = useState<AnalyzedPolicy | null>(null)
   const [fileName, setFileName] = useState<string>('')
@@ -208,7 +209,7 @@ export function SharedResult() {
               <div className="p-4 bg-gray-50 rounded-xl">
                 <div className="text-sm text-gray-500">{t.shared.premium}</div>
                 <div className="font-semibold text-gray-900">
-                  {policy.premium ? formatCurrency(policy.premium, 'TRY', locale) : 'N/A'}
+                  {policy.premium ? formatConverted(policy.premium) : 'N/A'}
                 </div>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl">
@@ -219,7 +220,7 @@ export function SharedResult() {
                       ? 'Rayiç Değer'
                       : 'Market Value'
                     : policy.coverage
-                      ? formatCurrency(policy.coverage, 'TRY', locale)
+                      ? formatConverted(policy.coverage)
                       : 'N/A'}
                 </div>
               </div>
@@ -251,7 +252,7 @@ export function SharedResult() {
                               ? locale === 'tr'
                                 ? '✓ Dahil'
                                 : '✓ Included'
-                              : formatCurrency(cov.limit || 0, 'TRY', locale)}
+                              : formatConverted(cov.limit || 0)}
                       </span>
                     </div>
                   ))}

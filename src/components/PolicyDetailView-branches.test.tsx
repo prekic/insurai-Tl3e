@@ -51,6 +51,16 @@ vi.mock('@/lib/supabase/auth-context', () => ({
   })),
 }))
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 const mockGetPolicyById = vi.fn()
 const mockFetchPolicyById = vi.fn()
 const mockSelectPolicy = vi.fn()

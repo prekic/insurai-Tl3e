@@ -1,7 +1,8 @@
 import { Eye, Trash2, MessageSquare, CheckSquare, Square, Sparkles, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { formatDate } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { Badge } from './ui/badge'
 import { GradeBadge, StatusIndicator, ScoreBreakdown, OverallScore } from './evaluation'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
@@ -42,6 +43,7 @@ export function PolicyCard({
   duplicateInfo = null,
 }: PolicyCardProps) {
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
   const { evaluation } = usePolicyEvaluation(showEvaluation ? policy : undefined)
 
   const policyTypeInfo = POLICY_TYPES[policy.type]
@@ -257,13 +259,13 @@ export function PolicyCard({
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">{t.policy.coverage}</p>
             <p className="text-lg font-semibold text-gray-900">
-              {formatCurrency(policy.coverage, 'TRY', locale)}
+              {formatConverted(policy.coverage)}
             </p>
           </div>
           <div>
             <p className="text-xs text-gray-500 uppercase tracking-wide">{t.policy.premium}</p>
             <p className="text-lg font-semibold text-gray-900">
-              {formatCurrency(policy.premium, 'TRY', locale)}/yr
+              {formatConverted(policy.premium)}/yr
             </p>
           </div>
         </div>

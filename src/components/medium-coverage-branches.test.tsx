@@ -24,6 +24,16 @@ import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
 const mockNavigate = vi.fn()
 const mockSignOut = vi.fn()
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {
@@ -903,8 +913,8 @@ describe('PolicyDiffViewer — extra branches', () => {
         ]}
       />
     )
-    expect(screen.getByText('TL0')).toBeInTheDocument()
-    expect(screen.getByText('TL1,000')).toBeInTheDocument()
+    expect(screen.getByText('₺0')).toBeInTheDocument()
+    expect(screen.getByText('₺1,000')).toBeInTheDocument()
   })
 
   it('shows both added and removed items when array changed', () => {

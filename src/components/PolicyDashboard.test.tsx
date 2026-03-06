@@ -168,6 +168,16 @@ vi.mock('sonner', () => ({
   },
 }))
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 // Mock free-trial for hasPendingTrialTransfer
 vi.mock('@/lib/free-trial', () => ({
   hasPendingTrialTransfer: () => false,

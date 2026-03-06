@@ -32,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { useI18n } from '@/lib/i18n'
-import { formatCurrency } from '@/lib/utils'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
 
 interface AIInsightsPanelProps {
@@ -41,6 +41,7 @@ interface AIInsightsPanelProps {
 
 export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']))
 
   const toggleSection = (section: string) => {
@@ -187,12 +188,12 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
                       {t.aiInsightsPanel.yourPremium}
                     </p>
                     <p className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(policy.premium, 'TRY', locale)}
+                      {formatConverted(policy.premium)}
                     </p>
                     {policy.marketComparison.averagePremium && (
                       <p className="text-xs text-gray-500 mt-1">
                         {t.aiInsightsPanel.marketAvg}{' '}
-                        {formatCurrency(policy.marketComparison.averagePremium, 'TRY', locale)}
+                        {formatConverted(policy.marketComparison.averagePremium)}
                       </p>
                     )}
                   </div>
@@ -362,7 +363,7 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
                         {t.aiInsightsPanel.financialExposure}
                       </span>
                       <span className="font-semibold text-gray-900">
-                        {formatCurrency(policy.gapAnalysis.financialExposure, 'TRY', locale)}
+                        {formatConverted(policy.gapAnalysis.financialExposure)}
                       </span>
                     </div>
                     {policy.gapAnalysis.remediationCost > 0 && (
@@ -371,7 +372,7 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
                           {t.aiInsightsPanel.remediationCost}
                         </span>
                         <span className="font-semibold text-green-700">
-                          {formatCurrency(policy.gapAnalysis.remediationCost, 'TRY', locale)}
+                          {formatConverted(policy.gapAnalysis.remediationCost)}
                         </span>
                       </div>
                     )}

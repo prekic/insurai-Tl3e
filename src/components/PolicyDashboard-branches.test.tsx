@@ -196,6 +196,16 @@ vi.mock('@/lib/i18n', () => ({
   useI18n: () => ({ t, isRTL: false, locale: mockLocale }),
 }))
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 // ─── Router mock ────────────────────────────────────────────────────────────
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', () => ({

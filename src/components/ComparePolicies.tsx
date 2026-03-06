@@ -16,8 +16,9 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
-import { cn, formatCurrency } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { usePolicies } from '@/lib/policy-context'
 import { usePolicyComparison } from '@/hooks/usePolicyComparison'
 import { PolicyCard } from './PolicyCard'
@@ -652,7 +653,7 @@ interface QuickStatsCardProps {
 }
 
 function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
-  const { locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
   const avgScore = Math.round(
     comparison.policies.reduce((sum, p) => sum + p.evaluation.overallScore, 0) /
       comparison.policies.length
@@ -674,12 +675,12 @@ function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
     },
     {
       label: t.comparison.avgPremium,
-      value: formatCurrency(avgPremium, 'TRY', locale),
+      value: formatConverted(avgPremium),
       icon: <TrendingUp className="w-5 h-5 text-amber-500" />,
     },
     {
       label: t.comparison.totalCoverage,
-      value: formatCurrency(totalCoverage, 'TRY', locale),
+      value: formatConverted(totalCoverage),
       icon: <TrendingUp className="w-5 h-5 text-purple-500" />,
     },
   ]
@@ -909,6 +910,7 @@ interface EnhancedCoverageMatrixProps {
 }
 
 function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatrixProps) {
+  const { formatConverted } = useDisplayCurrency()
   if (!comparison.coverageMatrix || comparison.coverageMatrix.length === 0) {
     return <CoverageMatrix comparison={comparison} />
   }
@@ -969,9 +971,7 @@ function EnhancedCoverageMatrix({ comparison, t, locale }: EnhancedCoverageMatri
                               isBest ? 'text-emerald-700' : 'text-gray-900'
                             )}
                           >
-                            {p.limit > 0
-                              ? formatCurrency(p.limit, 'TRY', locale)
-                              : t.comparison.included}
+                            {p.limit > 0 ? formatConverted(p.limit) : t.comparison.included}
                           </span>
                           {isBest && (
                             <span className="ml-1 text-[10px] text-emerald-600 font-semibold">

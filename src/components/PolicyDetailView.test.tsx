@@ -104,6 +104,16 @@ vi.mock('@/lib/i18n/i18n-context', async () => {
   }
 })
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 vi.mock('@/hooks/usePdfExport', () => ({
   usePdfExport: () => ({
     exportPolicy: vi.fn().mockResolvedValue(true),

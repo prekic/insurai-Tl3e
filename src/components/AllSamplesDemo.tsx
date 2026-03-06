@@ -15,8 +15,8 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { Badge } from './ui/badge'
 import { Button } from './ui/button'
 import { samplePolicies } from '@/data/sample-policies'
-import { formatCurrency } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
+import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 
 // Translate AI insight string using the i18n insightTranslations map
 function translateInsight(
@@ -41,6 +41,7 @@ function translateInsight(
 
 export function AllSamplesDemo() {
   const { t, locale } = useI18n()
+  const { formatConverted } = useDisplayCurrency()
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const toggleExpand = (id: string) => {
@@ -93,13 +94,13 @@ export function AllSamplesDemo() {
                       <div>
                         <p className="text-sm text-gray-500">{t.policy.coverage}</p>
                         <p className="font-semibold text-gray-900">
-                          {formatCurrency(policy.coverage, 'TRY', locale)}
+                          {formatConverted(policy.coverage)}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">{t.policy.premium}</p>
                         <p className="font-semibold text-gray-900">
-                          {formatCurrency(policy.premium, 'TRY', locale)}
+                          {formatConverted(policy.premium)}
                           {t.policy.perYear}
                         </p>
                       </div>
@@ -149,7 +150,7 @@ export function AllSamplesDemo() {
                             <Shield size={14} />
                             <span>
                               <span className="text-gray-400">{t.policy.deductible}:</span>{' '}
-                              {formatCurrency(policy.deductible, 'TRY', locale)}
+                              {formatConverted(policy.deductible)}
                             </span>
                           </div>
                         </div>
@@ -187,12 +188,11 @@ export function AllSamplesDemo() {
                                   {cov.included ? (
                                     <>
                                       <span className="text-gray-900 font-medium">
-                                        {formatCurrency(cov.limit, 'TRY', locale)}
+                                        {formatConverted(cov.limit)}
                                       </span>
                                       {cov.deductible > 0 && (
                                         <span className="text-xs text-gray-400">
-                                          ({t.policy.deductible}:{' '}
-                                          {formatCurrency(cov.deductible, 'TRY', locale)})
+                                          ({t.policy.deductible}: {formatConverted(cov.deductible)})
                                         </span>
                                       )}
                                     </>

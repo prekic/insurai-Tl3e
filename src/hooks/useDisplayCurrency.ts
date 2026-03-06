@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fxService, type SupportedCurrency } from '@/lib/fx/fx-service'
 import { useUserPreferences } from './useUserPreferences'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, formatCurrencyCompact } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 
 export function useDisplayCurrency() {
@@ -32,10 +32,19 @@ export function useDisplayCurrency() {
     [displayCurrency, locale]
   )
 
+  const formatConvertedCompact = useCallback(
+    (amount: number, fromBase: SupportedCurrency = 'TRY') => {
+      const convertedValue = fxService.convertSync(amount, fromBase, displayCurrency)
+      return formatCurrencyCompact(convertedValue, displayCurrency, locale)
+    },
+    [displayCurrency, locale]
+  )
+
   return {
     displayCurrency,
     convert,
     formatConverted,
+    formatConvertedCompact,
     isReady,
   }
 }

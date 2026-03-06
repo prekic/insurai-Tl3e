@@ -26,6 +26,16 @@ vi.mock('@/lib/i18n', () => ({
   }),
 }))
 
+vi.mock('@/hooks/useDisplayCurrency', () => ({
+  useDisplayCurrency: () => ({
+    displayCurrency: 'TRY',
+    convert: (amount: number) => amount,
+    formatConverted: (amount: number) => `₺${amount.toLocaleString()}`,
+    formatConvertedCompact: (amount: number) => `₺${amount.toLocaleString()}`,
+    isReady: true,
+  }),
+}))
+
 // Mock utils
 vi.mock('@/lib/utils', async () => {
   const actual = await vi.importActual('@/lib/utils')
