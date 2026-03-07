@@ -71,7 +71,7 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 - Railway auto-deploys on main merge
 
 ### ⚠️ URGENT INSTRUCTIONS FOR NEXT SESSION
-1. **Unfinished Tasks**: There is one piece of pending E2E technical debt. A skeleton E2E test file (`e2e/test_fx_ui.spec.ts`) was added during the cosmetic sweep to test the User Preferences FX UI. It currently lacks testing assertions. The next agent should populate this file with Playwright assertions to finalize E2E coverage.
+1. **Unfinished Tasks**: None! The pending E2E technical debt for the FX UI (`e2e/test_fx_ui.spec.ts`) has been fully populated with Playwright assertions, finalizing E2E coverage for this session.
 2. **Settings Pages**: Settings pages are complete and structurally sound. Avoid editing them unless a major layout overhaul is requested.
 3. **Cosmetic Sweep & Tests**: DO NOT introduce any linting errors. All PRs demand 0-error `eslint` and `tsc` executions to properly merge in the strict CI pipeline. Keep debug `console.log`s suppressed or removed prior to handoff.
 
