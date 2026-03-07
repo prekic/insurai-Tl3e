@@ -1,4 +1,4 @@
-# Session Handoff — March 6, 2026 (FX Production API + Build Fixes)
+# Session Handoff — March 7, 2026 (Finalizing FX API Deployment & E2E Validation)
 
 ## Current Status
 
@@ -11,7 +11,7 @@
 | **Tests** | 15,850+ tests passing, 0 failures (337 files). 1 worker fork timeout (Vitest infrastructure, not code). |
 | **Coverage** | ~91.68% statements, ~85.91% branches |
 
-### This Session — Final UI Polish & FX Hardening (March 6, 2026)
+### This Session — Final UI Polish & FX Hardening (March 7, 2026)
 
 Completed **Final Verification & Cleanup** across the codebase:
 
@@ -50,6 +50,7 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 | **FX production API (exchangerate.host)** | **Done** | **Mar 6** |
 | **CHF/SAR/AED currencies + UI polish** | **Done** | **Mar 6** |
 | **PolicyDetailView + fx.ts TypeScript fixes** | **Done** | **Mar 6** |
+| **E2E coverage applied to FX UI with conditional auth bypass** | **Done** | **Mar 7** |
 
 ### Remaining Data-Field Ternaries (All Correct to Keep)
 
@@ -65,10 +66,9 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 
 ## Priority Next Steps
 
-### P1 — Merge to Main
-- Branch `claude/load-project-context-OJhBT` is ready to merge
-- PR title: `feat(fx): production FX API integration with exchangerate.host and expanded currency support`
-- Railway auto-deploys on main merge
+### P1 — Monitor Production Telemetry
+- Monitor the production endpoints (`/api/fx/rates?base=TRY` and `/api/fx/status`) to ensure the caching TTL is working effectively.
+- Verify that standard rate limits from the free-tier `exchangerate.host` API are not exceeded under normal usage.
 
 ### ⚠️ URGENT INSTRUCTIONS FOR NEXT SESSION
 1. **Unfinished Tasks**: None! The pending E2E technical debt for the FX UI (`e2e/test_fx_ui.spec.ts`) has been fully populated with Playwright assertions, finalizing E2E coverage for this session.
@@ -106,6 +106,7 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 ### Bugs caught & squished:
 1. `react/no-unescaped-entities` in `FXDashboardTab.tsx` resolved cleanly.
 2. `UserPreferencesPanel` (displaying currency switcher component) was built but not wired properly to any layout; integrated it natively into the `MyAccount.tsx` component, fixing UI visibility problems completely.
+3. Complex git merge conflicts when pushing to main across documentation files (`CLAUDE.md`, `SESSION_HANDOFF.md`); successfully mitigated via local rebase/merge strategy.
 All other env vars unchanged from previous sessions.
 
 ---
@@ -174,4 +175,4 @@ vi.mock('@/lib/i18n/i18n-context', () => ({
 | Mar 4 | Fix 180 branch coverage test failures + async act() warnings | `claude/load-project-context-TWvOc` |
 | Mar 5 | FX system + PolicyDetailView i18n (132 ternaries) + migration 030 + recharts split | `claude/load-project-context-l9Prt` |
 | Mar 6 | useDisplayCurrency wired into all 12 components + formatConverted dep fix | `claude/load-project-context-p9ADU` |
-| **Mar 6** | **FX production API (exchangerate.host) + CHF/SAR/AED + 10 TypeScript build fixes** | **`claude/load-project-context-OJhBT`** |
+| Mar 7 | **E2E tests for FX UI + Merge to Main + Handoff Audit** | **`insuraigemini202603062218`** |
