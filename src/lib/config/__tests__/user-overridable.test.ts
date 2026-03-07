@@ -179,7 +179,7 @@ describe('PREFERENCE_FIELDS', () => {
   it('should have valid types for each field', () => {
     for (const cat of USER_OVERRIDABLE_CATEGORIES) {
       for (const field of PREFERENCE_FIELDS[cat]) {
-        expect(['number', 'boolean', 'array']).toContain(field.type)
+        expect(['number', 'boolean', 'array', 'string']).toContain(field.type)
         expect(field.key).toBeTruthy()
         expect(field.label).toBeTruthy()
         expect(field.description).toBeTruthy()

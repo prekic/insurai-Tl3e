@@ -1415,17 +1415,7 @@ export function PolicyDetailView() {
                   </div>
 
                   {/* Location for non-vehicle policies */}
-                  {(() => {
-                    if (policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location) {
-                      console.log(
-                        'Rendering Location block. type:',
-                        policy.type,
-                        'location:',
-                        policy.location
-                      )
-                    }
-                    return null
-                  })()}
+
                   {policy.type !== 'kasko' && policy.type !== 'traffic' && policy.location && (
                     <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                       <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">

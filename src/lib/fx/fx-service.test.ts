@@ -67,9 +67,20 @@ function mockNonOkResponse() {
 // =============================================================================
 
 describe('FXService Exports', () => {
-  it('exports SUPPORTED_CURRENCIES with all 7 currencies', () => {
-    expect(SUPPORTED_CURRENCIES).toEqual(['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED'])
-    expect(SUPPORTED_CURRENCIES).toHaveLength(7)
+  it('exports SUPPORTED_CURRENCIES with all 10 currencies', () => {
+    expect(SUPPORTED_CURRENCIES).toEqual([
+      'TRY',
+      'USD',
+      'EUR',
+      'GBP',
+      'CHF',
+      'SAR',
+      'AED',
+      'JPY',
+      'CAD',
+      'AUD',
+    ])
+    expect(SUPPORTED_CURRENCIES).toHaveLength(10)
   })
 
   it('exports FALLBACK_RATES with TRY as base (1)', () => {
