@@ -1,9 +1,4 @@
-import {
-  getAnthropicClient,
-  AI_CONFIG,
-  isProxyConfigured,
-  extractViaProxy,
-} from '../config'
+import { getAnthropicClient, AI_CONFIG, isProxyConfigured, extractViaProxy } from '../config'
 import { ExtractedPolicyData, EXTRACTION_SYSTEM_PROMPT } from '../extraction-schema'
 import { aiCache } from '../cache'
 import { costTracker, estimateTokens } from '../cost-tracking'
@@ -59,9 +54,12 @@ function getCurrentUserId(): string {
     const userId = localStorage.getItem('insurai_user_id')
     if (userId) return userId
   }
-  return 'anonymous_' + (typeof sessionStorage !== 'undefined'
-    ? sessionStorage.getItem('session_id') ?? 'unknown'
-    : 'unknown')
+  return (
+    'anonymous_' +
+    (typeof sessionStorage !== 'undefined'
+      ? (sessionStorage.getItem('session_id') ?? 'unknown')
+      : 'unknown')
+  )
 }
 
 /**
@@ -70,36 +68,46 @@ function getCurrentUserId(): string {
  * Implements caching for cost reduction (~60% savings on repeated documents)
  * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
-export async function extractWithClaude(documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
+export async function extractWithClaude(
+  documentText: string,
+  notifyUserId?: string
+): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.anthropic.extractionModel
 
   // Check rate limit
   const rateLimitResult = rateLimiter.consume('ai_extraction', userId)
   if (!rateLimitResult.allowed) {
-    const error = new Error('AI extraction rate limit exceeded. Please wait before processing more documents.')
-    await auditLogger.logAI('ai.extraction_failed', {
-      provider: 'anthropic',
-      documentLength: documentText.length,
-    }, {
-      userId,
-      success: false,
-      errorMessage: 'Rate limit exceeded',
-    })
+    const error = new Error(
+      'AI extraction rate limit exceeded. Please wait before processing more documents.'
+    )
+    await auditLogger.logAI(
+      'ai.extraction_failed',
+      {
+        provider: 'anthropic',
+        documentLength: documentText.length,
+      },
+      {
+        userId,
+        success: false,
+        errorMessage: 'Rate limit exceeded',
+      }
+    )
     throw error
   }
 
   // Start timed audit
-  const timedAudit = createTimedAudit('ai.extraction_started', {
-    provider: 'anthropic',
-    documentLength: documentText.length,
-  }, { userId })
+  const timedAudit = createTimedAudit(
+    'ai.extraction_started',
+    {
+      provider: 'anthropic',
+      documentLength: documentText.length,
+    },
+    { userId }
+  )
 
   // Initialize cache and cost tracker
-  await Promise.all([
-    aiCache.initialize(),
-    costTracker.initialize(),
-  ])
+  await Promise.all([aiCache.initialize(), costTracker.initialize()])
 
   // Truncate very long documents to fit context window
   const maxChars = 100000 // Claude has larger context window
@@ -115,7 +123,9 @@ export async function extractWithClaude(documentText: string, notifyUserId?: str
   const estimatedInputTokens = estimateTokens(userMessage)
 
   // Check cache first
-  const cached = await aiCache.getExtraction(truncatedText, 'anthropic')
+  const cached = await aiCache.getExtraction(truncatedText, 'anthropic', {
+    promptVersion: 'v2-evidence',
+  })
   if (cached) {
     // Track cached request (shows cost savings)
     await costTracker.recordUsage({
@@ -130,12 +140,16 @@ export async function extractWithClaude(documentText: string, notifyUserId?: str
       userId,
     })
 
-    await auditLogger.logAI('ai.extraction_cached', {
-      provider: 'anthropic',
-      documentLength: truncatedText.length,
-      cacheHit: true,
-      confidence: cached.confidence?.overall ?? 0.7,
-    }, { userId, success: true })
+    await auditLogger.logAI(
+      'ai.extraction_cached',
+      {
+        provider: 'anthropic',
+        documentLength: truncatedText.length,
+        cacheHit: true,
+        confidence: cached.confidence?.overall ?? 0.7,
+      },
+      { userId, success: true }
+    )
     return cached
   }
 
@@ -147,7 +161,12 @@ export async function extractWithClaude(documentText: string, notifyUserId?: str
   try {
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
-      const proxyResult = await extractViaProxy('anthropic', userMessage, EXTRACTION_SYSTEM_PROMPT, notifyUserId)
+      const proxyResult = await extractViaProxy(
+        'anthropic',
+        userMessage,
+        EXTRACTION_SYSTEM_PROMPT,
+        notifyUserId
+      )
 
       if (!proxyResult.success || !proxyResult.data) {
         throw new Error(proxyResult.error || 'Claude extraction via proxy failed')
@@ -276,7 +295,9 @@ export async function extractWithClaude(documentText: string, notifyUserId?: str
     })
 
     // Cache the result
-    await aiCache.setExtraction(truncatedText, 'anthropic', result)
+    await aiCache.setExtraction(truncatedText, 'anthropic', result, {
+      promptVersion: 'v2-evidence',
+    })
 
     // Log successful extraction with cost info
     console.warn('[Claude Extract] Extraction complete, logging audit...')

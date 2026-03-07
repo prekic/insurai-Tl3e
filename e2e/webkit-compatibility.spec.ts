@@ -20,9 +20,9 @@ test.describe('WebKit/Safari Compatibility', () => {
       const count = await flexElements.count()
 
       if (count > 0) {
-        const display = await flexElements.first().evaluate((el) =>
-          window.getComputedStyle(el).display
-        )
+        const display = await flexElements
+          .first()
+          .evaluate((el) => window.getComputedStyle(el).display)
         expect(display).toBe('flex')
       } else {
         // Alternatively, check any element uses flex
@@ -48,9 +48,9 @@ test.describe('WebKit/Safari Compatibility', () => {
       const count = await gridElements.count()
 
       if (count > 0) {
-        const display = await gridElements.first().evaluate((el) =>
-          window.getComputedStyle(el).display
-        )
+        const display = await gridElements
+          .first()
+          .evaluate((el) => window.getComputedStyle(el).display)
         expect(display).toBe('grid')
       }
     })
@@ -63,9 +63,9 @@ test.describe('WebKit/Safari Compatibility', () => {
       const blurElements = page.locator('[class*="backdrop"]')
 
       if ((await blurElements.count()) > 0) {
-        const backdropFilter = await blurElements.first().evaluate((el) =>
-          window.getComputedStyle(el).backdropFilter
-        )
+        const backdropFilter = await blurElements
+          .first()
+          .evaluate((el) => window.getComputedStyle(el).backdropFilter)
         // Safari uses -webkit-backdrop-filter
         expect(backdropFilter || 'none').not.toBe('')
       }
@@ -80,9 +80,9 @@ test.describe('WebKit/Safari Compatibility', () => {
       const count = await roundedElements.count()
 
       if (count > 0) {
-        const borderRadius = await roundedElements.first().evaluate((el) =>
-          window.getComputedStyle(el).borderRadius
-        )
+        const borderRadius = await roundedElements
+          .first()
+          .evaluate((el) => window.getComputedStyle(el).borderRadius)
         expect(borderRadius).not.toBe('0px')
       }
     })
@@ -95,9 +95,7 @@ test.describe('WebKit/Safari Compatibility', () => {
       const button = page.getByRole('button').first()
 
       if ((await button.count()) > 0) {
-        const transition = await button.evaluate((el) =>
-          window.getComputedStyle(el).transition
-        )
+        const transition = await button.evaluate((el) => window.getComputedStyle(el).transition)
         // Should have some transition defined
         expect(transition).toBeTruthy()
       }
@@ -109,9 +107,7 @@ test.describe('WebKit/Safari Compatibility', () => {
 
       // Check that CSS variables are resolved
       const body = page.locator('body')
-      const bgColor = await body.evaluate((el) =>
-        window.getComputedStyle(el).backgroundColor
-      )
+      const bgColor = await body.evaluate((el) => window.getComputedStyle(el).backgroundColor)
 
       // Should return resolved color, not var(--something)
       expect(bgColor).not.toContain('var(')
@@ -212,9 +208,7 @@ test.describe('WebKit/Safari Compatibility', () => {
       await page.goto('/')
 
       const result = await page.evaluate(async () => {
-        const promise = new Promise((resolve) =>
-          setTimeout(() => resolve('success'), 100)
-        )
+        const promise = new Promise((resolve) => setTimeout(() => resolve('success'), 100))
         return await promise
       })
 
@@ -259,10 +253,7 @@ test.describe('WebKit/Safari Compatibility', () => {
       await page.goto('/')
 
       const hasCrypto = await page.evaluate(() => {
-        return (
-          typeof crypto !== 'undefined' &&
-          typeof crypto.randomUUID === 'function'
-        )
+        return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
       })
 
       expect(hasCrypto).toBe(true)
@@ -357,7 +348,12 @@ test.describe('WebKit/Safari Compatibility', () => {
         // Check if any SVG is visible
         let hasVisibleSvg = false
         for (let i = 0; i < Math.min(count, 5); i++) {
-          if (await svgElements.nth(i).isVisible().catch(() => false)) {
+          if (
+            await svgElements
+              .nth(i)
+              .isVisible()
+              .catch(() => false)
+          ) {
             hasVisibleSvg = true
             break
           }
@@ -380,9 +376,7 @@ test.describe('WebKit/Safari Compatibility', () => {
       // Check first few images are loaded
       for (let i = 0; i < Math.min(count, 3); i++) {
         const img = images.nth(i)
-        const naturalWidth = await img.evaluate(
-          (el) => (el as HTMLImageElement).naturalWidth
-        )
+        const naturalWidth = await img.evaluate((el) => (el as HTMLImageElement).naturalWidth)
         expect(naturalWidth).toBeGreaterThan(0)
       }
     })
@@ -398,9 +392,9 @@ test.describe('WebKit/Safari Compatibility', () => {
       const count = await animatedElements.count()
 
       if (count > 0) {
-        const animation = await animatedElements.first().evaluate((el) =>
-          window.getComputedStyle(el).animation
-        )
+        const animation = await animatedElements
+          .first()
+          .evaluate((el) => window.getComputedStyle(el).animation)
         expect(animation).not.toBe('none')
       }
     })
@@ -526,18 +520,18 @@ test.describe('WebKit/Safari Compatibility', () => {
     test('should handle API requests', async ({ page }) => {
       await page.goto('/')
 
-      // Make a simple fetch request
+      // Make a simple fetch request for an existing resource to avoid 404s
+      // JSON endpoint or a local file like manifest/robots.txt is safest
       const fetchResult = await page.evaluate(async () => {
         try {
-          const response = await fetch('/api/health', {
+          const response = await fetch('/', {
             method: 'GET',
           })
           return {
-            ok: response.ok || response.status === 404, // 404 is fine, means route exists
+            ok: response.ok,
             status: response.status,
           }
         } catch (_error) {
-          // Network error is acceptable if server isn't running
           return { ok: true, status: 0 }
         }
       })
@@ -549,9 +543,7 @@ test.describe('WebKit/Safari Compatibility', () => {
       await page.goto('/')
 
       const hasRequestResponse = await page.evaluate(() => {
-        return (
-          typeof Request !== 'undefined' && typeof Response !== 'undefined'
-        )
+        return typeof Request !== 'undefined' && typeof Response !== 'undefined'
       })
 
       expect(hasRequestResponse).toBe(true)
@@ -575,19 +567,14 @@ test.describe('WebKit/Safari Compatibility', () => {
 
       // Filter out expected errors (auth redirects, etc.)
       const unexpectedErrors = errors.filter(
-        (e) =>
-          !e.includes('auth') &&
-          !e.includes('redirect') &&
-          !e.includes('Supabase')
+        (e) => !e.includes('auth') && !e.includes('redirect') && !e.includes('Supabase')
       )
 
       // Should have minimal unexpected errors
       expect(unexpectedErrors.length).toBeLessThanOrEqual(1)
     })
 
-    test('should display content even with console warnings', async ({
-      page,
-    }) => {
+    test('should display content even with console warnings', async ({ page }) => {
       await page.goto('/')
       await page.waitForLoadState('networkidle')
 
@@ -605,14 +592,12 @@ test.describe('WebKit-Specific Quirks', () => {
 
     // Scrollbar styling should not break layout
     const body = page.locator('body')
-    const overflow = await body.evaluate((el) =>
-      window.getComputedStyle(el).overflow
-    )
+    const overflow = await body.evaluate((el) => window.getComputedStyle(el).overflow)
 
     // Should have valid overflow value — modern CSS may return compound values like "clip visible"
     const validOverflowParts = ['visible', 'hidden', 'auto', 'scroll', 'clip']
     const overflowParts = overflow.split(' ')
-    const allValid = overflowParts.every(part => validOverflowParts.includes(part))
+    const allValid = overflowParts.every((part) => validOverflowParts.includes(part))
     expect(allValid).toBe(true)
   })
 
@@ -623,9 +608,8 @@ test.describe('WebKit-Specific Quirks', () => {
     // Check that -webkit-tap-highlight-color doesn't break anything
     const tapHighlight = await page.evaluate(() => {
       return (
-        window.getComputedStyle(document.body).getPropertyValue(
-          '-webkit-tap-highlight-color'
-        ) || 'supported'
+        window.getComputedStyle(document.body).getPropertyValue('-webkit-tap-highlight-color') ||
+        'supported'
       )
     })
 
@@ -640,9 +624,9 @@ test.describe('WebKit-Specific Quirks', () => {
     const stickyElements = page.locator('[class*="sticky"]')
 
     if ((await stickyElements.count()) > 0) {
-      const position = await stickyElements.first().evaluate((el) =>
-        window.getComputedStyle(el).position
-      )
+      const position = await stickyElements
+        .first()
+        .evaluate((el) => window.getComputedStyle(el).position)
       expect(position).toBe('sticky')
     }
   })

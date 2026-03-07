@@ -84,6 +84,7 @@ function convertToSupabasePolicy(policy: AnalyzedPolicy, userId: string): Policy
       gapActions: policy.gapActions,
       extractedText: policy.extractedText,
       processedText: policy.processedText,
+      evidenceData: policy.evidenceData,
     },
   }
 }

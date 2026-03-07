@@ -26,11 +26,9 @@ import {
   FileText,
   ChevronDown,
   ChevronUp,
-  Copy,
-  CheckCircle,
-  Code,
   FileSpreadsheet,
   FileDown,
+  Quote,
 } from 'lucide-react'
 import { Button } from './ui/button'
 import { Badge } from './ui/badge'
@@ -108,6 +106,57 @@ function formatCoverageLimit(
     return t.global.included // Default to "Dahil" instead of ₺0 for zero-limit coverages
   }
   return fmt(coverage.limit)
+}
+
+/**
+ * TruncatableText Component
+ * Re-added to satisfy UI branch tests and provide truncation for long insights/exclusions
+ */
+function TruncatableText({
+  text,
+  maxLength,
+  showFullTextTranslation,
+  showLessTranslation,
+}: {
+  text: string
+  maxLength: number
+  showFullTextTranslation: string
+  showLessTranslation: string
+}) {
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  if (text.length <= maxLength) {
+    return <span className="leading-relaxed block">{text}</span>
+  }
+
+  const displayText = isExpanded ? text : `${text.slice(0, maxLength)}...`
+
+  return (
+    <div className="space-y-1 w-full">
+      <span className="leading-relaxed block">{displayText}</span>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setIsExpanded(!isExpanded)
+        }}
+        className="text-xs text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
+      >
+        {isExpanded ? (
+          <>
+            <ChevronUp size={12} />
+            {showLessTranslation}
+          </>
+        ) : (
+          <>
+            <ChevronDown size={12} />
+            {showFullTextTranslation.replace('{chars}', (text.length - maxLength).toString())}
+          </>
+        )}
+      </button>
+    </div>
+  )
 }
 
 /**
@@ -582,11 +631,13 @@ function ExclusionsSection({
   policyType: _policyType, // Reserved for future policy-type-specific logic
   isCommercial = false,
   locale,
+  evidenceData,
 }: {
   exclusions: string[]
   policyType: string
   isCommercial?: boolean
   locale: string
+  evidenceData?: Record<string, string>
 }) {
   const [expandedExclusion, setExpandedExclusion] = useState<number | null>(null)
 
@@ -725,30 +776,41 @@ function ExclusionsSection({
                         </div>
 
                         {/* Expanded explanation */}
-                        {isExpanded && exclusion.explanation && (
-                          <div className="mt-3 p-3 bg-white/70 rounded-md border border-gray-200">
-                            <p className="text-sm text-gray-700 mb-2">
-                              <Info className="inline mr-1 text-blue-500" size={14} />
-                              {locale === 'tr'
-                                ? exclusion.explanation
-                                : exclusion.explanationEn || exclusion.explanation}
-                            </p>
-                            {exclusion.examples && exclusion.examples.length > 0 && (
-                              <div className="mt-2">
-                                <p className="text-xs font-medium text-gray-500 mb-1">
-                                  {t.policy.examples}
+                        {isExpanded &&
+                          (exclusion.explanation ||
+                            (evidenceData &&
+                              evidenceData[exclusion.original.trim().toLowerCase()])) && (
+                            <div className="mt-3 p-3 bg-white/70 rounded-md border border-gray-200">
+                              {exclusion.explanation && (
+                                <p className="text-sm text-gray-700 mb-2">
+                                  <Info className="inline mr-1 text-blue-500" size={14} />
+                                  {locale === 'tr'
+                                    ? exclusion.explanation
+                                    : exclusion.explanationEn || exclusion.explanation}
                                 </p>
-                                <ul className="text-xs text-gray-600 space-y-1">
-                                  {exclusion.examples.map((ex, j) => (
-                                    <li key={j} className="flex items-center gap-1">
-                                      <span className="text-gray-400">•</span> {ex}
-                                    </li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
+                              )}
+                              {exclusion.examples && exclusion.examples.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-gray-500 mb-1">
+                                    {t.policy.examples}
+                                  </p>
+                                  <ul className="text-xs text-gray-600 space-y-1">
+                                    {exclusion.examples.map((ex, j) => (
+                                      <li key={j} className="flex items-center gap-1">
+                                        <span className="text-gray-400">•</span> {ex}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {evidenceData &&
+                                evidenceData[exclusion.original.trim().toLowerCase()] && (
+                                  <EvidenceQuote
+                                    quote={evidenceData[exclusion.original.trim().toLowerCase()]}
+                                  />
+                                )}
+                            </div>
+                          )}
                       </div>
                       <Info className="text-gray-400 flex-shrink-0" size={14} />
                     </div>
@@ -815,134 +877,6 @@ function ExclusionsSection({
   )
 }
 
-/**
- * Document Text Section
- * Displays the AI-processed or raw text extracted from the PDF document
- * Shows processed text by default (with OCR corrections) if available
- */
-function RawExtractedTextSection({
-  extractedText,
-  processedText,
-}: {
-  extractedText: string
-  processedText?: string
-}) {
-  const [copied, setCopied] = useState(false)
-  const [showRaw, setShowRaw] = useState(false)
-
-  const { t } = useI18n()
-
-  // Use processed text by default if available, otherwise fall back to raw
-  const hasProcessedText = processedText && processedText !== extractedText
-  const displayText = showRaw || !processedText ? extractedText : processedText
-  const [isExpanded, setIsExpanded] = useState(false)
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(displayText)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea')
-      textarea.value = displayText
-      document.body.appendChild(textarea)
-      textarea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textarea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }
-
-  // Calculate text stats for current display text
-  const lineCount = displayText.split('\n').length
-  const wordCount = displayText.split(/\s+/).filter((w) => w.length > 0).length
-  const charCount = displayText.length
-
-  // Show preview (first 500 characters)
-  const previewText = displayText.slice(0, 500)
-  const hasMore = displayText.length > 500
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <FileText className="text-gray-600 flex-shrink-0" size={18} />
-            <span className="truncate">{showRaw ? t.policy.rawText : t.policy.documentText}</span>
-            {!showRaw && hasProcessedText && (
-              <Badge variant="success" className="text-xs flex-shrink-0">
-                AI
-              </Badge>
-            )}
-          </CardTitle>
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-            {hasProcessedText && (
-              <Button
-                variant={showRaw ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setShowRaw(!showRaw)}
-                className="gap-1 text-xs h-8 px-2 sm:px-3"
-              >
-                {showRaw ? <Sparkles size={12} /> : <Code size={12} />}
-                <span className="hidden sm:inline">
-                  {showRaw ? t.policy.processed : t.policy.raw}
-                </span>
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCopy}
-              className="gap-1 h-8 px-2 sm:px-3"
-            >
-              {copied ? <CheckCircle className="text-green-600" size={14} /> : <Copy size={14} />}
-              <span className="hidden sm:inline">{copied ? t.common.copied : t.common.copy}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="gap-1 h-8 px-2"
-            >
-              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              <span className="hidden sm:inline">{isExpanded ? t.common.less : t.common.more}</span>
-            </Button>
-          </div>
-        </div>
-        <p className="text-xs sm:text-sm text-gray-500 mt-2">
-          {t.policy.textStats
-            .replace('{lines}', lineCount.toString())
-            .replace('{words}', wordCount.toLocaleString())}
-        </p>
-      </CardHeader>
-      <CardContent>
-        <div
-          className={`relative bg-gray-50 rounded-lg border border-gray-200 ${isExpanded ? '' : 'max-h-48 overflow-hidden'}`}
-        >
-          <pre className="p-4 text-sm text-gray-700 whitespace-pre-wrap break-words font-mono leading-relaxed max-w-full">
-            {isExpanded ? displayText : previewText}
-            {!isExpanded && hasMore && '...'}
-          </pre>
-          {!isExpanded && hasMore && (
-            <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-gray-50 to-transparent pointer-events-none" />
-          )}
-        </div>
-        {!isExpanded && hasMore && (
-          <button
-            onClick={() => setIsExpanded(true)}
-            className="mt-2 text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
-          >
-            <ChevronDown size={14} />
-            {t.policy.showFullText.replace('{chars}', (charCount - 500).toLocaleString())}
-          </button>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 import { usePolicies } from '@/lib/policy-context'
 import { usePolicyEvaluation } from '@/hooks/usePolicyEvaluation'
 import { GradeBadge } from './evaluation/GradeBadge'
@@ -956,6 +890,31 @@ interface LocationState {
   isTrialResult?: boolean
   lowConfidence?: boolean
   confidenceScore?: number
+}
+
+function EvidenceQuote({ quote }: { quote: string }) {
+  const { t } = useI18n()
+  const [showQuote, setShowQuote] = useState(false)
+
+  return (
+    <div className="mt-4 border-t border-gray-100 pt-3">
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          setShowQuote(!showQuote)
+        }}
+        className="text-xs font-medium text-blue-600 hover:text-blue-800 flex items-center gap-1 transition-colors"
+      >
+        <Quote size={12} />
+        {showQuote ? t.common.hideQuote : t.common.showQuote}
+      </button>
+      {showQuote && (
+        <div className="mt-2 text-xs text-gray-600 bg-blue-50/50 p-2 text-left rounded border border-blue-100/50 italic whitespace-pre-wrap">
+          &quot;{quote}&quot;
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function PolicyDetailView() {
@@ -1556,13 +1515,34 @@ export function PolicyDetailView() {
                       )
                       // Strip any existing prefix characters from the text for clean display
                       const displayText = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+
+                      const originalInsight = policy.aiInsights[i]
+                      const originalInsightKey = originalInsight.trim().toLowerCase()
+                      const hasEvidence =
+                        policy.evidenceData?.insights &&
+                        policy.evidenceData.insights[originalInsightKey]
+
                       return (
                         <div
                           key={i}
-                          className="p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700 flex items-start gap-2"
+                          className="flex flex-col gap-1 p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700"
                         >
-                          <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
-                          <span>{displayText}</span>
+                          <div className="flex items-start gap-2">
+                            <Check className="text-purple-500 flex-shrink-0 mt-0.5" size={14} />
+                            <TruncatableText
+                              text={displayText}
+                              maxLength={100}
+                              showFullTextTranslation={t.policy.showFullText}
+                              showLessTranslation={t.common.showLess}
+                            />
+                          </div>
+                          {hasEvidence && (
+                            <div className="w-full pl-5">
+                              <EvidenceQuote
+                                quote={policy.evidenceData!.insights[originalInsightKey]}
+                              />
+                            </div>
+                          )}
                         </div>
                       )
                     }
@@ -1772,6 +1752,7 @@ export function PolicyDetailView() {
                     policyType={policy.type}
                     isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
                     locale={locale}
+                    evidenceData={policy.evidenceData?.exclusions}
                   />
                 </CardContent>
               ) : (
@@ -1785,14 +1766,6 @@ export function PolicyDetailView() {
             <div className="lg:hidden">
               <PolicyDocuments policyId={policy.id} />
             </div>
-
-            {/* Document Text Section - Low priority, at bottom */}
-            {(policy.extractedText || policy.processedText) && (
-              <RawExtractedTextSection
-                extractedText={policy.extractedText || ''}
-                processedText={policy.processedText}
-              />
-            )}
           </div>
 
           {/* Sidebar - Desktop only */}
@@ -1896,11 +1869,28 @@ export function PolicyDetailView() {
                       {Math.round(policy.aiConfidence * 100)}%
                     </span>
                   </div>
-                  {policy.aiInsights.map((_insight, i) => (
-                    <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
-                      {getLocalizedInsight(policy, i, locale, t.insightTranslations)}
-                    </div>
-                  ))}
+                  {policy.aiInsights.map((_insight, i) => {
+                    const originalInsight = policy.aiInsights[i]
+                    const originalInsightKey = originalInsight.trim().toLowerCase()
+                    const hasEvidence =
+                      policy.evidenceData?.insights &&
+                      policy.evidenceData.insights[originalInsightKey]
+                    return (
+                      <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
+                        <TruncatableText
+                          text={getLocalizedInsight(policy, i, locale, t.insightTranslations)}
+                          maxLength={150}
+                          showFullTextTranslation={t.policy.showFullText}
+                          showLessTranslation={t.common.showLess}
+                        />
+                        {hasEvidence && (
+                          <EvidenceQuote
+                            quote={policy.evidenceData!.insights[originalInsightKey]}
+                          />
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </CardContent>
             </Card>

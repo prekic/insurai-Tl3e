@@ -52,6 +52,7 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     sort: '',
     more: '',
     less: '',
+    showFullText: '',
     showLess: '',
     actions: '',
     share: '',
@@ -59,6 +60,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     linkCopied: '',
     copy: '',
     copied: '',
+    showQuote: '',
+    hideQuote: '',
   },
 
   global: {

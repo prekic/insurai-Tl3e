@@ -1,18 +1,18 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type ReactNode,
+} from 'react'
 import { toast } from 'sonner'
 import { AnalyzedPolicy, DuplicatePolicy } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
-import {
-  findDuplicatePolicies,
-  isNewPolicy,
-  createPolicyTimestamp,
-} from '@/lib/policy-utils'
+import { findDuplicatePolicies, isNewPolicy, createPolicyTimestamp } from '@/lib/policy-utils'
 import { isSupabaseConfigured } from '@/lib/supabase/config'
-import type {
-  PolicyRow,
-  PolicyInsert,
-  PolicyUpdate,
-} from '@/lib/supabase/types'
+import type { PolicyRow, PolicyInsert, PolicyUpdate } from '@/lib/supabase/types'
 import { useAuth } from '@/lib/supabase/auth-context'
 
 // localStorage keys
@@ -139,6 +139,8 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     extractedText: rawData.extractedText,
     // AI-processed text with OCR corrections
     processedText: rawData.processedText,
+    // Evidence data for AI insights and exclusions
+    evidenceData: rawData.evidenceData,
   }
 }
 
@@ -175,6 +177,7 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
       gapActions: policy.gapActions,
       extractedText: policy.extractedText,
       processedText: policy.processedText,
+      evidenceData: policy.evidenceData,
     },
   }
 }
@@ -212,7 +215,8 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
     updates.gapAnalysis !== undefined ||
     updates.gapActions !== undefined ||
     updates.extractedText !== undefined ||
-    updates.processedText !== undefined
+    updates.processedText !== undefined ||
+    updates.evidenceData !== undefined
 
   if (hasRawDataUpdates) {
     result.raw_data = {
@@ -229,6 +233,7 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
       gapActions: updates.gapActions,
       extractedText: updates.extractedText,
       processedText: updates.processedText,
+      evidenceData: updates.evidenceData,
     }
   }
 
@@ -364,27 +369,19 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
           const updatedPolicy = policyRowToAnalyzedPolicy(updatedRow)
 
           // Update local state
-          setPolicies((prev) =>
-            prev.map((p) => (p.id === id ? updatedPolicy : p))
-          )
+          setPolicies((prev) => prev.map((p) => (p.id === id ? updatedPolicy : p)))
 
           // Update selected policy if it's the one being updated
-          setSelectedPolicy((prev) =>
-            prev?.id === id ? updatedPolicy : prev
-          )
+          setSelectedPolicy((prev) => (prev?.id === id ? updatedPolicy : prev))
 
           toast.success('Policy updated', {
             description: 'Your changes have been saved.',
           })
         } else {
           // Update in local state
-          setPolicies((prev) =>
-            prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-          )
+          setPolicies((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)))
 
-          setSelectedPolicy((prev) =>
-            prev?.id === id ? { ...prev, ...updates } : prev
-          )
+          setSelectedPolicy((prev) => (prev?.id === id ? { ...prev, ...updates } : prev))
         }
       } catch (error) {
         console.error('Failed to update policy:', error)
@@ -611,9 +608,7 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
     if (!isLoading && policies.length > 1) {
       const detected = findDuplicatePolicies(policies)
       // Filter out dismissed duplicates
-      const activeDuplicates = detected.filter(
-        (d) => !dismissedDuplicateIds.has(d.policy.id)
-      )
+      const activeDuplicates = detected.filter((d) => !dismissedDuplicateIds.has(d.policy.id))
       setDuplicates(activeDuplicates)
     } else {
       setDuplicates([])
@@ -636,9 +631,7 @@ export function PolicyProvider({ children }: PolicyProviderProps) {
   // Get duplicates for a specific policy
   const getDuplicatesForPolicy = useCallback(
     (id: string): DuplicatePolicy[] => {
-      return duplicates.filter(
-        (d) => d.policy.id === id || d.duplicateOf.id === id
-      )
+      return duplicates.filter((d) => d.policy.id === id || d.duplicateOf.id === id)
     },
     [duplicates]
   )

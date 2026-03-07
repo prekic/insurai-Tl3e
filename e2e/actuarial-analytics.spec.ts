@@ -10,7 +10,7 @@ test.describe('Actuarial Analytics Endpoints', () => {
   const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
   let _adminToken: string
 
-  test.beforeAll(async ({ _request }) => {
+  test.beforeAll(async () => {
     // We would typically setup an admin token here, but we will mock interactions
     // or test against a test environment expecting local auth/bypasses based on test setup.
     _adminToken = 'test-token'

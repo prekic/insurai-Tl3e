@@ -42,8 +42,8 @@ test.describe('Upload Page', () => {
     await page.waitForLoadState('networkidle')
 
     if (page.url().includes('/upload')) {
-      // Look for upload-related text
-      await expect(page.getByText(/upload|compare|policy/i).first()).toBeVisible()
+      // Look for upload-related text (may be an upload button or dropzone)
+      await expect(page.getByText(/upload/i).first()).toBeVisible()
     }
   })
 })
@@ -66,9 +66,7 @@ test.describe('Chat Page', () => {
     await page.waitForLoadState('networkidle')
     const url = page.url()
     // Chat may redirect if no policies
-    expect(
-      url.includes('/chat') || url.includes('/auth') || url.includes('/dashboard')
-    ).toBe(true)
+    expect(url.includes('/chat') || url.includes('/auth') || url.includes('/dashboard')).toBe(true)
   })
 })
 

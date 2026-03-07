@@ -81,7 +81,10 @@ export interface TranslationDictionary {
     sort: string
     more: string
     less: string
+    showFullText: string
     showLess: string
+    showQuote: string
+    hideQuote: string
     actions: string
     share: string
     shareFailed: string

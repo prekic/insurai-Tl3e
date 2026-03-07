@@ -127,8 +127,9 @@ describe('extractWithClaude', () => {
     it('should throw error when rate limited', async () => {
       mockConsume.mockReturnValue({ allowed: false })
 
-      await expect(extractWithClaude('Test document'))
-        .rejects.toThrow('AI extraction rate limit exceeded')
+      await expect(extractWithClaude('Test document')).rejects.toThrow(
+        'AI extraction rate limit exceeded'
+      )
     })
 
     it('should log failed extraction when rate limited', async () => {
@@ -152,10 +153,9 @@ describe('extractWithClaude', () => {
     it('should check cache before making API call', async () => {
       await extractWithClaude('Test document text')
 
-      expect(mockGetExtraction).toHaveBeenCalledWith(
-        'Test document text',
-        'anthropic'
-      )
+      expect(mockGetExtraction).toHaveBeenCalledWith('Test document text', 'anthropic', {
+        promptVersion: 'v2-evidence',
+      })
     })
 
     it('should return cached result if available', async () => {
@@ -190,7 +190,8 @@ describe('extractWithClaude', () => {
       expect(mockSetExtraction).toHaveBeenCalledWith(
         'Test document text',
         'anthropic',
-        expect.any(Object)
+        expect.any(Object),
+        { promptVersion: 'v2-evidence' }
       )
     })
   })
@@ -297,8 +298,9 @@ describe('extractWithClaude - Error Handling', () => {
       },
     } as unknown as ReturnType<typeof getAnthropicClient>)
 
-    await expect(extractWithClaude('Test document'))
-      .rejects.toThrow('No text response from Claude model')
+    await expect(extractWithClaude('Test document')).rejects.toThrow(
+      'No text response from Claude model'
+    )
   })
 
   it('should track failed requests in cost tracker', async () => {

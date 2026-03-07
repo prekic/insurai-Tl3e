@@ -48,7 +48,8 @@ export async function extractWithConsensus(
   await aiCache.initialize()
 
   const configuredProviders = getConfiguredProviders()
-  const providers = options.providers?.filter((p) => configuredProviders.includes(p)) ?? configuredProviders
+  const providers =
+    options.providers?.filter((p) => configuredProviders.includes(p)) ?? configuredProviders
 
   if (providers.length === 0) {
     throw new Error('No AI providers configured')
@@ -56,12 +57,14 @@ export async function extractWithConsensus(
 
   // Check consensus cache first (for multi-provider results)
   if (providers.length > 1) {
-    const cached = await aiCache.getConsensus(documentText, providers)
+    const cached = await aiCache.getConsensus(documentText, providers, {
+      promptVersion: 'v2-evidence',
+    })
     if (cached) {
       // Return cached consensus result with minimal info
       return {
         data: cached,
-        providerResults: providers.map(p => ({ provider: p, data: cached })),
+        providerResults: providers.map((p) => ({ provider: p, data: cached })),
         consensus: {
           agreement: providers.length,
           agreedFields: [...AI_CONFIG.consensus.consensusFields],
@@ -137,7 +140,8 @@ export async function extractWithConsensus(
   }
 
   // Build consensus from multiple results
-  const { mergedData, agreedFields, disagreedFields, consensusScore } = buildConsensus(successfulResults)
+  const { mergedData, agreedFields, disagreedFields, consensusScore } =
+    buildConsensus(successfulResults)
 
   // Determine primary provider (prefer the one with higher confidence)
   const primaryProvider =
@@ -148,7 +152,7 @@ export async function extractWithConsensus(
         ).provider
 
   // Cache the consensus result
-  await aiCache.setConsensus(documentText, providers, mergedData)
+  await aiCache.setConsensus(documentText, providers, mergedData, { promptVersion: 'v2-evidence' })
 
   return {
     data: mergedData,
@@ -166,7 +170,10 @@ export async function extractWithConsensus(
 /**
  * Extract using a specific provider
  */
-async function extractWithProvider(provider: AIProvider, documentText: string): Promise<ExtractedPolicyData> {
+async function extractWithProvider(
+  provider: AIProvider,
+  documentText: string
+): Promise<ExtractedPolicyData> {
   switch (provider) {
     case 'openai':
       return extractWithOpenAI(documentText)
@@ -342,7 +349,9 @@ function normalizeValue(value: unknown, field: ConsensusField): string {
 /**
  * Merge coverages from multiple providers
  */
-function mergeCoverages(coverageArrays: ExtractedPolicyData['coverages'][]): ExtractedPolicyData['coverages'] {
+function mergeCoverages(
+  coverageArrays: ExtractedPolicyData['coverages'][]
+): ExtractedPolicyData['coverages'] {
   const merged = new Map<string, ExtractedPolicyData['coverages'][0]>()
 
   for (const coverages of coverageArrays) {

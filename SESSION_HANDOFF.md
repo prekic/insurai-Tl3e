@@ -1,181 +1,58 @@
-# Session Handoff — March 7, 2026 (Finalizing FX API Deployment & E2E Validation)
+# Session Handoff — March 7, 2026 (Debugging AI Evidence Display & Data Persistence)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | Passing (Railway deployment confirmed — healthcheck at `/api/health` succeeded) |
-| **TypeCheck** | 0 errors (frontend `tsc -b` + server `tsc -p server/tsconfig.json`) |
+| **Build** | Passing |
+| **TypeCheck** | 0 errors |
 | **ESLint Errors** | 0 errors |
-| **ESLint Warnings** | 0 warnings on modified files |
-| **Tests** | 15,850+ tests passing, 0 failures (337 files). 1 worker fork timeout (Vitest infrastructure, not code). |
-| **Coverage** | ~91.68% statements, ~85.91% branches |
+| **Tests** | 15,850+ tests passing, 0 failures. |
 
-### This Session — Final UI Polish & FX Hardening (March 7, 2026)
+### This Session — AI Evidence Quotes & Supabase Persistence Fix
 
-Completed **Final Verification & Cleanup** across the codebase:
+Completed **Strict QA Audit & Complete Fix** for the missing AI Evidence quotes bug:
 
-1. **Test Suite Adaptation** — Modified backend config and user-overridable FX service testing expectations to encompass completely new variables (such as arrays containing 10 currencies vs 7 and custom preference string types) resolving all lingering unit test faults.
-2. **Cosmetic Cleanliness** — Purged dozens of ad-hoc logging and vitest output scripts left over from earlier intensive CI/CD runs. Ripped down a misplaced IIFE `console.log` in `PolicyDetailView` saving memory and suppressing ESLint warnings.
-3. **Strict Type-Safe UI** — Enforced proper execution of translation hooks inside `UserPreferencesPanel` components (`CurrentRateHint`) and bypassed missing typing parameters gracefully, maintaining native `tsc` strict compliance.
+1. **AI Schema Update**: Moved away from black-box LLM insights. Modified `EXTRACTION_JSON_SCHEMA` and `ExtractedPolicyData` to explicitly request an `evidence` object containing `insights` and `exclusions` arrays detailing the `text` and verbatim `quote`.
+2. **Dictionary Key Mapping**: Updated `convertToAnalyzedPolicy` to populate an O(1) dictionary mapping on `AnalyzedPolicy.evidenceData` bridging insight text to specific policy quotes. Eliminated a double-prefixing bug where `policy-extractor` prepended `✓ ` while the LLM was also told to do so, breaking key lookups.
+3. **Data Persistence Fix (The Root Cause)**: Discovered that `evidenceData` was correctly generated in-memory but dropped instantly upon Supabase serialization! Added `evidenceData` to the deeply typed `RawPolicyData` SQL schema in `supabase/types.ts`, and updated the 3 core database mapping functions in `policy-context.tsx` and `PolicyUpload.tsx`.
+4. **Cache Invalidation**: Explicitly bumped the `promptVersion` cache keys in `openai.ts`, `claude.ts`, and `consensus.ts` to `v2-evidence` to prevent stale JSON schemas returning from IndexedDB.
+
+### Completeness Delta Report
+**What was missed in the previous audit and is now fully documented:**
+- The root cause of the "missing evidence" bug was fully traced to Database Serialization omissions (`src/lib/supabase/types.ts` and `src/lib/policy-context.tsx`).
+- Cache invalidation requirements (`v2-evidence`) completely breaking the test suite mocks until rebuilt.
+- **NEW QA AUDIT OMISSIONS**: The previous report forgot to mention `src/lib/i18n/*.ts` (translation keys for the new `showFullText` toggle), `e2e/*.spec.ts` (Playwright assertion fixes), and `PolicyDetailView-branches.test.tsx` (legacy React layout tests tied to the removed raw text tab).
+- Uncommitted files identified via `git status` which fixed the Supabase persistence issue.
+- Ad-hoc test scripts `test-ai.js`, `test-extraction.js` left in the workspace roots.
 
 ### Key Files Changed (This Session)
 
 | File | Change |
 |------|--------|
-| `src/components/UserPreferencesPanel.tsx` | Fixed i18n implicit typing TS errors and removed dangling hooks |
-| `src/components/PolicyDetailView.tsx` | Removed IIFE console block causing lint warnings |
-| `src/lib/fx/fx-service.test.ts` | Upgraded testing array matching 10 global currencies properly |
-| `src/lib/config/__tests__/user-overridable.test.ts` | Added strict parsing for strings to custom preference fields |
-| `supabase/migrations/031_fx_rate_history.sql` | Added migration for tracking FX exchange rates analytically |
-| `docs/adr/0010-translation-hook-typings.md` | Formalized the mandate to avoid arbitrary hook property injections |
-| `(Repository Root)` | Deleted unused scratch files (`test-results.txt`, `test_create_user.js`, `test_fx_backend.ts`) |
+| `src/lib/ai/extraction-schema.ts` | Enforced structured `evidence` arrays (required) in the main LLM schema. |
+| `src/types/policy.ts` | Extended `AnalyzedPolicy` with an `evidenceData` dictionary structure. |
+| `src/lib/ai/policy-extractor.ts` | Populated the frontend-consumable dictionary (`evidenceData`), suppressed double-prefixing bullets (`✓`). |
+| `src/lib/supabase/types.ts` | **CRITICAL FIX**: Explicitly defined `evidenceData` inside `RawPolicyData` interface to prevent stripping. |
+| `src/lib/policy-context.tsx` | **CRITICAL FIX**: Updated `policyRowToAnalyzedPolicy`, `analyzedPolicyToInsert`, `analyzedPolicyToUpdate`. |
+| `src/components/PolicyUpload.tsx` | **CRITICAL FIX**: Updated `convertToSupabasePolicy` to forward `evidenceData`. |
+| `src/lib/ai/providers/*.ts` | Invalidated cache aggressively by bumping version parameter to `v2-evidence`. |
+| `src/lib/ai/providers/*.test.ts` | Repaired broken CI tests by hard-bumping Vitest mock promptVersions to `v2-evidence`. |
+| `src/lib/i18n/translations*.ts` | Restored missing `showFullText` TranslationKeys, required by the `EvidenceQuote` Interactive UI. |
+| `e2e/*.spec.ts` | Fixed Playwright test assertions and fetch compatibility disrupted by the UI restructuring. |
+| `src/components/PolicyDetailView-branches.test.tsx` | Cleaned up legacy Vitest DOM layout test assertions targeting the removed Raw Document Text tab. |
+| `src/components/PolicyDetailView.tsx` | Gutted the raw text viewer tab entirely; wired the Interactive Quotes logic. |
 
 ---
 
-## Completed Feature Summary (Full i18n + FX Work)
-
-The i18n ternary migration and FX conversion system are **100% complete and deployed**:
-
-| Feature | Status | Session |
-|---------|--------|---------|
-| Locale-aware formatting functions | Done | Mar 3 |
-| S1 component i18n (4 components) | Done | Mar 4 |
-| S2 component i18n (4 components) | Done | Mar 4 |
-| 68 pre-existing test failures fixed | Done | Mar 4 |
-| FX server proxy + client service | Done | Mar 5 |
-| PolicyDetailView 132 ternaries migrated | Done | Mar 5 |
-| Migration 030 (426 keys seeded) | Done | Mar 5 |
-| Recharts bundle split | Done | Mar 5 |
-| useDisplayCurrency wired into all components | Done | Mar 6 |
-| formatConverted dependency fix | Done | Mar 6 |
-| **FX production API (exchangerate.host)** | **Done** | **Mar 6** |
-| **CHF/SAR/AED currencies + UI polish** | **Done** | **Mar 6** |
-| **PolicyDetailView + fx.ts TypeScript fixes** | **Done** | **Mar 6** |
-| **E2E coverage applied to FX UI with conditional auth bypass** | **Done** | **Mar 7** |
-
-### Remaining Data-Field Ternaries (All Correct to Keep)
-
-| Component | Ternary | Reason |
-|-----------|---------|--------|
-| `PolicyDiffViewer.tsx:50` | `change.fieldLabelTr` vs `change.fieldLabel` | Data-field selection |
-| `PolicyCard.tsx:49` | `policyTypeInfo?.labelTr` vs `policyTypeInfo?.label` | Config data-field |
-| `AIInsightsPanel.tsx` | `insight.textTr` vs `insight.text` | Data-field selection |
-| `EmailPreferences.tsx:160-161` | `config.labelTr`/`config.descriptionTr` | Config data-field |
-| PolicyDetailView (~4 locations) | Category/exclusion/knowledge data fields | Data-field selection |
+## ⚠️ URGENT INSTRUCTIONS FOR NEXT SESSION / GOTCHAS
+1. **Supabase Serialize Handlers**: Whenever you add a new field to `AnalyzedPolicy` (e.g. `evidenceData`), **DO NOT FORGET** to map it in `src/lib/supabase/types.ts` (`RawPolicyData`) and `src/lib/policy-context.tsx`. Failure to do so means the data exists perfectly well in Redux/Memory but silently vanishes the exact moment they fetch it back from the database.
+2. **Double Prefix Keys**: If you map text as dictionary keys in the frontend (like looking up an insight quote by the insight text String), you must sanitize strings for styling characters (`✓ `). The LLM prompt and the frontend code collided doing the exact same thing, preventing match evaluations.
+3. **Test Mocks constraints**: You must bump the `"version"` field in Vitest files testing AI Providers when you touch prompt signatures to pass the strict test suite enforcement. 
+4. **Clean up Scratchpad**: Several root files (`test-ai.js`) remain in untracked state to help any debugging flow tomorrow, but do not belong in main.
 
 ---
 
 ## Priority Next Steps
-
-### P1 — Monitor Production Telemetry
-- Monitor the production endpoints (`/api/fx/rates?base=TRY` and `/api/fx/status`) to ensure the caching TTL is working effectively.
-- Verify that standard rate limits from the free-tier `exchangerate.host` API are not exceeded under normal usage.
-
-### ⚠️ URGENT INSTRUCTIONS FOR NEXT SESSION
-1. **Unfinished Tasks**: None! The pending E2E technical debt for the FX UI (`e2e/test_fx_ui.spec.ts`) has been fully populated with Playwright assertions, finalizing E2E coverage for this session.
-2. **Settings Pages**: Settings pages are complete and structurally sound. Avoid editing them unless a major layout overhaul is requested.
-3. **Cosmetic Sweep & Tests**: DO NOT introduce any linting errors. All PRs demand 0-error `eslint` and `tsc` executions to properly merge in the strict CI pipeline. Keep debug `console.log`s suppressed or removed prior to handoff.
-
-### P2 — Production Verification (Completed locally, run on Railway)
-- Verify FX endpoint: `GET /api/fx/rates?base=TRY` — should return live rates
-- Verify status: `GET /api/fx/status` — should show `source: 'live'` (or `'fallback'` if no API key)
-- Optionally set `EXCHANGERATE_API_KEY` on Railway for higher rate limits
-- Test currency switching in user preferences UI
-
-### Completed P3 Enhancements (This Session)
-- **Admin FX rate monitoring dashboard (rates history, API health)**: Completed via `FXDashboardTab.tsx`.
-- **Locale-aware `formatCurrencyCompact()`**: Completed via standard `Intl.NumberFormat` refactor.
-- **FX rate alerts when rates change significantly**: Completed (5% threshold triggering `admin_notifications`).
-- **More currencies on demand**: Added `JPY`, `CAD`, and `AUD`.
-
-### P4 — Test Coverage Maintenance
-- Current: ~91.67% statements, ~85.91% branches — no regression from this session
-- 27 new FX server tests maintain coverage level
-- Monitor for any new test failures after merge
-
----
-
-## New Configuration Requirements
-
-| Variable | Required | Where | Notes |
-|----------|----------|-------|-------|
-| `EXCHANGERATE_API_KEY` | Optional | Railway env vars | exchangerate.host API key for higher rate limits. Without it, free tier works but with lower limits. Server has 6h cache so only ~4 API calls/day. |
-### Architecture & Design Notes
-- FX Live Rates uses exchangerate.host on an hourly cached TTL basis preventing extreme load costs while capturing changes.
-- Rate history logs every hourly API ping to maintain historical analytics internally for `insurai`.
-
-### Bugs caught & squished:
-1. `react/no-unescaped-entities` in `FXDashboardTab.tsx` resolved cleanly.
-2. `UserPreferencesPanel` (displaying currency switcher component) was built but not wired properly to any layout; integrated it natively into the `MyAccount.tsx` component, fixing UI visibility problems completely.
-3. Complex git merge conflicts when pushing to main across documentation files (`CLAUDE.md`, `SESSION_HANDOFF.md`); successfully mitigated via local rebase/merge strategy.
-4. Implicitly typed `t.common.approx` broke the strict `tsc` compiler (caught before PR merge); resolved by enforcing typescript dictionary integrity (see ADR-0010).
-All other env vars unchanged from previous sessions.
-
----
-
-## New Gotchas Discovered
-
-### 1. Server tsconfig `response.json()` Returns `unknown`
-- `server/tsconfig.json` is stricter than frontend — `fetch().json()` returns `unknown`
-- Always cast external API responses: `(await response.json()) as { ... }`
-- Applies to ANY new server-side `fetch` call, not just FX
-
-### 2. PolicyDetailView Sub-Component Prop Naming
-- `CollapsibleCoverageCategory` and `ExclusionsSection` receive `formatAmount` as prop
-- The parent destructures `useDisplayCurrency()` as `{ formatConverted: formatAmount }`
-- Using `formatConverted` inside sub-components causes TS2304 — use `formatAmount`
-- `ExclusionsSection` needs its own `useDisplayCurrency()` hook (it's a separate component)
-
-### 3. `missingImportantExclusions` vs `clarificationNeeded` Types
-- `clarificationNeeded` has `{ item, question, questionEn }` — HAS `questionEn`
-- `missingImportantExclusions` has `{ name, nameEn, question, importance }` — NO `questionEn`
-- Accessing `item.questionEn` on the wrong type compiles fine in dev but fails in strict build
-
-### 4. Translation Hook Implicit Typings
-- Trying to arbitrarily inject `t.common.approx` if the dictionary typing doesn’t structurally declare `approx: string` will immediately break the `tsc` compiler. Always explicitly update translation typescript interfaces if you need a novel dynamic string, or stick to English fallback blocks until the main dictionary files propagate.
-
----
-
-## Test Mock Patterns (For Next Agent Reference)
-
-### useDisplayCurrency Mock (Required for 12 Components)
-```tsx
-vi.mock('@/hooks/useDisplayCurrency', () => ({
-  useDisplayCurrency: () => ({
-    displayCurrency: 'TRY',
-    convert: (v: number) => v,
-    formatConverted: (v: number) => '₺' + v,
-    formatConvertedCompact: (v: number) => '₺' + v.toLocaleString(),
-    isReady: true,
-  }),
-}))
-```
-
-### i18n Mock (Two Approaches)
-```tsx
-// Approach 1: Inline (lighter, only provide sections component uses)
-vi.mock('@/lib/i18n', () => ({
-  useI18n: () => ({ t: { section: { key: 'value' } }, locale: 'en' }),
-}))
-
-// Approach 2: Full translations (heavier, auto-provides all keys)
-import { EN_TRANSLATIONS } from '@/lib/i18n/translations-en'
-vi.mock('@/lib/i18n/i18n-context', () => ({
-  useI18n: () => ({ t: EN_TRANSLATIONS, locale: 'en' }),
-}))
-```
-
----
-
-## Session Context Chain
-
-| Session | Key Deliverables | Branch |
-|---------|-----------------|--------|
-| Mar 3 | i18n Plan Audit + P0 (test fixes) + P1 (locale-aware formatting) | `claude/load-project-context-FT0Gj` |
-| Mar 4 | P2 (S1 components) + P3 (S2 components) — 99 ternaries replaced | `claude/load-project-context-9kxAB` |
-| Mar 4 | Fix 68 pre-existing test failures — 15,813 tests, 0 failures | `claude/load-project-context-TWvOc` |
-| Mar 4 | Fix 180 branch coverage test failures + async act() warnings | `claude/load-project-context-TWvOc` |
-| Mar 5 | FX system + PolicyDetailView i18n (132 ternaries) + migration 030 + recharts split | `claude/load-project-context-l9Prt` |
-| Mar 6 | useDisplayCurrency wired into all 12 components + formatConverted dep fix | `claude/load-project-context-p9ADU` |
-| Mar 7 | **E2E tests for FX UI + Merge to Main + Handoff Audit** | **`insuraigemini202603062218`** |
+1. Push and Merge the branch containing the Supabase typings and extraction-schema fixes.
+2. Verify in staging that the Interactive Quotes render reliably without vanishing on refresh.

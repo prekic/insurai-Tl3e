@@ -1,9 +1,4 @@
-import {
-  getOpenAIClient,
-  AI_CONFIG,
-  isProxyConfigured,
-  extractViaProxy,
-} from '../config'
+import { getOpenAIClient, AI_CONFIG, isProxyConfigured, extractViaProxy } from '../config'
 import {
   ExtractedPolicyData,
   EXTRACTION_JSON_SCHEMA,
@@ -24,9 +19,12 @@ function getCurrentUserId(): string {
     if (userId) return userId
   }
   // Fall back to session identifier
-  return 'anonymous_' + (typeof sessionStorage !== 'undefined'
-    ? sessionStorage.getItem('session_id') ?? 'unknown'
-    : 'unknown')
+  return (
+    'anonymous_' +
+    (typeof sessionStorage !== 'undefined'
+      ? (sessionStorage.getItem('session_id') ?? 'unknown')
+      : 'unknown')
+  )
 }
 
 /**
@@ -35,36 +33,46 @@ function getCurrentUserId(): string {
  * Implements caching for cost reduction (~60% savings on repeated documents)
  * Includes rate limiting, audit logging, and cost tracking for production readiness
  */
-export async function extractWithOpenAI(documentText: string, notifyUserId?: string): Promise<ExtractedPolicyData> {
+export async function extractWithOpenAI(
+  documentText: string,
+  notifyUserId?: string
+): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.openai.extractionModel
 
   // Check rate limit
   const rateLimitResult = rateLimiter.consume('ai_extraction', userId)
   if (!rateLimitResult.allowed) {
-    const error = new Error('AI extraction rate limit exceeded. Please wait before processing more documents.')
-    await auditLogger.logAI('ai.extraction_failed', {
-      provider: 'openai',
-      documentLength: documentText.length,
-    }, {
-      userId,
-      success: false,
-      errorMessage: 'Rate limit exceeded',
-    })
+    const error = new Error(
+      'AI extraction rate limit exceeded. Please wait before processing more documents.'
+    )
+    await auditLogger.logAI(
+      'ai.extraction_failed',
+      {
+        provider: 'openai',
+        documentLength: documentText.length,
+      },
+      {
+        userId,
+        success: false,
+        errorMessage: 'Rate limit exceeded',
+      }
+    )
     throw error
   }
 
   // Start timed audit
-  const timedAudit = createTimedAudit('ai.extraction_started', {
-    provider: 'openai',
-    documentLength: documentText.length,
-  }, { userId })
+  const timedAudit = createTimedAudit(
+    'ai.extraction_started',
+    {
+      provider: 'openai',
+      documentLength: documentText.length,
+    },
+    { userId }
+  )
 
   // Initialize cache and cost tracker
-  await Promise.all([
-    aiCache.initialize(),
-    costTracker.initialize(),
-  ])
+  await Promise.all([aiCache.initialize(), costTracker.initialize()])
 
   // Truncate very long documents to fit context window
   const maxChars = 30000
@@ -80,7 +88,9 @@ export async function extractWithOpenAI(documentText: string, notifyUserId?: str
   const estimatedInputTokens = estimateTokens(EXTRACTION_SYSTEM_PROMPT + userMessage)
 
   // Check cache first
-  const cached = await aiCache.getExtraction(truncatedText, 'openai')
+  const cached = await aiCache.getExtraction(truncatedText, 'openai', {
+    promptVersion: 'v2-evidence',
+  })
   if (cached) {
     // Track cached request (shows cost savings)
     await costTracker.recordUsage({
@@ -95,12 +105,16 @@ export async function extractWithOpenAI(documentText: string, notifyUserId?: str
       userId,
     })
 
-    await auditLogger.logAI('ai.extraction_cached', {
-      provider: 'openai',
-      documentLength: truncatedText.length,
-      cacheHit: true,
-      confidence: cached.confidence?.overall ?? 0.7,
-    }, { userId, success: true })
+    await auditLogger.logAI(
+      'ai.extraction_cached',
+      {
+        provider: 'openai',
+        documentLength: truncatedText.length,
+        cacheHit: true,
+        confidence: cached.confidence?.overall ?? 0.7,
+      },
+      { userId, success: true }
+    )
     return cached
   }
 
@@ -113,7 +127,12 @@ export async function extractWithOpenAI(documentText: string, notifyUserId?: str
     // Use proxy if configured (production)
     if (isProxyConfigured()) {
       console.warn('[OpenAI Extract] Using proxy, calling extractViaProxy...')
-      const proxyResult = await extractViaProxy('openai', userMessage, EXTRACTION_SYSTEM_PROMPT, notifyUserId)
+      const proxyResult = await extractViaProxy(
+        'openai',
+        userMessage,
+        EXTRACTION_SYSTEM_PROMPT,
+        notifyUserId
+      )
 
       console.warn('[OpenAI Extract] Proxy response received:', {
         success: proxyResult.success,
@@ -289,7 +308,7 @@ export async function extractWithOpenAI(documentText: string, notifyUserId?: str
     })
 
     // Cache the result
-    await aiCache.setExtraction(truncatedText, 'openai', result)
+    await aiCache.setExtraction(truncatedText, 'openai', result, { promptVersion: 'v2-evidence' })
 
     // Log successful extraction with cost info
     console.warn('[OpenAI Extract] Extraction complete, logging audit...')

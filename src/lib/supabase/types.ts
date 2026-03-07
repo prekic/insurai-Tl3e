@@ -15,7 +15,15 @@
 // =============================================================================
 
 /** Policy types supported by the application */
-export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business' | 'nakliyat'
+export type PolicyType =
+  | 'kasko'
+  | 'traffic'
+  | 'home'
+  | 'health'
+  | 'life'
+  | 'dask'
+  | 'business'
+  | 'nakliyat'
 
 /** Policy status values */
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
@@ -85,6 +93,10 @@ export interface RawPolicyData {
   // AI analysis results
   aiConfidence?: number
   aiInsights?: string[]
+  evidenceData?: {
+    insights: Record<string, string>
+    exclusions: Record<string, string>
+  }
   marketComparison?: MarketComparison
   riskScore?: RiskScore
   gapAnalysis?: GapAnalysis
@@ -588,15 +600,12 @@ export function isPolicyType(value: unknown): value is PolicyType {
 
 /** Check if a value is a valid PolicyStatus */
 export function isPolicyStatus(value: unknown): value is PolicyStatus {
-  return (
-    typeof value === 'string' && ['active', 'expiring', 'expired', 'pending'].includes(value)
-  )
+  return typeof value === 'string' && ['active', 'expiring', 'expired', 'pending'].includes(value)
 }
 
 /** Check if a value is a valid VersionChangeType */
 export function isVersionChangeType(value: unknown): value is VersionChangeType {
   return (
-    typeof value === 'string' &&
-    ['created', 'updated', 'extracted', 'manual_edit'].includes(value)
+    typeof value === 'string' && ['created', 'updated', 'extracted', 'manual_edit'].includes(value)
   )
 }

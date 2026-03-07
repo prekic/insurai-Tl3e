@@ -126,7 +126,12 @@ describe('claude coverage', () => {
 
     // Default direct API response
     mockMessagesCreate.mockResolvedValue({
-      content: [{ type: 'text', text: JSON.stringify({ policyNumber: 'P-1', confidence: { overall: 0.9 } }) }],
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({ policyNumber: 'P-1', confidence: { overall: 0.9 } }),
+        },
+      ],
       usage: { input_tokens: 100, output_tokens: 50 },
     })
     mockGetAnthropicClient.mockResolvedValue({
@@ -135,15 +140,31 @@ describe('claude coverage', () => {
 
     originalLocalStorage = globalThis.localStorage
     originalSessionStorage = globalThis.sessionStorage
-    Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true, configurable: true })
-    Object.defineProperty(globalThis, 'sessionStorage', { value: sessionStorageMock, writable: true, configurable: true })
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: localStorageMock,
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      value: sessionStorageMock,
+      writable: true,
+      configurable: true,
+    })
     localStorageMock.getItem.mockReturnValue(null)
     sessionStorageMock.getItem.mockReturnValue(null)
   })
 
   afterEach(() => {
-    Object.defineProperty(globalThis, 'localStorage', { value: originalLocalStorage, writable: true, configurable: true })
-    Object.defineProperty(globalThis, 'sessionStorage', { value: originalSessionStorage, writable: true, configurable: true })
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: originalLocalStorage,
+      writable: true,
+      configurable: true,
+    })
+    Object.defineProperty(globalThis, 'sessionStorage', {
+      value: originalSessionStorage,
+      writable: true,
+      configurable: true,
+    })
   })
 
   describe('getCurrentUserId', () => {
@@ -218,7 +239,9 @@ describe('claude coverage', () => {
         success: false,
       })
 
-      await expect(extractWithClaude('doc text')).rejects.toThrow('Claude extraction via proxy failed')
+      await expect(extractWithClaude('doc text')).rejects.toThrow(
+        'Claude extraction via proxy failed'
+      )
     })
 
     it('adds default confidence when proxy result has none', async () => {
@@ -311,12 +334,19 @@ describe('claude coverage', () => {
         usage: { input_tokens: 100, output_tokens: 0 },
       })
 
-      await expect(extractWithClaude('doc text')).rejects.toThrow('No text response from Claude model')
+      await expect(extractWithClaude('doc text')).rejects.toThrow(
+        'No text response from Claude model'
+      )
     })
 
     it('handles JSON in markdown code block', async () => {
       mockMessagesCreate.mockResolvedValue({
-        content: [{ type: 'text', text: '```json\n{"policyNumber": "MD-1", "confidence": {"overall": 0.8}}\n```' }],
+        content: [
+          {
+            type: 'text',
+            text: '```json\n{"policyNumber": "MD-1", "confidence": {"overall": 0.8}}\n```',
+          },
+        ],
         usage: { input_tokens: 100, output_tokens: 50 },
       })
 
@@ -326,7 +356,12 @@ describe('claude coverage', () => {
 
     it('handles JSON in markdown code block without json hint', async () => {
       mockMessagesCreate.mockResolvedValue({
-        content: [{ type: 'text', text: '```\n{"policyNumber": "MD-2", "confidence": {"overall": 0.8}}\n```' }],
+        content: [
+          {
+            type: 'text',
+            text: '```\n{"policyNumber": "MD-2", "confidence": {"overall": 0.8}}\n```',
+          },
+        ],
         usage: { input_tokens: 100, output_tokens: 50 },
       })
 
@@ -336,7 +371,12 @@ describe('claude coverage', () => {
 
     it('extracts JSON from surrounding text', async () => {
       mockMessagesCreate.mockResolvedValue({
-        content: [{ type: 'text', text: 'Here is the data: {"policyNumber": "EXT-1", "confidence": {"overall": 0.7}} Done.' }],
+        content: [
+          {
+            type: 'text',
+            text: 'Here is the data: {"policyNumber": "EXT-1", "confidence": {"overall": 0.7}} Done.',
+          },
+        ],
         usage: { input_tokens: 100, output_tokens: 50 },
       })
 
@@ -350,12 +390,19 @@ describe('claude coverage', () => {
         usage: { input_tokens: 100, output_tokens: 50 },
       })
 
-      await expect(extractWithClaude('doc text')).rejects.toThrow('Failed to parse Claude response as JSON')
+      await expect(extractWithClaude('doc text')).rejects.toThrow(
+        'Failed to parse Claude response as JSON'
+      )
     })
 
     it('uses estimated tokens when response has no usage', async () => {
       mockMessagesCreate.mockResolvedValue({
-        content: [{ type: 'text', text: JSON.stringify({ policyNumber: 'P-8', confidence: { overall: 0.9 } }) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ policyNumber: 'P-8', confidence: { overall: 0.9 } }),
+          },
+        ],
         // No usage field
       })
       mockEstimateTokens.mockReturnValue(200)
@@ -371,7 +418,12 @@ describe('claude coverage', () => {
 
     it('uses actual tokens from response usage', async () => {
       mockMessagesCreate.mockResolvedValue({
-        content: [{ type: 'text', text: JSON.stringify({ policyNumber: 'P-9', confidence: { overall: 0.9 } }) }],
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({ policyNumber: 'P-9', confidence: { overall: 0.9 } }),
+          },
+        ],
         usage: { input_tokens: 300, output_tokens: 150 },
       })
 
@@ -394,7 +446,8 @@ describe('claude coverage', () => {
       // The cache key should be the truncated version
       expect(mockGetExtraction).toHaveBeenCalledWith(
         expect.stringContaining('[Document truncated...]'),
-        'anthropic'
+        'anthropic',
+        { promptVersion: 'v2-evidence' }
       )
     })
 
@@ -402,10 +455,9 @@ describe('claude coverage', () => {
       const shortDoc = 'short document'
       await extractWithClaude(shortDoc)
 
-      expect(mockGetExtraction).toHaveBeenCalledWith(
-        shortDoc,
-        'anthropic'
-      )
+      expect(mockGetExtraction).toHaveBeenCalledWith(shortDoc, 'anthropic', {
+        promptVersion: 'v2-evidence',
+      })
     })
   })
 
@@ -416,9 +468,7 @@ describe('claude coverage', () => {
 
       const result = await extractWithClaude('doc')
       expect(result).toEqual(cached)
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ cacheHit: true })
-      )
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ cacheHit: true }))
     })
 
     it('uses 0.7 when cached confidence.overall is null', async () => {
@@ -438,7 +488,11 @@ describe('claude coverage', () => {
     it('tracks failed request cost with error message', async () => {
       mockMessagesCreate.mockRejectedValue(new Error('API error'))
 
-      try { await extractWithClaude('doc') } catch { /* expected */ }
+      try {
+        await extractWithClaude('doc')
+      } catch {
+        /* expected */
+      }
 
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -451,7 +505,11 @@ describe('claude coverage', () => {
     it('handles non-Error thrown values', async () => {
       mockMessagesCreate.mockRejectedValue('string error')
 
-      try { await extractWithClaude('doc') } catch { /* expected */ }
+      try {
+        await extractWithClaude('doc')
+      } catch {
+        /* expected */
+      }
 
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -464,7 +522,11 @@ describe('claude coverage', () => {
     it('calls timedAudit.fail on error', async () => {
       mockMessagesCreate.mockRejectedValue(new Error('fail'))
 
-      try { await extractWithClaude('doc') } catch { /* expected */ }
+      try {
+        await extractWithClaude('doc')
+      } catch {
+        /* expected */
+      }
 
       expect(mockTimedFail).toHaveBeenCalled()
     })
@@ -481,7 +543,11 @@ describe('claude coverage', () => {
     it('logs audit when rate limited', async () => {
       mockConsume.mockReturnValue({ allowed: false })
 
-      try { await extractWithClaude('doc') } catch { /* expected */ }
+      try {
+        await extractWithClaude('doc')
+      } catch {
+        /* expected */
+      }
 
       expect(mockLogAI).toHaveBeenCalledWith(
         'ai.extraction_failed',

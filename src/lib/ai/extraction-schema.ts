@@ -41,6 +41,12 @@ export interface ExtractedPolicyData {
     premiumDifference: number | null // Premium change amount (can be negative for refunds)
   }
 
+  // Evidence for AI-extracted insights and exclusions
+  evidence?: {
+    insights: Array<{ text: string; quote: string }>
+    exclusions: Array<{ text: string; quote: string }>
+  }
+
   // Confidence scores for each field
   confidence: {
     overall: number
@@ -58,7 +64,13 @@ export interface ExtractedPolicyData {
     provider?: string
     fallback?: boolean
     fallbackReason?: string
-    fallbackChain?: Array<{ provider: string; success: boolean; duration_ms?: number; error?: string; error_code?: string }>
+    fallbackChain?: Array<{
+      provider: string
+      success: boolean
+      duration_ms?: number
+      error?: string
+      error_code?: string
+    }>
   }
 }
 
@@ -118,11 +130,13 @@ export const EXTRACTION_JSON_SCHEMA = {
       },
       premium: {
         type: ['number', 'null'],
-        description: 'Total premium amount',
+        description:
+          'Total premium amount (Prim/Ödenecek Prim). DO NOT confuse with vehicle market value (Rayiç Bedel) which is usually in the millions.',
       },
       currency: {
         type: ['string', 'null'],
-        description: 'Currency code - REQUIRED. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Default to TRY only if no indicator found.',
+        description:
+          'Currency code - REQUIRED. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Default to TRY only if no indicator found.',
       },
       paymentFrequency: {
         type: ['string', 'null'],
@@ -135,22 +149,37 @@ export const EXTRACTION_JSON_SCHEMA = {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'Coverage name/type in English' },
-            nameTr: { type: ['string', 'null'], description: 'Coverage name in Turkish. For Turkish policies, provide the original Turkish name (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For English policies, set to null.' },
-            limit: { type: ['number', 'null'], description: 'Coverage limit amount. Use null for Sınırsız or Rayiç Değer.' },
+            nameTr: {
+              type: ['string', 'null'],
+              description:
+                'Coverage name in Turkish. For Turkish policies, provide the original Turkish name (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For English policies, set to null.',
+            },
+            limit: {
+              type: ['number', 'null'],
+              description: 'Coverage limit amount. Use null for Sınırsız or Rayiç Değer.',
+            },
             deductible: { type: ['number', 'null'], description: 'Deductible amount' },
             description: { type: ['string', 'null'], description: 'Brief description' },
-            isUnlimited: { type: 'boolean', description: 'Set to true if coverage shows "Sınırsız" (unlimited)' },
-            isMarketValue: { type: 'boolean', description: 'Set to true if limit shows "Rayiç Değer" (market value)' },
+            isUnlimited: {
+              type: 'boolean',
+              description: 'Set to true if coverage shows "Sınırsız" (unlimited)',
+            },
+            isMarketValue: {
+              type: 'boolean',
+              description: 'Set to true if limit shows "Rayiç Değer" (market value)',
+            },
             category: {
               type: ['string', 'null'],
               enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other', null],
-              description: 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
+              description:
+                'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
           },
           required: ['name', 'nameTr', 'isUnlimited', 'isMarketValue'],
           additionalProperties: false,
         },
-        description: 'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
+        description:
+          'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
       },
       specialConditions: {
         type: 'array',
@@ -167,11 +196,13 @@ export const EXTRACTION_JSON_SCHEMA = {
         properties: {
           isAmendment: {
             type: 'boolean',
-            description: 'true if document is a Zeyilname/Amendment (contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "DEĞİŞİKLİK NO")',
+            description:
+              'true if document is a Zeyilname/Amendment (contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "DEĞİŞİKLİK NO")',
           },
           amendmentNumber: {
             type: ['string', 'null'],
-            description: 'Amendment sequence number (e.g., "1/2024", "2/2024") from "NO: N/YYYY" or "Değişiklik No: N"',
+            description:
+              'Amendment sequence number (e.g., "1/2024", "2/2024") from "NO: N/YYYY" or "Değişiklik No: N"',
           },
           amendmentDate: {
             type: ['string', 'null'],
@@ -183,16 +214,75 @@ export const EXTRACTION_JSON_SCHEMA = {
           },
           amendmentReason: {
             type: ['string', 'null'],
-            description: 'Reason for amendment (e.g., "Sigortalı Talebi", "Prim Farkı", "Teminat Eklenmesi")',
+            description:
+              'Reason for amendment (e.g., "Sigortalı Talebi", "Prim Farkı", "Teminat Eklenmesi")',
           },
           premiumDifference: {
             type: ['number', 'null'],
-            description: 'Premium change amount (Prim Farkı) - positive for increase, negative for refund',
+            description:
+              'Premium change amount (Prim Farkı) - positive for increase, negative for refund',
           },
         },
-        required: ['isAmendment', 'amendmentNumber', 'amendmentDate', 'basePolicyNumber', 'amendmentReason', 'premiumDifference'],
+        required: [
+          'isAmendment',
+          'amendmentNumber',
+          'amendmentDate',
+          'basePolicyNumber',
+          'amendmentReason',
+          'premiumDifference',
+        ],
         additionalProperties: false,
-        description: 'Amendment/Zeyilname detection - identifies if this is a policy change document',
+        description:
+          'Amendment/Zeyilname detection - identifies if this is a policy change document',
+      },
+      evidence: {
+        type: 'object',
+        properties: {
+          insights: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description:
+                    'The insight text (e.g., "✓ Mükemmel sağlık teminatı" or "💡 Yurt dışı teminatı eklemeyi düşünün")',
+                },
+                quote: {
+                  type: 'string',
+                  description:
+                    'The exact verbatim quote from the raw document that proves this insight. DO NOT paraphrase. Extract directly from the text.',
+                },
+              },
+              required: ['text', 'quote'],
+              additionalProperties: false,
+            },
+            description: 'List of insights with corroborating quotes from the text',
+          },
+          exclusions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description: 'The specific exclusion (e.g., "Deprem teminatı hariçtir")',
+                },
+                quote: {
+                  type: 'string',
+                  description:
+                    'The exact verbatim quote from the raw document stating this exclusion. DO NOT paraphrase.',
+                },
+              },
+              required: ['text', 'quote'],
+              additionalProperties: false,
+            },
+            description: 'List of exclusions with corroborating quotes from the text',
+          },
+        },
+        required: ['insights', 'exclusions'],
+        additionalProperties: false,
+        description: 'Verbatim evidence supporting the generated insights and exclusions',
       },
       confidence: {
         type: 'object',
@@ -224,6 +314,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'specialConditions',
       'exclusions',
       'amendmentInfo',
+      'evidence',
       'confidence',
     ],
     additionalProperties: false,
@@ -345,5 +436,11 @@ Your task is to extract structured information from insurance policy documents.
    - premiumDifference: Amount added/subtracted from premium (can be negative)
 
    If NO amendment markers are found, set isAmendment to false and all other amendmentInfo fields to null.
+
+9. **CRITICAL - Evidence Extraction**:
+   You MUST extract verbatim quotes from the document to support your insights and exclusions.
+   - For every insight and exclusion generated, extract the exact original text from the document.
+   - DO NOT paraphrase the quote. Copy it exactly as it appears in the text.
+   - Populate the 'evidence.insights' and 'evidence.exclusions' arrays. Ensure the 'text' perfectly matches the generated insight or exclusion string, and the 'quote' is the verbatim evidence.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

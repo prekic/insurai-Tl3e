@@ -1,25 +1,40 @@
-export type PolicyType = 'kasko' | 'traffic' | 'home' | 'health' | 'life' | 'dask' | 'business' | 'nakliyat'
+export type PolicyType =
+  | 'kasko'
+  | 'traffic'
+  | 'home'
+  | 'health'
+  | 'life'
+  | 'dask'
+  | 'business'
+  | 'nakliyat'
 
 export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
 
 /** Coverage category for organization */
-export type CoverageCategory = 'main' | 'liability' | 'personal_accident' | 'supplementary' | 'assistance' | 'legal' | 'other'
+export type CoverageCategory =
+  | 'main'
+  | 'liability'
+  | 'personal_accident'
+  | 'supplementary'
+  | 'assistance'
+  | 'legal'
+  | 'other'
 
 /** Coverage importance for visual display */
 export type CoverageImportance = 'critical' | 'standard' | 'minor'
 
 /** Vehicle information for kasko policies */
 export interface VehicleInfo {
-  plate?: string          // e.g., "34 RZ 9511"
-  make?: string           // e.g., "Ford"
-  model?: string          // e.g., "Transit Custom"
-  year?: number           // e.g., 2023
-  engineNo?: string       // Motor no
-  chassisNo?: string      // Şasi no
-  color?: string          // Renk
-  usage?: string          // Kullanım şekli (Hususi/Ticari)
-  vehicleClass?: string   // Araç sınıfı (Binek/Kamyonet/TIR)
-  fuelType?: string       // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
+  plate?: string // e.g., "34 RZ 9511"
+  make?: string // e.g., "Ford"
+  model?: string // e.g., "Transit Custom"
+  year?: number // e.g., 2023
+  engineNo?: string // Motor no
+  chassisNo?: string // Şasi no
+  color?: string // Renk
+  usage?: string // Kullanım şekli (Hususi/Ticari)
+  vehicleClass?: string // Araç sınıfı (Binek/Kamyonet/TIR)
+  fuelType?: string // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
 }
 
 export interface Coverage {
@@ -141,6 +156,11 @@ export interface AnalyzedPolicy extends Policy {
   }>
   // Address for analysis
   insuredAddress?: string
+  // Evidence for AI-extracted data
+  evidenceData?: {
+    insights: Record<string, string> // Map of insight text -> verbatim quote
+    exclusions: Record<string, string> // Map of exclusion text -> verbatim quote
+  }
   // Comprehensive gap analysis
   gapAnalysis?: {
     overallScore: number // 0-100 (0 = no gaps, 100 = severe gaps)

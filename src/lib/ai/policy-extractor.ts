@@ -1526,6 +1526,39 @@ async function convertToAnalyzedPolicy(
     marketComparison: await generateMarketComparisonAsync(data),
     extractedText: rawText,
     processedText: processedText || rawText, // Use processed text if available, otherwise raw
+    evidenceData: (() => {
+      const insights: Record<string, string> = {}
+      const exclusions: Record<string, string> = {}
+      if (data.evidence?.insights) {
+        data.evidence.insights.forEach((i) => {
+          insights[i.text.trim().toLowerCase()] = i.quote
+        })
+      }
+      if (data.evidence?.exclusions) {
+        data.evidence.exclusions.forEach((e) => {
+          exclusions[e.text.trim().toLowerCase()] = e.quote
+        })
+      }
+      return { insights, exclusions }
+    })(),
+  }
+
+  // Prepend AI generated evidence-based insights
+  if (data.evidence?.insights) {
+    basePolicy.aiInsights = [
+      ...data.evidence.insights.map((i) => i.text.trim()),
+      ...basePolicy.aiInsights,
+    ]
+  }
+
+  // Merge AI generated evidence-based exclusions if they aren't already grouped
+  if (data.evidence?.exclusions) {
+    const existingExclusions = new Set(basePolicy.exclusions.map((e) => e.toLowerCase().trim()))
+    for (const e of data.evidence.exclusions) {
+      if (!existingExclusions.has(e.text.toLowerCase().trim())) {
+        basePolicy.exclusions.push(e.text)
+      }
+    }
   }
 
   // Calculate ML-based risk score

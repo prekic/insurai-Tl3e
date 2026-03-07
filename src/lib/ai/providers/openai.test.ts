@@ -131,8 +131,9 @@ describe('extractWithOpenAI', () => {
     it('should throw error when rate limited', async () => {
       mockConsume.mockReturnValue({ allowed: false })
 
-      await expect(extractWithOpenAI('Test document'))
-        .rejects.toThrow('AI extraction rate limit exceeded')
+      await expect(extractWithOpenAI('Test document')).rejects.toThrow(
+        'AI extraction rate limit exceeded'
+      )
     })
 
     it('should log failed extraction when rate limited', async () => {
@@ -156,10 +157,9 @@ describe('extractWithOpenAI', () => {
     it('should check cache before making API call', async () => {
       await extractWithOpenAI('Test document text')
 
-      expect(mockGetExtraction).toHaveBeenCalledWith(
-        'Test document text',
-        'openai'
-      )
+      expect(mockGetExtraction).toHaveBeenCalledWith('Test document text', 'openai', {
+        promptVersion: 'v2-evidence',
+      })
     })
 
     it('should return cached result if available', async () => {
@@ -194,7 +194,8 @@ describe('extractWithOpenAI', () => {
       expect(mockSetExtraction).toHaveBeenCalledWith(
         'Test document text',
         'openai',
-        expect.any(Object)
+        expect.any(Object),
+        { promptVersion: 'v2-evidence' }
       )
     })
   })
@@ -353,7 +354,14 @@ describe('extractWithOpenAI - Missing Schema Fields', () => {
       startDate: '2024-01-01',
       endDate: '2025-01-01',
       premium: 1000,
-      confidence: { overall: 0.8, policyNumber: 0.9, provider: 0.8, dates: 0.8, premium: 0.8, coverages: 0.7 },
+      confidence: {
+        overall: 0.8,
+        policyNumber: 0.9,
+        provider: 0.8,
+        dates: 0.8,
+        premium: 0.8,
+        coverages: 0.7,
+      },
       // NO coverages array!
     }
 
@@ -387,7 +395,14 @@ describe('extractWithOpenAI - Missing Schema Fields', () => {
       endDate: '2025-01-01',
       premium: 1000,
       coverages: [],
-      confidence: { overall: null, policyNumber: 0.9, provider: 0.8, dates: 0.8, premium: 0.8, coverages: 0.7 }, // null overall!
+      confidence: {
+        overall: null,
+        policyNumber: 0.9,
+        provider: 0.8,
+        dates: 0.8,
+        premium: 0.8,
+        coverages: 0.7,
+      }, // null overall!
     }
 
     const { getOpenAIClient } = await import('../config')
@@ -495,7 +510,14 @@ describe('extractWithOpenAI - Missing Schema Fields', () => {
       endDate: '2025-01-01',
       premium: 1000,
       coverages: [],
-      confidence: { overall: 0.8, policyNumber: 0.9, provider: 0.5, dates: 0.8, premium: 0.8, coverages: 0.7 },
+      confidence: {
+        overall: 0.8,
+        policyNumber: 0.9,
+        provider: 0.5,
+        dates: 0.8,
+        premium: 0.8,
+        coverages: 0.7,
+      },
     }
 
     const { getOpenAIClient } = await import('../config')
