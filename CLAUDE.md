@@ -97,7 +97,7 @@ insurai/
 │   └── __tests__/           # API route tests
 ├── e2e/                     # Playwright E2E tests
 ├── docs/                    # Extensive developer documentation
-│   ├── adr/                 # Architecture Decision Records
+│   ├── adr/                 # Architecture Decision Records (e.g., 0010-translation-hook-typings)
 │   ├── architecture/        # System architectural overviews
 │   ├── development/         # Developer guides, testing core playbook
 │   └── runbooks/            # Operational troubleshooting guides
@@ -318,6 +318,7 @@ insurai/
 | `supabase/migrations/025_monitoring_retention_config.sql` | **NEW** Monitoring/retention config seeds + configurable pg_cron cleanup functions |
 | `supabase/migrations/026_cron_monitoring_views.sql` | **NEW** Secure views around pg_cron extensions for UI monitoring |
 | `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** Actuarial Web Worker settings and historical confidence bounds |
+| `supabase/migrations/031_fx_rate_history.sql` | **NEW** FX exchange rate history table for tracking conversion analytics |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |

@@ -27,6 +27,8 @@ Completed **Final Verification & Cleanup** across the codebase:
 | `src/components/PolicyDetailView.tsx` | Removed IIFE console block causing lint warnings |
 | `src/lib/fx/fx-service.test.ts` | Upgraded testing array matching 10 global currencies properly |
 | `src/lib/config/__tests__/user-overridable.test.ts` | Added strict parsing for strings to custom preference fields |
+| `supabase/migrations/031_fx_rate_history.sql` | Added migration for tracking FX exchange rates analytically |
+| `docs/adr/0010-translation-hook-typings.md` | Formalized the mandate to avoid arbitrary hook property injections |
 | `(Repository Root)` | Deleted unused scratch files (`test-results.txt`, `test_create_user.js`, `test_fx_backend.ts`) |
 
 ---
@@ -107,6 +109,7 @@ The i18n ternary migration and FX conversion system are **100% complete and depl
 1. `react/no-unescaped-entities` in `FXDashboardTab.tsx` resolved cleanly.
 2. `UserPreferencesPanel` (displaying currency switcher component) was built but not wired properly to any layout; integrated it natively into the `MyAccount.tsx` component, fixing UI visibility problems completely.
 3. Complex git merge conflicts when pushing to main across documentation files (`CLAUDE.md`, `SESSION_HANDOFF.md`); successfully mitigated via local rebase/merge strategy.
+4. Implicitly typed `t.common.approx` broke the strict `tsc` compiler (caught before PR merge); resolved by enforcing typescript dictionary integrity (see ADR-0010).
 All other env vars unchanged from previous sessions.
 
 ---
