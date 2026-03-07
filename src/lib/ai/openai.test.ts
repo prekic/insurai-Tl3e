@@ -100,9 +100,15 @@ let sessionStore: Record<string, string> = {}
 Object.defineProperty(globalThis, 'localStorage', {
   value: {
     getItem: (key: string) => localStore[key] ?? null,
-    setItem: (key: string, value: string) => { localStore[key] = value },
-    removeItem: (key: string) => { delete localStore[key] },
-    clear: () => { localStore = {} },
+    setItem: (key: string, value: string) => {
+      localStore[key] = value
+    },
+    removeItem: (key: string) => {
+      delete localStore[key]
+    },
+    clear: () => {
+      localStore = {}
+    },
   },
   writable: true,
   configurable: true,
@@ -111,9 +117,15 @@ Object.defineProperty(globalThis, 'localStorage', {
 Object.defineProperty(globalThis, 'sessionStorage', {
   value: {
     getItem: (key: string) => sessionStore[key] ?? null,
-    setItem: (key: string, value: string) => { sessionStore[key] = value },
-    removeItem: (key: string) => { delete sessionStore[key] },
-    clear: () => { sessionStore = {} },
+    setItem: (key: string, value: string) => {
+      sessionStore[key] = value
+    },
+    removeItem: (key: string) => {
+      delete sessionStore[key]
+    },
+    clear: () => {
+      sessionStore = {}
+    },
   },
   writable: true,
   configurable: true,
@@ -167,7 +179,9 @@ function setupDirectClient(
 ) {
   mockChatCreate.mockResolvedValue({
     choices: [{ message: { content } }],
-    ...(usage !== undefined ? { usage } : { usage: { prompt_tokens: 200, completion_tokens: 150 } }),
+    ...(usage !== undefined
+      ? { usage }
+      : { usage: { prompt_tokens: 200, completion_tokens: 150 } }),
   })
   mockGetOpenAIClient.mockResolvedValue({
     chat: { completions: { create: mockChatCreate } },
@@ -255,7 +269,11 @@ describe('extractWithOpenAI', () => {
 
     it('should log audit event when rate limited', async () => {
       mockConsume.mockReturnValue({ allowed: false })
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockLogAI).toHaveBeenCalledWith(
         'ai.extraction_failed',
         expect.objectContaining({ provider: 'openai', documentLength: 3 }),
@@ -265,7 +283,11 @@ describe('extractWithOpenAI', () => {
 
     it('should not initialize cache or cost tracker when rate limited', async () => {
       mockConsume.mockReturnValue({ allowed: false })
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockCacheInitialize).not.toHaveBeenCalled()
       expect(mockCostInitialize).not.toHaveBeenCalled()
     })
@@ -297,14 +319,18 @@ describe('extractWithOpenAI', () => {
       const doc = 'x'.repeat(30000)
       await extractWithOpenAI(doc)
       // Cache lookup uses the non-truncated doc
-      expect(mockGetExtraction).toHaveBeenCalledWith(doc, 'openai')
+      expect(mockGetExtraction).toHaveBeenCalledWith(doc, 'openai', {
+        promptVersion: 'v2-evidence',
+      })
     })
 
     it('should truncate documents > 30000 chars and append marker', async () => {
       const doc = 'a'.repeat(35000)
       await extractWithOpenAI(doc)
       const expectedTruncated = 'a'.repeat(30000) + '\n\n[Document truncated...]'
-      expect(mockGetExtraction).toHaveBeenCalledWith(expectedTruncated, 'openai')
+      expect(mockGetExtraction).toHaveBeenCalledWith(expectedTruncated, 'openai', {
+        promptVersion: 'v2-evidence',
+      })
     })
 
     it('should use truncated text for estimateTokens', async () => {
@@ -377,7 +403,8 @@ describe('extractWithOpenAI', () => {
       expect(mockSetExtraction).toHaveBeenCalledWith(
         'doc',
         'openai',
-        expect.objectContaining({ policyNumber: 'POL-123' })
+        expect.objectContaining({ policyNumber: 'POL-123' }),
+        { promptVersion: 'v2-evidence' }
       )
     })
   })
@@ -606,6 +633,7 @@ describe('extractWithOpenAI', () => {
         'openai',
         expect.stringContaining('doc'),
         'Test system prompt',
+        undefined,
         undefined
       )
       expect(mockGetOpenAIClient).not.toHaveBeenCalled()
@@ -621,9 +649,7 @@ describe('extractWithOpenAI', () => {
 
     it('should throw with default message when proxy fails without error message', async () => {
       mockExtractViaProxy.mockResolvedValue({ success: false })
-      await expect(extractWithOpenAI('doc')).rejects.toThrow(
-        'OpenAI extraction via proxy failed'
-      )
+      await expect(extractWithOpenAI('doc')).rejects.toThrow('OpenAI extraction via proxy failed')
     })
 
     it('should throw when proxy returns success: true but no data', async () => {
@@ -631,9 +657,7 @@ describe('extractWithOpenAI', () => {
         success: true,
         data: null,
       })
-      await expect(extractWithOpenAI('doc')).rejects.toThrow(
-        'OpenAI extraction via proxy failed'
-      )
+      await expect(extractWithOpenAI('doc')).rejects.toThrow('OpenAI extraction via proxy failed')
     })
 
     it('should throw when proxy returns success: true but data is undefined', async () => {
@@ -641,9 +665,7 @@ describe('extractWithOpenAI', () => {
         success: true,
         // data is undefined
       })
-      await expect(extractWithOpenAI('doc')).rejects.toThrow(
-        'OpenAI extraction via proxy failed'
-      )
+      await expect(extractWithOpenAI('doc')).rejects.toThrow('OpenAI extraction via proxy failed')
     })
 
     it('should attach _proxyMeta to result', async () => {
@@ -829,16 +851,12 @@ describe('extractWithOpenAI', () => {
     it('should record userId in cost record', async () => {
       localStore['insurai_user_id'] = 'cost-user'
       await extractWithOpenAI('doc')
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ userId: 'cost-user' })
-      )
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ userId: 'cost-user' }))
     })
 
     it('should record model name from AI_CONFIG', async () => {
       await extractWithOpenAI('doc')
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ model: 'gpt-4o' })
-      )
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ model: 'gpt-4o' }))
     })
   })
 
@@ -862,16 +880,12 @@ describe('extractWithOpenAI', () => {
       delete (resp as Record<string, unknown>).confidence
       setupDirectClient(JSON.stringify(resp))
       await extractWithOpenAI('doc')
-      expect(mockTimedComplete).toHaveBeenCalledWith(
-        expect.objectContaining({ confidence: 0.7 })
-      )
+      expect(mockTimedComplete).toHaveBeenCalledWith(expect.objectContaining({ confidence: 0.7 }))
     })
 
     it('should use actual confidence when present', async () => {
       await extractWithOpenAI('doc')
-      expect(mockTimedComplete).toHaveBeenCalledWith(
-        expect.objectContaining({ confidence: 0.92 })
-      )
+      expect(mockTimedComplete).toHaveBeenCalledWith(expect.objectContaining({ confidence: 0.92 }))
     })
 
     it('should complete timed audit on proxy success', async () => {
@@ -881,9 +895,7 @@ describe('extractWithOpenAI', () => {
         data: makeFullResponse({ confidence: { overall: 0.85 } }),
       })
       await extractWithOpenAI('doc')
-      expect(mockTimedComplete).toHaveBeenCalledWith(
-        expect.objectContaining({ confidence: 0.85 })
-      )
+      expect(mockTimedComplete).toHaveBeenCalledWith(expect.objectContaining({ confidence: 0.85 }))
     })
   })
 
@@ -892,7 +904,11 @@ describe('extractWithOpenAI', () => {
   describe('Error Handling', () => {
     it('should record failed request in cost tracker with Error message', async () => {
       mockChatCreate.mockRejectedValue(new Error('Network timeout'))
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
@@ -906,7 +922,11 @@ describe('extractWithOpenAI', () => {
     it('should call timedAudit.fail with the original Error', async () => {
       const error = new Error('API crashed')
       mockChatCreate.mockRejectedValue(error)
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockTimedFail).toHaveBeenCalledWith(error, { provider: 'openai' })
     })
 
@@ -917,7 +937,11 @@ describe('extractWithOpenAI', () => {
 
     it('should convert non-Error thrown values to Error for timedAudit.fail', async () => {
       mockChatCreate.mockRejectedValue('string error')
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockTimedFail).toHaveBeenCalledWith(
         expect.objectContaining({ message: 'string error' }),
         { provider: 'openai' }
@@ -926,15 +950,21 @@ describe('extractWithOpenAI', () => {
 
     it('should stringify non-Error values for errorMessage in cost tracker', async () => {
       mockChatCreate.mockRejectedValue(42)
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ errorMessage: '42' })
-      )
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ errorMessage: '42' }))
     })
 
     it('should include durationMs in failed cost record', async () => {
       mockChatCreate.mockRejectedValue(new Error('fail'))
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       const callArg = mockRecordUsage.mock.calls[0][0] as Record<string, unknown>
       expect(callArg.durationMs).toBeGreaterThanOrEqual(0)
     })
@@ -945,7 +975,11 @@ describe('extractWithOpenAI', () => {
         success: false,
         error: 'Proxy down',
       })
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockRecordUsage).toHaveBeenCalledWith(
         expect.objectContaining({
           success: false,
@@ -963,13 +997,21 @@ describe('extractWithOpenAI', () => {
 
     it('should not cache result when extraction fails', async () => {
       mockChatCreate.mockRejectedValue(new Error('fail'))
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockSetExtraction).not.toHaveBeenCalled()
     })
 
     it('should not complete timed audit when extraction fails', async () => {
       mockChatCreate.mockRejectedValue(new Error('fail'))
-      try { await extractWithOpenAI('doc') } catch { /* expected */ }
+      try {
+        await extractWithOpenAI('doc')
+      } catch {
+        /* expected */
+      }
       expect(mockTimedComplete).not.toHaveBeenCalled()
       expect(mockTimedFail).toHaveBeenCalled()
     })
@@ -983,7 +1025,8 @@ describe('extractWithOpenAI', () => {
       expect(mockSetExtraction).toHaveBeenCalledWith(
         'my doc',
         'openai',
-        expect.objectContaining({ policyNumber: 'POL-123' })
+        expect.objectContaining({ policyNumber: 'POL-123' }),
+        { promptVersion: 'v2-evidence' }
       )
     })
 
@@ -997,7 +1040,8 @@ describe('extractWithOpenAI', () => {
       expect(mockSetExtraction).toHaveBeenCalledWith(
         'proxy doc',
         'openai',
-        expect.objectContaining({ policyNumber: 'PROXY-1' })
+        expect.objectContaining({ policyNumber: 'PROXY-1' }),
+        { promptVersion: 'v2-evidence' }
       )
     })
   })
@@ -1016,6 +1060,7 @@ describe('extractWithOpenAI', () => {
         'openai',
         expect.stringContaining('My insurance policy text'),
         'Test system prompt',
+        undefined,
         undefined
       )
       // Should include the instruction prefix
@@ -1051,9 +1096,7 @@ describe('extractWithOpenAI', () => {
       mockEstimateTokens.mockReturnValue(250)
       mockGetExtraction.mockResolvedValue(makeFullResponse())
       await extractWithOpenAI('doc')
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ inputTokens: 250 })
-      )
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ inputTokens: 250 }))
     })
   })
 
@@ -1071,9 +1114,7 @@ describe('extractWithOpenAI', () => {
 
     it('should use original document length when not truncated', async () => {
       await extractWithOpenAI('short doc')
-      expect(mockRecordUsage).toHaveBeenCalledWith(
-        expect.objectContaining({ documentLength: 9 })
-      )
+      expect(mockRecordUsage).toHaveBeenCalledWith(expect.objectContaining({ documentLength: 9 }))
     })
   })
 })

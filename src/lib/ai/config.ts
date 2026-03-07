@@ -241,7 +241,9 @@ export async function extractViaProxy(
   _provider: 'openai' | 'anthropic',
   documentText: string,
   systemPrompt: string,
-  userId?: string
+  userId?: string,
+  signal?: AbortSignal,
+  _retryCount = 0
 ): Promise<{
   success: boolean
   data?: Record<string, unknown>
@@ -260,18 +262,37 @@ export async function extractViaProxy(
     error?: string
     error_code?: string
   }>
+  // Diagnostic: server-side phase timing
+  serverPhaseTiming?: Record<string, number>
+  serverElapsedMs?: number
+  // Diagnostic: error classification
+  errorCode?: string
+  // Diagnostic: client-side elapsed time (for catch-block errors)
+  clientElapsedMs?: number
 }> {
   const proxyUrl = getProxyUrl()
   if (!proxyUrl) {
     return { success: false, error: 'Proxy not configured' }
   }
 
+  const fetchStartMs = performance.now()
+
+  // Build a combined signal: respect caller's signal (if any) AND enforce a 120s hard timeout.
+  // The server has a 105s budget; 120s gives 15s for network/serialization overhead.
+  const FETCH_TIMEOUT_MS = 120_000
+
   try {
-    console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`)
+    console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`, {
+      attempt: _retryCount + 1,
+      docLength: documentText?.length ?? 0,
+    })
 
     // Use unified endpoint with automatic fallback
     const headers: Record<string, string> = { 'Content-Type': 'application/json' }
     if (userId) headers['x-user-id'] = userId
+    const timeoutSignal = AbortSignal.timeout(FETCH_TIMEOUT_MS)
+    const effectiveSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal
+
     const response = await fetch(`${proxyUrl}/api/ai/extract`, {
       method: 'POST',
       headers,
@@ -279,22 +300,23 @@ export async function extractViaProxy(
         documentText,
         systemPrompt,
       }),
+      signal: effectiveSignal,
     })
 
-    console.warn('[extractViaProxy] Response status:', response.status, response.statusText)
+    const elapsedMs = Math.round(performance.now() - fetchStartMs)
+    console.warn('[extractViaProxy] Response status:', response.status, response.statusText, {
+      elapsedMs,
+    })
 
     const result = await response.json()
 
     console.warn('[extractViaProxy] Parsed response:', {
       success: result.success,
       hasData: !!result.data,
-      dataType: result.data ? typeof result.data : 'undefined',
-      dataKeys:
-        result.data && typeof result.data === 'object' ? Object.keys(result.data).slice(0, 15) : [],
       provider: result.provider,
       fallback: result.fallback,
       error: result.error,
-      hasUsage: !!result.usage,
+      elapsedMs,
     })
 
     if (!response.ok) {
@@ -304,23 +326,31 @@ export async function extractViaProxy(
       console.error('[extractViaProxy] HTTP error:', errorMsg, {
         code: result.code,
         status: response.status,
+        elapsedMs,
       })
       return {
         success: false,
         error: errorMsg,
+        // Thread server diagnostics so the UI can display failure context
+        errorCode: result.code,
+        requestId: result.requestId,
+        serverPhaseTiming: result.phaseTiming,
+        serverElapsedMs: result.elapsedMs,
+        fallbackChain: result.fallbackChain,
       }
     }
 
     // Check if result.data exists and has expected structure
     if (!result.data) {
-      console.error('[extractViaProxy] Server returned success but no data!')
+      console.error('[extractViaProxy] Server returned success but no data!', { elapsedMs })
       return {
         success: false,
         error: 'Server returned success but no data',
+        requestId: result.requestId,
+        serverElapsedMs: result.elapsedMs,
       }
     }
 
-    console.warn('[extractViaProxy] Returning successful result with data')
     return {
       success: true,
       data: result.data,
@@ -332,25 +362,55 @@ export async function extractViaProxy(
       requestId: result.requestId,
       route: result.route,
       fallbackChain: result.fallbackChain,
+      // Diagnostic: server-side phase timing breakdown
+      serverPhaseTiming: result.phaseTiming,
+      serverElapsedMs: result.elapsedMs,
     }
   } catch (error) {
+    const elapsedMs = Math.round(performance.now() - fetchStartMs)
     const rawMessage = error instanceof Error ? error.message : 'Network error'
-    // Enhance "Load failed" and similar browser-level fetch errors with context
-    let enhancedMessage = rawMessage
-    if (
+    const isAbort = error instanceof Error && error.name === 'AbortError'
+
+    // Check if this is a transient network error eligible for retry
+    const isNetworkError =
       rawMessage === 'Load failed' ||
       rawMessage === 'Failed to fetch' ||
       rawMessage === 'NetworkError when attempting to fetch resource.'
-    ) {
-      enhancedMessage = `${rawMessage} (network request to ${proxyUrl}/api/ai/extract failed — server may be restarting, timed out, or unreachable)`
+
+    // Retry once for transient network errors (handles mobile LTE drops)
+    if (_retryCount === 0 && isNetworkError && !isAbort && !signal?.aborted) {
+      console.warn(`[extractViaProxy] Network error after ${elapsedMs}ms, retrying in 2s...`, {
+        rawMessage,
+        attempt: 1,
+      })
+      await new Promise((r) => setTimeout(r, 2000))
+      return extractViaProxy(_provider, documentText, systemPrompt, userId, signal, 1)
+    }
+
+    // Enhance error with timing and context
+    let enhancedMessage = rawMessage
+    const isTimeout = isAbort && elapsedMs >= FETCH_TIMEOUT_MS - 5000
+    if (isNetworkError) {
+      const retryNote = _retryCount > 0 ? ' after retry' : ''
+      enhancedMessage = `${rawMessage} (after ${elapsedMs}ms${retryNote} — network request to ${proxyUrl}/api/ai/extract failed — server may be restarting, timed out, or unreachable)`
+    } else if (isTimeout) {
+      enhancedMessage = `Extraction timed out after ${Math.round(elapsedMs / 1000)}s — the AI service may be busy. Please try again.`
+    } else if (isAbort) {
+      enhancedMessage = `Request was cancelled (after ${elapsedMs}ms)`
     }
     console.error('[extractViaProxy] Exception:', enhancedMessage, {
       originalError: rawMessage,
       proxyUrl,
+      elapsedMs,
+      attempt: _retryCount + 1,
+      isAbort,
     })
     return {
       success: false,
       error: enhancedMessage,
+      // Client-side diagnostic fields for UI display
+      errorCode: isTimeout ? 'CLIENT_FETCH_TIMEOUT' : isAbort ? 'CLIENT_ABORT' : 'NETWORK_ERROR',
+      clientElapsedMs: elapsedMs,
     }
   }
 }

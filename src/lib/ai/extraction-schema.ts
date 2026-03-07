@@ -71,6 +71,10 @@ export interface ExtractedPolicyData {
       error?: string
       error_code?: string
     }>
+    /** Server-side phase timing breakdown (ms) */
+    serverPhaseTiming?: Record<string, number>
+    /** Total server-side elapsed time (ms) */
+    serverElapsedMs?: number
   }
 }
 

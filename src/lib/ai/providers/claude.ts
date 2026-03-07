@@ -70,7 +70,8 @@ function getCurrentUserId(): string {
  */
 export async function extractWithClaude(
   documentText: string,
-  notifyUserId?: string
+  notifyUserId?: string,
+  signal?: AbortSignal
 ): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.anthropic.extractionModel
@@ -165,11 +166,23 @@ export async function extractWithClaude(
         'anthropic',
         userMessage,
         EXTRACTION_SYSTEM_PROMPT,
-        notifyUserId
+        notifyUserId,
+        signal
       )
 
       if (!proxyResult.success || !proxyResult.data) {
-        throw new Error(proxyResult.error || 'Claude extraction via proxy failed')
+        const errorMsg = proxyResult.error || 'Claude extraction via proxy failed'
+        const proxyError = new Error(errorMsg) as Error & {
+          errorCode?: string
+          requestId?: string
+          serverPhaseTiming?: Record<string, number>
+          serverElapsedMs?: number
+        }
+        proxyError.errorCode = proxyResult.errorCode
+        proxyError.requestId = proxyResult.requestId
+        proxyError.serverPhaseTiming = proxyResult.serverPhaseTiming
+        proxyError.serverElapsedMs = proxyResult.serverElapsedMs
+        throw proxyError
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
@@ -182,6 +195,8 @@ export async function extractWithClaude(
         fallback: proxyResult.fallback,
         fallbackReason: proxyResult.fallbackReason,
         fallbackChain: proxyResult.fallbackChain,
+        serverPhaseTiming: proxyResult.serverPhaseTiming,
+        serverElapsedMs: proxyResult.serverElapsedMs,
       }
 
       // Ensure required fields exist (server may not enforce schema)

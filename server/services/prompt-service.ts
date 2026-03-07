@@ -14,6 +14,22 @@ import { logger } from '../lib/logger.js'
 
 const log = logger.child('PromptService')
 
+// Timeout for database queries — prevents hanging if Supabase is slow/unreachable
+const DB_QUERY_TIMEOUT_MS = 8_000
+
+/** Race a promise against a timeout */
+function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`${label} timed out after ${DB_QUERY_TIMEOUT_MS}ms`)),
+        DB_QUERY_TIMEOUT_MS
+      )
+    ),
+  ])
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -278,15 +294,14 @@ export async function getPromptById(id: string): Promise<PromptTemplate | null> 
     return cached
   }
 
-  // Try database
+  // Try database (with timeout to prevent indefinite hangs)
   const db = getClient()
   if (db) {
     try {
-      const { data, error } = await db
-        .from('prompt_templates')
-        .select('*')
-        .eq('id', id)
-        .single()
+      const { data, error } = await withTimeout(
+        Promise.resolve(db.from('prompt_templates').select('*').eq('id', id).single()),
+        'getPromptById'
+      )
 
       if (!error && data) {
         const template = mapFromDatabase(data)
@@ -294,7 +309,10 @@ export async function getPromptById(id: string): Promise<PromptTemplate | null> 
         return template
       }
     } catch (err) {
-      log.warn('Database error for prompt id', { id, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt id', {
+        id,
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -319,16 +337,16 @@ export async function getPromptByName(name: string): Promise<PromptTemplate | nu
     return cached
   }
 
-  // Try database
+  // Try database (with timeout to prevent indefinite hangs)
   const db = getClient()
   if (db) {
     try {
-      const { data, error } = await db
-        .from('prompt_templates')
-        .select('*')
-        .eq('name', name)
-        .eq('is_active', true)
-        .single()
+      const { data, error } = await withTimeout(
+        Promise.resolve(
+          db.from('prompt_templates').select('*').eq('name', name).eq('is_active', true).single()
+        ),
+        'getPromptByName'
+      )
 
       if (!error && data) {
         const template = mapFromDatabase(data)
@@ -336,7 +354,10 @@ export async function getPromptByName(name: string): Promise<PromptTemplate | nu
         return template
       }
     } catch (err) {
-      log.warn('Database error for prompt name', { name, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt name', {
+        name,
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -368,7 +389,10 @@ export async function getPromptsByCategory(category: PromptCategory): Promise<Pr
         return data.map(mapFromDatabase)
       }
     } catch (err) {
-      log.warn('Database error for prompt category', { category, error: err instanceof Error ? err.message : String(err) })
+      log.warn('Database error for prompt category', {
+        category,
+        error: err instanceof Error ? err.message : String(err),
+      })
     }
   }
 
@@ -525,13 +549,13 @@ function mapFromDatabase(row: Record<string, unknown>): PromptTemplate {
   return {
     id: row.id as string,
     name: row.name as string,
-    description: row.description as string || '',
+    description: (row.description as string) || '',
     category: row.category as PromptCategory,
     systemPrompt: row.system_prompt as string,
     userPromptTemplate: row.user_prompt_template as string,
     variables: (row.variables as string[]) || [],
     isActive: row.is_active as boolean,
-    version: row.version as number || 1,
+    version: (row.version as number) || 1,
     defaultProvider: row.default_provider as string | undefined,
     defaultModel: row.default_model as string | undefined,
     parameters: row.parameters as Record<string, unknown> | undefined,
@@ -547,7 +571,12 @@ function mapFromDatabase(row: Record<string, unknown>): PromptTemplate {
  */
 export async function updatePrompt(
   id: string,
-  updates: Partial<Pick<PromptTemplate, 'name' | 'description' | 'systemPrompt' | 'userPromptTemplate' | 'isActive' | 'parameters'>>
+  updates: Partial<
+    Pick<
+      PromptTemplate,
+      'name' | 'description' | 'systemPrompt' | 'userPromptTemplate' | 'isActive' | 'parameters'
+    >
+  >
 ): Promise<PromptTemplate | null> {
   const db = getClient()
   if (!db) {

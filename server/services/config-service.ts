@@ -14,6 +14,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { recordServerConfigFetch } from '../routes/settings.js'
 
+// Timeout for database queries — prevents hanging if Supabase is slow/unreachable
+const DB_QUERY_TIMEOUT_MS = 8_000
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -315,10 +318,19 @@ async function getCategorySettings(category: string): Promise<Record<string, unk
   }
 
   try {
-    const { data, error } = await db
-      .from('app_settings')
-      .select('key, value')
-      .eq('category', category)
+    // Race the DB query against a timeout to prevent indefinite hangs
+    const queryPromise = Promise.resolve(
+      db.from('app_settings').select('key, value').eq('category', category)
+    )
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Config query timed out after ${DB_QUERY_TIMEOUT_MS}ms`)),
+        DB_QUERY_TIMEOUT_MS
+      )
+    )
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise])
 
     if (error || !data) {
       recordServerConfigFetch(

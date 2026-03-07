@@ -3,9 +3,9 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Production Monitoring**: The FX API integration has been fully deployed to production with live endpoints (`/api/fx/rates?base=TRY` and `/api/fx/status`). Monitor production telemetry to ensure that the 6h caching TTL and free-tier exchangerate.host API are performing within acceptable parameters.
-2. **Settings Pages**: The Settings pages for both User and Admin (along with all relevant config panels) have been exhaustively tested and are fully responsive, properly laid out, and correctly tied to live databases with localized text.
-3. **Cosmetic Sweep & Tests**: A final comprehensive cosmetic sweep has been performed. The workspace is completely clear of ad-hoc debugging scripts. The platform asserts zero ESLint warnings, zero TS compiler issues, and 100% test passage across ~15,850+ vitest iterations. The application is in a deeply hardened state ready for major releases.
+1. **Deploy & Verify Extraction Resilience**: This session's 8 commits (abort-on-unmount fix, fetch timeout, pipeline diagnostics, error threading) need to be merged and deployed to Railway. After deploy, test by uploading a PDF on `/try`, navigating away mid-extraction, then returning — the result should be available. Also verify the diagnostic suffix appears on timeout errors (e.g., `[code=BUDGET_EXHAUSTED | req=ext-... | server_anthropic_ms=...]`).
+2. **Production Monitoring**: The FX API integration is fully deployed with live endpoints (`/api/fx/rates?base=TRY` and `/api/fx/status`). Monitor the 6h caching TTL and free-tier exchangerate.host API for production health.
+3. **Server Budget Tuning**: The extraction budget system (`REQUEST_BUDGET_MS=105s`, primary=50s, fallback=45s) may need adjustment based on production latency data. Review Railway logs for `phaseTiming` entries and adjust constants in `server/routes/ai.ts` if timeouts are too aggressive or too lenient.
 
 ---
 
@@ -14,9 +14,9 @@
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
 
 - **Owner**: Erdem (personal project)
-- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**.
+- **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**, **extraction timeout resilience (abort-on-unmount, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading)**.
 - **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100, finalized production FX API)
-- **Last Updated**: March 6, 2026 (Final UI & Cosmetic Sweep, 0-error strict code baseline, FX User Preference live integration, ad-hoc script purges)
+- **Last Updated**: March 7, 2026 (Extraction timeout resilience: abort-on-unmount fix, fetch timeout, pipeline phase timing diagnostics, diagnostic error threading through entire extraction pipeline)
 
 ---
 
@@ -4433,6 +4433,69 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Solution**: Added explicit type assertion: `(await response.json()) as { success?: boolean; quotes?: Record<string, number>; error?: unknown }`
 - **Commit**: `e6c0132`
 
+### 159. Extraction Abort-on-Unmount Causing Ghost Timeout Errors (Fixed Mar 7, 2026)
+- **Problem**: User navigates away from `/try` during extraction → `AbortController.abort()` fires → AI provider sees abort as an error → next extraction attempt starts with stale error state, or user sees "Load failed" on return
+- **Root Cause**: `TryAnalysis.tsx` used `AbortController` passed to `extractPolicyFromDocument()` and aborted on unmount. The abort signal propagated through the proxy fetch, causing in-flight server work to be wasted and client to receive an abort error that was confusing to end users.
+- **Solution**: Removed abort-on-unmount entirely. Extraction now runs to completion even if user navigates away. `saveTrialResult()` persists the result so it's available when user returns to `/try`. `isMounted` ref guards all UI state updates and toasts to prevent React warnings.
+- **Files Changed**: `src/components/TryAnalysis.tsx`, `src/lib/ai/policy-extractor.ts`
+- **Commit**: `7ca2727`
+
+### 160. extractViaProxy Hanging Indefinitely Without Fetch Timeout (Fixed Mar 7, 2026)
+- **Problem**: `extractViaProxy()` in `config.ts` had no timeout on the `fetch()` call. If the server hung or was unreachable, the client waited forever.
+- **Solution**: Added `AbortSignal.timeout(FETCH_TIMEOUT_MS)` (120s) to the fetch call. On timeout, returns a structured error with `CLIENT_FETCH_TIMEOUT` error code.
+- **Build Fix**: `FETCH_TIMEOUT_MS` was initially declared inside the `try` block but referenced in the `catch` block → `TS2304: Cannot find name`. Fixed by moving declaration before `try`.
+- **Files Changed**: `src/lib/ai/config.ts`
+- **Commits**: `cd3c4f3`, `53d4e48`
+
+### 161. Extraction Timeout Stacking — Recurring 90s Failures (Fixed Mar 7, 2026)
+- **Problem**: After one extraction timeout, subsequent attempts also timed out — the `Promise.race` timeout promise from the previous attempt lingered and won the race against the new extraction.
+- **Root Cause**: `timeoutId` and `timeoutPromise` were not properly scoped to each extraction attempt in `runExtraction()`.
+- **Solution**: Ensured each call to `runExtraction()` creates its own `timeoutPromise` with a fresh `setTimeout`. The `clearTimeout` runs in the finally block.
+- **File Changed**: `src/components/TryAnalysis.tsx`
+- **Commit**: `33747bf`
+
+### 162. Pipeline Phase Timing Diagnostics for Extraction Errors (Added Mar 7, 2026)
+- **Feature**: `extractPolicyFromDocument()` now records per-phase timing (pdf.js, Document AI, text preprocessing, AI extraction, validation, total) and includes it on both success and failure results.
+- **Client-Side Phases Tracked**: `pdfjs_ms`, `documentAI_ms`, `textPreprocessing_ms`, `aiExtraction_ms`, `validation_ms`, `pipeline_total_ms`
+- **Error Display**: `TryAnalysis.tsx` catch block extracts `clientPhaseTiming` from enriched errors and appends `[Timing: OCR: 50.1s, Server total: 52.0s, Total: 55.3s]` to error messages.
+- **Files Changed**: `src/lib/ai/policy-extractor.ts` (instrumented pipeline), `src/components/TryAnalysis.tsx` (error display)
+- **Commit**: `0a430e8`
+
+### 163. Production "Load failed" Diagnostic Instrumentation (Added Mar 7, 2026)
+- **Feature**: Server-side AI extraction routes now emit structured `log.info` with per-phase timing and full `fallbackChain` on every extraction completion/failure.
+- **Server Phases Tracked**: `configLoad_ms`, `anthropic_ms` or `openai_ms`, `total_ms`
+- **Budget System**: `REQUEST_BUDGET_MS = 105000` (105s total budget). Primary provider gets 50s (`PRIMARY_TIMEOUT_MS`), fallback gets 45s (`FALLBACK_TIMEOUT_MS`), remaining budget for config/overhead. When budget exhausted, returns error code `BUDGET_EXHAUSTED`.
+- **FallbackChain**: Each provider attempt recorded with `{ provider, success, duration_ms, error, error_code }`. Returned to client for diagnostic display.
+- **Error Codes Added**: `ANTHROPIC_SDK_TIMEOUT`, `OPENAI_SDK_TIMEOUT`, `ANTHROPIC_OVERLOADED`, `BUDGET_EXHAUSTED`
+- **Files Changed**: `server/routes/ai.ts`
+- **Commit**: `952680d`
+
+### 164. Diagnostic Error Threading Through Extraction Pipeline (Added Mar 7, 2026)
+- **Feature**: Error messages displayed to users now include pasteable diagnostic strings identifying the exact failure point.
+- **Format**: `[code=BUDGET_EXHAUSTED | req=ext-1709829374829 | server_anthropic_ms=50123ms, pipeline_total_ms=52000ms]`
+- **Pipeline (5 layers)**:
+  1. **`server/routes/ai.ts`**: Returns `requestId`, `phaseTiming`, `fallbackChain`, error codes in JSON response
+  2. **`config.ts` (`extractViaProxy`)**: Extracts `errorCode`, `requestId`, `serverPhaseTiming`, `serverElapsedMs` from HTTP error responses. In catch block, classifies as `CLIENT_FETCH_TIMEOUT` / `CLIENT_ABORT` / `NETWORK_ERROR` with `clientElapsedMs`.
+  3. **`openai.ts` / `claude.ts`**: Create enriched `Error` objects with `errorCode`, `requestId`, `serverPhaseTiming`, `serverElapsedMs` properties from proxy result
+  4. **`policy-extractor.ts`**: Extracts proxy diagnostic fields from enriched errors, merges server timing into `clientPhaseTiming` (prefixed `server_`), returns `errorCode` + `requestId` on `ExtractionError`
+  5. **`TryAnalysis.tsx`**: Builds `[code=X | req=Y | timing...]` diagnostic suffix from enriched error properties, appends to both timeout and non-timeout error messages
+- **Files Changed**: `src/lib/ai/config.ts`, `src/lib/ai/providers/openai.ts`, `src/lib/ai/providers/claude.ts`, `src/lib/ai/policy-extractor.ts`, `src/components/TryAnalysis.tsx`
+- **Commit**: `5f6412e`
+
+### 165. DB Query Timeout for Config and Prompt Services (Added Mar 7, 2026)
+- **Problem**: Supabase config and prompt queries could hang indefinitely during extraction, blocking the entire pipeline
+- **Root Cause**: No timeout on `supabase.from(...).select(...)` calls in `config-service.ts` and `prompt-service.ts`. If the Supabase connection pool is exhausted or the DB is slow, the extraction hangs forever.
+- **Solution**: Added `DB_QUERY_TIMEOUT_MS = 8_000` (8 seconds) to both services. Config queries are wrapped in `Promise.race` with a timeout that returns defaults on expiry. Prompt queries use a `withTimeout()` helper that rejects with a descriptive error.
+- **Behavior on Timeout**: Config service falls back to system defaults silently (no crash). Prompt service falls back to hardcoded prompts (existing fallback chain).
+- **Files Changed**: `server/services/config-service.ts`, `server/services/prompt-service.ts`
+- **Commit**: `0a430e8`
+
+### 166. ExtractedPolicyData `_proxyMeta` Interface Extended (Added Mar 7, 2026)
+- **Feature**: Added `serverPhaseTiming?: Record<string, number>` and `serverElapsedMs?: number` to the `_proxyMeta` interface in `extraction-schema.ts`
+- **Purpose**: Provider adapters (openai.ts, claude.ts) populate these fields from the proxy response, enabling the full diagnostic chain from server → client → user-visible error message
+- **File Changed**: `src/lib/ai/extraction-schema.ts`
+- **Commit**: `0a430e8`
+
 ---
 
 ## Turkish Market Considerations
@@ -5194,6 +5257,13 @@ connectSrc: [
 - Admin can now change retention periods via Settings → Data Retention without SQL changes
 - After applying migration 025 to production, verify with `SELECT * FROM cron.job` — job names should end in `-configurable`
 
+**DB Query Timeouts in Config/Prompt Services (Added Mar 7, 2026):**
+- `server/services/config-service.ts` and `server/services/prompt-service.ts` both use `DB_QUERY_TIMEOUT_MS = 8_000` (8 seconds)
+- Config service: `Promise.race` wrapper returns system defaults on timeout — never blocks extraction
+- Prompt service: `withTimeout()` helper rejects with descriptive error — falls back to hardcoded prompts
+- If adding new Supabase queries to these services, always wrap them with the existing timeout pattern
+- If Supabase queries consistently time out (visible in Railway logs as "Config query timed out" warnings), investigate connection pool exhaustion or slow DB
+
 **Extraction Alert Email & Configurable Thresholds — Completed (Feb 27, 2026):**
 - `fireAlert()` in `extraction-alert-service.ts` now sends email via `sendAdminAlertEmail()` gated by `config.enableEmailAlerts`
 - `checkIntervalMs` is now read from DB config (self-updating `cachedCheckIntervalMs` in `ai.ts`)
@@ -5369,6 +5439,30 @@ connectSrc: [
 **Playwright E2E Conditional Auth Bypass (Added Mar 7, 2026):**
 - When testing routes that may auto-redirect to `/auth` on strict setups without seeded users, employ a conditional bypass pattern: `if (page.url().includes('/auth')) { await page.click('[data-testid="demo-login-btn"]'); await page.waitForURL('/account'); }`. This prevents tests from hanging on redirects while remaining valid for environments with active sessions.
 
+**Extraction Error Diagnostic Threading (Added Mar 7, 2026):**
+- Error messages shown to users now carry a diagnostic suffix: `[code=X | req=Y | server_anthropic_ms=Zms, pipeline_total_ms=Wms]`
+- The diagnostic data flows through 5 layers: server response → `extractViaProxy` → provider adapter (openai.ts/claude.ts) → `policy-extractor.ts` → `TryAnalysis.tsx`
+- When adding new error paths in any of these layers, always propagate `errorCode`, `requestId`, and `serverPhaseTiming`/`serverElapsedMs` — dropping any of these fields makes production debugging impossible
+- The `ExtractionError` interface in `policy-extractor.ts` now has `errorCode?: string` and `requestId?: string` — set these from the proxy diagnostic fields in the catch block
+- `extractViaProxy` return type now includes `errorCode?: string` and `clientElapsedMs?: number` — these must be set in both the HTTP error path AND the catch block
+- Server error codes: `BUDGET_EXHAUSTED`, `ANTHROPIC_SDK_TIMEOUT`, `OPENAI_SDK_TIMEOUT`, `ANTHROPIC_OVERLOADED`. Client codes: `CLIENT_FETCH_TIMEOUT`, `CLIENT_ABORT`, `NETWORK_ERROR`
+- The 120s `AbortSignal.timeout()` on `extractViaProxy` fetch is the last-resort timeout — it should exceed the server's `REQUEST_BUDGET_MS` (105s) so the server has time to return a proper budget-exhausted error with diagnostics rather than the client aborting and losing all timing data
+
+**Extraction Abort-on-Unmount Removed (Added Mar 7, 2026):**
+- `TryAnalysis.tsx` no longer aborts in-flight extractions when the user navigates away
+- Extraction runs to completion; result is persisted via `saveTrialResult()` so it's available when the user returns
+- `isMounted` ref guards all `setState`/`toast` calls — prevents React warnings on unmounted components
+- Do NOT re-add `AbortController.abort()` on component unmount — it wastes the server-side extraction work and causes confusing "Load failed" errors
+- The only remaining abort path is `AbortSignal.timeout(120000)` on the fetch call itself, which fires only when the server is genuinely unresponsive
+
+**Server Extraction Budget System (Added Mar 7, 2026):**
+- `server/routes/ai.ts` implements a time-budget system: `REQUEST_BUDGET_MS = 105000` total
+- Primary provider timeout: 50s (`PRIMARY_TIMEOUT_MS`), fallback: 45s (`FALLBACK_TIMEOUT_MS`)
+- Each provider attempt is tracked in `fallbackChain[]` with `{ provider, success, duration_ms, error, error_code }`
+- When budget is exhausted, the server returns `code: 'BUDGET_EXHAUSTED'` with full `phaseTiming` and `fallbackChain`
+- `phaseTiming` keys: `configLoad_ms`, `anthropic_ms` or `openai_ms`, `total_ms`
+- To adjust timeouts, modify the constants at the top of `server/routes/ai.ts` — do NOT change `FETCH_TIMEOUT_MS` (120s) in `config.ts` below `REQUEST_BUDGET_MS` (105s) or the client will abort before the server can return diagnostics
+
 ---
 
 ## CI/CD
@@ -5440,4 +5534,4 @@ npm run build:analyze
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
-**Last Updated**: March 6, 2026 (FX production API, CHF/SAR/AED, PolicyDetailView & fx.ts build fixes — deployed to Railway)
+**Last Updated**: March 7, 2026 (Extraction timeout resilience: abort-on-unmount fix, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading through entire extraction pipeline)

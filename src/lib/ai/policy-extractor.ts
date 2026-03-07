@@ -91,6 +91,8 @@ export interface ExtractionResult {
     /** Warnings from OCR */
     warnings: string[]
   }
+  /** Client-side pipeline phase timing breakdown (ms) */
+  clientPhaseTiming?: Record<string, number>
 }
 
 export interface ExtractionError {
@@ -121,6 +123,12 @@ export interface ExtractionError {
     type?: string
   }
   fallbackAvailable: boolean
+  /** Client-side pipeline phase timing breakdown (ms) */
+  clientPhaseTiming?: Record<string, number>
+  /** Server or client error code for diagnostic display */
+  errorCode?: string
+  /** Server request ID for log correlation */
+  requestId?: string
 }
 
 export type ExtractionResponse = ExtractionResult | ExtractionError
@@ -136,6 +144,8 @@ export interface ExtractionOptions {
   logger?: ProcessingLogger
   /** Authenticated user's Supabase UUID — forwarded as x-user-id to trigger push notifications */
   userId?: string
+  /** AbortSignal to cancel in-flight extraction requests on component unmount */
+  signal?: AbortSignal
 }
 
 /**
@@ -327,7 +337,15 @@ export async function extractPolicyFromDocument(
     providers,
     logger, // Optional processing logger for tracking stages
     userId, // Authenticated user ID for push notification targeting
+    signal, // AbortSignal for cancelling in-flight requests on unmount
   } = options
+
+  // Pipeline phase timing for diagnostic visibility
+  const pipelineStart = performance.now()
+  const clientPhaseTiming: Record<string, number> = {}
+  function markClientPhase(name: string, startMs: number) {
+    clientPhaseTiming[name] = Math.round(performance.now() - startMs)
+  }
 
   // Validate file type
   if (!isPDFFile(file)) {
@@ -393,10 +411,16 @@ export async function extractPolicyFromDocument(
   const documentAIAvailable = isDocumentOCRAvailable()
   console.warn('[PolicyExtractor] Document AI available:', documentAIAvailable)
 
+  const ocrPhaseStart = performance.now()
   if (documentAIAvailable) {
     console.warn('[PolicyExtractor] Attempting Document AI extraction...')
     const ocrResult = await extractWithDocumentAI(file)
-    console.warn('[PolicyExtractor] Document AI result success:', ocrResult.success)
+    markClientPhase('documentAI_ms', ocrPhaseStart)
+    console.warn(
+      '[PolicyExtractor] Document AI result success:',
+      ocrResult.success,
+      `(${clientPhaseTiming['documentAI_ms']}ms)`
+    )
 
     if (ocrResult.success) {
       // Document AI succeeded - use its results
@@ -491,6 +515,7 @@ export async function extractPolicyFromDocument(
   // If Document AI didn't work (not available or failed), try pdf.js
   console.warn('[PolicyExtractor] extractionMethod after Document AI attempt:', extractionMethod)
   if (extractionMethod === 'none') {
+    const pdfjsStart = performance.now()
     console.warn('[PolicyExtractor] Starting pdf.js fallback extraction...')
     logger?.startStage('pdf_extraction', {
       filename: file.name,
@@ -499,7 +524,12 @@ export async function extractPolicyFromDocument(
     })
 
     const pdfResult = await extractTextFromPDFWithRetry(file)
-    console.warn('[PolicyExtractor] pdf.js extraction result success:', pdfResult.success)
+    markClientPhase('pdfjs_ms', pdfjsStart)
+    console.warn(
+      '[PolicyExtractor] pdf.js extraction result success:',
+      pdfResult.success,
+      `(${clientPhaseTiming['pdfjs_ms']}ms)`
+    )
 
     if (pdfResult.success) {
       // pdf.js succeeded
@@ -569,6 +599,8 @@ export async function extractPolicyFromDocument(
   }
 
   // ========== TEXT PREPROCESSING STAGE ==========
+  markClientPhase('textExtraction_total_ms', ocrPhaseStart) // Total time for OCR/pdf.js phase
+  const preprocessStart = performance.now()
   logger?.startStage('text_preprocessing', {
     text_length: documentText.length,
     use_clean_room: useCleanRoom,
@@ -686,6 +718,8 @@ export async function extractPolicyFromDocument(
   })
 
   // ========== AI EXTRACTION STAGE ==========
+  markClientPhase('textPreprocessing_ms', preprocessStart)
+  const aiExtractionStart = performance.now()
   const configuredProviders = getConfiguredProviders()
   // When proxy is configured, bypass consensus - the unified endpoint handles Anthropic→OpenAI fallback
   const useMultiProvider = useConsensus && configuredProviders.length > 1 && !isProxyConfigured()
@@ -730,7 +764,7 @@ export async function extractPolicyFromDocument(
     } else {
       // Use single provider (use processed text for better extraction)
       console.warn('[PolicyExtractor] Calling extractWithProvider, provider:', provider)
-      extractedData = await extractWithProvider(provider, processedText, userId)
+      extractedData = await extractWithProvider(provider, processedText, userId, signal)
       console.warn('[PolicyExtractor] extractWithProvider returned:', {
         hasData: !!extractedData,
         policyNumber: extractedData?.policyNumber,
@@ -751,6 +785,15 @@ export async function extractPolicyFromDocument(
           fallback_used: !!meta.fallback,
           chain: meta.fallbackChain || [{ provider: meta.provider || provider, success: true }],
         })
+      }
+      // Include server-side timing in client phase timing for full picture
+      if (meta.serverPhaseTiming) {
+        for (const [key, value] of Object.entries(meta.serverPhaseTiming)) {
+          clientPhaseTiming[`server_${key}`] = value
+        }
+      }
+      if (meta.serverElapsedMs !== undefined) {
+        clientPhaseTiming['server_total_ms'] = meta.serverElapsedMs
       }
       // Clean up metadata before further processing
       delete extractedData._proxyMeta
@@ -1210,6 +1253,9 @@ export async function extractPolicyFromDocument(
     })
 
     // Mark extraction as complete
+    markClientPhase('aiExtraction_ms', aiExtractionStart)
+    clientPhaseTiming['pipeline_total_ms'] = Math.round(performance.now() - pipelineStart)
+    console.warn('[PolicyExtractor] Pipeline timing breakdown:', clientPhaseTiming)
     logger?.complete()
 
     return {
@@ -1221,6 +1267,7 @@ export async function extractPolicyFromDocument(
       confidenceScore: confidenceOverall,
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
+      clientPhaseTiming, // Diagnostic: per-phase timing breakdown
       patternValidation: patternValidation
         ? {
             errors: patternValidation.errors,
@@ -1255,9 +1302,30 @@ export async function extractPolicyFromDocument(
           },
     }
   } catch (error) {
+    markClientPhase('aiExtraction_ms', aiExtractionStart)
+    clientPhaseTiming['pipeline_total_ms'] = Math.round(performance.now() - pipelineStart)
+    console.warn('[PolicyExtractor] Pipeline timing at failure:', clientPhaseTiming)
+
     const errorMessage = error instanceof Error ? error.message : 'Unknown AI error'
     const errorStack = error instanceof Error ? error.stack : undefined
     const errorType = error instanceof Error ? error.constructor.name : 'Unknown'
+
+    // Extract proxy diagnostic fields attached by openai.ts/claude.ts
+    const proxyErrorCode = (error as Error & { errorCode?: string })?.errorCode
+    const proxyRequestId = (error as Error & { requestId?: string })?.requestId
+    const proxyServerTiming = (error as Error & { serverPhaseTiming?: Record<string, number> })
+      ?.serverPhaseTiming
+    const proxyServerElapsed = (error as Error & { serverElapsedMs?: number })?.serverElapsedMs
+
+    // Merge server-side timing into client phase timing for unified diagnostic view
+    if (proxyServerTiming) {
+      for (const [key, value] of Object.entries(proxyServerTiming)) {
+        clientPhaseTiming[`server_${key}`] = value
+      }
+    }
+    if (proxyServerElapsed !== undefined) {
+      clientPhaseTiming['server_total_ms'] = proxyServerElapsed
+    }
 
     // Classify error code for structured logging
     let errorCode: ExtractionError['error']['code'] = 'AI_ERROR'
@@ -1348,6 +1416,9 @@ export async function extractPolicyFromDocument(
         type: errorType,
       },
       fallbackAvailable: false,
+      clientPhaseTiming, // Diagnostic: per-phase timing at failure point
+      errorCode: proxyErrorCode, // Server/client error code for diagnostic display
+      requestId: proxyRequestId, // Server request ID for log correlation
     }
   }
 }
@@ -1358,13 +1429,14 @@ export async function extractPolicyFromDocument(
 async function extractWithProvider(
   provider: AIProvider,
   documentText: string,
-  notifyUserId?: string
+  notifyUserId?: string,
+  signal?: AbortSignal
 ): Promise<ExtractedPolicyData> {
   switch (provider) {
     case 'openai':
-      return extractWithOpenAI(documentText, notifyUserId)
+      return extractWithOpenAI(documentText, notifyUserId, signal)
     case 'anthropic':
-      return extractWithClaude(documentText, notifyUserId)
+      return extractWithClaude(documentText, notifyUserId, signal)
     default:
       throw new Error(`Unknown provider: ${provider}`)
   }

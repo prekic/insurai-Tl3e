@@ -35,7 +35,8 @@ function getCurrentUserId(): string {
  */
 export async function extractWithOpenAI(
   documentText: string,
-  notifyUserId?: string
+  notifyUserId?: string,
+  signal?: AbortSignal
 ): Promise<ExtractedPolicyData> {
   const userId = getCurrentUserId()
   const model = AI_CONFIG.openai.extractionModel
@@ -131,7 +132,8 @@ export async function extractWithOpenAI(
         'openai',
         userMessage,
         EXTRACTION_SYSTEM_PROMPT,
-        notifyUserId
+        notifyUserId,
+        signal
       )
 
       console.warn('[OpenAI Extract] Proxy response received:', {
@@ -147,7 +149,17 @@ export async function extractWithOpenAI(
       if (!proxyResult.success || !proxyResult.data) {
         const errorMsg = proxyResult.error || 'OpenAI extraction via proxy failed'
         console.error('[OpenAI Extract] Proxy failed:', errorMsg)
-        throw new Error(errorMsg)
+        const proxyError = new Error(errorMsg) as Error & {
+          errorCode?: string
+          requestId?: string
+          serverPhaseTiming?: Record<string, number>
+          serverElapsedMs?: number
+        }
+        proxyError.errorCode = proxyResult.errorCode
+        proxyError.requestId = proxyResult.requestId
+        proxyError.serverPhaseTiming = proxyResult.serverPhaseTiming
+        proxyError.serverElapsedMs = proxyResult.serverElapsedMs
+        throw proxyError
       }
 
       result = proxyResult.data as unknown as ExtractedPolicyData
@@ -160,6 +172,8 @@ export async function extractWithOpenAI(
         fallback: proxyResult.fallback,
         fallbackReason: proxyResult.fallbackReason,
         fallbackChain: proxyResult.fallbackChain,
+        serverPhaseTiming: proxyResult.serverPhaseTiming,
+        serverElapsedMs: proxyResult.serverElapsedMs,
       }
 
       console.warn('[OpenAI Extract] Parsed result:', {

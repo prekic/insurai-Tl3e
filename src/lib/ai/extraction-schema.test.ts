@@ -4,10 +4,7 @@
  */
 
 import { describe, it, expect } from 'vitest'
-import {
-  EXTRACTION_JSON_SCHEMA,
-  EXTRACTION_SYSTEM_PROMPT,
-} from './extraction-schema'
+import { EXTRACTION_JSON_SCHEMA, EXTRACTION_SYSTEM_PROMPT } from './extraction-schema'
 import type { ExtractedPolicyData, ExtractedCoverage } from './extraction-schema'
 
 // =============================================================================
@@ -95,8 +92,8 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     expect(required).toContain('confidence')
   })
 
-  it('should have exactly 15 required fields', () => {
-    expect(required.length).toBe(15)
+  it('should have exactly 16 required fields', () => {
+    expect(required.length).toBe(16)
   })
 })
 

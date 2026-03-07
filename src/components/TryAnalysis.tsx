@@ -6,6 +6,7 @@ import { Button } from './ui/button'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
 import { sanitizeFileName } from '@/lib/sanitize'
 import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/ai'
+import { getProxyUrl } from '@/lib/ai/proxy-utils'
 import { createProcessingLogger } from '@/lib/processing-logger'
 import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
@@ -42,6 +43,23 @@ export function TryAnalysis() {
   const { health } = useBackendHealth()
   const processedFromStateRef = useRef(false)
   const { t } = useTranslation()
+  const isMounted = useRef(true)
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const intervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false
+      if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+      if (intervalIdRef.current) clearInterval(intervalIdRef.current)
+      // NOTE: We intentionally do NOT abort the extraction on unmount.
+      // If the user navigates away during extraction, the fetch continues
+      // in the background. When it completes, saveTrialResult() persists
+      // the result. When the user returns to /try, the effect at line 73
+      // finds the saved result and redirects to /policy/trial.
+      // Previously, aborting here killed successful extractions mid-flight.
+    }
+  }, [])
 
   const [state, setState] = useState<AnalysisState>('idle')
   const [progress, setProgress] = useState(0)
@@ -149,6 +167,30 @@ export function TryAnalysis() {
       let progressInterval: ReturnType<typeof setInterval> | null = null
 
       try {
+        // Pre-flight health check — fail fast if server is down instead of waiting 120s
+        const proxyUrl = getProxyUrl()
+        if (proxyUrl) {
+          try {
+            const healthResp = await fetch(`${proxyUrl}/api/health`, {
+              signal: AbortSignal.timeout(5000),
+            })
+            if (!healthResp.ok) {
+              throw new Error(t.tryAnalysis.serviceUnavailable)
+            }
+          } catch (healthErr) {
+            if (
+              healthErr instanceof Error &&
+              healthErr.message === t.tryAnalysis.serviceUnavailable
+            ) {
+              throw healthErr
+            }
+            // Network error or timeout on health check — server is unreachable
+            throw new Error(
+              `${t.tryAnalysis.serviceUnavailable}. ${t.tryAnalysis.serviceStartingUp}`
+            )
+          }
+        }
+
         setProgress(20)
         setProgressMessage(t.tryAnalysis.uploadingDocument)
         await new Promise((r) => setTimeout(r, 400))
@@ -161,24 +203,28 @@ export function TryAnalysis() {
 
         trackTrialAnalysisStarted()
 
-        // Add timeout to prevent stuck state (120 seconds to accommodate Document AI OCR + AI provider fallback)
-        const EXTRACTION_TIMEOUT_MS = 120000
+        // Client timeout: 150s to give the server's 105s budget room to respond.
+        // The server enforces its own budget and returns structured timeout errors,
+        // so this fires only as a last resort safety net.
+        const EXTRACTION_TIMEOUT_MS = 150_000
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => {
+          timeoutIdRef.current = setTimeout(() => {
             reject(new Error(t.tryAnalysis.analysisTimedOut))
           }, EXTRACTION_TIMEOUT_MS)
         })
 
-        // Update progress during extraction
+        // Update progress during extraction — more frequent updates for better UX
         progressInterval = setInterval(() => {
+          if (!isMounted.current) return
           setProgress((prev) => {
-            if (prev < 85) return prev + 5
+            if (prev < 85) return prev + 3
             return prev
           })
           setProgressMessage((prev) => {
             const messages = [
               t.tryAnalysis.extractingText,
               t.tryAnalysis.analyzingStructure,
+              t.tryAnalysis.processingWithAI,
               t.tryAnalysis.processingWithAI,
               t.tryAnalysis.almostThere,
             ]
@@ -188,11 +234,16 @@ export function TryAnalysis() {
             }
             return prev
           })
-        }, 10000) // Update every 10 seconds
+        }, 8000) // Update every 8 seconds
+        intervalIdRef.current = progressInterval
 
         // Run extraction with timeout - useFallback: false to surface real errors instead of mock data
         const extractionResult = await Promise.race([
-          extractPolicyFromDocument(file, { useFallback: false, logger, userId: user?.id }),
+          extractPolicyFromDocument(file, {
+            useFallback: false,
+            logger,
+            userId: user?.id,
+          }),
           timeoutPromise,
         ])
 
@@ -204,7 +255,21 @@ export function TryAnalysis() {
         }
 
         if (!extractionResult.success) {
-          throw new Error(extractionResult.error?.message || 'Failed to analyze policy')
+          // Preserve timing info in the error for diagnostic display
+          const errMsg = extractionResult.error?.message || 'Failed to analyze policy'
+          const timing = extractionResult.clientPhaseTiming
+          if (timing) {
+            console.warn('[TryAnalysis] Extraction failed - pipeline timing:', timing)
+          }
+          const enrichedError = new Error(errMsg) as Error & {
+            clientPhaseTiming?: Record<string, number>
+            errorCode?: string
+            requestId?: string
+          }
+          enrichedError.clientPhaseTiming = timing
+          enrichedError.errorCode = extractionResult.errorCode
+          enrichedError.requestId = extractionResult.requestId
+          throw enrichedError
         }
 
         // Reject fallback/sample data - user expects real AI results
@@ -219,9 +284,6 @@ export function TryAnalysis() {
         if (!extractionResult.policy) {
           throw new Error(t.tryAnalysis.noDataExtracted)
         }
-
-        setProgress(95)
-        setProgressMessage(t.tryAnalysis.finalizingAnalysis)
 
         const policy = extractionResult.policy
         const fileName = sanitizeFileName(file.name)
@@ -241,15 +303,24 @@ export function TryAnalysis() {
           fileName,
         }
 
+        // Always save the result — even if the user navigated away.
+        // When they return to /try, the saved result will be found and displayed.
         saveTrialResult(policyWithDefaults, fileName)
 
         // Mark processing as complete
         logger.complete()
 
+        trackTrialAnalysisCompleted(policy.type, policy.aiConfidence, policy.coverages?.length || 0)
+
+        // If component was unmounted (user navigated away), skip UI updates
+        // but the result is already saved above so nothing is lost.
+        if (!isMounted.current) return
+
+        setProgress(95)
+        setProgressMessage(t.tryAnalysis.finalizingAnalysis)
+
         setProgress(100)
         setProgressMessage(t.tryAnalysis.analysisComplete)
-
-        trackTrialAnalysisCompleted(policy.type, policy.aiConfidence, policy.coverages?.length || 0)
 
         if (isLowConfidence) {
           toast.warning(t.tryAnalysis.lowConfidenceTitle, {
@@ -273,13 +344,47 @@ export function TryAnalysis() {
         })
       } catch (err) {
         if (progressInterval) clearInterval(progressInterval)
+
+        // Don't update state or show toasts if component was unmounted
+        if (!isMounted.current) return
+
         console.warn('[TryAnalysis] Extraction error:', err instanceof Error ? err.message : err)
-        const message = err instanceof Error ? err.message : t.tryAnalysis.analysisFailed
+        let message = err instanceof Error ? err.message : t.tryAnalysis.analysisFailed
+
+        // Extract diagnostic fields from enriched error
+        const phaseTiming = (err as Error & { clientPhaseTiming?: Record<string, number> })
+          ?.clientPhaseTiming
+        const errorCode = (err as Error & { errorCode?: string })?.errorCode
+        const requestId = (err as Error & { requestId?: string })?.requestId
+
+        // Build diagnostic suffix: [code=X | req=Y | provider_ms=Z, total_ms=W]
+        const diagParts: string[] = []
+        if (errorCode) diagParts.push(`code=${errorCode}`)
+        if (requestId) diagParts.push(`req=${requestId}`)
+        if (phaseTiming) {
+          const timingEntries = Object.entries(phaseTiming)
+            .filter(([, v]) => v > 0)
+            .map(([k, v]) => `${k}=${Math.round(v)}ms`)
+          if (timingEntries.length) diagParts.push(timingEntries.join(', '))
+        }
+        const diagString = diagParts.length > 0 ? ` [${diagParts.join(' | ')}]` : ''
+
+        // Make timeout errors more user-friendly with retry guidance, keep diagnostics
+        const isTimeout =
+          message.includes('timed out') ||
+          message.includes('TIMEOUT') ||
+          message.includes('BUDGET_EXHAUSTED')
+        if (isTimeout) {
+          message = `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}${diagString}`
+        } else {
+          message = `${message}${diagString}`
+        }
 
         // Log the failure for admin visibility
         logger.fail(message, {
           error_type: err instanceof Error ? err.name : 'UnknownError',
           source: 'try_analysis',
+          ...(phaseTiming && { pipeline_timing: phaseTiming }),
         })
 
         setError(message)

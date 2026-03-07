@@ -604,11 +604,14 @@ describe('AI Config (config.ts)', () => {
       expect(result.route).toBe('unified')
       expect(result.fallbackChain).toHaveLength(1)
 
-      expect(globalThis.fetch).toHaveBeenCalledWith('http://localhost:4001/api/ai/extract', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ documentText: 'document text', systemPrompt: 'system prompt' }),
-      })
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'http://localhost:4001/api/ai/extract',
+        expect.objectContaining({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ documentText: 'document text', systemPrompt: 'system prompt' }),
+        })
+      )
     })
 
     it('should include fallbackReason when present in response', async () => {

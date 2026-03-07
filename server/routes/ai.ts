@@ -693,19 +693,22 @@ router.post(
           ? finalUserPrompt
           : finalUserPrompt + jsonReminder
 
-      const response = await client.chat.completions.create({
-        model: model || aiConfig.openaiExtractionModel,
-        messages: [
-          { role: 'system', content: systemPromptWithJson },
-          { role: 'user', content: userPromptWithJson },
-        ],
-        response_format: {
-          type: 'json_schema',
-          json_schema: EXTRACTION_JSON_SCHEMA,
+      const response = await client.chat.completions.create(
+        {
+          model: model || aiConfig.openaiExtractionModel,
+          messages: [
+            { role: 'system', content: systemPromptWithJson },
+            { role: 'user', content: userPromptWithJson },
+          ],
+          response_format: {
+            type: 'json_schema',
+            json_schema: EXTRACTION_JSON_SCHEMA,
+          },
+          max_tokens: aiConfig.maxTokens,
+          temperature: aiConfig.temperature,
         },
-        max_tokens: aiConfig.maxTokens,
-        temperature: aiConfig.temperature,
-      })
+        { signal: AbortSignal.timeout(60_000) }
+      )
       log.debug('OpenAI responded', { requestId })
 
       const content = response.choices[0]?.message?.content
@@ -964,12 +967,15 @@ router.post(
         }
       }
 
-      const response = await client.messages.create({
-        model: model || aiConfig.anthropicExtractionModel,
-        max_tokens: aiConfig.maxTokens,
-        system: finalSystemPrompt,
-        messages: [{ role: 'user', content: finalUserPrompt }],
-      })
+      const response = await client.messages.create(
+        {
+          model: model || aiConfig.anthropicExtractionModel,
+          max_tokens: aiConfig.maxTokens,
+          system: finalSystemPrompt,
+          messages: [{ role: 'user', content: finalUserPrompt }],
+        },
+        { signal: AbortSignal.timeout(60_000) }
+      )
 
       const textBlock = response.content.find((block) => block.type === 'text')
       if (!textBlock || textBlock.type !== 'text') {
@@ -1208,7 +1214,18 @@ router.post(
   async (req: Request, res: Response) => {
     const requestId = `ext-${Date.now()}`
     const startTime = Date.now()
-    log.info('Unified extraction request received', { requestId })
+    // Total request budget: hard cap to prevent client-side timeout race.
+    // Client timeout is 150s; we must respond well before that.
+    const REQUEST_BUDGET_MS = 105_000
+    // Per-provider timeout: must leave room for fallback within budget
+    const PRIMARY_PROVIDER_TIMEOUT_MS = 50_000
+    const FALLBACK_PROVIDER_TIMEOUT_MS = 45_000
+
+    // Phase-level timing diagnostics — surfaces WHERE time is spent
+    const phaseTiming: Record<string, number> = {}
+    function markPhase(name: string, startMs: number) {
+      phaseTiming[name] = Date.now() - startMs
+    }
 
     const {
       documentText,
@@ -1217,8 +1234,17 @@ router.post(
       policyType,
     } = req.body as AnthropicExtractionInput & { policyType?: string; model?: string }
 
+    log.info('Unified extraction request received', {
+      requestId,
+      documentLength: documentText?.length ?? 0,
+      policyType: policyType ?? 'auto',
+      hasClientPrompt: !!clientPrompt,
+    })
+
     // Get AI config from database first (needed for dynamic confidence weights in prompt)
+    const configStart = Date.now()
     const aiConfig = await getAIConfig()
+    markPhase('configLoad_ms', configStart)
 
     // Build Anthropic schema prompt with admin-configurable confidence weights
     const confidenceWeights: ConfidenceWeights = {
@@ -1236,11 +1262,14 @@ router.post(
     let openaiSystemPrompt: string
     let finalUserPrompt = documentText
 
+    const promptStart = Date.now()
     if (clientPrompt) {
       openaiSystemPrompt = clientPrompt
       finalUserPrompt = documentText
+      markPhase('promptLoad_ms', promptStart)
     } else {
       const renderedPrompt = await getExtractionPrompt(documentText, policyType)
+      markPhase('promptLoad_ms', promptStart)
       if (renderedPrompt) {
         openaiSystemPrompt = renderedPrompt.systemPrompt
         finalUserPrompt = renderedPrompt.userPrompt
@@ -1260,6 +1289,7 @@ router.post(
       anthropicModel: aiConfig.anthropicExtractionModel,
       openaiModel: aiConfig.openaiExtractionModel,
       setupMs: Date.now() - startTime,
+      phaseTiming,
     })
 
     // Try Anthropic first if available
@@ -1268,227 +1298,296 @@ router.post(
 
     if (anthropicClient) {
       const anthropicStart = Date.now()
-      log.info('Trying Anthropic first', { requestId, elapsedMs: anthropicStart - startTime })
-      try {
-        const response = await anthropicClient.messages.create({
-          model: model || aiConfig.anthropicExtractionModel,
-          max_tokens: aiConfig.maxTokens,
-          system: anthropicSystemPrompt,
-          messages: [{ role: 'user', content: finalUserPrompt }],
+      // Calculate remaining budget for primary provider
+      const elapsedSoFar = Date.now() - startTime
+      const primaryTimeout = Math.min(
+        PRIMARY_PROVIDER_TIMEOUT_MS,
+        REQUEST_BUDGET_MS - elapsedSoFar - 5000
+      )
+      if (primaryTimeout <= 5000) {
+        log.warn('Budget nearly exhausted before Anthropic attempt, skipping to fallback', {
+          requestId,
+          elapsedSoFar,
+          budgetMs: REQUEST_BUDGET_MS,
         })
-
-        const textBlock = response.content.find((block) => block.type === 'text')
-        if (!textBlock || textBlock.type !== 'text') {
-          throw new Error('Empty response from Anthropic')
-        }
-
-        // Parse JSON from response
-        let jsonContent = textBlock.text
-        const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
-        if (jsonMatch) {
-          jsonContent = jsonMatch[1].trim()
-        }
-
-        let parsedData: unknown
+      } else {
+        log.info('Trying Anthropic first', {
+          requestId,
+          elapsedMs: anthropicStart - startTime,
+          timeoutMs: primaryTimeout,
+        })
         try {
-          parsedData = JSON.parse(jsonContent)
-        } catch (parseError) {
-          log.error('Anthropic returned invalid JSON', {
-            requestId,
-            parseError: parseError instanceof Error ? parseError.message : String(parseError),
-            contentPreview: jsonContent.slice(0, 200),
-          })
-          throw new Error('AI returned invalid JSON — response could not be parsed')
-        }
+          const response = await anthropicClient.messages.create(
+            {
+              model: model || aiConfig.anthropicExtractionModel,
+              max_tokens: aiConfig.maxTokens,
+              system: anthropicSystemPrompt,
+              messages: [{ role: 'user', content: finalUserPrompt }],
+            },
+            { signal: AbortSignal.timeout(primaryTimeout) }
+          )
 
-        // Track cost
-        const usedModel = response.model || model || aiConfig.anthropicExtractionModel
-        const inputTokens = response.usage.input_tokens
-        const outputTokens = response.usage.output_tokens
-        const cost = calculateCost(usedModel, inputTokens, outputTokens)
+          const textBlock = response.content.find((block) => block.type === 'text')
+          if (!textBlock || textBlock.type !== 'text') {
+            throw new Error('Empty response from Anthropic')
+          }
 
-        recordUsage({
-          provider: 'anthropic',
-          model: usedModel,
-          operation: 'extraction',
-          inputTokens,
-          outputTokens,
-          totalTokens: inputTokens + outputTokens,
-          inputCost: cost.inputCost,
-          outputCost: cost.outputCost,
-          totalCost: cost.totalCost,
-          timestamp: new Date().toISOString(),
-        }).catch((err) =>
-          log.warn('Failed to record Anthropic usage', {
-            requestId,
-            error: err instanceof Error ? err.message : String(err),
-          })
-        )
+          // Parse JSON from response
+          let jsonContent = textBlock.text
+          const jsonMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/)
+          if (jsonMatch) {
+            jsonContent = jsonMatch[1].trim()
+          }
 
-        log.info('Anthropic extraction successful', {
-          requestId,
-          anthropicMs: Date.now() - anthropicStart,
-          totalMs: Date.now() - startTime,
-        })
+          let parsedData: unknown
+          try {
+            parsedData = JSON.parse(jsonContent)
+          } catch (parseError) {
+            log.error('Anthropic returned invalid JSON', {
+              requestId,
+              parseError: parseError instanceof Error ? parseError.message : String(parseError),
+              contentPreview: jsonContent.slice(0, 200),
+            })
+            throw new Error('AI returned invalid JSON — response could not be parsed')
+          }
 
-        // Record successful extraction metric
-        recordExtractionEvent({
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'anthropic',
-          success: true,
-          durationMs: Date.now() - startTime,
-          documentLength: documentText?.length ?? 0,
-        })
+          // Track cost
+          const usedModel = response.model || model || aiConfig.anthropicExtractionModel
+          const inputTokens = response.usage.input_tokens
+          const outputTokens = response.usage.output_tokens
+          const cost = calculateCost(usedModel, inputTokens, outputTokens)
 
-        // Fire push notification if user is authenticated (non-blocking fire-and-forget)
-        const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
-        if (notifyUserIdUNI_ANT) {
-          const extractedUNI_ANT = parsedData as Record<string, unknown>
-          sendExtractionCompleteNotification(
-            notifyUserIdUNI_ANT,
-            String(extractedUNI_ANT.policyType || 'policy'),
-            (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null
-          ).catch((err) =>
-            log.warn('Push notification failed after unified/Anthropic extraction', {
+          recordUsage({
+            provider: 'anthropic',
+            model: usedModel,
+            operation: 'extraction',
+            inputTokens,
+            outputTokens,
+            totalTokens: inputTokens + outputTokens,
+            inputCost: cost.inputCost,
+            outputCost: cost.outputCost,
+            totalCost: cost.totalCost,
+            timestamp: new Date().toISOString(),
+          }).catch((err) =>
+            log.warn('Failed to record Anthropic usage', {
               requestId,
               error: err instanceof Error ? err.message : String(err),
             })
           )
-        }
 
-        return res.json({
-          success: true,
-          data: parsedData,
-          usage: { input_tokens: inputTokens, output_tokens: outputTokens },
-          model: response.model,
-          provider: 'anthropic',
-          cost: cost.totalCost,
-          requestId,
-          route: '/api/ai/extract',
-        })
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Unknown error'
-        log.error('Anthropic failed', {
-          requestId,
-          error: message,
-          anthropicMs: Date.now() - anthropicStart,
-          totalMs: Date.now() - startTime,
-        })
-
-        // Classify the Anthropic error for structured fallback reporting
-        const isBillingError =
-          message.includes('credit') ||
-          message.includes('billing') ||
-          message.includes('FAILED_PRECONDITION')
-        const isRateLimitError = message.includes('429') || message.includes('rate_limit')
-        const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
-        const isOverloadedError = message.includes('overloaded') || message.includes('529')
-
-        // Determine fallback reason for structured response
-        let fallbackReason = 'ANTHROPIC_UNKNOWN_ERROR'
-        if (isBillingError) fallbackReason = 'ANTHROPIC_BILLING_ERROR'
-        else if (isRateLimitError) fallbackReason = 'ANTHROPIC_RATE_LIMITED'
-        else if (isAuthError) fallbackReason = 'ANTHROPIC_AUTH_ERROR'
-        else if (isOverloadedError) fallbackReason = 'ANTHROPIC_OVERLOADED'
-        else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
-          fallbackReason = 'ANTHROPIC_TIMEOUT'
-
-        // Capture in Sentry (even though we're falling back to OpenAI, record the failure)
-        captureServerError(error instanceof Error ? error : new Error(message), {
-          requestId,
-          provider: 'anthropic',
-          errorCode: fallbackReason,
-          documentLength: documentText?.length ?? 0,
-          willFallback: !!openaiClient,
-        })
-
-        // Record Anthropic failure metric (even in fallback path)
-        recordExtractionEvent({
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'anthropic',
-          success: false,
-          durationMs: Date.now() - anthropicStart,
-          errorCode: fallbackReason,
-          errorMessage: message.substring(0, 200),
-          documentLength: documentText?.length ?? 0,
-        })
-
-        // Notify admin for critical errors (not for transient capacity issues)
-        if (isBillingError) {
-          log.warn('Anthropic billing error, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService
-            .notifyBillingIssue('Anthropic', message, {
-              requestId,
-              errorMessage: message,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) =>
-              log.warn('Failed to notify billing issue', {
-                provider: 'Anthropic',
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
-        } else if (isRateLimitError) {
-          log.warn('Anthropic rate limit, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService
-            .notifyRateLimit('Anthropic', {
-              requestId,
-              errorMessage: message,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) =>
-              log.warn('Failed to notify rate limit', {
-                provider: 'Anthropic',
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
-        } else if (isAuthError) {
-          log.warn('Anthropic auth error, falling back to OpenAI', { requestId, fallbackReason })
-          adminNotificationService
-            .notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
-              requestId,
-              timestamp: new Date().toISOString(),
-            })
-            .catch((err) =>
-              log.warn('Failed to notify API error', {
-                provider: 'Anthropic',
-                requestId,
-                error: err instanceof Error ? err.message : String(err),
-              })
-            )
-        } else if (isOverloadedError) {
-          log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', {
+          markPhase('anthropic_ms', anthropicStart)
+          log.info('Anthropic extraction successful', {
             requestId,
-            fallbackReason,
+            anthropicMs: Date.now() - anthropicStart,
+            totalMs: Date.now() - startTime,
+            phaseTiming,
           })
-        } else {
-          log.warn('Anthropic failed with unknown error, falling back to OpenAI', {
+
+          // Record successful extraction metric
+          recordExtractionEvent({
             requestId,
-            fallbackReason,
+            timestamp: new Date().toISOString(),
+            provider: 'anthropic',
+            success: true,
+            durationMs: Date.now() - startTime,
+            documentLength: documentText?.length ?? 0,
+          })
+
+          // Fire push notification if user is authenticated (non-blocking fire-and-forget)
+          const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
+          if (notifyUserIdUNI_ANT) {
+            const extractedUNI_ANT = parsedData as Record<string, unknown>
+            sendExtractionCompleteNotification(
+              notifyUserIdUNI_ANT,
+              String(extractedUNI_ANT.policyType || 'policy'),
+              (extractedUNI_ANT.policyNumber as string | null | undefined) ?? null
+            ).catch((err) =>
+              log.warn('Push notification failed after unified/Anthropic extraction', {
+                requestId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            )
+          }
+
+          return res.json({
+            success: true,
+            data: parsedData,
+            usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+            model: response.model,
+            provider: 'anthropic',
+            cost: cost.totalCost,
+            requestId,
+            route: '/api/ai/extract',
+            elapsedMs: Date.now() - startTime,
+            phaseTiming,
+          })
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Unknown error'
+          markPhase('anthropic_ms', anthropicStart)
+          log.error('Anthropic failed', {
+            requestId,
             error: message,
+            anthropicMs: Date.now() - anthropicStart,
+            totalMs: Date.now() - startTime,
+            phaseTiming,
           })
-        }
 
-        // Store fallback reason for response
-        ;(req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
+          // Classify the Anthropic error for structured fallback reporting
+          const isBillingError =
+            message.includes('credit') ||
+            message.includes('billing') ||
+            message.includes('FAILED_PRECONDITION')
+          const isRateLimitError = message.includes('429') || message.includes('rate_limit')
+          const isAuthError = message.includes('401') || message.includes('invalid x-api-key')
+          const isOverloadedError = message.includes('overloaded') || message.includes('529')
 
-        // Fall back to OpenAI if available
-        if (openaiClient) {
-          log.info('Falling back to OpenAI', { requestId, fallbackReason })
+          // Determine fallback reason for structured response
+          const isAbortTimeout = error instanceof Error && error.name === 'AbortError'
+          let fallbackReason = 'ANTHROPIC_UNKNOWN_ERROR'
+          if (isAbortTimeout) fallbackReason = 'ANTHROPIC_SDK_TIMEOUT'
+          else if (isBillingError) fallbackReason = 'ANTHROPIC_BILLING_ERROR'
+          else if (isRateLimitError) fallbackReason = 'ANTHROPIC_RATE_LIMITED'
+          else if (isAuthError) fallbackReason = 'ANTHROPIC_AUTH_ERROR'
+          else if (isOverloadedError) fallbackReason = 'ANTHROPIC_OVERLOADED'
+          else if (message.includes('timeout') || message.includes('ETIMEDOUT'))
+            fallbackReason = 'ANTHROPIC_TIMEOUT'
+
+          // Capture in Sentry (even though we're falling back to OpenAI, record the failure)
+          captureServerError(error instanceof Error ? error : new Error(message), {
+            requestId,
+            provider: 'anthropic',
+            errorCode: fallbackReason,
+            documentLength: documentText?.length ?? 0,
+            willFallback: !!openaiClient,
+          })
+
+          // Record Anthropic failure metric (even in fallback path)
+          recordExtractionEvent({
+            requestId,
+            timestamp: new Date().toISOString(),
+            provider: 'anthropic',
+            success: false,
+            durationMs: Date.now() - anthropicStart,
+            errorCode: fallbackReason,
+            errorMessage: message.substring(0, 200),
+            documentLength: documentText?.length ?? 0,
+          })
+
+          // Notify admin for critical errors (not for transient capacity issues)
+          if (isBillingError) {
+            log.warn('Anthropic billing error, falling back to OpenAI', {
+              requestId,
+              fallbackReason,
+            })
+            adminNotificationService
+              .notifyBillingIssue('Anthropic', message, {
+                requestId,
+                errorMessage: message,
+                timestamp: new Date().toISOString(),
+              })
+              .catch((err) =>
+                log.warn('Failed to notify billing issue', {
+                  provider: 'Anthropic',
+                  requestId,
+                  error: err instanceof Error ? err.message : String(err),
+                })
+              )
+          } else if (isRateLimitError) {
+            log.warn('Anthropic rate limit, falling back to OpenAI', { requestId, fallbackReason })
+            adminNotificationService
+              .notifyRateLimit('Anthropic', {
+                requestId,
+                errorMessage: message,
+                timestamp: new Date().toISOString(),
+              })
+              .catch((err) =>
+                log.warn('Failed to notify rate limit', {
+                  provider: 'Anthropic',
+                  requestId,
+                  error: err instanceof Error ? err.message : String(err),
+                })
+              )
+          } else if (isAuthError) {
+            log.warn('Anthropic auth error, falling back to OpenAI', { requestId, fallbackReason })
+            adminNotificationService
+              .notifyAPIError('Anthropic', 'INVALID_API_KEY', message, {
+                requestId,
+                timestamp: new Date().toISOString(),
+              })
+              .catch((err) =>
+                log.warn('Failed to notify API error', {
+                  provider: 'Anthropic',
+                  requestId,
+                  error: err instanceof Error ? err.message : String(err),
+                })
+              )
+          } else if (isOverloadedError) {
+            log.info('Anthropic overloaded (capacity issue), falling back to OpenAI', {
+              requestId,
+              fallbackReason,
+            })
+          } else {
+            log.warn('Anthropic failed with unknown error, falling back to OpenAI', {
+              requestId,
+              fallbackReason,
+              error: message,
+            })
+          }
+
+          // Store fallback reason for response
+          ;(req as Request & { _fallbackReason?: string })._fallbackReason = fallbackReason
+
+          // Fall back to OpenAI if available
+          if (openaiClient) {
+            log.info('Falling back to OpenAI', { requestId, fallbackReason })
+          }
         }
-      }
+      } // end primaryTimeout > 5000 check
+    }
+
+    // Check budget before attempting fallback — if we've used too much time, fail fast
+    const budgetRemaining = REQUEST_BUDGET_MS - (Date.now() - startTime)
+    if (budgetRemaining < 10_000 && openaiClient && anthropicClient) {
+      log.warn('Request budget exhausted after Anthropic, no time for OpenAI fallback', {
+        requestId,
+        elapsedMs: Date.now() - startTime,
+        budgetMs: REQUEST_BUDGET_MS,
+        budgetRemainingMs: budgetRemaining,
+      })
+
+      recordExtractionEvent({
+        requestId,
+        timestamp: new Date().toISOString(),
+        provider: 'anthropic',
+        success: false,
+        durationMs: Date.now() - startTime,
+        errorCode: 'BUDGET_EXHAUSTED',
+        errorMessage: 'Request time budget exhausted before fallback could start',
+        documentLength: documentText?.length ?? 0,
+      })
+
+      return res.status(504).json({
+        error: 'Extraction timed out — the AI service took too long to respond',
+        code: 'EXTRACTION_BUDGET_EXHAUSTED',
+        details: `Primary provider (Anthropic) timed out after ${Math.round((Date.now() - startTime) / 1000)}s. No time remaining for fallback. Try again — subsequent requests are typically faster.`,
+        elapsedMs: Date.now() - startTime,
+        requestId,
+        phaseTiming,
+      })
     }
 
     // Try OpenAI (either as fallback or primary)
     if (openaiClient) {
       const openaiStart = Date.now()
+      // Calculate remaining budget for fallback provider
+      const fallbackTimeout = Math.min(
+        FALLBACK_PROVIDER_TIMEOUT_MS,
+        REQUEST_BUDGET_MS - (Date.now() - startTime) - 2000
+      )
       log.info('Trying OpenAI', {
         requestId,
         elapsedMs: openaiStart - startTime,
+        timeoutMs: fallbackTimeout,
         isFallback: !!anthropicClient,
       })
       try {
@@ -1505,19 +1604,22 @@ router.post(
             ? finalUserPrompt
             : finalUserPrompt + jsonReminder
 
-        const response = await openaiClient.chat.completions.create({
-          model: aiConfig.openaiExtractionModel,
-          messages: [
-            { role: 'system', content: systemPromptWithJson },
-            { role: 'user', content: userPromptWithJson },
-          ],
-          response_format: {
-            type: 'json_schema',
-            json_schema: EXTRACTION_JSON_SCHEMA,
+        const response = await openaiClient.chat.completions.create(
+          {
+            model: aiConfig.openaiExtractionModel,
+            messages: [
+              { role: 'system', content: systemPromptWithJson },
+              { role: 'user', content: userPromptWithJson },
+            ],
+            response_format: {
+              type: 'json_schema',
+              json_schema: EXTRACTION_JSON_SCHEMA,
+            },
+            max_tokens: aiConfig.maxTokens,
+            temperature: aiConfig.temperature,
           },
-          max_tokens: aiConfig.maxTokens,
-          temperature: aiConfig.temperature,
-        })
+          { signal: AbortSignal.timeout(Math.max(fallbackTimeout, 10_000)) }
+        )
 
         const content = response.choices[0]?.message?.content
         if (!content) {
@@ -1560,14 +1662,16 @@ router.post(
           throw new Error('AI returned invalid JSON — response could not be parsed')
         }
 
+        markPhase('openai_ms', openaiStart)
         const isFallback = !!anthropicClient
         const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason
         log.info('OpenAI extraction successful', {
           requestId,
           fallback: isFallback,
           fallbackReason: storedFallbackReason,
-          openaiMs: Date.now() - openaiStart,
+          openaiMs: phaseTiming['openai_ms'],
           totalMs: Date.now() - startTime,
+          phaseTiming,
         })
 
         // Record successful extraction metric
@@ -1607,20 +1711,25 @@ router.post(
           cost: cost.totalCost,
           requestId,
           route: '/api/ai/extract',
+          elapsedMs: Date.now() - startTime,
+          phaseTiming,
           ...(isFallback && {
             fallbackChain: [
               { provider: 'anthropic', success: false, error_code: storedFallbackReason },
-              { provider: 'openai', success: true, duration_ms: Date.now() - openaiStart },
+              { provider: 'openai', success: true, duration_ms: phaseTiming['openai_ms'] },
             ],
           }),
         })
       } catch (error) {
+        markPhase('openai_ms', openaiStart)
         const message = error instanceof Error ? error.message : 'Unknown error'
-        log.error('OpenAI also failed', { requestId, error: message })
+        log.error('OpenAI also failed', { requestId, error: message, phaseTiming })
 
         // Classify error code
         let openaiErrorCode = 'OPENAI_UNKNOWN_ERROR'
-        if (message.includes('401') || message.includes('Incorrect API key'))
+        const isAbortTimeout = error instanceof Error && error.name === 'AbortError'
+        if (isAbortTimeout) openaiErrorCode = 'OPENAI_SDK_TIMEOUT'
+        else if (message.includes('401') || message.includes('Incorrect API key'))
           openaiErrorCode = 'OPENAI_AUTH_ERROR'
         else if (message.includes('429')) openaiErrorCode = 'OPENAI_RATE_LIMITED'
         else if (message.includes('insufficient_quota') || message.includes('billing'))
@@ -1686,10 +1795,16 @@ router.post(
             )
         }
 
-        return res.status(500).json({
-          error: 'All AI providers failed',
-          code: 'ALL_PROVIDERS_FAILED',
+        const isTimeout = openaiErrorCode.includes('TIMEOUT')
+        return res.status(isTimeout ? 504 : 500).json({
+          error: isTimeout
+            ? 'Extraction timed out — the AI service took too long to respond. Please try again.'
+            : 'All AI providers failed',
+          code: isTimeout ? 'EXTRACTION_TIMEOUT' : 'ALL_PROVIDERS_FAILED',
           details: message,
+          elapsedMs: Date.now() - startTime,
+          phaseTiming,
+          requestId,
           timestamp: new Date().toISOString(),
         })
       }
