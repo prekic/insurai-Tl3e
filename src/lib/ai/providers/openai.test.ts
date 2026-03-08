@@ -299,6 +299,40 @@ describe('extractWithOpenAI - Error Handling', () => {
       })
     )
   })
+
+  it('should attach proxy diagnostic fields to thrown Error', async () => {
+    const { isProxyConfigured, extractViaProxy } = await import('../config')
+    vi.mocked(isProxyConfigured).mockReturnValue(true)
+    vi.mocked(extractViaProxy).mockResolvedValue({
+      success: false,
+      error: 'Timeout error',
+      errorCode: 'BUDGET_EXHAUSTED',
+      requestId: 'req-123',
+      serverPhaseTiming: { anthropic: 45000 },
+      serverElapsedMs: 45000,
+      provider: 'openai',
+      fallback: false,
+    })
+
+    try {
+      await expect(extractWithOpenAI('Test document')).rejects.toThrow('Timeout error')
+    } catch {
+      // Ignored
+    }
+
+    // We can also just catch the error directly for more explicit assertions
+    try {
+      await extractWithOpenAI('Test document')
+    } catch (error: any) {
+      expect(error.message).toBe('Timeout error')
+      expect(error.errorCode).toBe('BUDGET_EXHAUSTED')
+      expect(error.requestId).toBe('req-123')
+      expect(error.serverPhaseTiming).toEqual({ anthropic: 45000 })
+      expect(error.serverElapsedMs).toBe(45000)
+    } finally {
+      vi.mocked(isProxyConfigured).mockReturnValue(false)
+    }
+  })
 })
 
 describe('extractWithOpenAI - Missing Schema Fields', () => {

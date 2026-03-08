@@ -324,4 +324,34 @@ describe('extractWithClaude - Error Handling', () => {
       })
     )
   })
+
+  it('should attach proxy diagnostic fields to thrown Error', async () => {
+    const { isProxyConfigured, extractViaProxy } = await import('../config')
+    vi.mocked(isProxyConfigured).mockReturnValue(true)
+    vi.mocked(extractViaProxy).mockResolvedValue({
+      success: false,
+      error: 'Timeout error',
+      errorCode: 'BUDGET_EXHAUSTED',
+      requestId: 'req-123',
+      serverPhaseTiming: { anthropic: 45000 },
+      serverElapsedMs: 45000,
+      provider: 'anthropic',
+      fallback: false,
+    })
+
+    try {
+      await extractWithClaude('Test document')
+      // Should throw, fail if it gets here
+      expect(true).toBe(false)
+    } catch (error: any) {
+      // We assert on the error manually
+      expect(error.message).toBe('Timeout error')
+      expect(error.errorCode).toBe('BUDGET_EXHAUSTED')
+      expect(error.requestId).toBe('req-123')
+      expect(error.serverPhaseTiming).toEqual({ anthropic: 45000 })
+      expect(error.serverElapsedMs).toBe(45000)
+    } finally {
+      vi.mocked(isProxyConfigured).mockReturnValue(false)
+    }
+  })
 })
