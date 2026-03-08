@@ -209,7 +209,11 @@ export function TryAnalysis() {
         const EXTRACTION_TIMEOUT_MS = 150_000
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutIdRef.current = setTimeout(() => {
-            reject(new Error(t.tryAnalysis.analysisTimedOut))
+            const timeoutError = new Error(t.tryAnalysis.analysisTimedOut) as Error & {
+              errorCode?: string
+            }
+            timeoutError.errorCode = 'CLIENT_TIMEOUT_UMBRELLA'
+            reject(timeoutError)
           }, EXTRACTION_TIMEOUT_MS)
         })
 
@@ -267,7 +271,8 @@ export function TryAnalysis() {
             requestId?: string
           }
           enrichedError.clientPhaseTiming = timing
-          enrichedError.errorCode = extractionResult.errorCode
+          // Server/proxy returned error code takes precedence, then internal/semantic code
+          enrichedError.errorCode = extractionResult.errorCode || extractionResult.error?.code
           enrichedError.requestId = extractionResult.requestId
           throw enrichedError
         }
