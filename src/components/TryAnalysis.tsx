@@ -75,7 +75,20 @@ export function TryAnalysis() {
 
   // Check for existing trial result on mount - redirect to PolicyDetailView
   useEffect(() => {
+    const locationState = location.state as LocationState | null
+    const hasNewFile = !!locationState?.file
+
     const existingResult = getTrialResult()
+    const usedTrial = hasUsedFreeTrial() || existingResult
+
+    if (hasNewFile && usedTrial) {
+      // User is trying to upload a NEW file, but has already used their trial.
+      // Show them the "trial used" screen so they can sign up, instead of
+      // instantly redirecting them to their OLD cached result.
+      setState('trial-used')
+      return
+    }
+
     if (existingResult) {
       // Redirect to PolicyDetailView with the saved result
       navigate('/policy/trial', {
@@ -88,7 +101,7 @@ export function TryAnalysis() {
     } else if (hasUsedFreeTrial()) {
       setState('trial-used')
     }
-  }, [navigate])
+  }, [navigate, location.state])
 
   // Preload PDF.js worker
   useEffect(() => {

@@ -1,4 +1,4 @@
-# Session Handoff — March 7, 2026 (Extraction Timeout Resilience & Diagnostic Error Threading)
+# Session Handoff — March 8, 2026 (Free Trial Incognito Cache Fix)
 
 ## Current Status
 
@@ -8,67 +8,54 @@
 | **TypeCheck** | 0 errors |
 | **ESLint** | 0 errors |
 | **Tests** | 15,850+ tests passing, 0 failures |
-| **Branch** | `claude/load-project-context-ggw3q` — 8 new commits, pushed |
+| **Branch** | `insuraigemini202603080628` — 4 new commits, pushed |
 
 ---
 
-## This Session — 8 Commits Fixing Production Extraction Timeouts
+## This Session — Free Trial Cache Bypassing Fix
 
-Production users on `/try` experienced recurring "Analysis timed out" and "Load failed" errors. Root causes were: abort-on-unmount wasting server work, missing fetch timeout on the proxy call, stale timeout promises from previous attempts, and error messages stripping all diagnostic context.
+The user reported an issue where uploading a policy in incognito mode resulted in an "instant" completion, bypassing the actual AI extraction process and serving fake/mock data. We discovered the root cause was related to Google Chrome's Incognito Mode state management for `localStorage`. 
+
+In incognito mode, `localStorage` is preserved for the entire duration of the window session. When a user uploaded their *first* policy anonymously, the extraction succeeded, and the real AI result was saved to `localStorage` (which is the expected Free Trial behavior). However, when the user tried to test the app again by dragging a *new* file onto the uploader in the same incognito session, the `TryAnalysis.tsx` component detected the existing `localStorage` entry and instantly redirected the user to the cached view of the *first* upload, giving the illusion of a 0-second mock extraction.
+
+We fixed this by inspecting `location.state.file` in the initialization effect of `TryAnalysis.tsx`. If a *new* file is explicitly passed into the component but the trial has already been used, we intercept the redirect and correctly render the "You've used your free trial" signup prompt.
 
 ### Commits (oldest → newest)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `e4f01d0` | fix | Abort in-flight extraction on component unmount (initial approach, later reversed) |
-| `952680d` | fix | Server-side diagnostic instrumentation for "Load failed" errors — `phaseTiming`, `fallbackChain`, `REQUEST_BUDGET_MS` budget system |
-| `33747bf` | fix | Prevent extraction timeout stacking — fresh timeout per attempt |
-| `0a430e8` | feat | Pipeline phase timing diagnostics (`clientPhaseTiming`) on `ExtractionError` |
-| `7ca2727` | fix | **Reverse abort-on-unmount** — let extraction complete, persist result, guard UI updates with `isMounted` ref |
-| `cd3c4f3` | fix | Add 120s `AbortSignal.timeout()` to `extractViaProxy` fetch |
-| `53d4e48` | fix | Move `FETCH_TIMEOUT_MS` before `try` block to fix `TS2304` scope error |
-| `5f6412e` | feat | Thread `errorCode`/`requestId`/timing through 5-layer pipeline into user-visible error messages |
+| `faa7125` | fix  | resolve instant mock caching bug in incognito mode |
+| `05dfc92` | test | Add diagnostic error proxy threading coverage for openai and claude |
+| `ead8629` | fix  | Pass timeout code to TryAnalysis umbrella timeout to restore diag display |
+| `2a941ce` | fix  | Fallback to extracting semantic error code if proxy error code is missing in TryAnalysis |
+| `[INTEGRATED]` | feat | Add bilingual evidence quotes via quoteTr in extraction schema and Anthropic prompts |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
-| `server/routes/ai.ts` | Budget system (105s total, 50s primary, 45s fallback), per-phase timing, `fallbackChain`, error codes (`BUDGET_EXHAUSTED`, `ANTHROPIC_SDK_TIMEOUT`, etc.) |
-| `src/lib/ai/config.ts` | `extractViaProxy` return type extended with `errorCode`, `clientElapsedMs`. 120s fetch timeout. HTTP error path and catch block both surface diagnostics. |
-| `src/lib/ai/providers/openai.ts` | Enriched `Error` with `errorCode`, `requestId`, `serverPhaseTiming`, `serverElapsedMs` from proxy result |
-| `src/lib/ai/providers/claude.ts` | Same enriched error pattern as openai.ts |
-| `src/lib/ai/policy-extractor.ts` | Extracts proxy diagnostic fields from enriched errors, merges server timing (prefixed `server_`), returns `errorCode`/`requestId` on `ExtractionError` |
-| `src/components/TryAnalysis.tsx` | Removed abort-on-unmount. Builds `[code=X \| req=Y \| timing...]` diagnostic suffix. `isMounted` ref guards state updates. |
-| `server/services/config-service.ts` | Added `DB_QUERY_TIMEOUT_MS = 8_000` and `Promise.race` timeout wrapper for Supabase config queries to prevent indefinite hangs during extraction |
-| `server/services/prompt-service.ts` | Added `DB_QUERY_TIMEOUT_MS = 8_000` and `withTimeout()` helper for prompt DB queries — same timeout pattern as config-service |
-| `src/lib/ai/extraction-schema.ts` | Added `serverPhaseTiming?: Record<string, number>` and `serverElapsedMs?: number` to `ExtractedPolicyData._proxyMeta` interface |
-| `src/lib/ai/config.test.ts` | Loosened `extractViaProxy` fetch assertion from exact match to `expect.objectContaining()` to accommodate new `signal` and `x-user-id` headers |
+| `src/components/TryAnalysis.tsx` | Added explicit check for `location.state.file` during initialization. If true and `hasUsedFreeTrial()` is truthy, set state to `trial-used` to block instant re-rendering of older cached results. |
+| `src/utils/lazyRetry.ts` & `src/App.tsx` | **(Audited)** Implemented `lazyRetry` utility and wired it to React Router (`App.tsx`, `LandingPage.tsx`) to harden dynamic chunk loading failures against network issues. |
+| `src/lib/knowledge/kasko-knowledge.ts` | **(Audited)** Fixed greedy `limitPattern` regex matching to stop unwanted percentage extraction. Added `explanationEn` padding. |
+| `src/lib/i18n/*` | **(Audited)** Updated `translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts`, and `translations.ts` to support expanded bilingual data keys. |
+| `src/lib/ai/policy-extractor-validation.test.ts` | **(Audited)** Expanded test coverage for diagnostic UI proxy threading, including `PolicyUpload-coverage.test.tsx` and `TryAnalysis-coverage.test.tsx`. |
+| `src/lib/ai/extraction-schema.ts` | **(Audited)** Added `quoteTr` for capturing translated evidence from Anthropic mapping, synced with `src/lib/supabase/types.ts` and `src/types/policy.ts`. |
+| `.cursorrules` | **(Audited)** Updated underlying AI instruction set and repository memory. |
 
 ---
 
 ## ⚠️ Gotchas for Next Session
 
-1. **Do NOT re-add AbortController.abort() on TryAnalysis unmount.** The abort propagates to the server proxy fetch, wasting AI provider work and producing confusing "Load failed" errors. Extraction should run to completion; `saveTrialResult()` preserves the result for when the user returns.
-
-2. **FETCH_TIMEOUT_MS (120s) must exceed REQUEST_BUDGET_MS (105s).** If the client times out before the server, you lose all server-side diagnostic timing data. The server needs time to return a proper `BUDGET_EXHAUSTED` response with `phaseTiming` and `fallbackChain`.
-
-3. **`ExtractionError` interface has new fields.** `errorCode?: string` and `requestId?: string` were added. Any new error return paths in `policy-extractor.ts` catch block should set these from `proxyErrorCode` / `proxyRequestId`.
-
-4. **`extractViaProxy` return type was extended.** New fields: `errorCode?: string`, `clientElapsedMs?: number`. If you add new error return paths in `config.ts`, set both.
-
-5. **Provider adapters create enriched errors.** `openai.ts` and `claude.ts` both attach `errorCode`, `requestId`, `serverPhaseTiming`, `serverElapsedMs` to thrown `Error` objects. If adding new provider adapters, follow this pattern or diagnostics will be dropped.
-
-6. **Server budget constants.** `REQUEST_BUDGET_MS = 105000`, `PRIMARY_TIMEOUT_MS = 50000`, `FALLBACK_TIMEOUT_MS = 45000` in `server/routes/ai.ts`. Adjust based on production latency data.
-
-7. **DB_QUERY_TIMEOUT_MS (8s) in config-service and prompt-service.** Both `server/services/config-service.ts` and `server/services/prompt-service.ts` now wrap Supabase queries in `Promise.race` with an 8-second timeout. If a query hangs (e.g., Supabase connection pool exhausted), the service returns defaults instead of blocking the extraction pipeline indefinitely.
-
-8. **`_proxyMeta` on `ExtractedPolicyData` has new fields.** `serverPhaseTiming?: Record<string, number>` and `serverElapsedMs?: number` were added to the `_proxyMeta` interface in `extraction-schema.ts`. Provider adapters populate these from the proxy response.
+1. **Incognito Mode `localStorage`:** Remember that `localStorage` is NOT cleared between page refreshes in incognito mode; it persists until the entire incognito window is closed. This means features relying on `localStorage` for anonymous quotas (like Free Trial) will remain active across multiple tab reloads within the same session.
+2. **`extractionResult.error.code` vs `extractionResult.errorCode`:** The proxy layer provides `errorCode` at the top level, but internal pipeline failures (like `policy-extractor.ts` timeouts or OCR failures) set it inside `error.code`. UI components MUST check both (as `TryAnalysis.tsx` now does) to correctly display diagnostics.
+3. **Do NOT re-add AbortController.abort() on TryAnalysis unmount.** The prior rule remains: the abort propagates to the server proxy fetch, wasting AI provider work. Extraction should run to completion.
+4. **Bilingual Quotes depend on `quoteTr`:** The new UI bilingual quotes only show up if the AI manages to populate `evidence[].quoteTr`. Sometimes Claude or OpenAI miss this. If they do, the UI safely falls back to only rendering the original `quote`.
+5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
 ## Priority Next Steps
 
-1. **Merge & Deploy** — This branch is ready to merge. All tests pass, typecheck clean. Deploy to Railway and verify diagnostic suffixes appear in production timeout errors.
-2. **Production Validation** — Upload a PDF on `/try`, navigate away mid-extraction, return. Confirm result is persisted and displayed. Trigger a timeout (large PDF with slow provider) and verify the error message contains `[code=... | req=... | timing...]`.
-3. **Budget Tuning** — Review Railway logs for `phaseTiming` entries after deploy. If Anthropic consistently takes >45s, consider raising `PRIMARY_TIMEOUT_MS`. If config load is slow, investigate `configLoad_ms` values.
-4. **Test Coverage for New Error Paths** — The diagnostic threading code has been verified via typecheck and existing tests (183 passing across config/TryAnalysis/policy-extractor), but dedicated unit tests for the specific enriched-error construction in openai.ts/claude.ts catch blocks would add safety margin.
+1. **Merge & Deploy** — This branch (`insuraigemini202603080628`) is ready to merge.
+2. **Production Validation** — Verify that the Free Trial flow correctly halts and prompts for signup if a user tries to drag a second policy into the dropzone during an active anonymous session.
+3. **Telemetry Review** — Check the Supabase `processing_logs` table for new entries and verify that `metadata.phaseTiming` correctly captures the elapsed pipeline phases.

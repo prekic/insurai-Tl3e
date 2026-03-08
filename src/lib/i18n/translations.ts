@@ -471,6 +471,11 @@ export interface TranslationDictionary {
     coreKaskoCoveragesDesc: string
     coreKaskoCoveragesNote: string
     coverageDeductible: string
+    evaluationHistory: string
+    evaluationHistoryLoading: string
+    evaluationHistoryError: string
+    evaluationHistoryEmpty: string
+    evaluationHistoryDesc: string
   }
 
   // Export Menu (PolicyDetailView)

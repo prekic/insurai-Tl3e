@@ -310,12 +310,17 @@ function translateInsightLegacy(
  * falls back to display-time translation for legacy policies.
  */
 function getLocalizedInsight(
-  policy: { aiInsights: string[]; aiInsightsTr?: string[] },
+  policy: { aiInsights: string[]; aiInsightsTr?: string[]; aiInsightsEn?: string[] },
   index: number,
   locale: string,
   insightTranslations: Record<string, string>
 ): string {
-  if (locale === 'en') return policy.aiInsights[index]
+  if (locale === 'en') {
+    if (policy.aiInsightsEn && policy.aiInsightsEn[index]) {
+      return policy.aiInsightsEn[index]
+    }
+    return policy.aiInsights[index]
+  }
   // Use pre-translated TR insights if available
   if (policy.aiInsightsTr && policy.aiInsightsTr[index]) {
     return policy.aiInsightsTr[index]
@@ -628,16 +633,20 @@ function CoveragesByCategory({
  */
 function ExclusionsSection({
   exclusions,
+  exclusionsEn,
   policyType: _policyType, // Reserved for future policy-type-specific logic
   isCommercial = false,
   locale,
   evidenceData,
+  quoteTranslations,
 }: {
   exclusions: string[]
+  exclusionsEn?: string[] | null
   policyType: string
   isCommercial?: boolean
   locale: string
   evidenceData?: Record<string, string>
+  quoteTranslations?: Record<string, string>
 }) {
   const [expandedExclusion, setExpandedExclusion] = useState<number | null>(null)
 
@@ -646,8 +655,8 @@ function ExclusionsSection({
 
   // Analyze exclusions comprehensively
   const analysis = useMemo(
-    () => analyzeExclusionsComprehensive(exclusions, isCommercial),
-    [exclusions, isCommercial]
+    () => analyzeExclusionsComprehensive(exclusions, exclusionsEn || [], isCommercial),
+    [exclusions, exclusionsEn, isCommercial]
   )
 
   const getSeverityStyles = (severity: AnalyzedExclusion['severity']) => {
@@ -721,7 +730,9 @@ function ExclusionsSection({
                   <div className="flex items-center gap-3">
                     <Check className="text-green-600" size={16} />
                     <span className="text-sm text-gray-700">
-                      {item.original.replace(/\(.*\)/, '').trim()}
+                      {(locale === 'tr' ? item.original : item.originalEn || item.original)
+                        .replace(/\(.*\)/, '')
+                        .trim()}
                     </span>
                   </div>
                   <span className="text-sm font-semibold text-green-700">
@@ -745,43 +756,74 @@ function ExclusionsSection({
         </CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {analysis.exclusions.map((exclusion, i) => {
-              const styles = getSeverityStyles(exclusion.severity)
-              const isExpanded = expandedExclusion === i
+            {/* Deduplicate exclusions to hide LLM variability (e.g. "Aracın çalınması" vs "Aracın çalınması.") */}
+            {(() => {
+              const deduplicatedExclusions = analysis.exclusions.filter((current, index, self) => {
+                const currentText = current.original.trim().toLowerCase()
+                // Keep if there's no OTHER item that is slightly longer but contains this text
+                // OR if another item is identical but we are the FIRST occurrence
+                const isDuplicate =
+                  self.findIndex((other, otherIndex) => {
+                    if (index === otherIndex) return false
+                    const otherText = other.original.trim().toLowerCase()
+                    // Same text? Keep the first one only.
+                    if (currentText === otherText) return otherIndex < index
+                    // Other text is longer and contains current text? This is a subset, hide it.
+                    if (otherText.length > currentText.length && otherText.includes(currentText))
+                      return true
+                    return false
+                  }) !== -1
 
-              return (
-                <li key={i}>
-                  <button
-                    onClick={() => setExpandedExclusion(isExpanded ? null : i)}
-                    className={`w-full text-left p-3 rounded-lg border ${styles.bg} ${styles.border} transition-all hover:shadow-sm`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <X className={`flex-shrink-0 mt-0.5 ${styles.icon}`} size={16} />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span
-                            className={`text-sm leading-relaxed ${styles.text} ${exclusion.severity === 'critical' ? 'font-medium' : ''}`}
-                          >
-                            {exclusion.original}
-                          </span>
-                          {exclusion.severity !== 'standard' &&
-                            exclusion.severity !== 'informational' && (
-                              <Badge variant={styles.badge} className="text-xs">
-                                {getSeverityLabel(exclusion.severity)}
-                              </Badge>
+                return !isDuplicate
+              })
+
+              return deduplicatedExclusions.map((exclusion, i) => {
+                const styles = getSeverityStyles(exclusion.severity)
+                const isExpanded = expandedExclusion === i
+
+                const hasExplanation = !!exclusion.explanation
+                const hasEvidence = !!(
+                  evidenceData && evidenceData[exclusion.original.trim().toLowerCase()]
+                )
+                const hasContentToExpand = hasExplanation || hasEvidence
+
+                return (
+                  <li key={i}>
+                    <button
+                      onClick={() =>
+                        hasContentToExpand && setExpandedExclusion(isExpanded ? null : i)
+                      }
+                      className={`w-full text-left p-3 rounded-lg border ${styles.bg} ${styles.border} transition-all ${
+                        hasContentToExpand ? 'hover:shadow-sm cursor-pointer' : 'cursor-default'
+                      }`}
+                      aria-expanded={isExpanded}
+                      disabled={!hasContentToExpand}
+                    >
+                      <div className="flex items-start gap-3">
+                        <X className={`flex-shrink-0 mt-0.5 ${styles.icon}`} size={16} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span
+                              className={`text-sm leading-relaxed ${styles.text} ${exclusion.severity === 'critical' ? 'font-medium' : ''}`}
+                            >
+                              {locale === 'tr'
+                                ? exclusion.original
+                                : exclusion.originalEn || exclusion.original}
+                            </span>
+                            {exclusion.severity !== 'standard' &&
+                              exclusion.severity !== 'informational' && (
+                                <Badge variant={styles.badge} className="text-xs">
+                                  {getSeverityLabel(exclusion.severity)}
+                                </Badge>
+                              )}
+                            {exclusion.needsClarification && (
+                              <HelpCircle className="text-blue-500" size={14} />
                             )}
-                          {exclusion.needsClarification && (
-                            <HelpCircle className="text-blue-500" size={14} />
-                          )}
-                        </div>
+                          </div>
 
-                        {/* Expanded explanation */}
-                        {isExpanded &&
-                          (exclusion.explanation ||
-                            (evidenceData &&
-                              evidenceData[exclusion.original.trim().toLowerCase()])) && (
+                          {isExpanded && hasContentToExpand && (
                             <div className="mt-3 p-3 bg-white/70 rounded-md border border-gray-200">
-                              {exclusion.explanation && (
+                              {hasExplanation && (
                                 <p className="text-sm text-gray-700 mb-2">
                                   <Info className="inline mr-1 text-blue-500" size={14} />
                                   {locale === 'tr'
@@ -803,21 +845,26 @@ function ExclusionsSection({
                                   </ul>
                                 </div>
                               )}
-                              {evidenceData &&
-                                evidenceData[exclusion.original.trim().toLowerCase()] && (
-                                  <EvidenceQuote
-                                    quote={evidenceData[exclusion.original.trim().toLowerCase()]}
-                                  />
-                                )}
+                              {hasEvidence && (
+                                <EvidenceQuote
+                                  quote={evidenceData[exclusion.original.trim().toLowerCase()]}
+                                  quoteTr={
+                                    quoteTranslations?.[exclusion.original.trim().toLowerCase()]
+                                  }
+                                />
+                              )}
                             </div>
                           )}
+                        </div>
+                        {hasContentToExpand && (
+                          <Info className="text-gray-400 flex-shrink-0" size={14} />
+                        )}
                       </div>
-                      <Info className="text-gray-400 flex-shrink-0" size={14} />
-                    </div>
-                  </button>
-                </li>
-              )
-            })}
+                    </button>
+                  </li>
+                )
+              })
+            })()}
           </ul>
         </CardContent>
       </Card>
@@ -858,14 +905,16 @@ function ExclusionsSection({
                     className="p-3 bg-white rounded-lg border border-blue-200"
                   >
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-800">{item.name}</span>
+                      <span className="text-sm font-medium text-gray-800">
+                        {locale === 'tr' ? item.name : item.nameEn || item.name}
+                      </span>
                       <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
                         {t.policy.notSpecifiedInPolicy}
                       </Badge>
                     </div>
                     <p className="text-sm text-blue-700 flex items-center gap-1">
                       <HelpCircle size={12} />
-                      {item.question}
+                      {locale === 'tr' ? item.question : item.questionEn || item.question}
                     </p>
                   </div>
                 ))}
@@ -892,12 +941,14 @@ interface LocationState {
   confidenceScore?: number
 }
 
-function EvidenceQuote({ quote }: { quote: string }) {
+function EvidenceQuote({ quote, quoteTr }: { quote: string; quoteTr?: string }) {
   const { t } = useI18n()
   const [showQuote, setShowQuote] = useState(false)
 
+  if (!quote) return null
+
   return (
-    <div className="mt-4 border-t border-gray-100 pt-3">
+    <div className="mt-4 border-t border-gray-100 pt-3 w-full">
       <button
         onClick={(e) => {
           e.stopPropagation()
@@ -909,8 +960,21 @@ function EvidenceQuote({ quote }: { quote: string }) {
         {showQuote ? t.common.hideQuote : t.common.showQuote}
       </button>
       {showQuote && (
-        <div className="mt-2 text-xs text-gray-600 bg-blue-50/50 p-2 text-left rounded border border-blue-100/50 italic whitespace-pre-wrap">
-          &quot;{quote}&quot;
+        <div className="mt-2 space-y-2">
+          {quoteTr && (
+            <div className="text-xs text-gray-800 bg-blue-50 p-2 text-left rounded border border-blue-100 leading-relaxed font-medium">
+              &quot;{quoteTr}&quot;
+            </div>
+          )}
+          <div
+            className={`text-left rounded italic whitespace-pre-wrap leading-relaxed ${
+              quoteTr
+                ? 'text-[11px] text-gray-500 bg-gray-50 border border-gray-100 p-2 opacity-80'
+                : 'text-xs text-gray-600 bg-blue-50/50 border border-blue-100/50 p-2'
+            }`}
+          >
+            &quot;{quote}&quot;
+          </div>
         </div>
       )}
     </div>
@@ -1540,6 +1604,11 @@ export function PolicyDetailView() {
                             <div className="w-full pl-5">
                               <EvidenceQuote
                                 quote={policy.evidenceData!.insights[originalInsightKey]}
+                                quoteTr={
+                                  policy.evidenceData?.quoteTranslations?.insights?.[
+                                    originalInsightKey
+                                  ]
+                                }
                               />
                             </div>
                           )}
@@ -1749,10 +1818,12 @@ export function PolicyDetailView() {
                 <CardContent className="pt-0">
                   <ExclusionsSection
                     exclusions={policy.exclusions}
+                    exclusionsEn={policy.exclusionsEn}
                     policyType={policy.type}
                     isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
                     locale={locale}
                     evidenceData={policy.evidenceData?.exclusions}
+                    quoteTranslations={policy.evidenceData?.quoteTranslations?.exclusions}
                   />
                 </CardContent>
               ) : (

@@ -171,10 +171,7 @@ const createMockFile = (name = 'test-policy.pdf', type = 'application/pdf', size
 }
 
 // Helper to render with router
-const renderWithRouter = (
-  initialEntries: string[] = ['/try'],
-  locationState?: { file?: File }
-) => {
+const renderWithRouter = (initialEntries: string[] = ['/try'], locationState?: { file?: File }) => {
   const entries = initialEntries.map((path, index) => ({
     pathname: path,
     state: index === initialEntries.length - 1 ? locationState : undefined,
@@ -187,7 +184,10 @@ const renderWithRouter = (
         <Route path="/upload" element={<div data-testid="upload-page">Upload Page</div>} />
         <Route path="/auth" element={<div data-testid="auth-page">Auth Page</div>} />
         <Route path="/" element={<div data-testid="home-page">Home Page</div>} />
-        <Route path="/policy/trial" element={<div data-testid="policy-trial-page">Policy Trial View</div>} />
+        <Route
+          path="/policy/trial"
+          element={<div data-testid="policy-trial-page">Policy Trial View</div>}
+        />
       </Routes>
     </MemoryRouter>
   )
@@ -196,6 +196,13 @@ const renderWithRouter = (
 describe('TryAnalysis', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Mock global fetch for health check
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'test-log-id' } }),
+    })
+
     mockUser.mockReturnValue(null)
     mockCanPerformFreeTrial.mockReturnValue({ canTry: true })
     mockHasUsedFreeTrial.mockReturnValue(false)
@@ -231,7 +238,9 @@ describe('TryAnalysis', () => {
 
       renderWithRouter()
 
-      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsedTitle)).toBeInTheDocument()
+      expect(
+        screen.getByText(EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsedTitle)
+      ).toBeInTheDocument()
     })
 
     it('restores previous analysis result if exists', async () => {
@@ -264,16 +273,24 @@ describe('TryAnalysis', () => {
 
       // Should show analyzing state initially
       await waitFor(() => {
-        expect(screen.getByText(/Preparing document|Uploading document|Extracting text/)).toBeInTheDocument()
+        expect(
+          screen.getByText(/Preparing document|Uploading document|Extracting text/)
+        ).toBeInTheDocument()
       })
 
       // Should navigate to PolicyDetailView after completion
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
 
       // Should have processed the file with useFallback: false to surface real errors
-      expect(mockExtractPolicy).toHaveBeenCalledWith(mockFile, expect.objectContaining({ useFallback: false }))
+      expect(mockExtractPolicy).toHaveBeenCalledWith(
+        mockFile,
+        expect.objectContaining({ useFallback: false })
+      )
     })
 
     it('does not process file if trial already used', async () => {
@@ -304,7 +321,9 @@ describe('TryAnalysis', () => {
       renderWithRouter(['/try'], { file: mockFile })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
 
       expect(mockToast.error).toHaveBeenCalledWith(
@@ -326,9 +345,12 @@ describe('TryAnalysis', () => {
       renderWithRouter(['/try'], { file: mockFile })
 
       // Should navigate to PolicyDetailView after completion
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
 
       // File should only be processed once
       expect(mockExtractPolicy).toHaveBeenCalledTimes(1)
@@ -345,7 +367,9 @@ describe('TryAnalysis', () => {
 
       renderWithRouter()
 
-      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('label')!
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)
+        .closest('label')!
       const mockFile = createMockFile()
 
       // Simulate drop
@@ -358,9 +382,12 @@ describe('TryAnalysis', () => {
       })
 
       // Should navigate to PolicyDetailView after completion
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
 
     it('processes file uploaded via file input', async () => {
@@ -380,9 +407,12 @@ describe('TryAnalysis', () => {
       })
 
       // Should navigate to PolicyDetailView after completion
-      await waitFor(() => {
-        expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
-      }, { timeout: 5000 })
+      await waitFor(
+        () => {
+          expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
+        },
+        { timeout: 5000 }
+      )
     })
   })
 
@@ -437,7 +467,9 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
         expect(screen.getByText('Network error')).toBeInTheDocument()
       })
     })
@@ -455,7 +487,9 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
 
       // Click try again
@@ -511,7 +545,9 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
     })
 
@@ -531,7 +567,9 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
 
       // Should show a default error message
@@ -554,27 +592,32 @@ describe('TryAnalysis', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
     })
 
     it('shows progress indicators during each stage', async () => {
       // Use a delayed mock that resolves after a short delay
       mockExtractPolicy.mockImplementation(
-        () => new Promise((resolve) => {
-          setTimeout(() => {
-            resolve({
-              success: true,
-              policy: createMockPolicy(),
-            })
-          }, 100) // Short delay to allow checking progress
-        })
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                success: true,
+                policy: createMockPolicy(),
+              })
+            }, 100) // Short delay to allow checking progress
+          })
       )
 
       renderWithRouter()
 
       // Find the drop zone by label text
-      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('label')
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)
+        .closest('label')
       if (!dropZone) {
         // Skip if drop zone not found (component structure changed)
         return

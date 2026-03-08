@@ -301,6 +301,13 @@ function addPdfFile(name = 'test.pdf') {
 describe('PolicyUpload Coverage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Mock global fetch for health check
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'test-log-id' } }),
+    })
+
     mockUser = null
     mockAuthConfigured = false
     mockIsSupabaseConfigured = false
@@ -317,6 +324,7 @@ describe('PolicyUpload Coverage', () => {
   })
 
   afterEach(async () => {
+    vi.restoreAllMocks()
     // Flush pending async processing (upload progress loop uses 5×100ms setTimeout)
     // to prevent timer leakage between tests
     await act(async () => {

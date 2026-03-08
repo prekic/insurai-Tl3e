@@ -65,7 +65,10 @@ vi.mock('@/lib/ai', () => ({
 
 vi.mock('@/lib/errors', () => ({
   validateFiles: (files: File[]) => ({ valid: files, errors: [] }),
-  getErrorMessage: (code: string) => ({ title: `Error: ${code}`, description: 'Error description' }),
+  getErrorMessage: (code: string) => ({
+    title: `Error: ${code}`,
+    description: 'Error description',
+  }),
   FILE_CONSTRAINTS: {
     ALLOWED_EXTENSIONS: ['.pdf'],
     MAX_SIZE_MB: 25,
@@ -105,6 +108,13 @@ function renderTryAnalysis() {
 describe('TryAnalysis', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
+    // Mock global fetch
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: { id: 'test-log-id' } }),
+    })
+
     mockUser = null
     mockBackendHealth = { status: 'healthy' }
     mockHasUsedFreeTrial = false
@@ -138,10 +148,13 @@ describe('TryAnalysis', () => {
       const file = new File(['test'], 'policy.pdf', { type: 'application/pdf' })
       mockLocationState = { file }
       renderTryAnalysis()
-      expect(mockNavigate).toHaveBeenCalledWith('/upload', expect.objectContaining({
-        replace: true,
-        state: expect.objectContaining({ files: [file], autoProcess: true }),
-      }))
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/upload',
+        expect.objectContaining({
+          replace: true,
+          state: expect.objectContaining({ files: [file], autoProcess: true }),
+        })
+      )
     })
   })
 
@@ -150,10 +163,13 @@ describe('TryAnalysis', () => {
     it('redirects to policy view when trial result exists', () => {
       mockGetTrialResult = { policy: { id: 't1' } }
       renderTryAnalysis()
-      expect(mockNavigate).toHaveBeenCalledWith('/policy/trial', expect.objectContaining({
-        state: expect.objectContaining({ isTrialResult: true }),
-        replace: true,
-      }))
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/policy/trial',
+        expect.objectContaining({
+          state: expect.objectContaining({ isTrialResult: true }),
+          replace: true,
+        })
+      )
     })
   })
 
@@ -162,7 +178,9 @@ describe('TryAnalysis', () => {
     it('shows trial-used message when trial already used', () => {
       mockHasUsedFreeTrial = true
       renderTryAnalysis()
-      expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsedTitle)).toBeInTheDocument()
+      expect(
+        screen.getByText(EN_TRANSLATIONS.tryAnalysis.trialAlreadyUsedTitle)
+      ).toBeInTheDocument()
     })
 
     it('shows time remaining when available', () => {
@@ -244,7 +262,9 @@ describe('TryAnalysis', () => {
   describe('drag and drop', () => {
     it('changes appearance on drag over', () => {
       renderTryAnalysis()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('div[class*="transition-colors"]')
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)
+        .closest('div[class*="transition-colors"]')
       if (dropZone) {
         fireEvent.dragOver(dropZone, { preventDefault: () => {} })
         expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.dropFileHere)).toBeInTheDocument()
@@ -253,7 +273,9 @@ describe('TryAnalysis', () => {
 
     it('resets on drag leave', () => {
       renderTryAnalysis()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('div[class*="transition-colors"]')
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)
+        .closest('div[class*="transition-colors"]')
       if (dropZone) {
         fireEvent.dragOver(dropZone, { preventDefault: () => {} })
         fireEvent.dragLeave(dropZone)
@@ -263,7 +285,9 @@ describe('TryAnalysis', () => {
 
     it('processes dropped file', async () => {
       renderTryAnalysis()
-      const dropZone = screen.getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy).closest('div[class*="transition-colors"]')
+      const dropZone = screen
+        .getByText(EN_TRANSLATIONS.tryAnalysis.uploadYourPolicy)
+        .closest('div[class*="transition-colors"]')
       if (dropZone) {
         const file = new File(['test'], 'policy.pdf', { type: 'application/pdf' })
         await act(async () => {
@@ -310,7 +334,9 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
         expect(screen.getByText('Extraction failed')).toBeInTheDocument()
       })
     })
@@ -354,7 +380,9 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
     })
 
@@ -373,7 +401,11 @@ describe('TryAnalysis', () => {
     })
 
     it('rejects fallback/sample data', async () => {
-      mockExtractPolicy.mockResolvedValue({ success: true, source: 'fallback', policy: { id: 't1' } })
+      mockExtractPolicy.mockResolvedValue({
+        success: true,
+        source: 'fallback',
+        policy: { id: 't1' },
+      })
       renderTryAnalysis()
       const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
       const file = new File(['test'], 'policy.pdf', { type: 'application/pdf' })
@@ -382,7 +414,9 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
     })
 
@@ -396,7 +430,9 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       await waitFor(() => {
-        expect(screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)).toBeInTheDocument()
+        expect(
+          screen.getByText(EN_TRANSLATIONS.tryAnalysis.analysisFailedTitle)
+        ).toBeInTheDocument()
       })
     })
   })
@@ -412,10 +448,13 @@ describe('TryAnalysis', () => {
         fireEvent.change(fileInput)
       })
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/policy/trial', expect.objectContaining({
-          state: expect.objectContaining({ isTrialResult: true }),
-          replace: true,
-        }))
+        expect(mockNavigate).toHaveBeenCalledWith(
+          '/policy/trial',
+          expect.objectContaining({
+            state: expect.objectContaining({ isTrialResult: true }),
+            replace: true,
+          })
+        )
       })
     })
 

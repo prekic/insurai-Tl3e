@@ -1,4 +1,4 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { Toaster, toast } from 'sonner'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -14,49 +14,72 @@ import { ProtectedRoute } from './components/ProtectedRoute'
 
 // LandingPage loaded eagerly — it's the entry point, must render without Suspense CLS
 import { LandingPage } from './components/LandingPage'
+import { lazyRetry } from './utils/lazyRetry'
 
 // Lazy-loaded route components for code splitting
-const PolicyUpload = lazy(() =>
-  import('./components/PolicyUpload').then((m) => ({ default: m.PolicyUpload }))
+const PolicyUpload = lazyRetry(
+  () => import('./components/PolicyUpload').then((m) => ({ default: m.PolicyUpload })),
+  'PolicyUpload'
 )
-const PolicyDashboard = lazy(() =>
-  import('./components/PolicyDashboard').then((m) => ({ default: m.PolicyDashboard }))
+const PolicyDashboard = lazyRetry(
+  () => import('./components/PolicyDashboard').then((m) => ({ default: m.PolicyDashboard })),
+  'PolicyDashboard'
 )
-const PolicyDetailView = lazy(() =>
-  import('./components/PolicyDetailView').then((m) => ({ default: m.PolicyDetailView }))
+const PolicyDetailView = lazyRetry(
+  () => import('./components/PolicyDetailView').then((m) => ({ default: m.PolicyDetailView })),
+  'PolicyDetailView'
 )
-const PolicyChat = lazy(() =>
-  import('./components/PolicyChat').then((m) => ({ default: m.PolicyChat }))
+const PolicyChat = lazyRetry(
+  () => import('./components/PolicyChat').then((m) => ({ default: m.PolicyChat })),
+  'PolicyChat'
 )
-const MyAccount = lazy(() =>
-  import('./components/MyAccount').then((m) => ({ default: m.MyAccount }))
+const MyAccount = lazyRetry(
+  () => import('./components/MyAccount').then((m) => ({ default: m.MyAccount })),
+  'MyAccount'
 )
-const Settings = lazy(() => import('./components/Settings').then((m) => ({ default: m.Settings })))
-const HelpCenter = lazy(() =>
-  import('./components/HelpCenter').then((m) => ({ default: m.HelpCenter }))
+const Settings = lazyRetry(
+  () => import('./components/Settings').then((m) => ({ default: m.Settings })),
+  'Settings'
 )
-const AllSamplesDemo = lazy(() =>
-  import('./components/AllSamplesDemo').then((m) => ({ default: m.AllSamplesDemo }))
+const HelpCenter = lazyRetry(
+  () => import('./components/HelpCenter').then((m) => ({ default: m.HelpCenter })),
+  'HelpCenter'
 )
-const ComparePolicies = lazy(() =>
-  import('./components/ComparePolicies').then((m) => ({ default: m.ComparePolicies }))
+const AllSamplesDemo = lazyRetry(
+  () => import('./components/AllSamplesDemo').then((m) => ({ default: m.AllSamplesDemo })),
+  'AllSamplesDemo'
 )
-const NotFound = lazy(() => import('./components/NotFound').then((m) => ({ default: m.NotFound })))
-const AuthPage = lazy(() => import('./components/AuthPage').then((m) => ({ default: m.AuthPage })))
-const TryAnalysis = lazy(() =>
-  import('./components/TryAnalysis').then((m) => ({ default: m.TryAnalysis }))
+const ComparePolicies = lazyRetry(
+  () => import('./components/ComparePolicies').then((m) => ({ default: m.ComparePolicies })),
+  'ComparePolicies'
 )
-const SharedResult = lazy(() =>
-  import('./components/SharedResult').then((m) => ({ default: m.SharedResult }))
+const NotFound = lazyRetry(
+  () => import('./components/NotFound').then((m) => ({ default: m.NotFound })),
+  'NotFound'
 )
-const UnsubscribePage = lazy(() =>
-  import('./components/UnsubscribePage').then((m) => ({ default: m.UnsubscribePage }))
+const AuthPage = lazyRetry(
+  () => import('./components/AuthPage').then((m) => ({ default: m.AuthPage })),
+  'AuthPage'
 )
-const AdminDashboard = lazy(() =>
-  import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard }))
+const TryAnalysis = lazyRetry(
+  () => import('./components/TryAnalysis').then((m) => ({ default: m.TryAnalysis })),
+  'TryAnalysis'
 )
-const AdminLogin = lazy(() =>
-  import('./components/admin/AdminLogin').then((m) => ({ default: m.AdminLogin }))
+const SharedResult = lazyRetry(
+  () => import('./components/SharedResult').then((m) => ({ default: m.SharedResult })),
+  'SharedResult'
+)
+const UnsubscribePage = lazyRetry(
+  () => import('./components/UnsubscribePage').then((m) => ({ default: m.UnsubscribePage })),
+  'UnsubscribePage'
+)
+const AdminDashboard = lazyRetry(
+  () => import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard })),
+  'AdminDashboard'
+)
+const AdminLogin = lazyRetry(
+  () => import('./components/admin/AdminLogin').then((m) => ({ default: m.AdminLogin })),
+  'AdminLogin'
 )
 
 // Route configuration

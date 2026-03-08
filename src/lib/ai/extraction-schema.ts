@@ -29,6 +29,7 @@ export interface ExtractedPolicyData {
   // Special conditions and exclusions
   specialConditions: string[]
   exclusions: string[]
+  exclusionsEn?: string[] | null
 
   // Amendment/Zeyilname detection (NEW)
   // Turkish insurance amendments have specific markers that distinguish them from original policies
@@ -43,8 +44,8 @@ export interface ExtractedPolicyData {
 
   // Evidence for AI-extracted insights and exclusions
   evidence?: {
-    insights: Array<{ text: string; quote: string }>
-    exclusions: Array<{ text: string; quote: string }>
+    insights: Array<{ text: string; textEn: string; quote: string }>
+    exclusions: Array<{ text: string; textEn: string; quote: string }>
   }
 
   // Confidence scores for each field
@@ -195,6 +196,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: { type: 'string' },
         description: 'What is NOT covered',
       },
+      exclusionsEn: {
+        type: ['array', 'null'],
+        items: { type: 'string' },
+        description: 'English translation of the exclusions. REQUIRED if policy is in Turkish.',
+      },
       amendmentInfo: {
         type: 'object',
         properties: {
@@ -252,13 +258,23 @@ export const EXTRACTION_JSON_SCHEMA = {
                   description:
                     'The insight text (e.g., "✓ Mükemmel sağlık teminatı" or "💡 Yurt dışı teminatı eklemeyi düşünün")',
                 },
+                textEn: {
+                  type: 'string',
+                  description:
+                    'The English translation of the insight text (e.g., "✓ Excellent health coverage" or "💡 Consider adding international coverage")',
+                },
                 quote: {
                   type: 'string',
                   description:
                     'The exact verbatim quote from the raw document that proves this insight. DO NOT paraphrase. Extract directly from the text.',
                 },
+                quoteTr: {
+                  type: ['string', 'null'],
+                  description:
+                    'If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null.',
+                },
               },
-              required: ['text', 'quote'],
+              required: ['text', 'textEn', 'quote', 'quoteTr'],
               additionalProperties: false,
             },
             description: 'List of insights with corroborating quotes from the text',
@@ -272,13 +288,23 @@ export const EXTRACTION_JSON_SCHEMA = {
                   type: 'string',
                   description: 'The specific exclusion (e.g., "Deprem teminatı hariçtir")',
                 },
+                textEn: {
+                  type: 'string',
+                  description:
+                    'The English translation of the exclusion text (e.g., "Earthquake coverage is excluded")',
+                },
                 quote: {
                   type: 'string',
                   description:
                     'The exact verbatim quote from the raw document stating this exclusion. DO NOT paraphrase.',
                 },
+                quoteTr: {
+                  type: ['string', 'null'],
+                  description:
+                    'If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null.',
+                },
               },
-              required: ['text', 'quote'],
+              required: ['text', 'textEn', 'quote', 'quoteTr'],
               additionalProperties: false,
             },
             description: 'List of exclusions with corroborating quotes from the text',

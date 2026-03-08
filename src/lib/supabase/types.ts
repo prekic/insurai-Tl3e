@@ -87,12 +87,14 @@ export interface RawPolicyData {
   // Coverage details
   coverages?: Coverage[]
   exclusions?: string[]
+  exclusionsEn?: string[] | null
   specialConditions?: string[]
   insuranceLine?: string
 
   // AI analysis results
   aiConfidence?: number
   aiInsights?: string[]
+  aiInsightsEn?: string[] | null
   evidenceData?: {
     insights: Record<string, string>
     exclusions: Record<string, string>

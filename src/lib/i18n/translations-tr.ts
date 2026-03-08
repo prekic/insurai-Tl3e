@@ -469,6 +469,11 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     coreKaskoCoveragesNote:
       'Muafiyet, hasar oranı kesintisi ve özel şartlar için poliçenizi kontrol edin.',
     coverageDeductible: 'Muafiyet: {amount}',
+    evaluationHistory: 'Değerlendirme Geçmişi',
+    evaluationHistoryLoading: 'Geçmiş puanlar yükleniyor...',
+    evaluationHistoryError: 'Geçmiş yüklenemedi: {error}',
+    evaluationHistoryEmpty: 'Bu poliçe için değerlendirme geçmişi bulunamadı.',
+    evaluationHistoryDesc: 'Birden fazla değerlendirme üzerinden aktüeryal puan trendi',
   },
 
   exportMenu: {

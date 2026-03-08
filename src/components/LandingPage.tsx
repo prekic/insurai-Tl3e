@@ -1,4 +1,5 @@
-import { lazy, Suspense, memo } from 'react'
+import { Suspense, memo } from 'react'
+import { lazyRetry } from '@/utils/lazyRetry'
 import { Hero } from './landing/Hero'
 import { Stats } from './landing/Stats'
 import { TrustedProviders } from './landing/TrustedProviders'
@@ -6,15 +7,42 @@ import { StickyMobileCTA } from './landing/StickyMobileCTA'
 import { LazySection } from '@/hooks/useLazySection'
 
 // Lazy load below-the-fold sections for better FCP/LCP
-const HowItWorks = lazy(() => import('./landing/HowItWorks').then(m => ({ default: m.HowItWorks })))
-const PolicyComparisonSection = lazy(() => import('./landing/PolicyComparisonSection').then(m => ({ default: m.PolicyComparisonSection })))
-const Benefits = lazy(() => import('./landing/Benefits').then(m => ({ default: m.Benefits })))
-const WhoItsFor = lazy(() => import('./landing/WhoItsFor').then(m => ({ default: m.WhoItsFor })))
-const WhyChooseUs = lazy(() => import('./landing/WhyChooseUs').then(m => ({ default: m.WhyChooseUs })))
-const Testimonials = lazy(() => import('./landing/Testimonials').then(m => ({ default: m.Testimonials })))
-const CompareSection = lazy(() => import('./landing/CompareSection').then(m => ({ default: m.CompareSection })))
-const FAQ = lazy(() => import('./landing/FAQ').then(m => ({ default: m.FAQ })))
-const Footer = lazy(() => import('./landing/Footer').then(m => ({ default: m.Footer })))
+const HowItWorks = lazyRetry(
+  () => import('./landing/HowItWorks').then((m) => ({ default: m.HowItWorks })),
+  'HowItWorks'
+)
+const PolicyComparisonSection = lazyRetry(
+  () =>
+    import('./landing/PolicyComparisonSection').then((m) => ({
+      default: m.PolicyComparisonSection,
+    })),
+  'PolicyComparisonSection'
+)
+const Benefits = lazyRetry(
+  () => import('./landing/Benefits').then((m) => ({ default: m.Benefits })),
+  'Benefits'
+)
+const WhoItsFor = lazyRetry(
+  () => import('./landing/WhoItsFor').then((m) => ({ default: m.WhoItsFor })),
+  'WhoItsFor'
+)
+const WhyChooseUs = lazyRetry(
+  () => import('./landing/WhyChooseUs').then((m) => ({ default: m.WhyChooseUs })),
+  'WhyChooseUs'
+)
+const Testimonials = lazyRetry(
+  () => import('./landing/Testimonials').then((m) => ({ default: m.Testimonials })),
+  'Testimonials'
+)
+const CompareSection = lazyRetry(
+  () => import('./landing/CompareSection').then((m) => ({ default: m.CompareSection })),
+  'CompareSection'
+)
+const FAQ = lazyRetry(() => import('./landing/FAQ').then((m) => ({ default: m.FAQ })), 'FAQ')
+const Footer = lazyRetry(
+  () => import('./landing/Footer').then((m) => ({ default: m.Footer })),
+  'Footer'
+)
 
 // Minimal skeleton for lazy sections
 function SectionSkeleton() {

@@ -419,6 +419,11 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     coreKaskoCoveragesDesc: '',
     coreKaskoCoveragesNote: '',
     coverageDeductible: '',
+    evaluationHistory: '',
+    evaluationHistoryLoading: '',
+    evaluationHistoryError: '',
+    evaluationHistoryEmpty: '',
+    evaluationHistoryDesc: '',
   },
 
   exportMenu: {

@@ -135,8 +135,20 @@ vi.mock('@/data/market-data/benchmarks', () => ({
       premiumRange: { percentile75: 3000 },
       coverageRange: { average: 500000, median: 450000 },
       commonCoverages: [
-        { name: 'Fire', nameTr: 'Yangın', inclusionRate: 95, typicalDeductible: 500, typicalLimit: 500000 },
-        { name: 'Theft', nameTr: 'Hırsızlık', inclusionRate: 90, typicalDeductible: 300, typicalLimit: 300000 },
+        {
+          name: 'Fire',
+          nameTr: 'Yangın',
+          inclusionRate: 95,
+          typicalDeductible: 500,
+          typicalLimit: 500000,
+        },
+        {
+          name: 'Theft',
+          nameTr: 'Hırsızlık',
+          inclusionRate: 90,
+          typicalDeductible: 300,
+          typicalLimit: 300000,
+        },
       ],
       trends: { premiumChangeYoY: 10 },
     },
@@ -265,7 +277,11 @@ vi.mock('@/lib/ocr-decision/ocr-decision-engine', () => ({
       confidence: 0.85,
       document_classification: {
         detected_language: { locale_code: 'tr', confidence: 0.9 },
-        detected_policy_type: { policy_type_id: 'motor_kasko', policy_type_name: 'Kasko', confidence: 0.85 },
+        detected_policy_type: {
+          policy_type_id: 'motor_kasko',
+          policy_type_name: 'Kasko',
+          confidence: 0.85,
+        },
       },
       analysis: {
         text_quality: { quality_score: 0.8, is_good_quality: true },
@@ -273,7 +289,7 @@ vi.mock('@/lib/ocr-decision/ocr-decision-engine', () => ({
         confidence_breakdown: {
           component_scores: {
             char_density: { score: 0.9, weight: 0.25, contribution: 0.225 },
-            text_quality: { score: 0.8, weight: 0.30, contribution: 0.24 },
+            text_quality: { score: 0.8, weight: 0.3, contribution: 0.24 },
             page_variance: { score: 0.85, weight: 0.15, contribution: 0.1275 },
             encoding_check: { score: 0.95, weight: 0.15, contribution: 0.1425 },
             field_extraction: { score: 0.6, weight: 0.15, contribution: 0.09 },
@@ -324,10 +340,10 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@/lib/config', () => ({
   getAIConfig: vi.fn(() =>
     Promise.resolve({
-      confidenceWeightPolicyNumber: 0.20,
+      confidenceWeightPolicyNumber: 0.2,
       confidenceWeightProvider: 0.15,
-      confidenceWeightDates: 0.20,
-      confidenceWeightPremium: 0.20,
+      confidenceWeightDates: 0.2,
+      confidenceWeightPremium: 0.2,
       confidenceWeightCoverages: 0.25,
     })
   ),
@@ -352,18 +368,27 @@ vi.mock('@/lib/i18n/coverage-names', () => ({
 vi.mock('@/lib/i18n/translations-tr', () => ({
   TR_TRANSLATIONS: {
     insightTranslations: {
-      'Comprehensive coverage with multiple protection areas': 'Birden fazla koruma alanı ile kapsamlı teminat',
+      'Comprehensive coverage with multiple protection areas':
+        'Birden fazla koruma alanı ile kapsamlı teminat',
       'High coverage limits for major risks': 'Büyük riskler için yüksek teminat limitleri',
       'Zero deductible on some coverages': 'Bazı teminatlarda sıfır muafiyet',
-      'Includes special endorsements for enhanced protection': 'Artırılmış koruma için özel klozlar içerir',
+      'Includes special endorsements for enhanced protection':
+        'Artırılmış koruma için özel klozlar içerir',
       'Standard coverage for policy type': 'Poliçe türü için standart teminat',
-      'Multiple exclusions may limit coverage in certain scenarios': 'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
-      'High deductibles may result in significant out-of-pocket costs': 'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
-      'Total coverage significantly below market average': 'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
-      'Consider adding DASK earthquake insurance if not included': 'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
-      'Review coverage limits annually to ensure adequate protection': 'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
-      'Premium is above 75th percentile - compare with other providers': 'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
-      'Coverage below market median - consider increasing limits': 'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
+      'Multiple exclusions may limit coverage in certain scenarios':
+        'Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir',
+      'High deductibles may result in significant out-of-pocket costs':
+        'Yüksek muafiyetler önemli cepten harcamalara neden olabilir',
+      'Total coverage significantly below market average':
+        'Toplam teminat piyasa ortalamasının önemli ölçüde altında',
+      'Consider adding DASK earthquake insurance if not included':
+        'Dahil değilse DASK deprem sigortası eklemeyi düşünün',
+      'Review coverage limits annually to ensure adequate protection':
+        'Yeterli korumayı sağlamak için teminat limitlerini yıllık olarak gözden geçirin',
+      'Premium is above 75th percentile - compare with other providers':
+        'Prim 75. yüzdeliğin üzerinde - diğer şirketlerle karşılaştırın',
+      'Coverage below market median - consider increasing limits':
+        'Teminat piyasa ortancasının altında - limitleri artırmayı düşünün',
       missingCoverage: 'Yaygın teminat eksik: {name}',
       invalidTcKimlik: 'Geçersiz TC Kimlik: {value}',
       marketPremiumsYoY: 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin',
@@ -468,7 +493,7 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
     // aiInsightsTr should be "⚠ Çok sayıda istisna..."
     expect(policy!.aiInsightsTr).toBeDefined()
     const translated = policy!.aiInsightsTr!
-    expect(translated.some(t => t.includes('Çok sayıda istisna'))).toBe(true)
+    expect(translated.some((t) => t.includes('Çok sayıda istisna'))).toBe(true)
   })
 
   it('preserves the ⚠ prefix when translating a known watchOut string', () => {
@@ -477,7 +502,7 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
       watchOuts: ['High deductibles may result in significant out-of-pocket costs'],
     })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
-    const matched = policy!.aiInsightsTr!.find(t => t.startsWith('⚠'))
+    const matched = policy!.aiInsightsTr!.find((t) => t.startsWith('⚠'))
     expect(matched).toBeDefined()
     expect(matched).toContain('Yüksek muafiyetler')
   })
@@ -490,7 +515,7 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
     })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
     // The insight is "⚠ <unknownText>" — translateInsightToTr should return it unchanged
-    expect(policy!.aiInsightsTr!.some(t => t.includes(unknownText))).toBe(true)
+    expect(policy!.aiInsightsTr!.some((t) => t.includes(unknownText))).toBe(true)
   })
 
   it('translates "Missing common coverage: X" dynamic pattern', () => {
@@ -505,7 +530,7 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
     // Should become "⚠ Yaygın teminat eksik: Yangın"
     const translated = policy!.aiInsightsTr!
-    expect(translated.some(t => t.includes('Yaygın teminat eksik: Yangın'))).toBe(true)
+    expect(translated.some((t) => t.includes('Yaygın teminat eksik: Yangın'))).toBe(true)
   })
 
   it('translates "Invalid TC Kimlik: X" dynamic pattern', () => {
@@ -515,7 +540,7 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
     })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
     const translated = policy!.aiInsightsTr!
-    expect(translated.some(t => t.includes('Geçersiz TC Kimlik: 12345678901'))).toBe(true)
+    expect(translated.some((t) => t.includes('Geçersiz TC Kimlik: 12345678901'))).toBe(true)
   })
 
   it('translates YoY premium increase pattern dynamically', () => {
@@ -525,14 +550,14 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
     })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
     const translated = policy!.aiInsightsTr!
-    expect(translated.some(t => t.includes('Piyasa primleri yıllık %35 arttı'))).toBe(true)
+    expect(translated.some((t) => t.includes('Piyasa primleri yıllık %35 arttı'))).toBe(true)
   })
 
   it('includes the quality score insight in aiInsights', () => {
     const file = createMockFile('test.pdf', 'application/pdf')
     const result = makeComprehensiveResult({ qualityScore: 75 })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
-    expect(policy!.aiInsights.some(i => i.includes('75/100'))).toBe(true)
+    expect(policy!.aiInsights.some((i) => i.includes('75/100'))).toBe(true)
   })
 
   it('caps watchOuts at 5 in aiInsights', () => {
@@ -548,7 +573,10 @@ describe('translateInsightToTr() via comprehensiveToAnalyzedPolicy', () => {
   it('aiInsightsTr length matches aiInsights length', () => {
     const file = createMockFile('test.pdf', 'application/pdf')
     const result = makeComprehensiveResult({
-      watchOuts: ['High deductibles may result in significant out-of-pocket costs', 'Total coverage significantly below market average'],
+      watchOuts: [
+        'High deductibles may result in significant out-of-pocket costs',
+        'Total coverage significantly below market average',
+      ],
     })
     const policy = comprehensiveToAnalyzedPolicy(result, file, 'raw', 'processed')
     expect(policy!.aiInsightsTr!.length).toBe(policy!.aiInsights.length)
@@ -569,7 +597,14 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Kasko', nameTr: 'Kasko', limit: 800000, deductible: 0, category: 'main', included: true },
+          {
+            name: 'Kasko',
+            nameTr: 'Kasko',
+            limit: 800000,
+            deductible: 0,
+            category: 'main',
+            included: true,
+          },
         ],
       }),
     })
@@ -582,7 +617,14 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Mali Sorumluluk', nameTr: 'Mali Sorumluluk', limit: 200000, deductible: 0, category: 'liability', included: true },
+          {
+            name: 'Mali Sorumluluk',
+            nameTr: 'Mali Sorumluluk',
+            limit: 200000,
+            deductible: 0,
+            category: 'liability',
+            included: true,
+          },
         ],
       }),
     })
@@ -595,7 +637,14 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Yol Yardım', nameTr: 'Yol Yardım', limit: 5000, deductible: 0, category: 'assistance', included: true },
+          {
+            name: 'Yol Yardım',
+            nameTr: 'Yol Yardım',
+            limit: 5000,
+            deductible: 0,
+            category: 'assistance',
+            included: true,
+          },
         ],
       }),
     })
@@ -608,7 +657,14 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Other', nameTr: 'Diğer', limit: 1000, deductible: 0, category: 'supplementary', included: true },
+          {
+            name: 'Other',
+            nameTr: 'Diğer',
+            limit: 1000,
+            deductible: 0,
+            category: 'supplementary',
+            included: true,
+          },
         ],
       }),
     })
@@ -634,7 +690,15 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Legal', nameTr: 'Hukuki', limit: 0, deductible: 0, category: 'legal', isUnlimited: true, included: true },
+          {
+            name: 'Legal',
+            nameTr: 'Hukuki',
+            limit: 0,
+            deductible: 0,
+            category: 'legal',
+            isUnlimited: true,
+            included: true,
+          },
         ],
       }),
     })
@@ -648,7 +712,14 @@ describe('Coverage importance mapping via comprehensiveToAnalyzedPolicy', () => 
     const result = makeComprehensiveResult({
       structuredData: makeStructuredData({
         coverages: [
-          { name: 'Fire', nameTr: 'Fire', limit: 500000, deductible: 0, category: 'main', included: true },
+          {
+            name: 'Fire',
+            nameTr: 'Fire',
+            limit: 500000,
+            deductible: 0,
+            category: 'main',
+            included: true,
+          },
         ],
       }),
     })
@@ -825,7 +896,14 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       ],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -834,7 +912,9 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Comprehensive coverage with multiple protection areas'))).toBe(true)
+      expect(
+        insights.some((i) => i.includes('Comprehensive coverage with multiple protection areas'))
+      ).toBe(true)
     }
   })
 
@@ -851,12 +931,17 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       premium: 3000,
       currency: 'TRY',
       paymentFrequency: 'annual',
-      coverages: [
-        { name: 'Fire', limit: 600000, deductible: 0 },
-      ],
+      coverages: [{ name: 'Fire', limit: 600000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -865,7 +950,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('High coverage limits for major risks'))).toBe(true)
+      expect(insights.some((i) => i.includes('High coverage limits for major risks'))).toBe(true)
     }
   })
 
@@ -882,12 +967,17 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       premium: 3000,
       currency: 'TRY',
       paymentFrequency: 'annual',
-      coverages: [
-        { name: 'Fire', limit: 100000, deductible: 0 },
-      ],
+      coverages: [{ name: 'Fire', limit: 100000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -896,7 +986,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Zero deductible on some coverages'))).toBe(true)
+      expect(insights.some((i) => i.includes('Zero deductible on some coverages'))).toBe(true)
     }
   })
 
@@ -916,7 +1006,14 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: ['Ek kloz: Genişletilmiş deprem teminatı'],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -925,7 +1022,9 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Includes special endorsements for enhanced protection'))).toBe(true)
+      expect(
+        insights.some((i) => i.includes('Includes special endorsements for enhanced protection'))
+      ).toBe(true)
     }
   })
 
@@ -946,7 +1045,14 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -955,7 +1061,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Standard coverage for policy type'))).toBe(true)
+      expect(insights.some((i) => i.includes('Standard coverage for policy type'))).toBe(true)
     }
   })
 })
@@ -995,7 +1101,14 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: ['Exc1', 'Exc2', 'Exc3', 'Exc4', 'Exc5', 'Exc6'],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1004,7 +1117,11 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Multiple exclusions may limit coverage in certain scenarios'))).toBe(true)
+      expect(
+        insights.some((i) =>
+          i.includes('Multiple exclusions may limit coverage in certain scenarios')
+        )
+      ).toBe(true)
     }
   })
 
@@ -1032,7 +1149,14 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
       coverages: [{ name: 'Fire', limit: 500000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1041,7 +1165,11 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Consider adding DASK earthquake insurance if not included'))).toBe(true)
+      expect(
+        insights.some((i) =>
+          i.includes('Consider adding DASK earthquake insurance if not included')
+        )
+      ).toBe(true)
     }
   })
 
@@ -1050,7 +1178,13 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     const marketDataProvider = await import('@/lib/market-data/market-data-provider')
     vi.mocked(marketDataProvider.marketDataProvider.getBenchmark).mockResolvedValue({
       commonCoverages: [
-        { name: 'Fire', nameTr: 'Yangın', inclusionRate: 95, typicalDeductible: 500, typicalLimit: 500000 },
+        {
+          name: 'Fire',
+          nameTr: 'Yangın',
+          inclusionRate: 95,
+          typicalDeductible: 500,
+          typicalLimit: 500000,
+        },
       ],
       premiumRange: { min: 1000, max: 5000, average: 3000, median: 2500, percentile75: 4000 },
       coverageRange: { min: 100000, max: 1000000, average: 500000, median: 450000 },
@@ -1071,7 +1205,14 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
       coverages: [{ name: 'Theft', limit: 200000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1080,8 +1221,8 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      // gap: "Missing common coverage: Yangın"
-      expect(insights.some(i => i.includes('Missing common coverage: Yangın'))).toBe(true)
+      // gap: "Missing common coverage: Fire"
+      expect(insights.some((i) => i.includes('Missing common coverage: Fire'))).toBe(true)
     }
   })
 
@@ -1091,7 +1232,13 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     vi.mocked(marketDataProvider.marketDataProvider.getBenchmark).mockResolvedValue({
       commonCoverages: [
         // Collision is implicit in kasko — should be skipped
-        { name: 'Collision', nameTr: 'çarpma', inclusionRate: 99, typicalDeductible: 0, typicalLimit: 0 },
+        {
+          name: 'Collision',
+          nameTr: 'çarpma',
+          inclusionRate: 99,
+          typicalDeductible: 0,
+          typicalLimit: 0,
+        },
       ],
       premiumRange: { min: 5000, max: 20000, average: 10000, median: 9000, percentile75: 15000 },
       coverageRange: { min: 300000, max: 2000000, average: 800000, median: 700000 },
@@ -1112,7 +1259,14 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
       coverages: [{ name: 'Kasko', limit: 700000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1122,7 +1276,7 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     if (result.success) {
       const insights = result.policy.aiInsights
       // 'çarpma' is an implicit kasko coverage — should NOT be flagged as missing
-      expect(insights.every(i => !i.includes('Missing common coverage: çarpma'))).toBe(true)
+      expect(insights.every((i) => !i.includes('Missing common coverage: çarpma'))).toBe(true)
     }
   })
 })
@@ -1170,7 +1324,14 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1179,7 +1340,11 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Premium is above 75th percentile - compare with other providers'))).toBe(true)
+      expect(
+        insights.some((i) =>
+          i.includes('Premium is above 75th percentile - compare with other providers')
+        )
+      ).toBe(true)
     }
   })
 
@@ -1207,7 +1372,14 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
       coverages: [{ name: 'Fire', limit: 100000, deductible: 0 }],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1216,7 +1388,11 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Coverage below market median - consider increasing limits'))).toBe(true)
+      expect(
+        insights.some((i) =>
+          i.includes('Coverage below market median - consider increasing limits')
+        )
+      ).toBe(true)
     }
   })
 
@@ -1236,7 +1412,14 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1245,7 +1428,11 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Review coverage limits annually to ensure adequate protection'))).toBe(true)
+      expect(
+        insights.some((i) =>
+          i.includes('Review coverage limits annually to ensure adequate protection')
+        )
+      ).toBe(true)
     }
   })
 
@@ -1273,7 +1460,14 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1282,7 +1476,9 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some(i => i.includes('Market premiums increased 35% YoY - lock in rates early'))).toBe(true)
+      expect(
+        insights.some((i) => i.includes('Market premiums increased 35% YoY - lock in rates early'))
+      ).toBe(true)
     }
   })
 
@@ -1309,7 +1505,14 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
       coverages: [],
       specialConditions: [],
       exclusions: [],
-      confidence: { overall: 0.85, policyNumber: 0.85, provider: 0.85, dates: 0.85, premium: 0.85, coverages: 0.85 },
+      confidence: {
+        overall: 0.85,
+        policyNumber: 0.85,
+        provider: 0.85,
+        dates: 0.85,
+        premium: 0.85,
+        coverages: 0.85,
+      },
     })
 
     const file = createMockFile('policy.pdf', 'application/pdf')
@@ -1318,7 +1521,7 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.every(i => !i.includes('YoY - lock in rates early'))).toBe(true)
+      expect(insights.every((i) => !i.includes('YoY - lock in rates early'))).toBe(true)
     }
   })
 })

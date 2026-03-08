@@ -167,10 +167,11 @@ export const KASKO_IMPLICIT_COVERAGES = [
 export function isImplicitKaskoCoverage(coverageName: string): boolean {
   const nameLower = coverageName.toLowerCase()
 
-  return KASKO_IMPLICIT_COVERAGES.some(implicit =>
-    implicit.aliases.some(alias => nameLower.includes(alias.toLowerCase())) ||
-    nameLower.includes(implicit.name.toLowerCase()) ||
-    nameLower.includes(implicit.nameTr.toLowerCase())
+  return KASKO_IMPLICIT_COVERAGES.some(
+    (implicit) =>
+      implicit.aliases.some((alias) => nameLower.includes(alias.toLowerCase())) ||
+      nameLower.includes(implicit.name.toLowerCase()) ||
+      nameLower.includes(implicit.nameTr.toLowerCase())
   )
 }
 
@@ -384,44 +385,54 @@ export function detectCoverageCategory(coverageName: string): KaskoCoverageCateg
   const nameLower = coverageName.toLowerCase()
 
   // Check for liability keywords
-  if (nameLower.includes('mali sorumluluk') ||
-      nameLower.includes('manevi') ||
-      nameLower.includes('artan mali')) {
+  if (
+    nameLower.includes('mali sorumluluk') ||
+    nameLower.includes('manevi') ||
+    nameLower.includes('artan mali')
+  ) {
     return 'liability'
   }
 
   // Check for personal accident keywords
-  if (nameLower.includes('ferdi kaza') ||
-      nameLower.includes('koltuk') ||
-      nameLower.includes('ölüm') ||
-      nameLower.includes('sakatlık') ||
-      nameLower.includes('tedavi')) {
+  if (
+    nameLower.includes('ferdi kaza') ||
+    nameLower.includes('koltuk') ||
+    nameLower.includes('ölüm') ||
+    nameLower.includes('sakatlık') ||
+    nameLower.includes('tedavi')
+  ) {
     return 'personal_accident'
   }
 
   // Check for assistance keywords
-  if (nameLower.includes('asistans') ||
-      nameLower.includes('yol yardım') ||
-      nameLower.includes('ikame') ||
-      nameLower.includes('çekici') ||
-      nameLower.includes('hizmet')) {
+  if (
+    nameLower.includes('asistans') ||
+    nameLower.includes('yol yardım') ||
+    nameLower.includes('ikame') ||
+    nameLower.includes('çekici') ||
+    nameLower.includes('hizmet')
+  ) {
     return 'assistance'
   }
 
   // Check for legal keywords
-  if (nameLower.includes('hukuki') ||
-      nameLower.includes('kefalet') ||
-      nameLower.includes('avukat')) {
+  if (
+    nameLower.includes('hukuki') ||
+    nameLower.includes('kefalet') ||
+    nameLower.includes('avukat')
+  ) {
     return 'legal'
   }
 
   // Check for main coverage keywords
-  if (nameLower.includes('araç bedeli') ||
-      nameLower.includes('rayiç') ||
-      nameLower.includes('çarpma') ||
-      nameLower.includes('hırsızlık') ||
-      nameLower.includes('yangın') ||
-      nameLower.includes('doğal afet')) {
+  if (
+    nameLower.includes('araç bedeli') ||
+    nameLower.includes('rayiç') ||
+    nameLower.includes('çarpma') ||
+    nameLower.includes('hırsızlık') ||
+    nameLower.includes('yangın') ||
+    nameLower.includes('doğal afet')
+  ) {
     return 'main'
   }
 
@@ -445,7 +456,7 @@ export function shouldShowUnlimited(coverageName: string, limit: number): boolea
 
   // If limit is 0 and name contains unlimited patterns, it's unlimited
   if (limit === 0 || limit === null) {
-    return unlimitedPatterns.some(pattern => nameLower.includes(pattern))
+    return unlimitedPatterns.some((pattern) => nameLower.includes(pattern))
   }
 
   return false
@@ -469,7 +480,7 @@ export function shouldShowIncluded(coverageName: string, limit: number): boolean
   ]
 
   if (limit === 0 || limit === null) {
-    return servicePatterns.some(pattern => nameLower.includes(pattern))
+    return servicePatterns.some((pattern) => nameLower.includes(pattern))
   }
 
   return false
@@ -483,16 +494,16 @@ export function shouldShowIncluded(coverageName: string, limit: number): boolean
  * Vehicle information structure for kasko policies
  */
 export interface VehicleInfo {
-  plate?: string          // e.g., "34 RZ 9511"
-  make?: string           // e.g., "Ford"
-  model?: string          // e.g., "Transit Custom"
-  year?: number           // e.g., 2023
-  engineNo?: string       // Motor no
-  chassisNo?: string      // Şasi no
-  color?: string          // Renk
-  usage?: string          // Kullanım şekli (Hususi/Ticari)
-  vehicleClass?: string   // Araç sınıfı (Binek/Kamyonet/TIR)
-  fuelType?: string       // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
+  plate?: string // e.g., "34 RZ 9511"
+  make?: string // e.g., "Ford"
+  model?: string // e.g., "Transit Custom"
+  year?: number // e.g., 2023
+  engineNo?: string // Motor no
+  chassisNo?: string // Şasi no
+  color?: string // Renk
+  usage?: string // Kullanım şekli (Hususi/Ticari)
+  vehicleClass?: string // Araç sınıfı (Binek/Kamyonet/TIR)
+  fuelType?: string // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
   estimatedValue?: number // Tahmini araç değeri
 }
 
@@ -582,11 +593,7 @@ export const KASKO_MARKET_BENCHMARKS: KaskoMarketBenchmark[] = [
     premiumRange: { min: 12000, max: 30000 },
     marketValueRange: { min: 300000, max: 800000 },
     typicalDeductible: 500,
-    commonCoverages: [
-      'Rayiç Değer',
-      'Artan Mali Sorumluluk',
-      'Ferdi Kaza',
-    ],
+    commonCoverages: ['Rayiç Değer', 'Artan Mali Sorumluluk', 'Ferdi Kaza'],
   },
   {
     vehicleClass: 'SUV/Crossover',
@@ -611,11 +618,7 @@ export const KASKO_MARKET_BENCHMARKS: KaskoMarketBenchmark[] = [
     premiumRange: { min: 20000, max: 50000 },
     marketValueRange: { min: 600000, max: 2500000 },
     typicalDeductible: 1000,
-    commonCoverages: [
-      'Rayiç Değer',
-      'Artan Mali Sorumluluk',
-      'Hukuki Koruma',
-    ],
+    commonCoverages: ['Rayiç Değer', 'Artan Mali Sorumluluk', 'Hukuki Koruma'],
   },
   {
     vehicleClass: 'Motosiklet',
@@ -624,11 +627,7 @@ export const KASKO_MARKET_BENCHMARKS: KaskoMarketBenchmark[] = [
     premiumRange: { min: 4000, max: 15000 },
     marketValueRange: { min: 50000, max: 500000 },
     typicalDeductible: 500,
-    commonCoverages: [
-      'Rayiç Değer',
-      'Hırsızlık',
-      'Ferdi Kaza',
-    ],
+    commonCoverages: ['Rayiç Değer', 'Hırsızlık', 'Ferdi Kaza'],
   },
 ]
 
@@ -646,19 +645,30 @@ export function findKaskoBenchmark(
 
   if (classLower.includes('suv') || classLower.includes('crossover')) {
     matchedClass = 'SUV/Crossover'
-  } else if (classLower.includes('kamyonet') || classLower.includes('ticari') || classLower.includes('panel')) {
+  } else if (
+    classLower.includes('kamyonet') ||
+    classLower.includes('ticari') ||
+    classLower.includes('panel')
+  ) {
     matchedClass = 'Ticari'
   } else if (classLower.includes('motor') || classLower.includes('motosiklet')) {
     matchedClass = 'Motosiklet'
   }
 
-  const ageCategory = vehicleAge !== undefined
-    ? (vehicleAge <= 3 ? '0-3 yıl' : vehicleAge <= 7 ? '4-7 yıl' : '0-5 yıl')
-    : '0-3 yıl'
+  const ageCategory =
+    vehicleAge !== undefined
+      ? vehicleAge <= 3
+        ? '0-3 yıl'
+        : vehicleAge <= 7
+          ? '4-7 yıl'
+          : '0-5 yıl'
+      : '0-3 yıl'
 
-  return KASKO_MARKET_BENCHMARKS.find(
-    b => b.vehicleClass.includes(matchedClass) && b.ageRange === ageCategory
-  ) || KASKO_MARKET_BENCHMARKS.find(b => b.vehicleClass.includes(matchedClass))
+  return (
+    KASKO_MARKET_BENCHMARKS.find(
+      (b) => b.vehicleClass.includes(matchedClass) && b.ageRange === ageCategory
+    ) || KASKO_MARKET_BENCHMARKS.find((b) => b.vehicleClass.includes(matchedClass))
+  )
 }
 
 // =============================================================================
@@ -676,7 +686,7 @@ export interface KaskoEvaluationResult {
   hasReplacementVehicle: boolean
   hasLegalProtection: boolean
   coverageCompleteness: number // 0-100
-  premiumValueScore: number    // 0-100
+  premiumValueScore: number // 0-100
   recommendations: string[]
   positives: string[]
 }
@@ -702,7 +712,11 @@ export function evaluateKaskoPolicy(
   for (const coverage of coverages) {
     const nameLower = coverage.name.toLowerCase()
 
-    if (coverage.isMarketValue || nameLower.includes('rayiç') || nameLower.includes('araç bedeli')) {
+    if (
+      coverage.isMarketValue ||
+      nameLower.includes('rayiç') ||
+      nameLower.includes('araç bedeli')
+    ) {
       result.hasMarketValueCoverage = true
       result.positives.push('Araç rayiç değer üzerinden teminatlı')
     }
@@ -740,7 +754,10 @@ export function evaluateKaskoPolicy(
   result.coverageCompleteness = Math.min(completenessScore, 100)
 
   // Premium value analysis
-  const benchmark = findKaskoBenchmark(vehicleInfo?.vehicleClass, vehicleInfo?.year ? new Date().getFullYear() - vehicleInfo.year : undefined)
+  const benchmark = findKaskoBenchmark(
+    vehicleInfo?.vehicleClass,
+    vehicleInfo?.year ? new Date().getFullYear() - vehicleInfo.year : undefined
+  )
   if (benchmark) {
     if (premium <= benchmark.premiumRange.min) {
       result.premiumValueScore = 90
@@ -778,8 +795,8 @@ export function evaluateKaskoPolicy(
  * Categorize exclusions by severity and type
  */
 export interface ExclusionAnalysis {
-  critical: string[]      // Very important exclusions
-  standard: string[]      // Normal exclusions
+  critical: string[] // Very important exclusions
+  standard: string[] // Normal exclusions
   informational: string[] // FYI exclusions
 }
 
@@ -803,9 +820,7 @@ export function analyzeExclusions(exclusions: string[]): ExclusionAnalysis {
   for (const exclusion of exclusions) {
     const lower = exclusion.toLowerCase()
 
-    const isCritical = CRITICAL_EXCLUSION_PATTERNS.some(
-      p => lower.includes(p.pattern)
-    )
+    const isCritical = CRITICAL_EXCLUSION_PATTERNS.some((p) => lower.includes(p.pattern))
 
     if (isCritical) {
       result.critical.push(exclusion)
@@ -876,9 +891,12 @@ export function groupCoveragesByCategory<T extends { name: string; category?: st
 /**
  * Format coverage limit for display
  */
-export function formatKaskoCoverageLimit(
-  coverage: { name: string; limit: number; isUnlimited?: boolean; isMarketValue?: boolean }
-): string {
+export function formatKaskoCoverageLimit(coverage: {
+  name: string
+  limit: number
+  isUnlimited?: boolean
+  isMarketValue?: boolean
+}): string {
   if (coverage.isUnlimited) return 'Sınırsız'
   if (coverage.isMarketValue) return 'Rayiç Değer'
 
@@ -908,8 +926,8 @@ export const COVERAGE_GROUP_PREFIXES = [
     displayName: 'Hukuksal Koruma',
     displayNameEn: 'Legal Protection',
     subLimitLabels: {
-      'kefalet': 'Olay Başı Kefalet',
-      'avans': 'Olay Başı Avans',
+      kefalet: 'Olay Başı Kefalet',
+      avans: 'Olay Başı Avans',
       'olay başına azami limit': 'Olay Başı Limit',
       'sigorta süresi': 'Yıllık Limit',
     },
@@ -919,9 +937,9 @@ export const COVERAGE_GROUP_PREFIXES = [
     displayName: 'Koltuk Ferdi Kaza',
     displayNameEn: 'Seat Personal Accident',
     subLimitLabels: {
-      'ölüm': 'Ölüm',
+      ölüm: 'Ölüm',
       'sürekli sakatlık': 'Sürekli Sakatlık',
-      'tedavi': 'Tedavi Masrafları',
+      tedavi: 'Tedavi Masrafları',
     },
   },
   {
@@ -929,9 +947,9 @@ export const COVERAGE_GROUP_PREFIXES = [
     displayName: 'Artan Mali Sorumluluk',
     displayNameEn: 'Increased Liability',
     subLimitLabels: {
-      'maddi': 'Maddi Hasar',
-      'bedeni': 'Bedeni Hasar',
-      'manevi': 'Manevi Tazminat',
+      maddi: 'Maddi Hasar',
+      bedeni: 'Bedeni Hasar',
+      manevi: 'Manevi Tazminat',
     },
   },
   {
@@ -939,9 +957,9 @@ export const COVERAGE_GROUP_PREFIXES = [
     displayName: 'Ferdi Kaza',
     displayNameEn: 'Personal Accident',
     subLimitLabels: {
-      'ölüm': 'Ölüm',
-      'sakatlık': 'Sürekli Sakatlık',
-      'tedavi': 'Tedavi',
+      ölüm: 'Ölüm',
+      sakatlık: 'Sürekli Sakatlık',
+      tedavi: 'Tedavi',
     },
   },
 ] as const
@@ -976,31 +994,38 @@ export interface GroupedCoverage {
 /**
  * Service coverages that need clarification about terms
  */
-export const SERVICE_COVERAGE_CLARIFICATIONS: Record<string, {
-  question: string
-  questionEn: string
-  details: string[]
-  detailsEn: string[]
-}> = {
+export const SERVICE_COVERAGE_CLARIFICATIONS: Record<
+  string,
+  {
+    question: string
+    questionEn: string
+    details: string[]
+    detailsEn: string[]
+  }
+> = {
   'ikame araç': {
     question: 'İkame araç kaç gün ve hangi şartlarda sağlanıyor?',
     questionEn: 'How many days and under what conditions is replacement vehicle provided?',
     details: ['Gün limiti (genellikle 15-30 gün)', 'Araç sınıfı', 'Minimum hasar tutarı şartı'],
-    detailsEn: ['Day limit (usually 15-30 days)', 'Vehicle class', 'Minimum damage amount requirement'],
+    detailsEn: [
+      'Day limit (usually 15-30 days)',
+      'Vehicle class',
+      'Minimum damage amount requirement',
+    ],
   },
-  'çekici': {
+  çekici: {
     question: 'Çekici hizmeti limitsiz mi yoksa km sınırı var mı?',
     questionEn: 'Is towing unlimited or is there a distance limit?',
     details: ['Mesafe limiti (km)', 'Yıllık kullanım sayısı'],
     detailsEn: ['Distance limit (km)', 'Annual usage limit'],
   },
-  'asistans': {
+  asistans: {
     question: 'Asistans hizmetlerinin kapsamı ve limitleri nedir?',
     questionEn: 'What is the scope and limits of assistance services?',
     details: ['7/24 erişim', 'Yol yardımı kapsamı', 'Konaklama desteği'],
     detailsEn: ['24/7 access', 'Roadside assistance scope', 'Accommodation support'],
   },
-  'cam': {
+  cam: {
     question: 'Cam hasarında muafiyet var mı?',
     questionEn: 'Is there a deductible for glass damage?',
     details: ['Ön cam muafiyeti', 'Yan cam muafiyeti', 'Onarım vs değişim'],
@@ -1050,17 +1075,19 @@ export function sortByImportance(coverages: GroupedCoverage[]): GroupedCoverage[
  * Groups coverages that share a common prefix into consolidated items
  * e.g., "Hukuksal Koruma - Kefalet", "Hukuksal Koruma - Avans" become one item
  */
-export function groupCoverageSubLimits<T extends {
-  name: string
-  nameTr?: string
-  limit: number
-  deductible?: number
-  isUnlimited?: boolean
-  isMarketValue?: boolean
-  included?: boolean
-  category?: string
-  importance?: string
-}>(coverages: T[]): GroupedCoverage[] {
+export function groupCoverageSubLimits<
+  T extends {
+    name: string
+    nameTr?: string
+    limit: number
+    deductible?: number
+    isUnlimited?: boolean
+    isMarketValue?: boolean
+    included?: boolean
+    category?: string
+    importance?: string
+  },
+>(coverages: T[]): GroupedCoverage[] {
   const result: GroupedCoverage[] = []
   const processedIndices = new Set<number>()
 
@@ -1099,7 +1126,9 @@ export function groupCoverageSubLimits<T extends {
         category,
         isGrouped: true,
         subLimits: matchingCoverages.map(({ coverage, subKey }) => ({
-          label: groupDef.subLimitLabels[subKey as keyof typeof groupDef.subLimitLabels] || extractSubLimitLabel(coverage.name, groupDef.prefix),
+          label:
+            groupDef.subLimitLabels[subKey as keyof typeof groupDef.subLimitLabels] ||
+            extractSubLimitLabel(coverage.name, groupDef.prefix),
           limit: coverage.limit,
           // Check for unlimited status using both explicit flag and name pattern
           isUnlimited: coverage.isUnlimited || shouldShowUnlimited(coverage.name, coverage.limit),
@@ -1118,7 +1147,8 @@ export function groupCoverageSubLimits<T extends {
     if (processedIndices.has(index)) return
 
     // Check if this should be displayed as unlimited (even if not explicitly flagged)
-    const shouldBeUnlimited = coverage.isUnlimited || shouldShowUnlimited(coverage.name, coverage.limit)
+    const shouldBeUnlimited =
+      coverage.isUnlimited || shouldShowUnlimited(coverage.name, coverage.limit)
 
     result.push({
       name: coverage.name,
@@ -1166,24 +1196,29 @@ function extractSubLimitLabel(fullName: string, prefix: string): string {
  * Comprehensive exclusion explanations for kasko policies
  * Each exclusion has plain-language explanation and examples
  */
-export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
-  explanation: string
-  explanationEn: string
-  examples?: string[]
-  severity: 'critical' | 'important' | 'standard' | 'informational'
-  affectsPrivate?: boolean  // Does this affect private/personal vehicles?
-  affectsCommercial?: boolean  // Does this affect commercial vehicles?
-}> = {
+export const KASKO_EXCLUSION_EXPLANATIONS: Record<
+  string,
+  {
+    explanation: string
+    explanationEn: string
+    examples?: string[]
+    severity: 'critical' | 'important' | 'standard' | 'informational'
+    affectsPrivate?: boolean // Does this affect private/personal vehicles?
+    affectsCommercial?: boolean // Does this affect commercial vehicles?
+  }
+> = {
   // Critical exclusions - always important
-  'alkol': {
-    explanation: 'Sürücünün alkollü olması durumunda meydana gelen hasarlar karşılanmaz. Yasal alkol sınırı 0.50 promil\'dir.',
-    explanationEn: 'Damages that occur while the driver is under the influence of alcohol are not covered. Legal limit is 0.50 promil.',
+  alkol: {
+    explanation:
+      "Sürücünün alkollü olması durumunda meydana gelen hasarlar karşılanmaz. Yasal alkol sınırı 0.50 promil'dir.",
+    explanationEn:
+      'Damages that occur while the driver is under the influence of alcohol are not covered. Legal limit is 0.50 promil.',
     examples: ['Alkollü sürüş sonucu kaza', 'İçki içtikten sonra araç kullanımı'],
     severity: 'critical',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'uyuşturucu': {
+  uyuşturucu: {
     explanation: 'Uyuşturucu veya uyarıcı madde etkisi altında oluşan hasarlar karşılanmaz.',
     explanationEn: 'Damages occurring under the influence of drugs or stimulants are not covered.',
     examples: ['İlaç etkisi altında kaza', 'Uyuşturucu kullanımı sonrası kaza'],
@@ -1191,31 +1226,37 @@ export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'ehliyet': {
-    explanation: 'Geçerli ehliyeti olmayan sürücünün kullanımı sırasında oluşan hasarlar karşılanmaz.',
-    explanationEn: 'Damages that occur while the vehicle is driven by an unlicensed driver are not covered.',
+  ehliyet: {
+    explanation:
+      'Geçerli ehliyeti olmayan sürücünün kullanımı sırasında oluşan hasarlar karşılanmaz.',
+    explanationEn:
+      'Damages that occur while the vehicle is driven by an unlicensed driver are not covered.',
     examples: ['Ehliyetsiz sürüş', 'Süresi dolmuş ehliyet', 'Uygun sınıf ehliyet olmadan kullanım'],
     severity: 'critical',
     affectsPrivate: true,
     affectsCommercial: true,
   },
   'yetkisiz sürücü': {
-    explanation: 'Poliçede belirtilen sürücü dışında birinin aracı kullanması durumunda hasar karşılanmayabilir. Bazı poliçelerde "belirli sürücü" şartı vardır.',
-    explanationEn: 'Damages may not be covered if someone other than the designated driver operates the vehicle.',
+    explanation:
+      'Poliçede belirtilen sürücü dışında birinin aracı kullanması durumunda hasar karşılanmayabilir. Bazı poliçelerde "belirli sürücü" şartı vardır.',
+    explanationEn:
+      'Damages may not be covered if someone other than the designated driver operates the vehicle.',
     examples: ['Arkadaşa araç vermek', 'Aile üyesi dışında kullanım'],
     severity: 'important',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'vale': {
-    explanation: 'Vale (otopark görevlisi) kullanımı sırasında oluşan hasarlar genellikle kapsam dışıdır. Vale hizmeti aldığınızda dikkatli olun.',
-    explanationEn: 'Damages during valet parking are typically excluded. Be careful when using valet services.',
+  vale: {
+    explanation:
+      'Vale (otopark görevlisi) kullanımı sırasında oluşan hasarlar genellikle kapsam dışıdır. Vale hizmeti aldığınızda dikkatli olun.',
+    explanationEn:
+      'Damages during valet parking are typically excluded. Be careful when using valet services.',
     examples: ['Vale park sırasında çizik', 'Otoparkta hasar', 'Vale tarafından kaza'],
     severity: 'important',
     affectsPrivate: true,
     affectsCommercial: false,
   },
-  'yarış': {
+  yarış: {
     explanation: 'Yarış, hız denemesi veya ralli gibi etkinliklerde oluşan hasarlar karşılanmaz.',
     explanationEn: 'Damages during racing, speed tests, or rally events are not covered.',
     examples: ['Drag yarışı', 'Pist günü', 'Hız denemesi'],
@@ -1223,7 +1264,7 @@ export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'kasıt': {
+  kasıt: {
     explanation: 'Bilerek ve isteyerek yapılan hasarlar karşılanmaz.',
     explanationEn: 'Intentional damages are not covered.',
     examples: ['Kasıtlı hasar', 'Sigorta dolandırıcılığı'],
@@ -1231,71 +1272,82 @@ export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'siber': {
-    explanation: 'Siber saldırı, bilgisayar virüsü veya yazılım hatası kaynaklı hasarlar karşılanmaz. Modern araçlarda önemli bir risk.',
-    explanationEn: 'Damages from cyber attacks, computer viruses, or software failures are not covered.',
+  siber: {
+    explanation:
+      'Siber saldırı, bilgisayar virüsü veya yazılım hatası kaynaklı hasarlar karşılanmaz. Modern araçlarda önemli bir risk.',
+    explanationEn:
+      'Damages from cyber attacks, computer viruses, or software failures are not covered.',
     examples: ['Araç yazılımının hacklenmesi', 'Uzaktan erişim saldırısı'],
     severity: 'standard',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'salgın': {
-    explanation: 'Salgın hastalık (pandemi) döneminde karantina veya kısıtlamalar nedeniyle oluşan dolaylı zararlar karşılanmaz.',
+  salgın: {
+    explanation:
+      'Salgın hastalık (pandemi) döneminde karantina veya kısıtlamalar nedeniyle oluşan dolaylı zararlar karşılanmaz.',
     explanationEn: 'Indirect damages due to pandemic quarantine or restrictions are not covered.',
     examples: ['COVID-19 döneminde araç kullanılamama'],
     severity: 'informational',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'nükleer': {
-    explanation: 'Nükleer, biyolojik veya kimyasal riskler çoğu poliçede kapsam dışıdır veya sınırlı teminatlıdır.',
+  nükleer: {
+    explanation:
+      'Nükleer, biyolojik veya kimyasal riskler çoğu poliçede kapsam dışıdır veya sınırlı teminatlıdır.',
     explanationEn: 'Nuclear, biological, or chemical risks are excluded or have limited coverage.',
     examples: ['Radyoaktif kirlilik', 'Kimyasal sızıntı'],
     severity: 'informational',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'savaş': {
-    explanation: 'Savaş, iç savaş, isyan veya halk hareketleri sırasında oluşan hasarlar karşılanmaz.',
+  savaş: {
+    explanation:
+      'Savaş, iç savaş, isyan veya halk hareketleri sırasında oluşan hasarlar karşılanmaz.',
     explanationEn: 'Damages during war, civil war, riots, or civil unrest are not covered.',
     examples: ['Savaş hasarı', 'İsyan sırasında zarar'],
     severity: 'informational',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'terör': {
-    explanation: 'Terör eylemleri sonucu oluşan hasarlar genellikle ayrı değerlendirilir. DASK benzeri özel fonlar devreye girebilir.',
+  terör: {
+    explanation:
+      'Terör eylemleri sonucu oluşan hasarlar genellikle ayrı değerlendirilir. DASK benzeri özel fonlar devreye girebilir.',
     explanationEn: 'Damages from terrorist acts may be covered separately through special funds.',
     examples: ['Bombalı saldırı hasarı', 'Terör olayı sonucu zarar'],
     severity: 'important',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'yaptırım': {
-    explanation: 'Uluslararası yaptırımlar kapsamındaki kişi veya kuruluşlarla yapılan işlemlerle ilgili talepler karşılanmaz. Sigorta şirketleri yasal olarak bu ödemeleri yapamaz.',
-    explanationEn: 'Claims related to sanctioned persons or entities cannot be paid due to international sanctions compliance.',
+  yaptırım: {
+    explanation:
+      'Uluslararası yaptırımlar kapsamındaki kişi veya kuruluşlarla yapılan işlemlerle ilgili talepler karşılanmaz. Sigorta şirketleri yasal olarak bu ödemeleri yapamaz.',
+    explanationEn:
+      'Claims related to sanctioned persons or entities cannot be paid due to international sanctions compliance.',
     examples: ['Yaptırım listesindeki şirketle iş yapma', 'Ambargo uygulanan ülkelerle işlem'],
     severity: 'informational',
     affectsPrivate: false,
     affectsCommercial: true,
   },
-  'lpg': {
-    explanation: 'Ruhsata işlenmemiş veya yetkisiz LPG dönüşümü olan araçlarda yangın hasarları karşılanmayabilir.',
-    explanationEn: 'Fire damages may not be covered for vehicles with unauthorized LPG conversions.',
+  lpg: {
+    explanation:
+      'Ruhsata işlenmemiş veya yetkisiz LPG dönüşümü olan araçlarda yangın hasarları karşılanmayabilir.',
+    explanationEn:
+      'Fire damages may not be covered for vehicles with unauthorized LPG conversions.',
     examples: ['Kaçak LPG tüpü', 'Ruhsatsız dönüşüm'],
     severity: 'important',
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'kiralık': {
-    explanation: 'Aracın taksi, dolmuş veya kiralık araç olarak kullanılması durumunda özel şartlar geçerlidir. Hususi kullanım poliçeleri bu durumları kapsamaz.',
+  kiralık: {
+    explanation:
+      'Aracın taksi, dolmuş veya kiralık araç olarak kullanılması durumunda özel şartlar geçerlidir. Hususi kullanım poliçeleri bu durumları kapsamaz.',
     explanationEn: 'Special conditions apply if vehicle is used as taxi, minibus, or rental car.',
     examples: ['Uber/Bolt gibi servislerde kullanım', 'Araç kiralama işi'],
     severity: 'important',
     affectsPrivate: true,
     affectsCommercial: false,
   },
-  'aşınma': {
+  aşınma: {
     explanation: 'Normal kullanım sonucu oluşan yıpranma, aşınma ve eskime hasarları karşılanmaz.',
     explanationEn: 'Wear and tear from normal use is not covered.',
     examples: ['Lastik aşınması', 'Fren balatası eskimesi', 'Motor yıpranması'],
@@ -1303,8 +1355,9 @@ export const KASKO_EXCLUSION_EXPLANATIONS: Record<string, {
     affectsPrivate: true,
     affectsCommercial: true,
   },
-  'bakım': {
-    explanation: 'Yetersiz bakım veya periyodik bakım yapılmaması nedeniyle oluşan hasarlar karşılanmayabilir.',
+  bakım: {
+    explanation:
+      'Yetersiz bakım veya periyodik bakım yapılmaması nedeniyle oluşan hasarlar karşılanmayabilir.',
     explanationEn: 'Damages due to lack of maintenance may not be covered.',
     examples: ['Yağ değişimi yapılmadan motor arızası', 'Bakımsızlık nedeniyle hasar'],
     severity: 'standard',
@@ -1367,12 +1420,13 @@ export const COMMON_EXCLUSIONS_TO_CHECK = [
  */
 export interface AnalyzedExclusion {
   original: string
+  originalEn?: string
   type: 'exclusion' | 'coverage_with_limit' | 'condition'
   severity: 'critical' | 'important' | 'standard' | 'informational'
   explanation?: string
   explanationEn?: string
   examples?: string[]
-  extractedLimit?: number  // If it's actually a coverage with limit
+  extractedLimit?: number // If it's actually a coverage with limit
   needsClarification?: boolean
   clarificationQuestion?: string
 }
@@ -1382,7 +1436,7 @@ export interface AnalyzedExclusion {
  */
 export interface ExclusionAnalysisResult {
   exclusions: AnalyzedExclusion[]
-  coveragesInExclusions: AnalyzedExclusion[]  // Items that are actually coverages
+  coveragesInExclusions: AnalyzedExclusion[] // Items that are actually coverages
   clarificationNeeded: Array<{
     item: string
     question: string
@@ -1392,6 +1446,7 @@ export interface ExclusionAnalysisResult {
     name: string
     nameEn: string
     question: string
+    questionEn?: string
     importance: string
   }>
 }
@@ -1404,6 +1459,7 @@ export interface ExclusionAnalysisResult {
  */
 export function analyzeExclusionsComprehensive(
   exclusions: string[],
+  exclusionsEn: string[] = [],
   isCommercial: boolean = false
 ): ExclusionAnalysisResult {
   const result: ExclusionAnalysisResult = {
@@ -1413,10 +1469,13 @@ export function analyzeExclusionsComprehensive(
     missingImportantExclusions: [],
   }
 
-  // Pattern to detect if an "exclusion" is actually a coverage with limit
-  const limitPattern = /\(?\s*(\d+(?:[.,]\d+)*)\s*(?:TL|₺|lira)?\s*(?:limit|teminat)?\s*\)?/i
+  // Must have a limit word OR a currency symbol so we don't grab "35" from "35%"
+  const limitPattern =
+    /\(?\s*(\d+(?:[.,]\d+)*)\s*(?:TL|₺|lira|TRY|USD|EUR)\s*(?:limit|teminat|kadar|bedel)?\s*\)?/i
 
-  for (const exclusion of exclusions) {
+  for (let i = 0; i < exclusions.length; i++) {
+    const exclusion = exclusions[i]
+    const exclusionEn = exclusionsEn[i]
     const exclusionLower = exclusion.toLowerCase()
 
     // Check if this is actually a coverage with a limit
@@ -1428,6 +1487,7 @@ export function analyzeExclusionsComprehensive(
 
       result.coveragesInExclusions.push({
         original: exclusion,
+        originalEn: exclusionEn,
         type: 'coverage_with_limit',
         severity: 'informational',
         explanation: `Bu bir teminat limiti, istisna değil. ${exclusion.replace(limitMatch[0], '').trim()} için ${formatTurkishCurrency(limit)} limite kadar teminat verilmektedir.`,
@@ -1440,6 +1500,7 @@ export function analyzeExclusionsComprehensive(
     // Find explanation for this exclusion
     let analyzed: AnalyzedExclusion = {
       original: exclusion,
+      originalEn: exclusionEn,
       type: 'exclusion',
       severity: 'standard',
     }
@@ -1498,17 +1559,18 @@ export function analyzeExclusionsComprehensive(
   }
 
   // Check for important exclusions that SHOULD be mentioned but aren't
-  const mentionedTopics = exclusions.map(e => e.toLowerCase()).join(' ')
+  const mentionedTopics = exclusions.map((e) => e.toLowerCase()).join(' ')
 
   for (const check of COMMON_EXCLUSIONS_TO_CHECK) {
     const keywords = check.name.toLowerCase().split(/[\s/]+/)
-    const isMentioned = keywords.some(kw => mentionedTopics.includes(kw))
+    const isMentioned = keywords.some((kw) => mentionedTopics.includes(kw))
 
     if (!isMentioned) {
       result.missingImportantExclusions.push({
         name: check.name,
         nameEn: check.nameEn,
         question: check.question,
+        questionEn: check.questionEn,
         importance: check.importance,
       })
     }

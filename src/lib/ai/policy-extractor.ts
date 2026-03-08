@@ -1235,6 +1235,9 @@ export async function extractPolicyFromDocument(
           : 0,
         final_policy_id: policy.id,
       },
+      metadata: {
+        phaseTiming: clientPhaseTiming,
+      },
       // Full policy JSON for admin debugging
       full_extracted_json: JSON.stringify(policy, null, 2),
     })
@@ -1394,6 +1397,7 @@ export async function extractPolicyFromDocument(
           had_extracted_data: extractedData !== undefined,
           extracted_policy_number: extractedData?.policyNumber,
           extracted_provider: extractedData?.provider,
+          phaseTiming: clientPhaseTiming,
         },
       })
     }
@@ -1582,6 +1586,7 @@ async function convertToAnalyzedPolicy(
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     coverages,
     exclusions: data.exclusions,
+    exclusionsEn: data.exclusionsEn || null,
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
     // Currency might be in data.currency, data.premium.currency, or snake_case
@@ -1601,34 +1606,77 @@ async function convertToAnalyzedPolicy(
     evidenceData: (() => {
       const insights: Record<string, string> = {}
       const exclusions: Record<string, string> = {}
+      const quoteTranslations = {
+        insights: {} as Record<string, string>,
+        exclusions: {} as Record<string, string>,
+      }
+
       if (data.evidence?.insights) {
         data.evidence.insights.forEach((i) => {
-          insights[i.text.trim().toLowerCase()] = i.quote
+          const key = i.text.trim().toLowerCase()
+          insights[key] = i.quote
+          if ('quoteTr' in i && typeof i.quoteTr === 'string') {
+            quoteTranslations.insights[key] = i.quoteTr
+          }
         })
       }
       if (data.evidence?.exclusions) {
         data.evidence.exclusions.forEach((e) => {
-          exclusions[e.text.trim().toLowerCase()] = e.quote
+          const key = e.text.trim().toLowerCase()
+          exclusions[key] = e.quote
+          if ('quoteTr' in e && typeof e.quoteTr === 'string') {
+            quoteTranslations.exclusions[key] = e.quoteTr
+          }
         })
       }
-      return { insights, exclusions }
+      return { insights, exclusions, quoteTranslations }
     })(),
   }
 
   // Prepend AI generated evidence-based insights
+  const aiInsightsEn = [...(basePolicy.aiInsightsEn || [])]
   if (data.evidence?.insights) {
     basePolicy.aiInsights = [
       ...data.evidence.insights.map((i) => i.text.trim()),
       ...basePolicy.aiInsights,
     ]
+    const prependEn = data.evidence.insights.map((i) => i.textEn?.trim() || i.text.trim())
+    basePolicy.aiInsightsEn = [...prependEn, ...aiInsightsEn]
+  }
+
+  // Generate base strings (Strengths, Gaps, Recs)
+  const generatedInsights = await generateAIInsightsAsync(data)
+  basePolicy.aiInsights.push(...generatedInsights)
+
+  // Pad the English array with the same generated insights
+  // (The UI will translate "Missing common coverage: X" automatically)
+  if (basePolicy.aiInsightsEn) {
+    basePolicy.aiInsightsEn.push(...generatedInsights)
   }
 
   // Merge AI generated evidence-based exclusions if they aren't already grouped
   if (data.evidence?.exclusions) {
     const existingExclusions = new Set(basePolicy.exclusions.map((e) => e.toLowerCase().trim()))
+    const existingExclusionsEn = new Set(
+      (basePolicy.exclusionsEn || []).map((e) => e.toLowerCase().trim())
+    )
+
+    basePolicy.exclusionsEn = basePolicy.exclusionsEn || []
+
     for (const e of data.evidence.exclusions) {
       if (!existingExclusions.has(e.text.toLowerCase().trim())) {
         basePolicy.exclusions.push(e.text)
+      }
+      if (e.textEn && !existingExclusionsEn.has(e.textEn.toLowerCase().trim())) {
+        // Find if this specific exclusion text was already in the Turkish list, if so, put its translation in the same index
+        const trIndex = basePolicy.exclusions.findIndex(
+          (trEx) => trEx.toLowerCase().trim() === e.text.toLowerCase().trim()
+        )
+        if (trIndex !== -1) {
+          basePolicy.exclusionsEn[trIndex] = e.textEn
+        } else {
+          basePolicy.exclusionsEn.push(e.textEn)
+        }
       }
     }
   }
@@ -1971,7 +2019,8 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
         )
         if (hasPerAccident) continue
       }
-      gaps.push(`Missing common coverage: ${critical.nameTr}`)
+      // Use English name by default, we will translate in the UI
+      gaps.push(`Missing common coverage: ${critical.name}`)
     }
   }
 

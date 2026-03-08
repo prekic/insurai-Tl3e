@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { adminFetch } from '@/lib/admin/api'
+import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface HistoricalResult {
   id: string
@@ -31,6 +32,7 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
   const [data, setData] = useState<HistoricalResult[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { t } = useTranslation()
 
   useEffect(() => {
     async function fetchHistory() {
@@ -70,8 +72,8 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Evaluation History</CardTitle>
-          <CardDescription>Loading historical scores...</CardDescription>
+          <CardTitle>{t.policy.evaluationHistory}</CardTitle>
+          <CardDescription>{t.policy.evaluationHistoryLoading}</CardDescription>
         </CardHeader>
         <CardContent>
           <Skeleton className="h-[300px] w-full" />
@@ -84,9 +86,9 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Evaluation History</CardTitle>
+          <CardTitle>{t.policy.evaluationHistory}</CardTitle>
           <CardDescription className="text-red-500">
-            Failed to load history: {error}
+            {t.policy.evaluationHistoryError.replace('{error}', error)}
           </CardDescription>
         </CardHeader>
       </Card>
@@ -97,8 +99,8 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Evaluation History</CardTitle>
-          <CardDescription>No evaluation history found for this policy.</CardDescription>
+          <CardTitle>{t.policy.evaluationHistory}</CardTitle>
+          <CardDescription>{t.policy.evaluationHistoryEmpty}</CardDescription>
         </CardHeader>
       </Card>
     )
@@ -127,10 +129,8 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Evaluation History</CardTitle>
-        <CardDescription>
-          Historical trend of actuarial scores over multiple evaluations
-        </CardDescription>
+        <CardTitle>{t.policy.evaluationHistory}</CardTitle>
+        <CardDescription>{t.policy.evaluationHistoryDesc}</CardDescription>
       </CardHeader>
       <CardContent>
         <div className="h-[300px] w-full">

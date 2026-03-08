@@ -363,6 +363,7 @@ You MUST respond with ONLY valid JSON matching this exact schema. Do not include
   ],
   "specialConditions": string[],
   "exclusions": string[],
+  "exclusionsEn": string[] | null,
   "confidence": {
     "overall": number,
     "policyNumber": number,
@@ -378,6 +379,24 @@ You MUST respond with ONLY valid JSON matching this exact schema. Do not include
     "basePolicyNumber": string | null,
     "amendmentReason": string | null,
     "premiumDifference": number | null
+  },
+  "evidence": {
+    "insights": [
+      {
+        "text": "The insight text (e.g., '✓ Mükemmel sağlık teminatı' or '💡 Yurt dışı teminatı eklemeyi düşünün')",
+        "textEn": "The English translation of the insight text (e.g., '✓ Excellent health coverage' or '💡 Consider adding international coverage')",
+        "quote": "The exact verbatim quote from the raw document that proves this insight. DO NOT paraphrase. Extract directly from the text.",
+        "quoteTr": "If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null."
+      }
+    ],
+    "exclusions": [
+      {
+        "text": "The specific exclusion (e.g., 'Deprem teminatı hariçtir')",
+        "textEn": "The English translation of the exclusion text (e.g., 'Earthquake coverage is excluded')",
+        "quote": "The exact verbatim quote from the raw document stating this exclusion. DO NOT paraphrase.",
+        "quoteTr": "If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null."
+      }
+    ]
   }
 }
 
@@ -1216,10 +1235,10 @@ router.post(
     const startTime = Date.now()
     // Total request budget: hard cap to prevent client-side timeout race.
     // Client timeout is 150s; we must respond well before that.
-    const REQUEST_BUDGET_MS = 105_000
+    const REQUEST_BUDGET_MS = 125_000
     // Per-provider timeout: must leave room for fallback within budget
-    const PRIMARY_PROVIDER_TIMEOUT_MS = 50_000
-    const FALLBACK_PROVIDER_TIMEOUT_MS = 45_000
+    const PRIMARY_PROVIDER_TIMEOUT_MS = 65_000
+    const FALLBACK_PROVIDER_TIMEOUT_MS = 55_000
 
     // Phase-level timing diagnostics — surfaces WHERE time is spent
     const phaseTiming: Record<string, number> = {}

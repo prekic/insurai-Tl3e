@@ -12,6 +12,7 @@
 2. **Landing Component i18n**: Always mock `@/lib/i18n/i18n-context` in component tests for landing elements to avoid empty string flashes.
 3. **Translation Skeleton**: Never bloat `translations-skeleton.ts`; it must purely contain empty strings.
 4. **Proxy Function Signature**: The `extractViaProxy` function requires `notifyUserId` as the 4th parameter; tests must account for this.
+5. **DO NOT RUN FULL TEST SUITE**: Running `npm run test` or `vitest run` takes > 10 minutes. **NEVER** run the full test suite without explicitly warning the user and getting their confirmation. Always run isolated tests (e.g. `npx vitest run path/to/file.test.ts`).
 
 ## Required Workflows
 - **Session Wrap-Up**: Always update `CLAUDE.md` and `SESSION_HANDOFF.md` at the end of a session.

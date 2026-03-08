@@ -97,6 +97,7 @@ export interface Policy {
   uploadDate: string
   createdAt?: string // ISO timestamp for tracking when policy was added to system
   fileName: string
+  aiInsightsEn?: string[]
   documentType: string
   documentUrl?: string
   insuredPerson?: string
@@ -107,6 +108,7 @@ export interface Policy {
   agentName?: string
   coverages: Coverage[]
   exclusions: string[]
+  exclusionsEn?: string[] | null
   specialConditions: string[]
   insuranceLine: string
   /** Currency code for this policy (TRY, USD, EUR, GBP) - defaults to TRY */
@@ -160,6 +162,11 @@ export interface AnalyzedPolicy extends Policy {
   evidenceData?: {
     insights: Record<string, string> // Map of insight text -> verbatim quote
     exclusions: Record<string, string> // Map of exclusion text -> verbatim quote
+    // Map of original text -> translated verbatim quote
+    quoteTranslations?: {
+      insights: Record<string, string>
+      exclusions: Record<string, string>
+    }
   }
   // Comprehensive gap analysis
   gapAnalysis?: {

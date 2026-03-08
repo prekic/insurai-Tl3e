@@ -463,6 +463,11 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     coreKaskoCoveragesNote:
       'Please check your policy for deductibles, depreciation, and special conditions.',
     coverageDeductible: 'Deductible: {amount}',
+    evaluationHistory: 'Evaluation History',
+    evaluationHistoryLoading: 'Loading historical scores...',
+    evaluationHistoryError: 'Failed to load history: {error}',
+    evaluationHistoryEmpty: 'No evaluation history found for this policy.',
+    evaluationHistoryDesc: 'Historical trend of actuarial scores over multiple evaluations',
   },
 
   exportMenu: {
