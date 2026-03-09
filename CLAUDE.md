@@ -16,7 +16,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**, **extraction timeout resilience (abort-on-unmount, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading)**.
 - **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100, finalized production FX API)
-- **Last Updated**: March 8, 2026 (Fixed Free Trial instant mockup bug by intercepting cached `localStorage` uploads in incognito mode)
+- **Last Updated**: March 9, 2026 (Exclusion i18n fallback, Ask Your Insurer card redesign, mobile tab suspension extraction resilience)
 
 ---
 
@@ -336,6 +336,7 @@ insurai/
 | `src/lib/i18n/translation-service.ts` | Client-side translation loading (API fetch + localStorage cache) |
 | `src/lib/i18n/i18n-context.tsx` | **UPDATED** React context with DB-backed translation loading pipeline |
 | `src/lib/i18n/coverage-names.ts` | **NEW** Canonical EN→TR coverage name map (90+ entries) |
+| `src/lib/i18n/exclusion-translations.ts` | **NEW** Turkish→English exclusion pattern fallback (60+ patterns) |
 | `src/lib/i18n/translations.ts` | `TranslationDictionary` interface + `COMMON_LOCALES` + back-compat re-exports |
 | `src/lib/i18n/translations-en.ts` | **NEW** EN_TRANSLATIONS (eager, initial React state) |
 | `src/lib/i18n/translations-tr.ts` | **NEW** TR_TRANSLATIONS (lazy async Vite chunk, 39 KB / 14 KB gzip) |
@@ -4497,6 +4498,34 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File Changed**: `src/lib/ai/extraction-schema.ts`
 - **Commit**: `0a430e8`
 
+### 167. Exclusions Not Displaying in English When Locale is EN (Fixed Mar 9, 2026)
+- **Problem**: PolicyDetailView showed Turkish exclusion text even when app locale was set to English
+- **Root Cause**: Three-layer gap: (1) AI prompts didn't strongly require `exclusionsEn` population, (2) no fallback translation when AI failed to provide English exclusions, (3) `convertToAnalyzedPolicy()` passed `exclusionsEn: null` when AI didn't comply
+- **Solution**:
+  - Created `src/lib/i18n/exclusion-translations.ts` — 60+ Turkish→English exclusion pattern translations
+  - `ensureExclusionsEn()` fills gaps: AI-provided → pattern-match → Turkish fallback
+  - Wired into all 3 extraction paths in `policy-extractor.ts`
+  - Strengthened AI prompts in `server/routes/ai.ts` (Anthropic) and `extraction-schema.ts` (OpenAI)
+- **Key Pattern**:
+  ```typescript
+  import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
+  // Fills missing English translations for Turkish exclusions
+  exclusionsEn = ensureExclusionsEn(exclusions, exclusionsEn)
+  ```
+- **Tests**: 21 tests in `exclusion-translations.test.ts`
+- **Commit**: `4a3e26f`
+
+### 168. Mobile Tab Suspension Killing Extraction Fetch (Fixed Mar 9, 2026)
+- **Problem**: On mobile, backgrounding the tab during extraction killed the HTTP fetch but froze JS timers. On return, `CLIENT_TIMEOUT_UMBRELLA` error shown with ugly diagnostic codes like `[code=CLIENT_TIMEOUT_UMBRELLA]`
+- **Root Cause**: Mobile browsers suspend background tabs, killing network connections. Fetch promise never resolves/rejects because `AbortSignal.timeout` was also frozen. When tab resumes, the umbrella timeout fires.
+- **Solution (3 fixes)**:
+  1. **Visibility change auto-retry**: `visibilitychange` listener detects tab resume during in-flight extraction. Checks for saved result first (extraction may have completed), then auto-retries (up to 2 times) with 1.5s delay for network reconnect.
+  2. **Clean error messages**: Diagnostic codes moved to `console.warn`; users see clean "timed out, please try again"
+  3. **Timeout alignment**: Client fetch timeout 120s → 135s (was less than server's 125s budget)
+- **Key Refs Added**: `extractionInFlightRef`, `lastFileRef`, `retryCountRef` in `TryAnalysis.tsx`
+- **Files Changed**: `src/components/TryAnalysis.tsx`, `src/lib/ai/config.ts`
+- **Commit**: `303da34`
+
 ---
 
 ## Turkish Market Considerations
@@ -5454,15 +5483,38 @@ connectSrc: [
 - Extraction runs to completion; result is persisted via `saveTrialResult()` so it's available when the user returns
 - `isMounted` ref guards all `setState`/`toast` calls — prevents React warnings on unmounted components
 - Do NOT re-add `AbortController.abort()` on component unmount — it wastes the server-side extraction work and causes confusing "Load failed" errors
-- The only remaining abort path is `AbortSignal.timeout(120000)` on the fetch call itself, which fires only when the server is genuinely unresponsive
+- The only remaining abort path is `AbortSignal.timeout(135000)` on the fetch call itself, which fires only when the server is genuinely unresponsive
+- On mobile, `visibilitychange` listener auto-retries extraction when user returns to backgrounded tab (up to 2 times)
 
-**Server Extraction Budget System (Added Mar 7, 2026):**
-- `server/routes/ai.ts` implements a time-budget system: `REQUEST_BUDGET_MS = 105000` total
+**Server Extraction Budget System (Updated Mar 9, 2026):**
+- `server/routes/ai.ts` implements a time-budget system: `REQUEST_BUDGET_MS = 125000` total
 - Primary provider timeout: 50s (`PRIMARY_TIMEOUT_MS`), fallback: 45s (`FALLBACK_TIMEOUT_MS`)
 - Each provider attempt is tracked in `fallbackChain[]` with `{ provider, success, duration_ms, error, error_code }`
 - When budget is exhausted, the server returns `code: 'BUDGET_EXHAUSTED'` with full `phaseTiming` and `fallbackChain`
 - `phaseTiming` keys: `configLoad_ms`, `anthropic_ms` or `openai_ms`, `total_ms`
-- To adjust timeouts, modify the constants at the top of `server/routes/ai.ts` — do NOT change `FETCH_TIMEOUT_MS` (120s) in `config.ts` below `REQUEST_BUDGET_MS` (105s) or the client will abort before the server can return diagnostics
+- **Timeout chain**: Server budget 125s < client fetch 135s < client umbrella 150s. Each layer MUST exceed the previous so proper error messages propagate.
+- To adjust timeouts, modify the constants at the top of `server/routes/ai.ts` — do NOT change `FETCH_TIMEOUT_MS` (135s) in `config.ts` below `REQUEST_BUDGET_MS` (125s) or the client will abort before the server can return diagnostics
+
+**Exclusion Translation Fallback (Added Mar 9, 2026):**
+- `src/lib/i18n/exclusion-translations.ts` provides Turkish→English exclusion translation as extraction-time fallback
+- `ensureExclusionsEn(exclusions, exclusionsEn)` fills gaps: AI-provided → pattern-match → Turkish fallback
+- Wired into all 3 extraction paths in `policy-extractor.ts` — `convertToAnalyzedPolicy`, evidence merge, `comprehensiveToAnalyzedPolicy`
+- Pattern-based (substring matching): `"deprem"` matches any exclusion containing that word → `"Earthquake damage is excluded"`
+- When adding new AI-generated exclusion patterns, also add their English translation to `EXCLUSION_TR_TO_EN` in `exclusion-translations.ts`
+- `missingImportantExclusions` type does NOT have `questionEn` — only `{ name, nameEn, question, importance }`. Use `item.question` for both locales.
+
+**Mobile Tab Suspension Auto-Retry (Added Mar 9, 2026):**
+- `TryAnalysis.tsx` uses `visibilitychange` event to detect mobile tab resume during extraction
+- On resume: checks `getTrialResult()` first (extraction may have completed in background), then auto-retries with `lastFileRef.current`
+- `retryCountRef` caps retries at 2 to prevent infinite loops
+- `extractionInFlightRef` tracks whether extraction is active — only retries when true
+- 1.5s delay before retry to let mobile browser reconnect network
+- Diagnostic codes (`[code=...]`, `[req=...]`) are logged to `console.warn` only — user sees clean message
+
+**User-Facing Error Messages — No Diagnostic Codes (Changed Mar 9, 2026):**
+- Timeout errors show: "Analysis timed out. The AI service may be busy. Please try again."
+- Diagnostic codes (error code, request ID, phase timing) are in browser console only
+- If you need to debug extraction failures in production, ask user to check browser console (F12 → Console) for `[TryAnalysis] Diagnostics:` entries
 
 ---
 

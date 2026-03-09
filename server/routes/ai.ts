@@ -406,6 +406,8 @@ You MUST respond with ONLY valid JSON matching this exact schema. Do not include
 - Set isUnlimited: true for "Sınırsız" coverages
 - Set isMarketValue: true for "Rayiç Değer" coverages
 - Extract all coverages found in the document
+- CRITICAL: "exclusionsEn" MUST be populated for Turkish policies. Each entry must be the English translation of the corresponding "exclusions" entry at the same array index. Example: exclusions: ["Deprem hasarları hariçtir"], exclusionsEn: ["Earthquake damage is excluded"]
+- CRITICAL: "evidence.exclusions" MUST include "textEn" for every entry — the English translation of the Turkish exclusion text
 
 ${buildConfidencePromptSection(weights)}
 

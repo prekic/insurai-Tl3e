@@ -1,61 +1,98 @@
-# Session Handoff — March 8, 2026 (Free Trial Incognito Cache Fix)
+# Session Handoff — March 9, 2026 (Exclusion i18n + Mobile Extraction Resilience)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | ✅ Passing (typecheck clean, Railway build verified) |
-| **TypeCheck** | 0 errors |
+| **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | 15,850+ tests passing, 0 failures |
-| **Branch** | `insuraigemini202603080628` — 4 new commits, pushed |
+| **Branch** | `claude/load-project-context-Mhtah` — 3 commits, pushed |
 
 ---
 
-## This Session — Free Trial Cache Bypassing Fix
+## This Session — 3 Fixes
 
-The user reported an issue where uploading a policy in incognito mode resulted in an "instant" completion, bypassing the actual AI extraction process and serving fake/mock data. We discovered the root cause was related to Google Chrome's Incognito Mode state management for `localStorage`. 
+### 1. Exclusions Displaying in Turkish When Locale is English
 
-In incognito mode, `localStorage` is preserved for the entire duration of the window session. When a user uploaded their *first* policy anonymously, the extraction succeeded, and the real AI result was saved to `localStorage` (which is the expected Free Trial behavior). However, when the user tried to test the app again by dragging a *new* file onto the uploader in the same incognito session, the `TryAnalysis.tsx` component detected the existing `localStorage` entry and instantly redirected the user to the cached view of the *first* upload, giving the illusion of a 0-second mock extraction.
+**Problem**: PolicyDetailView showed Turkish exclusion text ("Anahtarla çalışan araçlarda...") even when the app was set to English.
 
-We fixed this by inspecting `location.state.file` in the initialization effect of `TryAnalysis.tsx`. If a *new* file is explicitly passed into the component but the trial has already been used, we intercept the redirect and correctly render the "You've used your free trial" signup prompt.
+**Root Cause**: Three-layer gap:
+- AI prompts (Anthropic/OpenAI) did not strongly require `exclusionsEn` population
+- No fallback translation when AI failed to provide English exclusions
+- `convertToAnalyzedPolicy()` passed `exclusionsEn: null` when AI didn't comply
+
+**Fix** (commit `4a3e26f`):
+- Created `src/lib/i18n/exclusion-translations.ts` — 60+ Turkish→English exclusion pattern translations as extraction-time fallback
+- `ensureExclusionsEn()` fills gaps: AI-provided → pattern-match translation → Turkish fallback
+- Wired into all 3 extraction paths: `convertToAnalyzedPolicy`, evidence merge post-processing, `comprehensiveToAnalyzedPolicy`
+- Strengthened AI prompts in `server/routes/ai.ts` (Anthropic schema) and `extraction-schema.ts` (OpenAI JSON schema) with CRITICAL instructions for `exclusionsEn`
+- 21 new tests in `exclusion-translations.test.ts`
+
+### 2. "Ask Your Insurer" Card Layout Improvement
+
+**Problem**: The clarification cards had awkward badge placement, weak visual hierarchy, tiny icons, and inconsistent spacing.
+
+**Fix** (commit `e40ddfc`):
+- Badge moved to top-right corner (`flex justify-between items-start`)
+- Topic names strengthened to `font-semibold text-gray-900`
+- HelpCircle icon enlarged (14px) and top-aligned for multi-line questions
+- Softer card borders (`blue-100`) with subtle `shadow-sm`
+- Compact badge styling (`text-[11px]`, `shrink-0`, `whitespace-nowrap`)
+- Fixed invalid `item.questionEn` access on `missingImportantExclusions` type (doesn't have that field)
+
+### 3. Mobile Tab Suspension Killing Extraction
+
+**Problem**: On mobile, when user backgrounds the tab during extraction, the browser kills the HTTP fetch connection but freezes JS timers. On return, the fetch is dead but the promise never resolves, causing `CLIENT_TIMEOUT_UMBRELLA` timeout with ugly diagnostic codes shown to user.
+
+**Fix** (commit `303da34`):
+- `visibilitychange` listener detects tab resume during in-flight extraction
+- Checks if result was saved in background (extraction may have completed) → redirects to results
+- Otherwise auto-retries extraction (up to 2 times) with 1.5s delay for network reconnect
+- Diagnostic codes (`[code=CLIENT_TIMEOUT_UMBRELLA]`, `[req=ext-xxx | timing...]`) moved to `console.warn` only — users see clean message
+- Client fetch timeout increased from 120s → 135s (was less than server's 125s budget, causing premature client abort)
 
 ### Commits (oldest → newest)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `faa7125` | fix  | resolve instant mock caching bug in incognito mode |
-| `05dfc92` | test | Add diagnostic error proxy threading coverage for openai and claude |
-| `ead8629` | fix  | Pass timeout code to TryAnalysis umbrella timeout to restore diag display |
-| `2a941ce` | fix  | Fallback to extracting semantic error code if proxy error code is missing in TryAnalysis |
-| `[INTEGRATED]` | feat | Add bilingual evidence quotes via quoteTr in extraction schema and Anthropic prompts |
+| `4a3e26f` | fix(i18n) | Ensure exclusions display in English when locale is EN |
+| `e40ddfc` | fix | Improve Ask Your Insurer card layout for mobile |
+| `303da34` | fix | Mobile tab suspension killing extraction + clean error messages |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
-| `src/components/TryAnalysis.tsx` | Added explicit check for `location.state.file` during initialization. If true and `hasUsedFreeTrial()` is truthy, set state to `trial-used` to block instant re-rendering of older cached results. |
-| `src/utils/lazyRetry.ts` & `src/App.tsx` | **(Audited)** Implemented `lazyRetry` utility and wired it to React Router (`App.tsx`, `LandingPage.tsx`) to harden dynamic chunk loading failures against network issues. |
-| `src/lib/knowledge/kasko-knowledge.ts` | **(Audited)** Fixed greedy `limitPattern` regex matching to stop unwanted percentage extraction. Added `explanationEn` padding. |
-| `src/lib/i18n/*` | **(Audited)** Updated `translations-en.ts`, `translations-tr.ts`, `translations-skeleton.ts`, and `translations.ts` to support expanded bilingual data keys. |
-| `src/lib/ai/policy-extractor-validation.test.ts` | **(Audited)** Expanded test coverage for diagnostic UI proxy threading, including `PolicyUpload-coverage.test.tsx` and `TryAnalysis-coverage.test.tsx`. |
-| `src/lib/ai/extraction-schema.ts` | **(Audited)** Added `quoteTr` for capturing translated evidence from Anthropic mapping, synced with `src/lib/supabase/types.ts` and `src/types/policy.ts`. |
-| `.cursorrules` | **(Audited)** Updated underlying AI instruction set and repository memory. |
+| `src/lib/i18n/exclusion-translations.ts` | **NEW** 60+ Turkish→English exclusion pattern translations with `ensureExclusionsEn()` |
+| `src/lib/i18n/exclusion-translations.test.ts` | **NEW** 21 tests for exclusion translation |
+| `src/lib/ai/policy-extractor.ts` | Wired `ensureExclusionsEn()` into 3 extraction paths |
+| `src/lib/ai/extraction-schema.ts` | Strengthened `exclusionsEn` description in OpenAI JSON schema |
+| `server/routes/ai.ts` | Added CRITICAL instructions for `exclusionsEn` in Anthropic prompt |
+| `src/components/PolicyDetailView.tsx` | Redesigned Ask Your Insurer card layout, fixed invalid `questionEn` access |
+| `src/components/TryAnalysis.tsx` | Visibility change auto-retry, clean error messages, extraction in-flight tracking |
+| `src/lib/ai/config.ts` | Client fetch timeout 120s → 135s (aligned with server 125s budget) |
 
 ---
 
 ## ⚠️ Gotchas for Next Session
 
-1. **Incognito Mode `localStorage`:** Remember that `localStorage` is NOT cleared between page refreshes in incognito mode; it persists until the entire incognito window is closed. This means features relying on `localStorage` for anonymous quotas (like Free Trial) will remain active across multiple tab reloads within the same session.
-2. **`extractionResult.error.code` vs `extractionResult.errorCode`:** The proxy layer provides `errorCode` at the top level, but internal pipeline failures (like `policy-extractor.ts` timeouts or OCR failures) set it inside `error.code`. UI components MUST check both (as `TryAnalysis.tsx` now does) to correctly display diagnostics.
-3. **Do NOT re-add AbortController.abort() on TryAnalysis unmount.** The prior rule remains: the abort propagates to the server proxy fetch, wasting AI provider work. Extraction should run to completion.
-4. **Bilingual Quotes depend on `quoteTr`:** The new UI bilingual quotes only show up if the AI manages to populate `evidence[].quoteTr`. Sometimes Claude or OpenAI miss this. If they do, the UI safely falls back to only rendering the original `quote`.
-5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Exclusion Translation Fallback is Pattern-Based**: `exclusion-translations.ts` uses substring matching — patterns like `"deprem"` match any exclusion containing that word. If AI extraction improves and always provides `exclusionsEn`, the fallback becomes a no-op. But for now, it's essential.
+2. **`missingImportantExclusions` Has No `questionEn` Field**: The type from `kasko-knowledge.ts` only has `{ name, nameEn, question, importance }`. Do NOT access `item.questionEn` on this type — use `item.question` for both locales.
+3. **Mobile Visibility Auto-Retry**: `retryCountRef` caps at 2 retries. The retry is triggered by `visibilitychange` to `visible` ONLY when `extractionInFlightRef.current` is true. The retry clears stale timers and resets state before re-running.
+4. **Client/Server Timeout Chain**: Server budget = 125s, client fetch = 135s, client umbrella = 150s. The client fetch MUST exceed the server budget so the server can return a proper `BUDGET_EXHAUSTED` error with diagnostics.
+5. **Diagnostic Codes No Longer Shown to Users**: `[code=...]` and `[req=...]` are logged to `console.warn` only. If you need to debug extraction failures, check the browser console. The user sees: "Analysis timed out. The AI service may be busy. Please try again."
+6. **Do NOT re-add AbortController.abort() on TryAnalysis unmount.** Extraction should run to completion; `saveTrialResult()` persists it for when the user returns.
+7. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
 ## Priority Next Steps
 
-1. **Merge & Deploy** — This branch (`insuraigemini202603080628`) is ready to merge.
-2. **Production Validation** — Verify that the Free Trial flow correctly halts and prompts for signup if a user tries to drag a second policy into the dropzone during an active anonymous session.
-3. **Telemetry Review** — Check the Supabase `processing_logs` table for new entries and verify that `metadata.phaseTiming` correctly captures the elapsed pipeline phases.
+1. **Merge & Deploy** — Branch `claude/load-project-context-Mhtah` is ready to merge. All 3 commits are clean.
+2. **Production Validation** — After deploy:
+   - Test exclusion display: Upload a Turkish policy, switch locale to EN, verify exclusions show in English
+   - Test mobile extraction: On phone, upload a file, switch to another app for 30s, return — should auto-retry or show results
+   - Verify Anthropic API health: `GET /api/ai/diagnose` — check `anthropic.valid`
+3. **Monitor Extraction Success Rate** — Check admin Extraction Health tab for error rate after deploy. If Anthropic credits are genuinely exhausted, the server falls back to OpenAI automatically, but latency increases.
+4. **Bilingual Evidence Quotes** — Previous session added `quoteTr` to extraction schema. Verify it's populated in real extractions after merge.

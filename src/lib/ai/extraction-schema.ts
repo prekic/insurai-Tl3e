@@ -199,7 +199,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       exclusionsEn: {
         type: ['array', 'null'],
         items: { type: 'string' },
-        description: 'English translation of the exclusions. REQUIRED if policy is in Turkish.',
+        description:
+          'REQUIRED: English translation of each exclusion at the same array index. For Turkish policies, ALWAYS provide this array with the same length as "exclusions". Example: exclusions=["Deprem hariçtir"] → exclusionsEn=["Earthquake is excluded"].',
       },
       amendmentInfo: {
         type: 'object',

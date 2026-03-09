@@ -46,6 +46,9 @@ export function TryAnalysis() {
   const isMounted = useRef(true)
   const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const intervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const extractionInFlightRef = useRef(false)
+  const lastFileRef = useRef<File | null>(null)
+  const retryCountRef = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -134,6 +137,10 @@ export function TryAnalysis() {
     async (file: File) => {
       // Track upload started
       trackTrialUploadStarted(file.type, file.size)
+
+      // Mark extraction as in-flight for visibility change detection
+      extractionInFlightRef.current = true
+      lastFileRef.current = file
 
       // Start analysis
       setSelectedFile(file)
@@ -323,6 +330,7 @@ export function TryAnalysis() {
 
         // Always save the result — even if the user navigated away.
         // When they return to /try, the saved result will be found and displayed.
+        extractionInFlightRef.current = false
         saveTrialResult(policyWithDefaults, fileName)
 
         // Mark processing as complete
@@ -363,6 +371,8 @@ export function TryAnalysis() {
       } catch (err) {
         if (progressInterval) clearInterval(progressInterval)
 
+        extractionInFlightRef.current = false
+
         // Don't update state or show toasts if component was unmounted
         if (!isMounted.current) return
 
@@ -375,27 +385,27 @@ export function TryAnalysis() {
         const errorCode = (err as Error & { errorCode?: string })?.errorCode
         const requestId = (err as Error & { requestId?: string })?.requestId
 
-        // Build diagnostic suffix: [code=X | req=Y | provider_ms=Z, total_ms=W]
-        const diagParts: string[] = []
-        if (errorCode) diagParts.push(`code=${errorCode}`)
-        if (requestId) diagParts.push(`req=${requestId}`)
-        if (phaseTiming) {
-          const timingEntries = Object.entries(phaseTiming)
-            .filter(([, v]) => v > 0)
-            .map(([k, v]) => `${k}=${Math.round(v)}ms`)
-          if (timingEntries.length) diagParts.push(timingEntries.join(', '))
+        // Log diagnostics to console for developers — don't show to users
+        if (errorCode || requestId || phaseTiming) {
+          const diagParts: string[] = []
+          if (errorCode) diagParts.push(`code=${errorCode}`)
+          if (requestId) diagParts.push(`req=${requestId}`)
+          if (phaseTiming) {
+            const timingEntries = Object.entries(phaseTiming)
+              .filter(([, v]) => v > 0)
+              .map(([k, v]) => `${k}=${Math.round(v)}ms`)
+            if (timingEntries.length) diagParts.push(timingEntries.join(', '))
+          }
+          console.warn('[TryAnalysis] Diagnostics:', diagParts.join(' | '))
         }
-        const diagString = diagParts.length > 0 ? ` [${diagParts.join(' | ')}]` : ''
 
-        // Make timeout errors more user-friendly with retry guidance, keep diagnostics
+        // Make timeout errors more user-friendly — no diagnostic codes shown
         const isTimeout =
           message.includes('timed out') ||
           message.includes('TIMEOUT') ||
           message.includes('BUDGET_EXHAUSTED')
         if (isTimeout) {
-          message = `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}${diagString}`
-        } else {
-          message = `${message}${diagString}`
+          message = `${t.tryAnalysis.analysisTimedOut} ${t.tryAnalysis.pleaseWait}`
         }
 
         // Log the failure for admin visibility
@@ -413,6 +423,51 @@ export function TryAnalysis() {
     },
     [navigate, t, user?.id]
   )
+
+  // Detect mobile tab suspension: when user returns to the tab after backgrounding,
+  // the HTTP fetch is likely dead but the promise never resolved. Auto-retry.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return
+      if (!extractionInFlightRef.current) return
+      if (!isMounted.current) return
+
+      // Tab became visible again while extraction was in-flight.
+      // Check if a result was saved in the background (extraction may have completed).
+      const existingResult = getTrialResult()
+      if (existingResult) {
+        // Extraction completed while tab was backgrounded — redirect to results
+        navigate('/policy/trial', {
+          state: { policy: existingResult.policy, isTrialResult: true },
+          replace: true,
+        })
+        return
+      }
+
+      // No result — the fetch connection was likely killed by the mobile browser.
+      // Auto-retry with the same file instead of showing a confusing timeout error.
+      const file = lastFileRef.current
+      if (file && retryCountRef.current < 2) {
+        console.warn('[TryAnalysis] Tab resumed during extraction — retrying automatically')
+        retryCountRef.current++
+        // Clear stale timers from the dead extraction
+        if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
+        if (intervalIdRef.current) clearInterval(intervalIdRef.current)
+        extractionInFlightRef.current = false
+        // Reset state and re-run
+        setState('idle')
+        setError(null)
+        setProgress(0)
+        // Small delay to let the browser reconnect network
+        setTimeout(() => {
+          if (isMounted.current) runExtraction(file)
+        }, 1500)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [navigate, runExtraction])
 
   // Validate file and check eligibility before running extraction
   const processFile = useCallback(

@@ -277,9 +277,9 @@ export async function extractViaProxy(
 
   const fetchStartMs = performance.now()
 
-  // Build a combined signal: respect caller's signal (if any) AND enforce a 120s hard timeout.
-  // The server has a 105s budget; 120s gives 15s for network/serialization overhead.
-  const FETCH_TIMEOUT_MS = 120_000
+  // Build a combined signal: respect caller's signal (if any) AND enforce a hard timeout.
+  // The server has a 125s budget; 135s gives 10s for network/serialization overhead.
+  const FETCH_TIMEOUT_MS = 135_000
 
   try {
     console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`, {

@@ -881,18 +881,20 @@ function ExclusionsSection({
             <p className="text-sm text-blue-700 mt-1">{t.policy.clarifyWithInsurer}</p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {/* Items from exclusions that need clarification */}
               {analysis.clarificationNeeded.map((item, i) => (
                 <div
                   key={`clarify-${i}`}
-                  className="p-3 bg-white rounded-lg border border-blue-200"
+                  className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm"
                 >
-                  <p className="text-sm font-medium text-gray-800 mb-1">{item.item}</p>
-                  <p className="text-sm text-blue-700 flex items-center gap-1">
-                    <HelpCircle size={12} />
-                    {locale === 'tr' ? item.question : item.questionEn || item.question}
-                  </p>
+                  <p className="text-sm font-semibold text-gray-900">{item.item}</p>
+                  <div className="flex items-start gap-1.5 mt-1.5">
+                    <HelpCircle className="text-blue-500 shrink-0 mt-0.5" size={14} />
+                    <p className="text-sm text-blue-700">
+                      {locale === 'tr' ? item.question : item.questionEn || item.question}
+                    </p>
+                  </div>
                 </div>
               ))}
 
@@ -902,20 +904,25 @@ function ExclusionsSection({
                 .map((item, i) => (
                   <div
                     key={`missing-${i}`}
-                    className="p-3 bg-white rounded-lg border border-blue-200"
+                    className="p-3 bg-white rounded-lg border border-blue-100 shadow-sm"
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-medium text-gray-800">
+                    <div className="flex justify-between items-start gap-2">
+                      <span className="text-sm font-semibold text-gray-900">
                         {locale === 'tr' ? item.name : item.nameEn || item.name}
                       </span>
-                      <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                      <Badge
+                        variant="outline"
+                        className="shrink-0 text-[11px] py-0.5 px-2 text-blue-600 border-blue-300 bg-blue-50 whitespace-nowrap"
+                      >
                         {t.policy.notSpecifiedInPolicy}
                       </Badge>
                     </div>
-                    <p className="text-sm text-blue-700 flex items-center gap-1">
-                      <HelpCircle size={12} />
-                      {locale === 'tr' ? item.question : item.questionEn || item.question}
-                    </p>
+                    <div className="flex items-start gap-1.5 mt-1.5">
+                      <HelpCircle className="text-blue-500 shrink-0 mt-0.5" size={14} />
+                      <p className="text-sm text-blue-700">
+                        {locale === 'tr' ? item.question : item.question}
+                      </p>
+                    </div>
                   </div>
                 ))}
             </div>

@@ -45,6 +45,7 @@ import {
   type ValidationResult,
 } from '@/lib/extraction'
 import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
+import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
 import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
 
 export interface ExtractionResult {
@@ -1586,7 +1587,7 @@ async function convertToAnalyzedPolicy(
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     coverages,
     exclusions: data.exclusions,
-    exclusionsEn: data.exclusionsEn || null,
+    exclusionsEn: ensureExclusionsEn(data.exclusions, data.exclusionsEn),
     specialConditions: data.specialConditions,
     insuranceLine: typeInfo.label,
     // Currency might be in data.currency, data.premium.currency, or snake_case
@@ -1680,6 +1681,9 @@ async function convertToAnalyzedPolicy(
       }
     }
   }
+
+  // Final pass: ensure every exclusion has an English translation
+  basePolicy.exclusionsEn = ensureExclusionsEn(basePolicy.exclusions, basePolicy.exclusionsEn)
 
   // Calculate ML-based risk score
   try {
@@ -2345,6 +2349,7 @@ export function comprehensiveToAnalyzedPolicy(
     insuredAddress: data.insured.address ?? undefined,
     coverages,
     exclusions: data.exclusions.map((e) => e.trigger),
+    exclusionsEn: ensureExclusionsEn(data.exclusions.map((e) => e.trigger)),
     specialConditions: [],
     insuranceLine: 'Kasko',
     currency: data.premium.currency,
