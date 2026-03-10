@@ -320,9 +320,16 @@ export async function extractViaProxy(
     })
 
     if (!response.ok) {
-      const errorMsg = result.details
-        ? `${result.error || 'Server error'}: ${result.details}`
-        : result.error || `HTTP ${response.status}`
+      let errorMsg = ''
+
+      if (response.status === 502 || response.status === 504) {
+        errorMsg = `Server timed out or is busy (${response.status}). If you are using a free tier hosting provider, the AI extraction may have exceeded the execution limit. Try a shorter document.`
+      } else {
+        errorMsg = result.details
+          ? `${result.error || 'Server error'}: ${result.details}`
+          : result.error || `HTTP ${response.status}`
+      }
+
       console.error('[extractViaProxy] HTTP error:', errorMsg, {
         code: result.code,
         status: response.status,

@@ -285,9 +285,9 @@ function translateInsightLegacy(
     return prefix ? `${prefix}${translated}` : translated
   }
 
-  if (text.startsWith('Invalid TC Kimlik:')) {
-    const value = text.replace('Invalid TC Kimlik:', '').trim()
-    const template = insightTranslations['invalidTcKimlik'] || 'Invalid TC Kimlik: {value}'
+  if (text.startsWith('Invalid TC Kimlik') || text.startsWith('Invalid VKN')) {
+    const value = text.split(':').slice(1).join(':').trim()
+    const template = insightTranslations['invalidTcKimlik'] || 'Invalid TC Kimlik / VKN: {value}'
     const translated = template.replace('{value}', value)
     return prefix ? `${prefix}${translated}` : translated
   }

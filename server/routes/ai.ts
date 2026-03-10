@@ -42,6 +42,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getAIConfig } from '../services/config-service.js'
+import { getClientWithError } from '../services/admin-db.js'
 import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
@@ -1844,6 +1845,121 @@ router.post(
     })
   }
 )
+
+/**
+ * POST /api/ai/sense-check
+ * Evaluates generated warnings/insights for false positives.
+ */
+router.post('/sense-check', validateJSON, async (req: Request, res: Response) => {
+  try {
+    const { rawInsights, policyData } = req.body
+    const policyType = policyData?.type || '*'
+
+    const aiConfig = await getAIConfig()
+
+    // Fetch dynamic guidelines from DB
+    let guidelinesText = ''
+    try {
+      const { client: db } = getClientWithError()
+      if (db) {
+        const { data } = await db
+          .from('ai_insight_guidelines')
+          .select('guidance_text')
+          .eq('is_active', true)
+          .in('policy_type', ['*', policyType])
+
+        if (data && data.length > 0) {
+          guidelinesText = data
+            .map((d: any, index: number) => `${index + 1}. ${d.guidance_text}`)
+            .join('\n')
+        }
+      }
+    } catch (dbErr) {
+      log.warn('Failed to fetch ai_insight_guidelines', { error: String(dbErr) })
+    }
+
+    const defaultGuidelinesText = `1. Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
+2. If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
+3. Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
+
+    const finalGuidelines = guidelinesText ? guidelinesText : defaultGuidelinesText
+
+    const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
+You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
+Your job is to identify and discard "false positive" warnings based on these rules:
+${finalGuidelines}
+
+Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }`
+
+    const userPrompt = `Policy Data:\n${JSON.stringify(policyData, null, 2)}\n\nRaw Insights:\n${JSON.stringify(rawInsights, null, 2)}`
+
+    const anthropicClient = getAnthropicClient()
+    const openaiClient = getOpenAIClient()
+
+    if (anthropicClient) {
+      try {
+        const response = await anthropicClient.messages.create({
+          model: aiConfig.anthropicBackupModel || aiConfig.anthropicExtractionModel,
+          max_tokens: 1024,
+          system:
+            systemPrompt +
+            '\n\nPlease strictly output the JSON object without any wrapping markdown blocks.',
+          messages: [{ role: 'user', content: userPrompt }],
+        })
+        const textBlock = response.content.find((block: any) => block.type === 'text')
+        if (textBlock && textBlock.type === 'text') {
+          let jsonString = textBlock.text
+          const jsonMatch = jsonString.match(/\\{.*\\}/s)
+          if (jsonMatch) jsonString = jsonMatch[0]
+          const result = JSON.parse(jsonString)
+          return res.json({
+            success: true,
+            validInsights: result.validInsights || rawInsights,
+            provider: 'anthropic',
+          })
+        }
+      } catch (err) {
+        log.warn('Anthropic sense-check failed, falling back', { error: String(err) })
+      }
+    }
+
+    if (openaiClient) {
+      try {
+        const response = await openaiClient.chat.completions.create({
+          model: aiConfig.openaiBackupModel || aiConfig.openaiExtractionModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          response_format: { type: 'json_object' },
+        })
+        const content = response.choices[0]?.message?.content
+        if (content) {
+          const result = JSON.parse(content)
+          return res.json({
+            success: true,
+            validInsights: result.validInsights || rawInsights,
+            provider: 'openai',
+          })
+        }
+      } catch (err) {
+        log.warn('OpenAI sense-check failed', { error: String(err) })
+      }
+    }
+
+    // If all fail, return original insights safely
+    return res.json({ success: true, validInsights: rawInsights, provider: 'fallback' })
+  } catch (e) {
+    log.error('Sense-check fatal error', { error: String(e) })
+    // Safe fallback
+    return res.json({
+      success: true,
+      validInsights: req.body?.rawInsights || [],
+      provider: 'fallback',
+      error: String(e),
+    })
+  }
+})
 
 /**
  * POST /api/ai/ocr

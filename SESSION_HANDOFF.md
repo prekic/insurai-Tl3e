@@ -1,4 +1,4 @@
-# Session Handoff — March 9, 2026 (Exclusion i18n + Mobile Extraction Resilience)
+# Session Handoff — March 10, 2026 (AI Insight Rules Dashboard)
 
 ## Current Status
 
@@ -7,92 +7,85 @@
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | 15,850+ tests passing, 0 failures |
-| **Branch** | `claude/load-project-context-Mhtah` — 3 commits, pushed |
+| **Branch** | `insuraigemini202603092125` — 5 commits, pushed |
 
 ---
 
-## This Session — 3 Fixes
+## This Session — New Features & Fixes
 
-### 1. Exclusions Displaying in Turkish When Locale is English
+### 1. Dynamic AI Insight Guidelines (Admin Dashboard)
 
-**Problem**: PolicyDetailView showed Turkish exclusion text ("Anahtarla çalışan araçlarda...") even when the app was set to English.
+**Problem**: The AI sometimes hallucinates incorrect or overly critical missing coverages (e.g., flagging "collision" missing on a comprehensive Kasko policy). We had hardcoded `if`/`else` rules in backend source code to prevent this.
 
-**Root Cause**: Three-layer gap:
-- AI prompts (Anthropic/OpenAI) did not strongly require `exclusionsEn` population
-- No fallback translation when AI failed to provide English exclusions
-- `convertToAnalyzedPolicy()` passed `exclusionsEn: null` when AI didn't comply
+**Fix** (commits `6010ee3`, `d249e35`):
+- Created Supabase table `ai_insight_guidelines` with migration `032_ai_insight_guidelines.sql`.
+- Updated `POST /api/ai/sense-check` to fetch rules scoped to `policy_type` and `region_code` (with `*` global wildcards).
+- Injected the dynamic output into the `systemPrompt`.
+- Created an extensive Admin UI Dashboard (`InsightsTab.tsx`) with full CRUD and active toggling abilities, accessible via the sidebar under "AI Insights".
+- Created ADR `018-dynamic-ai-insight-guidelines.md` documenting the architecture decision to shift to DB-controlled rules.
 
-**Fix** (commit `4a3e26f`):
-- Created `src/lib/i18n/exclusion-translations.ts` — 60+ Turkish→English exclusion pattern translations as extraction-time fallback
-- `ensureExclusionsEn()` fills gaps: AI-provided → pattern-match translation → Turkish fallback
-- Wired into all 3 extraction paths: `convertToAnalyzedPolicy`, evidence merge post-processing, `comprehensiveToAnalyzedPolicy`
-- Strengthened AI prompts in `server/routes/ai.ts` (Anthropic schema) and `extraction-schema.ts` (OpenAI JSON schema) with CRITICAL instructions for `exclusionsEn`
-- 21 new tests in `exclusion-translations.test.ts`
+### 2. VKN vs TC Kimlik Validation False Positives
 
-### 2. "Ask Your Insurer" Card Layout Improvement
+**Problem**: False positive identification of national ID formats.
 
-**Problem**: The clarification cards had awkward badge placement, weak visual hierarchy, tiny icons, and inconsistent spacing.
+**Fix** (commit `7db3d6e`):
+- Ensured validation differentiates between VKN (Tax IDs for companies) and TC Kimlik correctly.
 
-**Fix** (commit `e40ddfc`):
-- Badge moved to top-right corner (`flex justify-between items-start`)
-- Topic names strengthened to `font-semibold text-gray-900`
-- HelpCircle icon enlarged (14px) and top-aligned for multi-line questions
-- Softer card borders (`blue-100`) with subtle `shadow-sm`
-- Compact badge styling (`text-[11px]`, `shrink-0`, `whitespace-nowrap`)
-- Fixed invalid `item.questionEn` access on `missingImportantExclusions` type (doesn't have that field)
+### 3. TypeScript Casting for Extraction Data
 
-### 3. Mobile Tab Suspension Killing Extraction
+**Problem**: Extraction typing mismatch during AI output parsing.
 
-**Problem**: On mobile, when user backgrounds the tab during extraction, the browser kills the HTTP fetch connection but freezes JS timers. On return, the fetch is dead but the promise never resolves, causing `CLIENT_TIMEOUT_UMBRELLA` timeout with ugly diagnostic codes shown to user.
+**Fix** (commit `c9094de`):
+- Patched TypeScript casting issues for robust runtime parsing of extraction data.
 
-**Fix** (commit `303da34`):
-- `visibilitychange` listener detects tab resume during in-flight extraction
-- Checks if result was saved in background (extraction may have completed) → redirects to results
-- Otherwise auto-retries extraction (up to 2 times) with 1.5s delay for network reconnect
-- Diagnostic codes (`[code=CLIENT_TIMEOUT_UMBRELLA]`, `[req=ext-xxx | timing...]`) moved to `console.warn` only — users see clean message
-- Client fetch timeout increased from 120s → 135s (was less than server's 125s budget, causing premature client abort)
+### 4. 502/504 Errors on Proxy Extraction Timeout
+
+**Problem**: Prolonged extraction tasks occasionally trigger 502 (Bad Gateway) or 504 (Gateway Timeout) from proxies (like Railway/Cloudflare) before the internal server budget runs out.
+
+**Fix** (commit `35010e5`):
+- Handled 502/504 errors specifically on proxy timeout to provide better user feedback instead of crashing or showing unstructured server dump errors.
 
 ### Commits (oldest → newest)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `4a3e26f` | fix(i18n) | Ensure exclusions display in English when locale is EN |
-| `e40ddfc` | fix | Improve Ask Your Insurer card layout for mobile |
-| `303da34` | fix | Mobile tab suspension killing extraction + clean error messages |
+| `7db3d6e` | fix(ai) | resolve vkn vs tc kimlik validation false positives |
+| `6010ee3` | feat(ai) | implement ai sense checking for policy insights |
+| `c9094de` | fix(ai) | typescript casting for extraction data |
+| `35010e5` | fix(ai) | handle 502/504 errors on proxy extraction timeout to provide better user feedback |
+| `d249e35` | feat(admin) | add AI insights management dashboard |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/i18n/exclusion-translations.ts` | **NEW** 60+ Turkish→English exclusion pattern translations with `ensureExclusionsEn()` |
-| `src/lib/i18n/exclusion-translations.test.ts` | **NEW** 21 tests for exclusion translation |
-| `src/lib/ai/policy-extractor.ts` | Wired `ensureExclusionsEn()` into 3 extraction paths |
-| `src/lib/ai/extraction-schema.ts` | Strengthened `exclusionsEn` description in OpenAI JSON schema |
-| `server/routes/ai.ts` | Added CRITICAL instructions for `exclusionsEn` in Anthropic prompt |
-| `src/components/PolicyDetailView.tsx` | Redesigned Ask Your Insurer card layout, fixed invalid `questionEn` access |
-| `src/components/TryAnalysis.tsx` | Visibility change auto-retry, clean error messages, extraction in-flight tracking |
-| `src/lib/ai/config.ts` | Client fetch timeout 120s → 135s (aligned with server 125s budget) |
+| `supabase/migrations/032_ai_insight_guidelines.sql` | **NEW** Migration for AI sense-checking rules table |
+| `src/types/supabase.ts` | Automatically tracked DB types for new table |
+| `server/routes/ai.ts` | Removed hardcoded rules. Dynamically fetch rules from Supabase and concat to prompt |
+| `src/components/admin/tabs/InsightsTab.tsx` | **NEW** The React Admin UI dashboard for managing insight rules |
+| `src/components/admin/AdminLayout.tsx` | Linked "AI Insights" in the global Admin navigation view |
+| `src/components/admin/AdminDashboard.tsx` | Registered `InsightsTab` into the rendering switch case |
+| `src/components/admin/tabs/index.ts` | Exported `InsightsTab` |
+| `src/types/admin.ts` | Added `'insights'` to `AdminSection` routing type |
+| `src/components/PolicyDetailView.tsx` | TypeScript casting patches for extraction data parsing |
+| `src/lib/ai/config.ts` | Thresholds and config for proxy timeout resilience |
+| `src/lib/ai/policy-extractor.ts` | Proxy timeout resilience logic handling 502/504 edge cases |
+| `src/lib/extraction/turkish-patterns.ts` | Regex/validation logic fix for VKN vs TC Kimlik false positives |
+| `src/lib/extraction/turkish-patterns.test.ts` | Unit tests for VKN vs TC Kimlik validation |
+| `src/lib/i18n/translations-*.ts` | Localized UI feedback messages for proxy timeouts |
+| `docs/adr/018-dynamic-ai-insight-guidelines.md` | **NEW** ADR documenting the architectural shift |
 
 ---
 
 ## ⚠️ Gotchas for Next Session
 
-1. **Exclusion Translation Fallback is Pattern-Based**: `exclusion-translations.ts` uses substring matching — patterns like `"deprem"` match any exclusion containing that word. If AI extraction improves and always provides `exclusionsEn`, the fallback becomes a no-op. But for now, it's essential.
-2. **`missingImportantExclusions` Has No `questionEn` Field**: The type from `kasko-knowledge.ts` only has `{ name, nameEn, question, importance }`. Do NOT access `item.questionEn` on this type — use `item.question` for both locales.
-3. **Mobile Visibility Auto-Retry**: `retryCountRef` caps at 2 retries. The retry is triggered by `visibilitychange` to `visible` ONLY when `extractionInFlightRef.current` is true. The retry clears stale timers and resets state before re-running.
-4. **Client/Server Timeout Chain**: Server budget = 125s, client fetch = 135s, client umbrella = 150s. The client fetch MUST exceed the server budget so the server can return a proper `BUDGET_EXHAUSTED` error with diagnostics.
-5. **Diagnostic Codes No Longer Shown to Users**: `[code=...]` and `[req=...]` are logged to `console.warn` only. If you need to debug extraction failures, check the browser console. The user sees: "Analysis timed out. The AI service may be busy. Please try again."
-6. **Do NOT re-add AbortController.abort() on TryAnalysis unmount.** Extraction should run to completion; `saveTrialResult()` persists it for when the user returns.
-7. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Rule Caching Pipeline**: Currently, `POST /api/ai/sense-check` executes a `select` query directly against `ai_insight_guidelines` on every request. If extraction traffic rises significantly, we might need a node cache mechanism (e.g. `lru-cache`) to hold the rules in memory with a short TTL, reducing DB load.
+2. **Supabase Client Context in Admin Component**: `InsightsTab.tsx` leverages the client-side Supabase object exported from `src/lib/supabase/client.ts`. This works securely because the dashboard itself is rendered behind an authenticated route lock.
 
 ---
 
 ## Priority Next Steps
 
-1. **Merge & Deploy** — Branch `claude/load-project-context-Mhtah` is ready to merge. All 3 commits are clean.
-2. **Production Validation** — After deploy:
-   - Test exclusion display: Upload a Turkish policy, switch locale to EN, verify exclusions show in English
-   - Test mobile extraction: On phone, upload a file, switch to another app for 30s, return — should auto-retry or show results
-   - Verify Anthropic API health: `GET /api/ai/diagnose` — check `anthropic.valid`
-3. **Monitor Extraction Success Rate** — Check admin Extraction Health tab for error rate after deploy. If Anthropic credits are genuinely exhausted, the server falls back to OpenAI automatically, but latency increases.
-4. **Bilingual Evidence Quotes** — Previous session added `quoteTr` to extraction schema. Verify it's populated in real extractions after merge.
+1. **Merge & Deploy** — Branch `insuraigemini202603092125` is ready to merge. 
+2. **Production Validation** — After deploying, navigate to `/admin/insights` and create a dummy rule for a Kasko policy (`*` region) that forces the AI to append an exclamation mark to an insight. Perform a PDF extraction and verify the AI respects the new global rule. Delete the rule afterward.
+3. **Database Seed Verification** — Ensure that `032_ai_insight_guidelines.sql` runs perfectly on production through the established CI/CD pipeline or migration runner.

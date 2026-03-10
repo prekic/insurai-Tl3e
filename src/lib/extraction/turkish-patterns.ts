@@ -37,12 +37,34 @@ export function validateTCKimlik(tc: string): boolean {
   const oddSum = digits[0] + digits[2] + digits[4] + digits[6] + digits[8]
   const evenSum = digits[1] + digits[3] + digits[5] + digits[7]
   const check10 = (oddSum * 7 - evenSum) % 10
-  const check11 = (digits.slice(0, 10).reduce((a, b) => a + b, 0)) % 10
+  const check11 = digits.slice(0, 10).reduce((a, b) => a + b, 0) % 10
 
   // Handle negative modulo
   const normalizedCheck10 = ((check10 % 10) + 10) % 10
 
   return normalizedCheck10 === digits[9] && check11 === digits[10]
+}
+
+/**
+ * Validate Turkish Tax Identification Number (VKN - Vergi Kimlik Numarası)
+ *
+ * VKN rules:
+ * - Exactly 10 digits
+ * - Complies with Modulus 10 algorithm
+ */
+export function validateVKN(vkn: string): boolean {
+  if (!/^\d{10}$/.test(vkn)) return false
+
+  let sum = 0
+  for (let i = 0; i < 9; i++) {
+    const tmp = (parseInt(vkn.charAt(i), 10) + (9 - i)) % 10
+    let tmp2 = (tmp * Math.pow(2, 9 - i)) % 9
+    if (tmp !== 0 && tmp2 === 0) tmp2 = 9
+    sum += tmp === 0 ? 0 : tmp2
+  }
+
+  const lastDigit = (10 - (sum % 10)) % 10
+  return lastDigit === parseInt(vkn.charAt(9), 10)
 }
 
 /**
@@ -94,9 +116,7 @@ export function validateTurkishIBAN(iban: string): boolean {
 
   // IBAN checksum validation (mod 97)
   const rearranged = normalized.slice(4) + normalized.slice(0, 4)
-  const numericIBAN = rearranged.replace(/[A-Z]/g, (char) =>
-    (char.charCodeAt(0) - 55).toString()
-  )
+  const numericIBAN = rearranged.replace(/[A-Z]/g, (char) => (char.charCodeAt(0) - 55).toString())
 
   // Calculate mod 97 for large number
   let remainder = 0
@@ -146,9 +166,7 @@ export function normalizeTurkishDate(date: string): string {
  */
 export function normalizeCurrency(value: string): number {
   // Remove currency symbols and text
-  let cleaned = value
-    .replace(/[₺TL TRY]/gi, '')
-    .trim()
+  let cleaned = value.replace(/[₺TL TRY]/gi, '').trim()
 
   // Turkish format: dots are thousands, comma is decimal
   // If there's a comma, treat dots as thousands separators
@@ -194,7 +212,7 @@ export function normalizePhoneNumber(phone: string): string {
 
   // Format: 0XXX XXX XX XX
   if (digits.length === 11) {
-    return `${digits.slice(0,4)} ${digits.slice(4,7)} ${digits.slice(7,9)} ${digits.slice(9)}`
+    return `${digits.slice(0, 4)} ${digits.slice(4, 7)} ${digits.slice(7, 9)} ${digits.slice(9)}`
   }
 
   return digits
@@ -245,25 +263,30 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: 0.95,
       source: 'pattern',
       isValid: policyMatch[1].trim().length >= 5,
-      rawMatch: policyMatch[0]
+      rawMatch: policyMatch[0],
     }
   }
 
-  // TC Kimlik
-  const tcMatch = text.match(/(?:T\.?C\.?\s*(?:Kimlik)?\s*(?:No|Numaras[ıi])?\s*[:\s]*)(\d{11})/i)
+  // TC Kimlik / VKN
+  const tcMatch = text.match(
+    /(?:T\.?C\.?\s*(?:Kimlik)?\s*(?:No|Numaras[ıi])?|VKN|Vergi\s*(?:No|Numaras[ıi])?)\s*[:\s]*(\d{10,11})/i
+  )
   if (tcMatch) {
-    const isValid = validateTCKimlik(tcMatch[1])
+    const matchVal = tcMatch[1]
+    const isValid = matchVal.length === 11 ? validateTCKimlik(matchVal) : validateVKN(matchVal)
     result.tcKimlik = {
-      value: tcMatch[1],
+      value: matchVal,
       confidence: isValid ? 0.98 : 0.5,
       source: 'pattern',
       isValid,
-      rawMatch: tcMatch[0]
+      rawMatch: tcMatch[0],
     }
   }
 
   // Start Date
-  const startMatch = text.match(/(?:ba[şs]lang[ıi][çc]\s*tarihi|poli[çc]e\s*ba[şs]lang[ıi][çc]|yürürlük\s*tarihi)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i)
+  const startMatch = text.match(
+    /(?:ba[şs]lang[ıi][çc]\s*tarihi|poli[çc]e\s*ba[şs]lang[ıi][çc]|yürürlük\s*tarihi)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i
+  )
   if (startMatch) {
     const normalized = normalizeTurkishDate(startMatch[1])
     const isValid = !isNaN(new Date(normalized).getTime())
@@ -272,12 +295,14 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: isValid ? 0.95 : 0.6,
       source: 'pattern',
       isValid,
-      rawMatch: startMatch[0]
+      rawMatch: startMatch[0],
     }
   }
 
   // End Date
-  const endMatch = text.match(/(?:biti[şs]\s*tarihi|poli[çc]e\s*biti[şs]i|son\s*tarih|vade\s*sonu)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i)
+  const endMatch = text.match(
+    /(?:biti[şs]\s*tarihi|poli[çc]e\s*biti[şs]i|son\s*tarih|vade\s*sonu)\s*[:\s]*(\d{1,2}[./-]\d{1,2}[./-]\d{2,4})/i
+  )
   if (endMatch) {
     const normalized = normalizeTurkishDate(endMatch[1])
     const isValid = !isNaN(new Date(normalized).getTime())
@@ -286,12 +311,14 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: isValid ? 0.95 : 0.6,
       source: 'pattern',
       isValid,
-      rawMatch: endMatch[0]
+      rawMatch: endMatch[0],
     }
   }
 
   // Premium (supports ₺ before or after)
-  const premiumMatch = text.match(/(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*(?:₺|TL|TRY)?\s*([0-9][0-9.,]*)\s*(?:TL|₺|TRY)?/i)
+  const premiumMatch = text.match(
+    /(?:(?:toplam\s*)?prim|net\s*prim|brüt\s*prim)\s*[:\s]*(?:₺|TL|TRY)?\s*([0-9][0-9.,]*)\s*(?:TL|₺|TRY)?/i
+  )
   if (premiumMatch) {
     const normalized = normalizeCurrency(premiumMatch[1])
     result.premium = {
@@ -299,12 +326,14 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: normalized > 0 ? 0.9 : 0.5,
       source: 'pattern',
       isValid: normalized > 0,
-      rawMatch: premiumMatch[0]
+      rawMatch: premiumMatch[0],
     }
   }
 
   // Coverage/Teminat
-  const coverageMatch = text.match(/(?:teminat\s*(?:tutar[ıi])?|sigorta\s*bedeli|kasko\s*bedeli)\s*[:\s]*(?:₺|TL)?\s*([0-9][0-9.,]*)\s*(?:TL|₺)?/i)
+  const coverageMatch = text.match(
+    /(?:teminat\s*(?:tutar[ıi])?|sigorta\s*bedeli|kasko\s*bedeli)\s*[:\s]*(?:₺|TL)?\s*([0-9][0-9.,]*)\s*(?:TL|₺)?/i
+  )
   if (coverageMatch) {
     const normalized = normalizeCurrency(coverageMatch[1])
     result.coverage = {
@@ -312,7 +341,7 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: normalized > 0 ? 0.85 : 0.5,
       source: 'pattern',
       isValid: normalized > 0,
-      rawMatch: coverageMatch[0]
+      rawMatch: coverageMatch[0],
     }
   }
 
@@ -326,12 +355,14 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: isValid ? 0.95 : 0.7,
       source: 'pattern',
       isValid,
-      rawMatch: plateMatch[0]
+      rawMatch: plateMatch[0],
     }
   }
 
   // VIN/Chassis
-  const vinMatch = text.match(/(?:[şs]asi\s*(?:no|numaras[ıi])?|vin)\s*[:\s]*([A-HJ-NPR-Z0-9]{17})/i)
+  const vinMatch = text.match(
+    /(?:[şs]asi\s*(?:no|numaras[ıi])?|vin)\s*[:\s]*([A-HJ-NPR-Z0-9]{17})/i
+  )
   if (vinMatch) {
     const normalized = vinMatch[1].toUpperCase()
     const isValid = validateVIN(normalized)
@@ -340,7 +371,7 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: isValid ? 0.95 : 0.6,
       source: 'pattern',
       isValid,
-      rawMatch: vinMatch[0]
+      rawMatch: vinMatch[0],
     }
   }
 
@@ -355,12 +386,14 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: isValid ? 0.95 : 0.5,
       source: 'pattern',
       isValid,
-      rawMatch: yearMatch[0]
+      rawMatch: yearMatch[0],
     }
   }
 
   // Insured Name
-  const nameMatch = text.match(/(?:sigortali|sigorta\s*ettiren|ad[ıi]\s*soyad[ıi])\s*[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)(?=\s*(?:T\.?C|Adres|Telefon|\d|$))/i)
+  const nameMatch = text.match(
+    /(?:sigortali|sigorta\s*ettiren|ad[ıi]\s*soyad[ıi])\s*[:\s]*([A-ZÇĞİÖŞÜa-zçğıöşü\s]+?)(?=\s*(?:T\.?C|Adres|Telefon|\d|$))/i
+  )
   if (nameMatch) {
     const name = nameMatch[1].trim().toLocaleUpperCase('tr-TR')
     result.insuredName = {
@@ -368,7 +401,7 @@ export function extractWithPatterns(text: string): PatternExtractionResult {
       confidence: name.length > 3 ? 0.85 : 0.5,
       source: 'pattern',
       isValid: name.length > 3,
-      rawMatch: nameMatch[0]
+      rawMatch: nameMatch[0],
     }
   }
 
@@ -406,15 +439,24 @@ export function validateAndEnhanceExtraction(
   // Extract with patterns for comparison
   const patternResult = extractWithPatterns(originalText)
 
-  // Validate TC Kimlik
+  // Validate TC Kimlik or VKN
   const aiTcKimlik = aiResult.tcKimlik as string | undefined
   if (aiTcKimlik) {
-    if (!validateTCKimlik(aiTcKimlik)) {
+    const isValidTC = aiTcKimlik.length === 11 && validateTCKimlik(aiTcKimlik)
+    const isValidVKN = aiTcKimlik.length === 10 && validateVKN(aiTcKimlik)
+    const isValid = isValidTC || isValidVKN
+
+    if (!isValid) {
       if (patternResult.tcKimlik?.isValid) {
         enhancements.tcKimlik = patternResult.tcKimlik.value
-        warnings.push(`TC Kimlik corrected: ${aiTcKimlik} → ${patternResult.tcKimlik.value}`)
+        warnings.push(`TC Kimlik / VKN corrected: ${aiTcKimlik} → ${patternResult.tcKimlik.value}`)
       } else {
-        errors.push(`Invalid TC Kimlik: ${aiTcKimlik}`)
+        // Only error if it looks like a number, otherwise just log a warning
+        if (/^\d+$/.test(aiTcKimlik.replace(/\s/g, ''))) {
+          errors.push(`Invalid TC Kimlik / VKN: ${aiTcKimlik}`)
+        } else {
+          warnings.push(`Extracted TC Kimlik / VKN is not numeric: ${aiTcKimlik}`)
+        }
       }
     }
   } else if (patternResult.tcKimlik?.isValid) {
@@ -497,7 +539,7 @@ export function validateAndEnhanceExtraction(
     isValid: errors.length === 0,
     errors,
     warnings,
-    enhancements
+    enhancements,
   }
 }
 
@@ -514,7 +556,7 @@ export function mergeExtractionResults(
     _validation: {
       errors: validation.errors,
       warnings: validation.warnings,
-      enhanced: Object.keys(validation.enhancements)
-    }
+      enhanced: Object.keys(validation.enhancements),
+    },
   }
 }

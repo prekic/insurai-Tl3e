@@ -1397,7 +1397,7 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
       'Diş teminatı bu seviye için ortalamanın altında',
     'Good maternity benefits included': 'İyi doğum yardımları dahil',
     missingCoverage: 'Yaygın teminat eksik: {name}',
-    invalidTcKimlik: 'Geçersiz TC Kimlik: {value}',
+    invalidTcKimlik: 'Geçersiz TC Kimlik / VKN: {value}',
     marketPremiumsYoY: 'Piyasa primleri yıllık %{percent} arttı - oranları erkenden sabitleyin',
   },
 }

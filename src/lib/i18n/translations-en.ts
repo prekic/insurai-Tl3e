@@ -1387,7 +1387,7 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
       'Dental coverage is below average for this tier',
     'Good maternity benefits included': 'Good maternity benefits included',
     missingCoverage: 'Missing common coverage: {name}',
-    invalidTcKimlik: 'Invalid TC Kimlik: {value}',
+    invalidTcKimlik: 'Invalid TC Kimlik / VKN: {value}',
     marketPremiumsYoY: 'Market premiums increased {percent}% YoY - lock in rates early',
   },
 }

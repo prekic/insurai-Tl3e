@@ -831,6 +831,7 @@ export type AdminSection =
   | 'actuarial'
   | 'actuarial_analytics'
   | 'fx_rates'
+  | 'insights'
 
 export interface AdminFilters {
   dateRange: {

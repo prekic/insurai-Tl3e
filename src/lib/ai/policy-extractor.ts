@@ -3,6 +3,7 @@ import {
   AI_CONFIG,
   getConfiguredProviders,
   isProxyConfigured,
+  getProxyUrl,
   type AIProvider,
 } from './config'
 import { getAIConfig } from '@/lib/config'
@@ -1040,9 +1041,22 @@ export async function extractPolicyFromDocument(
 
     try {
       // Convert AI extraction to format for validation
+      // Extract numeric TC/VKN from insuredName if it exists, otherwise use what might be mapped directly (if any)
+      const potentialTcKimlikMatch = enhancedExtractedData.insuredName?.match(/\b(\d{10,11})\b/)
+      let extractedTcKimlik: string | undefined
+
+      if (potentialTcKimlikMatch) {
+        extractedTcKimlik = potentialTcKimlikMatch[1]
+      } else {
+        const rawTck =
+          (enhancedExtractedData as unknown as Record<string, unknown>).tcKimlik ||
+          (enhancedExtractedData as unknown as Record<string, unknown>).vkn
+        if (typeof rawTck === 'string') extractedTcKimlik = rawTck
+      }
+
       const aiResultForValidation: Record<string, unknown> = {
         policyNumber: enhancedExtractedData.policyNumber,
-        tcKimlik: enhancedExtractedData.insuredName, // TC Kimlik might be in raw data
+        tcKimlik: extractedTcKimlik,
         insuredName: enhancedExtractedData.insuredName,
         startDate: enhancedExtractedData.startDate,
         endDate: enhancedExtractedData.endDate,
@@ -1826,10 +1840,10 @@ function translateInsightToTr(insight: string): string {
     return prefix ? `${prefix}${translated}` : translated
   }
 
-  // Dynamic pattern: "Invalid TC Kimlik: X"
-  if (text.startsWith('Invalid TC Kimlik:')) {
-    const value = text.replace('Invalid TC Kimlik:', '').trim()
-    const template = trMap['invalidTcKimlik'] || 'Geçersiz TC Kimlik: {value}'
+  // Dynamic pattern: "Invalid TC Kimlik" or "Invalid TC Kimlik / VKN"
+  if (text.startsWith('Invalid TC Kimlik') || text.startsWith('Invalid VKN')) {
+    const value = text.split(':').slice(1).join(':').trim()
+    const template = trMap['invalidTcKimlik'] || 'Geçersiz TC Kimlik / VKN: {value}'
     const translated = template.replace('{value}', value)
     return prefix ? `${prefix}${translated}` : translated
   }
@@ -1869,6 +1883,38 @@ async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<strin
   const currencyValidation = validateCurrencyRegion(currency, address)
   if (currencyValidation.warning) {
     insights.push(`⚠ ${currencyValidation.warning}`)
+  }
+
+  // AI Sense-Checking Layer: Filter out false-positives based on broader logic
+  try {
+    const proxyUrl = getProxyUrl()
+    if (proxyUrl) {
+      const response = await fetch(`${proxyUrl}/api/ai/sense-check`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(typeof localStorage !== 'undefined' && {
+            'x-user-id': localStorage.getItem('insurai_user_id') || '',
+          }),
+        },
+        body: JSON.stringify({ rawInsights: insights, policyData: data }),
+      })
+      if (response.ok) {
+        const result = await response.json()
+        if (result.success && result.validInsights) {
+          // In development mode, log discard reason context if needed
+          if (import.meta.env.DEV && result.validInsights.length !== insights.length) {
+            console.warn('[AI Sense-Check] Filtered insights:', {
+              original: insights,
+              filtered: result.validInsights,
+            })
+          }
+          return result.validInsights
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[AI Sense-Check] Handled failure, falling back to raw insights', err)
   }
 
   return insights

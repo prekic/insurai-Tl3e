@@ -5,6 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   validateTCKimlik,
+  validateVKN,
   validateVIN,
   validateTurkishPlate,
   validateTurkishIBAN,
@@ -35,6 +36,25 @@ describe('TC Kimlik Validation', () => {
 
   it('should reject non-numeric TC Kimlik', () => {
     expect(validateTCKimlik('1234567890A')).toBe(false)
+  })
+})
+
+describe('VKN Validation', () => {
+  it('should validate correct VKN: 3130557669', () => {
+    expect(validateVKN('3130557669')).toBe(true)
+  })
+
+  it('should reject VKN with wrong length', () => {
+    expect(validateVKN('313055766')).toBe(false)
+    expect(validateVKN('48100234145')).toBe(false)
+  })
+
+  it('should reject invalid VKN', () => {
+    expect(validateVKN('1234567891')).toBe(false)
+  })
+
+  it('should reject non-numeric VKN', () => {
+    expect(validateVKN('123456789A')).toBe(false)
   })
 })
 
@@ -174,6 +194,13 @@ describe('Pattern Extraction', () => {
     expect(result.tcKimlik?.isValid).toBe(true)
   })
 
+  it('should extract VKN as tcKimlik field', () => {
+    const text = 'VKN: 3130557669'
+    const result = extractWithPatterns(text)
+    expect(result.tcKimlik?.value).toBe('3130557669')
+    expect(result.tcKimlik?.isValid).toBe(true)
+  })
+
   it('should extract start date', () => {
     const text = 'Başlangıç Tarihi: 15.01.2026'
     const result = extractWithPatterns(text)
@@ -215,12 +242,20 @@ describe('AI Extraction Validation & Enhancement', () => {
     expect(result.errors).toHaveLength(0)
   })
 
-  it('should detect invalid TC Kimlik', () => {
+  it('should detect invalid TC Kimlik / VKN', () => {
     const aiResult = {
       tcKimlik: '12345678901',
     }
     const result = validateAndEnhanceExtraction(aiResult, '')
-    expect(result.errors).toContain('Invalid TC Kimlik: 12345678901')
+    expect(result.errors).toContain('Invalid TC Kimlik / VKN: 12345678901')
+  })
+
+  it('should accept valid VKN', () => {
+    const aiResult = {
+      tcKimlik: '3130557669',
+    }
+    const result = validateAndEnhanceExtraction(aiResult, '')
+    expect(result.errors).toHaveLength(0)
   })
 
   it('should detect invalid date range', () => {
