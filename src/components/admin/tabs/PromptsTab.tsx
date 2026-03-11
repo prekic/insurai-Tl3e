@@ -17,12 +17,10 @@ import {
   FileText,
   Eye,
   Sparkles,
+  Workflow,
+  ArrowRight,
 } from 'lucide-react'
-import {
-  getPromptTemplates,
-  createPromptTemplate,
-  updatePromptTemplate,
-} from '@/lib/admin/api'
+import { getPromptTemplates, createPromptTemplate, updatePromptTemplate } from '@/lib/admin/api'
 import type { PromptTemplate } from '@/lib/admin/types'
 
 export function PromptsTab() {
@@ -34,6 +32,28 @@ export function PromptsTab() {
   const [error, setError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
+
+  const PROMPT_EXECUTION_ORDER: Record<string, string> = {
+    'OCR Correction - Lightweight': '1',
+    'Policy Type Detection': '2',
+    'Kasko Extraction': '3a',
+    'Traffic Insurance Extraction': '3b',
+    'Home Insurance Extraction': '3c',
+    'Health Insurance Extraction': '3d',
+    'Life Insurance Extraction': '3e',
+    'DASK Extraction': '3f',
+    'Business Insurance Extraction': '3g',
+    'Nakliyat Insurance Extraction': '3h',
+    'Policy Extraction - Master': '3i',
+    'AI Insights - Sense Check': '4',
+    'Policy Chat Assistant': '5',
+  }
+
+  const sortedTemplates = [...templates].sort((a, b) => {
+    const orderA = PROMPT_EXECUTION_ORDER[a.name] || '99'
+    const orderB = PROMPT_EXECUTION_ORDER[b.name] || '99'
+    return orderA.localeCompare(orderB, undefined, { numeric: true, sensitivity: 'base' })
+  })
 
   useEffect(() => {
     fetchTemplates()
@@ -164,6 +184,73 @@ export function PromptsTab() {
         </Button>
       </div>
 
+      {/* Execution Flow Schema */}
+      <Card className="bg-indigo-50/30 border-indigo-100 shadow-sm">
+        <CardHeader className="pb-2 pt-4">
+          <CardTitle className="text-sm font-bold text-indigo-900 flex items-center gap-2">
+            <Workflow className="h-4 w-4" />
+            Pipeline Execution Flow
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pb-4">
+          <div className="text-sm text-gray-600 flex flex-wrap gap-2 items-center">
+            <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
+              1. OCR
+            </Badge>{' '}
+            <ArrowRight className="h-3 w-3 text-indigo-300" />
+            <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
+              2. Type Detection
+            </Badge>{' '}
+            <ArrowRight className="h-3 w-3 text-indigo-300" />
+            <div className="flex flex-col gap-1.5 border border-indigo-100 bg-white p-2 rounded-lg shadow-sm">
+              <span className="text-[10px] font-bold text-center text-indigo-400 uppercase tracking-wider">
+                3. Extraction (Match By Type)
+              </span>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3a. Kasko
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3b. Traffic
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3c. Home
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3d. Health
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3e. Life
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3f. DASK
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3g. Business
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  3h. Nakliyat
+                </Badge>
+                <Badge variant="outline" className="text-xs border-indigo-200">
+                  3i. Fallback
+                </Badge>
+              </div>
+            </div>{' '}
+            <ArrowRight className="h-3 w-3 text-indigo-300" />
+            <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
+              4. AI Insights
+            </Badge>
+            <span className="text-gray-300 ml-2 mr-2">|</span>
+            <Badge
+              variant="outline"
+              className="bg-gray-50 text-gray-500 border-dashed border-gray-300 shadow-sm"
+            >
+              5. Chat Assistant (On-Demand)
+            </Badge>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Error Message */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center justify-between">
@@ -202,7 +289,12 @@ export function PromptsTab() {
                 <select
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg"
                   value={editForm.category || ''}
-                  onChange={(e) => setEditForm({ ...editForm, category: e.target.value as PromptTemplate['category'] })}
+                  onChange={(e) =>
+                    setEditForm({
+                      ...editForm,
+                      category: e.target.value as PromptTemplate['category'],
+                    })
+                  }
                 >
                   <option value="">Select category</option>
                   <option value="extraction">Extraction</option>
@@ -246,10 +338,14 @@ export function PromptsTab() {
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => {
-                setShowCreateForm(false)
-                setEditForm({})
-              }} disabled={isSaving}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCreateForm(false)
+                  setEditForm({})
+                }}
+                disabled={isSaving}
+              >
                 Cancel
               </Button>
               <Button onClick={handleCreate} disabled={isSaving}>
@@ -272,118 +368,138 @@ export function PromptsTab() {
             </CardContent>
           </Card>
         ) : (
-          templates.map((template) => (
-            <Card key={template.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${getCategoryColor(template.category)}`}>
-                      {getCategoryIcon(template.category)}
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">{template.name}</CardTitle>
-                      <CardDescription>{template.description}</CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">v{template.version}</Badge>
-                    <Badge className={getCategoryColor(template.category)}>
-                      {template.category}
-                    </Badge>
-                    {template.isActive ? (
-                      <Badge className="bg-green-100 text-green-800">Active</Badge>
-                    ) : (
-                      <Badge variant="outline">Inactive</Badge>
-                    )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {editingId === template.id ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        System Prompt
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
-                        rows={4}
-                        value={editForm.systemPrompt ?? template.systemPrompt}
-                        onChange={(e) => setEditForm({ ...editForm, systemPrompt: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        User Prompt Template
-                      </label>
-                      <textarea
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
-                        rows={4}
-                        value={editForm.userPromptTemplate ?? template.userPromptTemplate}
-                        onChange={(e) => setEditForm({ ...editForm, userPromptTemplate: e.target.value })}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => {
-                        setEditingId(null)
-                        setEditForm({})
-                      }} disabled={isSaving}>
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button onClick={() => handleSave(template.id)} disabled={isSaving}>
-                        <Save className="h-4 w-4 mr-2" />
-                        {isSaving ? 'Saving...' : 'Save Changes'}
-                      </Button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">System Prompt</h4>
-                      <pre className="p-3 bg-gray-900 text-gray-100 rounded-lg text-sm overflow-x-auto max-h-32">
-                        {template.systemPrompt}
-                      </pre>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700 mb-1">User Prompt Template</h4>
-                      <pre className="p-3 bg-blue-50 text-blue-900 rounded-lg text-sm overflow-x-auto max-h-32">
-                        {template.userPromptTemplate}
-                      </pre>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-                      <div className="text-sm text-gray-500">
-                        Used {template.usageCount} times
+          sortedTemplates.map((template) => {
+            const executionOrder = PROMPT_EXECUTION_ORDER[template.name]
+            return (
+              <Card key={template.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className={`p-2 rounded-lg ${getCategoryColor(template.category)}`}>
+                          {getCategoryIcon(template.category)}
+                        </div>
+                        {executionOrder && (
+                          <div className="mt-1 text-[10px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">
+                            #{executionOrder}
+                          </div>
+                        )}
                       </div>
-                      <div className="flex gap-2">
+                      <div>
+                        <CardTitle className="text-lg">{template.name}</CardTitle>
+                        <CardDescription>{template.description}</CardDescription>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline">v{template.version}</Badge>
+                      <Badge className={getCategoryColor(template.category)}>
+                        {template.category}
+                      </Badge>
+                      {template.isActive ? (
+                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                      ) : (
+                        <Badge variant="outline">Inactive</Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {editingId === template.id ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          System Prompt
+                        </label>
+                        <textarea
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
+                          rows={4}
+                          value={editForm.systemPrompt ?? template.systemPrompt}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, systemPrompt: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          User Prompt Template
+                        </label>
+                        <textarea
+                          className="w-full px-3 py-2 border border-gray-200 rounded-lg font-mono text-sm"
+                          rows={4}
+                          value={editForm.userPromptTemplate ?? template.userPromptTemplate}
+                          onChange={(e) =>
+                            setEditForm({ ...editForm, userPromptTemplate: e.target.value })
+                          }
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
-                          size="sm"
-                          onClick={() => toggleActive(template.id, template.isActive)}
-                        >
-                          {template.isActive ? 'Deactivate' : 'Activate'}
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
                           onClick={() => {
-                            setEditingId(template.id)
-                            setEditForm({
-                              systemPrompt: template.systemPrompt,
-                              userPromptTemplate: template.userPromptTemplate,
-                            })
+                            setEditingId(null)
+                            setEditForm({})
                           }}
+                          disabled={isSaving}
                         >
-                          <Edit2 className="h-4 w-4 mr-2" />
-                          Edit
+                          <X className="h-4 w-4 mr-2" />
+                          Cancel
+                        </Button>
+                        <Button onClick={() => handleSave(template.id)} disabled={isSaving}>
+                          <Save className="h-4 w-4 mr-2" />
+                          {isSaving ? 'Saving...' : 'Save Changes'}
                         </Button>
                       </div>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-1">System Prompt</h4>
+                        <pre className="p-3 bg-gray-900 text-gray-100 rounded-lg text-sm overflow-x-auto max-h-32">
+                          {template.systemPrompt}
+                        </pre>
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-1">
+                          User Prompt Template
+                        </h4>
+                        <pre className="p-3 bg-blue-50 text-blue-900 rounded-lg text-sm overflow-x-auto max-h-32">
+                          {template.userPromptTemplate}
+                        </pre>
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <div className="text-sm text-gray-500">
+                          Used {template.usageCount} times
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => toggleActive(template.id, template.isActive)}
+                          >
+                            {template.isActive ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setEditingId(template.id)
+                              setEditForm({
+                                systemPrompt: template.systemPrompt,
+                                userPromptTemplate: template.userPromptTemplate,
+                              })
+                            }}
+                          >
+                            <Edit2 className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })
         )}
       </div>
     </div>
