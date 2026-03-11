@@ -34,7 +34,9 @@ export function PromptsTab() {
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
   const PROMPT_EXECUTION_ORDER: Record<string, string> = {
-    'OCR Correction - Lightweight': '1',
+    'Document Preprocessing': '1a',
+    'OCR Correction - Lightweight': '1b',
+    'Document Normalization - Full': '1c',
     'Policy Type Detection': '2',
     'Kasko Extraction': '3a',
     'Traffic Insurance Extraction': '3b',
@@ -45,8 +47,10 @@ export function PromptsTab() {
     'Business Insurance Extraction': '3g',
     'Nakliyat Insurance Extraction': '3h',
     'Policy Extraction - Master': '3i',
-    'AI Insights - Sense Check': '4',
-    'Policy Chat Assistant': '5',
+    'Extraction Quality Scoring': '4',
+    'Coverage Gap Analysis': '5a',
+    'AI Insights - Sense Check': '5b',
+    'Policy Chat Assistant': '6',
   }
 
   const sortedTemplates = [...templates].sort((a, b) => {
@@ -194,9 +198,22 @@ export function PromptsTab() {
         </CardHeader>
         <CardContent className="pb-4">
           <div className="text-sm text-gray-600 flex flex-wrap gap-2 items-center">
-            <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
-              1. OCR
-            </Badge>{' '}
+            <div className="flex flex-col gap-1.5 border border-indigo-100 bg-white p-2 rounded-lg shadow-sm">
+              <span className="text-[10px] font-bold text-center text-indigo-400 uppercase tracking-wider">
+                1. OCR & Preprocessing
+              </span>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  1a. Preprocessing
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  1b. Lightweight
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  1c. Full Normalization
+                </Badge>
+              </div>
+            </div>{' '}
             <ArrowRight className="h-3 w-3 text-indigo-300" />
             <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
               2. Type Detection
@@ -238,14 +255,28 @@ export function PromptsTab() {
             </div>{' '}
             <ArrowRight className="h-3 w-3 text-indigo-300" />
             <Badge variant="secondary" className="bg-white text-indigo-700 shadow-sm">
-              4. AI Insights
-            </Badge>
+              4. QA Scoring
+            </Badge>{' '}
+            <ArrowRight className="h-3 w-3 text-indigo-300" />
+            <div className="flex flex-col gap-1.5 border border-indigo-100 bg-white p-2 rounded-lg shadow-sm">
+              <span className="text-[10px] font-bold text-center text-indigo-400 uppercase tracking-wider">
+                5. Analysis
+              </span>
+              <div className="flex flex-wrap gap-1.5 justify-center">
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  5a. Gap Analysis
+                </Badge>
+                <Badge variant="outline" className="text-xs bg-indigo-50/50">
+                  5b. AI Insights
+                </Badge>
+              </div>
+            </div>
             <span className="text-gray-300 ml-2 mr-2">|</span>
             <Badge
               variant="outline"
               className="bg-gray-50 text-gray-500 border-dashed border-gray-300 shadow-sm"
             >
-              5. Chat Assistant (On-Demand)
+              6. Chat Assistant (On-Demand)
             </Badge>
           </div>
         </CardContent>
