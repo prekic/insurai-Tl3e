@@ -19,9 +19,34 @@ export function InsightsTab() {
   const [isSaving, setIsSaving] = useState(false)
   const [saveSuccess, setSaveSuccess] = useState<string | null>(null)
 
+  const [showPreview, setShowPreview] = useState(false)
+  const [previewPrompt, setPreviewPrompt] = useState<string | null>(null)
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false)
+
   useEffect(() => {
     fetchGuidelines()
   }, [])
+
+  const fetchPromptPreview = async () => {
+    try {
+      setIsLoadingPreview(true)
+      setError(null)
+      const res = await fetch('/api/ai/sense-check-prompt-preview')
+      if (!res.ok) throw new Error('Failed to fetch prompt preview')
+      const data = await res.json()
+      if (data.success) {
+        setPreviewPrompt(data.prompt)
+        setShowPreview(true)
+      } else {
+        throw new Error(data.error || 'Failed to generate preview')
+      }
+    } catch (err) {
+      console.error('Failed to load prompt preview:', err)
+      setError(err instanceof Error ? err.message : 'Error loading prompt preview')
+    } finally {
+      setIsLoadingPreview(false)
+    }
+  }
 
   const fetchGuidelines = async () => {
     try {
@@ -137,10 +162,20 @@ export function InsightsTab() {
           <h1 className="text-2xl font-bold text-gray-900">AI Insight Guidelines</h1>
           <p className="text-gray-500">Manage rules to guide the AI's sense-checker for insights</p>
         </div>
-        <Button onClick={() => setShowCreateForm(true)} disabled={isSaving}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Guideline
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={fetchPromptPreview}
+            disabled={isLoadingPreview || isSaving}
+          >
+            <Lightbulb className="h-4 w-4 mr-2" />
+            {isLoadingPreview ? 'Loading...' : 'Preview Prompt'}
+          </Button>
+          <Button onClick={() => setShowCreateForm(true)} disabled={isSaving}>
+            <Plus className="h-4 w-4 mr-2" />
+            New Guideline
+          </Button>
+        </div>
       </div>
 
       {error && (
@@ -156,6 +191,35 @@ export function InsightsTab() {
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
           {saveSuccess}
         </div>
+      )}
+
+      {showPreview && previewPrompt && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardHeader className="pb-3 border-b border-blue-100 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-blue-900 flex items-center gap-2">
+                <Lightbulb className="h-5 w-5 text-blue-600" />
+                Final System Prompt Preview
+              </CardTitle>
+              <CardDescription className="text-blue-700 mt-1">
+                This is the exact prompt the AI receives, including your active custom guidelines.
+              </CardDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowPreview(false)}
+              className="text-blue-500 hover:text-blue-700"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <pre className="p-4 bg-gray-900 text-gray-100 rounded-lg text-sm overflow-x-auto whitespace-pre-wrap font-mono">
+              {previewPrompt}
+            </pre>
+          </CardContent>
+        </Card>
       )}
 
       {showCreateForm && (

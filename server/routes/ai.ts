@@ -43,7 +43,11 @@ const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getAIConfig } from '../services/config-service.js'
 import { getClientWithError } from '../services/admin-db.js'
-import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
+import {
+  getChatPrompt,
+  getExtractionPrompt,
+  getSenseCheckPrompt,
+} from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
@@ -1878,20 +1882,26 @@ router.post('/sense-check', validateJSON, async (req: Request, res: Response) =>
       log.warn('Failed to fetch ai_insight_guidelines', { error: String(dbErr) })
     }
 
-    const defaultGuidelinesText = `1. Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
-2. If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
-3. Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
+    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
+- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
+- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
 
-    const finalGuidelines = guidelinesText ? guidelinesText : defaultGuidelinesText
+    const finalGuidelines = guidelinesText
+      ? `${defaultGuidelinesText}\n${guidelinesText}`
+      : defaultGuidelinesText
 
-    const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
-You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
-Your job is to identify and discard "false positive" warnings based on these rules:
-${finalGuidelines}
+    const renderedPrompt = await getSenseCheckPrompt(
+      finalGuidelines,
+      JSON.stringify(policyData, null, 2),
+      JSON.stringify(rawInsights, null, 2)
+    )
 
-Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }`
+    if (!renderedPrompt) {
+      log.error('Could not load sense-check prompt template')
+      return res.json({ success: true, validInsights: rawInsights, provider: 'fallback' })
+    }
 
-    const userPrompt = `Policy Data:\n${JSON.stringify(policyData, null, 2)}\n\nRaw Insights:\n${JSON.stringify(rawInsights, null, 2)}`
+    const { systemPrompt, userPrompt } = renderedPrompt
 
     const anthropicClient = getAnthropicClient()
     const openaiClient = getOpenAIClient()
@@ -1901,9 +1911,7 @@ Return a JSON object: { "validInsights": string[], "discardedInsights": string[]
         const response = await anthropicClient.messages.create({
           model: aiConfig.anthropicBackupModel || aiConfig.anthropicExtractionModel,
           max_tokens: 1024,
-          system:
-            systemPrompt +
-            '\n\nPlease strictly output the JSON object without any wrapping markdown blocks.',
+          system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         })
         const textBlock = response.content.find((block: any) => block.type === 'text')
@@ -1958,6 +1966,61 @@ Return a JSON object: { "validInsights": string[], "discardedInsights": string[]
       provider: 'fallback',
       error: String(e),
     })
+  }
+})
+
+/**
+ * GET /api/ai/sense-check-prompt-preview
+ * Returns the final system prompt that would be sent to the AI for sense-checking,
+ * including all currently active custom guidelines combined with default rules.
+ */
+router.get('/sense-check-prompt-preview', async (req: Request, res: Response) => {
+  try {
+    const policyType = (req.query.policyType as string) || '*'
+
+    let guidelinesText = ''
+    try {
+      const { client: db } = getClientWithError()
+      if (db) {
+        const { data } = await db
+          .from('ai_insight_guidelines')
+          .select('guidance_text')
+          .eq('is_active', true)
+          .in('policy_type', ['*', policyType])
+
+        if (data && data.length > 0) {
+          guidelinesText = data
+            .map((d: any, index: number) => `${index + 1}. ${d.guidance_text}`)
+            .join('\n')
+        }
+      }
+    } catch (dbErr) {
+      log.warn('Failed to fetch ai_insight_guidelines for preview', { error: String(dbErr) })
+    }
+
+    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
+- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
+- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
+
+    const finalGuidelines = guidelinesText
+      ? `${defaultGuidelinesText}\n${guidelinesText}`
+      : defaultGuidelinesText
+
+    const renderedPrompt = await getSenseCheckPrompt(
+      finalGuidelines,
+      '{{Sample Policy Data}}',
+      '{{Sample Raw Insights}}'
+    )
+
+    if (!renderedPrompt) {
+      log.error('Could not load sense-check prompt template for preview')
+      return res.status(500).json({ success: false, error: 'Could not load prompt template' })
+    }
+
+    return res.json({ success: true, prompt: renderedPrompt.systemPrompt })
+  } catch (e) {
+    log.error('Sense-check prompt preview error', { error: String(e) })
+    return res.status(500).json({ success: false, error: String(e) })
   }
 })
 

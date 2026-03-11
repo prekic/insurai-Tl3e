@@ -1,4 +1,4 @@
-# Session Handoff — March 10, 2026 (AI Insight Rules Dashboard)
+# Session Handoff — March 11, 2026 (AI Prompts & UI Execution Schema)
 
 ## Current Status
 
@@ -6,86 +6,84 @@
 |--------|--------|
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
-| **Tests** | 15,850+ tests passing, 0 failures |
-| **Branch** | `insuraigemini202603092125` — 5 commits, pushed |
+| **Tests** | All tests passing, 0 failures |
+| **Branch** | `insuraigemini202603110438` — 7 commits, pushed |
 
 ---
 
 ## This Session — New Features & Fixes
 
-### 1. Dynamic AI Insight Guidelines (Admin Dashboard)
+### 1. Fix Duplicate AI Insights Firing
 
-**Problem**: The AI sometimes hallucinates incorrect or overly critical missing coverages (e.g., flagging "collision" missing on a comprehensive Kasko policy). We had hardcoded `if`/`else` rules in backend source code to prevent this.
+**Problem**: AI insights (Strengths, Gaps, Recommendations) and Sense-Check rules were generating duplicate entries in the final output because `generateAIInsightsAsync` was being called twice during the policy extraction phase.
 
-**Fix** (commits `6010ee3`, `d249e35`):
-- Created Supabase table `ai_insight_guidelines` with migration `032_ai_insight_guidelines.sql`.
-- Updated `POST /api/ai/sense-check` to fetch rules scoped to `policy_type` and `region_code` (with `*` global wildcards).
-- Injected the dynamic output into the `systemPrompt`.
-- Created an extensive Admin UI Dashboard (`InsightsTab.tsx`) with full CRUD and active toggling abilities, accessible via the sidebar under "AI Insights".
-- Created ADR `018-dynamic-ai-insight-guidelines.md` documenting the architecture decision to shift to DB-controlled rules.
+**Fix** (commits `92e5ef6`, `180fb31`, `e73275b`):
+- Prevented the duplicate `generateAIInsightsAsync` call in `src/lib/ai/policy-extractor.ts`.
+- Combined default and dynamic guidelines in the sense-check logic.
+- Enforced stricter anti-hallucination rules in the extraction prompt to prevent false positives.
 
-### 2. VKN vs TC Kimlik Validation False Positives
+### 2. Make AI Prompts Editable via Database
 
-**Problem**: False positive identification of national ID formats.
+**Problem**: Critical AI prompts, such as the AI Insights Sense-Check prompt, were hardcoded in the codebase backend, preventing administrators from dynamically adjusting AI behavior on the fly.
 
-**Fix** (commit `7db3d6e`):
-- Ensured validation differentiates between VKN (Tax IDs for companies) and TC Kimlik correctly.
+**Fix** (commit `9ea842e`):
+- Migrated the "AI Insights - Sense Check" prompt to the `prompt_templates` database table using migration `007_seed_insight_prompts.sql`.
+- Updated `prompt-service.ts` to fetch and render the prompt dynamically, including setting up a highly resilient fallback prompt if the database is unreachable.
+- Refactored `/api/ai/sense-check` endpoint to use the new database-driven system.
 
-### 3. TypeScript Casting for Extraction Data
+### 3. Prompt Preview in Insights Tab
 
-**Problem**: Extraction typing mismatch during AI output parsing.
+**Problem**: Administrators lacked a way to see the *exact* final prompt that gets sent to the LLM (combining the base prompt, static rules, and dynamic database rules).
 
-**Fix** (commit `c9094de`):
-- Patched TypeScript casting issues for robust runtime parsing of extraction data.
+**Fix** (commit `9bc01a5`):
+- Created a new GET route `/api/ai/sense-check-prompt-preview` that replicates the backend prompt engineering logic without sending it to the AI.
+- Added a "Preview Prompt" button in the Insights Tab (`InsightsTab.tsx`) that opens a readable dialog containing the final compiled prompt.
 
-### 4. 502/504 Errors on Proxy Extraction Timeout
+### 4. Admin Prompts UI Execution Flow Schema
 
-**Problem**: Prolonged extraction tasks occasionally trigger 502 (Bad Gateway) or 504 (Gateway Timeout) from proxies (like Railway/Cloudflare) before the internal server budget runs out.
+**Problem**: The Admin dashboard's list of Prompt Templates lacked a visual hierarchy explaining exactly which prompts fired in what order during the automated extraction pipeline.
 
-**Fix** (commit `35010e5`):
-- Handled 502/504 errors specifically on proxy timeout to provide better user feedback instead of crashing or showing unstructured server dump errors.
+**Fix** (commits `e3a968e`, `61346ab`):
+- Implemented a `Pipeline Execution Flow` visual schema in `PromptsTab.tsx`.
+- Defined a robust sequencing logic mapping (e.g., `1a`, `1b`, `1c`, `3a`, `3b`) to handle linear steps and path branching.
+- Verified that all edge-case prompt variants (Document Preprocessing, Extraction Quality Scoring, Coverage Gap Analysis) are visually accounted for in the execution map.
 
 ### Commits (oldest → newest)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `7db3d6e` | fix(ai) | resolve vkn vs tc kimlik validation false positives |
-| `6010ee3` | feat(ai) | implement ai sense checking for policy insights |
-| `c9094de` | fix(ai) | typescript casting for extraction data |
-| `35010e5` | fix(ai) | handle 502/504 errors on proxy extraction timeout to provide better user feedback |
-| `d249e35` | feat(admin) | add AI insights management dashboard |
+| `92e5ef6` | fix(ai) | resolve duplicate AI insights by preventing duplicate generateAIInsightsAsync call |
+| `180fb31` | fix(ai) | combine default and dynamic guidelines in sense-check and allow adding insights |
+| `e73275b` | fix(ai) | enforce stricter anti-hallucination rules in extraction prompt |
+| `9bc01a5` | feat(admin) | add prompt preview to insights tab |
+| `9ea842e` | feat(admin) | make AI Insights sense-check prompt editable via database |
+| `e3a968e` | feat(admin) | add visual execution schema and sort prompts by pipeline order |
+| `61346ab` | feat(admin) | expand execution flow schema with all prompt templates including OCR, scoring, and gap analysis |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/032_ai_insight_guidelines.sql` | **NEW** Migration for AI sense-checking rules table |
-| `src/types/supabase.ts` | Automatically tracked DB types for new table |
-| `server/routes/ai.ts` | Removed hardcoded rules. Dynamically fetch rules from Supabase and concat to prompt |
-| `src/components/admin/tabs/InsightsTab.tsx` | **NEW** The React Admin UI dashboard for managing insight rules |
-| `src/components/admin/AdminLayout.tsx` | Linked "AI Insights" in the global Admin navigation view |
-| `src/components/admin/AdminDashboard.tsx` | Registered `InsightsTab` into the rendering switch case |
-| `src/components/admin/tabs/index.ts` | Exported `InsightsTab` |
-| `src/types/admin.ts` | Added `'insights'` to `AdminSection` routing type |
-| `src/components/PolicyDetailView.tsx` | TypeScript casting patches for extraction data parsing |
-| `src/lib/ai/config.ts` | Thresholds and config for proxy timeout resilience |
-| `src/lib/ai/policy-extractor.ts` | Proxy timeout resilience logic handling 502/504 edge cases |
-| `src/lib/extraction/turkish-patterns.ts` | Regex/validation logic fix for VKN vs TC Kimlik false positives |
-| `src/lib/extraction/turkish-patterns.test.ts` | Unit tests for VKN vs TC Kimlik validation |
-| `src/lib/i18n/translations-*.ts` | Localized UI feedback messages for proxy timeouts |
-| `docs/adr/018-dynamic-ai-insight-guidelines.md` | **NEW** ADR documenting the architectural shift |
+| `src/lib/ai/policy-extractor.ts` | **FIX** Removed duplicate AI Insight generation calls |
+| `server/routes/ai.ts` | Refactored sense-check logic to use DB prompt, added preview endpoint |
+| `server/services/prompt-service.ts` | Configured dynamic fetching and base mappings for AI sense-check prompt |
+| `supabase/migrations/007_seed_insight_prompts.sql` | **NEW** Inserted the AI Insights prompt to the `prompt_templates` table |
+| `src/components/admin/tabs/InsightsTab.tsx` | Added "Preview Prompt" button and compilation UI |
+| `src/components/admin/tabs/PromptsTab.tsx` | Built visual Pipeline Execution Flow schema mapping |
+| `src/lib/ai/extraction-schema.ts` | **FIX** Enforced explicit anti-hallucination instructions requiring `null` outputs for missing values |
 
 ---
 
 ## ⚠️ Gotchas for Next Session
 
-1. **Rule Caching Pipeline**: Currently, `POST /api/ai/sense-check` executes a `select` query directly against `ai_insight_guidelines` on every request. If extraction traffic rises significantly, we might need a node cache mechanism (e.g. `lru-cache`) to hold the rules in memory with a short TTL, reducing DB load.
-2. **Supabase Client Context in Admin Component**: `InsightsTab.tsx` leverages the client-side Supabase object exported from `src/lib/supabase/client.ts`. This works securely because the dashboard itself is rendered behind an authenticated route lock.
+1. **Prompt Template Variables**: The `AI Insights - Sense Check` prompt strictly expects `{{policy_data}}`, `{{raw_insights}}`, and `{{guidelines}}` as variable keys. If an administrator breaks these template strings in the UI, the sense-check endpoint might fail.
+2. **Execution Order Mapping**: In `PromptsTab.tsx`, `PROMPT_EXECUTION_ORDER` requires exactly matching the prompt `name` from the database. If a new prompt is added via the DB, it will appear at the bottom of the execution track unless manually mapped in the component.
+3. **Extraction Anti-Hallucination Guardrails**: The extraction prompts in `src/lib/ai/extraction-schema.ts` were strictly updated to instruct the model to return `null` when finding missing fields. If future features are built relying on empty arrays or empty strings for specific fields (e.g. deductibles or dates), that parsing logic will need to handle `null`.
 
 ---
 
 ## Priority Next Steps
 
-1. **Merge & Deploy** — Branch `insuraigemini202603092125` is ready to merge. 
-2. **Production Validation** — After deploying, navigate to `/admin/insights` and create a dummy rule for a Kasko policy (`*` region) that forces the AI to append an exclamation mark to an insight. Perform a PDF extraction and verify the AI respects the new global rule. Delete the rule afterward.
-3. **Database Seed Verification** — Ensure that `032_ai_insight_guidelines.sql` runs perfectly on production through the established CI/CD pipeline or migration runner.
+1. **Merge & Deploy** — Branch `insuraigemini202603110438` is ready to merge. 
+2. **Production Validation** — Test editing the AI Insights prompt in production by changing a single parameter, executing a document analysis, and ensuring the new edit applies seamlessly.
+3. **Seed Verification** — Ensure the `007_seed_insight_prompts.sql` migration fires safely through the CI/CD deployment logic on the production DB.

@@ -422,7 +422,11 @@ Your task is to extract structured information from insurance policy documents.
    - Whether the information was explicitly stated vs inferred
    - Consistency of information across the document
 
-6. **Missing Information**: Use null for fields you cannot confidently extract
+6. **Missing Information & Anti-Hallucination** (CRITICAL):
+   - ONLY extract values explicitly stated in the document.
+   - DO NOT hallucinate, guess, or assume values.
+   - If a field (e.g. deductible, premium, limits, dates) is not explicitly found, you MUST return null.
+   - It is far better to return null than to extract an incorrect value.
 
 7. **Coverages**: List all coverage items found, including:
    - Main coverage (Ana Teminat)

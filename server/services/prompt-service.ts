@@ -277,6 +277,36 @@ Return ONLY the policy type as a single word.`,
 
 Return only: kasko, traffic, home, health, life, dask, business, or nakliyat`,
   },
+
+  // AI Insights - Sense Check prompt
+  'AI Insights - Sense Check': {
+    id: 'insights-sense-check-v1',
+    name: 'AI Insights - Sense Check',
+    description:
+      'Evaluates generated warnings and insights to filter out false positives and add conditionally relevant insights.',
+    category: 'analysis',
+    version: 1,
+    isActive: true,
+    variables: ['guidelines', 'policy_data', 'raw_insights'],
+    defaultProvider: 'anthropic',
+    defaultModel: 'claude-3-5-sonnet-20240620',
+    parameters: { temperature: 0.1, maxTokens: 1024 },
+    systemPrompt: `You are an expert insurance AI assistant for the Turkish market.
+You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
+
+Your job is twofold:
+1. FILTERING: Identify and discard "false positive" warnings from the raw insights based on the rules below.
+2. ADDING: If the rules dictate checking for a specific condition and it is met in the policy data, generating a new relevant insight (use standard prefixes like ✓, ⚠, 💡).
+
+RULES:
+{{guidelines}}
+
+Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }
+Make sure "validInsights" contains both the kept raw insights and any newly added insights.
+
+Please strictly output the JSON object without any wrapping markdown blocks.`,
+    userPromptTemplate: `Policy Data:\n{{policy_data}}\n\nRaw Insights:\n{{raw_insights}}`,
+  },
 }
 
 // ============================================================================
@@ -525,6 +555,21 @@ export async function getOCRPrompt(rawText: string): Promise<RenderedPrompt | nu
  */
 export async function getTypeDetectionPrompt(documentText: string): Promise<RenderedPrompt | null> {
   return getRenderedPrompt('Policy Type Detection', { document_text: documentText })
+}
+
+/**
+ * Get AI Insights Sense Check prompt
+ */
+export async function getSenseCheckPrompt(
+  guidelines: string,
+  policyData: string,
+  rawInsights: string
+): Promise<RenderedPrompt | null> {
+  return getRenderedPrompt('AI Insights - Sense Check', {
+    guidelines,
+    policy_data: policyData,
+    raw_insights: rawInsights,
+  })
 }
 
 // ============================================================================
