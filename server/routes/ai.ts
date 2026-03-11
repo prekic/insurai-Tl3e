@@ -1878,18 +1878,26 @@ router.post('/sense-check', validateJSON, async (req: Request, res: Response) =>
       log.warn('Failed to fetch ai_insight_guidelines', { error: String(dbErr) })
     }
 
-    const defaultGuidelinesText = `1. Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
-2. If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
-3. Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
+    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
+- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
+- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
 
-    const finalGuidelines = guidelinesText ? guidelinesText : defaultGuidelinesText
+    const finalGuidelines = guidelinesText
+      ? `${defaultGuidelinesText}\n${guidelinesText}`
+      : defaultGuidelinesText
 
     const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
 You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
-Your job is to identify and discard "false positive" warnings based on these rules:
+
+Your job is twofold:
+1. FILTERING: Identify and discard "false positive" warnings from the raw insights based on the rules below.
+2. ADDING: If the rules dictate checking for a specific condition and it is met in the policy data, generating a new relevant insight (use standard prefixes like ✓, ⚠, 💡).
+
+RULES:
 ${finalGuidelines}
 
-Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }`
+Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }
+Make sure "validInsights" contains both the kept raw insights and any newly added insights.`
 
     const userPrompt = `Policy Data:\n${JSON.stringify(policyData, null, 2)}\n\nRaw Insights:\n${JSON.stringify(rawInsights, null, 2)}`
 
