@@ -43,7 +43,11 @@ const __dirname = path.dirname(__filename)
 import { calculateCost, recordUsage } from '../middleware/cost-control.js'
 import { getAIConfig } from '../services/config-service.js'
 import { getClientWithError } from '../services/admin-db.js'
-import { getChatPrompt, getExtractionPrompt } from '../services/prompt-service.js'
+import {
+  getChatPrompt,
+  getExtractionPrompt,
+  getSenseCheckPrompt,
+} from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
 import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
@@ -1886,20 +1890,18 @@ router.post('/sense-check', validateJSON, async (req: Request, res: Response) =>
       ? `${defaultGuidelinesText}\n${guidelinesText}`
       : defaultGuidelinesText
 
-    const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
-You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
+    const renderedPrompt = await getSenseCheckPrompt(
+      finalGuidelines,
+      JSON.stringify(policyData, null, 2),
+      JSON.stringify(rawInsights, null, 2)
+    )
 
-Your job is twofold:
-1. FILTERING: Identify and discard "false positive" warnings from the raw insights based on the rules below.
-2. ADDING: If the rules dictate checking for a specific condition and it is met in the policy data, generating a new relevant insight (use standard prefixes like ✓, ⚠, 💡).
+    if (!renderedPrompt) {
+      log.error('Could not load sense-check prompt template')
+      return res.json({ success: true, validInsights: rawInsights, provider: 'fallback' })
+    }
 
-RULES:
-${finalGuidelines}
-
-Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }
-Make sure "validInsights" contains both the kept raw insights and any newly added insights.`
-
-    const userPrompt = `Policy Data:\n${JSON.stringify(policyData, null, 2)}\n\nRaw Insights:\n${JSON.stringify(rawInsights, null, 2)}`
+    const { systemPrompt, userPrompt } = renderedPrompt
 
     const anthropicClient = getAnthropicClient()
     const openaiClient = getOpenAIClient()
@@ -1909,9 +1911,7 @@ Make sure "validInsights" contains both the kept raw insights and any newly adde
         const response = await anthropicClient.messages.create({
           model: aiConfig.anthropicBackupModel || aiConfig.anthropicExtractionModel,
           max_tokens: 1024,
-          system:
-            systemPrompt +
-            '\n\nPlease strictly output the JSON object without any wrapping markdown blocks.',
+          system: systemPrompt,
           messages: [{ role: 'user', content: userPrompt }],
         })
         const textBlock = response.content.find((block: any) => block.type === 'text')
@@ -2006,20 +2006,18 @@ router.get('/sense-check-prompt-preview', async (req: Request, res: Response) =>
       ? `${defaultGuidelinesText}\n${guidelinesText}`
       : defaultGuidelinesText
 
-    const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
-You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
+    const renderedPrompt = await getSenseCheckPrompt(
+      finalGuidelines,
+      '{{Sample Policy Data}}',
+      '{{Sample Raw Insights}}'
+    )
 
-Your job is twofold:
-1. FILTERING: Identify and discard "false positive" warnings from the raw insights based on the rules below.
-2. ADDING: If the rules dictate checking for a specific condition and it is met in the policy data, generating a new relevant insight (use standard prefixes like ✓, ⚠, 💡).
+    if (!renderedPrompt) {
+      log.error('Could not load sense-check prompt template for preview')
+      return res.status(500).json({ success: false, error: 'Could not load prompt template' })
+    }
 
-RULES:
-${finalGuidelines}
-
-Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }
-Make sure "validInsights" contains both the kept raw insights and any newly added insights.`
-
-    return res.json({ success: true, prompt: systemPrompt })
+    return res.json({ success: true, prompt: renderedPrompt.systemPrompt })
   } catch (e) {
     log.error('Sense-check prompt preview error', { error: String(e) })
     return res.status(500).json({ success: false, error: String(e) })
