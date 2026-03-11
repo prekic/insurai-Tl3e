@@ -1970,6 +1970,63 @@ Make sure "validInsights" contains both the kept raw insights and any newly adde
 })
 
 /**
+ * GET /api/ai/sense-check-prompt-preview
+ * Returns the final system prompt that would be sent to the AI for sense-checking,
+ * including all currently active custom guidelines combined with default rules.
+ */
+router.get('/sense-check-prompt-preview', async (req: Request, res: Response) => {
+  try {
+    const policyType = (req.query.policyType as string) || '*'
+
+    let guidelinesText = ''
+    try {
+      const { client: db } = getClientWithError()
+      if (db) {
+        const { data } = await db
+          .from('ai_insight_guidelines')
+          .select('guidance_text')
+          .eq('is_active', true)
+          .in('policy_type', ['*', policyType])
+
+        if (data && data.length > 0) {
+          guidelinesText = data
+            .map((d: any, index: number) => `${index + 1}. ${d.guidance_text}`)
+            .join('\n')
+        }
+      }
+    } catch (dbErr) {
+      log.warn('Failed to fetch ai_insight_guidelines for preview', { error: String(dbErr) })
+    }
+
+    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
+- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
+- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
+
+    const finalGuidelines = guidelinesText
+      ? `${defaultGuidelinesText}\n${guidelinesText}`
+      : defaultGuidelinesText
+
+    const systemPrompt = `You are an expert insurance AI assistant for the Turkish market.
+You will be given a list of raw insights (warnings, strengths, gaps) and the extracted policy data.
+
+Your job is twofold:
+1. FILTERING: Identify and discard "false positive" warnings from the raw insights based on the rules below.
+2. ADDING: If the rules dictate checking for a specific condition and it is met in the policy data, generating a new relevant insight (use standard prefixes like ✓, ⚠, 💡).
+
+RULES:
+${finalGuidelines}
+
+Return a JSON object: { "validInsights": string[], "discardedInsights": string[] }
+Make sure "validInsights" contains both the kept raw insights and any newly added insights.`
+
+    return res.json({ success: true, prompt: systemPrompt })
+  } catch (e) {
+    log.error('Sense-check prompt preview error', { error: String(e) })
+    return res.status(500).json({ success: false, error: String(e) })
+  }
+})
+
+/**
  * POST /api/ai/ocr
  * Proxy for Google Cloud Vision OCR
  * Rate limited: 30 requests per hour
