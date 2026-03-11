@@ -1614,7 +1614,7 @@ async function convertToAnalyzedPolicy(
     // Confidence might be a number (0.95) or an object ({ overall: 0.95, ... })
     aiConfidence:
       typeof data.confidence === 'number' ? data.confidence : (data.confidence?.overall ?? 0.7),
-    aiInsights: await generateAIInsightsAsync(data),
+    aiInsights: [],
     marketComparison: await generateMarketComparisonAsync(data),
     extractedText: rawText,
     processedText: processedText || rawText, // Use processed text if available, otherwise raw
