@@ -15,7 +15,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { recordServerConfigFetch } from '../routes/settings.js'
 
 // Timeout for database queries — prevents hanging if Supabase is slow/unreachable
-const DB_QUERY_TIMEOUT_MS = 8_000
+// Default 8000 — configurable via app_settings server.db_query_timeout_ms
+let DB_QUERY_TIMEOUT_MS = 8_000
 
 // =============================================================================
 // TYPES
@@ -42,6 +43,11 @@ export interface AIConfig {
   confidenceWeightDates: number
   confidenceWeightPremium: number
   confidenceWeightCoverages: number
+  requestBudgetMs: number
+  primaryProviderTimeoutMs: number
+  fallbackProviderTimeoutMs: number
+  clientFetchTimeoutMs: number
+  trialExtractionTimeoutMs: number
 }
 
 export interface RateLimitsConfig {
@@ -70,6 +76,9 @@ export interface OCRConfig {
   weightFieldExtraction: number
   timeoutSeconds: number
   maxTextLength: number
+  pdfLoadTimeoutMs: number
+  maxWorkerFailures: number
+  ocrCleanupTimeoutMs: number
 }
 
 export interface MonitoringConfig {
@@ -81,11 +90,42 @@ export interface MonitoringConfig {
   enableEmailAlerts: boolean
   alertEmailAddresses: string
   minProviderRequestsForLatencyAlert: number
+  extractionBufferSize: number
+  maxMetricsBufferSize: number
+  maxAlertHistory: number
+  maxResponseTimes: number
+  serverPerfMaxEvents: number
+  serverPerfMaxAgeMs: number
 }
 
 export interface RetentionConfig {
   processingLogRetentionDays: number
   extractionMetricsRetentionDays: number
+}
+
+export interface FXConfig {
+  serverCacheTtlMs: number
+  apiTimeoutMs: number
+  supportedCurrencies: string[]
+  fallbackRates: Record<string, number>
+}
+
+export interface ServerConfig {
+  dbQueryTimeoutMs: number
+  configCacheTtlMs: number
+  promptCacheTtlMs: number
+  translationCacheTtlMs: number
+  rateLimitConfigCacheTtlMs: number
+}
+
+export interface WebhooksConfig {
+  maxDeliveryAttempts: number
+  deliveryTimeoutMs: number
+  maxResponseBodyLength: number
+}
+
+export interface CostConfig {
+  tokenPricing: Record<string, { input: number; output: number }>
 }
 
 // =============================================================================
@@ -113,6 +153,61 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
+  requestBudgetMs: 125000,
+  primaryProviderTimeoutMs: 65000,
+  fallbackProviderTimeoutMs: 55000,
+  clientFetchTimeoutMs: 135000,
+  trialExtractionTimeoutMs: 150000,
+}
+
+const DEFAULT_FX_CONFIG: FXConfig = {
+  serverCacheTtlMs: 21600000,
+  apiTimeoutMs: 10000,
+  supportedCurrencies: ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED', 'JPY', 'CAD', 'AUD'],
+  fallbackRates: {
+    TRY: 1,
+    USD: 33.5,
+    EUR: 36.5,
+    GBP: 42.5,
+    CHF: 38.0,
+    SAR: 8.9,
+    AED: 9.1,
+    JPY: 0.22,
+    CAD: 24.5,
+    AUD: 21.8,
+  },
+}
+
+const DEFAULT_SERVER_CONFIG: ServerConfig = {
+  dbQueryTimeoutMs: 8000,
+  configCacheTtlMs: 300000,
+  promptCacheTtlMs: 300000,
+  translationCacheTtlMs: 300000,
+  rateLimitConfigCacheTtlMs: 60000,
+}
+
+const DEFAULT_WEBHOOKS_CONFIG: WebhooksConfig = {
+  maxDeliveryAttempts: 3,
+  deliveryTimeoutMs: 10000,
+  maxResponseBodyLength: 1000,
+}
+
+const DEFAULT_COST_CONFIG: CostConfig = {
+  tokenPricing: {
+    'gpt-4o': { input: 0.0025, output: 0.01 },
+    'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
+    'gpt-4-turbo': { input: 0.01, output: 0.03 },
+    'gpt-4': { input: 0.03, output: 0.06 },
+    'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
+    'claude-3-5-sonnet': { input: 0.003, output: 0.015 },
+    'claude-3-5-haiku': { input: 0.00025, output: 0.00125 },
+    'claude-3-opus': { input: 0.015, output: 0.075 },
+    'claude-3-sonnet': { input: 0.003, output: 0.015 },
+    'claude-3-haiku': { input: 0.00025, output: 0.00125 },
+    'gemini-1.5-pro': { input: 0.00125, output: 0.005 },
+    'gemini-1.5-flash': { input: 0.000075, output: 0.0003 },
+    default: { input: 0.001, output: 0.002 },
+  },
 }
 
 const DEFAULT_RATE_LIMITS_CONFIG: RateLimitsConfig = {
@@ -141,6 +236,9 @@ const DEFAULT_OCR_CONFIG: OCRConfig = {
   weightFieldExtraction: 0.15,
   timeoutSeconds: 60,
   maxTextLength: 500000,
+  pdfLoadTimeoutMs: 30000,
+  maxWorkerFailures: 2,
+  ocrCleanupTimeoutMs: 30000,
 }
 
 const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
@@ -152,6 +250,12 @@ const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
   enableEmailAlerts: false,
   alertEmailAddresses: '',
   minProviderRequestsForLatencyAlert: 3,
+  extractionBufferSize: 200,
+  maxMetricsBufferSize: 10000,
+  maxAlertHistory: 1000,
+  maxResponseTimes: 1000,
+  serverPerfMaxEvents: 500,
+  serverPerfMaxAgeMs: 3600000,
 }
 
 const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
@@ -184,6 +288,45 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   confidence_weight_dates: 'confidenceWeightDates',
   confidence_weight_premium: 'confidenceWeightPremium',
   confidence_weight_coverages: 'confidenceWeightCoverages',
+  request_budget_ms: 'requestBudgetMs',
+  primary_provider_timeout_ms: 'primaryProviderTimeoutMs',
+  fallback_provider_timeout_ms: 'fallbackProviderTimeoutMs',
+  client_fetch_timeout_ms: 'clientFetchTimeoutMs',
+  trial_extraction_timeout_ms: 'trialExtractionTimeoutMs',
+}
+
+const FX_KEY_MAP: Record<string, keyof FXConfig> = {
+  server_cache_ttl_ms: 'serverCacheTtlMs',
+  api_timeout_ms: 'apiTimeoutMs',
+  supported_currencies: 'supportedCurrencies',
+  fallback_rates: 'fallbackRates',
+}
+
+const SERVER_KEY_MAP: Record<string, keyof ServerConfig> = {
+  db_query_timeout_ms: 'dbQueryTimeoutMs',
+  config_cache_ttl_ms: 'configCacheTtlMs',
+  prompt_cache_ttl_ms: 'promptCacheTtlMs',
+  translation_cache_ttl_ms: 'translationCacheTtlMs',
+  rate_limit_config_cache_ttl_ms: 'rateLimitConfigCacheTtlMs',
+}
+
+const WEBHOOKS_KEY_MAP: Record<string, keyof WebhooksConfig> = {
+  max_delivery_attempts: 'maxDeliveryAttempts',
+  delivery_timeout_ms: 'deliveryTimeoutMs',
+  max_response_body_length: 'maxResponseBodyLength',
+}
+
+const COST_KEY_MAP: Record<string, keyof CostConfig> = {
+  token_pricing: 'tokenPricing',
+}
+
+const MONITORING_BUFFER_KEY_MAP: Record<string, keyof MonitoringConfig> = {
+  extraction_buffer_size: 'extractionBufferSize',
+  max_metrics_buffer_size: 'maxMetricsBufferSize',
+  max_alert_history: 'maxAlertHistory',
+  max_response_times: 'maxResponseTimes',
+  server_perf_max_events: 'serverPerfMaxEvents',
+  server_perf_max_age_ms: 'serverPerfMaxAgeMs',
 }
 
 const RATE_LIMITS_KEY_MAP: Record<string, keyof RateLimitsConfig> = {
@@ -212,6 +355,9 @@ const OCR_KEY_MAP: Record<string, keyof OCRConfig> = {
   weight_field_extraction: 'weightFieldExtraction',
   timeout_seconds: 'timeoutSeconds',
   max_text_length: 'maxTextLength',
+  pdf_load_timeout_ms: 'pdfLoadTimeoutMs',
+  max_worker_failures: 'maxWorkerFailures',
+  ocr_cleanup_timeout_ms: 'ocrCleanupTimeoutMs',
 }
 
 const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
@@ -240,7 +386,29 @@ interface CacheEntry {
 }
 
 const cache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+// Default 300000 (5 min) — configurable via app_settings server.config_cache_ttl_ms
+let CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+// Self-updating: after first successful getServerConfig(), update local TTLs
+let _serverConfigSelfLoaded = false
+async function _selfLoadServerConfig(): Promise<void> {
+  if (_serverConfigSelfLoaded) return
+  _serverConfigSelfLoaded = true
+  try {
+    // Use a direct DB fetch to avoid circular cache dependency
+    const serverCfg = await getCategorySettings('server')
+    if (serverCfg['db_query_timeout_ms'] !== undefined) {
+      DB_QUERY_TIMEOUT_MS = Number(serverCfg['db_query_timeout_ms'])
+    }
+    if (serverCfg['config_cache_ttl_ms'] !== undefined) {
+      CACHE_TTL_MS = Number(serverCfg['config_cache_ttl_ms'])
+    }
+  } catch {
+    // Keep defaults — DB may not be available yet at startup
+  }
+}
+// Fire-and-forget after a short delay to let Supabase client initialize
+setTimeout(() => _selfLoadServerConfig(), 2000)
 
 function getFromCache<T>(key: string): T | null {
   const entry = cache.get(key)
@@ -475,6 +643,13 @@ export async function getMonitoringConfig(): Promise<MonitoringConfig> {
     }
   }
 
+  // Also merge buffer/limit settings from monitoring category
+  for (const [dbKey, tsKey] of Object.entries(MONITORING_BUFFER_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+    }
+  }
+
   setInCache(cacheKey, config)
   return config
 }
@@ -496,6 +671,127 @@ export async function getRetentionConfig(): Promise<RetentionConfig> {
   for (const [dbKey, tsKey] of Object.entries(RETENTION_KEY_MAP)) {
     if (dbSettings[dbKey] !== undefined) {
       ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get FX configuration with database values merged over defaults
+ */
+export async function getFXConfig(): Promise<FXConfig> {
+  const cacheKey = 'config:fx'
+
+  const cached = getFromCache<FXConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('fx')
+  const config = { ...DEFAULT_FX_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(FX_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      const val = dbSettings[dbKey]
+      if (tsKey === 'supportedCurrencies' || tsKey === 'fallbackRates') {
+        // JSON fields: parse if string, otherwise use as-is
+        if (typeof val === 'string') {
+          try {
+            ;(config as Record<string, unknown>)[tsKey] = JSON.parse(val)
+          } catch {
+            // Keep default on invalid JSON
+          }
+        } else {
+          ;(config as Record<string, unknown>)[tsKey] = val
+        }
+      } else {
+        ;(config as Record<string, unknown>)[tsKey] = Number(val)
+      }
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get server infrastructure configuration with database values merged over defaults
+ */
+export async function getServerConfig(): Promise<ServerConfig> {
+  const cacheKey = 'config:server'
+
+  const cached = getFromCache<ServerConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('server')
+  const config = { ...DEFAULT_SERVER_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(SERVER_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get webhooks configuration with database values merged over defaults
+ */
+export async function getWebhooksConfig(): Promise<WebhooksConfig> {
+  const cacheKey = 'config:webhooks'
+
+  const cached = getFromCache<WebhooksConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('webhooks')
+  const config = { ...DEFAULT_WEBHOOKS_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(WEBHOOKS_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+    }
+  }
+
+  setInCache(cacheKey, config)
+  return config
+}
+
+/**
+ * Get cost tracking configuration with database values merged over defaults
+ */
+export async function getCostConfig(): Promise<CostConfig> {
+  const cacheKey = 'config:cost'
+
+  const cached = getFromCache<CostConfig>(cacheKey)
+  if (cached !== null) {
+    return cached
+  }
+
+  const dbSettings = await getCategorySettings('cost')
+  const config = { ...DEFAULT_COST_CONFIG }
+
+  for (const [dbKey, tsKey] of Object.entries(COST_KEY_MAP)) {
+    if (dbSettings[dbKey] !== undefined) {
+      const val = dbSettings[dbKey]
+      if (tsKey === 'tokenPricing') {
+        if (typeof val === 'string') {
+          try {
+            ;(config as Record<string, unknown>)[tsKey] = JSON.parse(val)
+          } catch {
+            // Keep default on invalid JSON
+          }
+        } else {
+          ;(config as Record<string, unknown>)[tsKey] = val
+        }
+      }
     }
   }
 
@@ -611,6 +907,10 @@ export const configService = {
   getOCRConfig,
   getMonitoringConfig,
   getRetentionConfig,
+  getFXConfig,
+  getServerConfig,
+  getWebhooksConfig,
+  getCostConfig,
   isFeatureEnabled,
   invalidateCache,
 }

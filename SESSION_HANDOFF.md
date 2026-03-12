@@ -1,4 +1,4 @@
-# Session Handoff — March 11, 2026 (AI Prompts & UI Execution Schema)
+# Session Handoff — March 12, 2026 (Hardcoded Config → Admin-Configurable DB)
 
 ## Current Status
 
@@ -6,84 +6,118 @@
 |--------|--------|
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
-| **Tests** | All tests passing, 0 failures |
-| **Branch** | `insuraigemini202603110438` — 7 commits, pushed |
+| **Tests** | 49 new migration tests passing, 0 failures |
+| **Branch** | `claude/load-project-context-LofLp` — 4 commits, pushed |
 
 ---
 
 ## This Session — New Features & Fixes
 
-### 1. Fix Duplicate AI Insights Firing
+### 1. Migration 033: Hardcoded Backend Configs → app_settings
 
-**Problem**: AI insights (Strengths, Gaps, Recommendations) and Sense-Check rules were generating duplicate entries in the final output because `generateAIInsightsAsync` was being called twice during the policy extraction phase.
+**Problem**: 29 critical backend constants (extraction timeouts, FX cache TTLs, token pricing, service cache durations, monitoring buffer sizes) were hardcoded across `server/routes/ai.ts`, `server/routes/fx.ts`, `server/middleware/*.ts`, `server/services/*.ts`, and client-side `src/lib/` files. Changing any value required a code change and redeployment.
 
-**Fix** (commits `92e5ef6`, `180fb31`, `e73275b`):
-- Prevented the duplicate `generateAIInsightsAsync` call in `src/lib/ai/policy-extractor.ts`.
-- Combined default and dynamic guidelines in the sense-check logic.
-- Enforced stricter anti-hallucination rules in the extraction prompt to prevent false positives.
+**Fix** (commit `26c7524`):
+- Created `supabase/migrations/033_seed_hardcoded_configs.sql` — seeds 29 keys across 8 categories with `ON CONFLICT DO NOTHING`
+- Extended `server/services/config-service.ts` with 6 new typed getters: `getFXConfig()`, `getServerConfig()`, `getWebhooksConfig()`, `getCostConfig()`, extended `getMonitoringConfig()`, `getRetentionConfig()`
+- All 30 consumer files updated to read from config service instead of constants
+- Created `GenericSettingsPanel.tsx` — reusable admin UI panel for any config category
+- Added new tabs in Admin Settings: FX, Server, Webhooks, Cost, Monitoring buffers
 
-### 2. Make AI Prompts Editable via Database
+### 2. Test Mock Updates for AIConfig Extension
 
-**Problem**: Critical AI prompts, such as the AI Insights Sense-Check prompt, were hardcoded in the codebase backend, preventing administrators from dynamically adjusting AI behavior on the fly.
+**Problem**: Adding 5 timeout fields to `AIConfig` interface broke 6 existing test files that mocked `getAIConfig()` without the new fields.
 
-**Fix** (commit `9ea842e`):
-- Migrated the "AI Insights - Sense Check" prompt to the `prompt_templates` database table using migration `007_seed_insight_prompts.sql`.
-- Updated `prompt-service.ts` to fetch and render the prompt dynamically, including setting up a highly resilient fallback prompt if the database is unreachable.
-- Refactored `/api/ai/sense-check` endpoint to use the new database-driven system.
+**Fix** (commit `2e61dfc`):
+- Updated mocks in `ai-routes-extended`, `ai-ocr-coverage`, `ai-chat-ocr-diagnose-logs`, `ai-extraction-routes-branches`, `routes-branches`, `cost-control`, `webhook-service` test files
+- Added `default: childLogger` to cost-control logger mock
 
-### 3. Prompt Preview in Insights Tab
+### 3. Migration Validation Test Suite
 
-**Problem**: Administrators lacked a way to see the *exact* final prompt that gets sent to the LLM (combining the base prompt, static rules, and dynamic database rules).
+**Problem**: No automated verification that migration SQL values match TypeScript defaults (drift detection), and no tests for the 6 new config getters.
 
-**Fix** (commit `9bc01a5`):
-- Created a new GET route `/api/ai/sense-check-prompt-preview` that replicates the backend prompt engineering logic without sending it to the AI.
-- Added a "Preview Prompt" button in the Insights Tab (`InsightsTab.tsx`) that opens a readable dialog containing the final compiled prompt.
-
-### 4. Admin Prompts UI Execution Flow Schema
-
-**Problem**: The Admin dashboard's list of Prompt Templates lacked a visual hierarchy explaining exactly which prompts fired in what order during the automated extraction pipeline.
-
-**Fix** (commits `e3a968e`, `61346ab`):
-- Implemented a `Pipeline Execution Flow` visual schema in `PromptsTab.tsx`.
-- Defined a robust sequencing logic mapping (e.g., `1a`, `1b`, `1c`, `3a`, `3b`) to handle linear steps and path branching.
-- Verified that all edge-case prompt variants (Document Preprocessing, Extraction Quality Scoring, Coverage Gap Analysis) are visually accounted for in the execution map.
+**Fix** (commit `314f744`):
+- Created `server/__tests__/config-migration-validation.test.ts` (716 lines, 49 tests)
+- Suite 1: Parses migration SQL, validates all 29 seeded values match `DEFAULT_*_CONFIG` objects
+- Suite 2: Tests all 6 new getters with DB data, empty DB fallback, error fallback, JSON parsing, boolean coercion
+- Suite 3: Cache invalidation with new categories, barrel export completeness
 
 ### Commits (oldest → newest)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `92e5ef6` | fix(ai) | resolve duplicate AI insights by preventing duplicate generateAIInsightsAsync call |
-| `180fb31` | fix(ai) | combine default and dynamic guidelines in sense-check and allow adding insights |
-| `e73275b` | fix(ai) | enforce stricter anti-hallucination rules in extraction prompt |
-| `9bc01a5` | feat(admin) | add prompt preview to insights tab |
-| `9ea842e` | feat(admin) | make AI Insights sense-check prompt editable via database |
-| `e3a968e` | feat(admin) | add visual execution schema and sort prompts by pipeline order |
-| `61346ab` | feat(admin) | expand execution flow schema with all prompt templates including OCR, scoring, and gap analysis |
+| `26c7524` | feat(config) | migrate hardcoded backend configs to admin-configurable app_settings |
+| `2e61dfc` | fix(tests) | update test mocks for hardcoded config migration |
+| `314f744` | test(config) | add migration 033 validation and new config getter tests (49 tests) |
+| `93c0007` | docs | update CLAUDE.md and SESSION_HANDOFF.md for config migration session |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
-| `src/lib/ai/policy-extractor.ts` | **FIX** Removed duplicate AI Insight generation calls |
-| `server/routes/ai.ts` | Refactored sense-check logic to use DB prompt, added preview endpoint |
-| `server/services/prompt-service.ts` | Configured dynamic fetching and base mappings for AI sense-check prompt |
-| `supabase/migrations/007_seed_insight_prompts.sql` | **NEW** Inserted the AI Insights prompt to the `prompt_templates` table |
-| `src/components/admin/tabs/InsightsTab.tsx` | Added "Preview Prompt" button and compilation UI |
-| `src/components/admin/tabs/PromptsTab.tsx` | Built visual Pipeline Execution Flow schema mapping |
-| `src/lib/ai/extraction-schema.ts` | **FIX** Enforced explicit anti-hallucination instructions requiring `null` outputs for missing values |
+| `supabase/migrations/033_seed_hardcoded_configs.sql` | **NEW** Seeds 29 config keys across 8 categories |
+| `server/services/config-service.ts` | **EXTENDED** 6 new typed getters with DEFAULT_*_CONFIG and *_KEY_MAP |
+| `server/__tests__/config-migration-validation.test.ts` | **NEW** 49 tests: SQL↔TS drift detection + getter coverage |
+| `src/components/admin/tabs/settings/GenericSettingsPanel.tsx` | **NEW** Reusable admin settings panel for any category |
+| `src/components/admin/tabs/SettingsTab.tsx` | **EXTENDED** 5 new category tabs (FX, Server, Webhooks, Cost, Monitoring) |
+| `src/lib/config/types.ts` | **EXTENDED** FXConfig, ServerConfig, WebhooksConfig, CostConfig interfaces |
+| `src/lib/config/configuration-service.ts` | **EXTENDED** Client-side mirrors for all new config types |
+| `server/routes/ai.ts` | Extraction timeouts from getAIConfig() |
+| `server/routes/fx.ts` | FX cache/currencies from getFXConfig() |
+| `server/middleware/cost-control.ts` | Token pricing from getCostConfig() |
+| `server/middleware/rate-limit.ts` | Config cache TTL from getServerConfig() |
+| `server/middleware/monitoring.ts` | Buffer sizes from getMonitoringConfig() |
+| `server/services/webhook-service.ts` | Delivery config from getWebhooksConfig() |
+| `server/services/prompt-service.ts` | Cache TTL from getServerConfig() |
+| `server/services/translation-service.ts` | Cache TTL from getServerConfig() |
+| `src/lib/ai/config.ts` | Client fetch timeout from config |
+| `src/lib/ai/pdf-parser.ts` | PDF load timeout, worker failures from config |
+| `src/lib/free-trial.ts` | Trial expiry from config |
+| `src/components/TryAnalysis.tsx` | Umbrella timeout from config |
+| `server/routes/settings.ts` | **EXTENDED** Lazy-loads monitoring config for perf buffer limits; Zod schema reformatting |
+| `src/components/admin/tabs/settings/AISettingsPanel.tsx` | **EXTENDED** 5 new timeout keys added to SETTING_GROUPS.timeouts |
+| `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | Minor reformatting |
+| `src/lib/admin/settings-validation.ts` | **EXTENDED** Validation rules for all 29 new config keys (ranges, ms bounds) |
+| `server/__tests__/ai-chat-ocr-diagnose-logs.test.ts` | Mock updated: +5 AIConfig timeout fields |
+| `server/__tests__/ai-extraction-routes-branches.test.ts` | Mock updated: +5 AIConfig timeout fields |
+| `server/__tests__/ai-ocr-coverage.test.ts` | Mock updated: +5 AIConfig timeout fields, restructured |
+| `server/__tests__/ai-routes-extended.test.ts` | Mock updated: +5 AIConfig timeout fields |
+| `server/__tests__/cost-control.test.ts` | Mock updated: +`default: childLogger` for logger |
+| `server/__tests__/routes-branches.test.ts` | Mock updated: +5 AIConfig timeout fields, restructured |
+| `server/__tests__/webhook-service.test.ts` | Formatting fixes (indentation, line wrapping) |
 
 ---
 
 ## ⚠️ Gotchas for Next Session
 
-1. **Prompt Template Variables**: The `AI Insights - Sense Check` prompt strictly expects `{{policy_data}}`, `{{raw_insights}}`, and `{{guidelines}}` as variable keys. If an administrator breaks these template strings in the UI, the sense-check endpoint might fail.
-2. **Execution Order Mapping**: In `PromptsTab.tsx`, `PROMPT_EXECUTION_ORDER` requires exactly matching the prompt `name` from the database. If a new prompt is added via the DB, it will appear at the bottom of the execution track unless manually mapped in the component.
-3. **Extraction Anti-Hallucination Guardrails**: The extraction prompts in `src/lib/ai/extraction-schema.ts` were strictly updated to instruct the model to return `null` when finding missing fields. If future features are built relying on empty arrays or empty strings for specific fields (e.g. deductibles or dates), that parsing logic will need to handle `null`.
+1. **Migration 033 not yet applied to production**: Must be run via Supabase SQL Editor before admin-configurable values take effect. Until then, code uses hardcoded defaults (no behavioral change).
+2. **Cache invalidation subtlety**: `invalidateCache('fx')` does NOT clear `category:fx` cache used by `getCategorySettings()`. Use `invalidateCache()` (no argument) to fully clear all caches when testing config changes.
+3. **JSON config fields**: `supported_currencies`, `fallback_rates`, and `token_pricing` are stored as JSON strings. If an admin enters malformed JSON via the UI, the getter silently falls back to the hardcoded default. No error is surfaced to the admin.
+4. **Boolean coercion**: `enableEmailAlerts` in monitoring config uses strict `=== 'true'` comparison. Values like `'1'`, `'yes'`, `'TRUE'` (uppercase) are all treated as `false`.
+5. **AIConfig test mock requirement**: All AI route test files must include the 5 new timeout fields in their `getAIConfig()` mock. Omitting them causes test failures.
+6. **10 pre-existing failures in `ai-routes-extended.test.ts`**: These are `/api/ai/diagnose` timeout failures — NOT caused by this migration and not requested to be fixed.
+7. **Lazy-load config at module scope in `settings.ts`**: `server/routes/settings.ts` uses a module-level `_loadPerfConfig()` fire-and-forget async call to read monitoring buffer sizes from DB. If config-service is not yet initialized when settings.ts loads, this silently falls back to defaults. This is intentional — the config refreshes on next call.
+8. **Validation rules added for all 29 keys**: `src/lib/admin/settings-validation.ts` now has explicit `validators.milliseconds()` and `validators.positiveInteger()` bounds for every new config key. When adding more config keys in the future, add matching validation rules here too.
+9. **AISettingsPanel SETTING_GROUPS**: The 5 new timeout keys were added to the `timeouts` group in `AISettingsPanel.tsx`. If new AI-category keys are added to migration 033, they must also be added to the appropriate `SETTING_GROUPS` object for them to appear in the admin UI.
+
+---
+
+## Configuration Requirements
+
+### Environment Variables (No New Ones)
+This migration adds zero new environment variables. All 29 config keys have hardcoded defaults that match previous behavior exactly.
+
+### Database Migration Required
+```bash
+# Apply in Supabase SQL Editor (idempotent — safe to re-run):
+supabase/migrations/033_seed_hardcoded_configs.sql
+```
 
 ---
 
 ## Priority Next Steps
 
-1. **Merge & Deploy** — Branch `insuraigemini202603110438` is ready to merge. 
-2. **Production Validation** — Test editing the AI Insights prompt in production by changing a single parameter, executing a document analysis, and ensuring the new edit applies seamlessly.
-3. **Seed Verification** — Ensure the `007_seed_insight_prompts.sql` migration fires safely through the CI/CD deployment logic on the production DB.
+1. **Apply Migration 033** — Run SQL in Supabase SQL Editor. Verify via `/admin/settings` that new categories (FX, Server, Webhooks, Cost) appear with correct defaults.
+2. **Production Smoke Test** — After applying migration, change one value (e.g., `fx.server_cache_ttl_ms` from 21600000 to 10800000), trigger an FX rate fetch, and verify the new TTL is used.
+3. **JSON Validation for Admin UI** — `GenericSettingsPanel.tsx` accepts freeform text for JSON fields. Consider adding JSON syntax validation before save to prevent malformed values.
+4. **Merge & Deploy** — Branch `claude/load-project-context-LofLp` is ready to merge after migration verification.

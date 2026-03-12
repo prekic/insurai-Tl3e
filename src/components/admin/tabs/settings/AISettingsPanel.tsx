@@ -32,7 +32,10 @@ import type { SettingValue } from '../SettingsTab'
 interface AISettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
-  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
+  onBatchUpdate?: (
+    updates: Array<{ key: string; value: unknown }>,
+    reason?: string
+  ) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }
@@ -57,7 +60,16 @@ const SETTING_GROUPS = {
   timeouts: {
     title: 'Timeouts & Limits',
     description: 'Control extraction timing and resource usage',
-    keys: ['extraction_timeout_ms', 'max_retries', 'retry_delay_ms'],
+    keys: [
+      'extraction_timeout_ms',
+      'max_retries',
+      'retry_delay_ms',
+      'request_budget_ms',
+      'primary_provider_timeout_ms',
+      'fallback_provider_timeout_ms',
+      'client_fetch_timeout_ms',
+      'trial_extraction_timeout_ms',
+    ],
   },
   fallback: {
     title: 'Fallback & Consensus',
@@ -71,7 +83,8 @@ const SETTING_GROUPS = {
   },
   confidenceWeights: {
     title: 'Confidence Scoring Weights',
-    description: 'Control how per-field confidence scores combine into the overall confidence. Weights must sum to 1.0.',
+    description:
+      'Control how per-field confidence scores combine into the overall confidence. Weights must sum to 1.0.',
     keys: [
       'confidence_weight_policy_number',
       'confidence_weight_provider',
@@ -92,15 +105,24 @@ const MODEL_OPTIONS = {
   ],
 }
 
-export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpdate, isLoading, isSaving }: AISettingsPanelProps) {
+export function AISettingsPanel({
+  settings,
+  onUpdate,
+  onBatchUpdate: _onBatchUpdate,
+  isLoading,
+  isSaving,
+}: AISettingsPanelProps) {
   const [editingKey, setEditingKey] = useState<string | null>(null)
   const [editValue, setEditValue] = useState<string>('')
   const [editReason, setEditReason] = useState<string>('')
   const [validationError, setValidationError] = useState<ValidationResult | null>(null)
 
-  const getSettingByKey = useCallback((key: string): SettingValue | undefined => {
-    return settings.find((s) => s.key === key)
-  }, [settings])
+  const getSettingByKey = useCallback(
+    (key: string): SettingValue | undefined => {
+      return settings.find((s) => s.key === key)
+    },
+    [settings]
+  )
 
   const handleEdit = (setting: SettingValue) => {
     setEditingKey(setting.key)
@@ -155,17 +177,15 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
           onClick={() => handleToggle(setting)}
           disabled={isSaving}
           className={`p-1 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-            setting.value ? 'text-green-600 hover:text-green-700' : 'text-gray-400 hover:text-gray-500'
+            setting.value
+              ? 'text-green-600 hover:text-green-700'
+              : 'text-gray-400 hover:text-gray-500'
           }`}
           role="switch"
           aria-checked={setting.value as boolean}
           aria-label={`${keyLabel}: ${setting.value ? 'Enabled' : 'Disabled'}`}
         >
-          {setting.value ? (
-            <ToggleRight className="h-7 w-7" />
-          ) : (
-            <ToggleLeft className="h-7 w-7" />
-          )}
+          {setting.value ? <ToggleRight className="h-7 w-7" /> : <ToggleLeft className="h-7 w-7" />}
         </button>
       )
     }
@@ -338,9 +358,7 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
   }
 
   const renderSettingRow = (setting: SettingValue) => {
-    const keyLabel = setting.key
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (l) => l.toUpperCase())
+    const keyLabel = setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 
     return (
       <div
@@ -423,11 +441,13 @@ export function AISettingsPanel({ settings, onUpdate, onBatchUpdate: _onBatchUpd
                 {groupSettings.map((setting) => renderSettingRow(setting))}
               </div>
               {groupKey === 'confidenceWeights' && confidenceWeightSum !== null && (
-                <div className={`mt-4 px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                  confidenceWeightValid
-                    ? 'bg-green-50 text-green-700 border border-green-200'
-                    : 'bg-red-50 text-red-700 border border-red-200'
-                }`}>
+                <div
+                  className={`mt-4 px-3 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                    confidenceWeightValid
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : 'bg-red-50 text-red-700 border border-red-200'
+                  }`}
+                >
                   {confidenceWeightValid ? (
                     <span>Sum: {confidenceWeightSum.toFixed(2)} = 1.00</span>
                   ) : (

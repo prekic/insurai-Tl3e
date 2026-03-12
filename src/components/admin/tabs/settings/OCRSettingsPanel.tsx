@@ -24,7 +24,10 @@ import type { SettingValue } from '../SettingsTab'
 interface OCRSettingsPanelProps {
   settings: SettingValue[]
   onUpdate: (key: string, value: unknown, reason?: string) => Promise<void>
-  onBatchUpdate?: (updates: Array<{ key: string; value: unknown }>, reason?: string) => Promise<void>
+  onBatchUpdate?: (
+    updates: Array<{ key: string; value: unknown }>,
+    reason?: string
+  ) => Promise<void>
   isLoading: boolean
   isSaving: boolean
 }
@@ -44,29 +47,22 @@ const SETTING_GROUPS = {
   density: {
     title: 'Text Density Analysis',
     description: 'Thresholds for determining if a document needs OCR',
-    keys: [
-      'min_chars_per_page',
-      'skip_ocr_chars_threshold',
-      'selective_ocr_chars_threshold',
-    ],
+    keys: ['min_chars_per_page', 'skip_ocr_chars_threshold', 'selective_ocr_chars_threshold'],
   },
   quality: {
     title: 'Quality Settings',
     description: 'Settings for OCR output quality and validation',
-    keys: [
-      'garbage_ratio_threshold',
-      'min_insurance_terms_ratio',
-      'encoding_issue_threshold',
-    ],
+    keys: ['garbage_ratio_threshold', 'min_insurance_terms_ratio', 'encoding_issue_threshold'],
   },
   processing: {
     title: 'Processing Options',
     description: 'Control how documents are processed',
-    keys: [
-      'max_pages_per_request',
-      'enable_page_splitting',
-      'prefer_document_ai',
-    ],
+    keys: ['max_pages_per_request', 'enable_page_splitting', 'prefer_document_ai'],
+  },
+  pipeline: {
+    title: 'OCR Pipeline Timeouts',
+    description: 'Timeouts and retry limits for the OCR processing pipeline',
+    keys: ['pdf_load_timeout_ms', 'max_worker_failures', 'ocr_cleanup_timeout_ms'],
   },
 }
 
@@ -183,9 +179,7 @@ export function OCRSettingsPanel({
         </div>
         <div className="flex items-center gap-1">
           {indicator.icon}
-          <span className={`font-mono ${indicator.color}`}>
-            {(value * 100).toFixed(0)}%
-          </span>
+          <span className={`font-mono ${indicator.color}`}>{(value * 100).toFixed(0)}%</span>
         </div>
         <Button size="sm" variant="ghost" onClick={() => handleEdit(setting)}>
           Adjust
@@ -212,7 +206,11 @@ export function OCRSettingsPanel({
     }
 
     // Confidence threshold (0-1 range)
-    if (setting.key.includes('confidence') || setting.key.includes('ratio') || setting.key.includes('threshold')) {
+    if (
+      setting.key.includes('confidence') ||
+      setting.key.includes('ratio') ||
+      setting.key.includes('threshold')
+    ) {
       const value = Number(setting.value)
       if (value >= 0 && value <= 1) {
         return renderConfidenceSlider(setting)
@@ -296,9 +294,7 @@ export function OCRSettingsPanel({
             <FileText className="h-5 w-5 text-purple-500" />
             OCR Decision Flow
           </CardTitle>
-          <CardDescription>
-            How the system decides whether to use OCR on a document
-          </CardDescription>
+          <CardDescription>How the system decides whether to use OCR on a document</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-between text-sm">
@@ -363,9 +359,7 @@ export function OCRSettingsPanel({
                   >
                     <div className="flex-1 mr-4">
                       <div className="font-medium">
-                        {setting.key
-                          .replace(/_/g, ' ')
-                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        {setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                       </div>
                       <div className="text-sm text-gray-500">{setting.description}</div>
                     </div>
@@ -402,9 +396,7 @@ export function OCRSettingsPanel({
                   >
                     <div className="flex-1 mr-4">
                       <div className="font-medium">
-                        {setting.key
-                          .replace(/_/g, ' ')
-                          .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        {setting.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                       </div>
                       <div className="text-sm text-gray-500">{setting.description}</div>
                     </div>

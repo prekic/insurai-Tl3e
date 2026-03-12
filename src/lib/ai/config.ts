@@ -279,7 +279,15 @@ export async function extractViaProxy(
 
   // Build a combined signal: respect caller's signal (if any) AND enforce a hard timeout.
   // The server has a 125s budget; 135s gives 10s for network/serialization overhead.
-  const FETCH_TIMEOUT_MS = 135_000
+  // Default 135_000 — configurable via app_settings ai.client_fetch_timeout_ms
+  let FETCH_TIMEOUT_MS = 135_000
+  try {
+    const { getAIConfig } = await import('@/lib/config')
+    const aiCfg = await getAIConfig()
+    FETCH_TIMEOUT_MS = aiCfg.clientFetchTimeoutMs
+  } catch {
+    // Keep default
+  }
 
   try {
     console.warn('[extractViaProxy] Calling unified endpoint:', `${proxyUrl}/api/ai/extract`, {

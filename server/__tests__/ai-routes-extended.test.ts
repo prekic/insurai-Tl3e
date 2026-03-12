@@ -190,6 +190,11 @@ const DEFAULT_AI_CONFIG = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
+  requestBudgetMs: 125000,
+  primaryProviderTimeoutMs: 65000,
+  fallbackProviderTimeoutMs: 55000,
+  clientFetchTimeoutMs: 135000,
+  trialExtractionTimeoutMs: 150000,
 }
 
 // =============================================================================
@@ -1782,11 +1787,9 @@ describe('AI Routes Extended', () => {
     it('accepts Turkish characters in documentText', async () => {
       mockOpenAICreate.mockResolvedValue(makeOpenAIResponse(VALID_POLICY_JSON))
 
-      const res = await request(app)
-        .post('/api/ai/extract/openai')
-        .send({
-          documentText: 'Kasko Sigortas\u0131 - \u0130stanbul \u015Ei\u015Fli - JSON format',
-        })
+      const res = await request(app).post('/api/ai/extract/openai').send({
+        documentText: 'Kasko Sigortas\u0131 - \u0130stanbul \u015Ei\u015Fli - JSON format',
+      })
 
       expect([200, 503]).toContain(res.status)
     })

@@ -172,18 +172,38 @@ export interface DashboardSummary {
 // ============================================================================
 
 const metricsBuffer: RequestMetric[] = []
-const MAX_BUFFER_SIZE = 10000
+// Configurable via app_settings monitoring.extraction_buffer_size (default 10000)
+let MAX_BUFFER_SIZE = 10000
 
 const alertRules: Map<string, AlertRule> = new Map()
 const activeAlerts: Map<string, Alert> = new Map()
 const alertHistory: Alert[] = []
-const MAX_ALERT_HISTORY = 1000
+// Configurable via app_settings monitoring.max_alert_history (default 1000)
+let MAX_ALERT_HISTORY = 1000
 
 let requestCount = 0
 let errorCount = 0
 let totalResponseTime = 0
 const responseTimes: number[] = []
-const MAX_RESPONSE_TIMES = 1000
+// Configurable via app_settings monitoring.max_response_times (default 1000)
+let MAX_RESPONSE_TIMES = 1000
+
+// Lazy-load config overrides (fire-and-forget, non-blocking)
+let _monitoringConfigLoaded = false
+async function _loadMonitoringConfig(): Promise<void> {
+  if (_monitoringConfigLoaded) return
+  _monitoringConfigLoaded = true
+  try {
+    const { getMonitoringConfig } = await import('../services/config-service.js')
+    const monCfg = await getMonitoringConfig()
+    MAX_BUFFER_SIZE = monCfg.maxMetricsBufferSize
+    MAX_ALERT_HISTORY = monCfg.maxAlertHistory
+    MAX_RESPONSE_TIMES = monCfg.maxResponseTimes
+  } catch {
+    // Keep defaults
+  }
+}
+_loadMonitoringConfig()
 
 // Extraction-specific counters (for provider error rate alerts)
 let extractionRequestCount = 0
@@ -253,7 +273,9 @@ export function recordRequest(metric: RequestMetric): void {
 
   // Persist to database asynchronously
   persistMetric(metric).catch((err) => {
-    log.debug('Metric persistence failed (in-memory buffer available)', { error: err instanceof Error ? err.message : String(err) })
+    log.debug('Metric persistence failed (in-memory buffer available)', {
+      error: err instanceof Error ? err.message : String(err),
+    })
   })
 }
 
@@ -341,7 +363,8 @@ export function getSystemMetrics(): SystemMetrics {
     extraction: {
       total: extractionRequestCount,
       errors: extractionErrorCount,
-      errorRate: extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0,
+      errorRate:
+        extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0,
     },
     latency: {
       p50: percentile(responseTimes, 50),
@@ -623,8 +646,10 @@ function checkAlertRules(metric: RequestMetric): void {
         break
       case 'extraction_error_rate':
         // Only evaluate on extraction/OCR requests
-        if (!metric.endpoint.includes('/ai/extract') && !metric.endpoint.includes('/ai/ocr')) continue
-        value = extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0
+        if (!metric.endpoint.includes('/ai/extract') && !metric.endpoint.includes('/ai/ocr'))
+          continue
+        value =
+          extractionRequestCount > 0 ? (extractionErrorCount / extractionRequestCount) * 100 : 0
         break
       case 'ai_response_time':
         // Only evaluate on AI-related requests
@@ -692,13 +717,31 @@ function triggerAlert(rule: AlertRule, value: number): void {
   rule.lastTriggered = alert.timestamp
   alertRules.set(rule.id, rule)
 
-  log.warn('Alert triggered', { alertId: alert.id, rule: rule.name, metric: rule.metric, value, threshold: rule.threshold, severity: rule.severity })
+  log.warn('Alert triggered', {
+    alertId: alert.id,
+    rule: rule.name,
+    metric: rule.metric,
+    value,
+    threshold: rule.threshold,
+    severity: rule.severity,
+  })
 
   // Persist alert to monitoring_alerts table
-  persistAlert(alert).catch((err) => log.warn('Failed to persist alert', { alertId: alert.id, ruleName: alert.ruleName, error: err instanceof Error ? err.message : String(err) }))
+  persistAlert(alert).catch((err) =>
+    log.warn('Failed to persist alert', {
+      alertId: alert.id,
+      ruleName: alert.ruleName,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  )
 
   // Dispatch admin notification (fire-and-forget)
-  dispatchAlertNotification(alert).catch((err) => log.warn('Failed to dispatch alert notification', { alertId: alert.id, error: err instanceof Error ? err.message : String(err) }))
+  dispatchAlertNotification(alert).catch((err) =>
+    log.warn('Failed to dispatch alert notification', {
+      alertId: alert.id,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  )
 }
 
 /**
@@ -709,18 +752,13 @@ async function dispatchAlertNotification(alert: Alert): Promise<void> {
   const { notifyPerformanceAlert } = await import('../services/admin-notification-service.js')
   const severity = alert.severity === 'critical' ? 'critical' : 'warning'
 
-  await notifyPerformanceAlert(
-    alert.ruleName,
-    severity,
-    alert.message,
-    {
-      alertId: alert.id,
-      metric: alert.metric,
-      value: alert.value,
-      threshold: alert.threshold,
-      timestamp: alert.timestamp,
-    }
-  )
+  await notifyPerformanceAlert(alert.ruleName, severity, alert.message, {
+    alertId: alert.id,
+    metric: alert.metric,
+    value: alert.value,
+    threshold: alert.threshold,
+    timestamp: alert.timestamp,
+  })
 }
 
 /**

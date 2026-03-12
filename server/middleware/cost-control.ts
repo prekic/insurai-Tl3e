@@ -7,6 +7,7 @@ import { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '../lib/logger.js'
+import { getCostConfig } from '../services/config-service.js'
 
 const log = logger.child('CostControl')
 
@@ -60,7 +61,8 @@ export interface AIUsageCost {
 }
 
 // Cost per 1000 tokens (in USD) - Updated January 2026
-const COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
+// Used as sync fallback when DB config is unavailable
+const DEFAULT_COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
   // OpenAI
   'gpt-4o': { input: 0.0025, output: 0.01 },
   'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
@@ -77,7 +79,44 @@ const COST_PER_1K_TOKENS: Record<string, { input: number; output: number }> = {
   'gemini-1.5-pro': { input: 0.00125, output: 0.005 },
   'gemini-1.5-flash': { input: 0.000075, output: 0.0003 },
   // Default fallback
-  'default': { input: 0.001, output: 0.002 },
+  default: { input: 0.001, output: 0.002 },
+}
+
+// Cached token pricing from DB config, refreshed periodically
+let cachedTokenPricing: Record<string, { input: number; output: number }> | null = null
+let cachedTokenPricingExpiry = 0
+const TOKEN_PRICING_CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+/**
+ * Refresh the cached token pricing from DB config (fire-and-forget safe).
+ * Call this in async contexts to keep the cache warm.
+ */
+export async function refreshTokenPricingCache(): Promise<void> {
+  try {
+    const costConfig = await getCostConfig()
+    if (costConfig.tokenPricing && Object.keys(costConfig.tokenPricing).length > 0) {
+      cachedTokenPricing = costConfig.tokenPricing
+      cachedTokenPricingExpiry = Date.now() + TOKEN_PRICING_CACHE_TTL_MS
+    }
+  } catch (err) {
+    log.warn('Failed to refresh token pricing from DB config, using defaults', {
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+}
+
+/**
+ * Get the current token pricing map (sync).
+ * Returns DB-configured pricing if cached, otherwise defaults.
+ */
+function getTokenPricing(): Record<string, { input: number; output: number }> {
+  if (cachedTokenPricing && Date.now() < cachedTokenPricingExpiry) {
+    return cachedTokenPricing
+  }
+  // Trigger async refresh for next call (fire-and-forget)
+  refreshTokenPricingCache().catch(() => {})
+  // Return cached (even if expired) or defaults
+  return cachedTokenPricing || DEFAULT_COST_PER_1K_TOKENS
 }
 
 // ============================================================================
@@ -155,7 +194,9 @@ export function calculateCost(
   inputTokens: number,
   outputTokens: number
 ): { inputCost: number; outputCost: number; totalCost: number } {
-  const pricing = COST_PER_1K_TOKENS[model] || COST_PER_1K_TOKENS['default']
+  const tokenPricing = getTokenPricing()
+  const pricing =
+    tokenPricing[model] || tokenPricing['default'] || DEFAULT_COST_PER_1K_TOKENS['default']
 
   const inputCost = (inputTokens / 1000) * pricing.input
   const outputCost = (outputTokens / 1000) * pricing.output
@@ -172,7 +213,8 @@ export function calculateCost(
  * Get model pricing info
  */
 export function getModelPricing(model: string): { input: number; output: number } {
-  return COST_PER_1K_TOKENS[model] || COST_PER_1K_TOKENS['default']
+  const tokenPricing = getTokenPricing()
+  return tokenPricing[model] || tokenPricing['default'] || DEFAULT_COST_PER_1K_TOKENS['default']
 }
 
 // ============================================================================
@@ -186,10 +228,7 @@ export async function getActiveBudgets(): Promise<CostBudget[]> {
   const db = getClient()
 
   if (db) {
-    const { data, error } = await db
-      .from('cost_budgets')
-      .select('*')
-      .eq('is_active', true)
+    const { data, error } = await db.from('cost_budgets').select('*').eq('is_active', true)
 
     if (!error && data) {
       return data.map(mapBudgetFromDb)
@@ -207,11 +246,7 @@ export async function getBudget(id: string): Promise<CostBudget | null> {
   const db = getClient()
 
   if (db) {
-    const { data, error } = await db
-      .from('cost_budgets')
-      .select('*')
-      .eq('id', id)
-      .single()
+    const { data, error } = await db.from('cost_budgets').select('*').eq('id', id).single()
 
     if (!error && data) {
       return mapBudgetFromDb(data)
@@ -224,7 +259,9 @@ export async function getBudget(id: string): Promise<CostBudget | null> {
 /**
  * Create or update budget
  */
-export async function upsertBudget(budget: Partial<CostBudget> & { id?: string }): Promise<CostBudget | null> {
+export async function upsertBudget(
+  budget: Partial<CostBudget> & { id?: string }
+): Promise<CostBudget | null> {
   const db = getClient()
   const now = new Date().toISOString()
 
@@ -275,7 +312,10 @@ export async function upsertBudget(budget: Partial<CostBudget> & { id?: string }
 /**
  * Update budget usage
  */
-export async function updateBudgetUsage(budgetId: string, additionalCost: number): Promise<boolean> {
+export async function updateBudgetUsage(
+  budgetId: string,
+  additionalCost: number
+): Promise<boolean> {
   const db = getClient()
 
   if (db) {
@@ -354,7 +394,7 @@ function mapBudgetFromDb(row: Record<string, unknown>): CostBudget {
     name: row.name as string,
     budgetType: row.budget_type as CostBudget['budgetType'],
     limitAmount: parseFloat(row.limit_amount as string),
-    currentUsage: parseFloat(row.current_usage as string || '0'),
+    currentUsage: parseFloat((row.current_usage as string) || '0'),
     alertThresholdPercent: row.alert_threshold_percent as number,
     actionOnExceed: row.action_on_exceed as CostBudget['actionOnExceed'],
     appliesTo: row.applies_to as string | undefined,
@@ -649,25 +689,25 @@ export async function getUsageStats(
       .lte('timestamp', endDate)
 
     if (!error && data) {
-      return aggregateUsageStats(data.map((row) => ({
-        provider: row.provider,
-        model: row.model,
-        operation: row.operation,
-        inputTokens: row.input_tokens,
-        outputTokens: row.output_tokens,
-        totalTokens: row.total_tokens,
-        inputCost: parseFloat(row.input_cost || '0'),
-        outputCost: parseFloat(row.output_cost || '0'),
-        totalCost: parseFloat(row.total_cost || '0'),
-        timestamp: row.timestamp,
-      })))
+      return aggregateUsageStats(
+        data.map((row) => ({
+          provider: row.provider,
+          model: row.model,
+          operation: row.operation,
+          inputTokens: row.input_tokens,
+          outputTokens: row.output_tokens,
+          totalTokens: row.total_tokens,
+          inputCost: parseFloat(row.input_cost || '0'),
+          outputCost: parseFloat(row.output_cost || '0'),
+          totalCost: parseFloat(row.total_cost || '0'),
+          timestamp: row.timestamp,
+        }))
+      )
     }
   }
 
   // Fallback to in-memory
-  const filtered = inMemoryUsage.filter(
-    (u) => u.timestamp >= startDate && u.timestamp <= endDate
-  )
+  const filtered = inMemoryUsage.filter((u) => u.timestamp >= startDate && u.timestamp <= endDate)
   return aggregateUsageStats(filtered)
 }
 
@@ -782,7 +822,9 @@ export function costControlMiddleware(
 
       next()
     } catch (error) {
-      log.error('Cost control middleware error', { error: error instanceof Error ? error.message : String(error) })
+      log.error('Cost control middleware error', {
+        error: error instanceof Error ? error.message : String(error),
+      })
       // Don't block on errors - just continue
       next()
     }
@@ -821,6 +863,7 @@ export default {
   // Cost calculation
   calculateCost,
   getModelPricing,
+  refreshTokenPricingCache,
   // Budget management
   getActiveBudgets,
   getBudget,

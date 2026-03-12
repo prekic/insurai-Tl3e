@@ -15,7 +15,8 @@ import { logger } from '../lib/logger.js'
 const log = logger.child('PromptService')
 
 // Timeout for database queries — prevents hanging if Supabase is slow/unreachable
-const DB_QUERY_TIMEOUT_MS = 8_000
+// Default 8000 — configurable via app_settings server.db_query_timeout_ms
+let DB_QUERY_TIMEOUT_MS = 8_000
 
 /** Race a promise against a timeout */
 function withTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
@@ -93,7 +94,24 @@ interface CacheEntry {
 }
 
 const promptCache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+// Default 300000 (5 min) — configurable via app_settings server.prompt_cache_ttl_ms
+let CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+// Lazy-load config overrides (fire-and-forget, non-blocking)
+let _promptConfigLoaded = false
+async function _loadPromptConfig(): Promise<void> {
+  if (_promptConfigLoaded) return
+  _promptConfigLoaded = true
+  try {
+    const { getServerConfig } = await import('./config-service.js')
+    const serverCfg = await getServerConfig()
+    DB_QUERY_TIMEOUT_MS = serverCfg.dbQueryTimeoutMs
+    CACHE_TTL_MS = serverCfg.promptCacheTtlMs
+  } catch {
+    // Keep defaults
+  }
+}
+setTimeout(() => _loadPromptConfig(), 3000)
 
 function getCached(key: string): PromptTemplate | null {
   const entry = promptCache.get(key)

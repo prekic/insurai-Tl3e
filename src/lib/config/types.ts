@@ -22,6 +22,10 @@ export type ConfigCategory =
   | 'email'
   | 'monitoring'
   | 'retention'
+  | 'fx'
+  | 'server'
+  | 'webhooks'
+  | 'cost'
 
 export type ConfigValueType = 'string' | 'number' | 'boolean' | 'object' | 'array'
 
@@ -100,6 +104,12 @@ export interface AIConfig {
   confidenceWeightDates: number
   confidenceWeightPremium: number
   confidenceWeightCoverages: number
+  // Extraction Pipeline Timeouts
+  requestBudgetMs: number
+  primaryProviderTimeoutMs: number
+  fallbackProviderTimeoutMs: number
+  clientFetchTimeoutMs: number
+  trialExtractionTimeoutMs: number
 }
 
 export const DEFAULT_AI_CONFIG: AIConfig = {
@@ -123,6 +133,11 @@ export const DEFAULT_AI_CONFIG: AIConfig = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
+  requestBudgetMs: 125000,
+  primaryProviderTimeoutMs: 65000,
+  fallbackProviderTimeoutMs: 55000,
+  clientFetchTimeoutMs: 135000,
+  trialExtractionTimeoutMs: 150000,
 }
 
 // =============================================================================
@@ -252,6 +267,10 @@ export interface OCRConfig {
   maxPagesQuickAnalysis: number
   timeoutSeconds: number
   maxTextLength: number
+  // PDF Pipeline
+  pdfLoadTimeoutMs: number
+  maxWorkerFailures: number
+  ocrCleanupTimeoutMs: number
 }
 
 export const DEFAULT_OCR_CONFIG: OCRConfig = {
@@ -278,6 +297,9 @@ export const DEFAULT_OCR_CONFIG: OCRConfig = {
   maxPagesQuickAnalysis: 5,
   timeoutSeconds: 30,
   maxTextLength: 500000,
+  pdfLoadTimeoutMs: 30000,
+  maxWorkerFailures: 2,
+  ocrCleanupTimeoutMs: 30000,
 }
 
 // =============================================================================
@@ -386,6 +408,8 @@ export interface UIConfig {
   allowedFileExtensions: string[]
   // Localization
   displayCurrency: string
+  // Free Trial
+  trialExpiryMs: number
 }
 
 export const DEFAULT_UI_CONFIG: UIConfig = {
@@ -401,6 +425,7 @@ export const DEFAULT_UI_CONFIG: UIConfig = {
   maxFileSizeMb: 10,
   allowedFileExtensions: ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'],
   displayCurrency: 'TRY',
+  trialExpiryMs: 86400000,
 }
 
 // =============================================================================
@@ -443,6 +468,13 @@ export interface MonitoringConfig {
   enableEmailAlerts: boolean
   alertEmailAddresses: string
   minProviderRequestsForLatencyAlert: number
+  // Ring Buffers & Limits
+  extractionBufferSize: number
+  maxMetricsBufferSize: number
+  maxAlertHistory: number
+  maxResponseTimes: number
+  serverPerfMaxEvents: number
+  serverPerfMaxAgeMs: number
 }
 
 export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
@@ -454,6 +486,12 @@ export const DEFAULT_MONITORING_CONFIG: MonitoringConfig = {
   enableEmailAlerts: false,
   alertEmailAddresses: '',
   minProviderRequestsForLatencyAlert: 3,
+  extractionBufferSize: 200,
+  maxMetricsBufferSize: 10000,
+  maxAlertHistory: 1000,
+  maxResponseTimes: 1000,
+  serverPerfMaxEvents: 500,
+  serverPerfMaxAgeMs: 3600000,
 }
 
 // =============================================================================
@@ -471,6 +509,99 @@ export const DEFAULT_RETENTION_CONFIG: RetentionConfig = {
 }
 
 // =============================================================================
+// FX CONFIGURATION
+// =============================================================================
+
+export interface FXConfig {
+  serverCacheTtlMs: number
+  apiTimeoutMs: number
+  clientCacheTtlMs: number
+  supportedCurrencies: string[]
+  fallbackRates: Record<string, number>
+}
+
+export const DEFAULT_FX_CONFIG: FXConfig = {
+  serverCacheTtlMs: 21600000, // 6 hours
+  apiTimeoutMs: 10000,
+  clientCacheTtlMs: 14400000, // 4 hours
+  supportedCurrencies: ['TRY', 'USD', 'EUR', 'GBP', 'CHF', 'SAR', 'AED', 'JPY', 'CAD', 'AUD'],
+  fallbackRates: {
+    TRY: 1,
+    USD: 33.5,
+    EUR: 36.5,
+    GBP: 42.5,
+    CHF: 38.0,
+    SAR: 8.9,
+    AED: 9.1,
+    JPY: 0.22,
+    CAD: 24.5,
+    AUD: 21.8,
+  },
+}
+
+// =============================================================================
+// SERVER CONFIGURATION
+// =============================================================================
+
+export interface ServerConfig {
+  dbQueryTimeoutMs: number
+  configCacheTtlMs: number
+  promptCacheTtlMs: number
+  translationCacheTtlMs: number
+  rateLimitConfigCacheTtlMs: number
+}
+
+export const DEFAULT_SERVER_CONFIG: ServerConfig = {
+  dbQueryTimeoutMs: 8000,
+  configCacheTtlMs: 300000,
+  promptCacheTtlMs: 300000,
+  translationCacheTtlMs: 300000,
+  rateLimitConfigCacheTtlMs: 60000,
+}
+
+// =============================================================================
+// WEBHOOKS CONFIGURATION
+// =============================================================================
+
+export interface WebhooksConfig {
+  maxDeliveryAttempts: number
+  deliveryTimeoutMs: number
+  maxResponseBodyLength: number
+}
+
+export const DEFAULT_WEBHOOKS_CONFIG: WebhooksConfig = {
+  maxDeliveryAttempts: 3,
+  deliveryTimeoutMs: 10000,
+  maxResponseBodyLength: 1000,
+}
+
+// =============================================================================
+// COST CONFIGURATION
+// =============================================================================
+
+export interface CostConfig {
+  tokenPricing: Record<string, { input: number; output: number }>
+}
+
+export const DEFAULT_COST_CONFIG: CostConfig = {
+  tokenPricing: {
+    'gpt-4o': { input: 0.0025, output: 0.01 },
+    'gpt-4o-mini': { input: 0.00015, output: 0.0006 },
+    'gpt-4-turbo': { input: 0.01, output: 0.03 },
+    'gpt-4': { input: 0.03, output: 0.06 },
+    'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
+    'claude-3-5-sonnet': { input: 0.003, output: 0.015 },
+    'claude-3-5-haiku': { input: 0.00025, output: 0.00125 },
+    'claude-3-opus': { input: 0.015, output: 0.075 },
+    'claude-3-sonnet': { input: 0.003, output: 0.015 },
+    'claude-3-haiku': { input: 0.00025, output: 0.00125 },
+    'gemini-1.5-pro': { input: 0.00125, output: 0.005 },
+    'gemini-1.5-flash': { input: 0.000075, output: 0.0003 },
+    default: { input: 0.001, output: 0.002 },
+  },
+}
+
+// =============================================================================
 // COMBINED CONFIGURATION
 // =============================================================================
 
@@ -485,6 +616,10 @@ export interface AppConfig {
   email: EmailConfig
   monitoring: MonitoringConfig
   retention: RetentionConfig
+  fx: FXConfig
+  server: ServerConfig
+  webhooks: WebhooksConfig
+  cost: CostConfig
 }
 
 export const DEFAULT_APP_CONFIG: AppConfig = {
@@ -498,6 +633,10 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   email: DEFAULT_EMAIL_CONFIG,
   monitoring: DEFAULT_MONITORING_CONFIG,
   retention: DEFAULT_RETENTION_CONFIG,
+  fx: DEFAULT_FX_CONFIG,
+  server: DEFAULT_SERVER_CONFIG,
+  webhooks: DEFAULT_WEBHOOKS_CONFIG,
+  cost: DEFAULT_COST_CONFIG,
 }
 
 // =============================================================================

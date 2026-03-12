@@ -227,6 +227,46 @@ export const settingValidationRules: Record<string, ValidationRule> = {
 
   // Feature Flags
   rollout_percentage: validators.percentage(false),
+
+  // Phase 1: Extraction Timeouts (ai category)
+  request_budget_ms: validators.milliseconds(10000, 600000),
+  primary_provider_timeout_ms: validators.milliseconds(5000, 300000),
+  fallback_provider_timeout_ms: validators.milliseconds(5000, 300000),
+  client_fetch_timeout_ms: validators.milliseconds(10000, 600000),
+  trial_extraction_timeout_ms: validators.milliseconds(10000, 600000),
+
+  // Phase 2: FX Settings
+  server_cache_ttl_ms: validators.milliseconds(60000, 86400000),
+  api_timeout_ms: validators.milliseconds(1000, 60000),
+  client_cache_ttl_ms: validators.milliseconds(60000, 86400000),
+
+  // Phase 3: Service Cache TTLs (server category)
+  db_query_timeout_ms: validators.milliseconds(1000, 60000),
+  config_cache_ttl_ms: validators.milliseconds(10000, 3600000),
+  prompt_cache_ttl_ms: validators.milliseconds(10000, 3600000),
+  translation_cache_ttl_ms: validators.milliseconds(10000, 3600000),
+  rate_limit_config_cache_ttl_ms: validators.milliseconds(5000, 3600000),
+
+  // Phase 4: Webhook Delivery Config
+  max_delivery_attempts: validators.positiveInteger(1, 20),
+  delivery_timeout_ms: validators.milliseconds(1000, 120000),
+  max_response_body_length: validators.positiveInteger(100, 100000),
+
+  // Phase 5: OCR Pipeline
+  pdf_load_timeout_ms: validators.milliseconds(5000, 120000),
+  max_worker_failures: validators.positiveInteger(1, 10),
+  ocr_cleanup_timeout_ms: validators.milliseconds(5000, 120000),
+
+  // Phase 7: UI / Trial
+  trial_expiry_ms: validators.milliseconds(3600000, 604800000),
+
+  // Monitoring Buffers
+  extraction_buffer_size: validators.positiveInteger(10, 10000),
+  max_metrics_buffer_size: validators.positiveInteger(100, 100000),
+  max_alert_history: validators.positiveInteger(10, 100000),
+  max_response_times: validators.positiveInteger(10, 100000),
+  server_perf_max_events: validators.positiveInteger(10, 10000),
+  server_perf_max_age_ms: validators.milliseconds(60000, 86400000),
 }
 
 // =============================================================================
@@ -241,7 +281,7 @@ export function validateWeightsSum(weights: Record<string, number>): ValidationR
   if (sum !== 100) {
     return {
       valid: false,
-      error: `Weights must sum to 100% (currently ${sum}%)`
+      error: `Weights must sum to 100% (currently ${sum}%)`,
     }
   }
   return { valid: true }
@@ -256,7 +296,7 @@ export function validateOCRWeightsSum(weights: Record<string, number>): Validati
   if (roundedSum !== 1) {
     return {
       valid: false,
-      error: `Weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`
+      error: `Weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`,
     }
   }
   return { valid: true }
@@ -271,7 +311,7 @@ export function validateConfidenceWeightsSum(weights: Record<string, number>): V
   if (roundedSum !== 1) {
     return {
       valid: false,
-      error: `Confidence weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`
+      error: `Confidence weights must sum to 1.0 (currently ${roundedSum.toFixed(2)})`,
     }
   }
   return { valid: true }
@@ -311,7 +351,7 @@ export function validateOCRConfidenceOrder(thresholds: {
   if (thresholds.skip_ocr_threshold <= thresholds.selective_ocr_threshold) {
     return {
       valid: false,
-      error: 'Skip OCR threshold must be greater than Selective OCR threshold'
+      error: 'Skip OCR threshold must be greater than Selective OCR threshold',
     }
   }
   return { valid: true }

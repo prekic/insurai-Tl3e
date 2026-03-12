@@ -17,7 +17,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: vi.fn(() => null),
 }))
 
-// Mock logger
+// Mock logger (both named and default export — settings.ts uses default import)
 vi.mock('../lib/logger.js', () => {
   const noop = () => {}
   const childLogger = {
@@ -27,7 +27,7 @@ vi.mock('../lib/logger.js', () => {
     error: noop,
     child: () => childLogger,
   }
-  return { logger: childLogger }
+  return { logger: childLogger, default: childLogger }
 })
 
 // Store original env
@@ -220,7 +220,13 @@ describe('Cost Control', () => {
     })
 
     it('returns pricing for all known Anthropic models', () => {
-      for (const model of ['claude-3-5-sonnet', 'claude-3-5-haiku', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku']) {
+      for (const model of [
+        'claude-3-5-sonnet',
+        'claude-3-5-haiku',
+        'claude-3-opus',
+        'claude-3-sonnet',
+        'claude-3-haiku',
+      ]) {
         const pricing = getModelPricing(model)
         expect(pricing.input).toBeGreaterThan(0)
         expect(pricing.output).toBeGreaterThan(0)
@@ -237,7 +243,7 @@ describe('Cost Control', () => {
       const budgets = await getActiveBudgets()
 
       expect(budgets.length).toBeGreaterThanOrEqual(2)
-      const names = budgets.map(b => b.name)
+      const names = budgets.map((b) => b.name)
       expect(names).toContain('Daily Total Budget')
       expect(names).toContain('Monthly Total Budget')
     })
@@ -381,7 +387,7 @@ describe('Cost Control', () => {
 
       expect(result.allowed).toBe(true)
       expect(result.warnings.length).toBeGreaterThan(0)
-      expect(result.warnings.some(w => w.includes('Daily Total Budget'))).toBe(true)
+      expect(result.warnings.some((w) => w.includes('Daily Total Budget'))).toBe(true)
       expect(result.alerts.length).toBeGreaterThan(0)
     })
 
@@ -429,7 +435,7 @@ describe('Cost Control', () => {
       const result = await checkBudget(1)
 
       expect(result.allowed).toBe(true)
-      expect(result.warnings.some(w => w.includes('would be exceeded'))).toBe(true)
+      expect(result.warnings.some((w) => w.includes('would be exceeded'))).toBe(true)
     })
 
     it('skips budgets that do not apply to the user', async () => {
@@ -497,7 +503,7 @@ describe('Cost Control', () => {
       const result = await checkBudget(2)
 
       expect(result.alerts.length).toBeGreaterThanOrEqual(2)
-      const alertTypes = result.alerts.map(a => a.alertType)
+      const alertTypes = result.alerts.map((a) => a.alertType)
       expect(alertTypes).toContain('threshold_warning')
       expect(alertTypes).toContain('budget_exceeded')
     })
@@ -646,7 +652,7 @@ describe('Cost Control', () => {
       const stats = await getUsageStats('2026-02-08T00:00:00Z', '2026-02-08T23:59:59Z')
 
       expect(stats.byDay.length).toBeGreaterThanOrEqual(1)
-      const day = stats.byDay.find(d => d.date === '2026-02-08')
+      const day = stats.byDay.find((d) => d.date === '2026-02-08')
       expect(day).toBeDefined()
     })
 

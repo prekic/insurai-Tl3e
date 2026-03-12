@@ -12,13 +12,7 @@ import crypto from 'crypto'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const {
-  mockLogWarn,
-  mockLogError,
-  mockLogInfo,
-  mockLogDebug,
-  mockFrom,
-} = vi.hoisted(() => ({
+const { mockLogWarn, mockLogError, mockLogInfo, mockLogDebug, mockFrom } = vi.hoisted(() => ({
   mockLogWarn: vi.fn(),
   mockLogError: vi.fn(),
   mockLogInfo: vi.fn(),
@@ -103,8 +97,8 @@ describe('webhook-service', () => {
   afterEach(() => {
     if (savedUrl) process.env.SUPABASE_URL = savedUrl
     else delete process.env.SUPABASE_URL
-      delete process.env.VITE_SUPABASE_URL
-      delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     if (savedKey) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey
     else delete process.env.SUPABASE_SERVICE_ROLE_KEY
   })
@@ -364,9 +358,7 @@ describe('webhook-service', () => {
         enabled: false,
       })
 
-      expect(chain.insert).toHaveBeenCalledWith([
-        expect.objectContaining({ enabled: false }),
-      ])
+      expect(chain.insert).toHaveBeenCalledWith([expect.objectContaining({ enabled: false })])
     })
 
     it('returns null when Supabase not configured', async () => {
@@ -531,7 +523,8 @@ describe('webhook-service', () => {
       const chain: Record<string, unknown> = {}
       chain.update = vi.fn().mockReturnValue(chain)
       chain.eq = vi.fn().mockReturnValue(chain)
-      chain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: { message: 'Update error' } })
+      chain.then = (resolve: (v: unknown) => void) =>
+        resolve({ data: null, error: { message: 'Update error' } })
       mockFrom.mockReturnValue(chain)
 
       const { regenerateSecret } = await importService()
@@ -674,7 +667,9 @@ describe('webhook-service', () => {
       setupChain({ data: MOCK_WEBHOOK_DB, error: null })
 
       const originalFetch = globalThis.fetch
-      globalThis.fetch = vi.fn().mockRejectedValue(new Error('Connection refused')) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('Connection refused')) as unknown as typeof globalThis.fetch
 
       const { testWebhook } = await importService()
       const result = await testWebhook('wh-001')
@@ -765,13 +760,13 @@ describe('webhook-service', () => {
   })
 
   // --------------------------------------------------------------------------
-  // MAX_DELIVERY_ATTEMPTS export
+  // DEFAULT_MAX_DELIVERY_ATTEMPTS export
   // --------------------------------------------------------------------------
-  describe('MAX_DELIVERY_ATTEMPTS', () => {
-    it('exports MAX_DELIVERY_ATTEMPTS constant', async () => {
-      const { MAX_DELIVERY_ATTEMPTS } = await importService()
+  describe('DEFAULT_MAX_DELIVERY_ATTEMPTS', () => {
+    it('exports DEFAULT_MAX_DELIVERY_ATTEMPTS constant', async () => {
+      const { DEFAULT_MAX_DELIVERY_ATTEMPTS } = await importService()
 
-      expect(MAX_DELIVERY_ATTEMPTS).toBe(3)
+      expect(DEFAULT_MAX_DELIVERY_ATTEMPTS).toBe(3)
     })
   })
 })

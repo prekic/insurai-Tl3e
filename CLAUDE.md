@@ -3,10 +3,11 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Verify Editable AI Prompts**: This session migrated the "AI Insights - Sense Check" prompt into the `prompt_templates` table in Supabase. The prompt text is now fully editable by administrators via the Prompts Tab in the Admin UI. Before pushing heavy extraction tasks, edit a small part of the Sense Check prompt, submit a test PDF, and view the AI insights to confirm the prompt update correctly applied. Verify the new Prompt Execution Pipeline visualization map in `/admin/prompts`.
-2. **Deploy & Verify AI Insights Management**: Previous sessions added a Supabase table (`ai_insight_guidelines`) and an Admin UI (`InsightsTab.tsx`) to dynamically manage AI sense-check rules to prevent hallucination. Deploy this branch, log in, go to `/admin/insights`, and create a test rule to observe the extraction filtering.
-3. **Production Monitoring**: The FX API integration is fully deployed with live endpoints (`/api/fx/rates?base=TRY` and `/api/fx/status`). Monitor the 6h caching TTL and free-tier exchangerate.host API for production health.
-4. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Apply Migration 033 to Production**: Run `supabase/migrations/033_seed_hardcoded_configs.sql` in Supabase SQL Editor. This seeds 29 hardcoded backend config keys (extraction timeouts, FX rates, service caches, webhook config, cost token pricing, monitoring buffers) into `app_settings`. Idempotent via `ON CONFLICT DO NOTHING`.
+2. **Verify Admin Settings UI**: After migration, navigate to `/admin/settings` and verify the new categories (FX, Server, Webhooks, Cost, Monitoring buffer sizes) appear with correct default values. Test editing one value and confirm it persists.
+3. **Verify Editable AI Prompts**: Previous session migrated the "AI Insights - Sense Check" prompt into the `prompt_templates` table. Edit a small part, submit a test PDF, and verify the prompt update applies. Check Pipeline Execution visualization in `/admin/prompts`.
+4. **Production Monitoring**: The FX API integration is fully deployed (`/api/fx/rates?base=TRY` and `/api/fx/status`). Monitor the 6h caching TTL. All FX config values (cache TTL, supported currencies, fallback rates) are now admin-configurable via migration 033.
+5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
@@ -16,8 +17,8 @@
 
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 15-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**, **extraction timeout resilience (abort-on-unmount, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading)**, **Dynamic AI Insights Rules Engine (Admin UI + DB + Backend Endpoint integration)**, **VKN vs TC Kimlik false positive fixes**, **502/504 Proxy Extraction timeout handling for graceful user feedback**, **Duplicate AI Insights generated fix**, **Database-editable AI Prompt pipeline**, **Admin UI compiled AI execution map**.
-- **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100, finalized production FX API, dynamic AI tuning system)
-- **Last Updated**: March 11, 2026 (Editable AI Prompts, Pipeline Execution Schema in UI, Duplicate Insights Fix)
+- **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100, finalized production FX API, dynamic AI tuning system, hardcoded config migration to DB)
+- **Last Updated**: March 12, 2026 (Migration 033: hardcoded backend configs → admin-configurable app_settings, 9 config getter functions, 49 migration validation tests)
 
 ---
 
@@ -328,6 +329,7 @@ insurai/
 | `supabase/migrations/026_cron_monitoring_views.sql` | **NEW** Secure views around pg_cron extensions for UI monitoring |
 | `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** Actuarial Web Worker settings and historical confidence bounds |
 | `supabase/migrations/031_fx_rate_history.sql` | **NEW** FX exchange rate history table for tracking conversion analytics |
+| `supabase/migrations/033_seed_hardcoded_configs.sql` | **NEW** Seeds 29 hardcoded backend config keys across 8 categories into `app_settings` |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -1491,6 +1493,7 @@ Server Tests:               server/__tests__/
 | `src/__tests__/sample-policy-output-evaluation.test.ts` | 61 | End-to-end sample policy output evaluation |
 | `src/lib/actuarial-engine/__tests__/actuarial-events.test.ts` | 8 | Event bus: subscribe/unsubscribe, emit, error isolation |
 | `src/lib/actuarial-engine/__tests__/adapter-integration.test.ts` | 18 | Adapter→engine pipeline: kasko/traffic/DASK, TOPSIS, edge cases |
+| `server/__tests__/config-migration-validation.test.ts` | 49 | Migration 033 SQL↔TypeScript drift detection, new config getters (FX, Server, Webhooks, Cost, Monitoring, Retention) |
 
 ### Running Tests
 ```bash
@@ -4527,6 +4530,51 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Files Changed**: `src/components/TryAnalysis.tsx`, `src/lib/ai/config.ts`
 - **Commit**: `303da34`
 
+### 169. Hardcoded Backend Configs Migrated to Admin-Configurable app_settings (Added Mar 12, 2026)
+- **Feature**: 29 previously hardcoded backend constants are now stored in `app_settings` and admin-configurable
+- **Migration**: `supabase/migrations/033_seed_hardcoded_configs.sql` — idempotent via `ON CONFLICT DO NOTHING`
+- **Categories Seeded** (8 categories, 29 keys):
+  - `ai` (5 keys): `request_budget_ms`, `primary_provider_timeout_ms`, `fallback_provider_timeout_ms`, `client_fetch_timeout_ms`, `trial_extraction_timeout_ms`
+  - `fx` (5 keys): `server_cache_ttl_ms`, `supported_currencies`, `fallback_rates`, `api_timeout_ms`, `client_cache_ttl_ms`
+  - `server` (5 keys): `db_query_timeout_ms`, `config_cache_ttl_ms`, `prompt_cache_ttl_ms`, `translation_cache_ttl_ms`, `rate_limit_config_cache_ttl_ms`
+  - `webhooks` (3 keys): `max_delivery_attempts`, `delivery_timeout_ms`, `max_response_body_length`
+  - `ocr` (3 keys): `pdf_load_timeout_ms`, `max_worker_failures`, `ocr_cleanup_timeout_ms`
+  - `cost` (1 key): `token_pricing` (JSON — per-model pricing for 17 AI models)
+  - `ui` (1 key): `trial_expiry_ms`
+  - `monitoring` (6 keys): `extraction_buffer_size`, `max_metrics_buffer_size`, `max_alert_history`, `max_response_times`, `server_perf_max_events`, `server_perf_max_age_ms`
+- **Config Service** (`server/services/config-service.ts`):
+  - 6 new typed getters: `getFXConfig()`, `getServerConfig()`, `getWebhooksConfig()`, `getCostConfig()`, `getMonitoringConfig()` (extended with buffer keys), `getRetentionConfig()`
+  - Each has `DEFAULT_*_CONFIG` object + `*_KEY_MAP` record for snake_case→camelCase mapping
+  - DB-first with hardcoded fallback — if DB unavailable, code uses `DEFAULT_*_CONFIG`
+  - In-memory cache with 5-minute TTL
+- **Consumer Integration** (30 files changed):
+  - `server/routes/ai.ts` — Extraction timeouts read from `getAIConfig()`
+  - `server/routes/fx.ts` — Cache TTL, supported currencies, fallback rates from `getFXConfig()`
+  - `server/routes/settings.ts` — Rate limit config cache TTL from `getServerConfig()`
+  - `server/middleware/cost-control.ts` — Token pricing from `getCostConfig()`
+  - `server/middleware/rate-limit.ts` — Rate limit config refresh from `getServerConfig()`
+  - `server/middleware/monitoring.ts` — Buffer sizes from `getMonitoringConfig()`
+  - `server/services/prompt-service.ts` — Prompt cache TTL from `getServerConfig()`
+  - `server/services/translation-service.ts` — Translation cache TTL from `getServerConfig()`
+  - `server/services/webhook-service.ts` — Delivery config from `getWebhooksConfig()`
+  - `src/lib/ai/config.ts` — Client fetch timeout from `getAIConfig()`
+  - `src/lib/ai/pdf-parser.ts` — PDF load timeout, worker failure threshold from config
+  - `src/lib/free-trial.ts` — Trial expiry from `getUIConfig()`
+  - `src/components/TryAnalysis.tsx` — Umbrella timeout from `getAIConfig()`
+  - `src/lib/config/configuration-service.ts` — Client-side mirrors for FX, server, webhooks, cost
+  - `src/lib/config/types.ts` — All new TypeScript interfaces and defaults
+  - `src/components/admin/tabs/settings/GenericSettingsPanel.tsx` — **NEW** Reusable admin panel for any config category
+  - `src/components/admin/tabs/SettingsTab.tsx` — New category tabs (FX, Server, Webhooks, Cost, Monitoring buffers)
+- **Admin UI**: `GenericSettingsPanel.tsx` — renders editable forms for any config category using metadata from `SETTINGS_CATEGORIES` registry. Supports number, string, boolean, JSON value types with validation.
+- **Tests**: 49 new tests in `server/__tests__/config-migration-validation.test.ts`:
+  - SQL↔TypeScript drift detection: parses migration SQL, validates all 29 seeded values match `DEFAULT_*_CONFIG` objects
+  - JSON field validation: `supported_currencies`, `fallback_rates`, `token_pricing` parse correctly
+  - New getter tests: all 6 new getters tested with DB data, empty DB fallback, error fallback, JSON parsing, boolean coercion
+  - Cache invalidation: validates cache clear + re-fetch behavior
+  - Barrel export completeness
+- **Files Changed**: 30 files (+2,894 / −530 lines)
+- **Commits**: `26c7524`, `2e61dfc`, `314f744`
+
 ---
 
 ## Turkish Market Considerations
@@ -5516,6 +5564,16 @@ connectSrc: [
 - Timeout errors show: "Analysis timed out. The AI service may be busy. Please try again."
 - Diagnostic codes (error code, request ID, phase timing) are in browser console only
 - If you need to debug extraction failures in production, ask user to check browser console (F12 → Console) for `[TryAnalysis] Diagnostics:` entries
+
+**Migration 033 — Hardcoded Config to DB (Added Mar 12, 2026):**
+- All 29 seeded values use `ON CONFLICT DO NOTHING` — safe to re-run without overwriting admin changes
+- **Config getter pattern**: Each getter loads a full category from DB, maps snake_case keys to camelCase via `*_KEY_MAP`, merges over `DEFAULT_*_CONFIG`, caches 5 minutes. If DB unavailable, returns defaults silently.
+- **JSON fields** (`supported_currencies`, `fallback_rates`, `token_pricing`): Stored as JSON strings in `app_settings.value`. Getters parse with `JSON.parse()` inside try-catch — malformed JSON falls back to default.
+- **Boolean coercion**: `getMonitoringConfig()` coerces `enableEmailAlerts` via `=== 'true'` — any other string value (including `'false'`, `'1'`, `'yes'`) is treated as `false`.
+- **Cache invalidation subtlety**: `invalidateCache('fx')` clears `config:fx` and `fx:*` prefix keys, but `getCategorySettings()` caches under `category:fx` which requires `invalidateCache()` (no argument) to fully clear all caches. When changing a config value and re-reading, call `invalidateCache()` without arguments.
+- **Adding new config keys**: (1) Add to `DEFAULT_*_CONFIG` in `config-service.ts`, (2) add to `*_KEY_MAP`, (3) add INSERT to migration 033, (4) add to `types.ts` if client-side access needed, (5) update `config-migration-validation.test.ts` count assertions.
+- **GenericSettingsPanel.tsx**: Reusable admin settings panel — renders form for any category registered in `SETTINGS_CATEGORIES`. When adding a new admin-configurable category, register it in the `SETTINGS_CATEGORIES` object in `SettingsTab.tsx`.
+- **Test mock requirements**: 5 AI route test files needed mock updates for the new `AIConfig` timeout fields (`requestBudgetMs`, `primaryProviderTimeoutMs`, `fallbackProviderTimeoutMs`, `clientFetchTimeoutMs`, `trialExtractionTimeoutMs`). If you add new fields to `AIConfig`, update all AI route test mocks.
 
 ---
 

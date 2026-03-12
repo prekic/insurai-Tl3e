@@ -177,6 +177,11 @@ const DEFAULT_AI_CONFIG = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
+  requestBudgetMs: 125000,
+  primaryProviderTimeoutMs: 65000,
+  fallbackProviderTimeoutMs: 55000,
+  clientFetchTimeoutMs: 135000,
+  trialExtractionTimeoutMs: 150000,
 }
 
 function setupDefaultMocks() {
@@ -258,16 +263,14 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       process.env = { ...originalEnv, GOOGLE_CLOUD_API_KEY: 'test-key', NODE_ENV: 'production' }
       const app = await createApp()
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'API key not valid. Please pass a valid API key.' },
-            }),
-            { status: 400 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'API key not valid. Please pass a valid API key.' },
+          }),
+          { status: 400 }
         )
+      )
 
       const res = await request(app).post('/api/ai/ocr').send({ imageBase64: 'dGVzdA==' })
 
@@ -1018,13 +1021,11 @@ describe('AI Routes - OCR & Branch Coverage', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(JSON.stringify({ responses: [{ fullTextAnnotation: { text: '' } }] }), {
-            status: 200,
-          })
-        )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ responses: [{ fullTextAnnotation: { text: '' } }] }), {
+          status: 200,
+        })
+      )
 
       const res = await request(app).get('/api/ai/diagnose')
 
@@ -1059,13 +1060,11 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       })
 
       // HTTP 400 with no error status field
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(JSON.stringify({ error: { message: 'API key not valid', code: 400 } }), {
-            status: 400,
-          })
-        )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ error: { message: 'API key not valid', code: 400 } }), {
+          status: 400,
+        })
+      )
 
       const res = await request(app).get('/api/ai/diagnose')
 
@@ -1154,16 +1153,14 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       process.env = { ...originalEnv, GOOGLE_CLOUD_API_KEY: 'test-key', NODE_ENV: 'production' }
       const app = await createApp()
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'PERMISSION_DENIED: API not enabled', status: 'PERMISSION_DENIED' },
-            }),
-            { status: 403 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'PERMISSION_DENIED: API not enabled', status: 'PERMISSION_DENIED' },
+          }),
+          { status: 403 }
         )
+      )
 
       const res = await request(app).get('/api/ai/diagnose')
 

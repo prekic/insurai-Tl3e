@@ -28,7 +28,23 @@ const log = logger.child('RateLimit')
  */
 let cachedConfig: RateLimitsConfig | null = null
 let lastConfigFetch = 0
-const CONFIG_CACHE_TTL_MS = 60000 // 1 minute cache
+// Default 60000 (1 min) — configurable via app_settings server.rate_limit_config_cache_ttl_ms
+let CONFIG_CACHE_TTL_MS = 60000 // 1 minute cache
+
+// Lazy-load config override (fire-and-forget, non-blocking)
+let _rateLimitConfigLoaded = false
+async function _loadRateLimitConfig(): Promise<void> {
+  if (_rateLimitConfigLoaded) return
+  _rateLimitConfigLoaded = true
+  try {
+    const { getServerConfig } = await import('../services/config-service.js')
+    const serverCfg = await getServerConfig()
+    CONFIG_CACHE_TTL_MS = serverCfg.rateLimitConfigCacheTtlMs
+  } catch {
+    // Keep defaults
+  }
+}
+setTimeout(() => _loadRateLimitConfig(), 3000)
 
 /**
  * Default rate limit configuration (used as fallback)

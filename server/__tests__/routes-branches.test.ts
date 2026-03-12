@@ -178,6 +178,11 @@ const DEFAULT_AI_CONFIG = {
   confidenceWeightDates: 0.2,
   confidenceWeightPremium: 0.2,
   confidenceWeightCoverages: 0.25,
+  requestBudgetMs: 125000,
+  primaryProviderTimeoutMs: 65000,
+  fallbackProviderTimeoutMs: 55000,
+  clientFetchTimeoutMs: 135000,
+  trialExtractionTimeoutMs: 150000,
 }
 
 function setupDefaultMocks() {
@@ -554,16 +559,14 @@ describe('AI Routes Branch Coverage', () => {
       vi.resetModules()
       setupDefaultMocks()
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'API key not valid. Please pass a valid API key.' },
-            }),
-            { status: 400 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'API key not valid. Please pass a valid API key.' },
+          }),
+          { status: 400 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -675,16 +678,14 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'PERMISSION_DENIED: check service account', code: 403 },
-            }),
-            { status: 403 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'PERMISSION_DENIED: check service account', code: 403 },
+          }),
+          { status: 403 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -706,16 +707,14 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'NOT_FOUND: processor does not exist', code: 404 },
-            }),
-            { status: 404 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'NOT_FOUND: processor does not exist', code: 404 },
+          }),
+          { status: 404 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -766,19 +765,17 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: {
-                message: 'Document pages in non-imageless mode exceed the limit: 15 got 20',
-                code: 400,
-              },
-            }),
-            { status: 400 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: 'Document pages in non-imageless mode exceed the limit: 15 got 20',
+              code: 400,
+            },
+          }),
+          { status: 400 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -800,16 +797,14 @@ describe('AI Routes Branch Coverage', () => {
       setupDefaultMocks()
       mockGoogleAuthGetAccessToken.mockResolvedValue('token')
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'INVALID_ARGUMENT: unsupported format', code: 400 },
-            }),
-            { status: 400 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'INVALID_ARGUMENT: unsupported format', code: 400 },
+          }),
+          { status: 400 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1092,19 +1087,17 @@ describe('AI Routes Branch Coverage', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: {
-                message: 'Cloud Vision API has not been used in project',
-                status: 'PERMISSION_DENIED',
-              },
-            }),
-            { status: 403 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              message: 'Cloud Vision API has not been used in project',
+              status: 'PERMISSION_DENIED',
+            },
+          }),
+          { status: 403 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1130,16 +1123,14 @@ describe('AI Routes Branch Coverage', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'Billing account not configured', status: 'FAILED_PRECONDITION' },
-            }),
-            { status: 403 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'Billing account not configured', status: 'FAILED_PRECONDITION' },
+          }),
+          { status: 403 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1165,16 +1156,14 @@ describe('AI Routes Branch Coverage', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'Rate limit exceeded', status: 'RESOURCE_EXHAUSTED' },
-            }),
-            { status: 429 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'Rate limit exceeded', status: 'RESOURCE_EXHAUSTED' },
+          }),
+          { status: 429 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()
@@ -1290,16 +1279,14 @@ describe('AI Routes Branch Coverage', () => {
         model: 'claude-3-5-haiku-20241022',
       })
 
-      const fetchSpy = vi
-        .spyOn(globalThis, 'fetch')
-        .mockResolvedValue(
-          new Response(
-            JSON.stringify({
-              error: { message: 'Authentication failed', status: 'UNAUTHENTICATED' },
-            }),
-            { status: 401 }
-          )
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'Authentication failed', status: 'UNAUTHENTICATED' },
+          }),
+          { status: 401 }
         )
+      )
 
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()

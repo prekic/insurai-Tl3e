@@ -85,20 +85,35 @@ const EXPORT_VERSION = 1
 const importConfigSchema = z.object({
   version: z.number().int().positive(),
   exportedAt: z.string(),
-  settings: z.record(z.string(), z.array(z.object({
-    key: z.string(),
-    value: z.unknown(),
-  }))).optional(),
-  featureFlags: z.array(z.object({
-    key: z.string(),
-    enabled: z.boolean().optional(),
-    rolloutPercentage: z.number().min(0).max(100).optional(),
-  })).optional(),
-  regionalFactors: z.array(z.object({
-    regionCode: z.string(),
-    policyType: z.string().default('all'),
-    riskFactor: z.number().min(0).max(5),
-  })).optional(),
+  settings: z
+    .record(
+      z.string(),
+      z.array(
+        z.object({
+          key: z.string(),
+          value: z.unknown(),
+        })
+      )
+    )
+    .optional(),
+  featureFlags: z
+    .array(
+      z.object({
+        key: z.string(),
+        enabled: z.boolean().optional(),
+        rolloutPercentage: z.number().min(0).max(100).optional(),
+      })
+    )
+    .optional(),
+  regionalFactors: z
+    .array(
+      z.object({
+        regionCode: z.string(),
+        policyType: z.string().default('all'),
+        riskFactor: z.number().min(0).max(5),
+      })
+    )
+    .optional(),
 })
 
 const importRequestSchema = z.object({
@@ -142,8 +157,25 @@ interface ServerPerformanceAlert {
 }
 
 const serverPerfEvents: ServerConfigEvent[] = []
-const SERVER_PERF_MAX_EVENTS = 500
-const SERVER_PERF_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+// Defaults — configurable via app_settings monitoring.server_perf_max_events / monitoring.server_perf_max_age_ms
+let SERVER_PERF_MAX_EVENTS = 500
+let SERVER_PERF_MAX_AGE_MS = 60 * 60 * 1000 // 1 hour
+
+// Lazy-load config overrides (fire-and-forget, non-blocking)
+let _perfConfigLoaded = false
+async function _loadPerfConfig(): Promise<void> {
+  if (_perfConfigLoaded) return
+  _perfConfigLoaded = true
+  try {
+    const { getMonitoringConfig } = await import('../services/config-service.js')
+    const monCfg = await getMonitoringConfig()
+    SERVER_PERF_MAX_EVENTS = monCfg.serverPerfMaxEvents
+    SERVER_PERF_MAX_AGE_MS = monCfg.serverPerfMaxAgeMs
+  } catch {
+    // Keep defaults
+  }
+}
+_loadPerfConfig()
 
 let serverAlertThresholds: ServerAlertThresholds = {
   cacheHitRateWarning: 0.5,
@@ -168,7 +200,12 @@ function pruneServerPerfEvents(): void {
   }
 }
 
-function recordServerConfigFetch(category: string, latencyMs: number, cacheHit: boolean, success: boolean): void {
+function recordServerConfigFetch(
+  category: string,
+  latencyMs: number,
+  cacheHit: boolean,
+  success: boolean
+): void {
   serverPerfEvents.push({ timestamp: Date.now(), category, latencyMs, cacheHit, success })
   pruneServerPerfEvents()
 }
@@ -185,7 +222,10 @@ function getServerPerformanceSnapshot() {
 
   const dbEvents = events.filter((e) => !e.cacheHit && e.success)
   const dbLatencies = dbEvents.map((e) => e.latencyMs).sort((a, b) => a - b)
-  const allLatencies = events.filter((e) => e.success).map((e) => e.latencyMs).sort((a, b) => a - b)
+  const allLatencies = events
+    .filter((e) => e.success)
+    .map((e) => e.latencyMs)
+    .sort((a, b) => a - b)
   const totalHits = events.filter((e) => e.cacheHit).length
 
   // Per-category breakdown
@@ -196,20 +236,27 @@ function getServerPerformanceSnapshot() {
     catMap.set(ev.category, arr)
   }
 
-  const categories = Array.from(catMap.entries()).map(([cat, evts]) => {
-    const success = evts.filter((e) => e.success)
-    const avgLatency = success.length > 0 ? success.reduce((s, e) => s + e.latencyMs, 0) / success.length : 0
-    return {
-      category: cat,
-      fetchCount: evts.length,
-      avgLatencyMs: Math.round(avgLatency * 100) / 100,
-      cacheHitRate: evts.length > 0 ? Math.round((evts.filter((e) => e.cacheHit).length / evts.length) * 10000) / 10000 : 0,
-      errorCount: evts.filter((e) => !e.success).length,
-    }
-  }).sort((a, b) => b.fetchCount - a.fetchCount)
+  const categories = Array.from(catMap.entries())
+    .map(([cat, evts]) => {
+      const success = evts.filter((e) => e.success)
+      const avgLatency =
+        success.length > 0 ? success.reduce((s, e) => s + e.latencyMs, 0) / success.length : 0
+      return {
+        category: cat,
+        fetchCount: evts.length,
+        avgLatencyMs: Math.round(avgLatency * 100) / 100,
+        cacheHitRate:
+          evts.length > 0
+            ? Math.round((evts.filter((e) => e.cacheHit).length / evts.length) * 10000) / 10000
+            : 0,
+        errorCount: evts.filter((e) => !e.success).length,
+      }
+    })
+    .sort((a, b) => b.fetchCount - a.fetchCount)
 
   const computeStats = (latencies: number[]) => {
-    if (latencies.length === 0) return { count: 0, avgMs: 0, minMs: 0, maxMs: 0, p50Ms: 0, p95Ms: 0, p99Ms: 0 }
+    if (latencies.length === 0)
+      return { count: 0, avgMs: 0, minMs: 0, maxMs: 0, p50Ms: 0, p95Ms: 0, p99Ms: 0 }
     const sum = latencies.reduce((a, b) => a + b, 0)
     return {
       count: latencies.length,
@@ -255,7 +302,8 @@ function evaluateServerAlerts(): { alerts: ServerPerformanceAlert[]; suppressedC
   const errorRate = events.length > 0 ? events.filter((e) => !e.success).length / events.length : 0
   const dbEvents = events.filter((e) => !e.cacheHit && e.success)
   const dbLatencies = dbEvents.map((e) => e.latencyMs)
-  const avgDbLatency = dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
+  const avgDbLatency =
+    dbLatencies.length > 0 ? dbLatencies.reduce((a, b) => a + b, 0) / dbLatencies.length : 0
 
   const tryCreateAlert = (
     type: ServerPerformanceAlert['type'],
@@ -397,21 +445,27 @@ router.get('/performance', async (_req: Request, res: Response) => {
     // Fire notifications for new alerts
     if (alertEvaluation.alerts.length > 0) {
       // Lazy import to avoid circular dependencies
-      import('../services/admin-notification-service.js').then(({ notifyPerformanceAlert }) => {
-        for (const alert of alertEvaluation.alerts) {
-          const typeLabels: Record<string, string> = {
-            cache_hit_rate: 'Low Cache Hit Rate',
-            error_rate: 'High Error Rate',
-            db_latency: 'High DB Latency',
+      import('../services/admin-notification-service.js')
+        .then(({ notifyPerformanceAlert }) => {
+          for (const alert of alertEvaluation.alerts) {
+            const typeLabels: Record<string, string> = {
+              cache_hit_rate: 'Low Cache Hit Rate',
+              error_rate: 'High Error Rate',
+              db_latency: 'High DB Latency',
+            }
+            notifyPerformanceAlert(
+              typeLabels[alert.type] || alert.type,
+              alert.severity,
+              alert.message,
+              { currentValue: alert.currentValue, threshold: alert.threshold }
+            ).catch((err: unknown) =>
+              log.warn('Failed to create performance notification', { error: String(err) })
+            )
           }
-          notifyPerformanceAlert(
-            typeLabels[alert.type] || alert.type,
-            alert.severity,
-            alert.message,
-            { currentValue: alert.currentValue, threshold: alert.threshold }
-          ).catch((err: unknown) => log.warn('Failed to create performance notification', { error: String(err) }))
-        }
-      }).catch(() => { /* notification service not available */ })
+        })
+        .catch(() => {
+          /* notification service not available */
+        })
     }
 
     return res.json({
@@ -511,11 +565,38 @@ router.get('/export', async (req: Request, res: Response) => {
     // Fetch all data in parallel
     const [settingsResult, flagsResult, factorsResult, providersResult, benchmarksResult] =
       await Promise.all([
-        supabase.from('app_settings').select('category, key, value, value_type').order('category').order('display_order'),
-        supabase.from('feature_flags').select('key, description, enabled, rollout_percentage, user_segments, conditions, expires_at').order('key'),
-        supabase.from('regional_factors').select('region_code, region_name, region_name_tr, policy_type, risk_factor, year, source, notes').eq('is_active', true).order('region_code'),
-        supabase.from('insurance_providers').select('code, name, name_tr, market_share, customer_rating, established_year, headquarters, website, specialties, is_active').order('code'),
-        supabase.from('market_benchmarks').select('policy_type, coverage_type, coverage_name_tr, region_code, year, min_limit, typical_limit, max_limit, min_deductible, typical_deductible, max_deductible, inclusion_rate, importance, source').eq('is_active', true).order('policy_type').order('coverage_type'),
+        supabase
+          .from('app_settings')
+          .select('category, key, value, value_type')
+          .order('category')
+          .order('display_order'),
+        supabase
+          .from('feature_flags')
+          .select(
+            'key, description, enabled, rollout_percentage, user_segments, conditions, expires_at'
+          )
+          .order('key'),
+        supabase
+          .from('regional_factors')
+          .select(
+            'region_code, region_name, region_name_tr, policy_type, risk_factor, year, source, notes'
+          )
+          .eq('is_active', true)
+          .order('region_code'),
+        supabase
+          .from('insurance_providers')
+          .select(
+            'code, name, name_tr, market_share, customer_rating, established_year, headquarters, website, specialties, is_active'
+          )
+          .order('code'),
+        supabase
+          .from('market_benchmarks')
+          .select(
+            'policy_type, coverage_type, coverage_name_tr, region_code, year, min_limit, typical_limit, max_limit, min_deductible, typical_deductible, max_deductible, inclusion_rate, importance, source'
+          )
+          .eq('is_active', true)
+          .order('policy_type')
+          .order('coverage_type'),
       ])
 
     if (settingsResult.error) {
@@ -524,7 +605,10 @@ router.get('/export', async (req: Request, res: Response) => {
     }
 
     // Group settings by category
-    const groupedSettings: Record<string, Array<{ key: string; value: unknown; valueType: string }>> = {}
+    const groupedSettings: Record<
+      string,
+      Array<{ key: string; value: unknown; valueType: string }>
+    > = {}
     for (const row of settingsResult.data || []) {
       if (!groupedSettings[row.category]) {
         groupedSettings[row.category] = []
@@ -609,7 +693,11 @@ router.get('/export', async (req: Request, res: Response) => {
       category: '_system',
       key: 'config_export',
       previous_value: null,
-      new_value: { sections: Object.keys(groupedSettings), featureFlags: (flagsResult.data || []).length, regionalFactors: (factorsResult.data || []).length },
+      new_value: {
+        sections: Object.keys(groupedSettings),
+        featureFlags: (flagsResult.data || []).length,
+        regionalFactors: (factorsResult.data || []).length,
+      },
       changed_by: adminUserId,
       reason: 'Configuration exported',
       ip_address: req.ip,
@@ -687,17 +775,31 @@ router.post('/import', async (req: Request, res: Response) => {
             }
 
             // Validate value constraints
-            if (existing.min_value !== null && typeof setting.value === 'number' && setting.value < existing.min_value) {
-              results.settings.errors.push(`${category}.${setting.key}: value ${setting.value} below minimum ${existing.min_value}`)
+            if (
+              existing.min_value !== null &&
+              typeof setting.value === 'number' &&
+              setting.value < existing.min_value
+            ) {
+              results.settings.errors.push(
+                `${category}.${setting.key}: value ${setting.value} below minimum ${existing.min_value}`
+              )
               continue
             }
-            if (existing.max_value !== null && typeof setting.value === 'number' && setting.value > existing.max_value) {
-              results.settings.errors.push(`${category}.${setting.key}: value ${setting.value} above maximum ${existing.max_value}`)
+            if (
+              existing.max_value !== null &&
+              typeof setting.value === 'number' &&
+              setting.value > existing.max_value
+            ) {
+              results.settings.errors.push(
+                `${category}.${setting.key}: value ${setting.value} above maximum ${existing.max_value}`
+              )
               continue
             }
             if (existing.allowed_values && Array.isArray(existing.allowed_values)) {
               if (!(existing.allowed_values as unknown[]).includes(setting.value)) {
-                results.settings.errors.push(`${category}.${setting.key}: value not in allowed values`)
+                results.settings.errors.push(
+                  `${category}.${setting.key}: value not in allowed values`
+                )
                 continue
               }
             }
@@ -719,7 +821,11 @@ router.post('/import', async (req: Request, res: Response) => {
               .eq('id', existing.id)
 
             if (updateError) {
-              log.error('Settings import: update failed', { category, key: setting.key, error: updateError.message })
+              log.error('Settings import: update failed', {
+                category,
+                key: setting.key,
+                error: updateError.message,
+              })
               results.settings.errors.push(`${category}.${setting.key}: update failed`)
               continue
             }
@@ -739,7 +845,9 @@ router.post('/import', async (req: Request, res: Response) => {
 
             results.settings.updated++
           } catch (error) {
-            results.settings.errors.push(`${category}.${setting.key}: ${error instanceof Error ? error.message : 'unknown error'}`)
+            results.settings.errors.push(
+              `${category}.${setting.key}: ${error instanceof Error ? error.message : 'unknown error'}`
+            )
           }
         }
       }
@@ -756,7 +864,8 @@ router.post('/import', async (req: Request, res: Response) => {
           }
 
           if (flag.enabled !== undefined) updateData.enabled = flag.enabled
-          if (flag.rolloutPercentage !== undefined) updateData.rollout_percentage = flag.rolloutPercentage
+          if (flag.rolloutPercentage !== undefined)
+            updateData.rollout_percentage = flag.rolloutPercentage
 
           const { data: existing } = await supabase
             .from('feature_flags')
@@ -779,14 +888,19 @@ router.post('/import', async (req: Request, res: Response) => {
             .eq('key', flag.key)
 
           if (updateError) {
-            log.error('Settings import: flag update failed', { key: flag.key, error: updateError.message })
+            log.error('Settings import: flag update failed', {
+              key: flag.key,
+              error: updateError.message,
+            })
             results.featureFlags.errors.push(`${flag.key}: update failed`)
             continue
           }
 
           results.featureFlags.updated++
         } catch (error) {
-          results.featureFlags.errors.push(`${flag.key}: ${error instanceof Error ? error.message : 'unknown error'}`)
+          results.featureFlags.errors.push(
+            `${flag.key}: ${error instanceof Error ? error.message : 'unknown error'}`
+          )
         }
       }
     }
@@ -809,7 +923,9 @@ router.post('/import', async (req: Request, res: Response) => {
               results.regionalFactors.skipped++
               continue
             }
-            results.regionalFactors.errors.push(`${factor.regionCode}/${factor.policyType}: not found`)
+            results.regionalFactors.errors.push(
+              `${factor.regionCode}/${factor.policyType}: not found`
+            )
             continue
           }
 
@@ -828,21 +944,30 @@ router.post('/import', async (req: Request, res: Response) => {
             .eq('id', existing.id)
 
           if (updateError) {
-            log.error('Settings import: factor update failed', { regionCode: factor.regionCode, error: updateError.message })
+            log.error('Settings import: factor update failed', {
+              regionCode: factor.regionCode,
+              error: updateError.message,
+            })
             results.regionalFactors.errors.push(`${factor.regionCode}: update failed`)
             continue
           }
 
           results.regionalFactors.updated++
         } catch (error) {
-          results.regionalFactors.errors.push(`${factor.regionCode}: ${error instanceof Error ? error.message : 'unknown error'}`)
+          results.regionalFactors.errors.push(
+            `${factor.regionCode}: ${error instanceof Error ? error.message : 'unknown error'}`
+          )
         }
       }
     }
 
     // Log the import action
-    const totalUpdated = results.settings.updated + results.featureFlags.updated + results.regionalFactors.updated
-    const totalErrors = results.settings.errors.length + results.featureFlags.errors.length + results.regionalFactors.errors.length
+    const totalUpdated =
+      results.settings.updated + results.featureFlags.updated + results.regionalFactors.updated
+    const totalErrors =
+      results.settings.errors.length +
+      results.featureFlags.errors.length +
+      results.regionalFactors.errors.length
 
     await supabase.from('settings_audit_log').insert({
       category: '_system',
@@ -865,7 +990,9 @@ router.post('/import', async (req: Request, res: Response) => {
     if (totalUpdated > 0) {
       fireWebhooks('setting.imported', {
         category: '_system',
-        changes: [{ key: 'config_import', previous_value: null, new_value: { totalUpdated, totalErrors } }],
+        changes: [
+          { key: 'config_import', previous_value: null, new_value: { totalUpdated, totalErrors } },
+        ],
         reason: importReason,
         changed_by: adminUserId,
       }).catch((err) => log.warn('Webhook fire error on import', { error: String(err) }))
@@ -877,7 +1004,10 @@ router.post('/import', async (req: Request, res: Response) => {
         results,
         summary: {
           totalUpdated,
-          totalSkipped: results.settings.skipped + results.featureFlags.skipped + results.regionalFactors.skipped,
+          totalSkipped:
+            results.settings.skipped +
+            results.featureFlags.skipped +
+            results.regionalFactors.skipped,
           totalErrors,
         },
       },
@@ -893,11 +1023,16 @@ router.post('/import', async (req: Request, res: Response) => {
 // =============================================================================
 
 const batchUpdateSchema = z.object({
-  updates: z.array(z.object({
-    category: z.string().min(1),
-    key: z.string().min(1),
-    value: z.unknown(),
-  })).min(1).max(50),
+  updates: z
+    .array(
+      z.object({
+        category: z.string().min(1),
+        key: z.string().min(1),
+        value: z.unknown(),
+      })
+    )
+    .min(1)
+    .max(50),
   reason: z.string().optional(),
 })
 
@@ -931,7 +1066,14 @@ router.put('/batch', async (req: Request, res: Response) => {
     category: string
     key: string
     value: unknown
-    existing: { id: string; value: unknown; is_readonly: boolean; min_value: number | null; max_value: number | null; allowed_values: unknown[] | null }
+    existing: {
+      id: string
+      value: unknown
+      is_readonly: boolean
+      min_value: number | null
+      max_value: number | null
+      allowed_values: unknown[] | null
+    }
   }> = []
 
   // Supabase doesn't support OR-ing multiple AND conditions easily,
@@ -948,7 +1090,7 @@ router.put('/batch', async (req: Request, res: Response) => {
   }
 
   // Build lookup map
-  const settingsMap = new Map<string, typeof allSettings[0]>()
+  const settingsMap = new Map<string, (typeof allSettings)[0]>()
   for (const s of allSettings || []) {
     settingsMap.set(`${s.category}:${s.key}`, s)
   }
@@ -959,29 +1101,57 @@ router.put('/batch', async (req: Request, res: Response) => {
     const existing = settingsMap.get(mapKey)
 
     if (!existing) {
-      validationErrors.push({ category: update.category, key: update.key, error: 'Setting not found' })
+      validationErrors.push({
+        category: update.category,
+        key: update.key,
+        error: 'Setting not found',
+      })
       continue
     }
 
     if (existing.is_readonly) {
-      validationErrors.push({ category: update.category, key: update.key, error: 'Setting is read-only' })
+      validationErrors.push({
+        category: update.category,
+        key: update.key,
+        error: 'Setting is read-only',
+      })
       continue
     }
 
-    if (existing.min_value !== null && typeof update.value === 'number' && update.value < existing.min_value) {
-      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at least ${existing.min_value}` })
+    if (
+      existing.min_value !== null &&
+      typeof update.value === 'number' &&
+      update.value < existing.min_value
+    ) {
+      validationErrors.push({
+        category: update.category,
+        key: update.key,
+        error: `Value must be at least ${existing.min_value}`,
+      })
       continue
     }
 
-    if (existing.max_value !== null && typeof update.value === 'number' && update.value > existing.max_value) {
-      validationErrors.push({ category: update.category, key: update.key, error: `Value must be at most ${existing.max_value}` })
+    if (
+      existing.max_value !== null &&
+      typeof update.value === 'number' &&
+      update.value > existing.max_value
+    ) {
+      validationErrors.push({
+        category: update.category,
+        key: update.key,
+        error: `Value must be at most ${existing.max_value}`,
+      })
       continue
     }
 
     if (existing.allowed_values && Array.isArray(existing.allowed_values)) {
       const allowedValues = existing.allowed_values as unknown[]
       if (!allowedValues.includes(update.value)) {
-        validationErrors.push({ category: update.category, key: update.key, error: `Value must be one of: ${allowedValues.join(', ')}` })
+        validationErrors.push({
+          category: update.category,
+          key: update.key,
+          error: `Value must be one of: ${allowedValues.join(', ')}`,
+        })
         continue
       }
     }
@@ -1010,7 +1180,12 @@ router.put('/batch', async (req: Request, res: Response) => {
   }
 
   // Phase 2: Apply all validated updates
-  const results: Array<{ category: string; key: string; previousValue: unknown; newValue: unknown }> = []
+  const results: Array<{
+    category: string
+    key: string
+    previousValue: unknown
+    newValue: unknown
+  }> = []
   const errors: Array<{ category: string; key: string; error: string }> = []
 
   for (const update of validatedUpdates) {
@@ -1052,7 +1227,11 @@ router.put('/batch', async (req: Request, res: Response) => {
         })
       }
     } catch (error) {
-      log.error('Batch update error for individual setting', { category: update.category, key: update.key, error: String(error) })
+      log.error('Batch update error for individual setting', {
+        category: update.category,
+        key: update.key,
+        error: String(error),
+      })
       errors.push({ category: update.category, key: update.key, error: 'Internal error' })
     }
   }
@@ -1062,20 +1241,22 @@ router.put('/batch', async (req: Request, res: Response) => {
   // Fire webhooks for batch update (async, non-blocking)
   if (results.length > 0) {
     // Group changes by category for cleaner payloads
-    const byCategory = results.reduce<Record<string, Array<{ key: string; previous_value: unknown; new_value: unknown }>>>(
-      (acc, r) => {
-        if (!acc[r.category]) acc[r.category] = []
-        acc[r.category].push({ key: r.key, previous_value: r.previousValue, new_value: r.newValue })
-        return acc
-      }, {}
-    )
+    const byCategory = results.reduce<
+      Record<string, Array<{ key: string; previous_value: unknown; new_value: unknown }>>
+    >((acc, r) => {
+      if (!acc[r.category]) acc[r.category] = []
+      acc[r.category].push({ key: r.key, previous_value: r.previousValue, new_value: r.newValue })
+      return acc
+    }, {})
     for (const [cat, changes] of Object.entries(byCategory)) {
       fireWebhooks('setting.batch_updated', {
         category: cat,
         changes,
         reason,
         changed_by: adminUserId,
-      }).catch((err) => log.warn('Webhook fire error on batch update', { category: cat, error: String(err) }))
+      }).catch((err) =>
+        log.warn('Webhook fire error on batch update', { category: cat, error: String(err) })
+      )
     }
   }
 
@@ -1186,7 +1367,13 @@ router.put('/feature-flags/:key', async (req: Request, res: Response) => {
     // Fire webhooks for feature flag toggle (async, non-blocking)
     fireWebhooks('feature_flag.toggled', {
       category: 'feature_flags',
-      changes: [{ key: data.key, previous_value: null, new_value: { enabled: data.enabled, rolloutPercentage: data.rollout_percentage } }],
+      changes: [
+        {
+          key: data.key,
+          previous_value: null,
+          new_value: { enabled: data.enabled, rolloutPercentage: data.rollout_percentage },
+        },
+      ],
       changed_by: adminUserId,
     }).catch((err) => log.warn('Webhook fire error on feature flag toggle', { error: String(err) }))
 
@@ -1756,7 +1943,11 @@ router.get('/:category/:key', async (req: Request, res: Response) => {
       },
     })
   } catch (error) {
-    log.error('Unhandled exception fetching specific setting', { category, key, error: String(error) })
+    log.error('Unhandled exception fetching specific setting', {
+      category,
+      key,
+      error: String(error),
+    })
     return res.status(500).json({ success: false, error: 'Internal server error' })
   }
 })
@@ -1870,7 +2061,9 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
       changes: [{ key, previous_value: existing.value, new_value: value }],
       reason,
       changed_by: adminUserId,
-    }).catch((err) => log.warn('Webhook fire error on setting update', { category, key, error: String(err) }))
+    }).catch((err) =>
+      log.warn('Webhook fire error on setting update', { category, key, error: String(err) })
+    )
 
     return res.json({
       success: true,

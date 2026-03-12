@@ -27,6 +27,10 @@ import type {
   EmailConfig,
   MonitoringConfig,
   RetentionConfig,
+  FXConfig,
+  ServerConfig,
+  WebhooksConfig,
+  CostConfig,
   FeatureFlag,
   RegionalFactor,
   InsuranceProvider,
@@ -47,6 +51,10 @@ import {
   DEFAULT_EMAIL_CONFIG,
   DEFAULT_MONITORING_CONFIG,
   DEFAULT_RETENTION_CONFIG,
+  DEFAULT_FX_CONFIG,
+  DEFAULT_SERVER_CONFIG,
+  DEFAULT_WEBHOOKS_CONFIG,
+  DEFAULT_COST_CONFIG,
 } from './types'
 
 import { configPerformanceMonitor } from './config-performance-monitor'
@@ -105,6 +113,11 @@ const AI_KEY_MAP: Record<string, keyof AIConfig> = {
   confidence_weight_dates: 'confidenceWeightDates',
   confidence_weight_premium: 'confidenceWeightPremium',
   confidence_weight_coverages: 'confidenceWeightCoverages',
+  request_budget_ms: 'requestBudgetMs',
+  primary_provider_timeout_ms: 'primaryProviderTimeoutMs',
+  fallback_provider_timeout_ms: 'fallbackProviderTimeoutMs',
+  client_fetch_timeout_ms: 'clientFetchTimeoutMs',
+  trial_extraction_timeout_ms: 'trialExtractionTimeoutMs',
 }
 
 const EVALUATION_KEY_MAP: Record<string, keyof EvaluationConfig> = {
@@ -167,6 +180,9 @@ const OCR_KEY_MAP: Record<string, keyof OCRConfig> = {
   max_pages_quick_analysis: 'maxPagesQuickAnalysis',
   timeout_seconds: 'timeoutSeconds',
   max_text_length: 'maxTextLength',
+  pdf_load_timeout_ms: 'pdfLoadTimeoutMs',
+  max_worker_failures: 'maxWorkerFailures',
+  ocr_cleanup_timeout_ms: 'ocrCleanupTimeoutMs',
 }
 
 const FUZZY_MATCHING_KEY_MAP: Record<string, keyof FuzzyMatchingConfig> = {
@@ -215,6 +231,7 @@ const UI_KEY_MAP: Record<string, keyof UIConfig> = {
   max_file_size_mb: 'maxFileSizeMb',
   allowed_file_extensions: 'allowedFileExtensions',
   display_currency: 'displayCurrency',
+  trial_expiry_ms: 'trialExpiryMs',
 }
 
 const EMAIL_KEY_MAP: Record<string, keyof EmailConfig> = {
@@ -240,6 +257,40 @@ const MONITORING_KEY_MAP: Record<string, keyof MonitoringConfig> = {
 const RETENTION_KEY_MAP: Record<string, keyof RetentionConfig> = {
   processing_log_retention_days: 'processingLogRetentionDays',
   extraction_metrics_retention_days: 'extractionMetricsRetentionDays',
+}
+
+const MONITORING_BUFFER_KEY_MAP: Record<string, keyof MonitoringConfig> = {
+  extraction_buffer_size: 'extractionBufferSize',
+  max_alert_history: 'maxAlertHistory',
+  max_response_times: 'maxResponseTimes',
+  server_perf_max_events: 'serverPerfMaxEvents',
+  server_perf_max_age_ms: 'serverPerfMaxAgeMs',
+}
+
+const FX_KEY_MAP: Record<string, keyof FXConfig> = {
+  server_cache_ttl_ms: 'serverCacheTtlMs',
+  supported_currencies: 'supportedCurrencies',
+  fallback_rates: 'fallbackRates',
+  api_timeout_ms: 'apiTimeoutMs',
+  client_cache_ttl_ms: 'clientCacheTtlMs',
+}
+
+const SERVER_KEY_MAP: Record<string, keyof ServerConfig> = {
+  db_query_timeout_ms: 'dbQueryTimeoutMs',
+  config_cache_ttl_ms: 'configCacheTtlMs',
+  prompt_cache_ttl_ms: 'promptCacheTtlMs',
+  translation_cache_ttl_ms: 'translationCacheTtlMs',
+  rate_limit_config_cache_ttl_ms: 'rateLimitConfigCacheTtlMs',
+}
+
+const WEBHOOKS_KEY_MAP: Record<string, keyof WebhooksConfig> = {
+  max_delivery_attempts: 'maxDeliveryAttempts',
+  delivery_timeout_ms: 'deliveryTimeoutMs',
+  max_response_body_length: 'maxResponseBodyLength',
+}
+
+const COST_KEY_MAP: Record<string, keyof CostConfig> = {
+  token_pricing: 'tokenPricing',
 }
 
 // =============================================================================
@@ -587,6 +638,13 @@ export class ConfigurationService {
     for (const [dbKey, tsKey] of Object.entries(MONITORING_KEY_MAP)) {
       if (dbSettings[dbKey] !== undefined) {
         ;(config as Record<string, unknown>)[tsKey] = dbSettings[dbKey]
+      }
+    }
+
+    // Also merge buffer/limit settings from monitoring category
+    for (const [dbKey, tsKey] of Object.entries(MONITORING_BUFFER_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
       }
     }
 
@@ -1084,6 +1142,97 @@ export class ConfigurationService {
     return configPerformanceMonitor.getSnapshot()
   }
 
+  /**
+   * Get FX configuration with defaults
+   */
+  async getFXConfig(): Promise<FXConfig> {
+    const dbSettings = await this.getCategory('fx')
+    const config = { ...DEFAULT_FX_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(FX_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        const val = dbSettings[dbKey]
+        if (tsKey === 'supportedCurrencies') {
+          try {
+            ;(config as Record<string, unknown>)[tsKey] =
+              typeof val === 'string' ? JSON.parse(val) : val
+          } catch {
+            // Keep default
+          }
+        } else if (tsKey === 'fallbackRates') {
+          try {
+            ;(config as Record<string, unknown>)[tsKey] =
+              typeof val === 'string' ? JSON.parse(val) : val
+          } catch {
+            // Keep default
+          }
+        } else {
+          ;(config as Record<string, unknown>)[tsKey] = Number(val)
+        }
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Get server configuration with defaults
+   */
+  async getServerConfig(): Promise<ServerConfig> {
+    const dbSettings = await this.getCategory('server')
+    const config = { ...DEFAULT_SERVER_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(SERVER_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Get webhooks configuration with defaults
+   */
+  async getWebhooksConfig(): Promise<WebhooksConfig> {
+    const dbSettings = await this.getCategory('webhooks')
+    const config = { ...DEFAULT_WEBHOOKS_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(WEBHOOKS_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        ;(config as Record<string, unknown>)[tsKey] = Number(dbSettings[dbKey])
+      }
+    }
+
+    return config
+  }
+
+  /**
+   * Get cost configuration with defaults
+   */
+  async getCostConfig(): Promise<CostConfig> {
+    const dbSettings = await this.getCategory('cost')
+    const config = { ...DEFAULT_COST_CONFIG }
+
+    for (const [dbKey, tsKey] of Object.entries(COST_KEY_MAP)) {
+      if (dbSettings[dbKey] !== undefined) {
+        const val = dbSettings[dbKey]
+        if (tsKey === 'tokenPricing') {
+          try {
+            ;(config as Record<string, unknown>)[tsKey] =
+              typeof val === 'string' ? JSON.parse(val) : val
+          } catch {
+            // Keep default
+          }
+        } else {
+          ;(config as Record<string, unknown>)[tsKey] = val
+        }
+      }
+    }
+
+    return config
+  }
+
   // ===========================================================================
   // UTILITY METHODS
   // ===========================================================================
@@ -1180,4 +1329,32 @@ export async function getMonitoringConfig(): Promise<MonitoringConfig> {
  */
 export async function getRetentionConfig(): Promise<RetentionConfig> {
   return configService.getRetentionConfig()
+}
+
+/**
+ * Get FX configuration (convenience function)
+ */
+export async function getFXConfig(): Promise<FXConfig> {
+  return configService.getFXConfig()
+}
+
+/**
+ * Get server configuration (convenience function)
+ */
+export async function getServerConfig(): Promise<ServerConfig> {
+  return configService.getServerConfig()
+}
+
+/**
+ * Get webhooks configuration (convenience function)
+ */
+export async function getWebhooksConfig(): Promise<WebhooksConfig> {
+  return configService.getWebhooksConfig()
+}
+
+/**
+ * Get cost configuration (convenience function)
+ */
+export async function getCostConfig(): Promise<CostConfig> {
+  return configService.getCostConfig()
 }

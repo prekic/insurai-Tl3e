@@ -19,7 +19,15 @@ export interface PDFParseResult {
 }
 
 export interface PDFParseError {
-  code: 'INVALID_PDF' | 'EMPTY_PDF' | 'PARSE_ERROR' | 'PASSWORD_PROTECTED' | 'LOAD_ERROR' | 'FILE_READ_ERROR' | 'TIMEOUT_ERROR' | 'WORKER_ERROR'
+  code:
+    | 'INVALID_PDF'
+    | 'EMPTY_PDF'
+    | 'PARSE_ERROR'
+    | 'PASSWORD_PROTECTED'
+    | 'LOAD_ERROR'
+    | 'FILE_READ_ERROR'
+    | 'TIMEOUT_ERROR'
+    | 'WORKER_ERROR'
   message: string
 }
 
@@ -29,9 +37,25 @@ let loadPromise: Promise<typeof import('pdfjs-dist')> | null = null
 let workerLoadAttempted = false
 let workerFailureCount = 0
 
-// Configuration
-const PDF_LOAD_TIMEOUT_MS = 30000 // 30 seconds max for loading a PDF
-const MAX_WORKER_FAILURES = 2 // After 2 worker failures, force fake worker
+// Configuration — defaults, overridable via app_settings (ocr.pdf_load_timeout_ms, ocr.max_worker_failures)
+let PDF_LOAD_TIMEOUT_MS = 30000 // 30 seconds max for loading a PDF
+let MAX_WORKER_FAILURES = 2 // After 2 worker failures, force fake worker
+
+// Lazy-load config overrides (fire-and-forget, non-blocking)
+let _configLoaded = false
+async function _loadPdfConfig(): Promise<void> {
+  if (_configLoaded) return
+  _configLoaded = true
+  try {
+    const { getOCRConfig } = await import('@/lib/config')
+    const ocrCfg = await getOCRConfig()
+    PDF_LOAD_TIMEOUT_MS = ocrCfg.pdfLoadTimeoutMs
+    MAX_WORKER_FAILURES = ocrCfg.maxWorkerFailures
+  } catch {
+    // Keep defaults
+  }
+}
+_loadPdfConfig()
 
 /**
  * CDN sources for PDF.js worker (in order of preference)
@@ -39,8 +63,10 @@ const MAX_WORKER_FAILURES = 2 // After 2 worker failures, force fake worker
  */
 const WORKER_CDN_SOURCES = [
   (version: string) => `https://unpkg.com/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
-  (version: string) => `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
-  (version: string) => `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`,
+  (version: string) =>
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${version}/build/pdf.worker.min.mjs`,
+  (version: string) =>
+    `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${version}/pdf.worker.min.mjs`,
 ]
 
 /**
@@ -125,7 +151,9 @@ async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
 
         // If too many worker failures, force fake worker mode
         if (workerFailureCount >= MAX_WORKER_FAILURES) {
-          console.warn(`[PDF.js] Too many worker failures (${workerFailureCount}), forcing fake worker mode`)
+          console.warn(
+            `[PDF.js] Too many worker failures (${workerFailureCount}), forcing fake worker mode`
+          )
           // Don't set workerSrc - this forces PDF.js to use main thread
           pdfjs.GlobalWorkerOptions.workerSrc = ''
         } else {
@@ -170,7 +198,7 @@ function isWorkerError(errorMessage: string): boolean {
     'script error',
   ]
   const lowerMessage = errorMessage.toLowerCase()
-  return workerErrorPatterns.some(pattern => lowerMessage.includes(pattern.toLowerCase()))
+  return workerErrorPatterns.some((pattern) => lowerMessage.includes(pattern.toLowerCase()))
 }
 
 /**
@@ -190,7 +218,7 @@ function isTransientError(errorMessage: string): boolean {
     'overloaded',
   ]
   const lowerMessage = errorMessage.toLowerCase()
-  return transientPatterns.some(pattern => lowerMessage.includes(pattern.toLowerCase()))
+  return transientPatterns.some((pattern) => lowerMessage.includes(pattern.toLowerCase()))
 }
 
 /**
@@ -200,7 +228,9 @@ function isTransientError(errorMessage: string): boolean {
 export async function extractTextFromPDF(
   file: File
 ): Promise<{ success: true; data: PDFParseResult } | { success: false; error: PDFParseError }> {
-  let pdfDocument: Awaited<ReturnType<typeof import('pdfjs-dist')['getDocument']>['promise']> | null = null
+  let pdfDocument: Awaited<
+    ReturnType<(typeof import('pdfjs-dist'))['getDocument']>['promise']
+  > | null = null
 
   try {
     // Lazily load pdfjs-dist
@@ -326,7 +356,8 @@ export async function extractTextFromPDF(
         success: false,
         error: {
           code: 'EMPTY_PDF',
-          message: 'Could not extract meaningful text from the PDF. It may be a scanned document requiring OCR.',
+          message:
+            'Could not extract meaningful text from the PDF. It may be a scanned document requiring OCR.',
         },
       }
     }
@@ -353,7 +384,10 @@ export async function extractTextFromPDF(
     // Check if it's a worker-related error
     if (isWorkerError(errorMessage)) {
       workerFailureCount++
-      console.warn(`[PDF.js] Worker error detected (failure count: ${workerFailureCount}):`, errorMessage)
+      console.warn(
+        `[PDF.js] Worker error detected (failure count: ${workerFailureCount}):`,
+        errorMessage
+      )
       return {
         success: false,
         error: {
@@ -508,7 +542,7 @@ export async function extractTextFromPDFWithRetry(
       // Exponential backoff: 1s, 2s, 4s
       const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 4000)
       console.warn(`[PDF.js] Waiting ${delayMs}ms before retry ${attempt + 1}/${maxRetries}`)
-      await new Promise(resolve => setTimeout(resolve, delayMs))
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
   }
 

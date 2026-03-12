@@ -17,7 +17,23 @@ const STORAGE_KEYS = {
 } as const
 
 // Trial expires after 24 hours (encourages signup)
-const TRIAL_EXPIRY_MS = 24 * 60 * 60 * 1000
+// Default 86400000 — configurable via app_settings ui.trial_expiry_ms
+let TRIAL_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+// Lazy-load config override (fire-and-forget, non-blocking)
+let _trialConfigLoaded = false
+async function _loadTrialConfig(): Promise<void> {
+  if (_trialConfigLoaded) return
+  _trialConfigLoaded = true
+  try {
+    const { configService } = await import('@/lib/config')
+    const uiCfg = await configService.getUIConfig()
+    TRIAL_EXPIRY_MS = uiCfg.trialExpiryMs
+  } catch {
+    // Keep default
+  }
+}
+_loadTrialConfig()
 
 export interface TrialResult {
   policy: AnalyzedPolicy

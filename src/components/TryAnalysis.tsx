@@ -226,7 +226,15 @@ export function TryAnalysis() {
         // Client timeout: 150s to give the server's 105s budget room to respond.
         // The server enforces its own budget and returns structured timeout errors,
         // so this fires only as a last resort safety net.
-        const EXTRACTION_TIMEOUT_MS = 150_000
+        // Default 150_000 — configurable via app_settings ai.trial_extraction_timeout_ms
+        let EXTRACTION_TIMEOUT_MS = 150_000
+        try {
+          const { getAIConfig } = await import('@/lib/config')
+          const aiCfg = await getAIConfig()
+          EXTRACTION_TIMEOUT_MS = aiCfg.trialExtractionTimeoutMs
+        } catch {
+          // Keep default
+        }
         const timeoutPromise = new Promise<never>((_, reject) => {
           timeoutIdRef.current = setTimeout(() => {
             const timeoutError = new Error(t.tryAnalysis.analysisTimedOut) as Error & {

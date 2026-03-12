@@ -27,6 +27,9 @@ import {
   Bell,
   Clock,
   Building2,
+  DollarSign,
+  Server,
+  Coins,
 } from 'lucide-react'
 
 // Sub-panels
@@ -44,6 +47,7 @@ import { MonitoringAlertsPanel } from './settings/MonitoringAlertsPanel'
 import { RetentionSettingsPanel } from './settings/RetentionSettingsPanel'
 import { MarketBenchmarksPanel } from './settings/MarketBenchmarksPanel'
 import { CronJobsPanel } from './settings/CronJobsPanel'
+import { GenericSettingsPanel } from './settings/GenericSettingsPanel'
 
 type SettingsCategory =
   | 'ai'
@@ -54,6 +58,10 @@ type SettingsCategory =
   | 'feature_flags'
   | 'monitoring'
   | 'retention'
+  | 'fx'
+  | 'server'
+  | 'cost'
+  | 'ui'
   | 'history'
   | 'performance'
   | 'templates'
@@ -116,6 +124,30 @@ const CATEGORIES: CategoryConfig[] = [
     label: 'Data Retention',
     description: 'Cleanup schedules and retention periods',
     icon: <Clock className="h-5 w-5" />,
+  },
+  {
+    id: 'fx',
+    label: 'FX / Currency',
+    description: 'Exchange rate API, caching, and supported currencies',
+    icon: <DollarSign className="h-5 w-5" />,
+  },
+  {
+    id: 'server',
+    label: 'Server / Cache',
+    description: 'Database query timeouts and service cache TTLs',
+    icon: <Server className="h-5 w-5" />,
+  },
+  {
+    id: 'cost',
+    label: 'Cost Tracking',
+    description: 'Token pricing for AI cost calculations',
+    icon: <Coins className="h-5 w-5" />,
+  },
+  {
+    id: 'ui',
+    label: 'UI / Trial',
+    description: 'Free trial duration and UI behavior settings',
+    icon: <Timer className="h-5 w-5" />,
   },
   {
     id: 'history',
@@ -198,7 +230,19 @@ export function SettingsTab() {
     setError(null)
     try {
       // Fetch settings for all categories
-      const categories = ['ai', 'evaluation', 'rate_limits', 'ocr', 'monitoring', 'retention']
+      const categories = [
+        'ai',
+        'evaluation',
+        'rate_limits',
+        'ocr',
+        'monitoring',
+        'retention',
+        'fx',
+        'server',
+        'webhooks',
+        'cost',
+        'ui',
+      ]
       const responses = await Promise.all(
         categories.map((cat) => adminFetch(`/api/admin/settings/${cat}`))
       )
@@ -482,18 +526,37 @@ export function SettingsTab() {
         )
       case 'monitoring':
         return (
-          <MonitoringAlertsPanel
-            settings={categorySettings}
-            onUpdate={(key, value, reason) => updateSetting('monitoring', key, value, reason)}
-            onBatchUpdate={(updates, reason) =>
-              batchUpdateSettings(
-                updates.map((u) => ({ ...u, category: 'monitoring' })),
-                reason
-              )
-            }
-            isLoading={isLoading}
-            isSaving={isSaving}
-          />
+          <div className="space-y-6">
+            <MonitoringAlertsPanel
+              settings={categorySettings}
+              onUpdate={(key, value, reason) => updateSetting('monitoring', key, value, reason)}
+              onBatchUpdate={(updates, reason) =>
+                batchUpdateSettings(
+                  updates.map((u) => ({ ...u, category: 'monitoring' })),
+                  reason
+                )
+              }
+              isLoading={isLoading}
+              isSaving={isSaving}
+            />
+            <GenericSettingsPanel
+              settings={categorySettings.filter((s: SettingValue) =>
+                [
+                  'extraction_buffer_size',
+                  'max_metrics_buffer_size',
+                  'max_alert_history',
+                  'max_response_times',
+                  'server_perf_max_events',
+                  'server_perf_max_age_ms',
+                ].includes(s.key)
+              )}
+              onUpdate={(key, value, reason) => updateSetting('monitoring', key, value, reason)}
+              isLoading={isLoading}
+              isSaving={isSaving}
+              title="Monitoring Buffers"
+              description="In-memory buffer sizes for metrics collection. Changes take effect after server restart."
+            />
+          </div>
         )
       case 'retention':
         return (
@@ -508,6 +571,62 @@ export function SettingsTab() {
             }
             isLoading={isLoading}
             isSaving={isSaving}
+          />
+        )
+      case 'fx':
+        return (
+          <GenericSettingsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('fx', key, value, reason)}
+            isLoading={isLoading}
+            isSaving={isSaving}
+            title="FX / Currency Settings"
+            description="Configure exchange rate API, caching, and supported currencies"
+            groups={[
+              {
+                title: 'API Configuration',
+                description: 'Exchange rate API settings',
+                keys: ['api_timeout_ms', 'server_cache_ttl_ms', 'client_cache_ttl_ms'],
+              },
+              {
+                title: 'Currencies',
+                description: 'Supported currencies and fallback rates',
+                keys: ['supported_currencies', 'fallback_rates'],
+              },
+            ]}
+          />
+        )
+      case 'server':
+        return (
+          <GenericSettingsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('server', key, value, reason)}
+            isLoading={isLoading}
+            isSaving={isSaving}
+            title="Server / Cache Settings"
+            description="Database query timeouts and service cache TTLs. Changes take effect after server restart or cache expiry."
+          />
+        )
+      case 'cost':
+        return (
+          <GenericSettingsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('cost', key, value, reason)}
+            isLoading={isLoading}
+            isSaving={isSaving}
+            title="Cost Tracking"
+            description="Token pricing per model for AI cost calculations"
+          />
+        )
+      case 'ui':
+        return (
+          <GenericSettingsPanel
+            settings={categorySettings}
+            onUpdate={(key, value, reason) => updateSetting('ui', key, value, reason)}
+            isLoading={isLoading}
+            isSaving={isSaving}
+            title="UI / Trial Settings"
+            description="Free trial session duration and UI behavior configuration"
           />
         )
       case 'feature_flags':
@@ -525,7 +644,19 @@ export function SettingsTab() {
           />
         )
       case 'webhooks':
-        return <SettingsWebhooksPanel />
+        return (
+          <div className="space-y-6">
+            <GenericSettingsPanel
+              settings={categorySettings}
+              onUpdate={(key, value, reason) => updateSetting('webhooks', key, value, reason)}
+              isLoading={isLoading}
+              isSaving={isSaving}
+              title="Webhook Delivery Settings"
+              description="Configure how webhook deliveries are processed (retries, timeouts)"
+            />
+            <SettingsWebhooksPanel />
+          </div>
+        )
       case 'drift':
         return <ConfigDriftPanel />
       case 'cron_jobs':

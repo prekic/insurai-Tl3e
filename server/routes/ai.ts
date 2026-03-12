@@ -72,6 +72,8 @@ interface ExtractionEvent {
   documentLength?: number
 }
 
+// Default 200; configurable via monitoring.extraction_buffer_size in app_settings
+// (read at module scope so cannot be async — uses hardcoded default)
 const EXTRACTION_BUFFER_SIZE = 200
 const extractionMetrics: ExtractionEvent[] = []
 
@@ -1242,10 +1244,8 @@ router.post(
     const startTime = Date.now()
     // Total request budget: hard cap to prevent client-side timeout race.
     // Client timeout is 150s; we must respond well before that.
-    const REQUEST_BUDGET_MS = 125_000
-    // Per-provider timeout: must leave room for fallback within budget
-    const PRIMARY_PROVIDER_TIMEOUT_MS = 65_000
-    const FALLBACK_PROVIDER_TIMEOUT_MS = 55_000
+    // Defaults: REQUEST_BUDGET_MS=125_000, PRIMARY=65_000, FALLBACK=55_000
+    // Now read from aiConfig (fetched below) — see ai.request_budget_ms etc. in app_settings
 
     // Phase-level timing diagnostics — surfaces WHERE time is spent
     const phaseTiming: Record<string, number> = {}
@@ -1271,6 +1271,11 @@ router.post(
     const configStart = Date.now()
     const aiConfig = await getAIConfig()
     markPhase('configLoad_ms', configStart)
+
+    // Timeout budget from config (defaults: 125s / 65s / 55s)
+    const REQUEST_BUDGET_MS = aiConfig.requestBudgetMs
+    const PRIMARY_PROVIDER_TIMEOUT_MS = aiConfig.primaryProviderTimeoutMs
+    const FALLBACK_PROVIDER_TIMEOUT_MS = aiConfig.fallbackProviderTimeoutMs
 
     // Build Anthropic schema prompt with admin-configurable confidence weights
     const confidenceWeights: ConfidenceWeights = {

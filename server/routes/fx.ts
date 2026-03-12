@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { rateLimit } from 'express-rate-limit'
 import logger from '../lib/logger.js'
 import { getSupabaseWithError } from '../middleware/admin-auth.js'
+import { getFXConfig } from '../services/config-service.js'
 
 const router = Router()
 const log = logger.child('FX')
@@ -12,8 +13,8 @@ const fxLimiter = rateLimit({
   message: { error: 'Too many requests to FX service', code: 'RATE_LIMIT_EXCEEDED' },
 })
 
-// Currencies supported by the platform — TRY is always base = 1
-const SUPPORTED_SYMBOLS = [
+// Default currencies supported by the platform — TRY is always base = 1
+const DEFAULT_SUPPORTED_SYMBOLS = [
   'TRY',
   'USD',
   'EUR',
@@ -26,8 +27,8 @@ const SUPPORTED_SYMBOLS = [
   'AUD',
 ] as const
 
-// Fallback rates (approximate Q1 2026 values) used when API is unavailable
-const FALLBACK_RATES: Record<string, number> = {
+// Default fallback rates (approximate Q1 2026 values) used when API is unavailable
+const DEFAULT_FALLBACK_RATES: Record<string, number> = {
   TRY: 1,
   USD: 33.5,
   EUR: 36.5,
@@ -40,16 +41,27 @@ const FALLBACK_RATES: Record<string, number> = {
   AUD: 21.8,
 }
 
-let cachedRates: Record<string, number> = { ...FALLBACK_RATES }
+// Default cache TTL and API timeout (overridden by config service at request time)
+const DEFAULT_SERVER_CACHE_TTL = 1000 * 60 * 60 * 6 // 6 hours
+const DEFAULT_API_TIMEOUT_MS = 10_000
+
+let cachedRates: Record<string, number> = { ...DEFAULT_FALLBACK_RATES }
 let lastFetchTime = 0
 let lastFetchSource: 'api' | 'fallback' = 'fallback'
-const SERVER_CACHE_TTL = 1000 * 60 * 60 * 6 // 6 hours
 
 /**
  * Fetch live rates from exchangerate.host.
  * Returns null on failure so caller can fall back gracefully.
  */
-export async function fetchLiveRates(): Promise<Record<string, number> | null> {
+export async function fetchLiveRates(options?: {
+  supportedCurrencies?: string[]
+  fallbackRates?: Record<string, number>
+  apiTimeoutMs?: number
+}): Promise<Record<string, number> | null> {
+  const supportedSymbols = options?.supportedCurrencies || [...DEFAULT_SUPPORTED_SYMBOLS]
+  const fallbackRates = options?.fallbackRates || DEFAULT_FALLBACK_RATES
+  const apiTimeoutMs = options?.apiTimeoutMs || DEFAULT_API_TIMEOUT_MS
+
   const apiKey = process.env.EXCHANGERATE_API_KEY
   if (!apiKey) {
     log.info('EXCHANGERATE_API_KEY not set — using fallback rates')
@@ -57,11 +69,11 @@ export async function fetchLiveRates(): Promise<Record<string, number> | null> {
   }
 
   try {
-    const symbols = SUPPORTED_SYMBOLS.filter((s) => s !== 'TRY').join(',')
+    const symbols = supportedSymbols.filter((s) => s !== 'TRY').join(',')
     const url = `https://api.exchangerate.host/live?access_key=${apiKey}&source=TRY&currencies=${symbols}`
 
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10_000)
+    const timeout = setTimeout(() => controller.abort(), apiTimeoutMs)
 
     const response = await fetch(url, { signal: controller.signal })
     clearTimeout(timeout)
@@ -89,7 +101,7 @@ export async function fetchLiveRates(): Promise<Record<string, number> | null> {
     // We need the inverse: how many TRY per 1 foreign currency unit
     const rates: Record<string, number> = { TRY: 1 }
 
-    for (const symbol of SUPPORTED_SYMBOLS) {
+    for (const symbol of supportedSymbols) {
       if (symbol === 'TRY') continue
 
       const quoteKey = `TRY${symbol}`
@@ -101,7 +113,7 @@ export async function fetchLiveRates(): Promise<Record<string, number> | null> {
         rates[symbol] = Math.round((1 / quoteValue) * 10000) / 10000
       } else {
         // Use fallback for this specific currency if missing
-        rates[symbol] = FALLBACK_RATES[symbol] ?? 1
+        rates[symbol] = fallbackRates[symbol] ?? 1
       }
     }
 
@@ -166,7 +178,7 @@ export async function fetchLiveRates(): Promise<Record<string, number> | null> {
     return rates
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
-      log.warn('exchangerate.host request timed out (10s)')
+      log.warn(`exchangerate.host request timed out (${apiTimeoutMs}ms)`)
     } else {
       log.warn('Failed to fetch live FX rates', {
         error: error instanceof Error ? error.message : String(error),
@@ -178,8 +190,13 @@ export async function fetchLiveRates(): Promise<Record<string, number> | null> {
 
 router.get('/rates', fxLimiter, async (_req, res) => {
   try {
+    const fxConfig = await getFXConfig()
+    const cacheTtl = fxConfig.serverCacheTtlMs || DEFAULT_SERVER_CACHE_TTL
+    const fallbackRates = fxConfig.fallbackRates || DEFAULT_FALLBACK_RATES
+    const supportedCurrencies = fxConfig.supportedCurrencies || [...DEFAULT_SUPPORTED_SYMBOLS]
+
     const now = Date.now()
-    if (now - lastFetchTime < SERVER_CACHE_TTL && lastFetchTime > 0) {
+    if (now - lastFetchTime < cacheTtl && lastFetchTime > 0) {
       return res.json({
         base: 'TRY',
         rates: cachedRates,
@@ -188,13 +205,17 @@ router.get('/rates', fxLimiter, async (_req, res) => {
       })
     }
 
-    const liveRates = await fetchLiveRates()
+    const liveRates = await fetchLiveRates({
+      supportedCurrencies,
+      fallbackRates,
+      apiTimeoutMs: fxConfig.apiTimeoutMs || DEFAULT_API_TIMEOUT_MS,
+    })
 
     if (liveRates) {
       cachedRates = liveRates
       lastFetchSource = 'api'
     } else {
-      cachedRates = { ...FALLBACK_RATES }
+      cachedRates = { ...fallbackRates }
       lastFetchSource = 'fallback'
     }
     lastFetchTime = now
@@ -211,7 +232,7 @@ router.get('/rates', fxLimiter, async (_req, res) => {
     })
     res.status(500).json({
       error: 'Failed to fetch rates',
-      rates: FALLBACK_RATES,
+      rates: DEFAULT_FALLBACK_RATES,
       base: 'TRY',
       source: 'fallback',
     })
@@ -219,14 +240,16 @@ router.get('/rates', fxLimiter, async (_req, res) => {
 })
 
 // Diagnostic endpoint for admin visibility
-router.get('/status', fxLimiter, (_req, res) => {
+router.get('/status', fxLimiter, async (_req, res) => {
+  const fxConfig = await getFXConfig()
+
   res.json({
     hasApiKey: !!process.env.EXCHANGERATE_API_KEY,
     lastFetchTime: lastFetchTime || null,
     lastFetchSource,
     cacheAgeMs: lastFetchTime ? Date.now() - lastFetchTime : null,
-    cacheTtlMs: SERVER_CACHE_TTL,
-    supportedCurrencies: [...SUPPORTED_SYMBOLS],
+    cacheTtlMs: fxConfig.serverCacheTtlMs || DEFAULT_SERVER_CACHE_TTL,
+    supportedCurrencies: fxConfig.supportedCurrencies || [...DEFAULT_SUPPORTED_SYMBOLS],
     currentRates: cachedRates,
   })
 })

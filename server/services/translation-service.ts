@@ -87,7 +87,23 @@ interface CacheEntry {
 }
 
 const translationCache = new Map<string, CacheEntry>()
-const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+// Default 300000 (5 min) — configurable via app_settings server.translation_cache_ttl_ms
+let CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+// Lazy-load config override (fire-and-forget, non-blocking)
+let _translationConfigLoaded = false
+async function _loadTranslationConfig(): Promise<void> {
+  if (_translationConfigLoaded) return
+  _translationConfigLoaded = true
+  try {
+    const { getServerConfig } = await import('./config-service.js')
+    const serverCfg = await getServerConfig()
+    CACHE_TTL_MS = serverCfg.translationCacheTtlMs
+  } catch {
+    // Keep defaults
+  }
+}
+setTimeout(() => _loadTranslationConfig(), 3000)
 let localesCache: { data: TranslationLocale[]; timestamp: number } | null = null
 let versionCache: { version: string; timestamp: number } | null = null
 
@@ -259,10 +275,7 @@ export async function updateLocale(
   if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive
   if (updates.displayOrder !== undefined) dbUpdates.display_order = updates.displayOrder
 
-  const { error } = await supabase
-    .from('translation_locales')
-    .update(dbUpdates)
-    .eq('code', code)
+  const { error } = await supabase.from('translation_locales').update(dbUpdates).eq('code', code)
 
   if (error) {
     log.error('Failed to update locale', { code, error: error.message })
@@ -325,7 +338,11 @@ export async function createKey(key: {
     .single()
 
   if (error) {
-    log.error('Failed to create translation key', { section: key.section, key: key.key, error: error.message })
+    log.error('Failed to create translation key', {
+      section: key.section,
+      key: key.key,
+      error: error.message,
+    })
     return null
   }
 
@@ -367,7 +384,9 @@ export async function deleteKey(section: string, key: string): Promise<boolean> 
  * Get all translations for a locale as a nested TranslationDictionary.
  * This is the primary endpoint for the frontend.
  */
-export async function getTranslationsForLocale(locale: string): Promise<TranslationDictionary | null> {
+export async function getTranslationsForLocale(
+  locale: string
+): Promise<TranslationDictionary | null> {
   // Check cache
   const cached = translationCache.get(locale)
   if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
@@ -379,10 +398,12 @@ export async function getTranslationsForLocale(locale: string): Promise<Translat
 
   const { data, error } = await supabase
     .from('translations')
-    .select(`
+    .select(
+      `
       value,
       translation_keys!inner(section, key)
-    `)
+    `
+    )
     .eq('locale', locale)
 
   if (error) {
@@ -424,10 +445,12 @@ export async function getTranslationsFlat(locale: string): Promise<TranslationWi
 
   const { data, error } = await supabase
     .from('translations')
-    .select(`
+    .select(
+      `
       id, key_id, locale, value, is_reviewed, updated_by, updated_at,
       translation_keys!inner(section, key)
-    `)
+    `
+    )
     .eq('locale', locale)
 
   if (error) {
@@ -478,18 +501,16 @@ export async function updateTranslation(
   }
 
   // Upsert the translation
-  const { error } = await supabase
-    .from('translations')
-    .upsert(
-      {
-        key_id: keyData.id,
-        locale,
-        value,
-        is_reviewed: true,
-        updated_by: adminId || null,
-      },
-      { onConflict: 'key_id,locale' }
-    )
+  const { error } = await supabase.from('translations').upsert(
+    {
+      key_id: keyData.id,
+      locale,
+      value,
+      is_reviewed: true,
+      updated_by: adminId || null,
+    },
+    { onConflict: 'key_id,locale' }
+  )
 
   if (error) {
     log.error('Failed to update translation', { locale, section, key, error: error.message })
@@ -519,9 +540,7 @@ export async function batchUpdateTranslations(
   }
 
   // Look up all key IDs in one query
-  const { data: allKeys } = await supabase
-    .from('translation_keys')
-    .select('id, section, key')
+  const { data: allKeys } = await supabase.from('translation_keys').select('id, section, key')
 
   if (!allKeys) {
     result.errors.push('Failed to fetch translation keys')
@@ -585,9 +604,7 @@ export async function getCoverage(locale: string): Promise<CoverageStats | null>
   if (!supabase) return null
 
   // Get total keys count by section
-  const { data: allKeys } = await supabase
-    .from('translation_keys')
-    .select('section')
+  const { data: allKeys } = await supabase.from('translation_keys').select('section')
 
   if (!allKeys) return null
 
@@ -599,10 +616,12 @@ export async function getCoverage(locale: string): Promise<CoverageStats | null>
   // Get translated keys for this locale
   const { data: translations } = await supabase
     .from('translations')
-    .select(`
+    .select(
+      `
       is_reviewed,
       translation_keys!inner(section)
-    `)
+    `
+    )
     .eq('locale', locale)
 
   const sectionTranslated: Record<string, number> = {}
@@ -701,26 +720,22 @@ export async function importLocale(
     return result
   }
 
-  const { data: existingKeys } = await supabase
-    .from('translation_keys')
-    .select('section, key')
+  const { data: existingKeys } = await supabase.from('translation_keys').select('section, key')
 
   const existingSet = new Set(
     (existingKeys || []).map((k: { section: string; key: string }) => `${k.section}.${k.key}`)
   )
 
   // Create missing keys
-  const missingKeys = updates.filter(u => !existingSet.has(`${u.section}.${u.key}`))
+  const missingKeys = updates.filter((u) => !existingSet.has(`${u.section}.${u.key}`))
   if (missingKeys.length > 0) {
-    const newKeys = missingKeys.map(k => ({
+    const newKeys = missingKeys.map((k) => ({
       section: k.section,
       key: k.key,
       description: `${k.section}.${k.key}`,
     }))
 
-    const { error } = await supabase
-      .from('translation_keys')
-      .insert(newKeys)
+    const { error } = await supabase.from('translation_keys').insert(newKeys)
 
     if (error) {
       result.errors.push(`Failed to create ${missingKeys.length} keys: ${error.message}`)
@@ -750,19 +765,14 @@ export async function getAuditLog(options?: {
   const supabase = getSupabase()
   if (!supabase) return { entries: [], total: 0 }
 
-  let query = supabase
-    .from('translation_audit_log')
-    .select('*', { count: 'exact' })
+  let query = supabase.from('translation_audit_log').select('*', { count: 'exact' })
 
   if (options?.locale) query = query.eq('locale', options.locale)
   if (options?.section) query = query.eq('section', options.section)
 
   query = query
     .order('changed_at', { ascending: false })
-    .range(
-      options?.offset || 0,
-      (options?.offset || 0) + (options?.limit || 50) - 1
-    )
+    .range(options?.offset || 0, (options?.offset || 0) + (options?.limit || 50) - 1)
 
   const { data, error, count } = await query
 

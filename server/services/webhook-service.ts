@@ -15,6 +15,7 @@
 import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { logger } from '../lib/logger.js'
+import { getWebhooksConfig } from './config-service.js'
 
 const log = logger.child('WebhookService')
 
@@ -85,10 +86,10 @@ export interface WebhookPayload {
 // CONSTANTS
 // =============================================================================
 
-const MAX_DELIVERY_ATTEMPTS = 3
+const DEFAULT_MAX_DELIVERY_ATTEMPTS = 3
 const RETRY_DELAYS_MS = [2000, 8000, 30000] // exponential-ish backoff
-const DELIVERY_TIMEOUT_MS = 10000
-const MAX_RESPONSE_BODY_LENGTH = 1000
+const DEFAULT_DELIVERY_TIMEOUT_MS = 10000
+const DEFAULT_MAX_RESPONSE_BODY_LENGTH = 1000
 
 // =============================================================================
 // SUPABASE CLIENT
@@ -161,11 +162,7 @@ export async function getWebhook(id: string): Promise<Webhook | null> {
   const client = getSupabase()
   if (!client) return null
 
-  const { data, error } = await client
-    .from('settings_webhooks')
-    .select('*')
-    .eq('id', id)
-    .single()
+  const { data, error } = await client.from('settings_webhooks').select('*').eq('id', id).single()
 
   if (error) {
     log.error('Get error', { error: String(error) })
@@ -186,15 +183,17 @@ export async function createWebhook(input: WebhookInput): Promise<Webhook | null
 
   const { data, error } = await client
     .from('settings_webhooks')
-    .insert([{
-      name: input.name,
-      url: input.url,
-      secret,
-      events: input.events,
-      categories: input.categories || [],
-      enabled: input.enabled ?? true,
-      failure_count: 0,
-    }])
+    .insert([
+      {
+        name: input.name,
+        url: input.url,
+        secret,
+        events: input.events,
+        categories: input.categories || [],
+        enabled: input.enabled ?? true,
+        failure_count: 0,
+      },
+    ])
     .select()
     .single()
 
@@ -335,6 +334,8 @@ async function deliverToWebhook(
   const client = getSupabase()
   if (!client) return
 
+  const webhooksConfig = await getWebhooksConfig()
+
   const payload: WebhookPayload = {
     event,
     timestamp: new Date().toISOString(),
@@ -347,14 +348,16 @@ async function deliverToWebhook(
   // Create delivery record
   const { data: delivery, error: insertError } = await client
     .from('webhook_deliveries')
-    .insert([{
-      webhook_id: webhook.id,
-      event,
-      payload,
-      status: 'pending',
-      attempts: 0,
-      max_attempts: MAX_DELIVERY_ATTEMPTS,
-    }])
+    .insert([
+      {
+        webhook_id: webhook.id,
+        event,
+        payload,
+        status: 'pending',
+        attempts: 0,
+        max_attempts: webhooksConfig.maxDeliveryAttempts,
+      },
+    ])
     .select()
     .single()
 
@@ -364,7 +367,7 @@ async function deliverToWebhook(
   }
 
   // Attempt delivery with retries
-  await attemptDelivery(webhook, delivery.id, bodyString, signature, event)
+  await attemptDelivery(webhook, delivery.id, bodyString, signature, event, 1, webhooksConfig)
 }
 
 /**
@@ -376,14 +379,21 @@ async function attemptDelivery(
   bodyString: string,
   signature: string,
   webhookEvent: WebhookEvent,
-  attempt: number = 1
+  attempt: number = 1,
+  webhooksConfig?: {
+    maxDeliveryAttempts: number
+    deliveryTimeoutMs: number
+    maxResponseBodyLength: number
+  }
 ): Promise<void> {
   const client = getSupabase()
   if (!client) return
 
+  const config = webhooksConfig || (await getWebhooksConfig())
+
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS)
+    const timeout = setTimeout(() => controller.abort(), config.deliveryTimeoutMs)
 
     const response = await fetch(webhook.url, {
       method: 'POST',
@@ -401,63 +411,87 @@ async function attemptDelivery(
     clearTimeout(timeout)
 
     const responseBody = await response.text().catch(() => '')
-    const truncatedBody = responseBody.slice(0, MAX_RESPONSE_BODY_LENGTH)
+    const truncatedBody = responseBody.slice(0, config.maxResponseBodyLength)
 
     if (response.ok) {
       // Success
-      await client.from('webhook_deliveries').update({
-        status: 'success',
-        status_code: response.status,
-        response_body: truncatedBody,
-        attempts: attempt,
-        completed_at: new Date().toISOString(),
-      }).eq('id', deliveryId)
+      await client
+        .from('webhook_deliveries')
+        .update({
+          status: 'success',
+          status_code: response.status,
+          response_body: truncatedBody,
+          attempts: attempt,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', deliveryId)
 
       // Reset failure count
-      await client.from('settings_webhooks').update({
-        failure_count: 0,
-        last_triggered_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq('id', webhook.id)
+      await client
+        .from('settings_webhooks')
+        .update({
+          failure_count: 0,
+          last_triggered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', webhook.id)
     } else {
       throw new Error(`HTTP ${response.status}: ${truncatedBody}`)
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error'
 
-    if (attempt < MAX_DELIVERY_ATTEMPTS) {
+    if (attempt < config.maxDeliveryAttempts) {
       // Schedule retry
       const delayMs = RETRY_DELAYS_MS[attempt - 1] || RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1]
       const nextRetryAt = new Date(Date.now() + delayMs).toISOString()
 
-      await client.from('webhook_deliveries').update({
-        attempts: attempt,
-        error_message: errorMessage,
-        next_retry_at: nextRetryAt,
-      }).eq('id', deliveryId)
+      await client
+        .from('webhook_deliveries')
+        .update({
+          attempts: attempt,
+          error_message: errorMessage,
+          next_retry_at: nextRetryAt,
+        })
+        .eq('id', deliveryId)
 
-      // Retry after delay
+      // Retry after delay — pass config through to avoid re-fetching
       setTimeout(() => {
-        attemptDelivery(webhook, deliveryId, bodyString, signPayload(bodyString, webhook.secret), webhookEvent, attempt + 1)
-          .catch((err) => log.error('Retry error', { error: String(err) }))
+        attemptDelivery(
+          webhook,
+          deliveryId,
+          bodyString,
+          signPayload(bodyString, webhook.secret),
+          webhookEvent,
+          attempt + 1,
+          config
+        ).catch((err) => log.error('Retry error', { error: String(err) }))
       }, delayMs)
     } else {
       // Final failure
-      await client.from('webhook_deliveries').update({
-        status: 'failed',
-        attempts: attempt,
-        error_message: errorMessage,
-        completed_at: new Date().toISOString(),
-      }).eq('id', deliveryId)
+      await client
+        .from('webhook_deliveries')
+        .update({
+          status: 'failed',
+          attempts: attempt,
+          error_message: errorMessage,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', deliveryId)
 
       // Increment failure count on webhook
-      await client.from('settings_webhooks').update({
-        failure_count: (webhook.failure_count || 0) + 1,
-        last_triggered_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }).eq('id', webhook.id)
+      await client
+        .from('settings_webhooks')
+        .update({
+          failure_count: (webhook.failure_count || 0) + 1,
+          last_triggered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', webhook.id)
 
-      log.warn(`Delivery failed after ${attempt} attempts for ${webhook.name}`, { error: errorMessage })
+      log.warn(`Delivery failed after ${attempt} attempts for ${webhook.name}`, {
+        error: errorMessage,
+      })
     }
   }
 }
@@ -482,11 +516,13 @@ export async function testWebhook(id: string): Promise<{
     timestamp: new Date().toISOString(),
     data: {
       category: 'test',
-      changes: [{
-        key: 'test_ping',
-        previous_value: null,
-        new_value: 'ping',
-      }],
+      changes: [
+        {
+          key: 'test_ping',
+          previous_value: null,
+          new_value: 'ping',
+        },
+      ],
       reason: 'Test delivery from admin panel',
     },
   }
@@ -494,10 +530,11 @@ export async function testWebhook(id: string): Promise<{
   const bodyString = JSON.stringify(payload)
   const signature = signPayload(bodyString, webhook.secret)
 
+  const webhooksConfig = await getWebhooksConfig()
   const start = Date.now()
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS)
+    const timeout = setTimeout(() => controller.abort(), webhooksConfig.deliveryTimeoutMs)
 
     const response = await fetch(webhook.url, {
       method: 'POST',
@@ -519,7 +556,7 @@ export async function testWebhook(id: string): Promise<{
     return {
       success: response.ok,
       statusCode: response.status,
-      responseBody: responseBody.slice(0, MAX_RESPONSE_BODY_LENGTH),
+      responseBody: responseBody.slice(0, webhooksConfig.maxResponseBodyLength),
       durationMs,
       ...(response.ok ? {} : { error: `HTTP ${response.status}` }),
     }
@@ -583,4 +620,8 @@ function mapDbToWebhook(row: Record<string, unknown>): Webhook {
 }
 
 // Re-export for use in route wiring
-export { MAX_DELIVERY_ATTEMPTS }
+export {
+  DEFAULT_MAX_DELIVERY_ATTEMPTS,
+  DEFAULT_DELIVERY_TIMEOUT_MS,
+  DEFAULT_MAX_RESPONSE_BODY_LENGTH,
+}
