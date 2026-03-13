@@ -109,6 +109,7 @@ export function GenericSettingsPanel({
 }: GenericSettingsPanelProps) {
   const [editValues, setEditValues] = useState<Record<string, string>>({})
   const [dirtyKeys, setDirtyKeys] = useState<Set<string>>(new Set())
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
 
   // Initialize edit values from settings
   useEffect(() => {
@@ -119,6 +120,7 @@ export function GenericSettingsPanel({
     }
     setEditValues(vals)
     setDirtyKeys(new Set())
+    setValidationErrors({})
   }, [settings])
 
   if (isLoading) return <SettingsSkeleton />
@@ -130,8 +132,31 @@ export function GenericSettingsPanel({
   const getDescription = (key: string) =>
     keyDescriptions[key] || DEFAULT_KEY_DESCRIPTIONS[key] || ''
 
+  const validateJsonField = (key: string, value: string): string | null => {
+    const trimmed = value.trim()
+    if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null
+    try {
+      JSON.parse(trimmed)
+      return null
+    } catch (e) {
+      return `Invalid JSON: ${e instanceof SyntaxError ? e.message : 'parse error'}`
+    }
+  }
+
   const handleChange = (key: string, value: string) => {
     setEditValues((prev) => ({ ...prev, [key]: value }))
+
+    // Live JSON validation
+    const jsonError = validateJsonField(key, value)
+    setValidationErrors((prev) => {
+      if (jsonError) {
+        return { ...prev, [key]: jsonError }
+      }
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
     const original = settings.find((s) => s.key === key)
     const origStr =
       typeof original?.value === 'object'
@@ -149,6 +174,7 @@ export function GenericSettingsPanel({
   }
 
   const handleSave = async (key: string) => {
+    if (validationErrors[key]) return
     const setting = settings.find((s) => s.key === key)
     const rawVal = editValues[key]
     let parsedVal: unknown = rawVal
@@ -186,6 +212,11 @@ export function GenericSettingsPanel({
       next.delete(key)
       return next
     })
+    setValidationErrors((prev) => {
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
   }
 
   const renderSetting = (key: string) => {
@@ -194,6 +225,7 @@ export function GenericSettingsPanel({
     const isDirty = dirtyKeys.has(key)
     const value = editValues[key] ?? ''
     const isJsonField = value.startsWith('[') || value.startsWith('{')
+    const jsonError = validationErrors[key]
 
     return (
       <div key={key} className="flex flex-col gap-1.5 rounded-lg border bg-white p-3">
@@ -217,7 +249,11 @@ export function GenericSettingsPanel({
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </Button>
-                <Button size="sm" onClick={() => handleSave(key)} disabled={isSaving}>
+                <Button
+                  size="sm"
+                  onClick={() => handleSave(key)}
+                  disabled={isSaving || !!jsonError}
+                >
                   <Save className="h-3.5 w-3.5 mr-1" />
                   Save
                 </Button>
@@ -228,7 +264,11 @@ export function GenericSettingsPanel({
         {getDescription(key) && <p className="text-xs text-gray-500">{getDescription(key)}</p>}
         {isJsonField ? (
           <textarea
-            className="w-full rounded-md border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className={`w-full rounded-md border bg-gray-50 px-3 py-2 text-sm font-mono focus:ring-1 ${
+              jsonError
+                ? 'border-red-400 focus:border-red-500 focus:ring-red-500'
+                : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+            }`}
             rows={4}
             value={value}
             onChange={(e) => handleChange(key, e.target.value)}
@@ -240,6 +280,12 @@ export function GenericSettingsPanel({
             onChange={(e) => handleChange(key, e.target.value)}
             className="font-mono text-sm"
           />
+        )}
+        {jsonError && (
+          <p className="flex items-center gap-1 text-xs text-red-600">
+            <AlertCircle className="h-3 w-3" />
+            {jsonError}
+          </p>
         )}
       </div>
     )

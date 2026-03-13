@@ -1,123 +1,112 @@
-# Session Handoff — March 12, 2026 (Hardcoded Config → Admin-Configurable DB)
+# Session Handoff — March 13, 2026 (Migration 033/034 Production Verification & Smoke Test)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
-| **Build** | ✅ Passing (typecheck clean, 0 errors) |
-| **ESLint** | 0 errors |
-| **Tests** | 49 new migration tests passing, 0 failures |
-| **Branch** | `claude/load-project-context-LofLp` — 4 commits, pushed |
+| **Build** | Passing (typecheck clean, 0 errors) |
+| **ESLint** | 0 errors on changed files |
+| **Tests** | 148 targeted tests passing (13 GenericSettingsPanel + 49 migration + 86 free-trial) |
+| **Branch** | `claude/load-project-context-yPHOR` — all commits pushed, ready for PR merge |
+| **Production** | Migrations 033 + 034 applied and verified via API smoke test |
 
 ---
 
-## This Session — New Features & Fixes
+## This Session — Completed Work
 
-### 1. Migration 033: Hardcoded Backend Configs → app_settings
+### 1. Migration 033 & 034 Applied to Production
+- **Migration 033**: 29 hardcoded backend config keys across 8 categories seeded into `app_settings` via Supabase SQL Editor
+- **Migration 034**: `trial_max_uploads_per_day` (default 3) seeded into `app_settings`
+- Both migrations use `ON CONFLICT DO NOTHING` — safe to re-run
 
-**Problem**: 29 critical backend constants (extraction timeouts, FX cache TTLs, token pricing, service cache durations, monitoring buffer sizes) were hardcoded across `server/routes/ai.ts`, `server/routes/fx.ts`, `server/middleware/*.ts`, `server/services/*.ts`, and client-side `src/lib/` files. Changing any value required a code change and redeployment.
+### 2. Production API Smoke Test (No Browser Required)
+Verified all seeded values via direct admin API calls:
 
-**Fix** (commit `26c7524`):
-- Created `supabase/migrations/033_seed_hardcoded_configs.sql` — seeds 29 keys across 8 categories with `ON CONFLICT DO NOTHING`
-- Extended `server/services/config-service.ts` with 6 new typed getters: `getFXConfig()`, `getServerConfig()`, `getWebhooksConfig()`, `getCostConfig()`, extended `getMonitoringConfig()`, `getRetentionConfig()`
-- All 30 consumer files updated to read from config service instead of constants
-- Created `GenericSettingsPanel.tsx` — reusable admin UI panel for any config category
-- Added new tabs in Admin Settings: FX, Server, Webhooks, Cost, Monitoring buffers
+| Category | Keys Found | Source |
+|----------|-----------|--------|
+| `fx` | 5 | Migration 033 |
+| `server` | 5 | Migration 033 |
+| `webhooks` | 3 | Migration 033 |
+| `cost` | 1 | Migration 033 |
+| `monitoring` | 14 | Migration 033 + earlier |
+| `ui` | 2 | Migration 033 + 034 |
+| **Total** | **30** | |
 
-### 2. Test Mock Updates for AIConfig Extension
+**Write round-trip verified**: `fx.api_timeout_ms` updated 10000→12000→restored to 10000 successfully.
 
-**Problem**: Adding 5 timeout fields to `AIConfig` interface broke 6 existing test files that mocked `getAIConfig()` without the new fields.
+**FX endpoint confirmed consuming DB config**: 7 currencies, `cacheTtlMs: 21600000` (6h).
 
-**Fix** (commit `2e61dfc`):
-- Updated mocks in `ai-routes-extended`, `ai-ocr-coverage`, `ai-chat-ocr-diagnose-logs`, `ai-extraction-routes-branches`, `routes-branches`, `cost-control`, `webhook-service` test files
-- Added `default: childLogger` to cost-control logger mock
+**Unauthenticated checks**: `/api/health` (ok), `/api/admin/diagnostics` (all providers configured), `/api/fx/status` (live rates with 7 currencies).
 
-### 3. Migration Validation Test Suite
+### 3. Tests Verified
+- `GenericSettingsPanel.test.tsx` — 13/13 pass (JSON validation)
+- `config-migration-validation.test.ts` — 49/49 pass (SQL↔TypeScript drift)
+- `free-trial.test.ts` — 86/86 pass (N-uploads-per-day)
 
-**Problem**: No automated verification that migration SQL values match TypeScript defaults (drift detection), and no tests for the 6 new config getters.
+### 4. Documentation Updated
+- `CLAUDE.md` — Updated Next Session Instructions (removed completed items), added production verification status to Known Issue #169, added 2 new gotchas (admin API response shape, production smoke test pattern)
+- `SESSION_HANDOFF.md` — This file (full rewrite)
 
-**Fix** (commit `314f744`):
-- Created `server/__tests__/config-migration-validation.test.ts` (716 lines, 49 tests)
-- Suite 1: Parses migration SQL, validates all 29 seeded values match `DEFAULT_*_CONFIG` objects
-- Suite 2: Tests all 6 new getters with DB data, empty DB fallback, error fallback, JSON parsing, boolean coercion
-- Suite 3: Cache invalidation with new categories, barrel export completeness
-
-### Commits (oldest → newest)
+### Commits (this branch, all sessions)
 
 | Commit | Type | Summary |
 |--------|------|---------|
-| `26c7524` | feat(config) | migrate hardcoded backend configs to admin-configurable app_settings |
-| `2e61dfc` | fix(tests) | update test mocks for hardcoded config migration |
-| `314f744` | test(config) | add migration 033 validation and new config getter tests (49 tests) |
-| `93c0007` | docs | update CLAUDE.md and SESSION_HANDOFF.md for config migration session |
+| `b90635e` | feat(admin) | JSON validation for GenericSettingsPanel (live validation, save blocking, 13 tests) |
+| `6433d42` | docs | Update CLAUDE.md and SESSION_HANDOFF.md for JSON validation session |
+| `c0fd070` | feat | N-uploads-per-day free trial (migration 034, config service, 86 tests) |
+| `84ac1a5` | fix | Guard Object.entries/keys null API responses |
+| `1afad3e` | fix | Null-safe admin dashboard (cost/tokens/responseTime) |
+| `459526f` | fix | Prevent double extraction on landing page login redirect |
+| `879661f` | fix | Null guards on .toFixed()/.toLocaleString() in OverviewTab |
+| `39a9b89` | fix | Use fallback model string in Anthropic catch block (TS2304) |
+| `4f53617` | fix | Wire extraction/chat pipelines to populate admin overview metrics |
+| `91a57dd` | fix | Remove unused TrendingUp/TrendingDown imports |
+| `3f55839` | feat(admin) | Interactive Overview dashboard cards with drill-down details |
 
-### Key Files Changed
+### Key Files Changed (22 files on branch)
 
-| File | Change |
-|------|--------|
-| `supabase/migrations/033_seed_hardcoded_configs.sql` | **NEW** Seeds 29 config keys across 8 categories |
-| `server/services/config-service.ts` | **EXTENDED** 6 new typed getters with DEFAULT_*_CONFIG and *_KEY_MAP |
-| `server/__tests__/config-migration-validation.test.ts` | **NEW** 49 tests: SQL↔TS drift detection + getter coverage |
-| `src/components/admin/tabs/settings/GenericSettingsPanel.tsx` | **NEW** Reusable admin settings panel for any category |
-| `src/components/admin/tabs/SettingsTab.tsx` | **EXTENDED** 5 new category tabs (FX, Server, Webhooks, Cost, Monitoring) |
-| `src/lib/config/types.ts` | **EXTENDED** FXConfig, ServerConfig, WebhooksConfig, CostConfig interfaces |
-| `src/lib/config/configuration-service.ts` | **EXTENDED** Client-side mirrors for all new config types |
-| `server/routes/ai.ts` | Extraction timeouts from getAIConfig() |
-| `server/routes/fx.ts` | FX cache/currencies from getFXConfig() |
-| `server/middleware/cost-control.ts` | Token pricing from getCostConfig() |
-| `server/middleware/rate-limit.ts` | Config cache TTL from getServerConfig() |
-| `server/middleware/monitoring.ts` | Buffer sizes from getMonitoringConfig() |
-| `server/services/webhook-service.ts` | Delivery config from getWebhooksConfig() |
-| `server/services/prompt-service.ts` | Cache TTL from getServerConfig() |
-| `server/services/translation-service.ts` | Cache TTL from getServerConfig() |
-| `src/lib/ai/config.ts` | Client fetch timeout from config |
-| `src/lib/ai/pdf-parser.ts` | PDF load timeout, worker failures from config |
-| `src/lib/free-trial.ts` | Trial expiry from config |
-| `src/components/TryAnalysis.tsx` | Umbrella timeout from config |
-| `server/routes/settings.ts` | **EXTENDED** Lazy-loads monitoring config for perf buffer limits; Zod schema reformatting |
-| `src/components/admin/tabs/settings/AISettingsPanel.tsx` | **EXTENDED** 5 new timeout keys added to SETTING_GROUPS.timeouts |
-| `src/components/admin/tabs/settings/OCRSettingsPanel.tsx` | Minor reformatting |
-| `src/lib/admin/settings-validation.ts` | **EXTENDED** Validation rules for all 29 new config keys (ranges, ms bounds) |
-| `server/__tests__/ai-chat-ocr-diagnose-logs.test.ts` | Mock updated: +5 AIConfig timeout fields |
-| `server/__tests__/ai-extraction-routes-branches.test.ts` | Mock updated: +5 AIConfig timeout fields |
-| `server/__tests__/ai-ocr-coverage.test.ts` | Mock updated: +5 AIConfig timeout fields, restructured |
-| `server/__tests__/ai-routes-extended.test.ts` | Mock updated: +5 AIConfig timeout fields |
-| `server/__tests__/cost-control.test.ts` | Mock updated: +`default: childLogger` for logger |
-| `server/__tests__/routes-branches.test.ts` | Mock updated: +5 AIConfig timeout fields, restructured |
-| `server/__tests__/webhook-service.test.ts` | Formatting fixes (indentation, line wrapping) |
-
----
-
-## ⚠️ Gotchas for Next Session
-
-1. **Migration 033 not yet applied to production**: Must be run via Supabase SQL Editor before admin-configurable values take effect. Until then, code uses hardcoded defaults (no behavioral change).
-2. **Cache invalidation subtlety**: `invalidateCache('fx')` does NOT clear `category:fx` cache used by `getCategorySettings()`. Use `invalidateCache()` (no argument) to fully clear all caches when testing config changes.
-3. **JSON config fields**: `supported_currencies`, `fallback_rates`, and `token_pricing` are stored as JSON strings. If an admin enters malformed JSON via the UI, the getter silently falls back to the hardcoded default. No error is surfaced to the admin.
-4. **Boolean coercion**: `enableEmailAlerts` in monitoring config uses strict `=== 'true'` comparison. Values like `'1'`, `'yes'`, `'TRUE'` (uppercase) are all treated as `false`.
-5. **AIConfig test mock requirement**: All AI route test files must include the 5 new timeout fields in their `getAIConfig()` mock. Omitting them causes test failures.
-6. **10 pre-existing failures in `ai-routes-extended.test.ts`**: These are `/api/ai/diagnose` timeout failures — NOT caused by this migration and not requested to be fixed.
-7. **Lazy-load config at module scope in `settings.ts`**: `server/routes/settings.ts` uses a module-level `_loadPerfConfig()` fire-and-forget async call to read monitoring buffer sizes from DB. If config-service is not yet initialized when settings.ts loads, this silently falls back to defaults. This is intentional — the config refreshes on next call.
-8. **Validation rules added for all 29 keys**: `src/lib/admin/settings-validation.ts` now has explicit `validators.milliseconds()` and `validators.positiveInteger()` bounds for every new config key. When adding more config keys in the future, add matching validation rules here too.
-9. **AISettingsPanel SETTING_GROUPS**: The 5 new timeout keys were added to the `timeouts` group in `AISettingsPanel.tsx`. If new AI-category keys are added to migration 033, they must also be added to the appropriate `SETTING_GROUPS` object for them to appear in the admin UI.
+| File | Change | Commit(s) |
+|------|--------|-----------|
+| `CLAUDE.md` | **UPDATED** Next Session Instructions, Known Issue #169 production status, 2 new gotchas | `6433d42`, `c1cbc24` |
+| `SESSION_HANDOFF.md` | **REWRITTEN** Full session handoff with all 22 files, production verification, gotchas | `6433d42`, `c1cbc24` |
+| `server/routes/admin/operations.ts` | **FIX** Null-safe cost/tokens/responseTime in admin operations | `1afad3e` |
+| `server/routes/ai.ts` | **FIX** Fallback model string in Anthropic catch block, wire extraction/chat metrics, null-safe dashboard | `39a9b89`, `4f53617`, `1afad3e` |
+| `src/components/TryAnalysis.tsx` | **FIX** Prevent double extraction on login redirect; **FEAT** N-uploads-per-day free trial | `459526f`, `c0fd070` |
+| `src/components/admin/AdminDashboard.tsx` | **FEAT** Interactive Overview dashboard cards with drill-down | `3f55839` |
+| `src/components/admin/tabs/AIOperationsTab.tsx` | **FIX** Guard Object.entries/keys null responses, null-safe dashboard | `84ac1a5`, `1afad3e` |
+| `src/components/admin/tabs/ExtractionHealthTab.tsx` | **FIX** Guard Object.entries/keys null responses | `84ac1a5` |
+| `src/components/admin/tabs/OverviewTab.tsx` | **FEAT** Interactive drill-down; **FIX** Remove unused imports, null guards on .toFixed()/.toLocaleString(), null-safe dashboard | `3f55839`, `91a57dd`, `879661f`, `1afad3e` |
+| `src/components/admin/tabs/PoliciesTab.tsx` | **FIX** Guard Object.entries/keys null responses | `84ac1a5` |
+| `src/components/admin/tabs/ProcessingLogsTab.tsx` | **FIX** Guard Object.entries/keys null responses | `84ac1a5` |
+| `src/components/admin/tabs/settings/GenericSettingsPanel.tsx` | **ENHANCED** Live JSON validation, save blocking, error display | `b90635e` |
+| `src/components/admin/tabs/settings/GenericSettingsPanel.test.tsx` | **NEW** 13 tests for JSON validation | `b90635e` |
+| `src/lib/config/configuration-service.ts` | **UPDATED** N-uploads-per-day config key mapping (`trial_max_uploads_per_day`) | `c0fd070` |
+| `src/lib/config/types.ts` | **UPDATED** `UIConfig` interface: added `trialMaxUploadsPerDay` field | `c0fd070` |
+| `src/lib/free-trial.ts` | **ENHANCED** N-uploads-per-day logic (was binary used/not-used) | `c0fd070` |
+| `src/lib/free-trial.test.ts` | **UPDATED** 86 tests covering N-uploads-per-day (was 84) | `c0fd070` |
+| `src/lib/i18n/translations-en.ts` | **UPDATED** Added free trial upload limit i18n keys | `c0fd070` |
+| `src/lib/i18n/translations-tr.ts` | **UPDATED** Added free trial upload limit i18n keys (Turkish) | `c0fd070` |
+| `src/lib/i18n/translations-skeleton.ts` | **UPDATED** Added empty skeleton keys for free trial upload limit | `c0fd070` |
+| `src/lib/i18n/translations.ts` | **UPDATED** `TranslationDictionary` interface: added free trial upload limit keys | `c0fd070` |
+| `supabase/migrations/034_seed_trial_max_uploads.sql` | **NEW** Seeds `ui.trial_max_uploads_per_day = 3` (applied to production) |
 
 ---
 
-## Configuration Requirements
+## Gotchas for Next Session
 
-### Environment Variables (No New Ones)
-This migration adds zero new environment variables. All 29 config keys have hardcoded defaults that match previous behavior exactly.
-
-### Database Migration Required
-```bash
-# Apply in Supabase SQL Editor (idempotent — safe to re-run):
-supabase/migrations/033_seed_hardcoded_configs.sql
-```
+1. **Admin API response shape**: Settings API wraps under `data` — extract from `response.data.settings`, NOT `response.settings`. Login token at `response.data.token`.
+2. **Cache invalidation subtlety**: `invalidateCache('fx')` does NOT clear `category:fx` cache. Use `invalidateCache()` (no argument) for full clear.
+3. **JSON config fields**: `supported_currencies`, `fallback_rates`, `token_pricing` now have live JSON validation in admin UI. Existing malformed values in DB still silently fall back to defaults on read.
+4. **Boolean coercion**: `enableEmailAlerts` uses strict `=== 'true'`. Values like `'1'`, `'yes'`, `'TRUE'` are treated as `false`.
+5. **AIConfig test mock requirement**: All AI route test files must include 5 timeout fields in `getAIConfig()` mock: `requestBudgetMs`, `primaryProviderTimeoutMs`, `fallbackProviderTimeoutMs`, `clientFetchTimeoutMs`, `trialExtractionTimeoutMs`.
+6. **10 pre-existing failures in `ai-routes-extended.test.ts`**: `/api/ai/diagnose` timeout failures — NOT caused by this work. Investigate if needed.
+7. **Admin credentials for smoke tests**: `admin@insurai.com` / `secure-password` (super_admin role). Login endpoint: `POST /api/admin/auth/login`.
 
 ---
 
 ## Priority Next Steps
 
-1. **Apply Migration 033** — Run SQL in Supabase SQL Editor. Verify via `/admin/settings` that new categories (FX, Server, Webhooks, Cost) appear with correct defaults.
-2. **Production Smoke Test** — After applying migration, change one value (e.g., `fx.server_cache_ttl_ms` from 21600000 to 10800000), trigger an FX rate fetch, and verify the new TTL is used.
-3. **JSON Validation for Admin UI** — `GenericSettingsPanel.tsx` accepts freeform text for JSON fields. Consider adding JSON syntax validation before save to prevent malformed values.
-4. **Merge & Deploy** — Branch `claude/load-project-context-LofLp` is ready to merge after migration verification.
+1. **Verify Editable AI Prompts** — Edit "AI Insights - Sense Check" prompt in `/admin/prompts`, submit a test PDF, verify the prompt update applies.
+2. **Merge Branch** — `claude/load-project-context-yPHOR` is fully tested and production-verified. Create PR and merge.
+3. **Production Monitoring** — Monitor FX API caching (`/api/fx/status`), extraction health (`/api/admin/monitoring/extraction-health`), and alert thresholds.
+4. **Address pre-existing test failures** — 10 timeout failures in `ai-routes-extended.test.ts` for `/api/ai/diagnose` endpoint. Low priority but should be fixed for CI cleanliness.
