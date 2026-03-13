@@ -214,11 +214,11 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
         }
       }
       byProvider[request.provider].requests++
-      byProvider[request.provider].tokens.input += request.tokens.input
-      byProvider[request.provider].tokens.output += request.tokens.output
-      byProvider[request.provider].tokens.total += request.tokens.total
-      byProvider[request.provider].cost += request.cost.total
-      byProvider[request.provider].totalResponseTime += request.responseTime
+      byProvider[request.provider].tokens.input += request.tokens?.input ?? 0
+      byProvider[request.provider].tokens.output += request.tokens?.output ?? 0
+      byProvider[request.provider].tokens.total += request.tokens?.total ?? 0
+      byProvider[request.provider].cost += request.cost?.total ?? 0
+      byProvider[request.provider].totalResponseTime += request.responseTime ?? 0
       if (request.status === 'error') {
         byProvider[request.provider].errors++
       }
@@ -237,16 +237,16 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
       if (request.status === 'success') {
         byOperation[request.operation].successes++
       }
-      byOperation[request.operation].totalResponseTime += request.responseTime
-      byOperation[request.operation].totalTokens += request.tokens.total
-      byOperation[request.operation].totalCost += request.cost.total
+      byOperation[request.operation].totalResponseTime += request.responseTime ?? 0
+      byOperation[request.operation].totalTokens += request.tokens?.total ?? 0
+      byOperation[request.operation].totalCost += request.cost?.total ?? 0
     }
 
     const totalRequests = requests.length
-    const totalTokens = requests.reduce((sum, r) => sum + r.tokens.total, 0)
-    const totalCost = requests.reduce((sum, r) => sum + r.cost.total, 0)
+    const totalTokens = requests.reduce((sum, r) => sum + (r.tokens?.total ?? 0), 0)
+    const totalCost = requests.reduce((sum, r) => sum + (r.cost?.total ?? 0), 0)
     const totalErrors = requests.filter((r) => r.status === 'error').length
-    const totalResponseTime = requests.reduce((sum, r) => sum + r.responseTime, 0)
+    const totalResponseTime = requests.reduce((sum, r) => sum + (r.responseTime ?? 0), 0)
 
     const stats = {
       totalRequests,

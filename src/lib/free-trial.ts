@@ -3,6 +3,8 @@
  *
  * Manages anonymous user's free trial analysis.
  * Uses localStorage to track usage and store temporary results.
+ *
+ * Allows N uploads per 24-hour window (configurable via admin settings).
  */
 
 import type { AnalyzedPolicy } from '@/types/policy'
@@ -14,11 +16,15 @@ const STORAGE_KEYS = {
   TRIAL_FILE_NAME: 'insurai_trial_filename',
   TRIAL_EMAIL: 'insurai_trial_email',
   TRIAL_SHARE_ID: 'insurai_trial_share_id',
+  TRIAL_UPLOAD_COUNT: 'insurai_trial_upload_count',
+  TRIAL_WINDOW_START: 'insurai_trial_window_start',
 } as const
 
-// Trial expires after 24 hours (encourages signup)
-// Default 86400000 — configurable via app_settings ui.trial_expiry_ms
+// Trial window: 24 hours — configurable via app_settings ui.trial_expiry_ms
 let TRIAL_EXPIRY_MS = 24 * 60 * 60 * 1000
+
+// Max uploads per window — configurable via app_settings ui.trial_max_uploads_per_day
+let TRIAL_MAX_UPLOADS = 3
 
 // Lazy-load config override (fire-and-forget, non-blocking)
 let _trialConfigLoaded = false
@@ -29,8 +35,9 @@ async function _loadTrialConfig(): Promise<void> {
     const { configService } = await import('@/lib/config')
     const uiCfg = await configService.getUIConfig()
     TRIAL_EXPIRY_MS = uiCfg.trialExpiryMs
+    TRIAL_MAX_UPLOADS = uiCfg.trialMaxUploadsPerDay
   } catch {
-    // Keep default
+    // Keep defaults
   }
 }
 _loadTrialConfig()
@@ -50,29 +57,56 @@ export interface TrialEmail {
 }
 
 /**
- * Check if user has already used their free trial
+ * Get the current upload count and window start, resetting if the window expired.
+ */
+function getTrialUsage(): { count: number; windowStart: number } {
+  try {
+    const countStr = localStorage.getItem(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)
+    const windowStr = localStorage.getItem(STORAGE_KEYS.TRIAL_WINDOW_START)
+
+    if (!countStr || !windowStr) {
+      return { count: 0, windowStart: 0 }
+    }
+
+    const windowStart = parseInt(windowStr, 10)
+    const now = Date.now()
+
+    // Window expired — reset
+    if (now - windowStart > TRIAL_EXPIRY_MS) {
+      localStorage.removeItem(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)
+      localStorage.removeItem(STORAGE_KEYS.TRIAL_WINDOW_START)
+      return { count: 0, windowStart: 0 }
+    }
+
+    return { count: parseInt(countStr, 10) || 0, windowStart }
+  } catch {
+    return { count: 0, windowStart: 0 }
+  }
+}
+
+/**
+ * Get number of remaining uploads in the current window.
+ */
+export function getTrialUploadsRemaining(): number {
+  const { count } = getTrialUsage()
+  return Math.max(0, TRIAL_MAX_UPLOADS - count)
+}
+
+/**
+ * Get the max uploads per day setting.
+ */
+export function getTrialMaxUploads(): number {
+  return TRIAL_MAX_UPLOADS
+}
+
+/**
+ * Check if user has exhausted their daily trial uploads.
  */
 export function hasUsedFreeTrial(): boolean {
   try {
-    const trialUsed = localStorage.getItem(STORAGE_KEYS.TRIAL_USED)
-    const timestamp = localStorage.getItem(STORAGE_KEYS.TRIAL_TIMESTAMP)
-
-    if (!trialUsed || !timestamp) {
-      return false
-    }
-
-    // Check if trial has expired (allow new trial after 24h)
-    const trialTime = parseInt(timestamp, 10)
-    const now = Date.now()
-    if (now - trialTime > TRIAL_EXPIRY_MS) {
-      // Trial expired, clear old data and allow new trial
-      clearTrialData()
-      return false
-    }
-
-    return trialUsed === 'true'
+    const { count } = getTrialUsage()
+    return count >= TRIAL_MAX_UPLOADS
   } catch {
-    // localStorage might be unavailable
     return false
   }
 }
@@ -151,12 +185,20 @@ function generateShareId(): string {
 }
 
 /**
- * Save trial result after successful analysis
+ * Increment the trial upload counter and save the result.
  */
 export function saveTrialResult(policy: AnalyzedPolicy, fileName: string): void {
   try {
     const now = Date.now()
     const shareId = generateShareId()
+    const { count, windowStart } = getTrialUsage()
+
+    // Start a new window if none exists
+    const newWindowStart = windowStart || now
+    const newCount = count + 1
+
+    localStorage.setItem(STORAGE_KEYS.TRIAL_UPLOAD_COUNT, newCount.toString())
+    localStorage.setItem(STORAGE_KEYS.TRIAL_WINDOW_START, newWindowStart.toString())
     localStorage.setItem(STORAGE_KEYS.TRIAL_USED, 'true')
     localStorage.setItem(STORAGE_KEYS.TRIAL_RESULT, JSON.stringify(policy))
     localStorage.setItem(STORAGE_KEYS.TRIAL_TIMESTAMP, now.toString())
@@ -172,8 +214,16 @@ export function saveTrialResult(policy: AnalyzedPolicy, fileName: string): void 
  */
 export function markTrialUsed(): void {
   try {
+    const now = Date.now()
+    const { count, windowStart } = getTrialUsage()
+
+    const newWindowStart = windowStart || now
+    const newCount = count + 1
+
+    localStorage.setItem(STORAGE_KEYS.TRIAL_UPLOAD_COUNT, newCount.toString())
+    localStorage.setItem(STORAGE_KEYS.TRIAL_WINDOW_START, newWindowStart.toString())
     localStorage.setItem(STORAGE_KEYS.TRIAL_USED, 'true')
-    localStorage.setItem(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
+    localStorage.setItem(STORAGE_KEYS.TRIAL_TIMESTAMP, now.toString())
   } catch {
     // Ignore storage errors
   }
@@ -190,21 +240,23 @@ export function clearTrialData(): void {
     localStorage.removeItem(STORAGE_KEYS.TRIAL_FILE_NAME)
     localStorage.removeItem(STORAGE_KEYS.TRIAL_EMAIL)
     localStorage.removeItem(STORAGE_KEYS.TRIAL_SHARE_ID)
+    localStorage.removeItem(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)
+    localStorage.removeItem(STORAGE_KEYS.TRIAL_WINDOW_START)
   } catch {
     // Ignore storage errors
   }
 }
 
 /**
- * Get time remaining until trial expires (in milliseconds)
+ * Get time remaining until trial window resets (in milliseconds)
  */
 export function getTrialTimeRemaining(): number {
   try {
-    const timestamp = localStorage.getItem(STORAGE_KEYS.TRIAL_TIMESTAMP)
-    if (!timestamp) return 0
+    const windowStr = localStorage.getItem(STORAGE_KEYS.TRIAL_WINDOW_START)
+    if (!windowStr) return 0
 
-    const trialTime = parseInt(timestamp, 10)
-    const expiresAt = trialTime + TRIAL_EXPIRY_MS
+    const windowStart = parseInt(windowStr, 10)
+    const expiresAt = windowStart + TRIAL_EXPIRY_MS
     const remaining = expiresAt - Date.now()
 
     return Math.max(0, remaining)
@@ -229,20 +281,26 @@ export function formatTimeRemaining(ms: number): string {
 }
 
 /**
- * Check if user can perform a free trial
- * Returns { canTry: boolean, reason?: string }
+ * Check if user can perform a free trial.
+ * Returns { canTry, reason, uploadsRemaining, maxUploads }
  */
-export function canPerformFreeTrial(): { canTry: boolean; reason?: string } {
-  if (hasUsedFreeTrial()) {
+export function canPerformFreeTrial(): {
+  canTry: boolean
+  reason?: string
+  uploadsRemaining: number
+  maxUploads: number
+} {
+  const remaining = getTrialUploadsRemaining()
+  if (remaining <= 0) {
     const timeRemaining = getTrialTimeRemaining()
-    if (timeRemaining > 0) {
-      return {
-        canTry: false,
-        reason: `You've already used your free analysis. Sign up to analyze more policies, or try again in ${formatTimeRemaining(timeRemaining)}.`,
-      }
+    return {
+      canTry: false,
+      reason: `You've used all ${TRIAL_MAX_UPLOADS} free analyses for today. Sign up for unlimited access, or try again in ${formatTimeRemaining(timeRemaining)}.`,
+      uploadsRemaining: 0,
+      maxUploads: TRIAL_MAX_UPLOADS,
     }
   }
-  return { canTry: true }
+  return { canTry: true, uploadsRemaining: remaining, maxUploads: TRIAL_MAX_UPLOADS }
 }
 
 // ============================================================================

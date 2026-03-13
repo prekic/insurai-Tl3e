@@ -18,6 +18,8 @@ import {
   saveTrialResult,
   getTrialResult,
   getTrialTimeRemaining,
+  getTrialUploadsRemaining,
+  getTrialMaxUploads,
   formatTimeRemaining,
 } from '@/lib/free-trial'
 import {
@@ -82,18 +84,22 @@ export function TryAnalysis() {
     const hasNewFile = !!locationState?.file
 
     const existingResult = getTrialResult()
-    const usedTrial = hasUsedFreeTrial() || existingResult
+    const exhaustedUploads = hasUsedFreeTrial()
 
-    if (hasNewFile && usedTrial) {
-      // User is trying to upload a NEW file, but has already used their trial.
-      // Show them the "trial used" screen so they can sign up, instead of
-      // instantly redirecting them to their OLD cached result.
+    if (hasNewFile && exhaustedUploads) {
+      // User is trying to upload a NEW file, but has exhausted daily uploads.
       setState('trial-used')
       return
     }
 
+    if (hasNewFile && !exhaustedUploads) {
+      // User has a new file and still has uploads remaining — let them proceed
+      // (don't redirect to old result)
+      return
+    }
+
     if (existingResult) {
-      // Redirect to PolicyDetailView with the saved result
+      // No new file — redirect to PolicyDetailView with the saved result
       navigate('/policy/trial', {
         state: {
           policy: existingResult.policy,
@@ -101,7 +107,7 @@ export function TryAnalysis() {
         },
         replace: true,
       })
-    } else if (hasUsedFreeTrial()) {
+    } else if (exhaustedUploads) {
       setState('trial-used')
     }
   }, [navigate, location.state])
@@ -516,15 +522,23 @@ export function TryAnalysis() {
     const locationState = location.state as LocationState | null
     const fileFromState = locationState?.file
 
-    // Only process once, when we have a file and backend is ready
-    if (fileFromState && !processedFromStateRef.current && backendReady && state === 'idle') {
+    // Only process once, when we have a file, backend is ready, and user is NOT logged in.
+    // Logged-in users are redirected to /upload by the effect above — processing here
+    // would cause a double extraction (one here + one in PolicyUpload after redirect).
+    if (
+      fileFromState &&
+      !processedFromStateRef.current &&
+      backendReady &&
+      state === 'idle' &&
+      !user
+    ) {
       processedFromStateRef.current = true
       // Clear location state to prevent reprocessing on refresh
       navigate(location.pathname, { replace: true, state: {} })
       // Start processing the file
       processFile(fileFromState)
     }
-  }, [location, backendReady, state, navigate, processFile])
+  }, [location, backendReady, state, navigate, processFile, user])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -559,6 +573,7 @@ export function TryAnalysis() {
   // Render based on state
   if (state === 'trial-used') {
     const timeRemaining = getTrialTimeRemaining()
+    const maxUploads = getTrialMaxUploads()
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-12 px-4">
         <div className="max-w-lg mx-auto">
@@ -570,7 +585,7 @@ export function TryAnalysis() {
               {t.tryAnalysis.trialAlreadyUsedTitle}
             </h1>
             <p className="text-gray-600 mb-6">
-              {t.tryAnalysis.trialAlreadyUsedDesc}
+              {t.tryAnalysis.dailyLimitReached.replace('{max}', String(maxUploads))}
               {timeRemaining > 0 && (
                 <span className="block mt-2 text-sm text-gray-500">
                   {t.tryAnalysis.tryAgainIn} {formatTimeRemaining(timeRemaining)}
@@ -611,6 +626,13 @@ export function TryAnalysis() {
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.tryAnalysis.title}</h1>
           <p className="text-gray-600">{t.tryAnalysis.subtitle}</p>
+          {getTrialUploadsRemaining() < getTrialMaxUploads() && (
+            <p className="text-sm text-amber-600 mt-2">
+              {t.tryAnalysis.uploadsRemaining
+                .replace('{remaining}', String(getTrialUploadsRemaining()))
+                .replace('{max}', String(getTrialMaxUploads()))}
+            </p>
+          )}
         </div>
 
         {/* Upload Card */}

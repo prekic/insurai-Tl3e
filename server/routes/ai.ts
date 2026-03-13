@@ -55,8 +55,89 @@ import { captureServerError } from '../lib/sentry.js'
 import { persistExtractionEvent } from '../services/extraction-metrics-service.js'
 import { evaluateAndDispatchAlerts } from '../services/extraction-alert-service.js'
 import { getMonitoringConfig } from '../services/config-service.js'
+import {
+  aiRequests,
+  policyOperations,
+  requestCounters,
+  MAX_ENTRIES,
+  type AIRequest,
+  type PolicyOperation,
+} from './admin/shared.js'
 
 const router = Router()
+
+// ────────────────────────────────────────────────────────────────────────────
+// Overview tab metrics recording (populates admin/operations stats endpoints)
+// ────────────────────────────────────────────────────────────────────────────
+
+interface OverviewMetricEvent {
+  requestId: string
+  provider: string
+  model: string
+  operation: 'extraction' | 'chat' | 'ocr'
+  success: boolean
+  durationMs: number
+  inputTokens: number
+  outputTokens: number
+  cost: number
+  documentLength?: number
+  userId?: string
+  errorCode?: string
+  errorMessage?: string
+  ocrUsed?: boolean
+}
+
+function recordOverviewMetrics(event: OverviewMetricEvent): void {
+  // Record to aiRequests array
+  const aiReqId = `ai-${++requestCounters.aiRequestId}`
+  const aiReq: AIRequest = {
+    id: aiReqId,
+    timestamp: new Date().toISOString(),
+    provider: event.provider,
+    operation: event.operation,
+    model: event.model,
+    endpoint: `/api/ai/${event.operation === 'extraction' ? 'extract' : event.operation}`,
+    userId: event.userId,
+    prompt: '',
+    responseTime: event.durationMs ?? 0,
+    status: event.success ? 'success' : 'error',
+    error: event.errorMessage,
+    tokens: {
+      input: event.inputTokens ?? 0,
+      output: event.outputTokens ?? 0,
+      total: (event.inputTokens ?? 0) + (event.outputTokens ?? 0),
+    },
+    cost: {
+      input: 0,
+      output: 0,
+      total: event.cost ?? 0,
+    },
+  }
+  aiRequests.push(aiReq)
+  if (aiRequests.length > MAX_ENTRIES) aiRequests.shift()
+
+  // Record to policyOperations array (only for extractions)
+  if (event.operation === 'extraction') {
+    const policyOpId = `pol-${++requestCounters.policyOpId}`
+    const policyOp: PolicyOperation = {
+      id: policyOpId,
+      timestamp: new Date().toISOString(),
+      type: 'extraction',
+      userId: event.userId || 'anonymous',
+      status: event.success ? 'success' : 'error',
+      duration: event.durationMs,
+      extractionInfo: {
+        provider: event.provider,
+        model: event.model,
+        confidence: 0,
+        ocrUsed: event.ocrUsed ?? false,
+      },
+      error: event.errorMessage,
+    }
+    policyOperations.push(policyOp)
+    if (policyOperations.length > MAX_ENTRIES) policyOperations.shift()
+  }
+}
 
 // ────────────────────────────────────────────────────────────────────────────
 // In-memory extraction metrics ring buffer (last 200 events, no DB needed)
@@ -803,6 +884,13 @@ router.post(
         durationMs: Date.now() - startTime,
         documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
       })
+      recordOverviewMetrics({
+        requestId, provider: 'openai', model: usedModel, operation: 'extraction',
+        success: true, durationMs: Date.now() - startTime,
+        inputTokens, outputTokens, cost: cost.totalCost,
+        documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
+        userId: req.headers['x-user-id'] as string | undefined,
+      })
 
       // Fire push notification if user is authenticated (non-blocking fire-and-forget)
       const notifyUserIdOAI = req.headers['x-user-id'] as string | undefined
@@ -895,6 +983,14 @@ router.post(
         errorCode: code,
         errorMessage: message.substring(0, 200),
         documentLength: errorDetails.documentTextLength,
+      })
+      recordOverviewMetrics({
+        requestId, provider: 'openai', model: 'gpt-4o', operation: 'extraction',
+        success: false, durationMs: Date.now() - startTime,
+        inputTokens: 0, outputTokens: 0, cost: 0,
+        documentLength: errorDetails.documentTextLength,
+        userId: req.headers['x-user-id'] as string | undefined,
+        errorCode: code, errorMessage: message.substring(0, 200),
       })
 
       // Notify admin of extraction failure
@@ -1069,6 +1165,13 @@ router.post(
         durationMs: Date.now() - startTime,
         documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
       })
+      recordOverviewMetrics({
+        requestId, provider: 'anthropic', model: usedModel, operation: 'extraction',
+        success: true, durationMs: Date.now() - startTime,
+        inputTokens, outputTokens, cost: cost.totalCost,
+        documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
+        userId: req.headers['x-user-id'] as string | undefined,
+      })
 
       res.json({
         success: true,
@@ -1174,6 +1277,14 @@ router.post(
         errorCode: code,
         errorMessage: message.substring(0, 200),
         documentLength: errorDetails.documentTextLength,
+      })
+      recordOverviewMetrics({
+        requestId, provider: 'anthropic', model: 'claude-sonnet-4-20250514', operation: 'extraction',
+        success: false, durationMs: Date.now() - startTime,
+        inputTokens: 0, outputTokens: 0, cost: 0,
+        documentLength: errorDetails.documentTextLength,
+        userId: req.headers['x-user-id'] as string | undefined,
+        errorCode: code, errorMessage: message.substring(0, 200),
       })
 
       // Create admin notification for critical errors
@@ -1423,6 +1534,13 @@ router.post(
             durationMs: Date.now() - startTime,
             documentLength: documentText?.length ?? 0,
           })
+          recordOverviewMetrics({
+            requestId, provider: 'anthropic', model: usedModel, operation: 'extraction',
+            success: true, durationMs: Date.now() - startTime,
+            inputTokens, outputTokens, cost: cost.totalCost,
+            documentLength: documentText?.length ?? 0,
+            userId: req.headers['x-user-id'] as string | undefined,
+          })
 
           // Fire push notification if user is authenticated (non-blocking fire-and-forget)
           const notifyUserIdUNI_ANT = req.headers['x-user-id'] as string | undefined
@@ -1502,6 +1620,14 @@ router.post(
             errorCode: fallbackReason,
             errorMessage: message.substring(0, 200),
             documentLength: documentText?.length ?? 0,
+          })
+          recordOverviewMetrics({
+            requestId, provider: 'anthropic', model: aiConfig.anthropicExtractionModel, operation: 'extraction',
+            success: false, durationMs: Date.now() - anthropicStart,
+            inputTokens: 0, outputTokens: 0, cost: 0,
+            documentLength: documentText?.length ?? 0,
+            userId: req.headers['x-user-id'] as string | undefined,
+            errorCode: fallbackReason, errorMessage: message.substring(0, 200),
           })
 
           // Notify admin for critical errors (not for transient capacity issues)
@@ -1595,6 +1721,14 @@ router.post(
         errorCode: 'BUDGET_EXHAUSTED',
         errorMessage: 'Request time budget exhausted before fallback could start',
         documentLength: documentText?.length ?? 0,
+      })
+      recordOverviewMetrics({
+        requestId, provider: 'anthropic', model: 'unknown', operation: 'extraction',
+        success: false, durationMs: Date.now() - startTime,
+        inputTokens: 0, outputTokens: 0, cost: 0,
+        documentLength: documentText?.length ?? 0,
+        userId: req.headers['x-user-id'] as string | undefined,
+        errorCode: 'BUDGET_EXHAUSTED', errorMessage: 'Request time budget exhausted',
       })
 
       return res.status(504).json({
@@ -1714,6 +1848,13 @@ router.post(
           durationMs: Date.now() - startTime,
           documentLength: documentText?.length ?? 0,
         })
+        recordOverviewMetrics({
+          requestId, provider: 'openai', model: usedModel, operation: 'extraction',
+          success: true, durationMs: Date.now() - startTime,
+          inputTokens, outputTokens, cost: cost.totalCost,
+          documentLength: documentText?.length ?? 0,
+          userId: req.headers['x-user-id'] as string | undefined,
+        })
 
         // Fire push notification if user is authenticated (non-blocking fire-and-forget)
         const notifyUserIdUNI_OAI = req.headers['x-user-id'] as string | undefined
@@ -1789,6 +1930,14 @@ router.post(
           errorCode: openaiErrorCode,
           errorMessage: message.substring(0, 200),
           documentLength: documentText?.length ?? 0,
+        })
+        recordOverviewMetrics({
+          requestId, provider: 'openai', model: 'gpt-4o', operation: 'extraction',
+          success: false, durationMs: Date.now() - openaiStart,
+          inputTokens: 0, outputTokens: 0, cost: 0,
+          documentLength: documentText?.length ?? 0,
+          userId: req.headers['x-user-id'] as string | undefined,
+          errorCode: openaiErrorCode, errorMessage: message.substring(0, 200),
         })
 
         // Notify admin — both providers failed is always critical
@@ -2570,6 +2719,7 @@ router.post(
   validateChat,
   async (req: Request, res: Response) => {
     const IS_PRODUCTION = process.env.NODE_ENV === 'production'
+    const chatStart = Date.now()
 
     try {
       const { message, conversationHistory, policyContext, provider } = req.body as ChatInput
@@ -2662,6 +2812,13 @@ router.post(
             })
         })
 
+        recordOverviewMetrics({
+          requestId: `chat-${Date.now()}`, provider: 'openai', model: chatModel, operation: 'chat',
+          success: true, durationMs: Date.now() - chatStart,
+          inputTokens, outputTokens, cost: cost.totalCost,
+          userId: req.headers['x-user-id'] as string | undefined,
+        })
+
         return res.json({
           success: true,
           response: content,
@@ -2726,6 +2883,13 @@ router.post(
             log.debug('Cost tracking failed', {
               error: err instanceof Error ? err.message : String(err),
             })
+        })
+
+        recordOverviewMetrics({
+          requestId: `chat-${Date.now()}`, provider: 'anthropic', model: chatModel, operation: 'chat',
+          success: true, durationMs: Date.now() - chatStart,
+          inputTokens, outputTokens, cost: cost.totalCost,
+          userId: req.headers['x-user-id'] as string | undefined,
         })
 
         return res.json({

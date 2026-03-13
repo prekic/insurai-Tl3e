@@ -1045,8 +1045,11 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     trialAlreadyUsed: 'You have already used your free trial.',
     serviceUnavailableToast: 'Analysis service is temporarily unavailable. Please try again later.',
     pleaseWait: 'Please wait...',
-    trialAlreadyUsedTitle: 'Trial Already Used',
+    trialAlreadyUsedTitle: 'Daily Limit Reached',
     trialAlreadyUsedDesc: 'You have already used your free policy analysis for this session.',
+    dailyLimitReached:
+      'You have used all {max} free analyses for today. Sign up for unlimited access.',
+    uploadsRemaining: '{remaining} of {max} free analyses remaining today',
     tryAgainIn: 'Try again in',
     signUpUnlimited: 'Sign up for unlimited analysis',
     backToHome: 'Back to Home',

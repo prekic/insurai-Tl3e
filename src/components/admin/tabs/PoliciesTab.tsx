@@ -199,7 +199,7 @@ export function PoliciesTab() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {Object.entries(stats.byType).map(([type, count]) => (
+              {Object.entries(stats.byType ?? {}).map(([type, count]) => (
                 <div key={type} className="flex items-center gap-4">
                   <div className="w-24 text-sm font-medium capitalize">{type}</div>
                   <div className="flex-1">

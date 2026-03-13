@@ -232,6 +232,7 @@ const UI_KEY_MAP: Record<string, keyof UIConfig> = {
   allowed_file_extensions: 'allowedFileExtensions',
   display_currency: 'displayCurrency',
   trial_expiry_ms: 'trialExpiryMs',
+  trial_max_uploads_per_day: 'trialMaxUploadsPerDay',
 }
 
 const EMAIL_KEY_MAP: Record<string, keyof EmailConfig> = {

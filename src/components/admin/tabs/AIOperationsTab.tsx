@@ -127,8 +127,8 @@ export function AIOperationsTab() {
 
   // Calculate stats
   const totalRequests = requests.length
-  const totalCost = requests.reduce((sum, r) => sum + r.cost.total, 0)
-  const totalTokens = requests.reduce((sum, r) => sum + r.tokens.total, 0)
+  const totalCost = requests.reduce((sum, r) => sum + (r.cost?.total ?? 0), 0)
+  const totalTokens = requests.reduce((sum, r) => sum + (r.tokens?.total ?? 0), 0)
   const avgResponseTime = requests.length > 0
     ? requests.reduce((sum, r) => sum + r.responseTime, 0) / requests.length
     : 0
@@ -289,7 +289,7 @@ export function AIOperationsTab() {
                         </div>
                         <div className="flex items-center gap-1 text-gray-600">
                           <Coins className="h-3 w-3" />
-                          ${request.cost.total.toFixed(4)}
+                          ${(request.cost?.total ?? 0).toFixed(4)}
                         </div>
                       </div>
                       {getStatusBadge(request.status)}
@@ -308,15 +308,15 @@ export function AIOperationsTab() {
                       <div className="grid grid-cols-3 gap-4 p-3 bg-gray-50 rounded-lg">
                         <div>
                           <div className="text-xs text-gray-500">Input Tokens</div>
-                          <div className="font-medium">{request.tokens.input.toLocaleString()}</div>
+                          <div className="font-medium">{(request.tokens?.input ?? 0).toLocaleString()}</div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500">Output Tokens</div>
-                          <div className="font-medium">{request.tokens.output.toLocaleString()}</div>
+                          <div className="font-medium">{(request.tokens?.output ?? 0).toLocaleString()}</div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-500">Total Cost</div>
-                          <div className="font-medium">${request.cost.total.toFixed(6)}</div>
+                          <div className="font-medium">${(request.cost?.total ?? 0).toFixed(6)}</div>
                         </div>
                       </div>
 
@@ -402,7 +402,7 @@ export function AIOperationsTab() {
                       )}
 
                       {/* Parameters */}
-                      {Object.keys(request.parameters).length > 0 && (
+                      {Object.keys(request.parameters ?? {}).length > 0 && (
                         <div>
                           <h4 className="font-medium text-gray-700 mb-2">Parameters</h4>
                           <pre className="p-3 bg-gray-50 rounded-lg text-sm overflow-x-auto">

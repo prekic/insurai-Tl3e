@@ -14,6 +14,8 @@ import {
   getShareId,
   getTrialDataForTransfer,
   hasPendingTrialTransfer,
+  getTrialUploadsRemaining,
+  getTrialMaxUploads,
 } from './free-trial'
 import type { AnalyzedPolicy } from '@/types/policy'
 
@@ -29,6 +31,16 @@ const STORAGE_KEYS = {
   TRIAL_FILE_NAME: 'insurai_trial_filename',
   TRIAL_EMAIL: 'insurai_trial_email',
   TRIAL_SHARE_ID: 'insurai_trial_share_id',
+  TRIAL_UPLOAD_COUNT: 'insurai_trial_upload_count',
+  TRIAL_WINDOW_START: 'insurai_trial_window_start',
+}
+
+const TRIAL_MAX = 3 // default max uploads per day
+
+/** Helper to set count-based trial state in localStorage */
+function setTrialCount(count: number, windowStart: number) {
+  store.set(STORAGE_KEYS.TRIAL_UPLOAD_COUNT, count.toString())
+  store.set(STORAGE_KEYS.TRIAL_WINDOW_START, windowStart.toString())
 }
 
 // ---------------------------------------------------------------------------
@@ -62,10 +74,18 @@ function createMockLocalStorage() {
   store = new Map<string, string>()
   return {
     getItem: vi.fn((key: string) => store.get(key) ?? null),
-    setItem: vi.fn((key: string, value: string) => { store.set(key, value) }),
-    removeItem: vi.fn((key: string) => { store.delete(key) }),
-    clear: vi.fn(() => { store.clear() }),
-    get length() { return store.size },
+    setItem: vi.fn((key: string, value: string) => {
+      store.set(key, value)
+    }),
+    removeItem: vi.fn((key: string) => {
+      store.delete(key)
+    }),
+    clear: vi.fn(() => {
+      store.clear()
+    }),
+    get length() {
+      return store.size
+    },
     key: vi.fn((index: number) => {
       const keys = Array.from(store.keys())
       return keys[index] ?? null
@@ -88,7 +108,11 @@ const mockGetRandomValues = vi.fn((arr: Uint8Array) => {
 // ---------------------------------------------------------------------------
 beforeEach(() => {
   const mockStorage = createMockLocalStorage()
-  Object.defineProperty(globalThis, 'localStorage', { value: mockStorage, writable: true, configurable: true })
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: mockStorage,
+    writable: true,
+    configurable: true,
+  })
   Object.defineProperty(globalThis, 'crypto', {
     value: { getRandomValues: mockGetRandomValues },
     writable: true,
@@ -112,56 +136,49 @@ describe('hasUsedFreeTrial', () => {
     expect(hasUsedFreeTrial()).toBe(false)
   })
 
-  it('returns false when only TRIAL_USED is set (no timestamp)', () => {
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
+  it('returns false when count is below max', () => {
+    setTrialCount(1, Date.now())
     expect(hasUsedFreeTrial()).toBe(false)
   })
 
-  it('returns false when only timestamp is set (no TRIAL_USED)', () => {
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
+  it('returns false when count is 2 (below max of 3)', () => {
+    setTrialCount(2, Date.now())
     expect(hasUsedFreeTrial()).toBe(false)
   })
 
-  it('returns true when trial used recently', () => {
-    const now = Date.now()
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, now.toString())
+  it('returns true when count equals max', () => {
+    setTrialCount(TRIAL_MAX, Date.now())
     expect(hasUsedFreeTrial()).toBe(true)
   })
 
-  it('returns false when TRIAL_USED is not "true"', () => {
-    store.set(STORAGE_KEYS.TRIAL_USED, 'false')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
-    expect(hasUsedFreeTrial()).toBe(false)
+  it('returns true when count exceeds max', () => {
+    setTrialCount(TRIAL_MAX + 2, Date.now())
+    expect(hasUsedFreeTrial()).toBe(true)
   })
 
-  it('returns false and clears data when trial has expired', () => {
+  it('returns false when window has expired (count resets)', () => {
     const expiredTime = Date.now() - TRIAL_EXPIRY_MS - 1
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, expiredTime.toString())
-    store.set(STORAGE_KEYS.TRIAL_RESULT, '{}')
-    store.set(STORAGE_KEYS.TRIAL_FILE_NAME, 'test.pdf')
+    setTrialCount(TRIAL_MAX, expiredTime)
 
     expect(hasUsedFreeTrial()).toBe(false)
-    // Should have cleared all trial data
-    expect(store.has(STORAGE_KEYS.TRIAL_USED)).toBe(false)
-    expect(store.has(STORAGE_KEYS.TRIAL_RESULT)).toBe(false)
-    expect(store.has(STORAGE_KEYS.TRIAL_FILE_NAME)).toBe(false)
-    expect(store.has(STORAGE_KEYS.TRIAL_TIMESTAMP)).toBe(false)
+    // Window should have been reset
+    expect(store.has(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe(false)
+    expect(store.has(STORAGE_KEYS.TRIAL_WINDOW_START)).toBe(false)
   })
 
-  it('returns true when trial is exactly at the expiry boundary', () => {
-    // Exactly at boundary: now - trialTime === TRIAL_EXPIRY_MS, which is NOT > so not expired
+  it('returns true when count is at max and exactly at the expiry boundary', () => {
+    // Exactly at boundary: now - windowStart === TRIAL_EXPIRY_MS, which is NOT > so not expired
     const boundaryTime = Date.now() - TRIAL_EXPIRY_MS
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, boundaryTime.toString())
+    setTrialCount(TRIAL_MAX, boundaryTime)
     expect(hasUsedFreeTrial()).toBe(true)
   })
 
   it('returns false when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('Storage unavailable') },
+        getItem: () => {
+          throw new Error('Storage unavailable')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -215,7 +232,9 @@ describe('hasValidTrialResult', () => {
   it('returns false when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('QuotaExceeded') },
+        getItem: () => {
+          throw new Error('QuotaExceeded')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -303,7 +322,9 @@ describe('getTrialResult', () => {
   it('returns null when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('SecurityError') },
+        getItem: () => {
+          throw new Error('SecurityError')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -327,6 +348,8 @@ describe('saveTrialResult', () => {
     expect(store.has(STORAGE_KEYS.TRIAL_TIMESTAMP)).toBe(true)
     expect(store.has(STORAGE_KEYS.TRIAL_RESULT)).toBe(true)
     expect(store.has(STORAGE_KEYS.TRIAL_SHARE_ID)).toBe(true)
+    expect(store.get(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe('1')
+    expect(store.has(STORAGE_KEYS.TRIAL_WINDOW_START)).toBe(true)
   })
 
   it('stores the policy as JSON', () => {
@@ -367,7 +390,9 @@ describe('saveTrialResult', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: vi.fn(),
-        setItem: () => { throw new Error('QuotaExceeded') },
+        setItem: () => {
+          throw new Error('QuotaExceeded')
+        },
         removeItem: vi.fn(),
       },
       writable: true,
@@ -393,6 +418,21 @@ describe('markTrialUsed', () => {
     expect(ts).toBe(now)
   })
 
+  it('increments upload count and sets window start', () => {
+    markTrialUsed()
+    expect(store.get(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe('1')
+    expect(store.has(STORAGE_KEYS.TRIAL_WINDOW_START)).toBe(true)
+  })
+
+  it('increments count on repeated calls', () => {
+    markTrialUsed()
+    expect(store.get(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe('1')
+    markTrialUsed()
+    expect(store.get(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe('2')
+    markTrialUsed()
+    expect(store.get(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe('3')
+  })
+
   it('does not set TRIAL_RESULT or TRIAL_FILE_NAME', () => {
     markTrialUsed()
     expect(store.has(STORAGE_KEYS.TRIAL_RESULT)).toBe(false)
@@ -404,7 +444,9 @@ describe('markTrialUsed', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: vi.fn(),
-        setItem: () => { throw new Error('QuotaExceeded') },
+        setItem: () => {
+          throw new Error('QuotaExceeded')
+        },
         removeItem: vi.fn(),
       },
       writable: true,
@@ -425,6 +467,8 @@ describe('clearTrialData', () => {
     store.set(STORAGE_KEYS.TRIAL_FILE_NAME, 'f.pdf')
     store.set(STORAGE_KEYS.TRIAL_EMAIL, 'a@b.com')
     store.set(STORAGE_KEYS.TRIAL_SHARE_ID, 'abc')
+    store.set(STORAGE_KEYS.TRIAL_UPLOAD_COUNT, '3')
+    store.set(STORAGE_KEYS.TRIAL_WINDOW_START, '123')
 
     clearTrialData()
 
@@ -434,6 +478,8 @@ describe('clearTrialData', () => {
     expect(store.has(STORAGE_KEYS.TRIAL_FILE_NAME)).toBe(false)
     expect(store.has(STORAGE_KEYS.TRIAL_EMAIL)).toBe(false)
     expect(store.has(STORAGE_KEYS.TRIAL_SHARE_ID)).toBe(false)
+    expect(store.has(STORAGE_KEYS.TRIAL_UPLOAD_COUNT)).toBe(false)
+    expect(store.has(STORAGE_KEYS.TRIAL_WINDOW_START)).toBe(false)
   })
 
   it('does not affect unrelated storage keys', () => {
@@ -450,7 +496,9 @@ describe('clearTrialData', () => {
       value: {
         getItem: vi.fn(),
         setItem: vi.fn(),
-        removeItem: () => { throw new Error('SecurityError') },
+        removeItem: () => {
+          throw new Error('SecurityError')
+        },
       },
       writable: true,
       configurable: true,
@@ -463,13 +511,13 @@ describe('clearTrialData', () => {
 // getTrialTimeRemaining
 // ===========================================================================
 describe('getTrialTimeRemaining', () => {
-  it('returns 0 when no timestamp in storage', () => {
+  it('returns 0 when no window start in storage', () => {
     expect(getTrialTimeRemaining()).toBe(0)
   })
 
   it('returns the remaining time in ms', () => {
-    const oneHourAgo = Date.now() - (1 * 60 * 60 * 1000)
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, oneHourAgo.toString())
+    const oneHourAgo = Date.now() - 1 * 60 * 60 * 1000
+    store.set(STORAGE_KEYS.TRIAL_WINDOW_START, oneHourAgo.toString())
 
     const remaining = getTrialTimeRemaining()
     // 24h - 1h = 23h in ms
@@ -478,27 +526,29 @@ describe('getTrialTimeRemaining', () => {
 
   it('returns 0 when trial has expired', () => {
     const pastExpiry = Date.now() - TRIAL_EXPIRY_MS - 5000
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, pastExpiry.toString())
+    store.set(STORAGE_KEYS.TRIAL_WINDOW_START, pastExpiry.toString())
 
     expect(getTrialTimeRemaining()).toBe(0)
   })
 
   it('returns 0 (not negative) for long-expired trials', () => {
     const longAgo = Date.now() - TRIAL_EXPIRY_MS * 10
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, longAgo.toString())
+    store.set(STORAGE_KEYS.TRIAL_WINDOW_START, longAgo.toString())
 
     expect(getTrialTimeRemaining()).toBe(0)
   })
 
   it('returns full expiry time when trial just started', () => {
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
+    store.set(STORAGE_KEYS.TRIAL_WINDOW_START, Date.now().toString())
     expect(getTrialTimeRemaining()).toBe(TRIAL_EXPIRY_MS)
   })
 
   it('returns 0 when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('Error') },
+        getItem: () => {
+          throw new Error('Error')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -556,38 +606,47 @@ describe('formatTimeRemaining', () => {
 // canPerformFreeTrial
 // ===========================================================================
 describe('canPerformFreeTrial', () => {
-  it('returns canTry: true when trial has not been used', () => {
+  it('returns canTry: true with full uploads remaining when no usage', () => {
     const result = canPerformFreeTrial()
     expect(result.canTry).toBe(true)
     expect(result.reason).toBeUndefined()
+    expect(result.uploadsRemaining).toBe(TRIAL_MAX)
+    expect(result.maxUploads).toBe(TRIAL_MAX)
   })
 
-  it('returns canTry: false with reason when trial used and not expired', () => {
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, Date.now().toString())
+  it('returns canTry: true with reduced remaining when partially used', () => {
+    setTrialCount(1, Date.now())
+    const result = canPerformFreeTrial()
+    expect(result.canTry).toBe(true)
+    expect(result.uploadsRemaining).toBe(2)
+    expect(result.maxUploads).toBe(TRIAL_MAX)
+  })
+
+  it('returns canTry: false with reason when all uploads used and not expired', () => {
+    setTrialCount(TRIAL_MAX, Date.now())
 
     const result = canPerformFreeTrial()
     expect(result.canTry).toBe(false)
     expect(result.reason).toBeDefined()
-    expect(result.reason).toContain('already used your free analysis')
-    expect(result.reason).toContain('remaining')
+    expect(result.reason).toContain(`used all ${TRIAL_MAX} free analyses`)
+    expect(result.uploadsRemaining).toBe(0)
+    expect(result.maxUploads).toBe(TRIAL_MAX)
   })
 
-  it('returns canTry: true when trial was used but has expired', () => {
+  it('returns canTry: true when all uploads used but window has expired', () => {
     const expiredTime = Date.now() - TRIAL_EXPIRY_MS - 1
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, expiredTime.toString())
+    setTrialCount(TRIAL_MAX, expiredTime)
 
     const result = canPerformFreeTrial()
     expect(result.canTry).toBe(true)
     expect(result.reason).toBeUndefined()
+    expect(result.uploadsRemaining).toBe(TRIAL_MAX) // reset after expiry
   })
 
   it('includes formatted time remaining in the reason', () => {
-    // Set trial 1 hour ago
-    const oneHourAgo = Date.now() - (1 * 60 * 60 * 1000)
-    store.set(STORAGE_KEYS.TRIAL_USED, 'true')
-    store.set(STORAGE_KEYS.TRIAL_TIMESTAMP, oneHourAgo.toString())
+    // Set window 1 hour ago, count at max
+    const oneHourAgo = Date.now() - 1 * 60 * 60 * 1000
+    setTrialCount(TRIAL_MAX, oneHourAgo)
 
     const result = canPerformFreeTrial()
     expect(result.canTry).toBe(false)
@@ -615,7 +674,9 @@ describe('saveTrialEmail', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
         getItem: vi.fn(),
-        setItem: () => { throw new Error('QuotaExceeded') },
+        setItem: () => {
+          throw new Error('QuotaExceeded')
+        },
         removeItem: vi.fn(),
       },
       writable: true,
@@ -638,7 +699,9 @@ describe('getTrialEmail', () => {
   it('returns null when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('SecurityError') },
+        getItem: () => {
+          throw new Error('SecurityError')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -683,7 +746,9 @@ describe('getShareId', () => {
   it('returns null when localStorage throws', () => {
     Object.defineProperty(globalThis, 'localStorage', {
       value: {
-        getItem: () => { throw new Error('Error') },
+        getItem: () => {
+          throw new Error('Error')
+        },
         setItem: vi.fn(),
         removeItem: vi.fn(),
       },
@@ -761,46 +826,94 @@ describe('hasPendingTrialTransfer', () => {
 // ===========================================================================
 // Integration / Cross-function tests
 // ===========================================================================
+describe('getTrialUploadsRemaining', () => {
+  it('returns max when no uploads used', () => {
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX)
+  })
+
+  it('returns correct remaining after partial use', () => {
+    setTrialCount(1, Date.now())
+    expect(getTrialUploadsRemaining()).toBe(2)
+  })
+
+  it('returns 0 when all uploads used', () => {
+    setTrialCount(TRIAL_MAX, Date.now())
+    expect(getTrialUploadsRemaining()).toBe(0)
+  })
+
+  it('returns max after window expires', () => {
+    setTrialCount(TRIAL_MAX, Date.now() - TRIAL_EXPIRY_MS - 1)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX)
+  })
+})
+
+describe('getTrialMaxUploads', () => {
+  it('returns the default max uploads', () => {
+    expect(getTrialMaxUploads()).toBe(TRIAL_MAX)
+  })
+})
+
 describe('integration', () => {
-  it('full lifecycle: save result, verify, retrieve, expire, clear', () => {
+  it('full lifecycle: save results up to max, verify, expire, reset', () => {
     const policy = makeMockPolicy({ policyNumber: 'LIFECYCLE-001' })
 
     // 1. Initially, no trial used
     expect(hasUsedFreeTrial()).toBe(false)
     expect(canPerformFreeTrial().canTry).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX)
 
-    // 2. Save trial result
+    // 2. Save first trial result — still can upload more
     saveTrialResult(policy, 'lifecycle.pdf')
-    expect(hasUsedFreeTrial()).toBe(true)
+    expect(hasUsedFreeTrial()).toBe(false) // 1 of 3
     expect(hasValidTrialResult()).toBe(true)
-    expect(canPerformFreeTrial().canTry).toBe(false)
+    expect(canPerformFreeTrial().canTry).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(2)
 
-    // 3. Retrieve result
+    // 3. Second upload
+    saveTrialResult(makeMockPolicy({ policyNumber: 'LIFECYCLE-002' }), 'second.pdf')
+    expect(hasUsedFreeTrial()).toBe(false) // 2 of 3
+    expect(canPerformFreeTrial().canTry).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(1)
+
+    // 4. Third upload — now exhausted
+    saveTrialResult(makeMockPolicy({ policyNumber: 'LIFECYCLE-003' }), 'third.pdf')
+    expect(hasUsedFreeTrial()).toBe(true) // 3 of 3
+    expect(canPerformFreeTrial().canTry).toBe(false)
+    expect(getTrialUploadsRemaining()).toBe(0)
+
+    // 5. Retrieve last result
     const result = getTrialResult()
     expect(result).not.toBeNull()
-    expect(result!.policy.policyNumber).toBe('LIFECYCLE-001')
-    expect(result!.fileName).toBe('lifecycle.pdf')
+    expect(result!.policy.policyNumber).toBe('LIFECYCLE-003')
+    expect(result!.fileName).toBe('third.pdf')
 
-    // 4. Share link works
+    // 6. Share link works
     expect(getShareId()).not.toBeNull()
 
-    // 5. Time remaining is about 24h
+    // 7. Time remaining is about 24h
     expect(getTrialTimeRemaining()).toBe(TRIAL_EXPIRY_MS)
 
-    // 6. Advance time past expiry
+    // 8. Advance time past expiry
     vi.setSystemTime(new Date(Date.now() + TRIAL_EXPIRY_MS + 1))
 
-    // 7. Trial now expired
-    expect(hasUsedFreeTrial()).toBe(false) // also clears data
+    // 9. Trial now expired — count resets
+    expect(hasUsedFreeTrial()).toBe(false)
     expect(canPerformFreeTrial().canTry).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX)
     expect(getTrialTimeRemaining()).toBe(0)
   })
 
-  it('markTrialUsed makes hasUsedFreeTrial true but getTrialResult null', () => {
+  it('markTrialUsed increments count but does not save result', () => {
     markTrialUsed()
-    expect(hasUsedFreeTrial()).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(2) // 1 used of 3
     expect(getTrialResult()).toBeNull()
     expect(hasValidTrialResult()).toBe(false)
+
+    // After 3 markTrialUsed calls, trial is exhausted
+    markTrialUsed()
+    markTrialUsed()
+    expect(hasUsedFreeTrial()).toBe(true)
+    expect(getTrialUploadsRemaining()).toBe(0)
   })
 
   it('saveTrialEmail persists through getTrialResult', () => {
@@ -816,7 +929,7 @@ describe('integration', () => {
     saveTrialResult(makeMockPolicy(), 'f.pdf')
     saveTrialEmail('e@e.com')
 
-    expect(hasUsedFreeTrial()).toBe(true)
+    // 1 of 3 used
     expect(hasValidTrialResult()).toBe(true)
 
     clearTrialData()
@@ -828,11 +941,16 @@ describe('integration', () => {
     expect(getShareId()).toBeNull()
     expect(getTrialDataForTransfer()).toBeNull()
     expect(hasPendingTrialTransfer()).toBe(false)
+    expect(getTrialUploadsRemaining()).toBe(TRIAL_MAX)
   })
 
-  it('canPerformFreeTrial reason includes formatted time', () => {
-    // Use trial, then advance 12 hours
+  it('canPerformFreeTrial reason includes formatted time when exhausted', () => {
+    // Use all 3 uploads
     markTrialUsed()
+    markTrialUsed()
+    markTrialUsed()
+
+    // Advance 12 hours
     vi.setSystemTime(new Date(Date.now() + 12 * 60 * 60 * 1000))
 
     const result = canPerformFreeTrial()

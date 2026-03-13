@@ -557,7 +557,7 @@ export function ProcessingLogsTab() {
               AI Provider
             </div>
             <div className="text-sm font-medium text-gray-900 mt-1">
-              {Object.entries(stats.ai_provider_breakdown)
+              {Object.entries(stats.ai_provider_breakdown ?? {})
                 .map(([provider, count]) => `${provider}: ${count}`)
                 .join(', ') || '-'}
             </div>

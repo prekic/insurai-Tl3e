@@ -979,6 +979,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     pleaseWait: '',
     trialAlreadyUsedTitle: '',
     trialAlreadyUsedDesc: '',
+    dailyLimitReached: '',
+    uploadsRemaining: '',
     tryAgainIn: '',
     signUpUnlimited: '',
     backToHome: '',

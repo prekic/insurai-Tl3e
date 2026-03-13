@@ -1063,6 +1063,8 @@ export interface TranslationDictionary {
     pleaseWait: string
     trialAlreadyUsedTitle: string
     trialAlreadyUsedDesc: string
+    dailyLimitReached: string
+    uploadsRemaining: string
     tryAgainIn: string
     signUpUnlimited: string
     backToHome: string

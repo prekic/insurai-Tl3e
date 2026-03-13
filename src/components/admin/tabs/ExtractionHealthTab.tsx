@@ -172,7 +172,7 @@ export function ExtractionHealthTab() {
   const errorRatePercent = (last_24h.error_rate * 100).toFixed(1)
   const isHealthy = last_24h.error_rate < 0.05
   const isWarning = last_24h.error_rate >= 0.05 && last_24h.error_rate < 0.2
-  const providers = Object.entries(by_provider)
+  const providers = Object.entries(by_provider ?? {})
 
   return (
     <div className="space-y-6">

@@ -410,6 +410,7 @@ export interface UIConfig {
   displayCurrency: string
   // Free Trial
   trialExpiryMs: number
+  trialMaxUploadsPerDay: number
 }
 
 export const DEFAULT_UI_CONFIG: UIConfig = {
@@ -426,6 +427,7 @@ export const DEFAULT_UI_CONFIG: UIConfig = {
   allowedFileExtensions: ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg'],
   displayCurrency: 'TRY',
   trialExpiryMs: 86400000,
+  trialMaxUploadsPerDay: 3,
 }
 
 // =============================================================================

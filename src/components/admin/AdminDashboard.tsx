@@ -208,7 +208,7 @@ export function AdminDashboard() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab systemHealth={systemHealth} />
+        return <OverviewTab systemHealth={systemHealth} onNavigate={handleTabSelect} />
       case 'notifications':
         return <NotificationsTab />
       case 'ai_operations':
@@ -250,7 +250,7 @@ export function AdminDashboard() {
       case 'insights':
         return <InsightsTab />
       default:
-        return <OverviewTab systemHealth={systemHealth} />
+        return <OverviewTab systemHealth={systemHealth} onNavigate={handleTabSelect} />
     }
   }
 
