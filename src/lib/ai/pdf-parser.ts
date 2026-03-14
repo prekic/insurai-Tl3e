@@ -160,12 +160,20 @@ async function getPdfJs(): Promise<typeof import('pdfjs-dist')> {
           // Try to find a working CDN for the worker
           const workerUrl = await findWorkingWorkerUrl(PDFJS_VERSION)
 
-          if (workerUrl) {
+          // Check if we are running in Node/jsdom (where ESM loader restricts https workers)
+          const isNode =
+            typeof process !== 'undefined' &&
+            process.versions != null &&
+            process.versions.node != null
+
+          if (workerUrl && !isNode) {
             pdfjs.GlobalWorkerOptions.workerSrc = workerUrl
           } else {
-            // All CDNs failed - pdfjs will use fake worker (main thread)
-            // This is slower but still works
-            console.warn('[PDF.js] Using main thread (fake worker) - parsing may be slower')
+            // Node/jsdom environments or failed CDNs - use fake worker
+            pdfjs.GlobalWorkerOptions.workerSrc = ''
+            console.warn(
+              '[PDF.js] Using main thread (fake worker) - parsing may be slower or running in Node environment'
+            )
           }
         }
       }
@@ -265,7 +273,7 @@ export async function extractTextFromPDF(
 
     // Load PDF document with timeout
     const loadingTask = pdfjs.getDocument({
-      data: arrayBuffer,
+      data: new Uint8Array(arrayBuffer),
       useSystemFonts: true,
     })
 

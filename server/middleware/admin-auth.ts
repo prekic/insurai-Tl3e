@@ -53,7 +53,8 @@ export interface AuthenticatedRequest extends Request {
 function getJWTSecret(): string {
   const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET
   if (!secret) {
-    const msg = 'ADMIN_JWT_SECRET is not configured. Set ADMIN_JWT_SECRET environment variable. Refusing to start with no secret.'
+    const msg =
+      'ADMIN_JWT_SECRET is not configured. Set ADMIN_JWT_SECRET environment variable. Refusing to start with no secret.'
     log.error('FATAL: JWT secret not configured', { message: msg })
     throw new Error(msg)
   }
@@ -75,11 +76,6 @@ const JWT_EXPIRES_IN = process.env.ADMIN_JWT_EXPIRES_IN || '30m'
 const REFRESH_TOKEN_EXPIRES_IN = process.env.ADMIN_REFRESH_EXPIRES_IN || '7d'
 const BCRYPT_ROUNDS = 12
 
-// Supabase client for database access
-// IMPORTANT: Use SUPABASE_URL first (server-side), VITE_SUPABASE_URL as fallback (dev only)
-const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-
 let supabase: SupabaseClient<AnyDatabase> | null = null
 let supabaseInitError: string | null = null
 
@@ -87,31 +83,35 @@ let supabaseInitError: string | null = null
  * Get Supabase client for admin database operations
  * Returns { client, error } to allow proper error handling
  */
-export function getSupabaseWithError(): { client: SupabaseClient<AnyDatabase> | null; error: string | null } {
-  if (supabaseInitError) {
-    return { client: null, error: supabaseInitError }
-  }
+export function getSupabaseWithError(): {
+  client: SupabaseClient<AnyDatabase> | null
+  error: string | null
+} {
+  // Always grab the latest environment variables
+  const currentUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const currentKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   if (supabase) {
     return { client: supabase, error: null }
   }
 
   // Validate required env vars
-  if (!supabaseUrl) {
-    supabaseInitError = 'SUPABASE_URL is not configured. Set SUPABASE_URL environment variable.'
-    log.error('Supabase URL not configured', { error: supabaseInitError })
-    return { client: null, error: supabaseInitError }
+  if (!currentUrl) {
+    const errorMsg = 'SUPABASE_URL is not configured. Set SUPABASE_URL environment variable.'
+    log.error('Supabase URL not configured', { error: errorMsg })
+    return { client: null, error: errorMsg }
   }
 
-  if (!supabaseServiceKey) {
-    supabaseInitError = 'SUPABASE_SERVICE_ROLE_KEY is not configured. Set SUPABASE_SERVICE_ROLE_KEY environment variable.'
-    log.error('Supabase service role key not configured', { error: supabaseInitError })
-    return { client: null, error: supabaseInitError }
+  if (!currentKey) {
+    const errorMsg =
+      'SUPABASE_SERVICE_ROLE_KEY is not configured. Set SUPABASE_SERVICE_ROLE_KEY environment variable.'
+    log.error('Supabase service role key not configured', { error: errorMsg })
+    return { client: null, error: errorMsg }
   }
 
   try {
     log.info('Initializing Supabase client')
-    supabase = createClient<AnyDatabase>(supabaseUrl, supabaseServiceKey)
+    supabase = createClient<AnyDatabase>(currentUrl, currentKey)
     log.info('Supabase client initialized successfully')
     return { client: supabase, error: null }
   } catch (err) {
@@ -152,11 +152,9 @@ export function generateAdminToken(user: AdminUser, sessionId: string): string {
  * Generate a refresh token
  */
 export function generateRefreshToken(user: AdminUser, sessionId: string): string {
-  return jwt.sign(
-    { sub: user.id, sessionId, type: 'refresh' },
-    getJWTSecretCached(),
-    { expiresIn: REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'] } as jwt.SignOptions
-  )
+  return jwt.sign({ sub: user.id, sessionId, type: 'refresh' }, getJWTSecretCached(), {
+    expiresIn: REFRESH_TOKEN_EXPIRES_IN as jwt.SignOptions['expiresIn'],
+  } as jwt.SignOptions)
 }
 
 /**
@@ -249,7 +247,9 @@ export async function getAdminUserById(id: string): Promise<AdminUser | null> {
 /**
  * Get admin user by email from database
  */
-export async function getAdminUserByEmail(email: string): Promise<(AdminUser & { passwordHash?: string }) | null> {
+export async function getAdminUserByEmail(
+  email: string
+): Promise<(AdminUser & { passwordHash?: string }) | null> {
   log.debug('getAdminUserByEmail called', { email })
 
   const db = getSupabase()
@@ -266,7 +266,11 @@ export async function getAdminUserByEmail(email: string): Promise<(AdminUser & {
     .single()
 
   if (error) {
-    log.error('Database query error', { code: error.code, message: error.message, details: error.details })
+    log.error('Database query error', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+    })
     return null
   }
 
@@ -400,7 +404,11 @@ export async function updateAdminLogin(adminId: string, ipAddress: string): Prom
  * Main admin authentication middleware
  * Validates JWT token and attaches admin user to request
  */
-export function authenticateAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
+export function authenticateAdmin(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): void {
   // Check for Authorization header
   const authHeader = req.headers.authorization
 
@@ -523,8 +531,8 @@ export function requirePermission(...requiredPermissions: string[]) {
 
     // Check specific permissions
     const adminUser = req.adminUser
-    const hasAllPermissions = requiredPermissions.every(
-      (perm) => adminUser.permissions.includes(perm)
+    const hasAllPermissions = requiredPermissions.every((perm) =>
+      adminUser.permissions.includes(perm)
     )
 
     if (!hasAllPermissions) {
@@ -545,10 +553,7 @@ export function requirePermission(...requiredPermissions: string[]) {
  * Combined authentication + role check middleware
  */
 export function requireAdmin(role?: AdminRole) {
-  return [
-    authenticateAdmin,
-    ...(role ? [requireRole(role)] : []),
-  ]
+  return [authenticateAdmin, ...(role ? [requireRole(role)] : [])]
 }
 
 /**

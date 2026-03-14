@@ -1471,7 +1471,7 @@ export function analyzeExclusionsComprehensive(
 
   // Must have a limit word OR a currency symbol so we don't grab "35" from "35%"
   const limitPattern =
-    /\(?\s*(\d+(?:[.,]\d+)*)\s*(?:TL|₺|lira|TRY|USD|EUR)\s*(?:limit|teminat|kadar|bedel)?\s*\)?/i
+    /\(?\s*(\d+(?:[.,]\d+)*)\s*(?:(?:TL|₺|lira|TRY|USD|EUR)\s*(?:limit|teminat|kadar|bedel)?|(?:limit|teminat|kadar|bedel))\s*\)?/i
 
   for (let i = 0; i < exclusions.length; i++) {
     const exclusion = exclusions[i]
