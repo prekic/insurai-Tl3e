@@ -1,4 +1,4 @@
-# Session Handoff — March 11, 2026 (AI Prompts & UI Execution Schema)
+# Session Handoff — March 14, 2026 (AI Prompts, PDF Extraction Stability & UI Execution Schema)
 
 ## Current Status
 
@@ -7,7 +7,7 @@
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | All tests passing, 0 failures |
-| **Branch** | `insuraigemini202603110438` — 9 commits, ready to push |
+| **Branch** | `insuraigemini202603110438` — 11 commits, pushed |
 
 ---
 
@@ -40,7 +40,7 @@
 - Combined default and dynamic guidelines in the sense-check logic.
 - Enforced stricter anti-hallucination rules in the extraction prompt to prevent false positives.
 
-### 2. Make AI Prompts Editable via Database
+### 4. Make AI Prompts Editable via Database
 
 **Problem**: Critical AI prompts, such as the AI Insights Sense-Check prompt, were hardcoded in the codebase backend, preventing administrators from dynamically adjusting AI behavior on the fly.
 
@@ -49,7 +49,7 @@
 - Updated `prompt-service.ts` to fetch and render the prompt dynamically, including setting up a highly resilient fallback prompt if the database is unreachable.
 - Refactored `/api/ai/sense-check` endpoint to use the new database-driven system.
 
-### 3. Prompt Preview in Insights Tab
+### 5. Prompt Preview in Insights Tab
 
 **Problem**: Administrators lacked a way to see the *exact* final prompt that gets sent to the LLM (combining the base prompt, static rules, and dynamic database rules).
 
@@ -57,7 +57,7 @@
 - Created a new GET route `/api/ai/sense-check-prompt-preview` that replicates the backend prompt engineering logic without sending it to the AI.
 - Added a "Preview Prompt" button in the Insights Tab (`InsightsTab.tsx`) that opens a readable dialog containing the final compiled prompt.
 
-### 4. Admin Prompts UI Execution Flow Schema
+### 6. Admin Prompts UI Execution Flow Schema
 
 **Problem**: The Admin dashboard's list of Prompt Templates lacked a visual hierarchy explaining exactly which prompts fired in what order during the automated extraction pipeline.
 
@@ -94,6 +94,10 @@
 | `src/components/admin/tabs/InsightsTab.tsx` | Added "Preview Prompt" button and compilation UI |
 | `src/components/admin/tabs/PromptsTab.tsx` | Built visual Pipeline Execution Flow schema mapping |
 | `src/lib/ai/extraction-schema.ts` | **FIX** Enforced explicit anti-hallucination instructions requiring `null` outputs for missing values |
+| `server/middleware/admin-auth.ts` | **REFACTOR** Deferred Supabase env var reads to call-time (fixes hot-reload / test scenarios) |
+| `src/lib/knowledge/kasko-knowledge.ts` | **FIX** `limitPattern` regex improved to match standalone limit words without currency symbol |
+| `src/lib/knowledge/kasko-knowledge.test.ts` | **UPDATE** Major test rewrite (373 ins / 162 del): added missing `[]` param to `analyzeExclusionsComprehensive` calls |
+| `test-data/eriş ambalaj...pdf` | **NEW** Real Turkish kasko PDF for E2E extraction testing |
 
 ---
 
@@ -102,6 +106,11 @@
 1. **Prompt Template Variables**: The `AI Insights - Sense Check` prompt strictly expects `{{policy_data}}`, `{{raw_insights}}`, and `{{guidelines}}` as variable keys. If an administrator breaks these template strings in the UI, the sense-check endpoint might fail.
 2. **Execution Order Mapping**: In `PromptsTab.tsx`, `PROMPT_EXECUTION_ORDER` requires exactly matching the prompt `name` from the database. If a new prompt is added via the DB, it will appear at the bottom of the execution track unless manually mapped in the component.
 3. **Extraction Anti-Hallucination Guardrails**: The extraction prompts in `src/lib/ai/extraction-schema.ts` were strictly updated to instruct the model to return `null` when finding missing fields. If future features are built relying on empty arrays or empty strings for specific fields (e.g. deductibles or dates), that parsing logic will need to handle `null`.
+4. **E2E Real Extraction Test is `describe.skip`**: `src/lib/ai/e2e.test.ts` is intentionally skipped (`describe.skip`) because it requires live GCP Document AI credentials & AI API keys. It will fail in CI without real secrets. To run it locally, ensure `GOOGLE_CLOUD_API_KEY`, `OPENAI_API_KEY`, and `ANTHROPIC_API_KEY` are set.
+5. **pdf.js Node Worker Detection**: `pdf-parser.ts` now detects Node/jsdom via `typeof process !== 'undefined' && process.versions?.node` and forces the synchronous fake worker (`workerSrc = ''`). This prevents ESM loader crashes from https `workerSrc` URLs. If pdf.js parsing seems slow in Node tests, this is expected — fake worker mode is single-threaded.
+6. **Document AI Page Limit Changed**: `DOCUMENT_AI_PAGE_LIMIT` was lowered from 15 to **10** in `pdf-splitter.ts` to prevent HTTP 403 payload errors on dense PDFs. CLAUDE.md references to "15-page limit" are now stale and have been corrected to 10.
+7. **admin-auth.ts Supabase Init Refactored**: `getSupabaseWithError()` now reads `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` at call-time instead of module-load-time. This fixes test scenarios where env vars are set after import. If you see Supabase init errors in tests, ensure env vars are set before the first admin API call, not just before import.
+8. **kasko-knowledge `analyzeExclusionsComprehensive` Signature Changed**: The function now accepts an additional `coverageNames: string[]` parameter (2nd argument). All call sites must pass this array (or `[]` if unavailable). Tests were bulk-updated to match.
 
 ---
 
