@@ -7,8 +7,8 @@
 
 import { PDFDocument } from 'pdf-lib'
 
-/** Maximum pages per chunk for Document AI */
-export const DOCUMENT_AI_PAGE_LIMIT = 15
+/** Maximum pages per chunk for Document AI (reduced to 10 to avoid 20MB payload 403s on dense PDFs) */
+export const DOCUMENT_AI_PAGE_LIMIT = 10
 
 /**
  * Result of splitting a PDF
@@ -29,7 +29,7 @@ export interface PDFSplitResult {
  */
 export async function getPdfPageCount(file: File): Promise<number> {
   const buffer = await file.arrayBuffer()
-  const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true })
+  const pdfDoc = await PDFDocument.load(new Uint8Array(buffer), { ignoreEncryption: true })
   return pdfDoc.getPageCount()
 }
 
@@ -45,7 +45,7 @@ export async function splitPdf(
   maxPagesPerChunk: number = DOCUMENT_AI_PAGE_LIMIT
 ): Promise<PDFSplitResult> {
   const buffer = await file.arrayBuffer()
-  const pdfDoc = await PDFDocument.load(buffer, { ignoreEncryption: true })
+  const pdfDoc = await PDFDocument.load(new Uint8Array(buffer), { ignoreEncryption: true })
   const totalPages = pdfDoc.getPageCount()
 
   // If within limit, no splitting needed
@@ -63,7 +63,9 @@ export async function splitPdf(
   const chunks: Uint8Array[] = []
   const pageRanges: Array<[number, number]> = []
 
-  console.warn(`[PDF Splitter] Splitting ${totalPages} pages into ${numChunks} chunks of max ${maxPagesPerChunk} pages`)
+  console.warn(
+    `[PDF Splitter] Splitting ${totalPages} pages into ${numChunks} chunks of max ${maxPagesPerChunk} pages`
+  )
 
   for (let chunkIndex = 0; chunkIndex < numChunks; chunkIndex++) {
     const startPage = chunkIndex * maxPagesPerChunk
@@ -73,10 +75,7 @@ export async function splitPdf(
     const chunkDoc = await PDFDocument.create()
 
     // Copy pages from original to chunk
-    const pageIndices = Array.from(
-      { length: endPage - startPage },
-      (_, i) => startPage + i
-    )
+    const pageIndices = Array.from({ length: endPage - startPage }, (_, i) => startPage + i)
     const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndices)
 
     for (const page of copiedPages) {
@@ -88,7 +87,9 @@ export async function splitPdf(
     chunks.push(chunkBytes)
     pageRanges.push([startPage + 1, endPage]) // 1-indexed
 
-    console.warn(`[PDF Splitter] Created chunk ${chunkIndex + 1}/${numChunks}: pages ${startPage + 1}-${endPage}`)
+    console.warn(
+      `[PDF Splitter] Created chunk ${chunkIndex + 1}/${numChunks}: pages ${startPage + 1}-${endPage}`
+    )
   }
 
   return {

@@ -76,8 +76,8 @@ describe('KASKO_IMPLICIT_COVERAGES', () => {
   })
 
   it('should have 8 main coverages and 1 liability coverage', () => {
-    const mainCount = KASKO_IMPLICIT_COVERAGES.filter(c => c.category === 'main').length
-    const liabilityCount = KASKO_IMPLICIT_COVERAGES.filter(c => c.category === 'liability').length
+    const mainCount = KASKO_IMPLICIT_COVERAGES.filter((c) => c.category === 'main').length
+    const liabilityCount = KASKO_IMPLICIT_COVERAGES.filter((c) => c.category === 'liability').length
     expect(mainCount).toBe(8)
     expect(liabilityCount).toBe(1)
   })
@@ -85,7 +85,7 @@ describe('KASKO_IMPLICIT_COVERAGES', () => {
 
 describe('KASKO_COVERAGE_TYPES', () => {
   it('should have coverage types for all categories', () => {
-    const categories = new Set(Object.values(KASKO_COVERAGE_TYPES).map(t => t.category))
+    const categories = new Set(Object.values(KASKO_COVERAGE_TYPES).map((t) => t.category))
     expect(categories).toContain('main')
     expect(categories).toContain('liability')
     expect(categories).toContain('personal_accident')
@@ -529,9 +529,25 @@ describe('extractVehicleInfo', () => {
 
     it('should detect known car brands', () => {
       const brands = [
-        'ford', 'toyota', 'volkswagen', 'renault', 'fiat', 'mercedes',
-        'bmw', 'audi', 'hyundai', 'kia', 'peugeot', 'citroen',
-        'opel', 'skoda', 'seat', 'dacia', 'honda', 'nissan', 'mazda',
+        'ford',
+        'toyota',
+        'volkswagen',
+        'renault',
+        'fiat',
+        'mercedes',
+        'bmw',
+        'audi',
+        'hyundai',
+        'kia',
+        'peugeot',
+        'citroen',
+        'opel',
+        'skoda',
+        'seat',
+        'dacia',
+        'honda',
+        'nissan',
+        'mazda',
       ]
       for (const brand of brands) {
         const result = extractVehicleInfo(`Araç ${brand} model`)
@@ -773,98 +789,81 @@ describe('evaluateKaskoPolicy', () => {
 
   describe('coverage detection', () => {
     it('should detect market value coverage by isMarketValue flag', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Araç Bedeli', limit: 0, isMarketValue: true },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [{ name: 'Araç Bedeli', limit: 0, isMarketValue: true }],
+        20000
+      )
       expect(result.hasMarketValueCoverage).toBe(true)
       expect(result.positives).toContain('Araç rayiç değer üzerinden teminatlı')
     })
 
     it('should detect market value coverage by name containing rayiç', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Rayiç Değer', limit: 500000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Rayiç Değer', limit: 500000 }], 20000)
       expect(result.hasMarketValueCoverage).toBe(true)
     })
 
     it('should detect market value coverage by name containing araç bedeli', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Araç Bedeli', limit: 500000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Araç Bedeli', limit: 500000 }], 20000)
       expect(result.hasMarketValueCoverage).toBe(true)
     })
 
     it('should detect unlimited liability by isUnlimited flag', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [{ name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true }],
+        20000
+      )
       expect(result.hasUnlimitedLiability).toBe(true)
       expect(result.positives).toContain('Sınırsız mali sorumluluk teminatı mevcut')
     })
 
     it('should detect unlimited liability via shouldShowUnlimited', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Artan Mali Sorumluluk', limit: 0 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Artan Mali Sorumluluk', limit: 0 }], 20000)
       expect(result.hasUnlimitedLiability).toBe(true)
     })
 
     it('should NOT detect unlimited liability for non-liability coverage', () => {
       // coverage.isUnlimited is true, but name does not contain mali sorumluluk or artan mali
-      const result = evaluateKaskoPolicy([
-        { name: 'Cam Kırılması', limit: 0, isUnlimited: true },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [{ name: 'Cam Kırılması', limit: 0, isUnlimited: true }],
+        20000
+      )
       expect(result.hasUnlimitedLiability).toBe(false)
     })
 
     it('should detect personal accident', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Sürücü Ferdi Kaza', limit: 100000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Sürücü Ferdi Kaza', limit: 100000 }], 20000)
       expect(result.hasPersonalAccident).toBe(true)
     })
 
     it('should detect personal accident by koltuk keyword', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Koltuk Teminatı', limit: 50000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Koltuk Teminatı', limit: 50000 }], 20000)
       expect(result.hasPersonalAccident).toBe(true)
     })
 
     it('should detect replacement vehicle with ASCII ikame', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'ikame araç', limit: 0 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'ikame araç', limit: 0 }], 20000)
       expect(result.hasReplacementVehicle).toBe(true)
       expect(result.positives).toContain('İkame araç hizmeti dahil')
     })
 
     it('should NOT detect İkame Araç with Turkish İ', () => {
       // Turkish İ lowercases to i̇ (combining dot), so 'ikame' check fails
-      const result = evaluateKaskoPolicy([
-        { name: 'İkame Araç', limit: 0 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'İkame Araç', limit: 0 }], 20000)
       expect(result.hasReplacementVehicle).toBe(false)
     })
 
     it('should detect replacement vehicle by English keyword', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Replacement Vehicle', limit: 0 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Replacement Vehicle', limit: 0 }], 20000)
       expect(result.hasReplacementVehicle).toBe(true)
     })
 
     it('should detect legal protection', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Hukuki Koruma', limit: 10000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Hukuki Koruma', limit: 10000 }], 20000)
       expect(result.hasLegalProtection).toBe(true)
     })
 
     it('should detect legal protection by English keyword', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Legal Protection', limit: 10000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Legal Protection', limit: 10000 }], 20000)
       expect(result.hasLegalProtection).toBe(true)
     })
   })
@@ -876,48 +875,44 @@ describe('evaluateKaskoPolicy', () => {
     })
 
     it('should add 10 for market value', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Rayiç Değer', limit: 500000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Rayiç Değer', limit: 500000 }], 20000)
       expect(result.coverageCompleteness).toBe(70) // 60 + 10
     })
 
     it('should add 15 for unlimited liability', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [{ name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true }],
+        20000
+      )
       expect(result.coverageCompleteness).toBe(75) // 60 + 15
     })
 
     it('should add 5 for personal accident', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Ferdi Kaza', limit: 100000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Ferdi Kaza', limit: 100000 }], 20000)
       expect(result.coverageCompleteness).toBe(65) // 60 + 5
     })
 
     it('should add 5 for replacement vehicle', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'ikame araç', limit: 0 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'ikame araç', limit: 0 }], 20000)
       expect(result.coverageCompleteness).toBe(65) // 60 + 5
     })
 
     it('should add 5 for legal protection', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Hukuki Koruma', limit: 5000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy([{ name: 'Hukuki Koruma', limit: 5000 }], 20000)
       expect(result.coverageCompleteness).toBe(65) // 60 + 5
     })
 
     it('should cap at 100', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Rayiç Değer', limit: 500000 },
-        { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
-        { name: 'Ferdi Kaza', limit: 100000 },
-        { name: 'ikame araç', limit: 0 },
-        { name: 'Hukuki Koruma', limit: 5000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [
+          { name: 'Rayiç Değer', limit: 500000 },
+          { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
+          { name: 'Ferdi Kaza', limit: 100000 },
+          { name: 'ikame araç', limit: 0 },
+          { name: 'Hukuki Koruma', limit: 5000 },
+        ],
+        20000
+      )
       // 60 + 10 + 15 + 5 + 5 + 5 = 100
       expect(result.coverageCompleteness).toBe(100)
     })
@@ -941,13 +936,17 @@ describe('evaluateKaskoPolicy', () => {
       // Default benchmark (sedan 0-3): max=45000
       const result = evaluateKaskoPolicy([], 40000)
       expect(result.premiumValueScore).toBe(50)
-      expect(result.recommendations).toContain('Prim piyasa ortalamasının üzerinde - alternatif teklifler alın')
+      expect(result.recommendations).toContain(
+        'Prim piyasa ortalamasının üzerinde - alternatif teklifler alın'
+      )
     })
 
     it('should score 30 when premium > max of range', () => {
       const result = evaluateKaskoPolicy([], 50000)
       expect(result.premiumValueScore).toBe(30)
-      expect(result.recommendations).toContain('Prim çok yüksek - mutlaka karşılaştırmalı teklif alın')
+      expect(result.recommendations).toContain(
+        'Prim çok yüksek - mutlaka karşılaştırmalı teklif alın'
+      )
     })
 
     it('should use vehicle info for benchmark selection', () => {
@@ -980,11 +979,14 @@ describe('evaluateKaskoPolicy', () => {
     })
 
     it('should NOT recommend features that are present', () => {
-      const result = evaluateKaskoPolicy([
-        { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
-        { name: 'ikame araç', limit: 0 },
-        { name: 'Ferdi Kaza', limit: 100000 },
-      ], 20000)
+      const result = evaluateKaskoPolicy(
+        [
+          { name: 'Artan Mali Sorumluluk', limit: 0, isUnlimited: true },
+          { name: 'ikame araç', limit: 0 },
+          { name: 'Ferdi Kaza', limit: 100000 },
+        ],
+        20000
+      )
       expect(result.recommendations).not.toContain('Sınırsız mali sorumluluk teminatı ekleyin')
       expect(result.recommendations).not.toContain('İkame araç hizmeti eklemeyi değerlendirin')
       expect(result.recommendations).not.toContain('Ferdi kaza teminatı ekleyin')
@@ -1008,8 +1010,15 @@ describe('analyzeExclusions', () => {
   })
 
   it('should match all critical patterns', () => {
-    const patterns = ['nükleer riskler', 'savaş durumu', 'terör eylemleri', 'kasıtlı hasar',
-      'alkollü sürüş', 'ehliyetsiz kullanım', 'yarış ve hız denemesi']
+    const patterns = [
+      'nükleer riskler',
+      'savaş durumu',
+      'terör eylemleri',
+      'kasıtlı hasar',
+      'alkollü sürüş',
+      'ehliyetsiz kullanım',
+      'yarış ve hız denemesi',
+    ]
     const result = analyzeExclusions(patterns)
     expect(result.critical).toHaveLength(7)
   })
@@ -1025,10 +1034,7 @@ describe('analyzeExclusions', () => {
   })
 
   it('should categorize informational exclusions (fallback)', () => {
-    const result = analyzeExclusions([
-      'Normal aşınma ve yıpranma',
-      'Bakım eksikliği',
-    ])
+    const result = analyzeExclusions(['Normal aşınma ve yıpranma', 'Bakım eksikliği'])
     expect(result.informational).toHaveLength(2)
     expect(result.critical).toHaveLength(0)
     expect(result.standard).toHaveLength(0)
@@ -1073,15 +1079,11 @@ describe('sortCoveragesByCategory', () => {
   })
 
   it('should auto-detect category when not provided', () => {
-    const coverages = [
-      { name: 'Hukuki Koruma' },
-      { name: 'Çarpma/Çarpışma' },
-      { name: 'Asistans' },
-    ]
+    const coverages = [{ name: 'Hukuki Koruma' }, { name: 'Çarpma/Çarpışma' }, { name: 'Asistans' }]
     const sorted = sortCoveragesByCategory(coverages)
     expect(sorted[0].name).toBe('Çarpma/Çarpışma') // main
-    expect(sorted[1].name).toBe('Asistans')          // assistance
-    expect(sorted[2].name).toBe('Hukuki Koruma')      // legal
+    expect(sorted[1].name).toBe('Asistans') // assistance
+    expect(sorted[2].name).toBe('Hukuki Koruma') // legal
   })
 
   it('should use order 7 for unknown category in first position', () => {
@@ -1152,8 +1154,8 @@ describe('groupCoveragesByCategory', () => {
 
   it('should auto-detect category when not provided', () => {
     const coverages = [
-      { name: 'Ferdi Kaza Teminatı' },     // personal_accident
-      { name: 'Cam Kırılması' },             // supplementary
+      { name: 'Ferdi Kaza Teminatı' }, // personal_accident
+      { name: 'Cam Kırılması' }, // supplementary
     ]
     const groups = groupCoveragesByCategory(coverages)
     expect(groups.personal_accident).toHaveLength(1)
@@ -1161,9 +1163,7 @@ describe('groupCoveragesByCategory', () => {
   })
 
   it('should put unknown categories into supplementary', () => {
-    const coverages = [
-      { name: 'Mystery Coverage', category: 'unknown_category' },
-    ]
+    const coverages = [{ name: 'Mystery Coverage', category: 'unknown_category' }]
     const groups = groupCoveragesByCategory(coverages)
     expect(groups.supplementary).toHaveLength(1)
   })
@@ -1189,11 +1189,15 @@ describe('formatKaskoCoverageLimit', () => {
   })
 
   it('should return "Rayiç Değer" when isMarketValue is true', () => {
-    expect(formatKaskoCoverageLimit({ name: 'Any', limit: 0, isMarketValue: true })).toBe('Rayiç Değer')
+    expect(formatKaskoCoverageLimit({ name: 'Any', limit: 0, isMarketValue: true })).toBe(
+      'Rayiç Değer'
+    )
   })
 
   it('should prefer isUnlimited over isMarketValue', () => {
-    expect(formatKaskoCoverageLimit({ name: 'Any', limit: 0, isUnlimited: true, isMarketValue: true })).toBe('Sınırsız')
+    expect(
+      formatKaskoCoverageLimit({ name: 'Any', limit: 0, isUnlimited: true, isMarketValue: true })
+    ).toBe('Sınırsız')
   })
 
   it('should return "Sınırsız" via shouldShowUnlimited for artan mali with 0', () => {
@@ -1284,9 +1288,30 @@ describe('getCoverageClarifications', () => {
 describe('sortByImportance', () => {
   it('should sort by importance (critical first, minor last)', () => {
     const coverages: GroupedCoverage[] = [
-      { name: 'A', nameTr: 'A', nameEn: 'A', category: 'main', isGrouped: false, importance: 'minor' },
-      { name: 'B', nameTr: 'B', nameEn: 'B', category: 'main', isGrouped: false, importance: 'critical' },
-      { name: 'C', nameTr: 'C', nameEn: 'C', category: 'main', isGrouped: false, importance: 'standard' },
+      {
+        name: 'A',
+        nameTr: 'A',
+        nameEn: 'A',
+        category: 'main',
+        isGrouped: false,
+        importance: 'minor',
+      },
+      {
+        name: 'B',
+        nameTr: 'B',
+        nameEn: 'B',
+        category: 'main',
+        isGrouped: false,
+        importance: 'critical',
+      },
+      {
+        name: 'C',
+        nameTr: 'C',
+        nameEn: 'C',
+        category: 'main',
+        isGrouped: false,
+        importance: 'standard',
+      },
     ]
     const sorted = sortByImportance(coverages)
     expect(sorted[0].name).toBe('B') // critical
@@ -1296,8 +1321,22 @@ describe('sortByImportance', () => {
 
   it('should default to standard importance when undefined', () => {
     const coverages: GroupedCoverage[] = [
-      { name: 'A', nameTr: 'A', nameEn: 'A', category: 'main', isGrouped: false, importance: 'minor' },
-      { name: 'B', nameTr: 'B', nameEn: 'B', category: 'main', isGrouped: false, importance: undefined },
+      {
+        name: 'A',
+        nameTr: 'A',
+        nameEn: 'A',
+        category: 'main',
+        isGrouped: false,
+        importance: 'minor',
+      },
+      {
+        name: 'B',
+        nameTr: 'B',
+        nameEn: 'B',
+        category: 'main',
+        isGrouped: false,
+        importance: undefined,
+      },
     ]
     const sorted = sortByImportance(coverages)
     expect(sorted[0].name).toBe('B') // undefined -> standard (2) < minor (3)
@@ -1306,8 +1345,22 @@ describe('sortByImportance', () => {
 
   it('should use fallback order 2 for unknown importance values', () => {
     const coverages: GroupedCoverage[] = [
-      { name: 'A', nameTr: 'A', nameEn: 'A', category: 'main', isGrouped: false, importance: 'unknown' },
-      { name: 'B', nameTr: 'B', nameEn: 'B', category: 'main', isGrouped: false, importance: 'critical' },
+      {
+        name: 'A',
+        nameTr: 'A',
+        nameEn: 'A',
+        category: 'main',
+        isGrouped: false,
+        importance: 'unknown',
+      },
+      {
+        name: 'B',
+        nameTr: 'B',
+        nameEn: 'B',
+        category: 'main',
+        isGrouped: false,
+        importance: 'critical',
+      },
     ]
     const sorted = sortByImportance(coverages)
     expect(sorted[0].name).toBe('B') // critical (1) < unknown (2)
@@ -1316,8 +1369,22 @@ describe('sortByImportance', () => {
 
   it('should not mutate original array', () => {
     const coverages: GroupedCoverage[] = [
-      { name: 'A', nameTr: 'A', nameEn: 'A', category: 'main', isGrouped: false, importance: 'minor' },
-      { name: 'B', nameTr: 'B', nameEn: 'B', category: 'main', isGrouped: false, importance: 'critical' },
+      {
+        name: 'A',
+        nameTr: 'A',
+        nameEn: 'A',
+        category: 'main',
+        isGrouped: false,
+        importance: 'minor',
+      },
+      {
+        name: 'B',
+        nameTr: 'B',
+        nameEn: 'B',
+        category: 'main',
+        isGrouped: false,
+        importance: 'critical',
+      },
     ]
     const sorted = sortByImportance(coverages)
     expect(sorted).not.toBe(coverages)
@@ -1326,8 +1393,22 @@ describe('sortByImportance', () => {
 
   it('should handle both items with unknown importance', () => {
     const coverages: GroupedCoverage[] = [
-      { name: 'A', nameTr: 'A', nameEn: 'A', category: 'main', isGrouped: false, importance: 'unknown_x' },
-      { name: 'B', nameTr: 'B', nameEn: 'B', category: 'main', isGrouped: false, importance: 'unknown_y' },
+      {
+        name: 'A',
+        nameTr: 'A',
+        nameEn: 'A',
+        category: 'main',
+        isGrouped: false,
+        importance: 'unknown_x',
+      },
+      {
+        name: 'B',
+        nameTr: 'B',
+        nameEn: 'B',
+        category: 'main',
+        isGrouped: false,
+        importance: 'unknown_y',
+      },
     ]
     const sorted = sortByImportance(coverages)
     // Both fallback to 2, stable sort order
@@ -1373,14 +1454,12 @@ describe('groupCoverageSubLimits', () => {
     ]
     const result = groupCoverageSubLimits(coverages)
     // Single match for Koltuk Ferdi Kaza -> not grouped
-    expect(result.some(r => r.isGrouped)).toBe(false)
+    expect(result.some((r) => r.isGrouped)).toBe(false)
     expect(result).toHaveLength(2)
   })
 
   it('should pass through ungrouped coverages with detected category', () => {
-    const coverages = [
-      { name: 'Cam Kırılması', limit: 25000, category: 'supplementary' },
-    ]
+    const coverages = [{ name: 'Cam Kırılması', limit: 25000, category: 'supplementary' }]
     const result = groupCoverageSubLimits(coverages)
     expect(result).toHaveLength(1)
     expect(result[0].isGrouped).toBe(false)
@@ -1388,33 +1467,25 @@ describe('groupCoverageSubLimits', () => {
   })
 
   it('should auto-detect category for ungrouped coverages without category', () => {
-    const coverages = [
-      { name: 'Hırsızlık', limit: 500000 },
-    ]
+    const coverages = [{ name: 'Hırsızlık', limit: 500000 }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].category).toBe('main')
   })
 
   it('should detect unlimited status for ungrouped coverages', () => {
-    const coverages = [
-      { name: 'Artan Mali Sorumluluk', limit: 0 },
-    ]
+    const coverages = [{ name: 'Artan Mali Sorumluluk', limit: 0 }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].isUnlimited).toBe(true)
   })
 
   it('should use isUnlimited flag for ungrouped coverages', () => {
-    const coverages = [
-      { name: 'Some Coverage', limit: 0, isUnlimited: true },
-    ]
+    const coverages = [{ name: 'Some Coverage', limit: 0, isUnlimited: true }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].isUnlimited).toBe(true)
   })
 
   it('should pass through isMarketValue for ungrouped coverages', () => {
-    const coverages = [
-      { name: 'Araç Bedeli', limit: 0, isMarketValue: true },
-    ]
+    const coverages = [{ name: 'Araç Bedeli', limit: 0, isMarketValue: true }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].isMarketValue).toBe(true)
   })
@@ -1425,25 +1496,19 @@ describe('groupCoverageSubLimits', () => {
     ])
     expect(result1[0].nameTr).toBe('Cam Kırılması')
 
-    const result2 = groupCoverageSubLimits([
-      { name: 'Glass', limit: 25000 },
-    ])
+    const result2 = groupCoverageSubLimits([{ name: 'Glass', limit: 25000 }])
     expect(result2[0].nameTr).toBe('Glass')
   })
 
   it('should preserve deductible and included for ungrouped coverages', () => {
-    const coverages = [
-      { name: 'Cam Kırılması', limit: 25000, deductible: 500, included: true },
-    ]
+    const coverages = [{ name: 'Cam Kırılması', limit: 25000, deductible: 500, included: true }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].deductible).toBe(500)
     expect(result[0].included).toBe(true)
   })
 
   it('should preserve importance for ungrouped coverages', () => {
-    const coverages = [
-      { name: 'Cam Kırılması', limit: 25000, importance: 'standard' },
-    ]
+    const coverages = [{ name: 'Cam Kırılması', limit: 25000, importance: 'standard' }]
     const result = groupCoverageSubLimits(coverages)
     expect(result[0].importance).toBe('standard')
   })
@@ -1537,7 +1602,7 @@ describe('groupCoverageSubLimits', () => {
     const result = groupCoverageSubLimits(coverages)
     // 1 grouped + 2 ungrouped
     expect(result).toHaveLength(3)
-    expect(result.filter(r => r.isGrouped)).toHaveLength(1)
+    expect(result.filter((r) => r.isGrouped)).toHaveLength(1)
   })
 
   it('should handle empty array', () => {
@@ -1647,14 +1712,14 @@ describe('analyzeExclusionsComprehensive', () => {
         'Yarış katılımı',
       ])
       expect(result.exclusions).toHaveLength(3)
-      expect(result.exclusions.every(e => e.severity === 'critical')).toBe(true)
+      expect(result.exclusions.every((e) => e.severity === 'critical')).toBe(true)
     })
   })
 
   describe('commercial vs private vehicle filtering', () => {
     it('should skip exclusions not affecting commercial when isCommercial=true', () => {
       // 'vale' has affectsCommercial: false
-      const result = analyzeExclusionsComprehensive(['Vale park hasarı'], true)
+      const result = analyzeExclusionsComprehensive(['Vale park hasarı'], [], true)
       // The pattern matches but affectsCommercial is false, so it skips the vale explanation
       expect(result.exclusions).toHaveLength(1)
       // It won't get the vale explanation — keeps default severity
@@ -1663,7 +1728,7 @@ describe('analyzeExclusionsComprehensive', () => {
 
     it('should skip exclusions not affecting private when isCommercial=false', () => {
       // 'yaptırım' has affectsPrivate: false
-      const result = analyzeExclusionsComprehensive(['Yaptırım uygulaması'], false)
+      const result = analyzeExclusionsComprehensive(['Yaptırım uygulaması'], [], false)
       expect(result.exclusions).toHaveLength(1)
       // Should not match the yaptırım explanation
       expect(result.exclusions[0].severity).toBe('standard')
@@ -1671,24 +1736,24 @@ describe('analyzeExclusionsComprehensive', () => {
 
     it('should include matching explanation when affects both', () => {
       // 'alkol' has both affectsPrivate and affectsCommercial true
-      const result = analyzeExclusionsComprehensive(['Alkollü sürüş'], true)
+      const result = analyzeExclusionsComprehensive(['Alkollü sürüş'], [], true)
       expect(result.exclusions[0].severity).toBe('critical')
     })
 
     it('should include yaptırım for commercial vehicles', () => {
-      const result = analyzeExclusionsComprehensive(['Yaptırım uygulaması'], true)
+      const result = analyzeExclusionsComprehensive(['Yaptırım uygulaması'], [], true)
       expect(result.exclusions[0].severity).toBe('informational')
       expect(result.exclusions[0].explanation).toBeTruthy()
     })
 
     it('should include kiralık for private vehicles', () => {
       // 'kiralık' has affectsPrivate: true, affectsCommercial: false
-      const result = analyzeExclusionsComprehensive(['Kiralık araç kullanımı'], false)
+      const result = analyzeExclusionsComprehensive(['Kiralık araç kullanımı'], [], false)
       expect(result.exclusions[0].severity).toBe('important')
     })
 
     it('should skip kiralık explanation for commercial vehicles', () => {
-      const result = analyzeExclusionsComprehensive(['Kiralık araç kullanımı'], true)
+      const result = analyzeExclusionsComprehensive(['Kiralık araç kullanımı'], [], true)
       expect(result.exclusions[0].severity).toBe('standard') // No match found
     })
   })
@@ -1732,22 +1797,24 @@ describe('analyzeExclusionsComprehensive', () => {
 
     it('should not report mentioned exclusion topics', () => {
       // Mention 'vale' to cover "Vale Hırsızlığı/Hasarı"
-      const result = analyzeExclusionsComprehensive(['Vale park hizmetinde dikkat edilmesi gerekenler'])
-      const valeFound = result.missingImportantExclusions.find(e => e.name.includes('Vale'))
+      const result = analyzeExclusionsComprehensive([
+        'Vale park hizmetinde dikkat edilmesi gerekenler',
+      ])
+      const valeFound = result.missingImportantExclusions.find((e) => e.name.includes('Vale'))
       expect(valeFound).toBeUndefined()
     })
 
     it('should detect keyword matches when exclusion keywords appear in text', () => {
       // 'alkollü' is a keyword from "Alkollü Sürücü Limiti" — needs exact word match
       const result = analyzeExclusionsComprehensive(['Alkollü araç kullanımı yasaktır'])
-      const alcoholFound = result.missingImportantExclusions.find(e => e.name.includes('Alkol'))
+      const alcoholFound = result.missingImportantExclusions.find((e) => e.name.includes('Alkol'))
       expect(alcoholFound).toBeUndefined()
     })
 
     it('should NOT match partial substrings of keywords', () => {
       // 'alkol' is NOT the same as keyword 'alkollü' — won't match
       const result = analyzeExclusionsComprehensive(['Alkol düzeyi kontrolleri'])
-      const alcoholFound = result.missingImportantExclusions.find(e => e.name.includes('Alkol'))
+      const alcoholFound = result.missingImportantExclusions.find((e) => e.name.includes('Alkol'))
       expect(alcoholFound).toBeDefined() // Still listed as missing
     })
 
@@ -1765,14 +1832,14 @@ describe('analyzeExclusionsComprehensive', () => {
   describe('mixed inputs', () => {
     it('should handle mix of exclusions, coverages, and clarification items', () => {
       const result = analyzeExclusionsComprehensive([
-        'Alkollü sürüş yasaktır',             // critical exclusion
-        'İkame Araç (50.000 TL limit)',        // coverage with limit
-        'Yetkisiz sürücü kullanımı',           // needs clarification
-        'Normal aşınma',                        // standard exclusion
+        'Alkollü sürüş yasaktır', // critical exclusion
+        'İkame Araç (50.000 TL limit)', // coverage with limit
+        'Yetkisiz sürücü kullanımı', // needs clarification
+        'Normal aşınma', // standard exclusion
       ])
-      expect(result.exclusions.length).toBe(3)          // alkol + yetkisiz + aşınma
+      expect(result.exclusions.length).toBe(3) // alkol + yetkisiz + aşınma
       expect(result.coveragesInExclusions.length).toBe(1) // ikame araç
-      expect(result.clarificationNeeded.length).toBe(1)  // yetkisiz
+      expect(result.clarificationNeeded.length).toBe(1) // yetkisiz
     })
   })
 
@@ -1800,14 +1867,18 @@ describe('KASKO_EXCLUSION_EXPLANATIONS', () => {
   it('should have valid severity values', () => {
     const validSeverities = ['critical', 'important', 'standard', 'informational']
     for (const [key, info] of Object.entries(KASKO_EXCLUSION_EXPLANATIONS)) {
-      expect(validSeverities, `Invalid severity for ${key}: ${info.severity}`).toContain(info.severity)
+      expect(validSeverities, `Invalid severity for ${key}: ${info.severity}`).toContain(
+        info.severity
+      )
     }
   })
 
   it('should have defined affectsPrivate and affectsCommercial', () => {
     for (const [key, info] of Object.entries(KASKO_EXCLUSION_EXPLANATIONS)) {
       expect(typeof info.affectsPrivate, `affectsPrivate not boolean for ${key}`).toBe('boolean')
-      expect(typeof info.affectsCommercial, `affectsCommercial not boolean for ${key}`).toBe('boolean')
+      expect(typeof info.affectsCommercial, `affectsCommercial not boolean for ${key}`).toBe(
+        'boolean'
+      )
     }
   })
 })
@@ -1916,7 +1987,7 @@ describe('extractSubLimitLabel behavior (indirect)', () => {
     const result = groupCoverageSubLimits(coverages)
     expect(result).toHaveLength(1)
     // Known subKey 'kefalet' and 'avans' should resolve to the labels from COVERAGE_GROUP_PREFIXES
-    const labels = result[0].subLimits!.map(s => s.label)
+    const labels = result[0].subLimits!.map((s) => s.label)
     expect(labels).toContain('Olay Başı Kefalet')
     expect(labels).toContain('Olay Başı Avans')
   })
