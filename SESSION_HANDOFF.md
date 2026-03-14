@@ -7,13 +7,30 @@
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | All tests passing, 0 failures |
-| **Branch** | `insuraigemini202603110438` — 7 commits, pushed |
+| **Branch** | `insuraigemini202603110438` — 8 commits, ready to push |
 
 ---
 
 ## This Session — New Features & Fixes
 
-### 1. Fix Duplicate AI Insights Firing
+### 1. Fix PDF Extraction ArrayBuffer & Payload Errors
+
+**Problem**: PDF extraction failed in jsdom tests and Node environments due to `File.prototype.arrayBuffer` issues with Buffers, leading to cross-realm `instanceof ArrayBuffer` errors when using `pdf-lib` and `pdf.js`. Additionally, large PDFs were triggering HTTP 403 errors from Document AI due to payload size limits.
+
+**Fix** (commit `d551626`):
+- Polyfilled `File.prototype.arrayBuffer` in tests using `FileReader` to correctly handle binary data.
+- Explicitly converted `ArrayBuffer` to `Uint8Array` when passing data to `PDFDocument.load` (in `pdf-splitter.ts`) and `pdfjs.getDocument` (in `pdf-parser.ts`), circumventing cross-realm type checking bugs.
+- Lowered `DOCUMENT_AI_PAGE_LIMIT` from 15 to 10 in `pdf-splitter.ts` to reduce chunk sizes and prevent 403 errors on dense PDFs.
+
+### 2. Verify AI Prompts are Editable via Database
+
+**Problem**: We needed to validate that the main extraction pipeline correctly and dynamically pulls the "Policy Extraction - Master" prompt from the database without any frontend involvement.
+
+**Fix**:
+- Wrote a backend script (`update-prompt.ts`) to modify the prompt in the `prompt_templates` table by appending a verification string.
+- Ran a true backend pipeline test (`test-api-pipeline.ts`) to process a PDF and confirmed the LLM output contained the appended verification string.
+
+### 3. Fix Duplicate AI Insights Firing
 
 **Problem**: AI insights (Strengths, Gaps, Recommendations) and Sense-Check rules were generating duplicate entries in the final output because `generateAIInsightsAsync` was being called twice during the policy extraction phase.
 
@@ -59,11 +76,15 @@
 | `9ea842e` | feat(admin) | make AI Insights sense-check prompt editable via database |
 | `e3a968e` | feat(admin) | add visual execution schema and sort prompts by pipeline order |
 | `61346ab` | feat(admin) | expand execution flow schema with all prompt templates including OCR, scoring, and gap analysis |
+| `d551626` | fix(ai) | resolve PDF extraction ArrayBuffer errors and Document AI limits |
 
 ### Key Files Changed
 
 | File | Change |
 |------|--------|
+| `src/lib/ai/e2e.test.ts` | **FIX** Polyfilled File arrayBuffer and bumped test timeout to 120s |
+| `src/lib/ai/pdf-splitter.ts` | **FIX** Coerced ArrayBuffer to Uint8Array for pdf-lib; cut page limit to 10 |
+| `src/lib/ai/pdf-parser.ts` | **FIX** Coerced ArrayBuffer to Uint8Array for pdf.js to avoid cross-realm jsdom bugs |
 | `src/lib/ai/policy-extractor.ts` | **FIX** Removed duplicate AI Insight generation calls |
 | `server/routes/ai.ts` | Refactored sense-check logic to use DB prompt, added preview endpoint |
 | `server/services/prompt-service.ts` | Configured dynamic fetching and base mappings for AI sense-check prompt |
