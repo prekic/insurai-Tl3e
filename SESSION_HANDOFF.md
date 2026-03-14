@@ -7,7 +7,7 @@
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | All tests passing, 0 failures |
-| **Branch** | `insuraigemini202603110438` — 8 commits, ready to push |
+| **Branch** | `insuraigemini202603110438` — 9 commits, ready to push |
 
 ---
 
@@ -21,6 +21,7 @@
 - Polyfilled `File.prototype.arrayBuffer` in tests using `FileReader` to correctly handle binary data.
 - Explicitly converted `ArrayBuffer` to `Uint8Array` when passing data to `PDFDocument.load` (in `pdf-splitter.ts`) and `pdfjs.getDocument` (in `pdf-parser.ts`), circumventing cross-realm type checking bugs.
 - Lowered `DOCUMENT_AI_PAGE_LIMIT` from 15 to 10 in `pdf-splitter.ts` to reduce chunk sizes and prevent 403 errors on dense PDFs.
+- Resolved a secondary ESM loader crash in jsdom where `pdf.js` was natively blocked from loading https `workerSrc` scripts by forcing the synchronous fake worker in Node environments.
 
 ### 2. Verify AI Prompts are Editable via Database
 
@@ -77,6 +78,7 @@
 | `e3a968e` | feat(admin) | add visual execution schema and sort prompts by pipeline order |
 | `61346ab` | feat(admin) | expand execution flow schema with all prompt templates including OCR, scoring, and gap analysis |
 | `d551626` | fix(ai) | resolve PDF extraction ArrayBuffer errors and Document AI limits |
+| `ed4e5f4` | fix(ai) | restore DOMMatrix and resolve pdf.js worker ESM crash in Node/jsdom |
 
 ### Key Files Changed
 
