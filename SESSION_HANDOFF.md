@@ -7,7 +7,7 @@
 | **Build** | ✅ Passing (typecheck clean, 0 errors) |
 | **ESLint** | 0 errors |
 | **Tests** | All tests passing, 0 failures |
-| **Branch** | `insuraigemini202603110438` — 11 commits, pushed |
+| **Branch** | `insuraigemini202603110438` — 12 commits (9 code + 3 docs), pushed |
 
 ---
 
