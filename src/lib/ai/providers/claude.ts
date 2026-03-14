@@ -141,6 +141,7 @@ export async function extractWithClaude(
       userId,
     })
 
+    console.warn('[Claude Extract] ℹ️ CONFIDENCE CHECKPOINT: Cache HIT — returning cached confidence:', JSON.stringify(cached.confidence ?? 'NO confidence in cache, will default to 0.7'))
     await auditLogger.logAI(
       'ai.extraction_cached',
       {
@@ -202,6 +203,8 @@ export async function extractWithClaude(
       // Ensure required fields exist (server may not enforce schema)
       // Add defaults for any missing required fields
       if (!result.confidence) {
+        console.warn('[Claude Extract] ⚠️ CONFIDENCE CHECKPOINT: AI returned NO confidence scores — defaulting ALL fields to 0.7')
+        console.warn('[Claude Extract] CONFIDENCE CHECKPOINT: This masks real confidence. The AI model did not include a "confidence" object in its JSON output.')
         result.confidence = {
           overall: 0.7,
           policyNumber: 0.7,
@@ -210,6 +213,8 @@ export async function extractWithClaude(
           premium: 0.7,
           coverages: 0.7,
         }
+      } else {
+        console.warn('[Claude Extract] ✅ CONFIDENCE CHECKPOINT: AI returned confidence scores:', JSON.stringify(result.confidence))
       }
       if (!result.coverages) {
         result.coverages = []

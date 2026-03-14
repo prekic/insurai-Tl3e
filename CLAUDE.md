@@ -17,7 +17,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 10-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **production hardening phases 1-3 complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**, **extraction timeout resilience (abort-on-unmount, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading)**, **Dynamic AI Insights Rules Engine (Admin UI + DB + Backend Endpoint integration)**, **VKN vs TC Kimlik false positive fixes**, **502/504 Proxy Extraction timeout handling for graceful user feedback**, **Duplicate AI Insights generated fix**, **Database-editable AI Prompt pipeline**, **Admin UI compiled AI execution map**, **PDF extraction cross-realm ArrayBuffer/Uint8Array fixes**, **Node/jsdom pdf.js worker ESM crash fix**, **hardcoded config migration to DB**.
 - **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 0 warnings, 0 test failures, PWA support, server hardening, HSTS, Lighthouse 99/100/93/100, finalized production FX API, dynamic AI tuning system, hardcoded config migration to DB)
-- **Last Updated**: March 14, 2026 (Dynamic AI Insight Guidelines, proxy timeout handling, VKN/TC Kimlik fixes, Editable AI Prompts, Pipeline Execution Schema, Duplicate Insights Fix, PDF Extraction ArrayBuffer fixes, jsdom Worker Fix, diagnose test timeouts fixed via global fetch mock)
+- **Last Updated**: March 14, 2026 (Dynamic AI Insight Guidelines, proxy timeout handling, VKN/TC Kimlik fixes, Editable AI Prompts, Pipeline Execution Schema, Duplicate Insights Fix, PDF Extraction ArrayBuffer fixes, jsdom Worker Fix, diagnose test timeouts fixed via global fetch mock, TryAnalysis rawData TS2339 build fix, admin password reset procedure)
 
 ---
 
@@ -4584,6 +4584,41 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **File Changed**: `server/__tests__/ai-routes-extended.test.ts`
 - **Commit**: `6ad5b66`
 
+### 171. Confidence Diagnostic Checkpoints Added (Mar 14, 2026)
+- **Feature**: Added `[ConfidenceDiag]` diagnostic `console.warn` checkpoints across the entire AI extraction confidence pipeline to trace how confidence scores flow from AI provider → server → client → UI
+- **Files Changed** (5 files, +105 lines):
+  - `server/routes/ai.ts` — 3 server-side checkpoints at OpenAI standalone, Anthropic unified, and OpenAI fallback/unified success paths
+  - `src/lib/ai/policy-extractor.ts` — Client-side checkpoint after `recalculateOverallConfidence()` with weights source (`admin_db_config` vs `hardcoded_defaults`), per-field breakdown, and delta from AI-reported overall
+  - `src/lib/ai/providers/claude.ts` — Cache HIT checkpoint, missing confidence default checkpoint, AI-returned confidence checkpoint
+  - `src/lib/ai/providers/openai.ts` — Same 3 checkpoints (cache, missing, returned) for both proxy and direct API paths
+  - `src/components/TryAnalysis.tsx` — UI-level checkpoint before confidence warning/tier decision
+- **Log Prefix**: All checkpoints use `[ConfidenceDiag]` — search Railway logs to trace confidence flow
+- **Note**: These are diagnostic logs intended for investigation. Consider removing or gating behind a feature flag once confidence scoring is validated in production.
+- **Commit**: `fdedfea`
+
+### 172. TryAnalysis `rawData` Property Access Build Error (Fixed Mar 14, 2026)
+- **Problem**: Railway build failed with `TS2339: Property 'rawData' does not exist on type 'AnalyzedPolicy'` at `TryAnalysis.tsx:343`
+- **Root Cause**: A confidence diagnostic checkpoint (added in commit `fdedfea`) referenced `policy.rawData?.confidence`, but `AnalyzedPolicy` has `aiConfidence: number` directly — there is no `rawData` property on the type
+- **Solution**: Changed `rawConfidenceObject: policy.rawData?.confidence ?? 'not in rawData'` to `aiConfidenceValue: policy.aiConfidence`
+- **File Changed**: `src/components/TryAnalysis.tsx`
+- **Commit**: `2f819a3`
+
+### 173. Admin Password Reset Procedure (Documented Mar 14, 2026)
+- **Problem**: Admin login returns "Invalid email or password" when the password hash in the `admin_users` table doesn't match the password being entered
+- **Root Cause**: Password was changed at some point after initial setup, or migrations ran in an unexpected order
+- **Diagnosis**: Run `SELECT id, email, status, role FROM admin_users;` in Supabase SQL Editor to verify the user exists and is `active`
+- **Fix**: Generate a new bcrypt hash and update the DB directly:
+  ```bash
+  # Generate hash locally:
+  node -e "const b = require('bcryptjs'); b.hash('YourNewPassword', 12, (e, h) => console.log(h))"
+  ```
+  ```sql
+  -- Update in Supabase SQL Editor:
+  UPDATE admin_users SET password_hash = '<hash_from_above>' WHERE email = 'your-email@example.com';
+  ```
+- **Default Credentials** (from migration `005b_admin_tables.sql`): `admin@insurai.com` / `secure-password`
+- **Note**: The `admin_users` table may lack `display_name`, `failed_login_attempts`, and `locked_until` columns if `005a_admin_schema.sql` ran instead of `005b_admin_tables.sql`. The login code only requires `id`, `email`, `password_hash`, `role`, `status`, and `permissions`.
+
 ---
 
 ## Turkish Market Considerations
@@ -5605,6 +5640,28 @@ connectSrc: [
 - If adding new tests that exercise code paths calling `fetch()` directly (not through supertest or axios), always stub global fetch
 - **Cleanup note**: `vi.stubGlobal()` is NOT undone by `vi.clearAllMocks()` or `vi.restoreAllMocks()`. To clean up, call `vi.unstubAllGlobals()` in `afterEach`. In `ai-routes-extended.test.ts` this is safe without explicit cleanup because Vitest v4 uses `pool: 'forks'` (process isolation per file) and `setupDefaultMocks()` re-stubs on every `beforeEach`
 
+**Admin Password Reset (Documented Mar 14, 2026):**
+- If admin login returns "Invalid email or password", the password hash in the `admin_users` table doesn't match
+- Default credentials from migration `005b`: `admin@insurai.com` / `secure-password` — may have been changed after initial setup
+- **Diagnosis**: `SELECT id, email, status, role FROM admin_users;` in Supabase SQL Editor
+- **Fix**: Generate bcrypt hash locally (`node -e "require('bcryptjs').hash('NewPwd', 12, (e,h) => console.log(h))"`) and `UPDATE admin_users SET password_hash = '<hash>' WHERE email = 'your@email.com';`
+- The production DB may have a different schema than `005b_admin_tables.sql` (e.g., missing `display_name` column) — this does NOT affect login, which only needs `id`, `email`, `password_hash`, `role`, `status`, `permissions`
+- There are two admin users in production: `prekic@gmail.com` (super_admin) and `admin@insurai.com` (super_admin)
+
+**`[ConfidenceDiag]` Diagnostic Logs in Production (Added Mar 14, 2026):**
+- Commit `fdedfea` added `console.warn('[ConfidenceDiag] ...')` checkpoints across 5 files in the extraction confidence pipeline
+- These are intentional diagnostic logs, NOT errors — they trace how confidence scores flow from AI provider → server → client → UI
+- **Server-side** (`server/routes/ai.ts`): Logs raw AI confidence JSON at all 3 extraction success paths
+- **Client-side** (`policy-extractor.ts`, `openai.ts`, `claude.ts`): Logs confidence recalculation, cache hits, default fallbacks
+- **UI-level** (`TryAnalysis.tsx`): Logs tier decision (LOW_CONFIDENCE_WARNING vs FULL_CONFIDENCE)
+- These logs will be noisy in Railway — consider removing or gating behind `LOG_LEVEL=debug` once confidence investigation is complete
+- To find them: search Railway logs for `[ConfidenceDiag]`
+
+**AnalyzedPolicy Type — No `rawData` Property (Fixed Mar 14, 2026):**
+- `AnalyzedPolicy` in `src/types/policy.ts` has `aiConfidence: number` directly — there is NO `rawData` property
+- If you need confidence data, use `policy.aiConfidence` not `policy.rawData?.confidence`
+- The `rawData` JSONB field exists on the `policies` DB table (`raw_data JSONB`) but is NOT on the TypeScript `AnalyzedPolicy` type used in React components
+
 ---
 
 ## CI/CD
@@ -5676,4 +5733,4 @@ npm run build:analyze
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
-**Last Updated**: March 7, 2026 (Extraction timeout resilience: abort-on-unmount fix, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading through entire extraction pipeline)
+**Last Updated**: March 14, 2026 (TryAnalysis rawData TS2339 build fix, admin password reset procedure, confidence diagnostic checkpoints)

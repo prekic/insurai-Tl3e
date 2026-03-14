@@ -132,7 +132,7 @@ export function GenericSettingsPanel({
   const getDescription = (key: string) =>
     keyDescriptions[key] || DEFAULT_KEY_DESCRIPTIONS[key] || ''
 
-  const validateJsonField = (key: string, value: string): string | null => {
+  const validateJsonField = (_key: string, value: string): string | null => {
     const trimmed = value.trim()
     if (!trimmed.startsWith('[') && !trimmed.startsWith('{')) return null
     try {

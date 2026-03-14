@@ -1214,7 +1214,7 @@ export function PolicyDetailView() {
       )}
 
       <div className="sticky top-0 z-10 bg-white border-b shadow-sm w-full">
-        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 w-full overflow-hidden">
+        <div className="max-w-6xl mx-auto px-2 sm:px-4 py-2 sm:py-3 w-full">
           <div className="flex items-center gap-2 w-full">
             {/* Back button - minimal padding */}
             <button
