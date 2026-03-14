@@ -32,7 +32,13 @@ vi.mock('../services/webhook-service.js', () => ({
 // Mock logger (suppress all output)
 vi.mock('../lib/logger.js', () => {
   const noop = vi.fn()
-  const child = { debug: noop, info: noop, warn: noop, error: noop, child: vi.fn().mockReturnThis() }
+  const child = {
+    debug: noop,
+    info: noop,
+    warn: noop,
+    error: noop,
+    child: vi.fn().mockReturnThis(),
+  }
   return { default: child, logger: child }
 })
 
@@ -89,7 +95,7 @@ describe('Settings Routes — CRUD Operations', () => {
 
   afterEach(() => {
     delete process.env.SUPABASE_URL
-      delete process.env.VITE_SUPABASE_URL
+    delete process.env.VITE_SUPABASE_URL
     delete process.env.SUPABASE_SERVICE_ROLE_KEY
     vi.resetModules()
   })
@@ -171,9 +177,7 @@ describe('Settings Routes — CRUD Operations', () => {
     })
 
     it('returns 400 for invalid body (rolloutPercentage out of range)', async () => {
-      const res = await request(app)
-        .put('/feature-flags/my_flag')
-        .send({ rolloutPercentage: 150 })
+      const res = await request(app).put('/feature-flags/my_flag').send({ rolloutPercentage: 150 })
       expect(res.status).toBe(400)
       expect(res.body.success).toBe(false)
       expect(res.body.error).toBe('Invalid request body')
@@ -182,18 +186,14 @@ describe('Settings Routes — CRUD Operations', () => {
 
     it('returns 404 when DB returns error (flag not found)', async () => {
       mockFrom.mockReturnValue(buildQueryChain({ data: null, error: { message: 'no rows' } }))
-      const res = await request(app)
-        .put('/feature-flags/missing_flag')
-        .send({ enabled: false })
+      const res = await request(app).put('/feature-flags/missing_flag').send({ enabled: false })
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Feature flag not found')
     })
 
     it('returns 404 when DB returns null data (flag not found)', async () => {
       mockFrom.mockReturnValue(buildQueryChain({ data: null, error: null }))
-      const res = await request(app)
-        .put('/feature-flags/missing_flag')
-        .send({ enabled: true })
+      const res = await request(app).put('/feature-flags/missing_flag').send({ enabled: true })
       expect(res.status).toBe(404)
       expect(res.body.error).toBe('Feature flag not found')
     })
@@ -232,13 +232,15 @@ describe('Settings Routes — CRUD Operations', () => {
         updated_at: '2026-02-20T00:00:00Z',
       }
       mockFrom.mockReturnValue(buildQueryChain({ data: updatedFlag, error: null }))
-      const res = await request(app).put('/feature-flags/my_flag').send({
-        enabled: false,
-        rolloutPercentage: 25,
-        userSegments: ['admins'],
-        conditions: { env: 'prod' },
-        expiresAt: '2026-06-01',
-      })
+      const res = await request(app)
+        .put('/feature-flags/my_flag')
+        .send({
+          enabled: false,
+          rolloutPercentage: 25,
+          userSegments: ['admins'],
+          conditions: { env: 'prod' },
+          expiresAt: '2026-06-01',
+        })
       expect(res.status).toBe(200)
     })
 
@@ -251,9 +253,7 @@ describe('Settings Routes — CRUD Operations', () => {
         updated_at: '2026-02-20T00:00:00Z',
       }
       mockFrom.mockReturnValue(buildQueryChain({ data: updatedFlag, error: null }))
-      const res = await request(app)
-        .put('/feature-flags/my_flag')
-        .send({ enabled: true })
+      const res = await request(app).put('/feature-flags/my_flag').send({ enabled: true })
       expect(res.status).toBe(200)
     })
   })
@@ -888,9 +888,7 @@ describe('Settings Routes — CRUD Operations', () => {
     it('returns 400 when reason is not a string (schema validation fails)', async () => {
       // updateSettingSchema: value is z.unknown() (accepts anything incl. undefined),
       // but reason must be a string when present
-      const res = await request(app)
-        .put('/ai/temperature')
-        .send({ value: 0.5, reason: 12345 })
+      const res = await request(app).put('/ai/temperature').send({ value: 0.5, reason: 12345 })
       expect(res.status).toBe(400)
       expect(res.body.error).toBe('Invalid request body')
     })
@@ -989,14 +987,9 @@ describe('Settings Routes — CRUD Operations', () => {
       }
       // First call: fetch existing — success
       // Second call: update — error
-      let callCount = 0
-      mockFrom.mockImplementation(() => {
-        callCount++
-        if (callCount === 1) {
-          return buildQueryChain({ data: existingSetting, error: null })
-        }
-        return buildQueryChain({ data: null, error: { message: 'update failed' } })
-      })
+      mockFrom
+        .mockReturnValueOnce(buildQueryChain({ data: existingSetting, error: null }))
+        .mockReturnValueOnce(buildQueryChain({ data: null, error: { message: 'update failed' } }))
       const res = await request(app).put('/ai/temperature').send({ value: 0.7 })
       expect(res.status).toBe(500)
       expect(res.body.error).toBe('Failed to update setting')
@@ -1015,14 +1008,9 @@ describe('Settings Routes — CRUD Operations', () => {
       }
       const updatedSetting = { ...existingSetting, value: 0.7, updated_at: '2026-02-20T00:00:00Z' }
 
-      let callCount = 0
-      mockFrom.mockImplementation(() => {
-        callCount++
-        if (callCount === 1) {
-          return buildQueryChain({ data: existingSetting, error: null })
-        }
-        return buildQueryChain({ data: updatedSetting, error: null })
-      })
+      mockFrom
+        .mockReturnValueOnce(buildQueryChain({ data: existingSetting, error: null }))
+        .mockReturnValueOnce(buildQueryChain({ data: updatedSetting, error: null }))
 
       const res = await request(app).put('/ai/temperature').send({ value: 0.7 })
       expect(res.status).toBe(200)
@@ -1135,7 +1123,11 @@ describe('Settings Routes — CRUD Operations', () => {
         max_value: null,
         allowed_values: null,
       }
-      const updatedSetting = { ...existingSetting, value: 'anthropic', updated_at: '2026-02-20T00:00:00Z' }
+      const updatedSetting = {
+        ...existingSetting,
+        value: 'anthropic',
+        updated_at: '2026-02-20T00:00:00Z',
+      }
 
       let callCount = 0
       mockFrom.mockImplementation(() => {
@@ -1159,7 +1151,11 @@ describe('Settings Routes — CRUD Operations', () => {
         max_value: 100,
         allowed_values: null,
       }
-      const updatedSetting = { ...existingSetting, value: 'claude-3', updated_at: '2026-02-20T00:00:00Z' }
+      const updatedSetting = {
+        ...existingSetting,
+        value: 'claude-3',
+        updated_at: '2026-02-20T00:00:00Z',
+      }
 
       let callCount = 0
       mockFrom.mockImplementation(() => {
@@ -1183,7 +1179,11 @@ describe('Settings Routes — CRUD Operations', () => {
         max_value: null,
         allowed_values: ['openai', 'anthropic'],
       }
-      const updatedSetting = { ...existingSetting, value: 'anthropic', updated_at: '2026-02-20T00:00:00Z' }
+      const updatedSetting = {
+        ...existingSetting,
+        value: 'anthropic',
+        updated_at: '2026-02-20T00:00:00Z',
+      }
 
       let callCount = 0
       mockFrom.mockImplementation(() => {

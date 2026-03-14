@@ -25,9 +25,9 @@ function createThenable() {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
-    then: vi.fn().mockImplementation((cb: (val: unknown) => unknown) =>
-      Promise.resolve(cb(mockResult))
-    ),
+    then: vi
+      .fn()
+      .mockImplementation((cb: (val: unknown) => unknown) => Promise.resolve(cb(mockResult))),
   }
   return thenable
 }
@@ -46,14 +46,16 @@ function createThrowingThenable(error: unknown) {
     order: vi.fn().mockReturnThis(),
     limit: vi.fn().mockReturnThis(),
     single: vi.fn().mockReturnThis(),
-    then: vi.fn().mockImplementation((_onFulfilled: unknown, onRejected?: (err: unknown) => void) => {
-      // Call the reject callback to properly signal rejection to await
-      if (onRejected) {
-        onRejected(error)
-        return
-      }
-      throw error
-    }),
+    then: vi
+      .fn()
+      .mockImplementation((_onFulfilled: unknown, onRejected?: (err: unknown) => void) => {
+        // Call the reject callback to properly signal rejection to await
+        if (onRejected) {
+          onRejected(error)
+          return
+        }
+        throw error
+      }),
   }
   return thenable
 }
@@ -334,14 +336,14 @@ describe('Prompt Service — Branch Coverage', () => {
       setMock(null, { message: 'DB error' })
       const result = await getPromptsByCategory('chat')
       expect(result.length).toBeGreaterThan(0)
-      expect(result.every(p => p.category === 'chat')).toBe(true)
+      expect(result.every((p) => p.category === 'chat')).toBe(true)
     })
 
     it('should return fallback prompts for ocr category', async () => {
       setMock(null, { message: 'error' })
       const result = await getPromptsByCategory('ocr')
       expect(result.length).toBeGreaterThan(0)
-      expect(result.every(p => p.category === 'ocr')).toBe(true)
+      expect(result.every((p) => p.category === 'ocr')).toBe(true)
     })
 
     it('should return empty array for category with no fallbacks', async () => {
@@ -373,7 +375,7 @@ describe('Prompt Service — Branch Coverage', () => {
     it('should return fallback extraction prompts including master and type detection', async () => {
       setMock(null, { message: 'error' })
       const result = await getPromptsByCategory('extraction')
-      const names = result.map(p => p.name)
+      const names = result.map((p) => p.name)
       expect(names).toContain('Policy Extraction - Master')
       expect(names).toContain('Policy Type Detection')
     })
@@ -410,30 +412,30 @@ describe('Prompt Service — Branch Coverage', () => {
       expect(result).toHaveLength(3)
     })
 
-    it('should return all 4 fallback prompts when DB errors', async () => {
+    it('should return all 5 fallback prompts when DB errors', async () => {
       setMock(null, { message: 'error' })
       const result = await getAllPrompts()
-      expect(result).toHaveLength(4)
+      expect(result).toHaveLength(5)
     })
 
     it('should handle DB exception (catch branch with Error)', async () => {
       mockFrom.mockImplementation(() => createThrowingThenable(new Error('Fatal')))
 
       const result = await getAllPrompts()
-      expect(result).toHaveLength(4)
+      expect(result).toHaveLength(5)
     })
 
     it('should handle DB exception with non-Error object', async () => {
       mockFrom.mockImplementation(() => createThrowingThenable('string rejection'))
 
       const result = await getAllPrompts()
-      expect(result).toHaveLength(4)
+      expect(result).toHaveLength(5)
     })
 
     it('should return fallback when DB returns null data with no error', async () => {
       setMock(null, null)
       const result = await getAllPrompts()
-      expect(result).toHaveLength(4)
+      expect(result).toHaveLength(5)
     })
 
     it('should return empty array from DB when DB returns empty array', async () => {
@@ -527,16 +529,18 @@ describe('Prompt Service — Branch Coverage', () => {
 
   describe('getRenderedPrompt', () => {
     it('should return rendered prompt when template found (success)', async () => {
-      setMock(dbRow({
-        id: 'render-1',
-        name: 'Render Test',
-        system_prompt: 'Sys {{doc}}',
-        user_prompt_template: 'User {{doc}}',
-        version: 2,
-        default_provider: 'anthropic',
-        default_model: 'claude-3',
-        parameters: { temperature: 0.3 },
-      }))
+      setMock(
+        dbRow({
+          id: 'render-1',
+          name: 'Render Test',
+          system_prompt: 'Sys {{doc}}',
+          user_prompt_template: 'User {{doc}}',
+          version: 2,
+          default_provider: 'anthropic',
+          default_model: 'claude-3',
+          parameters: { temperature: 0.3 },
+        })
+      )
 
       const rendered = await getRenderedPrompt('Render Test', { doc: 'my-doc' })
       expect(rendered).not.toBeNull()
@@ -569,12 +573,14 @@ describe('Prompt Service — Branch Coverage', () => {
     })
 
     it('should render without optional fields (no provider, model, parameters)', async () => {
-      setMock(dbRow({
-        name: 'No Extras',
-        default_provider: undefined,
-        default_model: undefined,
-        parameters: undefined,
-      }))
+      setMock(
+        dbRow({
+          name: 'No Extras',
+          default_provider: undefined,
+          default_model: undefined,
+          parameters: undefined,
+        })
+      )
 
       const rendered = await getRenderedPrompt('No Extras', {})
       expect(rendered).not.toBeNull()
@@ -591,12 +597,14 @@ describe('Prompt Service — Branch Coverage', () => {
   describe('getExtractionPrompt', () => {
     it('should use type-specific prompt when policyType provided and DB has it', async () => {
       // Mock DB to return a type-specific prompt for the name lookup
-      setMock(dbRow({
-        id: 'kasko-ext',
-        name: 'Kasko Extraction',
-        system_prompt: 'Kasko specific {{document_text}}',
-        user_prompt_template: '{{document_text}}',
-      }))
+      setMock(
+        dbRow({
+          id: 'kasko-ext',
+          name: 'Kasko Extraction',
+          system_prompt: 'Kasko specific {{document_text}}',
+          user_prompt_template: '{{document_text}}',
+        })
+      )
 
       const result = await getExtractionPrompt('Doc text', 'kasko')
       expect(result).not.toBeNull()
@@ -764,20 +772,22 @@ describe('Prompt Service — Branch Coverage', () => {
     })
 
     it('should map all fields correctly from DB row', async () => {
-      setMock(dbRow({
-        id: 'full-map',
-        name: 'Full Map Test',
-        description: 'Full description',
-        category: 'chat',
-        system_prompt: 'System here',
-        user_prompt_template: 'User {{x}}',
-        variables: ['x', 'y'],
-        is_active: false,
-        version: 5,
-        default_provider: 'anthropic',
-        default_model: 'claude-3',
-        parameters: { maxTokens: 1000 },
-      }))
+      setMock(
+        dbRow({
+          id: 'full-map',
+          name: 'Full Map Test',
+          description: 'Full description',
+          category: 'chat',
+          system_prompt: 'System here',
+          user_prompt_template: 'User {{x}}',
+          variables: ['x', 'y'],
+          is_active: false,
+          version: 5,
+          default_provider: 'anthropic',
+          default_model: 'claude-3',
+          parameters: { maxTokens: 1000 },
+        })
+      )
 
       const result = await getPromptById('full-map')
       expect(result).toEqual({
@@ -820,10 +830,12 @@ describe('Prompt Service — Branch Coverage', () => {
             // Get current version => null
             return Promise.resolve(cb({ data: null, error: null }))
           } else if (callCount === 2) {
-            return Promise.resolve(cb({
-              data: dbRow({ id: 'upd-1', version: 1 }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({ id: 'upd-1', version: 1 }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }
@@ -852,10 +864,12 @@ describe('Prompt Service — Branch Coverage', () => {
           if (callCount === 1) {
             return Promise.resolve(cb({ data: { version: 3 }, error: null }))
           } else if (callCount === 2) {
-            return Promise.resolve(cb({
-              data: dbRow({ id: 'upd-2', version: 4 }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({ id: 'upd-2', version: 4 }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }
@@ -911,10 +925,12 @@ describe('Prompt Service — Branch Coverage', () => {
           if (callCount === 1) {
             return Promise.resolve(cb({ data: { version: 1 }, error: null }))
           } else {
-            return Promise.resolve(cb({
-              data: dbRow({ id: 'upd-4', version: 2 }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({ id: 'upd-4', version: 2 }),
+                error: null,
+              })
+            )
           }
         }),
       }
@@ -943,15 +959,18 @@ describe('Prompt Service — Branch Coverage', () => {
           if (callCount === 1) {
             return Promise.resolve(cb({ data: { version: 2 }, error: null }))
           } else if (callCount === 2) {
-            return Promise.resolve(cb({
-              data: dbRow({
-                id: 'upd-5', version: 3,
-                system_prompt: 'Original',
-                user_prompt_template: 'New user template',
-                variables: ['x'],
-              }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({
+                  id: 'upd-5',
+                  version: 3,
+                  system_prompt: 'Original',
+                  user_prompt_template: 'New user template',
+                  variables: ['x'],
+                }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }
@@ -981,10 +1000,12 @@ describe('Prompt Service — Branch Coverage', () => {
           if (callCount === 1) {
             return Promise.resolve(cb({ data: { version: 5 }, error: null }))
           } else if (callCount === 2) {
-            return Promise.resolve(cb({
-              data: dbRow({ id: 'upd-8', version: 6 }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({ id: 'upd-8', version: 6 }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }
@@ -1028,10 +1049,12 @@ describe('Prompt Service — Branch Coverage', () => {
           if (callCount === 1) {
             return Promise.resolve(cb({ data: { version: 1 }, error: null }))
           } else {
-            return Promise.resolve(cb({
-              data: dbRow({ id: 'upd-9', version: 2, is_active: false }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({ id: 'upd-9', version: 2, is_active: false }),
+                error: null,
+              })
+            )
           }
         }),
       }
@@ -1066,13 +1089,19 @@ describe('Prompt Service — Branch Coverage', () => {
         then: vi.fn().mockImplementation((cb: (val: unknown) => unknown) => {
           callCount++
           if (callCount === 1) {
-            return Promise.resolve(cb({
-              data: dbRow({
-                id: 'new-1', name: 'New Prompt', category: 'chat',
-                version: 1, default_provider: 'openai', default_model: 'gpt-4o',
-              }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({
+                  id: 'new-1',
+                  name: 'New Prompt',
+                  category: 'chat',
+                  version: 1,
+                  default_provider: 'openai',
+                  default_model: 'gpt-4o',
+                }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }
@@ -1113,7 +1142,9 @@ describe('Prompt Service — Branch Coverage', () => {
     })
 
     it('should handle exception during create (catch branch with Error)', async () => {
-      mockFrom.mockImplementation(() => createThrowingThenable(new Error('Database connection lost')))
+      mockFrom.mockImplementation(() =>
+        createThrowingThenable(new Error('Database connection lost'))
+      )
 
       const result = await createPrompt({
         name: 'Exception Create',
@@ -1157,14 +1188,18 @@ describe('Prompt Service — Branch Coverage', () => {
         then: vi.fn().mockImplementation((cb: (val: unknown) => unknown) => {
           callCount++
           if (callCount === 1) {
-            return Promise.resolve(cb({
-              data: dbRow({
-                id: 'new-full', name: 'Full Create',
-                default_provider: 'anthropic', default_model: 'claude-3-5-haiku',
-                parameters: { maxTokens: 2048 },
-              }),
-              error: null,
-            }))
+            return Promise.resolve(
+              cb({
+                data: dbRow({
+                  id: 'new-full',
+                  name: 'Full Create',
+                  default_provider: 'anthropic',
+                  default_model: 'claude-3-5-haiku',
+                  parameters: { maxTokens: 2048 },
+                }),
+                error: null,
+              })
+            )
           } else {
             return Promise.resolve(cb({ data: null, error: null }))
           }

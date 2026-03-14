@@ -18,13 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Hoisted mocks — available inside vi.mock() factories
 // ---------------------------------------------------------------------------
 
-const {
-  mockCreateClient,
-  _mockFrom,
-  mockSelect,
-  _mockEq,
-  _mockSingle,
-} = vi.hoisted(() => {
+const { mockCreateClient, _mockFrom, mockSelect, _mockEq, _mockSingle } = vi.hoisted(() => {
   const _mockSingle = vi.fn()
   const _mockEq = vi.fn().mockReturnValue({ single: _mockSingle })
   const mockSelect = vi.fn().mockReturnValue({ eq: _mockEq })
@@ -312,7 +306,7 @@ describe('config-service branches', () => {
       expect(config.openaiExtractionModel).toBe('gpt-4o')
       expect(config.openaiBackupModel).toBe('gpt-4o-mini')
       expect(config.anthropicExtractionModel).toBe('claude-sonnet-4-20250514')
-      expect(config.anthropicBackupModel).toBe('claude-3-5-haiku-20241022')
+      expect(config.anthropicBackupModel).toBe('claude-3-5-haiku-latest')
       expect(config.maxTokens).toBe(4096)
       expect(config.temperature).toBe(0.1)
       expect(config.chatTemperature).toBe(0.7)
@@ -323,11 +317,17 @@ describe('config-service branches', () => {
       expect(config.enableFallback).toBe(true)
       expect(config.consensusEnabled).toBe(true)
       expect(config.consensusAgreementThreshold).toBe(0.8)
-      expect(config.consensusFields).toEqual(['policyNumber', 'provider', 'premium', 'startDate', 'endDate'])
-      expect(config.confidenceWeightPolicyNumber).toBe(0.20)
+      expect(config.consensusFields).toEqual([
+        'policyNumber',
+        'provider',
+        'premium',
+        'startDate',
+        'endDate',
+      ])
+      expect(config.confidenceWeightPolicyNumber).toBe(0.2)
       expect(config.confidenceWeightProvider).toBe(0.15)
-      expect(config.confidenceWeightDates).toBe(0.20)
-      expect(config.confidenceWeightPremium).toBe(0.20)
+      expect(config.confidenceWeightDates).toBe(0.2)
+      expect(config.confidenceWeightPremium).toBe(0.2)
       expect(config.confidenceWeightCoverages).toBe(0.25)
     })
 
@@ -350,11 +350,11 @@ describe('config-service branches', () => {
             { key: 'consensus_enabled', value: false },
             { key: 'consensus_agreement_threshold', value: 0.9 },
             { key: 'consensus_fields', value: ['premium'] },
-            { key: 'confidence_weight_policy_number', value: 0.30 },
-            { key: 'confidence_weight_provider', value: 0.10 },
+            { key: 'confidence_weight_policy_number', value: 0.3 },
+            { key: 'confidence_weight_provider', value: 0.1 },
             { key: 'confidence_weight_dates', value: 0.25 },
             { key: 'confidence_weight_premium', value: 0.15 },
-            { key: 'confidence_weight_coverages', value: 0.20 },
+            { key: 'confidence_weight_coverages', value: 0.2 },
           ],
           error: null,
         }),
@@ -378,11 +378,11 @@ describe('config-service branches', () => {
       expect(config.consensusEnabled).toBe(false)
       expect(config.consensusAgreementThreshold).toBe(0.9)
       expect(config.consensusFields).toEqual(['premium'])
-      expect(config.confidenceWeightPolicyNumber).toBe(0.30)
-      expect(config.confidenceWeightProvider).toBe(0.10)
+      expect(config.confidenceWeightPolicyNumber).toBe(0.3)
+      expect(config.confidenceWeightProvider).toBe(0.1)
       expect(config.confidenceWeightDates).toBe(0.25)
       expect(config.confidenceWeightPremium).toBe(0.15)
-      expect(config.confidenceWeightCoverages).toBe(0.20)
+      expect(config.confidenceWeightCoverages).toBe(0.2)
     })
 
     it('returns cached AI config on repeated calls', async () => {
@@ -1284,7 +1284,7 @@ describe('config-service branches', () => {
       // Math.random returns 0.50 -> bucket = Math.floor(0.50 * 100) = 50
       // 50 >= 50 -> returns false
       const origRandom = Math.random
-      Math.random = vi.fn().mockReturnValue(0.50)
+      Math.random = vi.fn().mockReturnValue(0.5)
 
       try {
         const mod = await freshImport()

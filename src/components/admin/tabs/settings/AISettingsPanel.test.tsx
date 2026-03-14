@@ -20,18 +20,53 @@ vi.mock('sonner', () => ({
 
 // Create mock settings as array
 const createMockSettings = (): SettingValue[] => [
-  { key: 'openai_extraction_model', value: 'gpt-4o', valueType: 'string', description: 'OpenAI extraction model' },
-  { key: 'openai_backup_model', value: 'gpt-4o-mini', valueType: 'string', description: 'OpenAI backup model' },
-  { key: 'anthropic_extraction_model', value: 'claude-sonnet-4-20250514', valueType: 'string', description: 'Anthropic extraction model' },
-  { key: 'anthropic_backup_model', value: 'claude-3-5-haiku-20241022', valueType: 'string', description: 'Anthropic backup model' },
+  {
+    key: 'openai_extraction_model',
+    value: 'gpt-4o',
+    valueType: 'string',
+    description: 'OpenAI extraction model',
+  },
+  {
+    key: 'openai_backup_model',
+    value: 'gpt-4o-mini',
+    valueType: 'string',
+    description: 'OpenAI backup model',
+  },
+  {
+    key: 'anthropic_extraction_model',
+    value: 'claude-sonnet-4-20250514',
+    valueType: 'string',
+    description: 'Anthropic extraction model',
+  },
+  {
+    key: 'anthropic_backup_model',
+    value: 'claude-3-5-haiku-latest',
+    valueType: 'string',
+    description: 'Anthropic backup model',
+  },
   { key: 'temperature', value: 0.1, valueType: 'number', description: 'Extraction temperature' },
   { key: 'chat_temperature', value: 0.7, valueType: 'number', description: 'Chat temperature' },
   { key: 'max_tokens', value: 4096, valueType: 'number', description: 'Max tokens' },
-  { key: 'extraction_timeout_ms', value: 90000, valueType: 'number', description: 'Extraction timeout' },
-  { key: 'preferred_provider', value: 'auto', valueType: 'string', description: 'Preferred provider' },
+  {
+    key: 'extraction_timeout_ms',
+    value: 90000,
+    valueType: 'number',
+    description: 'Extraction timeout',
+  },
+  {
+    key: 'preferred_provider',
+    value: 'auto',
+    valueType: 'string',
+    description: 'Preferred provider',
+  },
   { key: 'enable_fallback', value: true, valueType: 'boolean', description: 'Enable fallback' },
   { key: 'consensus_enabled', value: true, valueType: 'boolean', description: 'Consensus enabled' },
-  { key: 'consensus_agreement_threshold', value: 0.8, valueType: 'number', description: 'Consensus threshold' },
+  {
+    key: 'consensus_agreement_threshold',
+    value: 0.8,
+    valueType: 'number',
+    description: 'Consensus threshold',
+  },
 ]
 
 describe('AISettingsPanel', () => {
@@ -248,12 +283,7 @@ describe('AISettingsPanel - Empty Settings', () => {
 
   it('should handle empty settings gracefully', () => {
     render(
-      <AISettingsPanel
-        settings={[]}
-        onUpdate={mockOnUpdate}
-        isLoading={false}
-        isSaving={false}
-      />
+      <AISettingsPanel settings={[]} onUpdate={mockOnUpdate} isLoading={false} isSaving={false} />
     )
 
     // Should show empty state message

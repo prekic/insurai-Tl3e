@@ -174,7 +174,7 @@ const DEFAULT_AI_CONFIG = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
   anthropicExtractionModel: 'claude-sonnet-4-20250514',
-  anthropicBackupModel: 'claude-3-5-haiku-20241022',
+  anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
   chatTemperature: 0.7,
@@ -1049,7 +1049,7 @@ describe('AI Routes Extended', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'Your kasko covers collision.' }],
         usage: { input_tokens: 50, output_tokens: 20 },
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app)
@@ -1291,7 +1291,7 @@ describe('AI Routes Extended', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'Response' }],
         usage: { input_tokens: 50, output_tokens: 20 },
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       await request(app).post('/api/ai/chat').send({ message: 'Test', provider: 'anthropic' })
@@ -1388,7 +1388,7 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -1409,7 +1409,7 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -1424,20 +1424,20 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
 
       expect(res.body.openai.model).toBe('gpt-4o-mini')
-      expect(res.body.anthropic.model).toBe('claude-3-5-haiku-20241022')
+      expect(res.body.anthropic.model).toBe('claude-3-5-haiku-latest')
     })
 
     it('reports invalid OpenAI key with error code', async () => {
       mockOpenAICreate.mockRejectedValue(new Error('401 Incorrect API key'))
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -1477,7 +1477,7 @@ describe('AI Routes Extended', () => {
       mockOpenAICreate.mockRejectedValue(new Error('insufficient_quota'))
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -1493,7 +1493,7 @@ describe('AI Routes Extended', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app).get('/api/ai/diagnose')
@@ -1537,7 +1537,7 @@ describe('AI Routes Extended', () => {
       setupDefaultMocks()
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
       const aiRouter = (await import('../routes/ai')).default
       const testApp = express()

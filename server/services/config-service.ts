@@ -136,7 +136,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
   anthropicExtractionModel: 'claude-sonnet-4-20250514',
-  anthropicBackupModel: 'claude-3-5-haiku-20241022',
+  anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
   chatTemperature: 0.7,

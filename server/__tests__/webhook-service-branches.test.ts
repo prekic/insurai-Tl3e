@@ -22,21 +22,15 @@ import crypto from 'crypto'
 // Hoisted Mocks
 // ---------------------------------------------------------------------------
 
-const {
-  mockLogWarn,
-  mockLogError,
-  mockLogInfo,
-  mockLogDebug,
-  mockFrom,
-  mockCreateClient,
-} = vi.hoisted(() => ({
-  mockLogWarn: vi.fn(),
-  mockLogError: vi.fn(),
-  mockLogInfo: vi.fn(),
-  mockLogDebug: vi.fn(),
-  mockFrom: vi.fn(),
-  mockCreateClient: vi.fn(),
-}))
+const { mockLogWarn, mockLogError, mockLogInfo, mockLogDebug, mockFrom, mockCreateClient } =
+  vi.hoisted(() => ({
+    mockLogWarn: vi.fn(),
+    mockLogError: vi.fn(),
+    mockLogInfo: vi.fn(),
+    mockLogDebug: vi.fn(),
+    mockFrom: vi.fn(),
+    mockCreateClient: vi.fn(),
+  }))
 
 // Mock logger
 vi.mock('../lib/logger.js', () => {
@@ -80,8 +74,7 @@ function setupChain(finalResult: { data: unknown; error: unknown; count?: number
   chain.contains = vi.fn().mockReturnValue(chain)
   chain.single = vi.fn().mockResolvedValue(finalResult)
   // Make the chain itself thenable for awaited chains without .single()
-  ;(chain as Record<string, unknown>).then = (resolve: (v: unknown) => void) =>
-    resolve(finalResult)
+  ;(chain as Record<string, unknown>).then = (resolve: (v: unknown) => void) => resolve(finalResult)
 
   mockFrom.mockReturnValue(chain)
   return chain
@@ -218,21 +211,25 @@ describe('webhook-service branches', () => {
       const { listWebhooks } = await importService()
       await listWebhooks()
 
-      expect(mockCreateClient).toHaveBeenCalledWith(
-        'https://vite-fallback.supabase.co',
-        'key'
-      )
+      expect(mockCreateClient).toHaveBeenCalledWith('https://vite-fallback.supabase.co', 'key')
     })
 
     it('caches the Supabase client across multiple calls (returns early when already set)', async () => {
+      const originalNodeEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'production'
       setupChain({ data: [], error: null })
 
       const { listWebhooks, getWebhook } = await importService()
+
+      mockCreateClient.mockClear()
+
       await listWebhooks()
       await getWebhook('id-1')
 
       // createClient should only be called once (cached on second call)
-      expect(mockCreateClient).toHaveBeenCalledTimes(2)
+      expect(mockCreateClient).toHaveBeenCalledTimes(1)
+
+      process.env.NODE_ENV = originalNodeEnv
     })
   })
 
@@ -356,9 +353,7 @@ describe('webhook-service branches', () => {
         // categories not provided → should default to []
       })
 
-      expect(chain.insert).toHaveBeenCalledWith([
-        expect.objectContaining({ categories: [] }),
-      ])
+      expect(chain.insert).toHaveBeenCalledWith([expect.objectContaining({ categories: [] })])
     })
 
     it('uses provided categories when specified', async () => {
@@ -372,9 +367,7 @@ describe('webhook-service branches', () => {
         categories: ['ai'],
       })
 
-      expect(chain.insert).toHaveBeenCalledWith([
-        expect.objectContaining({ categories: ['ai'] }),
-      ])
+      expect(chain.insert).toHaveBeenCalledWith([expect.objectContaining({ categories: ['ai'] })])
     })
 
     it('defaults enabled to true when not provided (enabled ?? true)', async () => {
@@ -388,9 +381,7 @@ describe('webhook-service branches', () => {
         // enabled not provided → should default to true via ??
       })
 
-      expect(chain.insert).toHaveBeenCalledWith([
-        expect.objectContaining({ enabled: true }),
-      ])
+      expect(chain.insert).toHaveBeenCalledWith([expect.objectContaining({ enabled: true })])
     })
 
     it('respects enabled=false (enabled ?? true does not override explicit false)', async () => {
@@ -404,9 +395,7 @@ describe('webhook-service branches', () => {
         enabled: false,
       })
 
-      expect(chain.insert).toHaveBeenCalledWith([
-        expect.objectContaining({ enabled: false }),
-      ])
+      expect(chain.insert).toHaveBeenCalledWith([expect.objectContaining({ enabled: false })])
     })
 
     it('logs error and returns null on insert failure', async () => {
@@ -538,7 +527,8 @@ describe('webhook-service branches', () => {
       chain.eq = vi.fn().mockReturnValue(chain)
       chain.then = (resolve: (v: unknown) => void) => {
         callCount++
-        if (callCount <= 1) resolve({ data: null, error: null }) // deliveries delete ok
+        if (callCount <= 1)
+          resolve({ data: null, error: null }) // deliveries delete ok
         else resolve({ data: null, error: { message: 'FK error' } }) // webhook delete fails
       }
       mockFrom.mockReturnValue(chain)
@@ -567,10 +557,7 @@ describe('webhook-service branches', () => {
       const result = await regenerateSecret('wh-001')
 
       expect(result).toBeNull()
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Regenerate secret error',
-        expect.any(Object)
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Regenerate secret error', expect.any(Object))
     })
   })
 
@@ -599,8 +586,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-001' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -670,8 +656,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-002' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -699,8 +684,7 @@ describe('webhook-service branches', () => {
       selectChain.select = vi.fn().mockReturnValue(selectChain)
       selectChain.eq = vi.fn().mockReturnValue(selectChain)
       selectChain.contains = vi.fn().mockReturnValue(selectChain)
-      selectChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      selectChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockReturnValue(selectChain)
 
@@ -730,8 +714,7 @@ describe('webhook-service branches', () => {
         data: null,
         error: { message: 'DB insert failed' },
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -776,8 +759,7 @@ describe('webhook-service branches', () => {
         data: null,
         error: { message: 'constraint violation' },
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -820,8 +802,7 @@ describe('webhook-service branches', () => {
         data: null,
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -875,8 +856,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-success' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return webhookChain
@@ -897,7 +877,9 @@ describe('webhook-service branches', () => {
 
       // Verify delivery update was called with success status
       const deliveryUpdate = allUpdateCalls.find(
-        (c) => c.table === 'webhook_deliveries' && (c.data as Record<string, unknown>).status === 'success'
+        (c) =>
+          c.table === 'webhook_deliveries' &&
+          (c.data as Record<string, unknown>).status === 'success'
       )
       expect(deliveryUpdate).toBeDefined()
       expect(deliveryUpdate!.data).toEqual(
@@ -909,9 +891,7 @@ describe('webhook-service branches', () => {
       )
 
       // Verify webhook failure_count was reset to 0
-      const webhookUpdate = allUpdateCalls.find(
-        (c) => c.table === 'settings_webhooks'
-      )
+      const webhookUpdate = allUpdateCalls.find((c) => c.table === 'settings_webhooks')
       expect(webhookUpdate).toBeDefined()
       expect(webhookUpdate!.data).toEqual(
         expect.objectContaining({
@@ -944,8 +924,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-retry' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -1004,8 +983,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-final-fail' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return webhookChain
@@ -1051,9 +1029,7 @@ describe('webhook-service branches', () => {
       )
 
       // Should increment failure_count on webhook
-      const webhookUpdate = allUpdateCalls.find(
-        (c) => c.table === 'settings_webhooks'
-      )
+      const webhookUpdate = allUpdateCalls.find((c) => c.table === 'settings_webhooks')
       expect(webhookUpdate).toBeDefined()
       expect(webhookUpdate!.data).toEqual(
         expect.objectContaining({
@@ -1087,8 +1063,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-network-err' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -1096,9 +1071,9 @@ describe('webhook-service branches', () => {
       })
 
       // fetch rejects with network error
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        new Error('ECONNREFUSED')
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('ECONNREFUSED')) as unknown as typeof globalThis.fetch
 
       const { fireWebhooks } = await importService()
       await fireWebhooks('setting.updated', {
@@ -1135,8 +1110,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-unknown-err' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -1144,9 +1118,9 @@ describe('webhook-service branches', () => {
       })
 
       // Throw a non-Error value
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        'string error'
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue('string error') as unknown as typeof globalThis.fetch
 
       const { fireWebhooks } = await importService()
       await fireWebhooks('setting.updated', {
@@ -1187,17 +1161,16 @@ describe('webhook-service branches', () => {
         data: { id: 'del-delay' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
         return deliveryChain
       })
 
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        new Error('timeout')
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('timeout')) as unknown as typeof globalThis.fetch
 
       const { fireWebhooks } = await importService()
       await fireWebhooks('setting.updated', {
@@ -1238,8 +1211,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-text-fail' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -1287,8 +1259,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-long-body' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain
@@ -1351,8 +1322,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-fc-undef' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return webhookChain
@@ -1360,9 +1330,9 @@ describe('webhook-service branches', () => {
       })
 
       // Make all 3 attempts fail so we reach the final failure branch
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        new Error('fail')
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('fail')) as unknown as typeof globalThis.fetch
 
       const { fireWebhooks } = await importService()
       await fireWebhooks('setting.updated', {
@@ -1375,9 +1345,7 @@ describe('webhook-service branches', () => {
       await vi.advanceTimersByTimeAsync(8100) // retry 3 (final)
 
       // failure_count should be (undefined || 0) + 1 = 1
-      const webhookUpdate = allUpdateCalls.find(
-        (c) => c.table === 'settings_webhooks'
-      )
+      const webhookUpdate = allUpdateCalls.find((c) => c.table === 'settings_webhooks')
       expect(webhookUpdate).toBeDefined()
       expect(webhookUpdate!.data).toEqual(
         expect.objectContaining({
@@ -1442,9 +1410,9 @@ describe('webhook-service branches', () => {
     it('handles fetch rejection with Error instance', async () => {
       setupChain({ data: MOCK_WEBHOOK_ROW, error: null })
 
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        new Error('DNS resolution failed')
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi
+        .fn()
+        .mockRejectedValue(new Error('DNS resolution failed')) as unknown as typeof globalThis.fetch
 
       const { testWebhook } = await importService()
       const result = await testWebhook('wh-branch-001')
@@ -1456,9 +1424,7 @@ describe('webhook-service branches', () => {
     it('handles fetch rejection with non-Error value (unknown error)', async () => {
       setupChain({ data: MOCK_WEBHOOK_ROW, error: null })
 
-      globalThis.fetch = vi.fn().mockRejectedValue(
-        42
-      ) as unknown as typeof globalThis.fetch
+      globalThis.fetch = vi.fn().mockRejectedValue(42) as unknown as typeof globalThis.fetch
 
       const { testWebhook } = await importService()
       const result = await testWebhook('wh-branch-001')
@@ -1543,11 +1509,13 @@ describe('webhook-service branches', () => {
       expect(payload.event).toBe('setting.updated')
       expect(payload.timestamp).toBeDefined()
       expect(payload.data.category).toBe('test')
-      expect(payload.data.changes).toEqual([{
-        key: 'test_ping',
-        previous_value: null,
-        new_value: 'ping',
-      }])
+      expect(payload.data.changes).toEqual([
+        {
+          key: 'test_ping',
+          previous_value: null,
+          new_value: 'ping',
+        },
+      ])
       expect(payload.data.reason).toBe('Test delivery from admin panel')
     })
   })
@@ -1615,10 +1583,7 @@ describe('webhook-service branches', () => {
 
       expect(result.deliveries).toEqual([])
       expect(result.total).toBe(0)
-      expect(mockLogError).toHaveBeenCalledWith(
-        'Deliveries fetch error',
-        expect.any(Object)
-      )
+      expect(mockLogError).toHaveBeenCalledWith('Deliveries fetch error', expect.any(Object))
     })
   })
 
@@ -1663,8 +1628,7 @@ describe('webhook-service branches', () => {
         data: { id: 'del-retry-timer' },
         error: null,
       })
-      deliveryChain.then = (resolve: (v: unknown) => void) =>
-        resolve({ data: null, error: null })
+      deliveryChain.then = (resolve: (v: unknown) => void) => resolve({ data: null, error: null })
 
       mockFrom.mockImplementation((table: string) => {
         if (table === 'settings_webhooks') return selectChain

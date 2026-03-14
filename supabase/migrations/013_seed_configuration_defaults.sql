@@ -20,8 +20,8 @@ INSERT INTO public.app_settings (category, key, value, value_type, description, 
 ('ai', 'openai_backup_model', '"gpt-4o-mini"', 'string', 'Backup OpenAI model', 'Yedek OpenAI modeli', 2, '["gpt-4o", "gpt-4o-mini", "gpt-4-turbo"]'),
 
 -- Anthropic Settings
-('ai', 'anthropic_extraction_model', '"claude-sonnet-4-20250514"', 'string', 'Anthropic model for policy extraction', 'Poliçe çıkarma için Anthropic modeli', 3, '["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022", "claude-3-opus-20240229"]'),
-('ai', 'anthropic_backup_model', '"claude-3-5-haiku-20241022"', 'string', 'Backup Anthropic model', 'Yedek Anthropic modeli', 4, '["claude-sonnet-4-20250514", "claude-3-5-haiku-20241022"]'),
+('ai', 'anthropic_extraction_model', '"claude-sonnet-4-20250514"', 'string', 'Anthropic model for policy extraction', 'Poliçe çıkarma için Anthropic modeli', 3, '["claude-sonnet-4-20250514", "claude-3-5-haiku-latest", "claude-3-opus-20240229"]'),
+('ai', 'anthropic_backup_model', '"claude-3-5-haiku-latest"', 'string', 'Backup Anthropic model', 'Yedek Anthropic modeli', 4, '["claude-sonnet-4-20250514", "claude-3-5-haiku-latest"]'),
 
 -- General AI Settings
 ('ai', 'max_tokens', '4096', 'number', 'Maximum tokens for AI response', 'AI yanıtı için maksimum token', 5, NULL),

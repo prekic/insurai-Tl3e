@@ -468,11 +468,7 @@ function initializeDefaultFeatureFlags(): void {
 
 initializeDefaultFeatureFlags()
 
-export function isFeatureEnabled(
-  featureId: string,
-  userId?: string,
-  userRole?: UserRole
-): boolean {
+export function isFeatureEnabled(featureId: string, userId?: string, userRole?: UserRole): boolean {
   const flag = featureFlags.get(featureId)
 
   if (!flag) {
@@ -650,7 +646,7 @@ function initializeProviderConfigs(): void {
           recommended: true,
         },
         {
-          id: 'claude-3-5-haiku-20241022',
+          id: 'claude-3-5-haiku-latest',
           name: 'Claude 3.5 Haiku',
           enabled: true,
           maxContextTokens: 200000,
@@ -839,7 +835,9 @@ export function getPromptTemplates(category?: PromptTemplate['category']): Promp
   return results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
 }
 
-export function getActivePromptTemplate(category: PromptTemplate['category']): PromptTemplate | undefined {
+export function getActivePromptTemplate(
+  category: PromptTemplate['category']
+): PromptTemplate | undefined {
   for (const template of promptTemplates.values()) {
     if (template.category === category && template.isActive) {
       return template
@@ -901,8 +899,18 @@ Pay special attention to Turkish-specific terms and formats.`,
 Return the data in the following JSON structure:
 {{json_schema}}`,
       variables: [
-        { name: 'document_text', description: 'The extracted text from the PDF', type: 'string', required: true },
-        { name: 'json_schema', description: 'The target JSON schema for extraction', type: 'json', required: true },
+        {
+          name: 'document_text',
+          description: 'The extracted text from the PDF',
+          type: 'string',
+          required: true,
+        },
+        {
+          name: 'json_schema',
+          description: 'The target JSON schema for extraction',
+          type: 'json',
+          required: true,
+        },
       ],
       defaultProvider: 'openai',
       defaultModel: 'gpt-4o',
@@ -931,8 +939,18 @@ If you're unsure about something, say so rather than making assumptions.`,
 
 User Question: {{user_message}}`,
       variables: [
-        { name: 'policy_context', description: 'Formatted policy details for context', type: 'string', required: true },
-        { name: 'user_message', description: 'The user\'s question', type: 'string', required: true },
+        {
+          name: 'policy_context',
+          description: 'Formatted policy details for context',
+          type: 'string',
+          required: true,
+        },
+        {
+          name: 'user_message',
+          description: "The user's question",
+          type: 'string',
+          required: true,
+        },
       ],
       defaultProvider: 'openai',
       defaultModel: 'gpt-4o-mini',
@@ -961,7 +979,12 @@ Pay attention to Turkish characters (ı, İ, ğ, Ğ, ü, Ü, ş, Ş, ö, Ö, ç,
 
 Return only the corrected text without explanations.`,
       variables: [
-        { name: 'raw_text', description: 'The raw OCR text to correct', type: 'string', required: true },
+        {
+          name: 'raw_text',
+          description: 'The raw OCR text to correct',
+          type: 'string',
+          required: true,
+        },
       ],
       defaultProvider: 'openai',
       defaultModel: 'gpt-4o-mini',

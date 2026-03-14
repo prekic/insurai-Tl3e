@@ -1986,6 +1986,8 @@ router.put('/:category/:key', async (req: Request, res: Response) => {
       .eq('key', key)
       .single()
 
+    console.log('[DEBUG EXACT TEST] existing:', existing, 'fetchError:', fetchError)
+
     if (fetchError || !existing) {
       return res.status(404).json({ success: false, error: 'Setting not found' })
     }

@@ -48,9 +48,9 @@ describe('MODEL_PRICING', () => {
   })
 
   it('should have pricing for claude-3-5-haiku', () => {
-    expect(MODEL_PRICING['claude-3-5-haiku-20241022']).toBeDefined()
-    expect(MODEL_PRICING['claude-3-5-haiku-20241022'].inputPer1K).toBe(0.001)
-    expect(MODEL_PRICING['claude-3-5-haiku-20241022'].outputPer1K).toBe(0.005)
+    expect(MODEL_PRICING['claude-3-5-haiku-latest']).toBeDefined()
+    expect(MODEL_PRICING['claude-3-5-haiku-latest'].inputPer1K).toBe(0.001)
+    expect(MODEL_PRICING['claude-3-5-haiku-latest'].outputPer1K).toBe(0.005)
   })
 
   it('should have pricing for claude-3-opus', () => {

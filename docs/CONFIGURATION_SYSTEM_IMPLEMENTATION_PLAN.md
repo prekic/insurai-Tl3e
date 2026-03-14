@@ -946,7 +946,7 @@ const OPENAI_MODELS = [
 
 const ANTHROPIC_MODELS = [
   { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4 (Recommended)' },
-  { value: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku (Faster)' },
+  { value: 'claude-3-5-haiku-latest', label: 'Claude 3.5 Haiku (Faster)' },
   { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus (Most Capable)' }
 ]
 

@@ -99,7 +99,7 @@ const MODEL_OPTIONS = {
   openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'],
   anthropic: [
     'claude-sonnet-4-20250514',
-    'claude-3-5-haiku-20241022',
+    'claude-3-5-haiku-latest',
     'claude-3-opus-20240229',
     'claude-3-sonnet-20240229',
   ],

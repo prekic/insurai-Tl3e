@@ -160,7 +160,7 @@ const DEFAULT_AI_CONFIG = {
   openaiExtractionModel: 'gpt-4o',
   openaiBackupModel: 'gpt-4o-mini',
   anthropicExtractionModel: 'claude-sonnet-4-20250514',
-  anthropicBackupModel: 'claude-3-5-haiku-20241022',
+  anthropicBackupModel: 'claude-3-5-haiku-latest',
   maxTokens: 4096,
   temperature: 0.1,
   chatTemperature: 0.7,
@@ -954,7 +954,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'image', source: {} }], // No text block
         usage: { input_tokens: 10, output_tokens: 0 },
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app)
@@ -987,7 +987,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'Anthropic response' }],
         usage: { input_tokens: 10, output_tokens: 5 },
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const res = await request(app)
@@ -1018,7 +1018,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -1056,7 +1056,7 @@ describe('AI Routes - OCR & Branch Coverage', () => {
       })
       mockAnthropicCreate.mockResolvedValue({
         content: [{ type: 'text', text: 'OK' }],
-        model: 'claude-3-5-haiku-20241022',
+        model: 'claude-3-5-haiku-latest',
       })
 
       // HTTP 400 with no error status field

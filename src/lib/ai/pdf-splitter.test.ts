@@ -7,12 +7,7 @@
 
 import { describe, it, expect, beforeAll } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
-import {
-  DOCUMENT_AI_PAGE_LIMIT,
-  getPdfPageCount,
-  splitPdf,
-  chunkToFile,
-} from './pdf-splitter'
+import { DOCUMENT_AI_PAGE_LIMIT, getPdfPageCount, splitPdf, chunkToFile } from './pdf-splitter'
 
 /**
  * jsdom's File/Blob implementation does not support .arrayBuffer().
@@ -48,8 +43,8 @@ async function createTestPdf(pageCount: number, filename = 'test.pdf'): Promise<
 // DOCUMENT_AI_PAGE_LIMIT
 // ---------------------------------------------------------------------------
 describe('DOCUMENT_AI_PAGE_LIMIT', () => {
-  it('should be 15', () => {
-    expect(DOCUMENT_AI_PAGE_LIMIT).toBe(15)
+  it('should be 10', () => {
+    expect(DOCUMENT_AI_PAGE_LIMIT).toBe(10)
   })
 })
 
@@ -139,44 +134,54 @@ describe('splitPdf', () => {
     expect(result.pageRanges).toEqual([[1, 1]])
   })
 
-  it('does not split a PDF at exactly the page limit (15 pages)', async () => {
-    const file = await createTestPdf(15)
+  it('does not split a PDF at exactly the page limit (10 pages)', async () => {
+    const file = await createTestPdf(10)
     const result = await splitPdf(file)
 
     expect(result.wasSplit).toBe(false)
-    expect(result.totalPages).toBe(15)
+    expect(result.totalPages).toBe(10)
     expect(result.chunks).toHaveLength(1)
-    expect(result.pageRanges).toEqual([[1, 15]])
+    expect(result.pageRanges).toEqual([[1, 10]])
   })
 
-  it('splits a 16-page PDF into 2 chunks (15 + 1)', async () => {
-    const file = await createTestPdf(16)
+  it('splits a 11-page PDF into 2 chunks (10 + 1)', async () => {
+    const file = await createTestPdf(11)
     const result = await splitPdf(file)
 
     expect(result.wasSplit).toBe(true)
-    expect(result.totalPages).toBe(16)
+    expect(result.totalPages).toBe(11)
     expect(result.chunks).toHaveLength(2)
-    expect(result.pageRanges).toEqual([[1, 15], [16, 16]])
+    expect(result.pageRanges).toEqual([
+      [1, 10],
+      [11, 11],
+    ])
   })
 
-  it('splits a 30-page PDF into 2 chunks (15 + 15)', async () => {
-    const file = await createTestPdf(30)
+  it('splits a 20-page PDF into 2 chunks (10 + 10)', async () => {
+    const file = await createTestPdf(20)
     const result = await splitPdf(file)
 
     expect(result.wasSplit).toBe(true)
-    expect(result.totalPages).toBe(30)
+    expect(result.totalPages).toBe(20)
     expect(result.chunks).toHaveLength(2)
-    expect(result.pageRanges).toEqual([[1, 15], [16, 30]])
+    expect(result.pageRanges).toEqual([
+      [1, 10],
+      [11, 20],
+    ])
   })
 
-  it('splits a 31-page PDF into 3 chunks (15 + 15 + 1)', async () => {
-    const file = await createTestPdf(31)
+  it('splits a 21-page PDF into 3 chunks (10 + 10 + 1)', async () => {
+    const file = await createTestPdf(21)
     const result = await splitPdf(file)
 
     expect(result.wasSplit).toBe(true)
-    expect(result.totalPages).toBe(31)
+    expect(result.totalPages).toBe(21)
     expect(result.chunks).toHaveLength(3)
-    expect(result.pageRanges).toEqual([[1, 15], [16, 30], [31, 31]])
+    expect(result.pageRanges).toEqual([
+      [1, 10],
+      [11, 20],
+      [21, 21],
+    ])
   })
 
   it('uses custom maxPagesPerChunk when provided', async () => {
@@ -186,7 +191,11 @@ describe('splitPdf', () => {
     expect(result.wasSplit).toBe(true)
     expect(result.totalPages).toBe(12)
     expect(result.chunks).toHaveLength(3)
-    expect(result.pageRanges).toEqual([[1, 5], [6, 10], [11, 12]])
+    expect(result.pageRanges).toEqual([
+      [1, 5],
+      [6, 10],
+      [11, 12],
+    ])
   })
 
   it('does not split when pages are within custom limit', async () => {
@@ -205,8 +214,8 @@ describe('splitPdf', () => {
 
     // First chunk starts at page 1, not 0
     expect(result.pageRanges[0][0]).toBe(1)
-    // Second chunk starts at page 16
-    expect(result.pageRanges[1][0]).toBe(16)
+    // Second chunk starts at page 11
+    expect(result.pageRanges[1][0]).toBe(11)
     // Last page range ends at the total page count
     const lastRange = result.pageRanges[result.pageRanges.length - 1]
     expect(lastRange[1]).toBe(20)
@@ -223,12 +232,12 @@ describe('splitPdf', () => {
   })
 
   it('produces chunks that are valid PDF documents with correct page counts', async () => {
-    const file = await createTestPdf(16)
+    const file = await createTestPdf(11)
     const result = await splitPdf(file)
 
-    // First chunk should have 15 pages
+    // First chunk should have 10 pages
     const chunk1Doc = await PDFDocument.load(result.chunks[0])
-    expect(chunk1Doc.getPageCount()).toBe(15)
+    expect(chunk1Doc.getPageCount()).toBe(10)
 
     // Second chunk should have 1 page
     const chunk2Doc = await PDFDocument.load(result.chunks[1])
@@ -284,7 +293,11 @@ describe('splitPdf', () => {
     expect(result.wasSplit).toBe(true)
     expect(result.totalPages).toBe(3)
     expect(result.chunks).toHaveLength(3)
-    expect(result.pageRanges).toEqual([[1, 1], [2, 2], [3, 3]])
+    expect(result.pageRanges).toEqual([
+      [1, 1],
+      [2, 2],
+      [3, 3],
+    ])
 
     // Verify each chunk has exactly 1 page
     for (const chunk of result.chunks) {

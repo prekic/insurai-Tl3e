@@ -1221,7 +1221,7 @@ interface AIConfig {
   openaiExtractionModel: string      // 'gpt-4o'
   openaiBackupModel: string          // 'gpt-4o-mini'
   anthropicExtractionModel: string   // 'claude-sonnet-4-20250514'
-  anthropicBackupModel: string       // 'claude-3-5-haiku-20241022'
+  anthropicBackupModel: string       // 'claude-3-5-haiku-latest'
   maxTokens: number                  // 4096
   temperature: number                // 0.1
   chatTemperature: number            // 0.7

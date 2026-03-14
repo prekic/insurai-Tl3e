@@ -131,7 +131,7 @@ describe('AI Config (config.ts)', () => {
 
     it('should have correct Anthropic model configuration', () => {
       expect(AI_CONFIG.anthropic.extractionModel).toBe('claude-sonnet-4-20250514')
-      expect(AI_CONFIG.anthropic.backupModel).toBe('claude-3-5-haiku-20241022')
+      expect(AI_CONFIG.anthropic.backupModel).toBe('claude-3-5-haiku-latest')
     })
 
     it('should have correct extraction settings', () => {

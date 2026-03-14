@@ -869,13 +869,21 @@ router.post(
       }
 
       // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT ===
-      const serverConfidence = (parsedData as Record<string, unknown>)?.confidence as Record<string, unknown> | undefined
+      const serverConfidence = (parsedData as Record<string, unknown>)?.confidence as
+        | Record<string, unknown>
+        | undefined
       log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
         requestId,
         provider: 'openai',
         hasConfidence: !!serverConfidence,
-        confidenceObject: serverConfidence ? JSON.stringify(serverConfidence) : 'NOT_RETURNED_BY_AI',
-        allFieldsPresent: serverConfidence ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(k => k in serverConfidence) : false,
+        confidenceObject: serverConfidence
+          ? JSON.stringify(serverConfidence)
+          : 'NOT_RETURNED_BY_AI',
+        allFieldsPresent: serverConfidence
+          ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
+              (k) => k in serverConfidence
+            )
+          : false,
       })
 
       log.info('Extraction successful', {
@@ -895,9 +903,15 @@ router.post(
         documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
       })
       recordOverviewMetrics({
-        requestId, provider: 'openai', model: usedModel, operation: 'extraction',
-        success: true, durationMs: Date.now() - startTime,
-        inputTokens, outputTokens, cost: cost.totalCost,
+        requestId,
+        provider: 'openai',
+        model: usedModel,
+        operation: 'extraction',
+        success: true,
+        durationMs: Date.now() - startTime,
+        inputTokens,
+        outputTokens,
+        cost: cost.totalCost,
         documentLength: (req.body as OpenAIExtractionInput).documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
       })
@@ -995,12 +1009,19 @@ router.post(
         documentLength: errorDetails.documentTextLength,
       })
       recordOverviewMetrics({
-        requestId, provider: 'openai', model: 'gpt-4o', operation: 'extraction',
-        success: false, durationMs: Date.now() - startTime,
-        inputTokens: 0, outputTokens: 0, cost: 0,
+        requestId,
+        provider: 'openai',
+        model: 'gpt-4o',
+        operation: 'extraction',
+        success: false,
+        durationMs: Date.now() - startTime,
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
         documentLength: errorDetails.documentTextLength,
         userId: req.headers['x-user-id'] as string | undefined,
-        errorCode: code, errorMessage: message.substring(0, 200),
+        errorCode: code,
+        errorMessage: message.substring(0, 200),
       })
 
       // Notify admin of extraction failure
@@ -1176,9 +1197,15 @@ router.post(
         documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
       })
       recordOverviewMetrics({
-        requestId, provider: 'anthropic', model: usedModel, operation: 'extraction',
-        success: true, durationMs: Date.now() - startTime,
-        inputTokens, outputTokens, cost: cost.totalCost,
+        requestId,
+        provider: 'anthropic',
+        model: usedModel,
+        operation: 'extraction',
+        success: true,
+        durationMs: Date.now() - startTime,
+        inputTokens,
+        outputTokens,
+        cost: cost.totalCost,
         documentLength: (req.body as AnthropicExtractionInput).documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
       })
@@ -1289,12 +1316,19 @@ router.post(
         documentLength: errorDetails.documentTextLength,
       })
       recordOverviewMetrics({
-        requestId, provider: 'anthropic', model: 'claude-sonnet-4-20250514', operation: 'extraction',
-        success: false, durationMs: Date.now() - startTime,
-        inputTokens: 0, outputTokens: 0, cost: 0,
+        requestId,
+        provider: 'anthropic',
+        model: 'claude-sonnet-4-20250514',
+        operation: 'extraction',
+        success: false,
+        durationMs: Date.now() - startTime,
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
         documentLength: errorDetails.documentTextLength,
         userId: req.headers['x-user-id'] as string | undefined,
-        errorCode: code, errorMessage: message.substring(0, 200),
+        errorCode: code,
+        errorMessage: message.substring(0, 200),
       })
 
       // Create admin notification for critical errors
@@ -1530,13 +1564,21 @@ router.post(
           markPhase('anthropic_ms', anthropicStart)
 
           // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT (Anthropic) ===
-          const serverConfidenceAnt = (parsedData as Record<string, unknown>)?.confidence as Record<string, unknown> | undefined
+          const serverConfidenceAnt = (parsedData as Record<string, unknown>)?.confidence as
+            | Record<string, unknown>
+            | undefined
           log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
             requestId,
             provider: 'anthropic',
             hasConfidence: !!serverConfidenceAnt,
-            confidenceObject: serverConfidenceAnt ? JSON.stringify(serverConfidenceAnt) : 'NOT_RETURNED_BY_AI',
-            allFieldsPresent: serverConfidenceAnt ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(k => k in serverConfidenceAnt) : false,
+            confidenceObject: serverConfidenceAnt
+              ? JSON.stringify(serverConfidenceAnt)
+              : 'NOT_RETURNED_BY_AI',
+            allFieldsPresent: serverConfidenceAnt
+              ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
+                  (k) => k in serverConfidenceAnt
+                )
+              : false,
           })
 
           log.info('Anthropic extraction successful', {
@@ -1556,9 +1598,15 @@ router.post(
             documentLength: documentText?.length ?? 0,
           })
           recordOverviewMetrics({
-            requestId, provider: 'anthropic', model: usedModel, operation: 'extraction',
-            success: true, durationMs: Date.now() - startTime,
-            inputTokens, outputTokens, cost: cost.totalCost,
+            requestId,
+            provider: 'anthropic',
+            model: usedModel,
+            operation: 'extraction',
+            success: true,
+            durationMs: Date.now() - startTime,
+            inputTokens,
+            outputTokens,
+            cost: cost.totalCost,
             documentLength: documentText?.length ?? 0,
             userId: req.headers['x-user-id'] as string | undefined,
           })
@@ -1643,12 +1691,19 @@ router.post(
             documentLength: documentText?.length ?? 0,
           })
           recordOverviewMetrics({
-            requestId, provider: 'anthropic', model: aiConfig.anthropicExtractionModel, operation: 'extraction',
-            success: false, durationMs: Date.now() - anthropicStart,
-            inputTokens: 0, outputTokens: 0, cost: 0,
+            requestId,
+            provider: 'anthropic',
+            model: aiConfig.anthropicExtractionModel,
+            operation: 'extraction',
+            success: false,
+            durationMs: Date.now() - anthropicStart,
+            inputTokens: 0,
+            outputTokens: 0,
+            cost: 0,
             documentLength: documentText?.length ?? 0,
             userId: req.headers['x-user-id'] as string | undefined,
-            errorCode: fallbackReason, errorMessage: message.substring(0, 200),
+            errorCode: fallbackReason,
+            errorMessage: message.substring(0, 200),
           })
 
           // Notify admin for critical errors (not for transient capacity issues)
@@ -1744,12 +1799,19 @@ router.post(
         documentLength: documentText?.length ?? 0,
       })
       recordOverviewMetrics({
-        requestId, provider: 'anthropic', model: 'unknown', operation: 'extraction',
-        success: false, durationMs: Date.now() - startTime,
-        inputTokens: 0, outputTokens: 0, cost: 0,
+        requestId,
+        provider: 'anthropic',
+        model: 'unknown',
+        operation: 'extraction',
+        success: false,
+        durationMs: Date.now() - startTime,
+        inputTokens: 0,
+        outputTokens: 0,
+        cost: 0,
         documentLength: documentText?.length ?? 0,
         userId: req.headers['x-user-id'] as string | undefined,
-        errorCode: 'BUDGET_EXHAUSTED', errorMessage: 'Request time budget exhausted',
+        errorCode: 'BUDGET_EXHAUSTED',
+        errorMessage: 'Request time budget exhausted',
       })
 
       return res.status(504).json({
@@ -1851,14 +1913,22 @@ router.post(
         markPhase('openai_ms', openaiStart)
 
         // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT (OpenAI fallback/unified) ===
-        const serverConfidenceOAI = (parsedOpenAIData as Record<string, unknown>)?.confidence as Record<string, unknown> | undefined
+        const serverConfidenceOAI = (parsedOpenAIData as Record<string, unknown>)?.confidence as
+          | Record<string, unknown>
+          | undefined
         log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
           requestId,
           provider: 'openai',
           path: 'unified_endpoint',
           hasConfidence: !!serverConfidenceOAI,
-          confidenceObject: serverConfidenceOAI ? JSON.stringify(serverConfidenceOAI) : 'NOT_RETURNED_BY_AI',
-          allFieldsPresent: serverConfidenceOAI ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(k => k in serverConfidenceOAI) : false,
+          confidenceObject: serverConfidenceOAI
+            ? JSON.stringify(serverConfidenceOAI)
+            : 'NOT_RETURNED_BY_AI',
+          allFieldsPresent: serverConfidenceOAI
+            ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
+                (k) => k in serverConfidenceOAI
+              )
+            : false,
         })
 
         const isFallback = !!anthropicClient
@@ -1882,9 +1952,15 @@ router.post(
           documentLength: documentText?.length ?? 0,
         })
         recordOverviewMetrics({
-          requestId, provider: 'openai', model: usedModel, operation: 'extraction',
-          success: true, durationMs: Date.now() - startTime,
-          inputTokens, outputTokens, cost: cost.totalCost,
+          requestId,
+          provider: 'openai',
+          model: usedModel,
+          operation: 'extraction',
+          success: true,
+          durationMs: Date.now() - startTime,
+          inputTokens,
+          outputTokens,
+          cost: cost.totalCost,
           documentLength: documentText?.length ?? 0,
           userId: req.headers['x-user-id'] as string | undefined,
         })
@@ -1965,12 +2041,19 @@ router.post(
           documentLength: documentText?.length ?? 0,
         })
         recordOverviewMetrics({
-          requestId, provider: 'openai', model: 'gpt-4o', operation: 'extraction',
-          success: false, durationMs: Date.now() - openaiStart,
-          inputTokens: 0, outputTokens: 0, cost: 0,
+          requestId,
+          provider: 'openai',
+          model: 'gpt-4o',
+          operation: 'extraction',
+          success: false,
+          durationMs: Date.now() - openaiStart,
+          inputTokens: 0,
+          outputTokens: 0,
+          cost: 0,
           documentLength: documentText?.length ?? 0,
           userId: req.headers['x-user-id'] as string | undefined,
-          errorCode: openaiErrorCode, errorMessage: message.substring(0, 200),
+          errorCode: openaiErrorCode,
+          errorMessage: message.substring(0, 200),
         })
 
         // Notify admin — both providers failed is always critical
@@ -2846,9 +2929,15 @@ router.post(
         })
 
         recordOverviewMetrics({
-          requestId: `chat-${Date.now()}`, provider: 'openai', model: chatModel, operation: 'chat',
-          success: true, durationMs: Date.now() - chatStart,
-          inputTokens, outputTokens, cost: cost.totalCost,
+          requestId: `chat-${Date.now()}`,
+          provider: 'openai',
+          model: chatModel,
+          operation: 'chat',
+          success: true,
+          durationMs: Date.now() - chatStart,
+          inputTokens,
+          outputTokens,
+          cost: cost.totalCost,
           userId: req.headers['x-user-id'] as string | undefined,
         })
 
@@ -2919,9 +3008,15 @@ router.post(
         })
 
         recordOverviewMetrics({
-          requestId: `chat-${Date.now()}`, provider: 'anthropic', model: chatModel, operation: 'chat',
-          success: true, durationMs: Date.now() - chatStart,
-          inputTokens, outputTokens, cost: cost.totalCost,
+          requestId: `chat-${Date.now()}`,
+          provider: 'anthropic',
+          model: chatModel,
+          operation: 'chat',
+          success: true,
+          durationMs: Date.now() - chatStart,
+          inputTokens,
+          outputTokens,
+          cost: cost.totalCost,
           userId: req.headers['x-user-id'] as string | undefined,
         })
 
@@ -3159,7 +3254,7 @@ router.get('/diagnose', generalLimiter, async (_req: Request, res: Response) => 
       if (client) {
         // Make a minimal API call to verify the key works
         const response = await client.messages.create({
-          model: 'claude-3-5-haiku-20241022',
+          model: 'claude-3-5-haiku-latest',
           max_tokens: 5,
           messages: [{ role: 'user', content: 'Say "OK"' }],
         })

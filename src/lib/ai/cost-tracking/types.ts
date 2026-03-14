@@ -13,49 +13,49 @@ import type { AIProvider } from '@/lib/ai/config'
  * Pricing per 1000 tokens for each provider/model
  */
 export interface ModelPricing {
-  inputPer1K: number   // Cost per 1000 input tokens (USD)
-  outputPer1K: number  // Cost per 1000 output tokens (USD)
+  inputPer1K: number // Cost per 1000 input tokens (USD)
+  outputPer1K: number // Cost per 1000 output tokens (USD)
   contextLimit: number // Maximum context window in tokens
 }
 
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   // OpenAI pricing
   'gpt-4o': {
-    inputPer1K: 0.0025,   // $2.50 per 1M input tokens
-    outputPer1K: 0.01,    // $10 per 1M output tokens
+    inputPer1K: 0.0025, // $2.50 per 1M input tokens
+    outputPer1K: 0.01, // $10 per 1M output tokens
     contextLimit: 128000,
   },
   'gpt-4o-mini': {
-    inputPer1K: 0.00015,  // $0.15 per 1M input tokens
-    outputPer1K: 0.0006,  // $0.60 per 1M output tokens
+    inputPer1K: 0.00015, // $0.15 per 1M input tokens
+    outputPer1K: 0.0006, // $0.60 per 1M output tokens
     contextLimit: 128000,
   },
   'gpt-4-turbo': {
-    inputPer1K: 0.01,     // $10 per 1M input tokens
-    outputPer1K: 0.03,    // $30 per 1M output tokens
+    inputPer1K: 0.01, // $10 per 1M input tokens
+    outputPer1K: 0.03, // $30 per 1M output tokens
     contextLimit: 128000,
   },
 
   // Anthropic Claude pricing
   'claude-3-5-sonnet-20241022': {
-    inputPer1K: 0.003,    // $3 per 1M input tokens
-    outputPer1K: 0.015,   // $15 per 1M output tokens
+    inputPer1K: 0.003, // $3 per 1M input tokens
+    outputPer1K: 0.015, // $15 per 1M output tokens
     contextLimit: 200000,
   },
-  'claude-3-5-haiku-20241022': {
-    inputPer1K: 0.001,    // $1 per 1M input tokens
-    outputPer1K: 0.005,   // $5 per 1M output tokens
+  'claude-3-5-haiku-latest': {
+    inputPer1K: 0.001, // $1 per 1M input tokens
+    outputPer1K: 0.005, // $5 per 1M output tokens
     contextLimit: 200000,
   },
   'claude-3-opus-20240229': {
-    inputPer1K: 0.015,    // $15 per 1M input tokens
-    outputPer1K: 0.075,   // $75 per 1M output tokens
+    inputPer1K: 0.015, // $15 per 1M input tokens
+    outputPer1K: 0.075, // $75 per 1M output tokens
     contextLimit: 200000,
   },
 
   // Google Document AI (per page)
   'google-document-ai': {
-    inputPer1K: 1.5,      // $1.50 per 1000 pages
+    inputPer1K: 1.5, // $1.50 per 1000 pages
     outputPer1K: 0,
     contextLimit: 0,
   },
@@ -122,22 +122,28 @@ export interface UsageStats {
 
   // Costs
   totalCost: number
-  totalSavings: number  // From cache hits
-  netCost: number       // totalCost - totalSavings
+  totalSavings: number // From cache hits
+  netCost: number // totalCost - totalSavings
 
   // By provider
-  byProvider: Record<AIProvider, {
-    requests: number
-    tokens: number
-    cost: number
-  }>
+  byProvider: Record<
+    AIProvider,
+    {
+      requests: number
+      tokens: number
+      cost: number
+    }
+  >
 
   // By operation
-  byOperation: Record<string, {
-    requests: number
-    tokens: number
-    cost: number
-  }>
+  byOperation: Record<
+    string,
+    {
+      requests: number
+      tokens: number
+      cost: number
+    }
+  >
 
   // Performance
   avgDurationMs: number
@@ -152,13 +158,13 @@ export interface UsageStats {
  */
 export interface CostBudget {
   // Monthly limits
-  monthlyLimit: number       // Maximum monthly spend (USD)
-  warningThreshold: number   // Warn when reaching this % of limit
-  hardLimit: boolean         // Block requests when limit reached
+  monthlyLimit: number // Maximum monthly spend (USD)
+  warningThreshold: number // Warn when reaching this % of limit
+  hardLimit: boolean // Block requests when limit reached
 
   // Per-user limits
-  perUserDaily: number       // Max daily spend per user
-  perUserMonthly: number     // Max monthly spend per user
+  perUserDaily: number // Max daily spend per user
+  perUserMonthly: number // Max monthly spend per user
 
   // Alert configuration
   alertEmail?: string
@@ -169,11 +175,11 @@ export interface CostBudget {
  * Default budget configuration
  */
 export const DEFAULT_BUDGET: CostBudget = {
-  monthlyLimit: 100,          // $100/month
-  warningThreshold: 0.8,      // Warn at 80%
-  hardLimit: false,           // Don't block, just warn
-  perUserDaily: 5,            // $5/day per user
-  perUserMonthly: 50,         // $50/month per user
+  monthlyLimit: 100, // $100/month
+  warningThreshold: 0.8, // Warn at 80%
+  hardLimit: false, // Don't block, just warn
+  perUserDaily: 5, // $5/day per user
+  perUserMonthly: 50, // $50/month per user
 }
 
 // =============================================================================
@@ -232,7 +238,7 @@ export function calculateCost(
   const totalCost = inputCost + outputCost
 
   return {
-    inputCost: Math.round(inputCost * 10000) / 10000,   // 4 decimal places
+    inputCost: Math.round(inputCost * 10000) / 10000, // 4 decimal places
     outputCost: Math.round(outputCost * 10000) / 10000,
     totalCost: Math.round(totalCost * 10000) / 10000,
   }

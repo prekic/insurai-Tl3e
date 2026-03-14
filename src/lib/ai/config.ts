@@ -549,7 +549,7 @@ export const AI_CONFIG = {
   // Anthropic models
   anthropic: {
     extractionModel: 'claude-sonnet-4-20250514' as const,
-    backupModel: 'claude-3-5-haiku-20241022' as const,
+    backupModel: 'claude-3-5-haiku-latest' as const,
   },
 
   // Max tokens for extraction response
