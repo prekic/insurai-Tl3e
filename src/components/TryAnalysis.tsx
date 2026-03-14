@@ -338,8 +338,10 @@ export function TryAnalysis() {
         // === CONFIDENCE DIAGNOSTIC CHECKPOINT (TryAnalysis) ===
         console.warn('[TryAnalysis ConfidenceDiag] Extraction result confidence state:', {
           lowConfidence: isLowConfidence,
-          confidenceScore: confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
-          policyAiConfidence: policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
+          confidenceScore:
+            confidenceScore != null ? Math.round(confidenceScore * 100) + '%' : 'not provided',
+          policyAiConfidence:
+            policy.aiConfidence != null ? Math.round(policy.aiConfidence * 100) + '%' : 'not set',
           aiConfidenceValue: policy.aiConfidence,
           tier: isLowConfidence ? 'LOW_CONFIDENCE_WARNING' : 'FULL_CONFIDENCE',
         })
@@ -351,10 +353,22 @@ export function TryAnalysis() {
           fileName,
         }
 
-        // Always save the result — even if the user navigated away.
-        // When they return to /try, the saved result will be found and displayed.
+        // Always save the result locally — even if the user navigated away.
         extractionInFlightRef.current = false
         saveTrialResult(policyWithDefaults, fileName)
+
+        // BACKGROUND SYNC: Fire and forget to the anonymous persistence API
+        // This persists the extraction out-of-band so we don't block the UI.
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('extractionResult', JSON.stringify(policyWithDefaults))
+
+        fetch(`${getProxyUrl() || ''}/api/policy/save-anonymous`, {
+          method: 'POST',
+          body: formData,
+        }).catch((err) => {
+          console.warn('[TryAnalysis] Failed to persist anonymous extraction in background', err)
+        })
 
         // Mark processing as complete
         logger.complete()

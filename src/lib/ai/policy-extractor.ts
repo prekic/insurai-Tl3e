@@ -182,7 +182,10 @@ function recalculateOverallConfidence(
   weights = DEFAULT_CONFIDENCE_WEIGHTS
 ): number {
   if (!confidence) {
-    console.warn('[ConfidenceDiag] recalculateOverallConfidence: confidence object is null/undefined — returning fallback:', fallback)
+    console.warn(
+      '[ConfidenceDiag] recalculateOverallConfidence: confidence object is null/undefined — returning fallback:',
+      fallback
+    )
     return fallback
   }
 
@@ -201,7 +204,10 @@ function recalculateOverallConfidence(
       pm == null ? 'premium' : null,
       cv == null ? 'coverages' : null,
     ].filter(Boolean)
-    console.warn(`[ConfidenceDiag] recalculateOverallConfidence: Missing per-field scores [${missing.join(', ')}] — using AI-reported overall as fallback:`, fallback)
+    console.warn(
+      `[ConfidenceDiag] recalculateOverallConfidence: Missing per-field scores [${missing.join(', ')}] — using AI-reported overall as fallback:`,
+      fallback
+    )
     return fallback
   }
 
@@ -217,7 +223,10 @@ function recalculateOverallConfidence(
     weights,
     calculated: Math.round(calculated * 1000) / 1000,
     aiReportedOverall: confidence.overall,
-    delta: confidence.overall != null ? Math.round((calculated - confidence.overall) * 1000) / 1000 : 'N/A',
+    delta:
+      confidence.overall != null
+        ? Math.round((calculated - confidence.overall) * 1000) / 1000
+        : 'N/A',
   })
 
   return calculated
@@ -844,18 +853,27 @@ export async function extractPolicyFromDocument(
     // === CONFIDENCE DIAGNOSTIC CHECKPOINT ===
     console.warn('[ConfidenceDiag] ====== CONFIDENCE PIPELINE CHECKPOINT ======')
     console.warn('[ConfidenceDiag] Provider used:', provider)
-    console.warn('[ConfidenceDiag] Extraction mode:', isProxyConfigured() ? 'proxy' : useMultiProvider ? 'consensus' : 'direct')
+    console.warn(
+      '[ConfidenceDiag] Extraction mode:',
+      isProxyConfigured() ? 'proxy' : useMultiProvider ? 'consensus' : 'direct'
+    )
     console.warn('[ConfidenceDiag] Weights source:', weightsSource)
-    console.warn('[ConfidenceDiag] AI-returned confidence object:', JSON.stringify(extractedData.confidence))
+    console.warn(
+      '[ConfidenceDiag] AI-returned confidence object:',
+      JSON.stringify(extractedData.confidence)
+    )
     console.warn('[ConfidenceDiag] AI-reported overall (or default 0.7 if missing):', rawOverall)
-    const allFieldsDefault = extractedData.confidence &&
+    const allFieldsDefault =
+      extractedData.confidence &&
       extractedData.confidence.policyNumber === 0.7 &&
       extractedData.confidence.provider === 0.7 &&
       extractedData.confidence.dates === 0.7 &&
       extractedData.confidence.premium === 0.7 &&
       extractedData.confidence.coverages === 0.7
     if (allFieldsDefault) {
-      console.warn('[ConfidenceDiag] ⚠️ WARNING: All per-field scores are exactly 0.7 — this likely means the AI did NOT return real confidence scores and the adapter defaulted them')
+      console.warn(
+        '[ConfidenceDiag] ⚠️ WARNING: All per-field scores are exactly 0.7 — this likely means the AI did NOT return real confidence scores and the adapter defaulted them'
+      )
     }
 
     const confidenceOverall = recalculateOverallConfidence(
@@ -866,11 +884,24 @@ export async function extractPolicyFromDocument(
     if (extractedData.confidence) {
       extractedData.confidence.overall = confidenceOverall
     }
-    console.warn('[ConfidenceDiag] Final recalculated overall:', Math.round(confidenceOverall * 100) + '%',
-      '| AI reported:', Math.round(rawOverall * 100) + '%',
-      '| Tier:', confidenceOverall >= AI_CONFIG.warningConfidence ? 'FULL_CONFIDENCE' :
-        confidenceOverall >= AI_CONFIG.minConfidence ? 'LOW_CONFIDENCE_WARNING' : 'HARD_REJECT')
-    console.warn('[ConfidenceDiag] Thresholds: minConfidence=' + AI_CONFIG.minConfidence + ', warningConfidence=' + AI_CONFIG.warningConfidence)
+    console.warn(
+      '[ConfidenceDiag] Final recalculated overall:',
+      Math.round(confidenceOverall * 100) + '%',
+      '| AI reported:',
+      Math.round(rawOverall * 100) + '%',
+      '| Tier:',
+      confidenceOverall >= AI_CONFIG.warningConfidence
+        ? 'FULL_CONFIDENCE'
+        : confidenceOverall >= AI_CONFIG.minConfidence
+          ? 'LOW_CONFIDENCE_WARNING'
+          : 'HARD_REJECT'
+    )
+    console.warn(
+      '[ConfidenceDiag] Thresholds: minConfidence=' +
+        AI_CONFIG.minConfidence +
+        ', warningConfidence=' +
+        AI_CONFIG.warningConfidence
+    )
     console.warn('[ConfidenceDiag] ============================================')
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
@@ -1024,11 +1055,22 @@ export async function extractPolicyFromDocument(
           .replace(',', '.')
         const parsedPremium = parseFloat(cleanPremium)
         if (!isNaN(parsedPremium) && parsedPremium !== extractedData.premium) {
-          enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
-          if (import.meta.env.DEV) {
+          // Magnitude sanity check: Prevent extracting vehicle market value as premium
+          // Kasko premiums are rarely over 500,000 TL, but vehicle values are usually 1M+ TL
+          const isSuspiciousVehicleValue =
+            parsedPremium > 500000 && (!extractedData.premium || extractedData.premium < 500000)
+
+          if (isSuspiciousVehicleValue) {
             console.warn(
-              `[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`
+              `[Document AI] Rejected suspicious premium OCR enhancement. OCR value ${parsedPremium} resembles vehicle value. Keeping AI value: ${extractedData.premium}`
             )
+          } else {
+            enhancedExtractedData = { ...enhancedExtractedData, premium: parsedPremium }
+            if (import.meta.env.DEV) {
+              console.warn(
+                `[Document AI] Premium enhanced: ${extractedData.premium} → ${parsedPremium}`
+              )
+            }
           }
         }
       }

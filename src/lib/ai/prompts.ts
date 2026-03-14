@@ -83,7 +83,7 @@ If policy type is unclear, summarize what is insured in plain language with cita
 4. Premium & Payment
 • Net premium
 • Taxes/fees (BSMV, etc.)
-• Total payable
+• Total payable (CRITICAL: DO NOT extract Vehicle Market Value / "Araç Kasko Bedeli" / "Sigorta Bedeli" here. Premium is the cost of the insurance policy, not the value of the insured asset.)
 • Currency
 • Payment plan: installment count, dates, amounts, method (if stated)
 
@@ -163,35 +163,92 @@ Output the cleaned text only, no explanations.`
  */
 export const TURKISH_INSURANCE_TERMS = [
   // Policy document terms
-  'POLİÇE', 'SİGORTA', 'TEMİNAT', 'MUAFİYET', 'PRİM', 'HASAR',
-  'SÖZLEŞME', 'ŞİRKET', 'ADRES', 'TARİH', 'SÜRE', 'VERGİ',
+  'POLİÇE',
+  'SİGORTA',
+  'TEMİNAT',
+  'MUAFİYET',
+  'PRİM',
+  'HASAR',
+  'SÖZLEŞME',
+  'ŞİRKET',
+  'ADRES',
+  'TARİH',
+  'SÜRE',
+  'VERGİ',
 
   // Coverage types
-  'KASKO', 'TRAFİK', 'KONUT', 'SAĞLIK', 'HAYAT', 'YANGIN', 'DEPREM',
-  'DASK', 'SEL', 'HIRSIZLIK', 'KAZA', 'SORUMLULUK', 'NAKLİYAT',
+  'KASKO',
+  'TRAFİK',
+  'KONUT',
+  'SAĞLIK',
+  'HAYAT',
+  'YANGIN',
+  'DEPREM',
+  'DASK',
+  'SEL',
+  'HIRSIZLIK',
+  'KAZA',
+  'SORUMLULUK',
+  'NAKLİYAT',
 
   // Policy parties
-  'SİGORTALI', 'SİGORTA ETTİREN', 'LEHDAR', 'DAİN-İ MÜRTEHİN',
+  'SİGORTALI',
+  'SİGORTA ETTİREN',
+  'LEHDAR',
+  'DAİN-İ MÜRTEHİN',
 
   // Coverage terms
-  'TAZMİNAT', 'LİMİT', 'TUTAR', 'BEDEL', 'DEĞER', 'ORAN',
-  'FRANŞİZ', 'İSTİSNA', 'KAPSAM', 'TEMİNAT DIŞI',
+  'TAZMİNAT',
+  'LİMİT',
+  'TUTAR',
+  'BEDEL',
+  'DEĞER',
+  'ORAN',
+  'FRANŞİZ',
+  'İSTİSNA',
+  'KAPSAM',
+  'TEMİNAT DIŞI',
 
   // Document sections
-  'GENEL ŞARTLAR', 'ÖZEL ŞARTLAR', 'KLOZLAR', 'EK SÖZLEŞME',
-  'TEMİNATLAR', 'İSTİSNALAR', 'AÇIKLAMALAR', 'BİLDİRİM',
+  'GENEL ŞARTLAR',
+  'ÖZEL ŞARTLAR',
+  'KLOZLAR',
+  'EK SÖZLEŞME',
+  'TEMİNATLAR',
+  'İSTİSNALAR',
+  'AÇIKLAMALAR',
+  'BİLDİRİM',
 
   // Vehicle specific
-  'PLAKA', 'ŞASİ', 'MOTOR', 'MODEL', 'MARKA', 'ARAÇ', 'RUHSAT',
+  'PLAKA',
+  'ŞASİ',
+  'MOTOR',
+  'MODEL',
+  'MARKA',
+  'ARAÇ',
+  'RUHSAT',
 
   // Financial terms
-  'ÖDEME', 'TAKSİT', 'BSMV', 'NET PRİM', 'BRÜT PRİM', 'TOPLAM',
+  'ÖDEME',
+  'TAKSİT',
+  'BSMV',
+  'NET PRİM',
+  'BRÜT PRİM',
+  'TOPLAM',
 
   // Company names (partial)
-  'ANONİM', 'ŞİRKETİ', 'AŞ', 'TÜRKİYE', 'ANADOLU',
+  'ANONİM',
+  'ŞİRKETİ',
+  'AŞ',
+  'TÜRKİYE',
+  'ANADOLU',
 
   // Common words in documents
-  'BİRLEŞİK', 'KAPSAMINDA', 'UYARINCA', 'GEREĞİNCE', 'MADDE',
+  'BİRLEŞİK',
+  'KAPSAMINDA',
+  'UYARINCA',
+  'GEREĞİNCE',
+  'MADDE',
 ] as const
 
 /**
@@ -199,18 +256,18 @@ export const TURKISH_INSURANCE_TERMS = [
  * Used for validation of corrections.
  */
 export const OCR_CONFUSION_PAIRS: Record<string, string[]> = {
-  'İ': ['I', 'l', '1', '|'],
-  'ı': ['i', 'l', '1'],
-  'Ş': ['S', '5'],
-  'ş': ['s', '5'],
-  'Ğ': ['G', '6'],
-  'ğ': ['g', '9'],
-  'Ü': ['U', 'Ü'],
-  'ü': ['u', 'ü'],
-  'Ö': ['O', '0'],
-  'ö': ['o', '0'],
-  'Ç': ['C', 'c'],
-  'ç': ['c', 'C'],
+  İ: ['I', 'l', '1', '|'],
+  ı: ['i', 'l', '1'],
+  Ş: ['S', '5'],
+  ş: ['s', '5'],
+  Ğ: ['G', '6'],
+  ğ: ['g', '9'],
+  Ü: ['U', 'Ü'],
+  ü: ['u', 'ü'],
+  Ö: ['O', '0'],
+  ö: ['o', '0'],
+  Ç: ['C', 'c'],
+  ç: ['c', 'C'],
   '0': ['O', 'o', 'Q'],
   '1': ['l', 'I', '|', 'i'],
 }
@@ -253,11 +310,12 @@ export function buildDocumentProcessingPrompt(
     ? DOCUMENT_NORMALIZATION_PROMPT
     : OCR_CORRECTION_PROMPT
 
-  const languageNote = language === 'tr'
-    ? '\n\nNote: This document is in Turkish (Türkçe). Preserve Turkish characters (İ, ı, Ş, ş, Ğ, ğ, Ü, ü, Ö, ö, Ç, ç) carefully.'
-    : language === 'en'
-    ? '\n\nNote: This document is in English.'
-    : '\n\nNote: This document is mixed Turkish/English. Preserve Turkish characters carefully.'
+  const languageNote =
+    language === 'tr'
+      ? '\n\nNote: This document is in Turkish (Türkçe). Preserve Turkish characters (İ, ı, Ş, ş, Ğ, ğ, Ü, ü, Ö, ö, Ç, ç) carefully.'
+      : language === 'en'
+        ? '\n\nNote: This document is in English.'
+        : '\n\nNote: This document is mixed Turkish/English. Preserve Turkish characters carefully.'
 
   return `${systemPrompt}${languageNote}
 
@@ -281,19 +339,25 @@ export function parseDocumentProcessingResponse(response: string): {
   }
 
   // Try to find Output A marker
-  const outputAMatch = response.match(/===\s*OUTPUT A[:\s]*CLEANED TEXT\s*===\s*([\s\S]*?)(?====\s*OUTPUT B|$)/i)
+  const outputAMatch = response.match(
+    /===\s*OUTPUT A[:\s]*CLEANED TEXT\s*===\s*([\s\S]*?)(?====\s*OUTPUT B|$)/i
+  )
   if (outputAMatch) {
     result.cleanedText = outputAMatch[1].trim()
 
     // Extract normalization log from Output A
-    const logMatch = result.cleanedText.match(/Normalization Log[:\s]*([\s\S]*?)(?=\n\n|\n---|\n[A-Z])/i)
+    const logMatch = result.cleanedText.match(
+      /Normalization Log[:\s]*([\s\S]*?)(?=\n\n|\n---|\n[A-Z])/i
+    )
     if (logMatch) {
       result.normalizationLog = logMatch[1].trim()
     }
   }
 
   // Try to find Output B marker
-  const outputBMatch = response.match(/===\s*OUTPUT B[:\s]*STRUCTURED EXTRACTION\s*===\s*([\s\S]*?)$/i)
+  const outputBMatch = response.match(
+    /===\s*OUTPUT B[:\s]*STRUCTURED EXTRACTION\s*===\s*([\s\S]*?)$/i
+  )
   if (outputBMatch) {
     result.structuredExtraction = outputBMatch[1].trim()
   }
@@ -301,7 +365,10 @@ export function parseDocumentProcessingResponse(response: string): {
   // If no markers found, try to split on common patterns
   if (!result.cleanedText && !result.structuredExtraction) {
     // Look for structured extraction patterns
-    if (response.includes('## 1. Document Metadata') || response.includes('### Document Metadata')) {
+    if (
+      response.includes('## 1. Document Metadata') ||
+      response.includes('### Document Metadata')
+    ) {
       // Assume everything before metadata is cleaned text
       const metadataIndex = response.search(/##?\s*1?\.\s*Document Metadata/i)
       if (metadataIndex > 100) {
@@ -322,7 +389,10 @@ export function parseDocumentProcessingResponse(response: string): {
 /**
  * Validate that OCR corrections are consistent with known Turkish terms
  */
-export function validateOCRCorrection(original: string, corrected: string): {
+export function validateOCRCorrection(
+  original: string,
+  corrected: string
+): {
   isValid: boolean
   issues: string[]
 } {
@@ -337,7 +407,7 @@ export function validateOCRCorrection(original: string, corrected: string): {
       // New character introduced - check if it's a valid Turkish correction
       const isValidTurkishChar = /[İıŞşĞğÜüÖöÇç]/.test(char)
       const couldBeConfusion = Object.entries(OCR_CONFUSION_PAIRS).some(
-        ([correct, confusions]) => correct === char && confusions.some(c => originalChars.has(c))
+        ([correct, confusions]) => correct === char && confusions.some((c) => originalChars.has(c))
       )
 
       if (!isValidTurkishChar && !couldBeConfusion) {

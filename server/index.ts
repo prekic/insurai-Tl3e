@@ -28,6 +28,8 @@ import emailRoutes from './routes/email.js'
 import fxRoutes from './routes/fx.js'
 import settingsRoutes from './routes/settings.js'
 import webhookRoutes from './routes/webhooks.js'
+import policyRoutes from './routes/policy.js'
+
 import driftRoutes from './routes/drift.js'
 import translationRoutes from './routes/translations.js'
 import notificationRoutes from './routes/notifications.js'
@@ -338,6 +340,9 @@ app.use('/api/admin/drift', authenticateAdmin, driftRoutes)
 
 // PDF extraction routes (with longer timeout for large files)
 app.use('/api/pdf', requestTimeout(SERVER_CONFIG.AI_REQUEST_TIMEOUT), pdfRoutes)
+
+// Policy routes (saves, proxy users, anonymous)
+app.use('/api/policy', policyRoutes)
 
 // FX (Currency conversion) routes
 app.use('/api/fx', fxRoutes)

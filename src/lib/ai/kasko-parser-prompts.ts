@@ -279,6 +279,7 @@ PARSING ANCHORS - explicitly search for these phrases:
 
 **Premium:**
 - "Vergi Öncesi Prim", "BSMV", "Ödenecek Tutar", "Ödeme Planı"
+- CRITICAL WARNING: Do not confuse the Premium ("Prim" - the cost of insurance, typically thousands of TL) with the Vehicle Market Value ("Araç Değeri" or "Kasko Bedeli", typically millions of TL).
 
 **Coverages:**
 - "TEMİNAT", "SİGORTA KAPSAMI", "KOLTUK FERDİ KAZA", "HUKUKSAL KORUMA", "ARTAN MALİ SORUMLULUK"
@@ -494,49 +495,12 @@ export interface StructuredPolicyData {
 // ============================================================================
 
 export const TURKISH_SECTION_ANCHORS = {
-  TARAFLAR: [
-    'SÖZLEŞME TARAFLARI',
-    'Sigorta Ettiren',
-    'Sigortalı',
-    'SİGORTACI',
-    'ACENTESİ',
-  ],
-  KONU: [
-    'SİGORTA KONUSU',
-    'Sigortalanan Araç',
-    'Araç Bilgileri',
-    'ARAÇ',
-    'Plaka',
-  ],
-  PRIM: [
-    'PRİM BİLGİLERİ',
-    'Prim Tutarı',
-    'Ödeme Planı',
-    'BSMV',
-    'Ödenecek Tutar',
-    'NET PRİM',
-  ],
-  TEMINAT: [
-    'TEMİNAT',
-    'SİGORTA KAPSAMI',
-    'Teminat Tablosu',
-    'KASKO TEMİNATLARI',
-    'EK TEMİNATLAR',
-  ],
-  KLOZLAR: [
-    'KLOZLAR',
-    'Özel Şartlar',
-    'KLOZ',
-    'Ek Klozlar',
-  ],
-  MUAFIYET: [
-    'MUAFİYET',
-    'Tenzili Muafiyet',
-    'TENZİLİ MUAFİYET',
-    'Sigortalı Payı',
-    '%35',
-    '%80',
-  ],
+  TARAFLAR: ['SÖZLEŞME TARAFLARI', 'Sigorta Ettiren', 'Sigortalı', 'SİGORTACI', 'ACENTESİ'],
+  KONU: ['SİGORTA KONUSU', 'Sigortalanan Araç', 'Araç Bilgileri', 'ARAÇ', 'Plaka'],
+  PRIM: ['PRİM BİLGİLERİ', 'Prim Tutarı', 'Ödeme Planı', 'BSMV', 'Ödenecek Tutar', 'NET PRİM'],
+  TEMINAT: ['TEMİNAT', 'SİGORTA KAPSAMI', 'Teminat Tablosu', 'KASKO TEMİNATLARI', 'EK TEMİNATLAR'],
+  KLOZLAR: ['KLOZLAR', 'Özel Şartlar', 'KLOZ', 'Ek Klozlar'],
+  MUAFIYET: ['MUAFİYET', 'Tenzili Muafiyet', 'TENZİLİ MUAFİYET', 'Sigortalı Payı', '%35', '%80'],
   HASARSIZLIK: [
     'Hasarsızlık',
     'HASARSIZLIK',
@@ -544,47 +508,13 @@ export const TURKISH_SECTION_ANCHORS = {
     'Hasarsızlık İndirimi',
     'Hasarsızlık Kademesi',
   ],
-  IKAME: [
-    'İkame Araç',
-    'İKAME ARAÇ',
-    'Yedek Araç',
-    'Kiralık Araç',
-  ],
-  ASISTANS: [
-    'Asistans',
-    'ASİSTANS',
-    'Yol Yardım',
-    'Çekme Kurtarma',
-  ],
-  FERDI_KAZA: [
-    'Ferdi Kaza',
-    'FERDİ KAZA',
-    'Koltuk Ferdi Kaza',
-    'Sürücü Ferdi Kaza',
-  ],
-  HUKUKI: [
-    'Hukuki Koruma',
-    'HUKUKİ KORUMA',
-    'Hukuksal Koruma',
-  ],
-  MALI_SORUMLULUK: [
-    'Artan Mali Sorumluluk',
-    'İMM',
-    'İhtiyari Mali',
-    'Mali Mesuliyet',
-  ],
-  ISTISNALAR: [
-    'İSTİSNALAR',
-    'Kapsam Dışı',
-    'Sigorta Dışı',
-    'Teminat Dışı',
-  ],
-  HASAR: [
-    'HASAR',
-    'Hasar Bildirimi',
-    'Hasar Anında',
-    'Hasar Prosedürü',
-  ],
+  IKAME: ['İkame Araç', 'İKAME ARAÇ', 'Yedek Araç', 'Kiralık Araç'],
+  ASISTANS: ['Asistans', 'ASİSTANS', 'Yol Yardım', 'Çekme Kurtarma'],
+  FERDI_KAZA: ['Ferdi Kaza', 'FERDİ KAZA', 'Koltuk Ferdi Kaza', 'Sürücü Ferdi Kaza'],
+  HUKUKI: ['Hukuki Koruma', 'HUKUKİ KORUMA', 'Hukuksal Koruma'],
+  MALI_SORUMLULUK: ['Artan Mali Sorumluluk', 'İMM', 'İhtiyari Mali', 'Mali Mesuliyet'],
+  ISTISNALAR: ['İSTİSNALAR', 'Kapsam Dışı', 'Sigorta Dışı', 'Teminat Dışı'],
+  HASAR: ['HASAR', 'Hasar Bildirimi', 'Hasar Anında', 'Hasar Prosedürü'],
 }
 
 // ============================================================================
