@@ -37,6 +37,7 @@ const mockUpdateProcessingLog = vi.fn()
 const mockAddProcessingStage = vi.fn()
 const mockGetProcessingLog = vi.fn()
 const mockGoogleAuthGetAccessToken = vi.fn()
+const mockFetch = vi.fn()
 
 // =============================================================================
 // MODULE MOCKS
@@ -210,6 +211,13 @@ function setupDefaultMocks() {
   mockNotifyBillingIssue.mockResolvedValue(undefined)
   mockNotifyRateLimit.mockResolvedValue(undefined)
   mockNotifyAPIError.mockResolvedValue(undefined)
+  // Mock global fetch for Google Vision API calls in /diagnose endpoint
+  mockFetch.mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => ({ responses: [{}] }),
+  })
+  vi.stubGlobal('fetch', mockFetch)
 }
 
 function makeOpenAIResponse(content: string, model = 'gpt-4o') {
