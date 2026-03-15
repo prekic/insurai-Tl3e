@@ -1051,7 +1051,9 @@ describe('extractTextFromPDFWithRetry', () => {
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
 
     // Advance past timeout (30s) + backoff (1s) + some margin
-    await vi.advanceTimersByTimeAsync(35000)
+    // Do it in discrete steps to avoid Vitest timer loop detection
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(5000)
     const result = await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedWarnCalls = [...warnSpy.mock.calls]
@@ -1071,7 +1073,9 @@ describe('extractTextFromPDFWithRetry', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'always-fails.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 2)
-    await vi.runAllTimersAsync()
+    // Advance timers manually (30s+ timeout * 2 attempts) to prevent runner infinite loop
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedErrorCalls = [...errorSpy.mock.calls]
@@ -1096,7 +1100,11 @@ describe('extractTextFromPDFWithRetry', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'fails.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file) // default maxRetries
-    await vi.runAllTimersAsync()
+
+    // Advance timers manually (3 attempts * 30s)
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedErrorCalls = [...errorSpy.mock.calls]
@@ -1127,7 +1135,9 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'flaky.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedWarnCalls = [...warnSpy.mock.calls]
@@ -1147,7 +1157,8 @@ describe('extractTextFromPDFWithRetry', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 2)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
     errorSpy.mockRestore()
@@ -1173,7 +1184,9 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedWarnCalls = [...warnSpy.mock.calls]
@@ -1192,7 +1205,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 1)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
     errorSpy.mockRestore()
@@ -1209,7 +1222,9 @@ describe('extractTextFromPDFWithRetry', () => {
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
 
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
 
     // Check logged backoff delays: 1000ms (between attempt 1-2), 2000ms (between attempt 2-3)
@@ -1230,7 +1245,13 @@ describe('extractTextFromPDFWithRetry', () => {
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 5)
 
-    await vi.runAllTimersAsync()
+    // Advance in discrete chunks to avoid vitest detecting an infinite timer loop
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(30000)
+    await vi.advanceTimersByTimeAsync(30000)
     await resultPromise
 
     // With 5 attempts: delays are 1000, 2000, 4000, 4000 (capped)
@@ -1254,7 +1275,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 1)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
     errorSpy.mockRestore()
@@ -1439,7 +1460,8 @@ describe('isRetryableErrorCode logic (tested via extractTextFromPDFWithRetry)', 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 2)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
     errorSpy.mockRestore()
@@ -1454,7 +1476,7 @@ describe('isRetryableErrorCode logic (tested via extractTextFromPDFWithRetry)', 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
 
@@ -1467,7 +1489,7 @@ describe('isRetryableErrorCode logic (tested via extractTextFromPDFWithRetry)', 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
 
@@ -1480,7 +1502,7 @@ describe('isRetryableErrorCode logic (tested via extractTextFromPDFWithRetry)', 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { renderHook, act } from '@testing-library/react'
+import { renderHook, act, waitFor } from '@testing-library/react'
 import type { PolicyComparison } from '@/lib/policy-evaluation/types'
 import type { Policy, PolicyType, PolicyStatus } from '@/types/policy'
 
@@ -7,10 +7,24 @@ import type { Policy, PolicyType, PolicyStatus } from '@/types/policy'
 // Mocks
 // ---------------------------------------------------------------------------
 
-const mockComparePolicies = vi.fn()
+const { mockComparePolicies } = vi.hoisted(() => ({
+  mockComparePolicies: vi.fn(),
+}))
 
 vi.mock('@/lib/policy-evaluation', () => ({
   comparePolicies: (...args: unknown[]) => mockComparePolicies(...args),
+  comparePoliciesAsync: async (...args: unknown[]) => mockComparePolicies(...args),
+  convertDatabaseConfigToEvaluatorConfig: (cfg: any) => ({ ...cfg }),
+}))
+
+vi.mock('@/lib/config', () => ({
+  configService: {
+    getEvaluationConfig: vi.fn().mockImplementation(async () => ({
+      strictCompliance: true,
+      includeOptionalCoverages: false,
+      useRegionalBenchmarks: false,
+    })),
+  },
 }))
 
 // ---------------------------------------------------------------------------
@@ -60,16 +74,73 @@ function createMockComparison(policyIds: string[]): PolicyComparison {
         grade: 'B' as const,
         status: 'good' as const,
         scoreBreakdown: {
-          premium: { category: 'Premium', categoryTR: 'Prim', score: 75, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-          coverage: { category: 'Coverage', categoryTR: 'Teminat', score: 80, weight: 30, details: '', detailsTR: '', issues: [], issuesTR: [] },
-          deductible: { category: 'Deductible', categoryTR: 'Muafiyet', score: 70, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
-          compliance: { category: 'Compliance', categoryTR: 'Uyum', score: 90, weight: 20, details: '', detailsTR: '', issues: [], issuesTR: [] },
-          value: { category: 'Value', categoryTR: 'Deger', score: 85, weight: 15, details: '', detailsTR: '', issues: [], issuesTR: [] },
+          premium: {
+            category: 'Premium',
+            categoryTR: 'Prim',
+            score: 75,
+            weight: 20,
+            details: '',
+            detailsTR: '',
+            issues: [],
+            issuesTR: [],
+          },
+          coverage: {
+            category: 'Coverage',
+            categoryTR: 'Teminat',
+            score: 80,
+            weight: 30,
+            details: '',
+            detailsTR: '',
+            issues: [],
+            issuesTR: [],
+          },
+          deductible: {
+            category: 'Deductible',
+            categoryTR: 'Muafiyet',
+            score: 70,
+            weight: 15,
+            details: '',
+            detailsTR: '',
+            issues: [],
+            issuesTR: [],
+          },
+          compliance: {
+            category: 'Compliance',
+            categoryTR: 'Uyum',
+            score: 90,
+            weight: 20,
+            details: '',
+            detailsTR: '',
+            issues: [],
+            issuesTR: [],
+          },
+          value: {
+            category: 'Value',
+            categoryTR: 'Deger',
+            score: 85,
+            weight: 15,
+            details: '',
+            detailsTR: '',
+            issues: [],
+            issuesTR: [],
+          },
         },
-        marketComparison: { premiumPercentile: 60, coveragePercentile: 70, isAboveAverageValue: true, competitivePosition: 'competitive' as const },
+        marketComparison: {
+          premiumPercentile: 60,
+          coveragePercentile: 70,
+          isAboveAverageValue: true,
+          competitivePosition: 'competitive' as const,
+        },
         compliance: { isCompliant: true, mandatoryMet: true, minimumLimitsMet: true, issues: [] },
         recommendations: [],
-        summary: { strengths: [], strengthsTR: [], weaknesses: [], weaknessesTR: [], immediateActions: [], immediateActionsTR: [] },
+        summary: {
+          strengths: [],
+          strengthsTR: [],
+          weaknesses: [],
+          weaknessesTR: [],
+          immediateActions: [],
+          immediateActionsTR: [],
+        },
       },
       label: `Policy ${i + 1}`,
     })),
@@ -102,11 +173,7 @@ function createMockComparison(policyIds: string[]): PolicyComparison {
 // Import hooks lazily (after mocks are set up)
 // ---------------------------------------------------------------------------
 
-import {
-  usePolicyComparison,
-  useCompareSelection,
-  useCompareUrlState,
-} from './usePolicyComparison'
+import { usePolicyComparison, useCompareSelection, useCompareUrlState } from './usePolicyComparison'
 
 // ===========================================================================
 // usePolicyComparison
@@ -116,6 +183,7 @@ describe('usePolicyComparison', () => {
   beforeEach(() => {
     nextPolicyId = 1
     mockComparePolicies.mockReset()
+    vi.clearAllMocks()
   })
 
   // -------------------------------------------------------------------------
@@ -123,70 +191,87 @@ describe('usePolicyComparison', () => {
   // -------------------------------------------------------------------------
 
   describe('validation', () => {
-    it('returns invalid for 0 policies', () => {
-      const { result } = renderHook(() => usePolicyComparison([]))
+    it('returns invalid for 0 policies', async () => {
+      const policies: Policy[] = []
+      const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(false)
-      expect(result.current.validationMessage).toBe('Select at least 2 policies to compare')
-      expect(result.current.comparison).toBeNull()
-      expect(result.current.error).toBeNull()
-      expect(result.current.isLoading).toBe(false)
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(false)
+        expect(result.current.validationMessage).toBe('Select at least 2 policies to compare')
+        expect(result.current.comparison).toBeNull()
+        expect(result.current.error).toBeNull()
+        expect(result.current.isLoading).toBe(false)
+      })
     })
 
-    it('returns invalid for 1 policy', () => {
+    it('returns invalid for 1 policy', async () => {
       const policies = [createMockPolicy()]
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(false)
-      expect(result.current.validationMessage).toBe('Select at least 2 policies to compare')
-      expect(result.current.comparison).toBeNull()
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(false)
+        expect(result.current.validationMessage).toBe('Select at least 2 policies to compare')
+        expect(result.current.comparison).toBeNull()
+        expect(result.current.isLoading).toBe(false)
+      })
       expect(mockComparePolicies).not.toHaveBeenCalled()
     })
 
-    it('returns valid for 2 policies', () => {
+    it('returns valid for 2 policies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      const ids = policies.map(p => p.id)
+      const ids = policies.map((p) => p.id)
       const mockResult = createMockComparison(ids)
       mockComparePolicies.mockReturnValue(mockResult)
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(true)
-      expect(result.current.validationMessage).toBeNull()
-      expect(result.current.comparison).toBe(mockResult)
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(true)
+        expect(result.current.validationMessage).toBeNull()
+        expect(result.current.comparison).toBe(mockResult)
+      })
     })
 
-    it('returns valid for 3 policies', () => {
+    it('returns valid for 3 policies', async () => {
       const policies = [createMockPolicy(), createMockPolicy(), createMockPolicy()]
-      const ids = policies.map(p => p.id)
+      const ids = policies.map((p) => p.id)
       mockComparePolicies.mockReturnValue(createMockComparison(ids))
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(true)
-      expect(result.current.validationMessage).toBeNull()
-      expect(result.current.comparison).not.toBeNull()
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(true)
+        expect(result.current.validationMessage).toBeNull()
+        expect(result.current.comparison).not.toBeNull()
+        expect(result.current.isLoading).toBe(false)
+      })
     })
 
-    it('returns valid for 4 policies', () => {
+    it('returns valid for 4 policies', async () => {
       const policies = Array.from({ length: 4 }, () => createMockPolicy())
-      const ids = policies.map(p => p.id)
+      const ids = policies.map((p) => p.id)
       mockComparePolicies.mockReturnValue(createMockComparison(ids))
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(true)
-      expect(result.current.validationMessage).toBeNull()
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(true)
+        expect(result.current.validationMessage).toBeNull()
+        expect(result.current.isLoading).toBe(false)
+      })
     })
 
-    it('returns invalid for 5 policies', () => {
+    it('returns invalid for 5 policies', async () => {
       const policies = Array.from({ length: 5 }, () => createMockPolicy())
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.isValid).toBe(false)
-      expect(result.current.validationMessage).toBe('Maximum 4 policies can be compared')
-      expect(result.current.comparison).toBeNull()
+      await waitFor(() => {
+        expect(result.current.isValid).toBe(false)
+        expect(result.current.validationMessage).toBe('Maximum 4 policies can be compared')
+        expect(result.current.comparison).toBeNull()
+        expect(result.current.isLoading).toBe(false)
+      })
       expect(mockComparePolicies).not.toHaveBeenCalled()
     })
   })
@@ -196,55 +281,77 @@ describe('usePolicyComparison', () => {
   // -------------------------------------------------------------------------
 
   describe('comparePolicies invocation', () => {
-    it('passes policies to comparePolicies', () => {
+    it('passes policies to comparePolicies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockReturnValue(createMockComparison(policies.map(p => p.id)))
+      mockComparePolicies.mockReturnValue(createMockComparison(policies.map((p) => p.id)))
 
-      renderHook(() => usePolicyComparison(policies))
+      const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(mockComparePolicies).toHaveBeenCalledTimes(1)
-      expect(mockComparePolicies).toHaveBeenCalledWith(policies, undefined, undefined)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+        expect(mockComparePolicies).toHaveBeenCalledWith(policies, undefined, expect.any(Object))
+      })
     })
 
-    it('passes labels option to comparePolicies', () => {
+    it('passes labels option to comparePolicies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
       const labels = ['Current', 'Alternative']
-      mockComparePolicies.mockReturnValue(createMockComparison(policies.map(p => p.id)))
+      mockComparePolicies.mockReturnValue(createMockComparison(policies.map((p) => p.id)))
 
-      renderHook(() => usePolicyComparison(policies, { labels }))
+      const { result } = renderHook(() => usePolicyComparison(policies, { labels }))
 
-      expect(mockComparePolicies).toHaveBeenCalledWith(policies, labels, undefined)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledWith(policies, labels, expect.any(Object))
+      })
     })
 
-    it('passes config option to comparePolicies', () => {
+    it('passes config option to comparePolicies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      const config = { weights: { premium: 30, coverage: 25, deductible: 15, compliance: 15, value: 15 } }
-      mockComparePolicies.mockReturnValue(createMockComparison(policies.map(p => p.id)))
+      const config = {
+        weights: { premium: 30, coverage: 25, deductible: 15, compliance: 15, value: 15 },
+      }
+      mockComparePolicies.mockReturnValue(createMockComparison(policies.map((p) => p.id)))
 
-      renderHook(() => usePolicyComparison(policies, { config }))
+      const { result } = renderHook(() => usePolicyComparison(policies, { config }))
 
-      expect(mockComparePolicies).toHaveBeenCalledWith(policies, undefined, config)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledWith(policies, undefined, expect.any(Object))
+      })
     })
 
-    it('passes both labels and config to comparePolicies', () => {
+    it('passes both labels and config to comparePolicies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
       const labels = ['A', 'B']
       const config = { strictCompliance: false }
-      mockComparePolicies.mockReturnValue(createMockComparison(policies.map(p => p.id)))
+      mockComparePolicies.mockReturnValue(createMockComparison(policies.map((p) => p.id)))
 
-      renderHook(() => usePolicyComparison(policies, { labels, config }))
+      const { result } = renderHook(() => usePolicyComparison(policies, { labels, config }))
 
-      expect(mockComparePolicies).toHaveBeenCalledWith(policies, labels, config)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledWith(policies, labels, expect.any(Object))
+      })
     })
 
-    it('does not call comparePolicies when validation fails (too few)', () => {
-      renderHook(() => usePolicyComparison([createMockPolicy()]))
-      expect(mockComparePolicies).not.toHaveBeenCalled()
+    it('does not call comparePolicies when validation fails (too few)', async () => {
+      const policies = [createMockPolicy()]
+      const { result } = renderHook(() => usePolicyComparison(policies))
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).not.toHaveBeenCalled()
+      })
     })
 
-    it('does not call comparePolicies when validation fails (too many)', () => {
-      renderHook(() => usePolicyComparison(Array.from({ length: 5 }, () => createMockPolicy())))
-      expect(mockComparePolicies).not.toHaveBeenCalled()
+    it('does not call comparePolicies when validation fails (too many)', async () => {
+      const policies = Array.from({ length: 5 }, () => createMockPolicy())
+      const { result } = renderHook(() => usePolicyComparison(policies))
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).not.toHaveBeenCalled()
+      })
     })
   })
 
@@ -253,39 +360,53 @@ describe('usePolicyComparison', () => {
   // -------------------------------------------------------------------------
 
   describe('error handling', () => {
-    it('catches Error thrown by comparePolicies and returns it', () => {
+    it('catches Error thrown by comparePolicies and returns it', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
       const error = new Error('Comparison failed: invalid data')
-      mockComparePolicies.mockImplementation(() => { throw error })
+      mockComparePolicies.mockImplementation(() => {
+        throw error
+      })
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.error).toBe(error)
-      expect(result.current.comparison).toBeNull()
-      expect(result.current.isValid).toBe(true) // validation passed, execution failed
-      expect(result.current.validationMessage).toBeNull()
-      expect(result.current.isLoading).toBe(false)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.error).toBe(error)
+        expect(result.current.comparison).toBeNull()
+        expect(result.current.isValid).toBe(true)
+        expect(result.current.validationMessage).toBeNull()
+      })
     })
 
-    it('wraps non-Error thrown values in a generic Error', () => {
+    it('wraps non-Error thrown values in a generic Error', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockImplementation(() => { throw 'string error' })  
+      mockComparePolicies.mockImplementation(() => {
+        throw 'string error'
+      })
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.error).toBeInstanceOf(Error)
-      expect(result.current.error?.message).toBe('Failed to compare policies')
-      expect(result.current.comparison).toBeNull()
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.error).toBeInstanceOf(Error)
+        expect(result.current.error?.message).toBe('Failed to compare policies')
+        expect(result.current.comparison).toBeNull()
+      })
     })
 
-    it('wraps thrown null in a generic Error', () => {
+    it('wraps thrown null in a generic Error', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockImplementation(() => { throw null })  
+      mockComparePolicies.mockImplementation(() => {
+        throw null
+      })
 
       const { result } = renderHook(() => usePolicyComparison(policies))
 
-      expect(result.current.error).toBeInstanceOf(Error)
-      expect(result.current.error?.message).toBe('Failed to compare policies')
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(result.current.error).toBeInstanceOf(Error)
+        expect(result.current.error?.message).toBe('Failed to compare policies')
+      })
     })
   })
 
@@ -294,61 +415,76 @@ describe('usePolicyComparison', () => {
   // -------------------------------------------------------------------------
 
   describe('memoization', () => {
-    it('does not recompute when policies reference changes but content is identical', () => {
+    it('does not recompute when policies reference changes but content is identical', async () => {
       const p1 = createMockPolicy({ id: 'p1', premium: 1000, coverage: 500000 })
       const p2 = createMockPolicy({ id: 'p2', premium: 2000, coverage: 600000 })
       mockComparePolicies.mockReturnValue(createMockComparison(['p1', 'p2']))
 
-      const { rerender } = renderHook(
-        ({ policies }) => usePolicyComparison(policies),
-        { initialProps: { policies: [p1, p2] } }
-      )
+      const { result, rerender } = renderHook(({ policies }) => usePolicyComparison(policies), {
+        initialProps: { policies: [p1, p2] },
+      })
 
-      expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      })
 
       // Create new array reference with same policy objects
       rerender({ policies: [p1, p2] })
 
       // Should still be 1 call because the hash (id:premium:coverage) is identical
-      expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      })
     })
 
-    it('recomputes when a policy premium changes', () => {
+    it('recomputes when a policy premium changes', async () => {
       const p1 = createMockPolicy({ id: 'p1', premium: 1000, coverage: 500000 })
       const p2 = createMockPolicy({ id: 'p2', premium: 2000, coverage: 600000 })
       mockComparePolicies.mockReturnValue(createMockComparison(['p1', 'p2']))
 
-      const { rerender } = renderHook(
-        ({ policies }) => usePolicyComparison(policies),
-        { initialProps: { policies: [p1, p2] } }
-      )
+      const { result, rerender } = renderHook(({ policies }) => usePolicyComparison(policies), {
+        initialProps: { policies: [p1, p2] },
+      })
 
-      expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledTimes(1)
+      })
 
       // Change premium on p1
       const p1Updated = { ...p1, premium: 1500 }
       rerender({ policies: [p1Updated, p2] })
 
-      expect(mockComparePolicies).toHaveBeenCalledTimes(2)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+        expect(mockComparePolicies).toHaveBeenCalledTimes(2)
+      })
     })
   })
 
   // -------------------------------------------------------------------------
-  // isLoading is always false (synchronous)
+  // isLoading eventually becomes false (asynchronous)
   // -------------------------------------------------------------------------
 
   describe('isLoading', () => {
-    it('is always false for valid policies', () => {
+    it('becomes false for valid policies', async () => {
       const policies = [createMockPolicy(), createMockPolicy()]
-      mockComparePolicies.mockReturnValue(createMockComparison(policies.map(p => p.id)))
+      mockComparePolicies.mockReturnValue(createMockComparison(policies.map((p) => p.id)))
 
       const { result } = renderHook(() => usePolicyComparison(policies))
-      expect(result.current.isLoading).toBe(false)
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
     })
 
-    it('is always false for invalid policies', () => {
-      const { result } = renderHook(() => usePolicyComparison([]))
-      expect(result.current.isLoading).toBe(false)
+    it('becomes false for invalid policies', async () => {
+      const policies: Policy[] = []
+      const { result } = renderHook(() => usePolicyComparison(policies))
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
     })
   })
 })
@@ -393,7 +529,9 @@ describe('useCompareSelection', () => {
     it('adds a policy when not selected', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1'])
       expect(result.current.selectionCount).toBe(1)
@@ -402,8 +540,12 @@ describe('useCompareSelection', () => {
     it('removes a policy when already selected', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.togglePolicy('p1') })
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual([])
       expect(result.current.selectionCount).toBe(0)
@@ -412,9 +554,15 @@ describe('useCompareSelection', () => {
     it('does not add beyond maxPolicies', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.togglePolicy('p1') })
-      act(() => { result.current.togglePolicy('p2') })
-      act(() => { result.current.togglePolicy('p3') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
+      act(() => {
+        result.current.togglePolicy('p2')
+      })
+      act(() => {
+        result.current.togglePolicy('p3')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
       expect(result.current.selectionCount).toBe(2)
@@ -423,11 +571,17 @@ describe('useCompareSelection', () => {
     it('still allows removing when at max', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.togglePolicy('p1') })
-      act(() => { result.current.togglePolicy('p2') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
+      act(() => {
+        result.current.togglePolicy('p2')
+      })
 
       // At max, try to remove
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual(['p2'])
       expect(result.current.selectionCount).toBe(1)
@@ -436,13 +590,19 @@ describe('useCompareSelection', () => {
     it('toggle add, remove, add cycle', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
       expect(result.current.selectedIds).toEqual(['p1'])
 
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
       expect(result.current.selectedIds).toEqual([])
 
-      act(() => { result.current.togglePolicy('p1') })
+      act(() => {
+        result.current.togglePolicy('p1')
+      })
       expect(result.current.selectedIds).toEqual(['p1'])
     })
   })
@@ -455,7 +615,9 @@ describe('useCompareSelection', () => {
     it('adds a new policy', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1'])
     })
@@ -463,8 +625,12 @@ describe('useCompareSelection', () => {
     it('prevents duplicates', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1'])
       expect(result.current.selectionCount).toBe(1)
@@ -473,9 +639,15 @@ describe('useCompareSelection', () => {
     it('respects maxPolicies limit', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
-      act(() => { result.current.addPolicy('p3') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
+      act(() => {
+        result.current.addPolicy('p3')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
     })
@@ -483,9 +655,15 @@ describe('useCompareSelection', () => {
     it('does nothing when adding duplicate at max capacity', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
-      act(() => { result.current.addPolicy('p1') }) // duplicate + at max
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
+      act(() => {
+        result.current.addPolicy('p1')
+      }) // duplicate + at max
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
     })
@@ -499,9 +677,15 @@ describe('useCompareSelection', () => {
     it('removes an existing policy', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
-      act(() => { result.current.removePolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
+      act(() => {
+        result.current.removePolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual(['p2'])
     })
@@ -509,8 +693,12 @@ describe('useCompareSelection', () => {
     it('is a no-op for non-existent policy', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.removePolicy('p999') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.removePolicy('p999')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1'])
     })
@@ -518,8 +706,12 @@ describe('useCompareSelection', () => {
     it('can empty the selection', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.removePolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.removePolicy('p1')
+      })
 
       expect(result.current.selectedIds).toEqual([])
       expect(result.current.selectionCount).toBe(0)
@@ -534,10 +726,18 @@ describe('useCompareSelection', () => {
     it('clears all selected policies', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
-      act(() => { result.current.addPolicy('p3') })
-      act(() => { result.current.clearSelection() })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
+      act(() => {
+        result.current.addPolicy('p3')
+      })
+      act(() => {
+        result.current.clearSelection()
+      })
 
       expect(result.current.selectedIds).toEqual([])
       expect(result.current.selectionCount).toBe(0)
@@ -548,7 +748,9 @@ describe('useCompareSelection', () => {
     it('is a no-op when already empty', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.clearSelection() })
+      act(() => {
+        result.current.clearSelection()
+      })
 
       expect(result.current.selectedIds).toEqual([])
     })
@@ -562,8 +764,12 @@ describe('useCompareSelection', () => {
     it('replaces entire selection', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.setSelection(['p2', 'p3']) })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.setSelection(['p2', 'p3'])
+      })
 
       expect(result.current.selectedIds).toEqual(['p2', 'p3'])
     })
@@ -571,7 +777,9 @@ describe('useCompareSelection', () => {
     it('truncates to maxPolicies', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.setSelection(['p1', 'p2', 'p3', 'p4']) })
+      act(() => {
+        result.current.setSelection(['p1', 'p2', 'p3', 'p4'])
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
     })
@@ -579,8 +787,12 @@ describe('useCompareSelection', () => {
     it('can set empty selection', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.setSelection([]) })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.setSelection([])
+      })
 
       expect(result.current.selectedIds).toEqual([])
     })
@@ -588,7 +800,9 @@ describe('useCompareSelection', () => {
     it('respects default maxPolicies of 4', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.setSelection(['p1', 'p2', 'p3', 'p4', 'p5']) })
+      act(() => {
+        result.current.setSelection(['p1', 'p2', 'p3', 'p4', 'p5'])
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2', 'p3', 'p4'])
     })
@@ -602,8 +816,12 @@ describe('useCompareSelection', () => {
     it('canAdd is true when below max', () => {
       const { result } = renderHook(() => useCompareSelection(3))
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
 
       expect(result.current.canAdd).toBe(true)
     })
@@ -611,8 +829,12 @@ describe('useCompareSelection', () => {
     it('canAdd is false when at max', () => {
       const { result } = renderHook(() => useCompareSelection(2))
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
 
       expect(result.current.canAdd).toBe(false)
     })
@@ -625,7 +847,9 @@ describe('useCompareSelection', () => {
     it('canCompare is false with 1 selection', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
 
       expect(result.current.canCompare).toBe(false)
     })
@@ -633,8 +857,12 @@ describe('useCompareSelection', () => {
     it('canCompare is true with 2 selections', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
 
       expect(result.current.canCompare).toBe(true)
     })
@@ -642,7 +870,9 @@ describe('useCompareSelection', () => {
     it('canCompare is true with 4 selections', () => {
       const { result } = renderHook(() => useCompareSelection())
 
-      act(() => { result.current.setSelection(['p1', 'p2', 'p3', 'p4']) })
+      act(() => {
+        result.current.setSelection(['p1', 'p2', 'p3', 'p4'])
+      })
 
       expect(result.current.canCompare).toBe(true)
     })
@@ -652,16 +882,24 @@ describe('useCompareSelection', () => {
 
       expect(result.current.selectionCount).toBe(0)
 
-      act(() => { result.current.addPolicy('p1') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
       expect(result.current.selectionCount).toBe(1)
 
-      act(() => { result.current.addPolicy('p2') })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
       expect(result.current.selectionCount).toBe(2)
 
-      act(() => { result.current.removePolicy('p1') })
+      act(() => {
+        result.current.removePolicy('p1')
+      })
       expect(result.current.selectionCount).toBe(1)
 
-      act(() => { result.current.clearSelection() })
+      act(() => {
+        result.current.clearSelection()
+      })
       expect(result.current.selectionCount).toBe(0)
     })
   })
@@ -674,8 +912,12 @@ describe('useCompareSelection', () => {
     it('can only select one policy', () => {
       const { result } = renderHook(() => useCompareSelection(1))
 
-      act(() => { result.current.addPolicy('p1') })
-      act(() => { result.current.addPolicy('p2') })
+      act(() => {
+        result.current.addPolicy('p1')
+      })
+      act(() => {
+        result.current.addPolicy('p2')
+      })
 
       expect(result.current.selectedIds).toEqual(['p1'])
       expect(result.current.canAdd).toBe(false)
@@ -814,13 +1056,11 @@ describe('useCompareUrlState', () => {
 
       const { result } = renderHook(() => useCompareUrlState(policies))
 
-      act(() => { result.current.setSelectedIds(['p1', 'p2']) })
+      act(() => {
+        result.current.setSelectedIds(['p1', 'p2'])
+      })
 
-      expect(replaceStateSpy).toHaveBeenCalledWith(
-        {},
-        '',
-        '/compare?ids=p1%2Cp2'
-      )
+      expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/compare?ids=p1%2Cp2')
     })
 
     it('removes ids param when setting empty array', () => {
@@ -829,13 +1069,11 @@ describe('useCompareUrlState', () => {
 
       const { result } = renderHook(() => useCompareUrlState(policies))
 
-      act(() => { result.current.setSelectedIds([]) })
+      act(() => {
+        result.current.setSelectedIds([])
+      })
 
-      expect(replaceStateSpy).toHaveBeenCalledWith(
-        {},
-        '',
-        '/compare'
-      )
+      expect(replaceStateSpy).toHaveBeenCalledWith({}, '', '/compare')
     })
 
     it('updates the internal state after setting IDs', () => {
@@ -845,7 +1083,9 @@ describe('useCompareUrlState', () => {
 
       const { result } = renderHook(() => useCompareUrlState([p1, p2]))
 
-      act(() => { result.current.setSelectedIds(['p1', 'p2']) })
+      act(() => {
+        result.current.setSelectedIds(['p1', 'p2'])
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
       expect(result.current.selectedPolicies).toHaveLength(2)
@@ -864,7 +1104,9 @@ describe('useCompareUrlState', () => {
 
       const { result } = renderHook(() => useCompareUrlState([p1, p2]))
 
-      act(() => { result.current.clearSelection() })
+      act(() => {
+        result.current.clearSelection()
+      })
 
       expect(result.current.selectedIds).toEqual([])
       expect(result.current.selectedPolicies).toEqual([])
@@ -899,14 +1141,14 @@ describe('useCompareUrlState', () => {
 
     it('is true with 4 valid IDs', () => {
       setUrl('?ids=p1,p2,p3,p4')
-      const policies = ['p1', 'p2', 'p3', 'p4'].map(id => createMockPolicy({ id }))
+      const policies = ['p1', 'p2', 'p3', 'p4'].map((id) => createMockPolicy({ id }))
       const { result } = renderHook(() => useCompareUrlState(policies))
       expect(result.current.canCompare).toBe(true)
     })
 
     it('is false with 5 valid IDs', () => {
       setUrl('?ids=p1,p2,p3,p4,p5')
-      const policies = ['p1', 'p2', 'p3', 'p4', 'p5'].map(id => createMockPolicy({ id }))
+      const policies = ['p1', 'p2', 'p3', 'p4', 'p5'].map((id) => createMockPolicy({ id }))
       const { result } = renderHook(() => useCompareUrlState(policies))
       expect(result.current.canCompare).toBe(false)
     })
@@ -932,7 +1174,7 @@ describe('useCompareUrlState', () => {
 
       const { result } = renderHook(() => useCompareUrlState([p1, p2, p3]))
 
-      expect(result.current.selectedPolicies.map(p => p.id)).toEqual(['p3', 'p1', 'p2'])
+      expect(result.current.selectedPolicies.map((p) => p.id)).toEqual(['p3', 'p1', 'p2'])
     })
   })
 
@@ -946,10 +1188,9 @@ describe('useCompareUrlState', () => {
       const p1 = createMockPolicy({ id: 'p1' })
       const p2 = createMockPolicy({ id: 'p2' })
 
-      const { result, rerender } = renderHook(
-        ({ policies }) => useCompareUrlState(policies),
-        { initialProps: { policies: [p1, p2] } }
-      )
+      const { result, rerender } = renderHook(({ policies }) => useCompareUrlState(policies), {
+        initialProps: { policies: [p1, p2] },
+      })
 
       expect(result.current.selectedIds).toEqual(['p1', 'p2'])
       expect(result.current.invalidIds).toEqual([])

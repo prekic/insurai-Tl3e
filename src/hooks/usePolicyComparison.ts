@@ -38,11 +38,19 @@ interface UsePolicyComparisonResult {
  * return <ComparisonTable comparison={comparison} />
  * ```
  */
+let renderCount = 0
+
 export function usePolicyComparison(
   policies: Policy[],
   options: UsePolicyComparisonOptions = {}
 ): UsePolicyComparisonResult {
-  const { config, labels } = options
+  renderCount++
+  if (renderCount > 200) throw new Error(`INFINITE RENDER LOOP DETECTED! Count: ${renderCount}`)
+  // Stabilize options to prevent infinite loops when object literals are passed
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedLabels = useMemo(() => options.labels, [JSON.stringify(options.labels)])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const memoizedConfig = useMemo(() => options.config, [JSON.stringify(options.config)])
 
   // Validate policy count
   const validation = useMemo(() => {
@@ -91,14 +99,13 @@ export function usePolicyComparison(
 
   // Merge database config with provided config
   const mergedConfig = useMemo(() => {
-    if (!dbConfig) return config
-
-    // Convert database config to evaluator format
-    const evaluatorConfig = convertDatabaseConfigToEvaluatorConfig(dbConfig)
+    // Convert database config to evaluator format if it exists
+    const evaluatorConfig = dbConfig ? convertDatabaseConfigToEvaluatorConfig(dbConfig) : {}
 
     // Merge: provided config overrides database config
-    return { ...evaluatorConfig, ...config }
-  }, [dbConfig, config])
+    return { ...evaluatorConfig, ...memoizedConfig }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(dbConfig), memoizedConfig])
 
   const [result, setResult] = useState<UsePolicyComparisonResult>({
     comparison: null,
@@ -129,7 +136,7 @@ export function usePolicyComparison(
 
     setResult((prev) => ({ ...prev, isLoading: true, error: null }))
 
-    comparePoliciesAsync(policies, labels, mergedConfig)
+    comparePoliciesAsync(policies, memoizedLabels, mergedConfig)
       .then((comparison) => {
         if (mounted) {
           setResult({
@@ -156,7 +163,14 @@ export function usePolicyComparison(
     return () => {
       mounted = false
     }
-  }, [policiesHash, labels, mergedConfig, validation, configLoading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    policiesHash,
+    memoizedLabels,
+    mergedConfig,
+    validation.isValid,
+    validation.message,
+    configLoading,
+  ]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return result
 }

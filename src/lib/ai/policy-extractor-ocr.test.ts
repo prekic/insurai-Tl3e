@@ -16,6 +16,7 @@ vi.mock('./config', () => ({
   isAIConfigured: vi.fn().mockReturnValue(true),
   isOCRConfigured: vi.fn().mockReturnValue(false),
   isProxyConfigured: vi.fn().mockReturnValue(false),
+  getProxyUrl: vi.fn().mockReturnValue('http://localhost:4001'),
   AI_CONFIG: {
     minConfidence: 0.4,
     warningConfidence: 0.7,
@@ -58,7 +59,12 @@ vi.mock('./document-ocr', () => ({
 
 vi.mock('./ocr', () => ({
   isLikelyScannedPDF: vi.fn().mockReturnValue(false),
-  performOCR: vi.fn().mockResolvedValue({ success: true, data: { text: '', confidence: 0.5, pageCount: 1, isScanned: true } }),
+  performOCR: vi
+    .fn()
+    .mockResolvedValue({
+      success: true,
+      data: { text: '', confidence: 0.5, pageCount: 1, isScanned: true },
+    }),
   extractFormFieldMap: vi.fn().mockReturnValue(new Map()),
   findFormField: vi.fn().mockReturnValue(null),
   TURKISH_FORM_FIELD_PATTERNS: {
@@ -93,19 +99,35 @@ vi.mock('./text-processor', () => ({
     processedText: 'ai processed text',
     corrections: [],
     confidence: 0.95,
-    cleanupStats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 0, urlsCleaned: 0, totalCharactersRemoved: 0 },
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
   }),
-  applyBasicOCRCorrections: vi.fn().mockImplementation((text: string) => ({ text, corrections: [] })),
+  applyBasicOCRCorrections: vi
+    .fn()
+    .mockImplementation((text: string) => ({ text, corrections: [] })),
   textNeedsProcessing: vi.fn().mockReturnValue(false),
   processTextEnhanced: vi.fn().mockResolvedValue({
     success: true,
     processedText: 'enhanced processed text',
     corrections: [],
     confidence: 0.95,
-    cleanupStats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 0, urlsCleaned: 0, totalCharactersRemoved: 0 },
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
     cleanRoomOutput: undefined,
   }),
-  applyComprehensivePreprocessing: vi.fn().mockImplementation((text: string) => ({ text, stats: {} })),
+  applyComprehensivePreprocessing: vi
+    .fn()
+    .mockImplementation((text: string) => ({ text, stats: {} })),
   addSectionMarkers: vi.fn().mockImplementation((text: string) => ({ text, sectionsFound: [] })),
 }))
 
@@ -124,8 +146,12 @@ vi.mock('@/lib/config', () => ({
 }))
 
 vi.mock('@/lib/market-data/service', () => ({
-  generateMarketComparisonData: vi.fn().mockReturnValue({ percentile: 50, avgPremium: 3000, avgCoverage: 500000 }),
-  generateMarketComparisonDataAsync: vi.fn().mockResolvedValue({ percentile: 50, avgPremium: 3000, avgCoverage: 500000 }),
+  generateMarketComparisonData: vi
+    .fn()
+    .mockReturnValue({ percentile: 50, avgPremium: 3000, avgCoverage: 500000 }),
+  generateMarketComparisonDataAsync: vi
+    .fn()
+    .mockResolvedValue({ percentile: 50, avgPremium: 3000, avgCoverage: 500000 }),
 }))
 
 vi.mock('@/lib/market-data/market-data-provider', () => ({
@@ -221,7 +247,11 @@ vi.mock('@/lib/ocr-decision/ocr-decision-engine', () => ({
       confidence: 0.85,
       document_classification: {
         detected_language: { locale_code: 'tr', confidence: 0.9 },
-        detected_policy_type: { policy_type_id: 'motor_kasko', policy_type_name: 'Kasko', confidence: 0.85 },
+        detected_policy_type: {
+          policy_type_id: 'motor_kasko',
+          policy_type_name: 'Kasko',
+          confidence: 0.85,
+        },
       },
       analysis: {
         text_quality: { quality_score: 0.8, is_good_quality: true },
@@ -229,7 +259,7 @@ vi.mock('@/lib/ocr-decision/ocr-decision-engine', () => ({
         confidence_breakdown: {
           component_scores: {
             char_density: { score: 0.9, weight: 0.25, contribution: 0.225 },
-            text_quality: { score: 0.8, weight: 0.30, contribution: 0.24 },
+            text_quality: { score: 0.8, weight: 0.3, contribution: 0.24 },
             page_variance: { score: 0.85, weight: 0.15, contribution: 0.1275 },
             encoding_check: { score: 0.95, weight: 0.15, contribution: 0.1425 },
             field_extraction: { score: 0.6, weight: 0.15, contribution: 0.09 },
@@ -295,7 +325,7 @@ const VALID_EXTRACTED_DATA = {
     overall: 0.92,
     policyNumber: 0.95,
     provider: 0.99,
-    dates: 0.90,
+    dates: 0.9,
     premium: 0.95,
     coverages: 0.88,
   },
@@ -391,7 +421,13 @@ async function resetToDefaults() {
     processedText: 'enhanced processed text',
     corrections: [],
     confidence: 0.95,
-    cleanupStats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 0, urlsCleaned: 0, totalCharactersRemoved: 0 },
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
     cleanRoomOutput: undefined,
   })
   vi.mocked(tp.processTextWithAI).mockResolvedValue({
@@ -399,9 +435,18 @@ async function resetToDefaults() {
     processedText: 'ai processed text',
     corrections: [],
     confidence: 0.95,
-    cleanupStats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 0, urlsCleaned: 0, totalCharactersRemoved: 0 },
+    cleanupStats: {
+      garbageBlocksRemoved: 0,
+      qrBlocksRemoved: 0,
+      spacedCharsFixed: 0,
+      urlsCleaned: 0,
+      totalCharactersRemoved: 0,
+    },
   })
-  vi.mocked(tp.applyBasicOCRCorrections).mockImplementation((text: string) => ({ text, corrections: [] }))
+  vi.mocked(tp.applyBasicOCRCorrections).mockImplementation((text: string) => ({
+    text,
+    corrections: [],
+  }))
 }
 
 // ---------------------------------------------------------------------------
@@ -500,7 +545,9 @@ describe('policy-extractor — OCR pipeline branches', () => {
         success: true,
         data: {
           text: 'document ai extracted text',
-          pages: [{ pageNumber: 1, text: 'document ai extracted text', confidence: 0.95, warnings: [] }],
+          pages: [
+            { pageNumber: 1, text: 'document ai extracted text', confidence: 0.95, warnings: [] },
+          ],
           pageCount: 1,
           confidence: 0.95,
           pdfHash: 'hash-abc',
@@ -731,14 +778,23 @@ describe('policy-extractor — OCR pipeline branches', () => {
         processedText: 'clean room output text',
         corrections: [],
         confidence: 0.97,
-        cleanupStats: { garbageBlocksRemoved: 2, qrBlocksRemoved: 0, spacedCharsFixed: 5, urlsCleaned: 1, totalCharactersRemoved: 20 },
+        cleanupStats: {
+          garbageBlocksRemoved: 2,
+          qrBlocksRemoved: 0,
+          spacedCharsFixed: 5,
+          urlsCleaned: 1,
+          totalCharactersRemoved: 20,
+        },
         cleanRoomOutput: undefined,
       })
       const openai = await getOpenAIMock()
       vi.mocked(openai.extractWithOpenAI).mockResolvedValue({ ...VALID_EXTRACTED_DATA })
 
       const file = makeFile()
-      const result = await extractPolicyFromDocument(file, { useFallback: false, useCleanRoom: true })
+      const result = await extractPolicyFromDocument(file, {
+        useFallback: false,
+        useCleanRoom: true,
+      })
 
       expect(tp.processTextEnhanced).toHaveBeenCalled()
       expect(result.success).toBe(true)
@@ -752,7 +808,10 @@ describe('policy-extractor — OCR pipeline branches', () => {
       vi.mocked(openai.extractWithOpenAI).mockResolvedValue({ ...VALID_EXTRACTED_DATA })
 
       const file = makeFile()
-      const result = await extractPolicyFromDocument(file, { useFallback: false, useCleanRoom: true })
+      const result = await extractPolicyFromDocument(file, {
+        useFallback: false,
+        useCleanRoom: true,
+      })
 
       expect(tp.applyBasicOCRCorrections).toHaveBeenCalled()
       expect(result.success).toBe(true)
@@ -766,7 +825,13 @@ describe('policy-extractor — OCR pipeline branches', () => {
         processedText: 'legacy ai processed text',
         corrections: [],
         confidence: 0.93,
-        cleanupStats: { garbageBlocksRemoved: 0, qrBlocksRemoved: 0, spacedCharsFixed: 3, urlsCleaned: 0, totalCharactersRemoved: 10 },
+        cleanupStats: {
+          garbageBlocksRemoved: 0,
+          qrBlocksRemoved: 0,
+          spacedCharsFixed: 3,
+          urlsCleaned: 0,
+          totalCharactersRemoved: 10,
+        },
       })
       const openai = await getOpenAIMock()
       vi.mocked(openai.extractWithOpenAI).mockResolvedValue({ ...VALID_EXTRACTED_DATA })
@@ -786,7 +851,10 @@ describe('policy-extractor — OCR pipeline branches', () => {
       vi.mocked(openai.extractWithOpenAI).mockResolvedValue({ ...VALID_EXTRACTED_DATA })
 
       const file = makeFile()
-      const result = await extractPolicyFromDocument(file, { useFallback: false, useCleanRoom: false })
+      const result = await extractPolicyFromDocument(file, {
+        useFallback: false,
+        useCleanRoom: false,
+      })
 
       expect(tp.applyBasicOCRCorrections).toHaveBeenCalled()
       expect(result.success).toBe(true)
@@ -809,7 +877,7 @@ describe('policy-extractor — OCR pipeline branches', () => {
           pageCount: 1,
           confidence: 0.9,
           pdfHash: 'h1',
-          formFields: [],   // empty
+          formFields: [], // empty
           tables: [],
           metadata: { processingTimeMs: 500, warnings: [] },
         },
@@ -862,7 +930,9 @@ describe('policy-extractor — OCR pipeline branches', () => {
           pageCount: 1,
           confidence: 0.9,
           pdfHash: 'h3',
-          formFields: [{ name: 'Poliçe No', value: 'FORM-FIELD-777', confidence: 0.96, boundingBox: [] }],
+          formFields: [
+            { name: 'Poliçe No', value: 'FORM-FIELD-777', confidence: 0.96, boundingBox: [] },
+          ],
           tables: [],
           metadata: { processingTimeMs: 500, warnings: [] },
         },
@@ -901,7 +971,9 @@ describe('policy-extractor — OCR pipeline branches', () => {
           pageCount: 1,
           confidence: 0.9,
           pdfHash: 'h4',
-          formFields: [{ name: 'Poliçe No', value: 'LOW-CONF-POL', confidence: 0.3, boundingBox: [] }],
+          formFields: [
+            { name: 'Poliçe No', value: 'LOW-CONF-POL', confidence: 0.3, boundingBox: [] },
+          ],
           tables: [],
           metadata: { processingTimeMs: 500, warnings: [] },
         },
@@ -916,7 +988,7 @@ describe('policy-extractor — OCR pipeline branches', () => {
       vi.mocked(ocrMod.findFormField).mockReturnValue({
         name: 'Poliçe No',
         value: 'LOW-CONF-POL',
-        confidence: 0.3,  // below 0.6 threshold
+        confidence: 0.3, // below 0.6 threshold
         boundingBox: [],
       })
 
@@ -980,7 +1052,7 @@ describe('policy-extractor — OCR pipeline branches', () => {
           confidence: 0.9,
           pdfHash: 'h6',
           formFields: [],
-          tables: [],  // empty
+          tables: [], // empty
           metadata: { processingTimeMs: 500, warnings: [] },
         },
       })
@@ -1047,7 +1119,13 @@ describe('policy-extractor — OCR pipeline branches', () => {
       const openai = await getOpenAIMock()
       vi.mocked(openai.extractWithOpenAI).mockResolvedValue({ ...VALID_EXTRACTED_DATA })
       const tableParser = await import('./table-parser')
-      const tableCoverage = { name: 'Yangın', nameTr: 'Yangın', limit: 500000, deductible: 0, included: true }
+      const tableCoverage = {
+        name: 'Yangın',
+        nameTr: 'Yangın',
+        limit: 500000,
+        deductible: 0,
+        included: true,
+      }
       vi.mocked(tableParser.parseTablesForCoverages).mockReturnValue({
         coverages: [tableCoverage],
         confidence: 0.85,
@@ -1259,7 +1337,7 @@ describe('policy-extractor — OCR pipeline branches', () => {
 
     it('does not call consensus when proxy is configured even with multiple providers', async () => {
       const configMod = await getConfigMock()
-      vi.mocked(configMod.isProxyConfigured).mockReturnValue(true)  // proxy bypasses consensus
+      vi.mocked(configMod.isProxyConfigured).mockReturnValue(true) // proxy bypasses consensus
       vi.mocked(configMod.getConfiguredProviders).mockReturnValue(['openai', 'anthropic'])
       const consensus = await getConsensusMock()
       const openai = await getOpenAIMock()
@@ -1319,7 +1397,10 @@ describe('policy-extractor — OCR pipeline branches', () => {
       })
 
       const file = makeFile()
-      const result = await extractPolicyFromDocument(file, { useFallback: false, useConsensus: true })
+      const result = await extractPolicyFromDocument(file, {
+        useFallback: false,
+        useConsensus: true,
+      })
 
       expect(result.success).toBe(true)
       if (result.success) {
@@ -1345,7 +1426,9 @@ describe('policy-extractor — OCR pipeline branches', () => {
 
       expect(result.success).toBe(true)
       if (result.success) {
-        expect(result.documentOCR?.warnings).toContain('Extracted with pdf.js (Document AI unavailable)')
+        expect(result.documentOCR?.warnings).toContain(
+          'Extracted with pdf.js (Document AI unavailable)'
+        )
         expect(result.documentOCR?.formFields).toHaveLength(0)
         expect(result.documentOCR?.tables).toHaveLength(0)
       }

@@ -1,51 +1,37 @@
-# Session Handoff — March 14, 2026 (Anonymous Extractions & AI Premium Fixes)
+# Session Handoff — March 15, 2026 (Dynamic AI Guidelines & Vitest Crash Fix)
 
 ## Current Status
 
 | Metric | Status |
 |--------|--------|
 | **Build** | ✅ Passing |
-| **ESLint** | 0 errors on changed files |
-| **Tests** | All tests passing |
-| **Branch** | `insuraigemini202603142134` — Ready to push |
-| **Deployment** | Pending Railway deployment for user verification |
+| **ESLint** | 0 errors |
+| **Tests** | All tests passing (100% on `usePolicyComparison` suite) |
+| **Branch** | `insuraigemini202603151015` — Ready to push |
+| **Deployment** | Pending Railway deployment |
 
 ---
 
 ## This Session — Completed Work
 
-### 1. Anonymous Extraction Persistence
-**Feature**: Implemented a system to persist policy uploads and extractions performed by anonymous users. This ensures that valuable policy data and metadata (like location and language) are recorded in the database without requiring standard user registration.
+### 1. Dynamic AI Insight Guidelines
+**Feature**: Completely eliminated hardcoded AI sense-check rules from the codebase in favor of a new Admin UI and DB table (`ai_insight_guidelines`) that allows dynamic, on-the-fly tweaking of anti-hallucination instructions.
+**Fix**: 
+- Added a `ai_insight_guidelines` DB table and seeded it with migrated rules.
+- Created `/admin/insights` UI tab for administrators to configure constraints per Policy Type and Region.
+- Ensured backend dynamic guidelines immediately overwrite generic prompts for AI extraction calls.
 
-**Files Changed**:
-- `server/routes/policy.ts` (NEW) — A dedicated API route `/api/policy/save-anonymous` using `SUPABASE_SERVICE_ROLE_KEY` to securely bypass RLS and create a proxy `auth.users` record containing IP and locale metadata, before uploading the PDF to storage and inserting the `AnalyzedPolicy` into the database.
-- `server/index.ts` — Mounted the new `policyRoutes` to `/api/policy`.
-- `src/components/TryAnalysis.tsx` — Modified to asynchronously fire a `POST` request to `/api/policy/save-anonymous` upon successful extraction without blocking the UI.
+### 2. Evidence Storage & Translation Prompts
+**Feature**: The AI often hallucinated evidence or failed to explicitly quote the text for the interactive UI.
+**Fix**: 
+- Added `quoteTr` to the `extraction-schema.ts` explicitly demanding the AI return the exact matched text translated to Turkish.
+- Updated Anthropic guidelines to explicitly restrict AI from summarizing quote fields and mandating strict JSON array parsing.
 
-### 2. AI Premium vs Vehicle Value Fixes
-**Problem**: The AI was erroneously extracting Vehicle Value instead of the actual Policy Premium for certain Eris Ambalaj Kasko policies.
-
-**Fix**:
-- `src/lib/ai/policy-extractor.ts` — Added post-processing magnitude sanity checks: if `totalPremium` is >5x the amount of `totalCoverage` (or exceeds reasonable bounds like 2 million TRY), it sets the premium to `null` instead of storing an absurdly high vehicle value.
-- `src/lib/ai/kasko-parser-prompts.ts` & `src/lib/ai/prompts.ts` — Enhanced explicit constraints in prompts, demanding that "Vehicle Value / Araç Değeri" must absolutely NOT be used for Premium, and that Premium values are typically labeled as "BRÜT PRİM", "TOPLAM PRİM", or "ÖDENECEK TUTAR".
-
-### 3. Admin Schema Alignment
-**Note**: Generated `035_admin_users_schema_alignment.sql` to add `display_name`, `failed_login_attempts`, and `locked_until` to `admin_users` to match earlier table expectations in `005b_admin_tables.sql`.
-
-### 4. Test Suite Stabilization & Vitest Mocking Fixes
-**Feature**: Systematically debugged and eliminated test flakiness and incorrect status codes across the test suite to achieve a 100% pass rate.
-
-**Fixes**:
-- `server/routes/settings.ts` & `server/services/config-service.ts` — Wrapped background config loading functions (`_loadPerfConfig` and `_selfLoadServerConfig`) with `if (process.env.NODE_ENV !== 'test')` to prevent un-awaited background Supabase queries from consuming Vitest's `mockReturnValueOnce` assertions mid-test for unrelated routes.
-- `server/__tests__/fx-monitoring.test.ts` — Fixed a module parse error by adding the `logger` named export to the `../lib/logger.js` mock.
-- `server/__tests__/settings-routes-crud-operations.test.ts` — Fixed failing `PUT` requests by clearing the mock before expectations so the query chain receives the correct `mockReturnValueOnce` mock implementations.
-- `server/__tests__/prompt-service-branches.test.ts` — Updated the category in the fallback test from `analysis` to `unknown_category` because `analysis` now has a generic Sense Check fallback prompt.
-
-### 5. Anthropic Deprecated Model Updates
-**Feature**: Updated out-of-date model names before they are deprecated by Anthropic.
-
-**Fixes**:
-- `src/lib/ai/config.ts` , `server/routes/ai.ts`, and `supabase/migrations/036_update_anthropic_haiku_model.sql` — Replaced hardcoded and DB-seeded instances of `claude-3-5-haiku-20241022` with `claude-3-5-haiku-latest`.
+### 3. Vitest "Heap Out of Memory" Worker Crash Fix
+**Feature**: The CI pipeline was hanging and silently dying during `usePolicyComparison.test.ts` due to an infinitely-propagating re-render memory leak in background React testing containers.
+**Fix**: 
+- Isolated the cause to inline arrays supplied to `@testing-library/react`'s `renderHook()` (e.g., `renderHook(() => usePolicyComparison([createMockPolicy()]))`). This generated sequentially unique mocked IDs causing a new memory reference on every boolean hook render phase.
+- Extracted inline dynamic arrays into variable definitions executed *prior* to `renderHook`, resolving all infinite looping cascades. Test suite now effortlessly hits 66/66 cleanly.
 
 ---
 
@@ -53,19 +39,22 @@
 
 | File | Change |
 |------|--------|
-| `server/routes/policy.ts` | **NEW** Implements anonymous user proxy creation, storage upload, and policy DB insertion |
-| `server/index.ts` | **FIX** Mounts the new `policy` route |
-| `src/components/TryAnalysis.tsx` | **FIX** Integrated background API fetch to sync extraction data for unauthenticated users |
-| `src/lib/ai/policy-extractor.ts` | **FIX** Post-processing magnitude sanity check to drop erroneous premium values |
-| `src/lib/ai/kasko-parser-prompts.ts` | **FIX** Explicit Prompt Engineering to stop confusing Vehicle Value with Premium |
-| `server/__tests__/*.test.ts` | **FIX** Stabilized tests across 4 files involving mock resets and parsed logger mocks |
-| `server/routes/settings.ts` | **FIX** Prevent background config load in test environment |
-| `server/services/config-service.ts` | **FIX** Prevent background config load in test environment |
+| `supabase/migrations/032_ai_insight_guidelines.sql` | **NEW** DB table for Dynamic Rules Engine (from prior session) |
+| `supabase/migrations/037_update_master_extraction_prompt.sql` | **NEW** Synchronized the DB master extraction prompt with the refined backend hardcoded JSON Schema prompt |
+| `src/components/admin/tabs/InsightsTab.tsx` | **NEW** Admin interface for managing rule constraints |
+| `src/lib/ai/policy-extractor.ts` | **FIX** Merged DB guidelines into JSON Schema prompt construction |
+| `src/lib/ai/providers/claude.ts` & `openai.ts` | **FIX** Explicitly separated JSON schema construction from baseline extraction text |
+| `server/routes/ai.ts` | **FIX** Merged dynamic guidelines directly into Anthropic's JSON schema prompt building logic and deleted hardcoded fallback arrays |
+| `server/services/prompt-service.ts` | **FIX** Audited generic fallback prompts; injected primary anti-hallucination rules directly into base fallback prompt |
+| `scripts/test-local-anthropic.ts` | **NEW** Test script to manually verify Claude extractions bypassing the frontend |
+| `src/hooks/usePolicyComparison.test.ts` | **FIX** Fixed infinite hook re-renders crashing vitest workers |
+| `src/lib/ai/prompts.ts` | **FIX** Audited generic fallback prompts for stricter constraints |
+| `src/lib/ai/kasko-parser-prompts.ts` | **FIX** Removed hardcoded fallback limits |
 
 ---
 
 ## Priority Next Steps
 
-1. **Verify on Railway** — The user was experiencing issues with localhost testing, so the next step is to explicitly verify the anonymous flow and premium extraction on the staging or production Railway environment once deployed.
-2. **Database Migration** — Run the new Supabase migration `035_admin_users_schema_alignment.sql` on the Railway target DB.
-3. **Verify Admin Insights Rules** — The user still needs to navigate to `/admin/insights` to create a dynamic test rule and ensure the extractions respect it without hallucinations.
+1. **Verify on Railway** — Merge Branch, allow Release Please to bump the SemVer version, deploy to staging Railway environment.
+2. **Setup Admin Test Insight Rule** — Navigate to `/admin/insights`, create an arbitrary rule (e.g., `guidance: Verify TC Kimlik numbers strictly`) to prove the AI respects the DB prompt during the next analysis extraction.
+3. **Database Migration Sync** — Ensure `037_update_master_extraction_prompt.sql` processes cleanly on the Railway Supabase DB instance.

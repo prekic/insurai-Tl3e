@@ -632,7 +632,7 @@ describe('extractWithOpenAI', () => {
       expect(mockExtractViaProxy).toHaveBeenCalledWith(
         'openai',
         expect.stringContaining('doc'),
-        'Test system prompt',
+        '',
         undefined,
         undefined
       )
@@ -1049,7 +1049,7 @@ describe('extractWithOpenAI', () => {
   // ─── User message construction ─────────────────────────────────
 
   describe('User message construction', () => {
-    it('should pass the user message with document text to proxy', async () => {
+    it('should pass the raw document text to proxy', async () => {
       mockIsProxyConfigured.mockReturnValue(true)
       mockExtractViaProxy.mockResolvedValue({
         success: true,
@@ -1059,13 +1059,14 @@ describe('extractWithOpenAI', () => {
       expect(mockExtractViaProxy).toHaveBeenCalledWith(
         'openai',
         expect.stringContaining('My insurance policy text'),
-        'Test system prompt',
+        '',
         undefined,
         undefined
       )
-      // Should include the instruction prefix
+      // Should NOT include the instruction prefix for proxy
       const userMsg = mockExtractViaProxy.mock.calls[0][1] as string
-      expect(userMsg).toContain('Please extract the insurance policy information')
+      expect(userMsg).not.toContain('Please extract the insurance policy information')
+      expect(userMsg).toBe('My insurance policy text')
     })
 
     it('should pass truncated text when document exceeds max chars', async () => {

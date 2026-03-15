@@ -106,7 +106,10 @@ export async function extractWithOpenAI(
       userId,
     })
 
-    console.warn('[OpenAI Extract] ℹ️ CONFIDENCE CHECKPOINT: Cache HIT — returning cached confidence:', JSON.stringify(cached.confidence ?? 'NO confidence in cache, will default to 0.7'))
+    console.warn(
+      '[OpenAI Extract] ℹ️ CONFIDENCE CHECKPOINT: Cache HIT — returning cached confidence:',
+      JSON.stringify(cached.confidence ?? 'NO confidence in cache, will default to 0.7')
+    )
     await auditLogger.logAI(
       'ai.extraction_cached',
       {
@@ -131,8 +134,8 @@ export async function extractWithOpenAI(
       console.warn('[OpenAI Extract] Using proxy, calling extractViaProxy...')
       const proxyResult = await extractViaProxy(
         'openai',
-        userMessage,
-        EXTRACTION_SYSTEM_PROMPT,
+        truncatedText, // Send raw text so backend can apply dynamic prompts
+        '', // Empty prompt forces backend to use admin DB prompts
         notifyUserId,
         signal
       )
@@ -192,8 +195,12 @@ export async function extractWithOpenAI(
       // Ensure required fields exist (server may not enforce schema)
       // Add defaults for any missing required fields
       if (!result.confidence) {
-        console.warn('[OpenAI Extract] ⚠️ CONFIDENCE CHECKPOINT: AI returned NO confidence scores — defaulting ALL fields to 0.7')
-        console.warn('[OpenAI Extract] CONFIDENCE CHECKPOINT: This masks real confidence. The AI model did not include a "confidence" object in its JSON output.')
+        console.warn(
+          '[OpenAI Extract] ⚠️ CONFIDENCE CHECKPOINT: AI returned NO confidence scores — defaulting ALL fields to 0.7'
+        )
+        console.warn(
+          '[OpenAI Extract] CONFIDENCE CHECKPOINT: This masks real confidence. The AI model did not include a "confidence" object in its JSON output.'
+        )
         result.confidence = {
           overall: 0.7,
           policyNumber: 0.7,
@@ -203,7 +210,10 @@ export async function extractWithOpenAI(
           coverages: 0.7,
         }
       } else {
-        console.warn('[OpenAI Extract] ✅ CONFIDENCE CHECKPOINT: AI returned confidence scores:', JSON.stringify(result.confidence))
+        console.warn(
+          '[OpenAI Extract] ✅ CONFIDENCE CHECKPOINT: AI returned confidence scores:',
+          JSON.stringify(result.confidence)
+        )
       }
       if (!result.coverages || !Array.isArray(result.coverages)) {
         console.warn('[OpenAI Extract] Adding default coverages array')
@@ -270,7 +280,9 @@ export async function extractWithOpenAI(
       // Ensure required fields exist (direct API may also have missing fields)
       // This matches the proxy path defaults for consistency
       if (!result.confidence) {
-        console.warn('[OpenAI Extract] ⚠️ CONFIDENCE CHECKPOINT (Direct API): AI returned NO confidence scores — defaulting ALL fields to 0.7')
+        console.warn(
+          '[OpenAI Extract] ⚠️ CONFIDENCE CHECKPOINT (Direct API): AI returned NO confidence scores — defaulting ALL fields to 0.7'
+        )
         result.confidence = {
           overall: 0.7,
           policyNumber: 0.7,
@@ -280,7 +292,10 @@ export async function extractWithOpenAI(
           coverages: 0.7,
         }
       } else {
-        console.warn('[OpenAI Extract] ✅ CONFIDENCE CHECKPOINT (Direct API): AI returned confidence scores:', JSON.stringify(result.confidence))
+        console.warn(
+          '[OpenAI Extract] ✅ CONFIDENCE CHECKPOINT (Direct API): AI returned confidence scores:',
+          JSON.stringify(result.confidence)
+        )
       }
       if (!result.coverages || !Array.isArray(result.coverages)) {
         result.coverages = []

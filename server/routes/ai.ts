@@ -1440,17 +1440,19 @@ router.post(
       premium: aiConfig.confidenceWeightPremium,
       coverages: aiConfig.confidenceWeightCoverages,
     }
-    const anthropicSystemPrompt = buildAnthropicSchemaPrompt(confidenceWeights)
+    const anthropicSchemaPrompt = buildAnthropicSchemaPrompt(confidenceWeights)
 
     // Get extraction prompt (shared between providers)
-    // For Anthropic, we use schema prompt to ensure structured JSON output
+    // For Anthropic, we append the schema prompt to ensure structured JSON output
     // For OpenAI, we use response_format: json_schema
     let openaiSystemPrompt: string
+    let anthropicSystemPrompt: string
     let finalUserPrompt = documentText
 
     const promptStart = Date.now()
     if (clientPrompt) {
       openaiSystemPrompt = clientPrompt
+      anthropicSystemPrompt = `${clientPrompt}\n\n${anthropicSchemaPrompt}`
       finalUserPrompt = documentText
       markPhase('promptLoad_ms', promptStart)
     } else {
@@ -1458,6 +1460,7 @@ router.post(
       markPhase('promptLoad_ms', promptStart)
       if (renderedPrompt) {
         openaiSystemPrompt = renderedPrompt.systemPrompt
+        anthropicSystemPrompt = `${renderedPrompt.systemPrompt}\n\n${anthropicSchemaPrompt}`
         finalUserPrompt = renderedPrompt.userPrompt
         log.info('Using prompt template', {
           requestId,
@@ -1466,6 +1469,7 @@ router.post(
         })
       } else {
         openaiSystemPrompt = 'Extract policy information as JSON.'
+        anthropicSystemPrompt = `Extract policy information as JSON.\n\n${anthropicSchemaPrompt}`
         log.info('Using fallback prompt', { requestId })
       }
     }
@@ -2152,13 +2156,9 @@ router.post('/sense-check', validateJSON, async (req: Request, res: Response) =>
       log.warn('Failed to fetch ai_insight_guidelines', { error: String(dbErr) })
     }
 
-    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
-- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
-- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
-
-    const finalGuidelines = guidelinesText
-      ? `${defaultGuidelinesText}\n${guidelinesText}`
-      : defaultGuidelinesText
+    const finalGuidelines =
+      guidelinesText ||
+      'No specific rules defined. Use your best judgment to filter false positives.'
 
     const renderedPrompt = await getSenseCheckPrompt(
       finalGuidelines,
@@ -2268,13 +2268,9 @@ router.get('/sense-check-prompt-preview', async (req: Request, res: Response) =>
       log.warn('Failed to fetch ai_insight_guidelines for preview', { error: String(dbErr) })
     }
 
-    const defaultGuidelinesText = `- Kasko policies inherently cover "çarpışma" (collision), "çarpma", "yangın" (fire), and natural disasters (sel, deprem) even if not explicitly listed as sub-coverages. If the policy is Kasko and these "missing coverage" warnings appear, discard them.
-- If the policy address is in Turkey, "TL" or "TRY" are valid currencies. Discard any "Unusual currency TL detected" warnings.
-- Keep legitimate insights (e.g. high deductibles, low limits, DASK recommendations).`
-
-    const finalGuidelines = guidelinesText
-      ? `${defaultGuidelinesText}\n${guidelinesText}`
-      : defaultGuidelinesText
+    const finalGuidelines =
+      guidelinesText ||
+      'No specific rules defined. Use your best judgment to filter false positives.'
 
     const renderedPrompt = await getSenseCheckPrompt(
       finalGuidelines,
