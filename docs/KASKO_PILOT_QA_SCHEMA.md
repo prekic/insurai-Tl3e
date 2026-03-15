@@ -23,6 +23,12 @@ interface KaskoPilotQARecord {
   reviewerOutcome: 'accepted' | 'corrected_minor' | 'corrected_major' | 'rejected'
   reviewTimeMinutes: number   // How long human review took
 
+  // Admissibility & Pilot Constraints (Phase 8I)
+  admissionStatus: 'pilot_eligible_clean' | 'pilot_eligible_moderate' | 'pilot_ineligible_noisy' | 'pilot_ineligible_incomplete'
+  admissionReason: string
+  countedInPilotMetrics: boolean // True only if pilot_eligible_*
+
+
   // Correction Categories (if corrected)
   correctionCategories: Array<
     | 'policy_number'
