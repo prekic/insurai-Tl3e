@@ -32,6 +32,7 @@ import { ExtractedPolicyData, ExtractedCoverage } from './extraction-schema'
 import type { AnalyzedPolicy, PolicyType, Coverage, CoverageImportance } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import { generateAnalysisBundle } from '@/lib/analysis/engine'
 import {
   generateMarketComparisonData,
   generateMarketComparisonDataAsync,
@@ -1839,6 +1840,23 @@ async function convertToAnalyzedPolicy(
     basePolicy.gapActions = actionItems
   } catch {
     // Gap analysis is optional, continue without it
+  }
+
+  // Phase 4: Unified Analysis Bundle Engine
+  try {
+    const defaultValidation = { isValid: true, flags: [] }
+    const validationRes = {
+      isValid: safetyResult?.isValid ?? defaultValidation.isValid,
+      flags: (safetyResult?.flags ?? defaultValidation.flags).map((f) => ({
+        ...f,
+        ruleId: 'MIGRATION_PLACEHOLDER',
+      })),
+      blockReason: safetyResult?.blockReason,
+    }
+
+    basePolicy.analysisBundle = generateAnalysisBundle(basePolicy.id, data, validationRes)
+  } catch (err) {
+    console.error('[PolicyExtractor] Failed to generate AnalysisBundle', err)
   }
 
   // Translate final aiInsights to Turkish (after all modifications like validation warnings)

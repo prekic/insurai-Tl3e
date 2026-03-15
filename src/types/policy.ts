@@ -272,6 +272,8 @@ export interface AnalyzedPolicy extends Policy {
   // Output from deterministic validator
   safetyFlags?: Array<{ level: 'Safe' | 'Warning' | 'Error'; message: string; field?: string }>
   safetyBlockReason?: string
+  // Phase 4: Unified structured analysis containing scores, insights, benchmarks
+  analysisBundle?: import('@/types/analysis').AnalysisBundle
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {
