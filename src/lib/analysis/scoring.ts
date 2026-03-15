@@ -204,6 +204,89 @@ function computeRiskAttention(data: ExtractedPolicyData, generatedAt: string): S
     warnings.push('KASKO policy lacks clear market value statement.')
   }
 
+  // Branch-specific risk signals
+  if (data.policyType === 'traffic') {
+    const hasEnhanced = data.coverages?.some((c) => c.limit !== null && c.limit > 1_200_000)
+    if (!hasEnhanced) {
+      score += 15
+      rulesApplied.push('RISK_TRAFFIC_STATUTORY_ONLY:+15')
+    }
+  }
+
+  if (data.policyType === 'home') {
+    const hasBuilding = data.coverages?.some(
+      (c) => c.name?.toLowerCase().includes('building') || c.nameTr?.toLowerCase().includes('bina')
+    )
+    const hasContents = data.coverages?.some(
+      (c) => c.name?.toLowerCase().includes('contents') || c.nameTr?.toLowerCase().includes('eşya')
+    )
+    if (!hasBuilding || !hasContents) {
+      score += 25
+      rulesApplied.push('RISK_HOME_MISSING_SEPARATION:+25')
+      warnings.push('Home policy lacks clear building/contents separation.')
+    }
+  }
+
+  if (data.policyType === 'health') {
+    const conditions = data.specialConditions || []
+    const hasNetwork = conditions.some(
+      (c) => c.toLowerCase().includes('network') || c.toLowerCase().includes('anlaşmalı')
+    )
+    if (!hasNetwork) {
+      score += 20
+      rulesApplied.push('RISK_HEALTH_MISSING_NETWORK:+20')
+    }
+  }
+
+  if (data.policyType === 'life') {
+    const conditions = data.specialConditions || []
+    const hasBeneficiary = conditions.some(
+      (c) => c.toLowerCase().includes('beneficiary') || c.toLowerCase().includes('lehdar')
+    )
+    if (!hasBeneficiary) {
+      score += 25
+      rulesApplied.push('RISK_LIFE_MISSING_BENEFICIARY:+25')
+      warnings.push('Life policy lacks explicit beneficiary information.')
+    }
+  }
+
+  if (data.policyType === 'dask') {
+    const nonEq = data.coverages?.filter(
+      (c) =>
+        !c.name?.toLowerCase().includes('earthquake') && !c.nameTr?.toLowerCase().includes('deprem')
+    )
+    if (nonEq && nonEq.length > 2) {
+      score += 30
+      rulesApplied.push('RISK_DASK_NON_EARTHQUAKE_COVERAGES:+30')
+      warnings.push('DASK policy has unexpected non-earthquake coverages.')
+    }
+  }
+
+  if (data.policyType === 'business') {
+    const hasBI = data.coverages?.some((c) =>
+      c.name?.toLowerCase().includes('business interruption')
+    )
+    const conditions = data.specialConditions || []
+    const hasBIPeriod = conditions.some(
+      (c) =>
+        c.toLowerCase().includes('indemnity period') || c.toLowerCase().includes('waiting period')
+    )
+    if (hasBI && !hasBIPeriod) {
+      score += 25
+      rulesApplied.push('RISK_BUSINESS_BI_NO_PERIOD:+25')
+      warnings.push('Business BI coverage lacks indemnity/waiting period.')
+    }
+  }
+
+  if (data.policyType === 'nakliyat') {
+    const hasICC = data.coverages?.some((c) => c.name?.toLowerCase().includes('icc'))
+    if (!hasICC) {
+      score += 20
+      rulesApplied.push('RISK_NAKLIYAT_MISSING_ICC:+20')
+      warnings.push('Cargo policy lacks ICC clause classification.')
+    }
+  }
+
   if (score > 100) score = 100
 
   return {
