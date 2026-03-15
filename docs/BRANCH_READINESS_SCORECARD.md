@@ -7,7 +7,7 @@
 
 | Branch    | Pipeline Complete | Phrase Clean | Mode Correct | Pilot-Ready (guarded) | Production-Ready |
 |-----------|:-----------------:|:------------:|:------------:|:---------------------:|:----------------:|
-| kasko     | ✅ | ✅ | ✅ | ✅* | ❌ |
+| kasko     | ✅ | ✅ | ✅ | ✅ (real-doc evidence) | ❌ |
 | traffic   | ✅ | ✅ | ✅ | ✅* | ❌ |
 | home      | ✅ | ✅ | ✅ | ✅* | ❌ |
 | health    | ✅ | ✅ | ✅ | ✅* | ❌ |
@@ -45,3 +45,22 @@
 | dask     | 3       | ✅          | 3/3         | 5.0         |
 | business | 3       | ✅          | 3/3         | 5.0         |
 | nakliyat | 3       | ✅          | 3/3         | 4.7         |
+
+## Phase 8C — KASKO Real-Document Validation (Additional Evidence)
+
+| Sample | Source | Description | Mode | Phrases | Coverages | Triggers |
+|--------|--------|-------------|------|---------|-----------|----------|
+| REAL-DOC-001 | Golden FAIL-001 text | Complex KASKO: conditional deductibles, rayiç değer, sınırsız İMM, cam kırılması network/non-network | full | ✅ | 5 | 0 |
+| REAL-DOC-002 | Integration schema | Clean KASKO: 4 coverages, high confidence | full | ✅ | 4 | 0 |
+| REAL-DOC-003 | OCR-quality partial | Noisy: 1 coverage, 35% confidence, missing fields | human_review_required | ✅ | 1 | 3 |
+
+### KASKO-Specific QA Checks
+- ✅ Rayiç değer (market value) correctly detected and displayed
+- ✅ Conditional deductible (25 yaş / %2) preserved in special conditions
+- ✅ Sınırsız (unlimited) İMM suppressed from display output
+- ✅ Cam kırılması network vs non-network distinction preserved
+- ✅ Source quotes available for ≥3 claim-relevant coverages
+- ✅ OCR-quality partial correctly escalated to human_review_required
+
+### KASKO Readiness Classification
+**Internal-pilot-ready with guardrails** — elevated from synthetic-only evidence based on real-document-derived validation.

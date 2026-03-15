@@ -10,7 +10,7 @@
 | 4 | Contradiction detection active | ✅ PASS | Phase 7A DEF-006/008/009/010 fixes verified |
 | 5 | Display-safe boundary enforced | ✅ PASS | All output passes through display-interpreter sanitization |
 | 6 | Human-review guardrails active | ✅ PASS | Moderate/low-confidence samples trigger restricted/human_review |
-| 7 | Real PDF extraction tested | ❌ FAIL | No real PDFs have been processed end-to-end |
+| 7 | Real PDF extraction tested | ⚠️ PARTIAL | KASKO validated against golden text + integration schema + OCR-partial (3 samples, 23 tests). No other branches tested. |
 | 8 | Integration testing complete | ❌ FAIL | Pipeline tested in isolation only |
 | 9 | Load/latency benchmarking | ❌ FAIL | Not attempted |
 | 10 | Feature flag infrastructure | ❌ FAIL | Not deployed |
