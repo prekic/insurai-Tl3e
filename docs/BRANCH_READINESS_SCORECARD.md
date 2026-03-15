@@ -7,7 +7,7 @@
 
 | Branch    | Pipeline Complete | Phrase Clean | Mode Correct | Pilot-Ready (guarded) | Production-Ready |
 |-----------|:-----------------:|:------------:|:------------:|:---------------------:|:----------------:|
-| kasko     | ✅ | ✅ | ✅ | ✅ (real-doc evidence) | ❌ |
+| kasko     | ✅ | ✅ | ✅ | ✅ (real-PDF E2E evidence) | ❌ |
 | traffic   | ✅ | ✅ | ✅ | ✅* | ❌ |
 | home      | ✅ | ✅ | ✅ | ✅* | ❌ |
 | health    | ✅ | ✅ | ✅ | ✅* | ❌ |
@@ -64,3 +64,22 @@
 
 ### KASKO Readiness Classification
 **Internal-pilot-ready with guardrails** — elevated from synthetic-only evidence based on real-document-derived validation.
+
+## Phase 8D — KASKO Real-PDF Extraction Validation (End-to-End)
+
+| PDF | File | Size | Pages | Chars | LLM | Policy# | Premium | Covs | Rayiç | Mode | Phrases | Quotes |
+|-----|------|------|-------|-------|-----|---------|---------|------|-------|------|---------|--------|
+| KASKO-PDF-001 | sample-kasko-policy.pdf | 118K | 11 | 44,470 | gpt-4o-mini | 101450719 | 2,599 | 4 | ✅ | full | ✅ | 4 |
+| KASKO-PDF-002 | eriş ambalaj 34 rz 9511 kasko pol.pdf | 549K | 16 | 62,459 | gpt-4o-mini | 1680600025 | 31,140 | 4 | ✅ | full | ✅ | 4 |
+| KASKO-PDF-003 | test-policy.pdf | 0.7K | 1 | 118 | gpt-4o-mini | KSK-2026-001234 | 15,000 | 0 | ❌ | full | ✅ | 0 |
+
+### Phase 8D Findings
+- ✅ PDF text extraction works for both digital and mixed-content PDFs using pdfjs-dist
+- ✅ LLM extraction (gpt-4o-mini) successfully extracts policy number, provider, branch, premium, coverages
+- ✅ No prohibited phrase leakage in any real-PDF extraction run
+- ⚠️ DEF-EX-001: Conditional deductible text present in PDF-001 but not captured by LLM
+- ⚠️ DEF-EX-002: Special conditions missed in PDF-002 (truncation from 62K→30K chars)
+- ⚠️ DEF-EX-003: Minimal PDF fixture (0 coverages) still gets `full` display mode
+
+### Updated KASKO Readiness
+**Internal-pilot-ready with guardrails** — now backed by real E2E PDF→LLM→pipeline evidence. 3 open extraction-stage findings logged (non-blocking for pilot with guardrails).
