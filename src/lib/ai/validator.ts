@@ -68,7 +68,7 @@ export function validateExtractionSafety(data: Partial<ExtractedPolicyData>): Va
       if (!coverage.isUnlimited && !coverage.isMarketValue && coverage.limit === null) {
         flags.push({
           level: 'Warning',
-          message: `Coverage '${coverage.name}' has no limit specified but is not marked as unlimited or market value.`,
+          message: `Coverage '${coverage.name}' has no limit specified and is not flagged as no-cap or market value.`,
           field: `coverages[${index}].limit`,
         })
       }

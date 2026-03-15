@@ -1,6 +1,10 @@
-Defect ID,Branch,Sample ID,Severity,Pipeline Stage,Issue Type,Observed Output,Expected Safer Output,Proposed Fix,Status
-DEF-006,home,HOME-CONTRA-001,Medium,review-thresholds,human-review threshold miss,"Contradictory conditions (average clause in conditions + 'does not apply' in exclusions) at confidence 0.65 now correctly produce displayMode='restricted'","displayMode='restricted' when contradictions detected","Added detectConditionContradictions() to review-thresholds.ts with average_clause pattern",Fixed
-DEF-007,all,All noisy samples,Low,display-interpreter,quote-link miss,"Noisy samples produce coverage cards but no source quote links (evidence.insights empty in fixtures)","Source quotes depend on LLM extraction quality","Not a pipeline defect — reflects reality. Acknowledged in readiness scorecard.",Acknowledged
-DEF-008,nakliyat,NAK-CONTRA-001,Medium,review-thresholds,ICC conflict miss,"ICC (A) in coverage name + (C) in description now correctly detected as contradiction → displayMode='restricted'","Should detect ICC conflict and flag ambiguity","Added icc_conflict pattern to detectConditionContradictions()",Fixed
-DEF-009,health,HEALTH-CONTRA-001,Medium,review-thresholds,copay/waiting contradiction,"Contradictory copay (%20 vs %0) and waiting period (30 days vs none) now detected → displayMode='restricted'","Should detect condition contradictions","Added copay and waiting_period patterns to detectConditionContradictions()",Fixed
-DEF-010,business,BIZ-CONTRA-001,Medium,review-thresholds,BI/warranty contradiction,"Contradictory BI periods (6 vs 18 months) and alarm warranty (required vs not) now detected → displayMode='restricted'","Should detect contradictory conditions","Added bi_indemnity_conflict and alarm_warranty patterns to detectConditionContradictions()",Fixed
+defect_id,branch,issue_type,root_cause,fix_applied,status,file_changed
+DEF-PH-001,kasko,prohibited_phrase,"validator.ts used word 'unlimited' in warning message",Reworded to 'no-cap',CLOSED,src/lib/ai/validator.ts
+DEF-PH-002,kasko,prohibited_phrase,"buildMissingCards passes validator warnings verbatim to display",Added sanitization loop,CLOSED,src/lib/analysis/display-interpreter.ts
+DEF-PH-003,home,prohibited_phrase,Same as DEF-PH-001/002,Same fixes,CLOSED,Same files
+DEF-PH-004,health,prohibited_phrase,Same as DEF-PH-001/002,Same fixes,CLOSED,Same files
+DEF-MD-001,kasko,mode_under_restriction,"Moderate confidence (0.68) with warnings not caught; MIN_OVERALL_CONFIDENCE=0.6 too low, MAX_AMBIGUITY_FLAGS=5 too high",Added Rule 7 (moderate confidence → restricted),CLOSED,src/lib/analysis/review-thresholds.ts
+DEF-MD-002,home,mode_under_restriction,"Moderate confidence (0.72) with 0 warnings not caught",Added Rule 7 (standalone moderate → restricted),CLOSED,src/lib/analysis/review-thresholds.ts
+DEF-MD-003,health,mode_under_restriction,"Moderate confidence (0.72) with 2 warnings not caught",Added Rule 7,CLOSED,src/lib/analysis/review-thresholds.ts
+DEF-MD-004,business,mode_under_restriction,"Low confidence (0.38) with 3 warning triggers not escalated to critical",Added Rule 9 (trigger count escalation),CLOSED,src/lib/analysis/review-thresholds.ts
+DEF-MD-005,business,mode_under_restriction,"Moderate confidence (0.70) with 0 warnings not caught",Added Rule 7,CLOSED,src/lib/analysis/review-thresholds.ts

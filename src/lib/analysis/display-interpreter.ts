@@ -546,6 +546,15 @@ function buildMissingCards(data: ExtractedPolicyData, validation: ValidationResu
     })
   }
 
+  // Sanitize: scrub prohibited phrases from card body text (defense in depth)
+  for (const card of cards) {
+    for (const phrase of PROHIBITED_PHRASES) {
+      const regex = new RegExp(phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi')
+      card.body = card.body.replace(regex, '[limit-status-unclear]')
+      card.impact = card.impact.replace(regex, '[limit-status-unclear]')
+    }
+  }
+
   return cards
 }
 

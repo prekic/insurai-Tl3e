@@ -248,6 +248,41 @@ export function evaluateDisplayMode(
     })
   }
 
+  // Rule 7: Moderate confidence → restricted
+  // Catches borderline samples (0.60–0.75 confidence) regardless of warning count.
+  // These are too uncertain for `full` display without further verification.
+  const MODERATE_CONFIDENCE_CEILING = 0.75
+  if (overallConf >= MIN_OVERALL_CONFIDENCE && overallConf < MODERATE_CONFIDENCE_CEILING) {
+    triggers.push({
+      triggerRule: 'MODERATE_CONFIDENCE',
+      severity: 'warning',
+      message: `Overall confidence (${(overallConf * 100).toFixed(0)}%) is in moderate range (${MIN_OVERALL_CONFIDENCE * 100}%–${MODERATE_CONFIDENCE_CEILING * 100}%). Display restricted for safety.`,
+    })
+  }
+
+  // Rule 8: Low confidence + warning saturation → human_review_required
+  // If confidence is below restricted threshold AND multiple warnings exist
+  const WARNING_SATURATION_THRESHOLD = 3
+  if (overallConf < MIN_OVERALL_CONFIDENCE && warningCount >= WARNING_SATURATION_THRESHOLD) {
+    triggers.push({
+      triggerRule: 'LOW_CONFIDENCE_WARNING_SATURATION',
+      severity: 'critical',
+      message: `Low confidence (${(overallConf * 100).toFixed(0)}%) combined with ${warningCount} warnings exceeds safety threshold. Human review required.`,
+    })
+  }
+
+  // Rule 9: Multiple trigger escalation
+  // If 3+ warning-level triggers have accumulated at low confidence, escalate to critical
+  const TRIGGER_ESCALATION_THRESHOLD = 3
+  const warningTriggerCount = triggers.filter((t) => t.severity === 'warning').length
+  if (overallConf < MIN_OVERALL_CONFIDENCE && warningTriggerCount >= TRIGGER_ESCALATION_THRESHOLD) {
+    triggers.push({
+      triggerRule: 'TRIGGER_COUNT_ESCALATION',
+      severity: 'critical',
+      message: `${warningTriggerCount} warning triggers accumulated at low confidence (${(overallConf * 100).toFixed(0)}%). Escalating to human review.`,
+    })
+  }
+
   // Determine mode
   const hasCritical = triggers.some((t) => t.severity === 'critical')
   const hasWarning = triggers.some((t) => t.severity === 'warning')

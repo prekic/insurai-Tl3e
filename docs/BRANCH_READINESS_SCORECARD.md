@@ -1,54 +1,47 @@
-# Branch Readiness Scorecard
+# Branch Readiness Scorecard — Post Phase 8B
 
-## Assessment Date: 2026-03-15 (Post Phase 7A Remediation)
-## Validation Basis: 23 realistic synthetic samples (NOT real policy PDFs)
-
-> [!CAUTION]
-> No branch has been validated against real policy document extraction. All classifications below are based on pipeline validation with synthetic samples that simulate messy extraction output. True production-readiness requires real-document extraction validation.
+> **Last updated**: Phase 8B remediation pass
+> **Based on**: 27 document-realistic synthetic samples + 23 Phase 7 validation samples
 
 ## Readiness Classification
 
-| Branch | Clean | Noisy | Contradictory | Edge | Pipeline OK | Display OK | Prohibited Phrase OK | Human Review OK | Contradiction OK | Classification |
-|--------|:-----:|:-----:|:------------:|:----:|:-----------:|:----------:|:-------------------:|:--------------:|:---------------:|---------------|
-| KASKO | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Traffic | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Home | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Health | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Life | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| DASK | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Business | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
-| Nakliyat | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | **Pilot-ready** |
+| Branch    | Pipeline Complete | Phrase Clean | Mode Correct | Pilot-Ready (guarded) | Production-Ready |
+|-----------|:-----------------:|:------------:|:------------:|:---------------------:|:----------------:|
+| kasko     | ✅ | ✅ | ✅ | ✅* | ❌ |
+| traffic   | ✅ | ✅ | ✅ | ✅* | ❌ |
+| home      | ✅ | ✅ | ✅ | ✅* | ❌ |
+| health    | ✅ | ✅ | ✅ | ✅* | ❌ |
+| life      | ✅ | ✅ | ✅ | ✅* | ❌ |
+| dask      | ✅ | ✅ | ✅ | ✅* | ❌ |
+| business  | ✅ | ✅ | ✅ | ✅* | ❌ |
+| nakliyat  | ✅ | ✅ | ✅ | ✅* | ❌ |
 
-## Classification Definitions
+> **✅***: Pilot-ready with guardrails means: human-review mode is active for all moderate/noisy samples, prohibited phrases are suppressed, and display-safe boundaries are enforced. This was validated against document-realistic synthetic samples only — **no real PDF extraction has been tested end-to-end yet**.
 
-| Classification | Meaning |
-|---------------|---------|
-| **Production-ready** | Real-document validated, all defects resolved, safe for live users |
-| **Production-ready with guardrails** | Real-document validated, minor defects only, safe with feature flags |
-| **Pilot-ready** | Pipeline validated on synthetic data, all known defects resolved, safe for internal pilot testing |
-| **Pipeline-complete, not rollout-ready** | Pipeline works but open defects in contradiction detection or human-review thresholds |
-| **Not ready** | Pipeline incomplete or critical failures |
+## What "Pilot-Ready with Guardrails" Means
+- Display boundaries enforced (no prohibited phrases leak)
+- Moderate-confidence samples (0.60–0.75) automatically get `restricted` mode
+- Low-confidence samples with multiple warnings escalate to `human_review_required`
+- Contradiction detection active on all branches
+- All display output passes through suppression/sanitization
+- Human review guardrails remain active
 
-## Phase 7A Changes
+## What "Not Production-Ready" Means
+- No real PDF documents have been processed end-to-end through the pipeline
+- Only 2 KASKO PDFs exist in the codebase; no PDFs for other branches
+- Synthetic samples, even document-realistic ones, are NOT the same as real extractions
+- No load testing, latency benchmarking, or integration testing has been done
+- Feature flags not yet deployed to production infrastructure
 
-| Defect | Status | Fix Applied |
-|--------|--------|-------------|
-| DEF-006 (home) | **Fixed** | `detectConditionContradictions()` → average_clause pattern |
-| DEF-008 (nakliyat) | **Fixed** | `detectConditionContradictions()` → icc_conflict pattern |
-| DEF-009 (health) | **Fixed** | `detectConditionContradictions()` → copay + waiting_period patterns |
-| DEF-010 (business) | **Fixed** | `detectConditionContradictions()` → bi_indemnity_conflict + alarm_warranty patterns |
-| DEF-007 (all) | **Acknowledged** | Not a pipeline defect — quote availability depends on LLM extraction |
+## Post-Phase 8B Pilot Validation Results
 
-## Open Defects by Branch
-
-| Branch | Open | Critical | Medium | Low |
-|--------|:----:|:--------:|:------:|:---:|
-| All branches | 0 | 0 | 0 | 0 |
-| Cross-cutting | 1 (DEF-007) | 0 | 0 | 1 |
-
-## Honest Limitations
-
-1. **No branch is production-ready.** No real policy PDFs have been extracted and validated.
-2. **Pilot-ready** means all known safety defects are resolved on synthetic data. Real-document extraction may expose extraction-level issues.
-3. **Source quote availability** depends on LLM extraction quality and cannot be pipeline-guaranteed.
-4. **Contradiction detector** covers 9 known pattern types. Real documents may contain novel contradiction forms not covered.
+| Branch   | Samples | Phrase Clean | Mode Safety |  Avg Safety |
+|----------|:-------:|:----------:|:-----------:|:-----------:|
+| kasko    | 5       | ✅          | 5/5         | 4.6         |
+| traffic  | 3       | ✅          | 3/3         | 5.0         |
+| home     | 3       | ✅          | 3/3         | 5.0         |
+| health   | 4       | ✅          | 4/4         | 5.0         |
+| life     | 3       | ✅          | 3/3         | 4.7         |
+| dask     | 3       | ✅          | 3/3         | 5.0         |
+| business | 3       | ✅          | 3/3         | 5.0         |
+| nakliyat | 3       | ✅          | 3/3         | 4.7         |
