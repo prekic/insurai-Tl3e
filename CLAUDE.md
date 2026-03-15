@@ -10,6 +10,12 @@
 
 ---
 
+## 🚨 Developer Gotchas
+
+1. **Vitest Mocking vs Background Promises**: If a route or service triggers an un-awaited background Promise that makes a database call (e.g., fetching configuration for performance tracking), it **must** be conditionally disabled in tests (`if (process.env.NODE_ENV !== 'test')`). Otherwise, these background calls will unpredictably consume `mockReturnValueOnce` assertions intended for subsequent API requests in the test chain, causing confusing failures like "returning 500 because `auth()` failed" when the mock was actually stolen by `_loadPerfConfig()`.
+
+---
+
 ## Project Overview
 
 **insurai** is an insurance policy analysis platform for Turkish market professionals. Upload PDF policies, extract structured data with AI, and benchmark coverage against market standards.
@@ -86,6 +92,7 @@ insurai/
 │   │   │   ├── cost.ts      # Cost tracking
 │   │   │   └── shared.ts    # Shared utilities
 │   │   ├── settings.ts      # Configuration API
+│   │   ├── policy.ts        # Anonymous policy proxy endpoints
 │   │   ├── drift.ts         # Config drift detection
 │   │   ├── webhooks.ts      # Settings change webhooks
 │   │   └── email.ts         # Email endpoints
@@ -329,6 +336,8 @@ insurai/
 | `supabase/migrations/029_actuarial_worker_settings.sql` | **NEW** Actuarial Web Worker settings and historical confidence bounds |
 | `supabase/migrations/031_fx_rate_history.sql` | **NEW** FX exchange rate history table for tracking conversion analytics |
 | `supabase/migrations/033_seed_hardcoded_configs.sql` | **NEW** Seeds 29 hardcoded backend config keys across 8 categories into `app_settings` |
+| `supabase/migrations/035_admin_users_schema_alignment.sql` | **NEW** Schema alignment for admin_users (`display_name`, `locked_until`) |
+| `supabase/migrations/036_update_anthropic_haiku_model.sql` | **NEW** Updates `claude-3-5-haiku-20241022` to `claude-3-5-haiku-latest` |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -734,6 +743,7 @@ xl: 1280px  /* Large desktop */
 | `/api/ai/ocr` | POST | Google Vision OCR for scanned PDFs | 30/hr |
 | `/api/ai/providers` | GET | Check which AI providers are configured | - |
 | `/api/ai/diagnose` | GET | Test API key validity | - |
+| `/api/policy/save-anonymous` | POST | **NEW** Secure background persist for unauthenticated policy extractions | 60/hr |
 | `/api/health` | GET | Server health check | 60/min |
 | `/api/admin/monitoring/extraction-health` | GET | 24h extraction metrics snapshot (per-provider stats, hourly buckets, recent errors) | Admin |
 | `/api/admin/monitoring/extraction-health/historical` | GET | **NEW** Fetch daily aggregated 30-day extraction health stats | Admin |
