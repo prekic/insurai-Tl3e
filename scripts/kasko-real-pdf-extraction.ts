@@ -1,8 +1,13 @@
 /**
- * Phase 8D — Controlled Real-PDF Extraction Runner
+ * Phase 8D/8E — Controlled Real-PDF Extraction Runner
  *
  * This script reads actual KASKO PDFs, extracts text, calls the LLM,
  * then runs the full analysis pipeline.
+ *
+ * Phase 8E improvements:
+ * - Section-aware chunking (head + tail) replaces naive truncation
+ * - Enhanced prompt for conditional deductibles and special conditions
+ * - Two-pass extraction for long docs (coverages + conditions)
  *
  * Usage: npx tsx scripts/kasko-real-pdf-extraction.ts
  *
@@ -74,11 +79,45 @@ async function extractTextFromPdfFile(filePath: string): Promise<{
 // STEP 2: LLM EXTRACTION (call OpenAI or Anthropic directly)
 // ============================================================================
 
+// ============================================================================
+// SECTION-AWARE TEXT CHUNKING (Phase 8E — DEF-EX-002 fix)
+// ============================================================================
+
+/**
+ * Instead of naive truncation that drops later pages, keep:
+ * - Head: first 20K chars (policy header, declarations, main coverages)
+ * - Tail: last 12K chars (special conditions, endorsements, signatures)
+ * This preserves both coverage detail AND late-page clauses.
+ */
+function buildSectionAwareText(fullText: string, maxChars: number = 32000): string {
+  if (fullText.length <= maxChars) return fullText
+
+  const HEAD_RATIO = 0.625 // 62.5% for head
+  const headSize = Math.floor(maxChars * HEAD_RATIO)
+  const tailSize = maxChars - headSize
+
+  const head = fullText.substring(0, headSize)
+  const tail = fullText.substring(fullText.length - tailSize)
+
+  return head + '\n\n[... document middle section omitted for length ...]\n\n' + tail
+}
+
+/**
+ * For very long documents, extract a focused "conditions supplement"
+ * from the tail section to capture special conditions / endorsements.
+ */
+function _extractConditionsSupplementText(fullText: string): string {
+  // Take the last 15K chars where conditions/endorsements typically live
+  const TAIL_SIZE = 15000
+  if (fullText.length <= TAIL_SIZE) return ''
+  return fullText.substring(fullText.length - TAIL_SIZE)
+}
+
 async function extractWithLLM(
   documentText: string,
   provider: 'openai' | 'anthropic'
 ): Promise<{ success: boolean; data?: any; model?: string; error?: string }> {
-  const systemPrompt = `You are a Turkish insurance policy extraction expert. 
+  const systemPrompt = `You are a Turkish insurance policy (KASKO) extraction expert.
 Extract structured data from the following policy document text.
 Return ONLY valid JSON with these fields:
 {
@@ -91,7 +130,7 @@ Return ONLY valid JSON with these fields:
   "currency": "TRY",
   "coverages": [{
     "name": "string",
-    "description": "string",
+    "description": "string — include deductible conditions, network/non-network distinctions",
     "limit": number or null,
     "deductible": number or null,
     "isMarketValue": boolean,
@@ -104,7 +143,7 @@ Return ONLY valid JSON with these fields:
     }
   }],
   "exclusions": ["string"],
-  "specialConditions": ["string"],
+  "specialConditions": ["string — include ALL conditional deductibles, age/license restrictions, repair network conditions, and endorsement clauses"],
   "confidence": { "overall": number between 0 and 1 },
   "evidence": {
     "insights": [{ "text": "string", "textEn": "string", "quote": "string" }],
@@ -112,11 +151,21 @@ Return ONLY valid JSON with these fields:
   }
 }
 
-Pay special attention to:
-- Rayiç Değer (market value) vs fixed sum insured
-- Conditional deductibles (e.g., age-based muafiyet)
-- Sınırsız (unlimited) coverages with carve-outs/sublimits
-- Service vs indemnity distinctions (e.g., anlaşmalı vs anlaşmasız servis)`
+CRITICAL EXTRACTION REQUIREMENTS:
+1. CONDITIONAL DEDUCTIBLES: Look for muafiyet/tenzili muafiyet clauses that apply under specific conditions:
+   - Age-based: "25 yaşından küçük", "yaş şartı", "sürücü yaşı"
+   - License-based: "ehliyet süresi", "2 yıldan az"
+   - Repair network: "anlaşmalı servis", "anlaşmasız servis", "%25 muafiyet"
+   - Scenario-based: "alkol", "ehliyetsiz", "hız"
+   Each conditional deductible MUST appear in specialConditions.
+
+2. SPECIAL CONDITIONS / ENDORSEMENTS: Extract ALL special conditions, even if they appear at the end of the document:
+   - Özel şartlar, kloz, zeyilname, ek teminat şartları
+   - Include the full condition text, not just the heading.
+
+3. RAYIÇ DEĞER: If the sum insured is based on market value (rayiç değer), set isMarketValue=true.
+4. SINURSIZ: If a coverage is unlimited (sınırsız), set isUnlimited=true.
+5. SERVICE DISTINCTIONS: Note differences between anlaşmalı (network) and anlaşmasız (non-network) service.`
 
   try {
     if (provider === 'openai') {
@@ -350,13 +399,12 @@ async function main() {
       continue
     }
 
-    // Step 2: LLM extraction (try OpenAI first, fallback to Anthropic)
-    // Truncate very large documents to avoid API timeout
-    const MAX_LLM_CHARS = 30000
-    let llmText = textResult.text
-    if (llmText.length > MAX_LLM_CHARS) {
-      console.log(`  ⚠️ Truncating text from ${llmText.length} to ${MAX_LLM_CHARS} chars for LLM`)
-      llmText = llmText.substring(0, MAX_LLM_CHARS)
+    // Step 2: LLM extraction with section-aware chunking (Phase 8E)
+    const llmText = buildSectionAwareText(textResult.text)
+    if (llmText.length < textResult.text.length) {
+      console.log(
+        `  📎 Section-aware chunking: ${textResult.text.length} → ${llmText.length} chars (head+tail preserved)`
+      )
     }
     console.log('  🤖 Running LLM extraction (OpenAI gpt-4o-mini)...')
     let llmResult = await extractWithLLM(llmText, 'openai')

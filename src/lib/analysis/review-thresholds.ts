@@ -283,6 +283,18 @@ export function evaluateDisplayMode(
     })
   }
 
+  // Rule 10: Zero-coverage extraction safety (Phase 8E — DEF-EX-003)
+  // If no coverages were extracted at all, the extraction is too shallow
+  // to safely display as "full". Force at least restricted mode.
+  const coverageCount = data.coverages?.length ?? 0
+  if (coverageCount === 0) {
+    triggers.push({
+      triggerRule: 'ZERO_COVERAGES_EXTRACTED',
+      severity: 'warning',
+      message: 'No coverages were extracted from the document. Extraction may be incomplete.',
+    })
+  }
+
   // Determine mode
   const hasCritical = triggers.some((t) => t.severity === 'critical')
   const hasWarning = triggers.some((t) => t.severity === 'warning')

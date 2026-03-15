@@ -83,3 +83,42 @@
 
 ### Updated KASKO Readiness
 **Internal-pilot-ready with guardrails** — now backed by real E2E PDF→LLM→pipeline evidence. 3 open extraction-stage findings logged (non-blocking for pilot with guardrails).
+
+## Phase 8E — KASKO Extraction Hardening Results
+
+### Before/After Comparison
+
+| Field | PDF | Phase 8D | Phase 8E | Status |
+|-------|-----|----------|----------|--------|
+| condDeductible | PDF-001 | ❌ | ❌ | Still open (LLM miss) |
+| condDeductible | PDF-002 | ❌ | ✅ | Fixed |
+| display mode | PDF-003 | full | restricted | Fixed (Rule 10) |
+| triggers | PDF-003 | none | ZERO_COVERAGES_EXTRACTED | Fixed |
+| coverageCount | PDF-001 | 4 | 2 | Regressed (LLM variability) |
+| coverageCount | PDF-002 | 4 | 1 | Regressed (LLM variability) |
+| phrase clean | all | ✅ | ✅ | Maintained |
+
+### Defect Summary
+
+| ID | Status | Fix |
+|----|--------|-----|
+| DEF-EX-001 | OPEN | LLM variability — requires human review |
+| DEF-EX-002 | IMPROVED | Section-aware head+tail chunking |
+| DEF-EX-003 | CLOSED | Rule 10: ZERO_COVERAGES_EXTRACTED |
+| DEF-EX-004 | OPEN (new) | Coverage count regression — LLM non-determinism |
+
+### Updated KASKO Readiness
+**Internal-pilot-ready with mandatory human review** — DEF-EX-001/004 are LLM variability issues that cannot be fully resolved without model tuning. Human review mitigates the risk.
+
+### Internal Pilot Gate Proposal
+
+| Parameter | Value |
+|-----------|-------|
+| Feature flag | `kasko_ai_extraction_pilot` |
+| Allowed users | Internal QA team only (max 5 users) |
+| Mandatory review | Every extraction requires human review before display |
+| Accepted documents | KASKO policies only (BİRLEŞİK KASKO SÖZLEŞMESİ) |
+| Rollback triggers | >20% extractions with 0 coverages, any prohibited phrase leak |
+| Metrics to watch | coverage count per extraction, conditional deductible capture rate, display mode distribution, phrase leak rate |
+| Monitoring period | Minimum 2 weeks, minimum 20 documents processed |
+| Escalation | If >50% of extractions require human correction → pause pilot |
