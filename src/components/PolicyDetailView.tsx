@@ -222,11 +222,11 @@ function getCoverageInfoText(
 
   // Add info about special values
   if (coverage.isMarketValue) {
-    parts.push(t.policy.paidByMarketValue)
+    parts.push(applySafeWording(t.policy.paidByMarketValue))
   }
 
   if (coverage.isUnlimited) {
-    parts.push(t.policy.noUpperLimit)
+    parts.push(applySafeWording(t.policy.noUpperLimit))
   }
 
   return parts.length > 0 ? parts.join(' • ') : null
@@ -404,7 +404,9 @@ function CollapsibleCoverageCategory({
                       <span
                         className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
                       >
-                        {subLimit.isUnlimited ? t.global.unlimited : formatAmount(subLimit.limit)}
+                        {subLimit.isUnlimited
+                          ? applySafeWording(t.global.unlimited)
+                          : formatAmount(subLimit.limit)}
                       </span>
                     </div>
                   ))}
@@ -1124,7 +1126,7 @@ export function PolicyDetailView() {
       `=== ${t.policy.coveragesTitleExport} ===`,
       ...policy.coverages.map(
         (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? t.global.unlimited : formatConverted(c.limit)}`
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? applySafeWording(t.global.unlimited) : formatConverted(c.limit)}`
       ),
       '',
       `=== ${t.policy.exclusionsTitleExport} ===`,
@@ -1132,7 +1134,8 @@ export function PolicyDetailView() {
       '',
       `=== ${t.policy.aiInsightsTitleExport} ===`,
       ...policy.aiInsights.map(
-        (_, i) => `• ${getLocalizedInsight(policy, i, locale, t.insightTranslations)}`
+        (_, i) =>
+          `• ${applySafeWording(getLocalizedInsight(policy, i, locale, t.insightTranslations))}`
       ),
     ].join('\n')
 
@@ -1583,7 +1586,9 @@ export function PolicyDetailView() {
                         t.insightTranslations
                       )
                       // Strip any existing prefix characters from the text for clean display
-                      const displayText = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      const displayText = applySafeWording(
+                        rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      )
 
                       const originalInsight = policy.aiInsights[i]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
@@ -1954,7 +1959,9 @@ export function PolicyDetailView() {
                     return (
                       <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
                         <TruncatableText
-                          text={getLocalizedInsight(policy, i, locale, t.insightTranslations)}
+                          text={applySafeWording(
+                            getLocalizedInsight(policy, i, locale, t.insightTranslations)
+                          )}
                           maxLength={150}
                           showFullTextTranslation={t.policy.showFullText}
                           showLessTranslation={t.common.showLess}
