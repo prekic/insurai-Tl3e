@@ -37,6 +37,73 @@ export interface VehicleInfo {
   fuelType?: string // Yakıt tipi (Benzin/Dizel/LPG/Elektrik)
 }
 
+/** Types of evidence sources in the document */
+export type EvidenceType =
+  | 'explicit_clause'
+  | 'table_value'
+  | 'endorsement'
+  | 'implicit_context'
+  | 'external_reference'
+
+/** State of ambiguity for an extracted fact */
+export type AmbiguityState = 'clear' | 'contradictory' | 'missing' | 'implied' | 'low_confidence'
+
+/** Canonical Evidence representation for full traceability */
+export interface Evidence {
+  page?: number
+  section?: string
+  offsets?: {
+    start: number
+    end: number
+  }
+  rawSnippet: string
+  normalizedSnippet?: string
+  evidenceType: EvidenceType
+  confidence: number
+  ambiguityState: AmbiguityState
+}
+
+/** Wrapper for any extracted primitive to ensure traceability */
+export interface Traceable<T> {
+  value: T
+  evidence?: Evidence
+}
+
+/** Mapping of extracted output field to character spans in canonical text */
+export interface SpanMap {
+  fieldPath: string
+  start: number
+  end: number
+}
+
+/** Types of relationships between clauses or coverage items */
+export type RelationshipType =
+  | 'coverage_inclusion'
+  | 'conditional_restriction'
+  | 'deductible_trigger'
+  | 'sublimit'
+  | 'carve_out'
+  | 'endorsement_override'
+  | 'service_benefit_linkage'
+
+/** Edge in the clause relationship graph */
+export interface ClauseRelationship {
+  sourceId: string
+  /** The target clause ID. Can be null if the relationship is ambiguous or unresolved. */
+  targetId: string | null
+  relationshipType: RelationshipType
+  description?: string
+  precedenceWeight?: number
+  /** Indicates if this is an unresolved candidate relationship that needs human review */
+  isCandidate?: boolean
+}
+
+/** Graph representing relationships and overrides between clauses */
+export interface ClauseGraph {
+  nodes: Record<string, unknown>
+  edges: ClauseRelationship[]
+}
+
 export interface Coverage {
   name: string
   nameTr: string
@@ -123,6 +190,22 @@ export interface Policy {
   extractedText?: string
   /** AI-processed text with OCR corrections and improved readability */
   processedText?: string
+  /** Canonical, immutable text of the policy document for extraction */
+  canonicalText?: string
+  /** Mapping of JSON paths to character spans in canonicalText */
+  spanMaps?: SpanMap[]
+  /** Graph of relationships and precedence between clauses */
+  clauseGraph?: ClauseGraph
+  /** Versioned persistence fields mapped from Universal Schema */
+  isUniversalSchema?: boolean
+  validationErrors?: unknown
+  validationWarnings?: unknown
+  safetyScore?: number
+  documentVersion?: number
+  canonicalTextVersion?: number
+  evidenceSpanVersion?: number
+  clauseGraphVersion?: number
+  extractionSchemaVersion?: string
 }
 
 /**
