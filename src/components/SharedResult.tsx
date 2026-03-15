@@ -28,16 +28,18 @@ import {
 import { useI18n } from '@/lib/i18n'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
+import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
 
 type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
 
 export function SharedResult() {
   const { shareId } = useParams<{ shareId: string }>()
   const navigate = useNavigate()
-  const { t, locale } = useI18n()
+  const { t } = useI18n()
   const { formatConverted } = useDisplayCurrency()
   const [state, setState] = useState<ViewState>('loading')
   const [policy, setPolicy] = useState<AnalyzedPolicy | null>(null)
+  const displaySummary = useDisplaySafeSummary(policy)
   const [fileName, setFileName] = useState<string>('')
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
 
@@ -215,52 +217,42 @@ export function SharedResult() {
               <div className="p-4 bg-gray-50 rounded-xl">
                 <div className="text-sm text-gray-500">{t.shared.coverage}</div>
                 <div className="font-semibold text-gray-900">
-                  {policy.coverages?.some((c) => c.isMarketValue)
-                    ? locale === 'tr'
-                      ? 'Rayiç Değer'
-                      : 'Market Value'
-                    : policy.coverage
-                      ? formatConverted(policy.coverage)
-                      : 'N/A'}
+                  {displaySummary?.protectionBasisCard
+                    ? displaySummary.protectionBasisCard.basisDetail
+                    : 'N/A'}
                 </div>
               </div>
             </div>
 
-            {/* Coverages */}
-            {policy.coverages && policy.coverages.length > 0 && (
+            {/* Coverages — from display interpreter */}
+            {displaySummary && displaySummary.keyCoverageCards.length > 0 && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">
-                  {t.shared.coveragesCount.replace('{count}', String(policy.coverages.length))}
+                  {t.shared.coveragesCount.replace(
+                    '{count}',
+                    String(displaySummary.keyCoverageCards.length)
+                  )}
                 </h3>
                 <div className="space-y-2">
-                  {policy.coverages.slice(0, 5).map((cov, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg"
-                    >
-                      <span className="text-sm text-emerald-800">{cov.nameTr || cov.name}</span>
-                      <span className="text-sm font-medium text-emerald-700">
-                        {cov.isUnlimited
-                          ? locale === 'tr'
-                            ? 'Sınırsız'
-                            : 'Unlimited'
-                          : cov.isMarketValue
-                            ? locale === 'tr'
-                              ? 'Rayiç Değer'
-                              : 'Market Value'
-                            : cov.included && (!cov.limit || cov.limit === 0)
-                              ? locale === 'tr'
-                                ? '✓ Dahil'
-                                : '✓ Included'
-                              : formatConverted(cov.limit || 0)}
-                      </span>
-                    </div>
-                  ))}
-                  {policy.coverages.length > 5 && (
+                  {displaySummary.keyCoverageCards
+                    .filter((c) => c.displayEligibility)
+                    .slice(0, 5)
+                    .map((card) => (
+                      <div
+                        key={card.id}
+                        className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg"
+                      >
+                        <span className="text-sm text-emerald-800">{card.coverageName}</span>
+                        <span className="text-sm font-medium text-emerald-700">
+                          {card.limit || '✓'}
+                        </span>
+                      </div>
+                    ))}
+                  {displaySummary.keyCoverageCards.length > 5 && (
                     <p className="text-sm text-gray-500 text-center py-2">
                       {t.shared.moreCoverages.replace(
                         '{count}',
-                        String(policy.coverages.length - 5)
+                        String(displaySummary.keyCoverageCards.length - 5)
                       )}
                     </p>
                   )}
@@ -268,35 +260,44 @@ export function SharedResult() {
               </div>
             )}
 
-            {/* Exclusions */}
-            {policy.exclusions && policy.exclusions.length > 0 && (
+            {/* Missing/Unclear — from display interpreter */}
+            {displaySummary && displaySummary.missingOrUnclearCards.length > 0 && (
               <div>
                 <h3 className="font-semibold text-gray-900 mb-3">{t.shared.keyExclusions}</h3>
                 <div className="space-y-2">
-                  {policy.exclusions.slice(0, 3).map((exc, i) => (
-                    <div key={i} className="flex items-start gap-2 p-3 bg-red-50 rounded-lg">
-                      <XCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-red-800">{exc}</span>
-                    </div>
-                  ))}
+                  {displaySummary.missingOrUnclearCards
+                    .filter((c) => c.displayEligibility)
+                    .slice(0, 3)
+                    .map((card) => (
+                      <div
+                        key={card.id}
+                        className="flex items-start gap-2 p-3 bg-red-50 rounded-lg"
+                      >
+                        <XCircle size={16} className="text-red-500 mt-0.5 flex-shrink-0" />
+                        <span className="text-sm text-red-800">{card.body}</span>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}
 
-            {/* AI Insights */}
-            {policy.aiInsights && policy.aiInsights.length > 0 && (
+            {/* Claim Risks — from display interpreter */}
+            {displaySummary && displaySummary.claimReductionRiskCards.length > 0 && (
               <div className="p-4 bg-blue-50 rounded-xl">
                 <h3 className="font-semibold text-blue-900 mb-3 flex items-center gap-2">
                   <Sparkles size={16} />
                   {t.shared.aiInsights}
                 </h3>
                 <div className="space-y-2">
-                  {policy.aiInsights.slice(0, 3).map((insight, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <CheckCircle2 size={14} className="text-blue-600 mt-0.5 flex-shrink-0" />
-                      <p className="text-sm text-blue-800">{insight.replace(/^[✓✔]\s*/, '')}</p>
-                    </div>
-                  ))}
+                  {displaySummary.claimReductionRiskCards
+                    .filter((c) => c.displayEligibility)
+                    .slice(0, 3)
+                    .map((card) => (
+                      <div key={card.id} className="flex items-start gap-2">
+                        <CheckCircle2 size={14} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-sm text-blue-800">{card.body}</p>
+                      </div>
+                    ))}
                 </div>
               </div>
             )}

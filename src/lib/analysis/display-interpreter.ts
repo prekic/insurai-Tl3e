@@ -62,7 +62,7 @@ export function checkProhibitedPhrase(text: string): string | null {
 /**
  * Applies safe wording to text, replacing prohibited phrases with governed alternatives.
  */
-function applySafeWording(text: string): string {
+export function applySafeWording(text: string): string {
   let safe = text
   const replacements: [RegExp, string][] = [
     [/\bno deductible\b/gi, 'Deductible treatment depends on the specific scenario'],
