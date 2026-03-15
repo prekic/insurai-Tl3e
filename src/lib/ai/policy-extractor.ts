@@ -48,6 +48,8 @@ import {
 import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
 import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
 import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
+import { validateExtractionSafety } from './validator'
+import { resolveClauseRelationships } from './relationship-resolver'
 
 export interface ExtractionResult {
   success: true
@@ -1300,14 +1302,27 @@ export async function extractPolicyFromDocument(
       coverages_count: enhancedExtractedData.coverages.length,
     })
 
+    const safetyResult = validateExtractionSafety(enhancedExtractedData)
+
+    if (!safetyResult.isValid) {
+      console.warn(`[PolicyExtractor] Data extraction safety warnings/errors:`, safetyResult.flags)
+      if (import.meta.env.DEV) {
+        console.warn(`[PolicyExtractor] Safety block reason: ${safetyResult.blockReason}`)
+      }
+    }
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = await convertToAnalyzedPolicy(
+    let policy = await convertToAnalyzedPolicy(
       enhancedExtractedData,
       file,
       documentText,
-      processedText
+      processedText,
+      safetyResult
     )
+
+    // Apply relationship resolution and precedence rules
+    policy = resolveClauseRelationships(policy, enhancedExtractedData.clauseGraph)
 
     // Add validation warnings to AI insights
     if (patternValidation) {
@@ -1554,7 +1569,12 @@ async function convertToAnalyzedPolicy(
   data: ExtractedPolicyData,
   file: File,
   rawText?: string,
-  processedText?: string
+  processedText?: string,
+  safetyResult?: {
+    flags: Array<{ level: 'Safe' | 'Warning' | 'Error'; message: string; field?: string }>
+    isValid: boolean
+    blockReason?: string
+  }
 ): Promise<AnalyzedPolicy> {
   const now = new Date()
 
@@ -1728,6 +1748,8 @@ async function convertToAnalyzedPolicy(
       }
       return { insights, exclusions, quoteTranslations }
     })(),
+    safetyFlags: safetyResult?.flags,
+    safetyBlockReason: safetyResult?.blockReason,
   }
 
   // Prepend AI generated evidence-based insights

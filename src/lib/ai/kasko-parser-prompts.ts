@@ -66,8 +66,8 @@ export const EXTRACTION_SYSTEM_PROMPT = `You are an insurance policy parser and 
 NON-NEGOTIABLE RULES:
 1) Do NOT rewrite or paraphrase limits/deductibles. Extract them exactly as numbers + currency.
 2) De-duplicate: if the same rule appears multiple times, keep the most specific version once.
-3) If a detail is not present in the text, say "BELİRTİLMEMİŞ" (do not guess).
-4) Output must be structured, readable, and auditable.
+3) If a detail is not present in the text, use \`null\`. DO NOT guess. DO NOT apply default values (e.g., do NOT assume the currency is TRY, do NOT assume deductible is 0).
+4) Output must be structured, readable, and auditable. Provide citations for all critical fields.
 
 OUTPUT FORMAT (MUST FOLLOW EXACTLY):
 

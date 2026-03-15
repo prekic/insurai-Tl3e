@@ -48,6 +48,24 @@ export interface ExtractedPolicyData {
     exclusions: Array<{ text: string; textEn: string; quote: string }>
   }
 
+  // Graph of relationships between coverages/clauses
+  clauseGraph?: {
+    edges: Array<{
+      sourceId: string
+      targetId: string | null
+      relationshipType:
+        | 'coverage_inclusion'
+        | 'conditional_restriction'
+        | 'deductible_trigger'
+        | 'sublimit'
+        | 'carve_out'
+        | 'endorsement_override'
+        | 'service_benefit_linkage'
+      description?: string | null
+      isCandidate: boolean
+    }>
+  }
+
   // Confidence scores for each field
   confidence: {
     overall: number
@@ -141,7 +159,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       currency: {
         type: ['string', 'null'],
         description:
-          'Currency code - REQUIRED. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Default to TRY only if no indicator found.',
+          'Currency code - REQUIRED IF PRESENT. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Return null if no currency can be found. DO NOT default to TRY or any other currency.',
       },
       paymentFrequency: {
         type: ['string', 'null'],
@@ -315,6 +333,52 @@ export const EXTRACTION_JSON_SCHEMA = {
         additionalProperties: false,
         description: 'Verbatim evidence supporting the generated insights and exclusions',
       },
+      clauseGraph: {
+        type: 'object',
+        properties: {
+          edges: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                sourceId: { type: 'string', description: 'Name of the source coverage or clause' },
+                targetId: {
+                  type: ['string', 'null'],
+                  description: 'Name of the target coverage or clause. Use null if ambiguous.',
+                },
+                relationshipType: {
+                  type: 'string',
+                  enum: [
+                    'coverage_inclusion',
+                    'conditional_restriction',
+                    'deductible_trigger',
+                    'sublimit',
+                    'carve_out',
+                    'endorsement_override',
+                    'service_benefit_linkage',
+                  ],
+                  description: 'Type of relationship',
+                },
+                description: {
+                  type: ['string', 'null'],
+                  description: 'Explanation of the relationship',
+                },
+                isCandidate: {
+                  type: 'boolean',
+                  description:
+                    'Set to true if this relationship is unclear or ambiguous and needs review',
+                },
+              },
+              required: ['sourceId', 'targetId', 'relationshipType', 'isCandidate'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['edges'],
+        additionalProperties: false,
+        description:
+          'A graph representing relationships and overrides between clauses and coverages',
+      },
       confidence: {
         type: 'object',
         properties: {
@@ -346,6 +410,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'exclusions',
       'amendmentInfo',
       'evidence',
+      'clauseGraph',
       'confidence',
     ],
     additionalProperties: false,
@@ -414,8 +479,8 @@ Your task is to extract structured information from insurance policy documents.
      - Coverage limits (Teminat Limiti)
      - Sum insured (Sigorta Bedeli)
    - If mixed currencies: use the currency of the main coverage/premium
-   - Default to "TRY" only if no currency indicator is found
-   - ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR)
+   - If no currency indicator is found, YOU MUST RETURN null. DO NOT guess or default to TRY.
+   - ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR) if found.
 
 5. **Confidence Scores**: Rate your confidence (0-1) based on:
    - Clarity of the source text
@@ -477,5 +542,13 @@ Your task is to extract structured information from insurance policy documents.
    - For every insight and exclusion generated, extract the exact original text from the document.
    - DO NOT paraphrase the quote. Copy it exactly as it appears in the text.
    - Populate the 'evidence.insights' and 'evidence.exclusions' arrays. Ensure the 'text' perfectly matches the generated insight or exclusion string, and the 'quote' is the verbatim evidence.
+
+10. **CRITICAL - Clause Graph & Relationships**:
+    You MUST identify relationships and overrides between different clauses or coverages.
+    - Create a 'clauseGraph.edges' array connecting related items.
+    - 'sourceId': The name of the primary coverage/clause.
+    - 'targetId': What it affects (can be null if ambiguous).
+    - 'relationshipType': Must be one of coverage_inclusion, conditional_restriction, deductible_trigger, sublimit, carve_out, endorsement_override, service_benefit_linkage.
+    - 'isCandidate': Set to true ONLY if you are unsure of the relationship or if it is ambiguous.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

@@ -269,6 +269,9 @@ export interface AnalyzedPolicy extends Policy {
     actionTr: string
     estimatedCost: number | null
   }>
+  // Output from deterministic validator
+  safetyFlags?: Array<{ level: 'Safe' | 'Warning' | 'Error'; message: string; field?: string }>
+  safetyBlockReason?: string
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {
