@@ -133,11 +133,8 @@ describe('Validation: Display Mode Appropriateness', () => {
   for (const sample of contradictorySamples) {
     it(`${sample.meta.id} (contradictory): should be restricted or human_review_required`, () => {
       const { result } = runPipeline(sample)
-      // KNOWN DEFECT (DEF-006): contradictory conditions at moderate confidence (>0.6)
-      // do not trigger restricted mode because the validator does not detect condition-level
-      // contradictions. Accept current behavior and log as defect.
-      // Ideal: expect(['restricted', 'human_review_required']).toContain(result.displayMode)
-      expect(['full', 'restricted', 'human_review_required']).toContain(result.displayMode)
+      // After Phase 7A fix: contradiction detection now triggers restricted/human_review_required
+      expect(['restricted', 'human_review_required']).toContain(result.displayMode)
     })
   }
 })
