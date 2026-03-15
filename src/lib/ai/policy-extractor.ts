@@ -32,6 +32,7 @@ import { ExtractedPolicyData, ExtractedCoverage } from './extraction-schema'
 import type { AnalyzedPolicy, PolicyType, Coverage, CoverageImportance } from '@/types/policy'
 import { POLICY_TYPES } from '@/types/policy'
 import { samplePolicies } from '@/data/sample-policies'
+import { generateAnalysisBundle } from '@/lib/analysis/engine'
 import {
   generateMarketComparisonData,
   generateMarketComparisonDataAsync,
@@ -48,6 +49,8 @@ import {
 import { lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
 import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
 import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
+import { validateExtractionSafety } from './validator'
+import { resolveClauseRelationships } from './relationship-resolver'
 
 export interface ExtractionResult {
   success: true
@@ -1300,14 +1303,27 @@ export async function extractPolicyFromDocument(
       coverages_count: enhancedExtractedData.coverages.length,
     })
 
+    const safetyResult = validateExtractionSafety(enhancedExtractedData)
+
+    if (!safetyResult.isValid) {
+      console.warn(`[PolicyExtractor] Data extraction safety warnings/errors:`, safetyResult.flags)
+      if (import.meta.env.DEV) {
+        console.warn(`[PolicyExtractor] Safety block reason: ${safetyResult.blockReason}`)
+      }
+    }
+
     // Convert extracted data to AnalyzedPolicy format
     // Store both raw extractedText and processedText for display and analysis
-    const policy = await convertToAnalyzedPolicy(
+    let policy = await convertToAnalyzedPolicy(
       enhancedExtractedData,
       file,
       documentText,
-      processedText
+      processedText,
+      safetyResult
     )
+
+    // Apply relationship resolution and precedence rules
+    policy = resolveClauseRelationships(policy, enhancedExtractedData.clauseGraph)
 
     // Add validation warnings to AI insights
     if (patternValidation) {
@@ -1554,7 +1570,12 @@ async function convertToAnalyzedPolicy(
   data: ExtractedPolicyData,
   file: File,
   rawText?: string,
-  processedText?: string
+  processedText?: string,
+  safetyResult?: {
+    flags: Array<{ level: 'Safe' | 'Warning' | 'Error'; message: string; field?: string }>
+    isValid: boolean
+    blockReason?: string
+  }
 ): Promise<AnalyzedPolicy> {
   const now = new Date()
 
@@ -1728,6 +1749,8 @@ async function convertToAnalyzedPolicy(
       }
       return { insights, exclusions, quoteTranslations }
     })(),
+    safetyFlags: safetyResult?.flags,
+    safetyBlockReason: safetyResult?.blockReason,
   }
 
   // Prepend AI generated evidence-based insights
@@ -1817,6 +1840,23 @@ async function convertToAnalyzedPolicy(
     basePolicy.gapActions = actionItems
   } catch {
     // Gap analysis is optional, continue without it
+  }
+
+  // Phase 4: Unified Analysis Bundle Engine
+  try {
+    const defaultValidation = { isValid: true, flags: [] }
+    const validationRes = {
+      isValid: safetyResult?.isValid ?? defaultValidation.isValid,
+      flags: (safetyResult?.flags ?? defaultValidation.flags).map((f) => ({
+        ...f,
+        ruleId: 'MIGRATION_PLACEHOLDER',
+      })),
+      blockReason: safetyResult?.blockReason,
+    }
+
+    basePolicy.analysisBundle = generateAnalysisBundle(basePolicy.id, data, validationRes)
+  } catch (err) {
+    console.error('[PolicyExtractor] Failed to generate AnalysisBundle', err)
   }
 
   // Translate final aiInsights to Turkish (after all modifications like validation warnings)

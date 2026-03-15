@@ -14,8 +14,6 @@ import {
   Brain,
   AlertTriangle,
   CheckCircle,
-  TrendingUp,
-  TrendingDown,
   Lightbulb,
   BookOpen,
   Users,
@@ -34,6 +32,7 @@ import { Button } from './ui/button'
 import { useI18n } from '@/lib/i18n'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
+import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
 
 interface AIInsightsPanelProps {
   policy: AnalyzedPolicy
@@ -42,6 +41,7 @@ interface AIInsightsPanelProps {
 export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
+  const displaySummary = useDisplaySafeSummary(policy)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']))
 
   const toggleSection = (section: string) => {
@@ -108,6 +108,38 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
       </CardHeader>
 
       <CardContent className="p-0">
+        {/* === PILOT REVIEW BANNER (KASKO internal pilot) === */}
+        {displaySummary?.isPilotResult && (
+          <div
+            className="p-4 border-b-2 border-amber-400 bg-amber-50"
+            role="alert"
+            aria-live="polite"
+            data-testid="pilot-review-banner"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-amber-800 text-sm">
+                  ⚠️ TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {displaySummary.pilotReviewBanner ||
+                    'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'}
+                </p>
+                {displaySummary.pilotReviewStatus && (
+                  <Badge className="mt-2 bg-amber-100 text-amber-800 border border-amber-300">
+                    {displaySummary.pilotReviewStatus === 'pending_review'
+                      ? 'İnceleme Bekliyor / Pending Review'
+                      : displaySummary.pilotReviewStatus === 'review_in_progress'
+                        ? 'İnceleniyor / Review In Progress'
+                        : displaySummary.pilotReviewStatus}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Analysis Quality Summary */}
         <div
           className={`p-4 border-b ${qualityColors[qualityLevel].replace('text-', 'bg-').replace('-600', '-50')}`}
@@ -122,8 +154,11 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
               <p className="font-semibold text-gray-900">{qualityLabelMap[qualityLevel]}</p>
               <p className="text-sm text-gray-600">
                 {t.aiInsightsPanel.detectedSummary
-                  .replace('{coverages}', String(policy.coverages?.length ?? 0))
-                  .replace('{exclusions}', String(policy.exclusions?.length ?? 0))}
+                  .replace('{coverages}', String(displaySummary?.keyCoverageCards?.length ?? 0))
+                  .replace(
+                    '{exclusions}',
+                    String(displaySummary?.missingOrUnclearCards?.length ?? 0)
+                  )}
               </p>
             </div>
           </div>
@@ -131,7 +166,7 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
 
         {/* Collapsible Sections */}
         <div className="divide-y">
-          {/* Key Insights Section */}
+          {/* Key Insights Section — from display interpreter */}
           <CollapsibleSection
             id="summary"
             title={t.aiInsightsPanel.keyFindings}
@@ -140,40 +175,40 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
             onToggle={() => toggleSection('summary')}
           >
             <div className="space-y-3">
-              {/* Positive findings */}
-              {policy.aiInsights
-                ?.filter((i) => i.startsWith('✓'))
-                .map((insight, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
+              {/* Display-safe coverage cards (confirmed) */}
+              {displaySummary?.keyCoverageCards
+                ?.filter((c) => c.displayEligibility && c.statementType === 'confirmed_from_policy')
+                .map((card) => (
+                  <div key={card.id} className="flex items-start gap-2 text-sm">
                     <CheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={16} />
-                    <span className="text-gray-700">{insight.replace('✓ ', '')}</span>
+                    <span className="text-gray-700">{card.body}</span>
                   </div>
                 ))}
 
-              {/* Warnings */}
-              {policy.aiInsights
-                ?.filter((i) => i.startsWith('⚠'))
-                .map((insight, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
+              {/* Display-safe restriction/conditional cards */}
+              {displaySummary?.conditionalRestrictionCards
+                ?.filter((c) => c.displayEligibility)
+                .map((card) => (
+                  <div key={card.id} className="flex items-start gap-2 text-sm">
                     <AlertTriangle className="text-amber-600 mt-0.5 flex-shrink-0" size={16} />
-                    <span className="text-gray-700">{insight.replace('⚠ ', '')}</span>
+                    <span className="text-gray-700">{card.body}</span>
                   </div>
                 ))}
 
-              {/* Tips */}
-              {policy.aiInsights
-                ?.filter((i) => i.startsWith('💡'))
-                .map((insight, idx) => (
-                  <div key={idx} className="flex items-start gap-2 text-sm">
+              {/* Display-safe missing/unclear cards */}
+              {displaySummary?.missingOrUnclearCards
+                ?.filter((c) => c.displayEligibility)
+                .map((card) => (
+                  <div key={card.id} className="flex items-start gap-2 text-sm">
                     <Lightbulb className="text-blue-600 mt-0.5 flex-shrink-0" size={16} />
-                    <span className="text-gray-700">{insight.replace('💡 ', '')}</span>
+                    <span className="text-gray-700">{card.body}</span>
                   </div>
                 ))}
             </div>
           </CollapsibleSection>
 
-          {/* Market Comparison Section */}
-          {policy.marketComparison && (
+          {/* Market Comparison Section — from display interpreter benchmark cards */}
+          {displaySummary && displaySummary.benchmarkCards.length > 0 && (
             <CollapsibleSection
               id="market"
               title={t.aiInsightsPanel.marketComparison}
@@ -182,64 +217,20 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
               onToggle={() => toggleSection('market')}
             >
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase">
-                      {t.aiInsightsPanel.yourPremium}
-                    </p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {formatConverted(policy.premium)}
-                    </p>
-                    {policy.marketComparison.averagePremium && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        {t.aiInsightsPanel.marketAvg}{' '}
-                        {formatConverted(policy.marketComparison.averagePremium)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 uppercase">
-                      {t.aiInsightsPanel.marketRank}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-lg font-semibold text-gray-900">
-                        {policy.marketComparison.percentile ?? 50}%
-                      </p>
-                      {(policy.marketComparison.percentile ?? 50) > 50 ? (
-                        <TrendingUp className="text-amber-600" size={18} />
-                      ) : (
-                        <TrendingDown className="text-green-600" size={18} />
-                      )}
+                <p className="text-xs text-gray-500 italic">
+                  These are market comparisons, not contractual policy terms.
+                </p>
+                {displaySummary.benchmarkCards.map((card) => (
+                  <div key={card.id} className="p-3 bg-gray-50 rounded-lg">
+                    <p className="text-sm font-medium text-gray-800">{card.title}</p>
+                    <p className="text-xs text-gray-600 mt-1">{card.body}</p>
+                    <div className="flex items-center justify-between mt-2 text-xs">
+                      <span className="text-gray-500">Policy: {card.policyValue}</span>
+                      <span className="text-gray-500">Benchmark: {card.benchmarkValue}</span>
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {(policy.marketComparison.percentile ?? 50) > 50
-                        ? t.aiInsightsPanel.aboveMarket.replace('{percent}', '')
-                        : t.aiInsightsPanel.belowMarket.replace('{percent}', '')}
-                    </p>
+                    <p className="text-xs text-gray-400 mt-1">{card.provenanceSummary}</p>
                   </div>
-                </div>
-
-                {/* Premium position bar */}
-                <div>
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>{t.aiInsightsPanel.lowest}</span>
-                    <span>{t.aiInsightsPanel.highest}</span>
-                  </div>
-                  <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500"
-                      style={{ width: '100%' }}
-                    />
-                  </div>
-                  <div
-                    className="relative"
-                    style={{ marginLeft: `${policy.marketComparison.percentile ?? 50}%` }}
-                  >
-                    <div className="absolute -top-4 -ml-1">
-                      <div className="w-2 h-2 bg-gray-900 rounded-full" />
-                    </div>
-                  </div>
-                </div>
+                ))}
               </div>
             </CollapsibleSection>
           )}

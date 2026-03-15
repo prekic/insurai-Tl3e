@@ -1,4 +1,4 @@
-# Session Handoff — March 15, 2026 (Dynamic AI Guidelines & Vitest Crash Fix)
+# Session Handoff — March 15, 2026 (AI Extraction Hardening & KASKO Internal Pilot)
 
 ## Current Status
 
@@ -6,32 +6,35 @@
 |--------|--------|
 | **Build** | ✅ Passing |
 | **ESLint** | 0 errors |
-| **Tests** | All tests passing (100% on `usePolicyComparison` suite) |
-| **Branch** | `insuraigemini202603151015` — Ready to push |
-| **Deployment** | Pending Railway deployment |
+| **Tests** | All tests passing (including 19/19 on KASKO pilot batch) |
+| **Branch** | `insuraigemini202603151438` — Ready to push |
+| **Deployment** | Internal KASKO pilot active |
 
 ---
 
 ## This Session — Completed Work
 
-### 1. Dynamic AI Insight Guidelines
-**Feature**: Completely eliminated hardcoded AI sense-check rules from the codebase in favor of a new Admin UI and DB table (`ai_insight_guidelines`) that allows dynamic, on-the-fly tweaking of anti-hallucination instructions.
-**Fix**: 
-- Added a `ai_insight_guidelines` DB table and seeded it with migrated rules.
-- Created `/admin/insights` UI tab for administrators to configure constraints per Policy Type and Region.
-- Ensured backend dynamic guidelines immediately overwrite generic prompts for AI extraction calls.
+### 1. Phase 5 & 6: Display Interpreter & Branch Expansion
+**Feature**: Re-architected how AI outputs reach the UI to ensure strict safety, replacing direct LLM pass-through.
+**Details**: 
+- Implemented `display-interpreter.ts` to sanitize and enforce UI boundaries (preventing prohibited phrases like "sınırsız" from leaking).
+- Expanded validation, insights, and scoring rules for all 7 insurance branches (Kasko, Traffic, Home, Health, Life, Dask, Business, Nakliyat).
 
-### 2. Evidence Storage & Translation Prompts
-**Feature**: The AI often hallucinated evidence or failed to explicitly quote the text for the interactive UI.
-**Fix**: 
-- Added `quoteTr` to the `extraction-schema.ts` explicitly demanding the AI return the exact matched text translated to Turkish.
-- Updated Anthropic guidelines to explicitly restrict AI from summarizing quote fields and mandating strict JSON array parsing.
+### 2. Phase 7: Validation Harness & Safety Hardening
+**Feature**: Built a robust validation layer to detect AI hallucinations and contradictory conditions.
+**Details**: 
+- Created `validator.ts`, `engine.ts`, and `review-thresholds.ts`.
+- Implemented synthetic testing fixtures.
+- Added explicit condition-contradiction detection (e.g., identifying when an AI claims a condition exists but the text says it doesn't) to force `human_review_required` or `restricted` modes.
 
-### 3. Vitest "Heap Out of Memory" Worker Crash Fix
-**Feature**: The CI pipeline was hanging and silently dying during `usePolicyComparison.test.ts` due to an infinitely-propagating re-render memory leak in background React testing containers.
-**Fix**: 
-- Isolated the cause to inline arrays supplied to `@testing-library/react`'s `renderHook()` (e.g., `renderHook(() => usePolicyComparison([createMockPolicy()]))`). This generated sequentially unique mocked IDs causing a new memory reference on every boolean hook render phase.
-- Extracted inline dynamic arrays into variable definitions executed *prior* to `renderHook`, resolving all infinite looping cascades. Test suite now effortlessly hits 66/66 cleanly.
+### 3. Phase 8: KASKO Internal Pilot Execution
+**Feature**: Operationalized a highly-controlled internal pilot for the KASKO branch using real documents.
+**Details**: 
+- Ran E2E extraction on actual KASKO PDFs.
+- Integrated the `kasko-pilot-gate.ts` into the `useDisplaySafeSummary` product hook.
+- Enforced a max-5 user limit and a mandatory bilingual "Draft / Review Required" banner on the frontend.
+- Ran the first 5-document internal pilot batch: 3 clean documents accepted, 1 noisy document rejected (safely), 1 moderate document with a generic provider name prompted a major correction.
+- Confirmed rollback triggers (phrase leaks, >20% zero-coverage docs) did not fire.
 
 ---
 
@@ -39,22 +42,29 @@
 
 | File | Change |
 |------|--------|
-| `supabase/migrations/032_ai_insight_guidelines.sql` | **NEW** DB table for Dynamic Rules Engine (from prior session) |
-| `supabase/migrations/037_update_master_extraction_prompt.sql` | **NEW** Synchronized the DB master extraction prompt with the refined backend hardcoded JSON Schema prompt |
-| `src/components/admin/tabs/InsightsTab.tsx` | **NEW** Admin interface for managing rule constraints |
-| `src/lib/ai/policy-extractor.ts` | **FIX** Merged DB guidelines into JSON Schema prompt construction |
-| `src/lib/ai/providers/claude.ts` & `openai.ts` | **FIX** Explicitly separated JSON schema construction from baseline extraction text |
-| `server/routes/ai.ts` | **FIX** Merged dynamic guidelines directly into Anthropic's JSON schema prompt building logic and deleted hardcoded fallback arrays |
-| `server/services/prompt-service.ts` | **FIX** Audited generic fallback prompts; injected primary anti-hallucination rules directly into base fallback prompt |
-| `scripts/test-local-anthropic.ts` | **NEW** Test script to manually verify Claude extractions bypassing the frontend |
-| `src/hooks/usePolicyComparison.test.ts` | **FIX** Fixed infinite hook re-renders crashing vitest workers |
-| `src/lib/ai/prompts.ts` | **FIX** Audited generic fallback prompts for stricter constraints |
-| `src/lib/ai/kasko-parser-prompts.ts` | **FIX** Removed hardcoded fallback limits |
+| `src/lib/analysis/display-interpreter.ts` | **NEW** Core UI safety boundary and text sanitization layer |
+| `src/lib/ai/extraction-normalizer.ts` | **NEW** Deterministic document normalization before validation |
+| `src/lib/ai/validator.ts` | **NEW** Cross-field consistency and rule validation |
+| `src/lib/ai/relationship-resolver.ts` | **NEW** AI clause logic resolver |
+| `src/lib/analysis/engine.ts` | **NEW** Orchestrator combining LLM output, validation, and review thresholds |
+| `src/lib/analysis/review-thresholds.ts` | **NEW** Logic converting confidence and warning flags into UI display modes (`full`, `restricted`, `human_review_required`) |
+| `src/lib/analysis/benchmarks.ts`, `insights.ts`, `scoring.ts` | **NEW** Extraction analysis utility split |
+| `src/lib/analysis/kasko-pilot-gate.ts` | **NEW** Feature flag checks, reviewer segment enforcement, and QA logging for the pilot |
+| `src/types/analysis.ts`, `src/types/display.ts` | **NEW** Typings for analysis and display outputs |
+| `src/components/ui/SafetyLabel.tsx`, `SourceQuoteTooltip.tsx` | **NEW** Components for rendering safe UI insights and source context |
+| `src/hooks/useDisplaySafeSummary.ts` | **UPDATED** Hook now evaluates the pilot gate and attaches pilot metadata |
+| `src/components/AIInsightsPanel.tsx`, `PolicyDetailView.tsx`, `SharedResult.tsx` | **UPDATED** Consumers of the new Display Interpreter pipeline |
+| `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** DB migration adding traceability, span maps, and validation outputs |
+| `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** DB migration adding versioned persistence to track schema/text versions |
+| `docs/BRANCH_READINESS_SCORECARD.md` | **NEW** Markdown scorecard evaluating the pilot and production readiness of all branches |
+| `docs/REAL_DOCUMENT_DEFECT_LOG.csv` | **NEW** Centralized tracking for extraction and validation defects found during real-document testing |
+| `src/lib/analysis/__tests__/pilot-8h-batch.test.ts` | **NEW** Automated harness simulating the first 5-document pilot batch |
 
 ---
 
 ## Priority Next Steps
 
-1. **Verify on Railway** — Merge Branch, allow Release Please to bump the SemVer version, deploy to staging Railway environment.
-2. **Setup Admin Test Insight Rule** — Navigate to `/admin/insights`, create an arbitrary rule (e.g., `guidance: Verify TC Kimlik numbers strictly`) to prove the AI respects the DB prompt during the next analysis extraction.
-3. **Database Migration Sync** — Ensure `037_update_master_extraction_prompt.sql` processes cleanly on the Railway Supabase DB instance.
+1. **Continue KASKO Pilot to 20 Documents**: The pilot successfully processed 5 documents. The immediate next step is to run 15 more clean/real KASKO policies through the system, maintaining mandatory human review.
+2. **Address Extraction Variability**: LLM non-determinism occasionally misses conditional deductibles or fluctuates coverage counts. Consider prompt engineering tweaks or secondary verification passes for these specific fields before broadening the pilot.
+3. **Expand to Traffic/Home**: Once KASKO reaches the 20-document milestone and extraction variability is mitigated, prepare the Traffic or Home branch for Phase 8 real-document validation.
+4. **Merge & Deploy**: Push the `insuraigemini202603151438` branch, create a PR with the title `feat(analysis): implement display interpreter and kasko pilot pipeline`, and deploy to the staging environment to let internal reviewers test the KASKO pilot live.

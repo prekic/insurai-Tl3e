@@ -141,6 +141,19 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     processedText: rawData.processedText,
     // Evidence data for AI insights and exclusions
     evidenceData: rawData.evidenceData,
+    // Universal schema mapping
+    canonicalText: row.canonical_text || undefined,
+    spanMaps: (row.span_maps as any) || undefined,
+    clauseGraph: (row.clause_graph as any) || undefined,
+    isUniversalSchema: row.is_universal_schema || false,
+    validationErrors: row.validation_errors || undefined,
+    validationWarnings: row.validation_warnings || undefined,
+    safetyScore: row.safety_score || undefined,
+    documentVersion: row.document_version || 1,
+    canonicalTextVersion: row.canonical_text_version || 1,
+    evidenceSpanVersion: row.evidence_span_version || 1,
+    clauseGraphVersion: row.clause_graph_version || 1,
+    extractionSchemaVersion: row.extraction_schema_version || undefined,
   }
 }
 
@@ -179,6 +192,18 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
       processedText: policy.processedText,
       evidenceData: policy.evidenceData,
     },
+    canonical_text: policy.canonicalText,
+    span_maps: policy.spanMaps,
+    clause_graph: policy.clauseGraph,
+    is_universal_schema: policy.isUniversalSchema,
+    validation_errors: policy.validationErrors,
+    validation_warnings: policy.validationWarnings,
+    safety_score: policy.safetyScore,
+    document_version: policy.documentVersion || 1,
+    canonical_text_version: policy.canonicalTextVersion || 1,
+    evidence_span_version: policy.evidenceSpanVersion || 1,
+    clause_graph_version: policy.clauseGraphVersion || 1,
+    extraction_schema_version: policy.extractionSchemaVersion,
   }
 }
 
@@ -200,6 +225,24 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
   if (updates.location !== undefined) result.location = updates.location
   if (updates.documentType !== undefined) result.document_type = updates.documentType
   if (updates.logo !== undefined) result.logo = updates.logo
+  if (updates.canonicalText !== undefined) result.canonical_text = updates.canonicalText
+  if (updates.spanMaps !== undefined) result.span_maps = updates.spanMaps
+  if (updates.clauseGraph !== undefined) result.clause_graph = updates.clauseGraph
+  if (updates.isUniversalSchema !== undefined)
+    result.is_universal_schema = updates.isUniversalSchema
+  if (updates.validationErrors !== undefined) result.validation_errors = updates.validationErrors
+  if (updates.validationWarnings !== undefined)
+    result.validation_warnings = updates.validationWarnings
+  if (updates.safetyScore !== undefined) result.safety_score = updates.safetyScore
+  if (updates.documentVersion !== undefined) result.document_version = updates.documentVersion
+  if (updates.canonicalTextVersion !== undefined)
+    result.canonical_text_version = updates.canonicalTextVersion
+  if (updates.evidenceSpanVersion !== undefined)
+    result.evidence_span_version = updates.evidenceSpanVersion
+  if (updates.clauseGraphVersion !== undefined)
+    result.clause_graph_version = updates.clauseGraphVersion
+  if (updates.extractionSchemaVersion !== undefined)
+    result.extraction_schema_version = updates.extractionSchemaVersion
 
   // Handle raw_data updates
   const hasRawDataUpdates =

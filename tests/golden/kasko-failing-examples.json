@@ -1,0 +1,9 @@
+[
+  {
+    "id": "FAIL-001",
+    "defect": "DEF-001_DEF-002_DEF-003",
+    "description": "Complex KASKO policy with conditional deductibles, rayiç değer, and sublimits that AI currently flattens into simplistic positive statements.",
+    "documentText": "TÜRKİYE SİGORTA KASKO POLİÇESİ\nPOLİÇE NO: 987654321\nSİGORTA BEDELİ: İşbu poliçe kapsamında aracın bedeli ödeme tarihindeki piyasa Rayiç Değeri olarak kabul edilmiştir.\nMUAFİYET ŞARTLARI: Poliçede genel muafiyet uygulanmamaktadır. Ancak, aracı kullanan kişinin 25 yaşından küçük olması veya ehliyet süresinin 2 yıldan az olması durumunda meydana gelecek hasarlarda %2 oranında tenzili muafiyet uygulanır.\nİHTİYARİ MALİ MESULİYET (İMM): 3. Şahıslara karşı verilecek bedeni ve maddi zararlar Sınırsız olarak teminat altındadır.\nMANEVİ TAZMİNAT: İMM teminatı kapsamında talep edilecek manevi tazminat talepleri olay başı ve yıllık toplam 500.000 TL ile sınırlandırılmıştır.\nCAM KIRILMASI: Anlaşmalı cam servislerinde yapılacak olan orijinal cam değişimleri muafiyetsiz ve sınırsızdır. Ancak anlaşmasız servislerde yapılacak cam değişimlerinde %25 oranında muafiyet uygulanır.\nASİSTANS: 1500 TL'ye kadar ücretsiz çekici hizmeti sağlanmaktadır.",
+    "policyType": "kasko"
+  }
+]

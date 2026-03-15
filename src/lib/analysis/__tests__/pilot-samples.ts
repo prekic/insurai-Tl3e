@@ -1,0 +1,1803 @@
+/**
+ * Phase 8 — Document-Realistic Pilot Validation Samples
+ *
+ * These differ from Phase 7 realistic-samples.ts by being modeled after
+ * actual Turkish policy document formats found in sample-documents.ts:
+ * - Real Turkish field names and formatting (e.g., "Poliçe No:", "Teminat Kapsamı:")
+ * - Actual statutory limit values from Turkish insurance regulations
+ * - Real provider names and document structure patterns
+ * - Document-quality variation (clean digital, moderate scan, noisy OCR)
+ *
+ * These are NOT extracted from real PDFs (except KASKO inspiration) but they
+ * simulate what extraction output from real Turkish policy documents looks like.
+ */
+import type { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
+
+function base(overrides: Partial<ExtractedPolicyData>): ExtractedPolicyData {
+  return {
+    policyNumber: null,
+    provider: null,
+    policyType: null,
+    insuredName: null,
+    insuredAddress: null,
+    startDate: null,
+    endDate: null,
+    premium: null,
+    currency: 'TRY',
+    paymentFrequency: null,
+    coverages: [],
+    specialConditions: [],
+    exclusions: [],
+    amendmentInfo: {
+      isAmendment: false,
+      amendmentNumber: null,
+      amendmentDate: null,
+      basePolicyNumber: null,
+      amendmentReason: null,
+      premiumDifference: null,
+    },
+    evidence: { insights: [], exclusions: [] },
+    clauseGraph: { edges: [] },
+    confidence: {
+      overall: 0.5,
+      policyNumber: 0.5,
+      provider: 0.5,
+      dates: 0.5,
+      premium: 0.5,
+      coverages: 0.5,
+    },
+    ...overrides,
+  }
+}
+
+export interface PilotSampleMeta {
+  id: string
+  branch: string
+  sourceType: 'real_pdf' | 'text_fixture' | 'doc_realistic_synthetic'
+  documentQuality: 'clean' | 'moderate' | 'noisy'
+  pageCompleteness: 'full' | 'partial'
+  expectedCriticalFacts: string[]
+  expectedCriticalConditions: string[]
+  expectedAmbiguities: string[]
+  humanExpectedDisplayMode: 'full' | 'restricted' | 'human_review_required'
+}
+
+export interface PilotSample {
+  meta: PilotSampleMeta
+  data: ExtractedPolicyData
+}
+
+// ============================================================================
+// KASKO (5 samples — highest confidence, inspired by real PDFs)
+// ============================================================================
+
+export const rdKas001: PilotSample = {
+  meta: {
+    id: 'RD-KAS-001',
+    branch: 'kasko',
+    sourceType: 'real_pdf',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'provider', 'premium', 'vehicleType', 'coverages'],
+    expectedCriticalConditions: ['muafiyet %5 min 2500 TL', 'ticari kullanım'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'kasko',
+    policyNumber: 'KSK-2024-001234567',
+    provider: 'XYZ Sigorta A.Ş.',
+    insuredName: 'ERİŞ AMBALAJ SANAYİ VE TİCARET A.Ş.',
+    insuredAddress: 'Organize Sanayi Bölgesi 15. Cadde No:42 Gebze/KOCAELİ',
+    startDate: '2024-01-15',
+    endDate: '2025-01-15',
+    premium: 47745,
+    currency: 'TRY',
+    coverages: [
+      {
+        name: 'Kasko (Tam Kasko)',
+        nameTr: 'Tam Kasko',
+        description: 'Araç Rayiç Değeri',
+        limit: null,
+        deductible: null,
+        isMarketValue: true,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Çarpışma/Çarpma',
+        nameTr: 'Çarpışma',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Hırsızlık (Tam)',
+        nameTr: 'Hırsızlık',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Ferdi Kaza (Sürücü)',
+        nameTr: 'Ferdi Kaza',
+        description: '200.000 TL',
+        limit: 200000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Cam Kırılması',
+        nameTr: 'Cam',
+        description: 'Sınırsız',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: true,
+      },
+    ],
+    specialConditions: [
+      'Hasar Başına Muafiyet: %5 (minimum 2.500 TL)',
+      'Kullanım Tarzı: Ticari (Nakliyat)',
+      'Yabancı Ülkelerde Geçerlilik: Yeşil Kart Ülkeleri',
+    ],
+    exclusions: [
+      'Yarış veya hız yarışmaları',
+      'Kasıtlı hasar',
+      'Alkollü araç kullanımı',
+      'Ehliyetsiz sürücüler',
+    ],
+    evidence: {
+      insights: [
+        {
+          text: 'Muafiyet: %5 (minimum 2.500 TL)',
+          textEn: 'Deductible: 5% (minimum 2,500 TL)',
+          quote: 'Hasar Başına Muafiyet: %5 (minimum 2.500 TL)',
+        },
+      ],
+      exclusions: [
+        { text: 'Yarış hariç', textEn: 'Racing excluded', quote: 'Yarış veya hız yarışmaları' },
+      ],
+    },
+    confidence: {
+      overall: 0.94,
+      policyNumber: 0.98,
+      provider: 0.95,
+      dates: 0.95,
+      premium: 0.92,
+      coverages: 0.9,
+    },
+  }),
+}
+
+export const rdKas002: PilotSample = {
+  meta: {
+    id: 'RD-KAS-002',
+    branch: 'kasko',
+    sourceType: 'real_pdf',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'provider', 'vehicleInfo'],
+    expectedCriticalConditions: ['ticari çekici'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'kasko',
+    policyNumber: 'KSK-2024-ERİŞ-9511',
+    provider: 'Allianz Sigorta',
+    insuredName: 'ERİŞ AMBALAJ SAN. TİC. A.Ş.',
+    startDate: '2024-03-01',
+    endDate: '2025-03-01',
+    premium: 52000,
+    currency: 'TRY',
+    coverages: [
+      {
+        name: 'Tam Kasko',
+        nameTr: 'Tam Kasko',
+        description: 'Çekici araç için tam kasko',
+        limit: null,
+        deductible: 5000,
+        isMarketValue: true,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: 'Hırsızlık',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Yangın',
+        nameTr: 'Yangın',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Doğal Afet',
+        nameTr: 'Doğal Afet',
+        description: 'Dahil',
+        limit: null,
+        deductible: 10000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Araç Tipi: Çekici (TIR)', 'Muafiyet: ₺5.000 genel, ₺10.000 doğal afet'],
+    exclusions: ['Kasıtlı hasar', 'Yarış', 'Ehliyetsiz sürüş'],
+    confidence: {
+      overall: 0.93,
+      policyNumber: 0.95,
+      provider: 0.97,
+      dates: 0.92,
+      premium: 0.9,
+      coverages: 0.9,
+    },
+  }),
+}
+
+export const rdKas003: PilotSample = {
+  meta: {
+    id: 'RD-KAS-003',
+    branch: 'kasko',
+    sourceType: 'text_fixture',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'provider', 'premium', 'coverages'],
+    expectedCriticalConditions: ['muafiyet'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'kasko',
+    policyNumber: 'KSK-2024-001234567',
+    provider: 'XYZ Sigorta A.Ş.',
+    insuredName: 'ERİŞ AMBALAJ SANAYİ',
+    startDate: '2024-01-15',
+    endDate: '2025-01-15',
+    premium: 47745,
+    coverages: [
+      {
+        name: 'Kasko (Tam Kasko)',
+        nameTr: 'Tam Kasko',
+        description: 'Araç Rayiç Değeri',
+        limit: null,
+        deductible: null,
+        isMarketValue: true,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: 'Hırsızlık',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Ferdi Kaza',
+        nameTr: 'Ferdi Kaza',
+        description: '200.000 TL',
+        limit: 200000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Muafiyet: %5 (min 2.500 TL)'],
+    exclusions: ['Kasıtlı hasar', 'Alkollü sürüş'],
+    confidence: {
+      overall: 0.92,
+      policyNumber: 0.95,
+      provider: 0.95,
+      dates: 0.93,
+      premium: 0.9,
+      coverages: 0.88,
+    },
+  }),
+}
+
+export const rdKas004: PilotSample = {
+  meta: {
+    id: 'RD-KAS-004',
+    branch: 'kasko',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverages'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['provider_garbled', 'premium_unclear', 'dates_missing'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'kasko',
+    policyNumber: 'KSK-2O24-OO12??', // OCR confusion
+    provider: null,
+    insuredName: 'E. A. SAN.',
+    startDate: null,
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Kasko',
+        nameTr: null,
+        description: 'Rayiç',
+        limit: null,
+        deductible: null,
+        isMarketValue: true,
+        isUnlimited: false,
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: null,
+        description: '',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [],
+    confidence: {
+      overall: 0.32,
+      policyNumber: 0.25,
+      provider: 0.1,
+      dates: 0.15,
+      premium: 0.1,
+      coverages: 0.45,
+    },
+  }),
+}
+
+export const rdKas005: PilotSample = {
+  meta: {
+    id: 'RD-KAS-005',
+    branch: 'kasko',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'coverages', 'premium'],
+    expectedCriticalConditions: ['muafiyet'],
+    expectedAmbiguities: ['provider_uncertain'],
+    humanExpectedDisplayMode: 'restricted',
+  },
+  data: base({
+    policyType: 'kasko',
+    policyNumber: 'KSK-2024-887654',
+    provider: 'Sigorta A.Ş.',
+    insuredName: 'Mehmet Y.',
+    startDate: '2024-06-01',
+    endDate: '2025-06-01',
+    premium: 38000,
+    coverages: [
+      {
+        name: 'Tam Kasko',
+        nameTr: 'Tam Kasko',
+        description: 'Rayiç değer',
+        limit: null,
+        deductible: 3000,
+        isMarketValue: true,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: 'Hırsızlık',
+        description: 'Dahil',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Muafiyet: ₺3.000'],
+    confidence: {
+      overall: 0.68,
+      policyNumber: 0.8,
+      provider: 0.4,
+      dates: 0.75,
+      premium: 0.7,
+      coverages: 0.7,
+    },
+  }),
+}
+
+// ============================================================================
+// TRAFFIC (3 samples — from ZMSS text fixture + synthetic)
+// ============================================================================
+
+export const rdTrf001: PilotSample = {
+  meta: {
+    id: 'RD-TRF-001',
+    branch: 'traffic',
+    sourceType: 'text_fixture',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'statutory_limits', 'premium'],
+    expectedCriticalConditions: ['zorunlu asgari limitler'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'traffic',
+    policyNumber: 'TRF-2024-00987654',
+    provider: 'Axa Sigorta',
+    insuredName: 'MEHMET YILMAZ',
+    insuredAddress: 'Atatürk Cad. No:123 Kadıköy/İSTANBUL',
+    startDate: '2024-02-01',
+    endDate: '2025-02-01',
+    premium: 2575,
+    coverages: [
+      {
+        name: 'Maddi Hasarlar (Araç Başına)',
+        nameTr: 'Maddi Hasar',
+        description: '2024 tarife',
+        limit: 300000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Maddi Hasarlar (Kaza Başına)',
+        nameTr: 'Maddi Hasar Kaza',
+        description: '2024 tarife',
+        limit: 600000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Bedeni Hasarlar (Kişi Başına)',
+        nameTr: 'Bedeni Hasar',
+        description: 'Zorunlu limit',
+        limit: 2700000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Bedeni Hasarlar (Kaza Başına)',
+        nameTr: 'Bedeni Hasar Kaza',
+        description: 'Zorunlu limit',
+        limit: 13500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+    ],
+    specialConditions: [
+      'Bu teminat limitleri Hazine ve Maliye Bakanlığı tarafından belirlenen zorunlu asgari limitlerdir',
+      'ZMSS kapsamında düzenlenmiştir',
+    ],
+    exclusions: ['Alkollü araç kullanımı', 'Ehliyetsiz sürüş'],
+    evidence: {
+      insights: [
+        {
+          text: 'Zorunlu limitler',
+          textEn: 'Statutory limits set by Treasury',
+          quote: 'Hazine ve Maliye Bakanlığı tarafından belirlenen zorunlu asgari limitlerdir',
+        },
+      ],
+      exclusions: [],
+    },
+    confidence: {
+      overall: 0.96,
+      policyNumber: 0.98,
+      provider: 0.95,
+      dates: 0.98,
+      premium: 0.95,
+      coverages: 0.95,
+    },
+  }),
+}
+
+export const rdTrf002: PilotSample = {
+  meta: {
+    id: 'RD-TRF-002',
+    branch: 'traffic',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverages'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['limits_partial', 'provider_garbled'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'traffic',
+    policyNumber: 'TRF-2O24-??987',
+    provider: null,
+    insuredName: null,
+    startDate: '2024-01-01',
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Maddi Hasar',
+        nameTr: 'Maddi',
+        description: '',
+        limit: 300000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Bedeni Hasar',
+        nameTr: 'Bedeni',
+        description: '',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+    ],
+    confidence: {
+      overall: 0.38,
+      policyNumber: 0.25,
+      provider: 0.1,
+      dates: 0.35,
+      premium: 0.1,
+      coverages: 0.5,
+    },
+  }),
+}
+
+export const rdTrf003: PilotSample = {
+  meta: {
+    id: 'RD-TRF-003',
+    branch: 'traffic',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['policyNumber', 'statutory_limits', 'premium'],
+    expectedCriticalConditions: ['zorunlu'],
+    expectedAmbiguities: ['provider_name_short'],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'traffic',
+    policyNumber: 'TRF-2024-112233',
+    provider: 'Güneş Sigorta',
+    insuredName: 'AYŞE KARA',
+    startDate: '2024-04-01',
+    endDate: '2025-04-01',
+    premium: 2800,
+    coverages: [
+      {
+        name: 'Maddi (Araç)',
+        nameTr: 'Maddi Hasar',
+        description: 'Zorunlu',
+        limit: 300000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Maddi (Kaza)',
+        nameTr: 'Maddi Kaza',
+        description: 'Zorunlu',
+        limit: 600000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Bedeni (Kişi)',
+        nameTr: 'Bedeni',
+        description: 'Zorunlu',
+        limit: 2700000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+      {
+        name: 'Bedeni (Kaza)',
+        nameTr: 'Bedeni Kaza',
+        description: 'Zorunlu',
+        limit: 13500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+    ],
+    specialConditions: ['Zorunlu trafik sigortası'],
+    confidence: {
+      overall: 0.88,
+      policyNumber: 0.9,
+      provider: 0.85,
+      dates: 0.9,
+      premium: 0.85,
+      coverages: 0.88,
+    },
+  }),
+}
+
+// ============================================================================
+// HOME (3 samples)
+// ============================================================================
+
+export const rdHom001: PilotSample = {
+  meta: {
+    id: 'RD-HOM-001',
+    branch: 'home',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'building_class', 'deductibles'],
+    expectedCriticalConditions: ['alarm_requirement', 'vacancy_clause'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'home',
+    policyNumber: 'KON-2024-556677',
+    provider: 'Anadolu Sigorta A.Ş.',
+    insuredName: 'FATMA ÖZ',
+    insuredAddress: 'Bağdat Cad. No:45 D:8 Kadıköy/İSTANBUL',
+    startDate: '2024-05-01',
+    endDate: '2025-05-01',
+    premium: 8500,
+    coverages: [
+      {
+        name: 'Bina Yangın',
+        nameTr: 'Bina Yangın',
+        description: 'Betonarme bina',
+        limit: 1200000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Eşya (Ev Eşyası)',
+        nameTr: 'Eşya',
+        description: 'Ev içi eşya',
+        limit: 200000,
+        deductible: 2000,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: 'Hırsızlık',
+        description: 'Ev eşyası hırsızlık',
+        limit: 75000,
+        deductible: 3000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Su Hasarı',
+        nameTr: 'Su Hasarı',
+        description: 'Tesisat kaynaklı',
+        limit: 50000,
+        deductible: 500,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Cam Kırılması',
+        nameTr: 'Cam',
+        description: 'Dış cam',
+        limit: 15000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Alarm sistemi aktif olmalıdır',
+      'Bina 45 günden fazla boş olmamalıdır',
+      'Yapı tarzı: Betonarme (1. derece)',
+    ],
+    exclusions: ['Deprem (DASK kapsamında)', 'Kasıtlı hasar', 'Savaş/terör/darbe'],
+    confidence: {
+      overall: 0.91,
+      policyNumber: 0.95,
+      provider: 0.95,
+      dates: 0.9,
+      premium: 0.88,
+      coverages: 0.89,
+    },
+  }),
+}
+
+export const rdHom002: PilotSample = {
+  meta: {
+    id: 'RD-HOM-002',
+    branch: 'home',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverages'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['building_contents_separation', 'deductibles_missing'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'home',
+    policyNumber: null,
+    provider: 'Sigorta A.Ş.',
+    insuredName: null,
+    startDate: null,
+    endDate: null,
+    premium: 5000,
+    coverages: [
+      {
+        name: 'Yangın',
+        nameTr: null,
+        description: '',
+        limit: 400000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Hırsızlık',
+        nameTr: null,
+        description: '',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    confidence: {
+      overall: 0.35,
+      policyNumber: 0.1,
+      provider: 0.25,
+      dates: 0.15,
+      premium: 0.5,
+      coverages: 0.4,
+    },
+  }),
+}
+
+export const rdHom003: PilotSample = {
+  meta: {
+    id: 'RD-HOM-003',
+    branch: 'home',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'deductibles'],
+    expectedCriticalConditions: ['average_clause'],
+    expectedAmbiguities: ['deductible_amounts_unclear'],
+    humanExpectedDisplayMode: 'restricted',
+  },
+  data: base({
+    policyType: 'home',
+    policyNumber: 'KON-2024-998877',
+    provider: 'Mapfre Sigorta',
+    insuredName: 'ALİ CAN',
+    startDate: '2024-02-01',
+    endDate: '2025-02-01',
+    premium: 12000,
+    coverages: [
+      {
+        name: 'Bina',
+        nameTr: 'Bina',
+        description: '',
+        limit: 800000,
+        deductible: 5000,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Eşya',
+        nameTr: 'Eşya',
+        description: '',
+        limit: 250000,
+        deductible: 3000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Average clause applies: beyan edilen < %80 ise orantılı azaltma',
+      'Muafiyet: genel ₺5.000',
+    ],
+    exclusions: ['Deprem (DASK)'],
+    confidence: {
+      overall: 0.72,
+      policyNumber: 0.8,
+      provider: 0.85,
+      dates: 0.7,
+      premium: 0.7,
+      coverages: 0.65,
+    },
+  }),
+}
+
+// ============================================================================
+// HEALTH (4 samples)
+// ============================================================================
+
+export const rdSag001: PilotSample = {
+  meta: {
+    id: 'RD-SAG-001',
+    branch: 'health',
+    sourceType: 'text_fixture',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'network', 'premium'],
+    expectedCriticalConditions: ['anlaşmalı hastaneler', 'ilaç %80'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'health',
+    policyNumber: 'TSS-2024-001234',
+    provider: 'Acıbadem Sigorta',
+    insuredName: 'AYŞE DEMİR',
+    startDate: '2024-03-01',
+    endDate: '2025-03-01',
+    premium: 9000,
+    paymentFrequency: 'monthly',
+    coverages: [
+      {
+        name: 'Yatarak Tedavi',
+        nameTr: 'Yatarak',
+        description: 'Ameliyat + Yoğun Bakım + Özel Oda',
+        limit: 500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Ayakta Tedavi',
+        nameTr: 'Ayakta',
+        description: 'Doktor + Tetkik + İlaç %80',
+        limit: 50000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Diş Tedavisi',
+        nameTr: 'Diş',
+        description: '',
+        limit: 5000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Gözlük/Lens',
+        nameTr: 'Gözlük',
+        description: '',
+        limit: 2000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Check-up',
+        nameTr: 'Check-up',
+        description: 'Yılda 1 kez',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Anlaşmalı özel hastanelerde geçerlidir',
+      'İlaç: %80 karşılanır',
+      'TSS kapsamında düzenlenmiştir',
+    ],
+    exclusions: ['Estetik cerrahi', 'Mevcut hastalıklar (ilk 12 ay)'],
+    evidence: {
+      insights: [
+        {
+          text: 'Anlaşmalı hastaneler',
+          textEn: 'Network hospitals',
+          quote: 'Anlaşmalı özel hastanelerde geçerlidir',
+        },
+      ],
+      exclusions: [
+        { text: 'Estetik cerrahi', textEn: 'Cosmetic surgery', quote: 'Estetik cerrahi' },
+      ],
+    },
+    confidence: {
+      overall: 0.93,
+      policyNumber: 0.95,
+      provider: 0.95,
+      dates: 0.92,
+      premium: 0.9,
+      coverages: 0.91,
+    },
+  }),
+}
+
+export const rdSag002: PilotSample = {
+  meta: {
+    id: 'RD-SAG-002',
+    branch: 'health',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'copay', 'waiting'],
+    expectedCriticalConditions: ['bekleme süresi', 'katılım payı'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'health',
+    policyNumber: 'SAG-2024-445566',
+    provider: 'Allianz Sigorta',
+    insuredName: 'ZEYNEP YILMAZ',
+    startDate: '2024-01-01',
+    endDate: '2025-01-01',
+    premium: 18000,
+    coverages: [
+      {
+        name: 'Yatarak Tedavi',
+        nameTr: 'Yatarak',
+        description: 'Tüm ameliyatlar',
+        limit: 1000000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Ayakta Tedavi',
+        nameTr: 'Ayakta',
+        description: 'Muayene + tetkik',
+        limit: 80000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Bekleme süresi: 30 gün',
+      'Katılım payı: %20 ayakta tedavi',
+      'Ön onay: yatarak tedavi için gerekli',
+    ],
+    exclusions: ['Estetik', 'Mevcut hastalık (12 ay)'],
+    confidence: {
+      overall: 0.9,
+      policyNumber: 0.95,
+      provider: 0.92,
+      dates: 0.9,
+      premium: 0.88,
+      coverages: 0.87,
+    },
+  }),
+}
+
+export const rdSag003: PilotSample = {
+  meta: {
+    id: 'RD-SAG-003',
+    branch: 'health',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverages'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['network_unknown', 'waiting_unknown'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'health',
+    policyNumber: null,
+    provider: null,
+    insuredName: 'Z. Y.',
+    startDate: null,
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Yatarak',
+        nameTr: null,
+        description: '',
+        limit: null,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: true,
+      },
+    ],
+    confidence: {
+      overall: 0.28,
+      policyNumber: 0.1,
+      provider: 0.1,
+      dates: 0.15,
+      premium: 0.1,
+      coverages: 0.4,
+    },
+  }),
+}
+
+export const rdSag004: PilotSample = {
+  meta: {
+    id: 'RD-SAG-004',
+    branch: 'health',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'pre_existing'],
+    expectedCriticalConditions: ['mevcut hastalık', 'bekleme'],
+    expectedAmbiguities: ['copay_unclear'],
+    humanExpectedDisplayMode: 'restricted',
+  },
+  data: base({
+    policyType: 'health',
+    policyNumber: 'SAG-2024-889900',
+    provider: 'HDI Sigorta',
+    insuredName: 'CAN ÖZTÜRK',
+    startDate: '2024-06-01',
+    endDate: '2025-06-01',
+    premium: 15000,
+    coverages: [
+      {
+        name: 'Yatarak Tedavi',
+        nameTr: 'Yatarak',
+        description: '',
+        limit: 750000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Ayakta',
+        nameTr: 'Ayakta',
+        description: '',
+        limit: 40000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Mevcut hastalık dışlama: 24 ay', 'Bekleme: 90 gün genel'],
+    exclusions: ['Estetik', 'Daha önce teşhis konulmuş hastalıklar'],
+    confidence: {
+      overall: 0.72,
+      policyNumber: 0.8,
+      provider: 0.75,
+      dates: 0.75,
+      premium: 0.7,
+      coverages: 0.65,
+    },
+  }),
+}
+
+// ============================================================================
+// LIFE (3 samples)
+// ============================================================================
+
+export const rdHay001: PilotSample = {
+  meta: {
+    id: 'RD-HAY-001',
+    branch: 'life',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['death_benefit', 'beneficiary', 'term'],
+    expectedCriticalConditions: ['contestability', 'suicide_clause'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'life',
+    policyNumber: 'HAY-2024-334455',
+    provider: 'MetLife Emeklilik ve Hayat',
+    insuredName: 'OSMAN KARA',
+    startDate: '2024-01-01',
+    endDate: '2044-01-01',
+    premium: 5400,
+    coverages: [
+      {
+        name: 'Vefat Teminatı',
+        nameTr: 'Vefat',
+        description: 'Ana teminat',
+        limit: 750000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Kaza Sonucu Vefat',
+        nameTr: 'Kaza Vefat',
+        description: 'Ek teminat',
+        limit: 1500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'supplementary',
+      },
+      {
+        name: 'Maluliyet',
+        nameTr: 'Maluliyet',
+        description: 'Tam ve kalıcı',
+        limit: 750000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Lehdar: Fatma Kara (eş)',
+      'İtiraz süresi: 2 yıl (contestability)',
+      'Süre: 20 yıl vadeli',
+    ],
+    exclusions: ['İlk 2 yıl intihar', 'Savaş/terör', 'Nükleer olay'],
+    confidence: {
+      overall: 0.92,
+      policyNumber: 0.95,
+      provider: 0.95,
+      dates: 0.9,
+      premium: 0.9,
+      coverages: 0.88,
+    },
+  }),
+}
+
+export const rdHay002: PilotSample = {
+  meta: {
+    id: 'RD-HAY-002',
+    branch: 'life',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['death_benefit'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['beneficiary_unknown', 'term_unknown'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'life',
+    policyNumber: 'HAY-????',
+    provider: null,
+    insuredName: 'O. K.',
+    startDate: null,
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Vefat',
+        nameTr: null,
+        description: '',
+        limit: 400000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    confidence: {
+      overall: 0.3,
+      policyNumber: 0.15,
+      provider: 0.1,
+      dates: 0.1,
+      premium: 0.1,
+      coverages: 0.5,
+    },
+  }),
+}
+
+export const rdHay003: PilotSample = {
+  meta: {
+    id: 'RD-HAY-003',
+    branch: 'life',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['death_benefit', 'beneficiary'],
+    expectedCriticalConditions: ['contestability'],
+    expectedAmbiguities: ['rider_unclear'],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'life',
+    policyNumber: 'HAY-2024-778899',
+    provider: 'Anadolu Hayat Emeklilik',
+    insuredName: 'HASAN DEMİR',
+    startDate: '2024-03-01',
+    endDate: '2039-03-01',
+    premium: 3600,
+    coverages: [
+      {
+        name: 'Vefat Teminatı',
+        nameTr: 'Vefat',
+        description: '15 yıl vadeli',
+        limit: 500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+    ],
+    specialConditions: ['Lehdar: Eşi ve çocukları', 'Contestability: 2 yıl'],
+    exclusions: ['İntihar (2 yıl)', 'Savaş'],
+    confidence: {
+      overall: 0.85,
+      policyNumber: 0.88,
+      provider: 0.9,
+      dates: 0.85,
+      premium: 0.82,
+      coverages: 0.8,
+    },
+  }),
+}
+
+// ============================================================================
+// DASK (3 samples)
+// ============================================================================
+
+export const rdDsk001: PilotSample = {
+  meta: {
+    id: 'RD-DSK-001',
+    branch: 'dask',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverage', 'building_class', 'area', 'zone'],
+    expectedCriticalConditions: ['statutory_cap', 'deductible_2%'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'dask',
+    policyNumber: 'DASK-2024-1234567890',
+    provider: 'DASK (Doğal Afet Sigortaları Kurumu)',
+    insuredName: 'FATMA ŞAHİN',
+    insuredAddress: 'Atatürk Mah. Cumhuriyet Cad. No:12 D:3 Üsküdar/İSTANBUL',
+    startDate: '2024-05-01',
+    endDate: '2025-05-01',
+    premium: 1250,
+    coverages: [
+      {
+        name: 'Deprem Hasarı',
+        nameTr: 'Deprem',
+        description: 'Zorunlu deprem sigortası',
+        limit: 640000,
+        deductible: 12800,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+    ],
+    specialConditions: [
+      'Yapı tarzı: Betonarme (A sınıfı)',
+      'Brüt alan: 120 m²',
+      'Deprem bölgesi: 1. derece',
+      'Muafiyet: %2 (min ₺12.800)',
+      'Azami teminat: ₺640.000 (2024)',
+    ],
+    exclusions: ['Ev eşyası', 'Araç', 'İş durması', 'Üçüncü şahıs talebi'],
+    confidence: {
+      overall: 0.96,
+      policyNumber: 0.98,
+      provider: 0.99,
+      dates: 0.95,
+      premium: 0.95,
+      coverages: 0.94,
+    },
+  }),
+}
+
+export const rdDsk002: PilotSample = {
+  meta: {
+    id: 'RD-DSK-002',
+    branch: 'dask',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverage'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['building_class_missing', 'area_missing'],
+    humanExpectedDisplayMode: 'restricted',
+  },
+  data: base({
+    policyType: 'dask',
+    policyNumber: null,
+    provider: 'DASK',
+    insuredName: null,
+    startDate: '2024-01-01',
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Deprem',
+        nameTr: null,
+        description: '',
+        limit: 640000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    confidence: {
+      overall: 0.5,
+      policyNumber: 0.1,
+      provider: 0.9,
+      dates: 0.3,
+      premium: 0.1,
+      coverages: 0.6,
+    },
+  }),
+}
+
+export const rdDsk003: PilotSample = {
+  meta: {
+    id: 'RD-DSK-003',
+    branch: 'dask',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverage', 'statutory_cap'],
+    expectedCriticalConditions: ['cap_ceiling'],
+    expectedAmbiguities: ['building_value_vs_cap'],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'dask',
+    policyNumber: 'DASK-2024-MAX-456',
+    provider: 'DASK',
+    insuredName: 'CEMAL USTA',
+    startDate: '2024-07-01',
+    endDate: '2025-07-01',
+    premium: 2800,
+    coverages: [
+      {
+        name: 'Deprem Hasarı',
+        nameTr: 'Deprem',
+        description: 'Azami teminat',
+        limit: 640000,
+        deductible: 12800,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+    ],
+    specialConditions: [
+      'Yapı tarzı: Çelik (A sınıfı)',
+      'Brüt alan: 280 m²',
+      'Bina değeri: ₺4.200.000 — DASK azami teminat ₺640.000',
+      'Deprem bölgesi: 2. derece',
+    ],
+    exclusions: ['Ev eşyası', 'Araç'],
+    confidence: {
+      overall: 0.88,
+      policyNumber: 0.9,
+      provider: 0.99,
+      dates: 0.88,
+      premium: 0.85,
+      coverages: 0.85,
+    },
+  }),
+}
+
+// ============================================================================
+// BUSINESS (3 samples)
+// ============================================================================
+
+export const rdBiz001: PilotSample = {
+  meta: {
+    id: 'RD-BIZ-001',
+    branch: 'business',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'bi_period', 'liability', 'warranty'],
+    expectedCriticalConditions: ['sprinkler_warranty', 'alarm_requirement', 'bi_waiting'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'business',
+    policyNumber: 'ISY-2024-334455',
+    provider: 'Zurich Sigorta A.Ş.',
+    insuredName: 'ABC SANAYİ A.Ş.',
+    insuredAddress: 'Organize Sanayi Bölgesi No:25 Gebze/KOCAELİ',
+    startDate: '2024-01-01',
+    endDate: '2025-01-01',
+    premium: 65000,
+    coverages: [
+      {
+        name: 'Bina Yangın',
+        nameTr: 'Bina',
+        description: 'Fabrika binası',
+        limit: 5000000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Emtia/Stok',
+        nameTr: 'Emtia',
+        description: 'Hammadde ve mamul',
+        limit: 1500000,
+        deductible: 25000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'Makine Kırılması',
+        nameTr: 'Makine',
+        description: 'Üretim makineleri',
+        limit: 2500000,
+        deductible: 50000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'İş Durması',
+        nameTr: 'İş Durması',
+        description: '12 ay tazminat süresi',
+        limit: 1200000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'İşveren Sorumluluk',
+        nameTr: 'İşveren Sorumluluğu',
+        description: '3. şahıs',
+        limit: 750000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'liability',
+      },
+    ],
+    specialConditions: [
+      'Sprinkler sistemi çalışır durumda olmalıdır',
+      'Alarm sistemi 7/24 aktif',
+      'İş durması bekleme süresi: 72 saat',
+      'İş durması tazminat süresi: 12 ay',
+      'Emtia muafiyet: ₺25.000',
+    ],
+    exclusions: ['Deprem (ayrı poliçe)', 'Terör', 'Siber saldırı', 'Savaş'],
+    confidence: {
+      overall: 0.89,
+      policyNumber: 0.95,
+      provider: 0.92,
+      dates: 0.9,
+      premium: 0.85,
+      coverages: 0.86,
+    },
+  }),
+}
+
+export const rdBiz002: PilotSample = {
+  meta: {
+    id: 'RD-BIZ-002',
+    branch: 'business',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverages'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['bi_period_missing', 'warranty_unclear'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'business',
+    policyNumber: null,
+    provider: 'Sigorta',
+    insuredName: 'XYZ LTD.',
+    startDate: null,
+    endDate: null,
+    premium: 30000,
+    coverages: [
+      {
+        name: 'Yangın',
+        nameTr: null,
+        description: '',
+        limit: 2000000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'İş Durması',
+        nameTr: null,
+        description: '',
+        limit: 500000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Alarm zorunlu'],
+    confidence: {
+      overall: 0.38,
+      policyNumber: 0.1,
+      provider: 0.2,
+      dates: 0.15,
+      premium: 0.5,
+      coverages: 0.48,
+    },
+  }),
+}
+
+export const rdBiz003: PilotSample = {
+  meta: {
+    id: 'RD-BIZ-003',
+    branch: 'business',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['coverages', 'warranty'],
+    expectedCriticalConditions: ['sprinkler', 'average_clause'],
+    expectedAmbiguities: ['bi_period'],
+    humanExpectedDisplayMode: 'restricted',
+  },
+  data: base({
+    policyType: 'business',
+    policyNumber: 'ISY-2024-667788',
+    provider: 'HDI Sigorta',
+    insuredName: 'MNO ÜRETİM A.Ş.',
+    startDate: '2024-04-01',
+    endDate: '2025-04-01',
+    premium: 42000,
+    coverages: [
+      {
+        name: 'Bina',
+        nameTr: 'Bina',
+        description: '',
+        limit: 3000000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+      {
+        name: 'Emtia',
+        nameTr: 'Emtia',
+        description: '',
+        limit: 800000,
+        deductible: 15000,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+      {
+        name: 'İş Durması',
+        nameTr: 'İş Durması',
+        description: '',
+        limit: 600000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: [
+      'Sprinkler aktif olmalı',
+      'Average clause applies: beyan edilen değer < %80 orantılı',
+    ],
+    exclusions: ['Deprem'],
+    confidence: {
+      overall: 0.7,
+      policyNumber: 0.8,
+      provider: 0.75,
+      dates: 0.7,
+      premium: 0.65,
+      coverages: 0.65,
+    },
+  }),
+}
+
+// ============================================================================
+// NAKLIYAT (3 samples)
+// ============================================================================
+
+export const rdNak001: PilotSample = {
+  meta: {
+    id: 'RD-NAK-001',
+    branch: 'nakliyat',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'clean',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['icc_basis', 'route', 'limit', 'w2w'],
+    expectedCriticalConditions: ['icc_a', 'packaging', 'incoterms'],
+    expectedAmbiguities: [],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'nakliyat',
+    policyNumber: 'NAK-2024-112233',
+    provider: 'Türk P&I Sigorta',
+    insuredName: 'GHI LOJİSTİK A.Ş.',
+    startDate: '2024-07-01',
+    endDate: '2025-07-01',
+    premium: 22000,
+    coverages: [
+      {
+        name: 'ICC (A) Tüm Riskler',
+        nameTr: 'Tüm Riskler',
+        description: 'Institute Cargo Clauses (A) — All Risks',
+        limit: 3000000,
+        deductible: 7500,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+    ],
+    specialConditions: [
+      'Warehouse-to-warehouse: dahil',
+      'Ambalaj: standart ihracat ambalajı zorunlu',
+      'Güzergah: İstanbul - Rotterdam',
+      'Taşıma: Deniz (konteyner)',
+      'Incoterms: CIF Rotterdam',
+    ],
+    exclusions: ['Yetersiz ambalaj', 'Gecikme', 'Doğal özellik (inherent vice)', 'Kasıtlı hasar'],
+    evidence: {
+      insights: [
+        {
+          text: 'ICC (A) Tüm Riskler',
+          textEn: 'ICC (A) All Risks',
+          quote: 'Institute Cargo Clauses (A) — All Risks',
+        },
+      ],
+      exclusions: [
+        { text: 'Yetersiz ambalaj', textEn: 'Insufficient packaging', quote: 'Yetersiz ambalaj' },
+      ],
+    },
+    confidence: {
+      overall: 0.9,
+      policyNumber: 0.95,
+      provider: 0.9,
+      dates: 0.88,
+      premium: 0.85,
+      coverages: 0.88,
+    },
+  }),
+}
+
+export const rdNak002: PilotSample = {
+  meta: {
+    id: 'RD-NAK-002',
+    branch: 'nakliyat',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'noisy',
+    pageCompleteness: 'partial',
+    expectedCriticalFacts: ['coverage'],
+    expectedCriticalConditions: [],
+    expectedAmbiguities: ['icc_unknown', 'route_unknown', 'packaging_unknown'],
+    humanExpectedDisplayMode: 'human_review_required',
+  },
+  data: base({
+    policyType: 'nakliyat',
+    policyNumber: null,
+    provider: 'Sigorta',
+    insuredName: null,
+    startDate: null,
+    endDate: null,
+    premium: null,
+    coverages: [
+      {
+        name: 'Yük Sigortası',
+        nameTr: null,
+        description: '',
+        limit: 800000,
+        deductible: null,
+        isMarketValue: false,
+        isUnlimited: false,
+      },
+    ],
+    specialConditions: ['Güzergah: belirtilmemiş'],
+    confidence: {
+      overall: 0.3,
+      policyNumber: 0.1,
+      provider: 0.15,
+      dates: 0.1,
+      premium: 0.1,
+      coverages: 0.4,
+    },
+  }),
+}
+
+export const rdNak003: PilotSample = {
+  meta: {
+    id: 'RD-NAK-003',
+    branch: 'nakliyat',
+    sourceType: 'doc_realistic_synthetic',
+    documentQuality: 'moderate',
+    pageCompleteness: 'full',
+    expectedCriticalFacts: ['icc_basis', 'route'],
+    expectedCriticalConditions: ['icc_b', 'temperature'],
+    expectedAmbiguities: ['w2w_unclear'],
+    humanExpectedDisplayMode: 'full',
+  },
+  data: base({
+    policyType: 'nakliyat',
+    policyNumber: 'NAK-2024-556677',
+    provider: 'Anadolu Sigorta',
+    insuredName: 'PQR TİCARET LTD.',
+    startDate: '2024-09-01',
+    endDate: '2025-09-01',
+    premium: 15000,
+    coverages: [
+      {
+        name: 'ICC (B) Named Perils',
+        nameTr: 'İsimlendirilmiş Riskler',
+        description: 'Institute Cargo Clauses (B)',
+        limit: 1500000,
+        deductible: 5000,
+        isMarketValue: false,
+        isUnlimited: false,
+        category: 'main',
+      },
+    ],
+    specialConditions: [
+      'Güzergah: Mersin - Londra',
+      'Soğuk zincir taşıması: -18°C',
+      'Incoterms: FOB Mersin',
+    ],
+    exclusions: ['Gecikme', 'Inherent vice', 'Sıcaklık sapması'],
+    confidence: {
+      overall: 0.82,
+      policyNumber: 0.85,
+      provider: 0.85,
+      dates: 0.8,
+      premium: 0.78,
+      coverages: 0.8,
+    },
+  }),
+}
+
+// ============================================================================
+// ALL PILOT SAMPLES EXPORT
+// ============================================================================
+
+export const allPilotSamples: PilotSample[] = [
+  rdKas001,
+  rdKas002,
+  rdKas003,
+  rdKas004,
+  rdKas005,
+  rdTrf001,
+  rdTrf002,
+  rdTrf003,
+  rdHom001,
+  rdHom002,
+  rdHom003,
+  rdSag001,
+  rdSag002,
+  rdSag003,
+  rdSag004,
+  rdHay001,
+  rdHay002,
+  rdHay003,
+  rdDsk001,
+  rdDsk002,
+  rdDsk003,
+  rdBiz001,
+  rdBiz002,
+  rdBiz003,
+  rdNak001,
+  rdNak002,
+  rdNak003,
+]

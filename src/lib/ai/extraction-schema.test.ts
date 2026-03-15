@@ -92,8 +92,12 @@ describe('EXTRACTION_JSON_SCHEMA Required Fields', () => {
     expect(required).toContain('confidence')
   })
 
-  it('should have exactly 16 required fields', () => {
-    expect(required.length).toBe(16)
+  it('should require clauseGraph', () => {
+    expect(required).toContain('clauseGraph')
+  })
+
+  it('should have exactly 17 required fields', () => {
+    expect(required.length).toBe(17)
   })
 })
 
@@ -154,6 +158,10 @@ describe('EXTRACTION_JSON_SCHEMA Property Types', () => {
 
   it('should define confidence as object', () => {
     expect(props.confidence.type).toBe('object')
+  })
+
+  it('should define clauseGraph as object', () => {
+    expect(props.clauseGraph.type).toBe('object')
   })
 })
 

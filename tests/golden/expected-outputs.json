@@ -1,0 +1,113 @@
+[
+  {
+    "testId": "FAIL-001",
+    "expectedExtraction": {
+      "isUniversalSchema": true,
+      "spanMaps": [
+        { "fieldPath": "coverages[0].isMarketValue", "start": 105, "end": 116 },
+        { "fieldPath": "coverages[1].isUnlimited", "start": 412, "end": 420 },
+        { "fieldPath": "coverages[3].isUnlimited", "start": 622, "end": 631 }
+      ],
+      "clauseGraph": {
+        "nodes": {
+          "cov_kasko_main": { "type": "coverage", "name": "Kasko" },
+          "cond_age_25_or_license_2": {
+            "type": "condition",
+            "description": "Driver <25 years old or <2 years license"
+          },
+          "deductible_2pct": { "type": "deductible", "value": 2, "unit": "percent" },
+          "cov_imm": { "type": "coverage", "name": "İhtiyari Mali Mesuliyet" },
+          "cov_imm_moral": { "type": "coverage", "name": "Manevi Tazminat" },
+          "limit_500k": { "type": "limit", "value": 500000, "currency": "TRY" },
+          "cov_glass": { "type": "coverage", "name": "Cam Kırılması" },
+          "service_network": { "type": "service_provider", "typeOf": "anlaşmalı_servis" },
+          "service_non_network": { "type": "service_provider", "typeOf": "anlaşmasız_servis" },
+          "deductible_25pct": { "type": "deductible", "value": 25, "unit": "percent" },
+          "cov_towing": { "type": "coverage", "name": "Çekici Hizmeti" },
+          "limit_1500_try": { "type": "limit", "value": 1500, "currency": "TRY" }
+        },
+        "edges": [
+          {
+            "sourceId": "cond_age_25_or_license_2",
+            "targetId": "deductible_2pct",
+            "relationshipType": "conditional_restriction"
+          },
+          {
+            "sourceId": "deductible_2pct",
+            "targetId": "cov_kasko_main",
+            "relationshipType": "deductible_trigger"
+          },
+          {
+            "sourceId": "cov_imm_moral",
+            "targetId": "cov_imm",
+            "relationshipType": "coverage_inclusion"
+          },
+          { "sourceId": "limit_500k", "targetId": "cov_imm_moral", "relationshipType": "sublimit" },
+          {
+            "sourceId": "limit_500k",
+            "targetId": "cov_imm",
+            "relationshipType": "carve_out",
+            "description": "Moral damages carved out from unlimited IMM"
+          },
+          {
+            "sourceId": "service_network",
+            "targetId": "cov_glass",
+            "relationshipType": "service_benefit_linkage"
+          },
+          {
+            "sourceId": "deductible_25pct",
+            "targetId": "service_non_network",
+            "relationshipType": "conditional_restriction",
+            "precedenceWeight": 1
+          },
+          { "sourceId": "limit_1500_try", "targetId": "cov_towing", "relationshipType": "sublimit" }
+        ]
+      },
+      "coverages": [
+        {
+          "name": "Comprehensive Auto",
+          "nameTr": "Kasko",
+          "limit": 0,
+          "deductible": 0,
+          "isMarketValue": true
+        },
+        {
+          "name": "Discretionary Liability (IMM)",
+          "nameTr": "İhtiyari Mali Mesuliyet (İMM)",
+          "limit": 0,
+          "deductible": 0,
+          "isUnlimited": true
+        },
+        {
+          "name": "Moral Damages",
+          "nameTr": "Manevi Tazminat",
+          "limit": 500000,
+          "deductible": 0
+        },
+        {
+          "name": "Glass Replacement",
+          "nameTr": "Cam Kırılması",
+          "limit": 0,
+          "deductible": 0,
+          "isUnlimited": true
+        },
+        {
+          "name": "Towing",
+          "nameTr": "Çekici",
+          "limit": 1500,
+          "deductible": 0
+        }
+      ]
+    },
+    "expectedUiPolicy": {
+      "safetyScore": 100,
+      "validationErrors": [],
+      "validationWarnings": [
+        "Conditional deductible of 2% applies for young/inexperienced drivers.",
+        "Manevi Tazminat is capped at 500,000 TL despite unlimited IMM.",
+        "Cam Kırılması has 25% deductible outside network.",
+        "Towing is limited to 1500 TL."
+      ]
+    }
+  }
+]

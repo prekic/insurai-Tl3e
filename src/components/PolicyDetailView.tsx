@@ -58,10 +58,12 @@ import {
   emitEvaluation,
 } from '@/lib/actuarial-engine'
 import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryChart'
+import { applySafeWording } from '@/lib/analysis/display-interpreter'
 
 /**
- * Format coverage limit with special handling for unlimited and market value
- * Uses kasko knowledge hub for intelligent detection
+ * Format coverage limit with display-safe wording governance.
+ * Uses kasko knowledge hub for intelligent detection, then passes
+ * result through the display interpreter's safe wording filter.
  */
 function formatCoverageLimit(
   coverage: Coverage,
@@ -69,43 +71,39 @@ function formatCoverageLimit(
   t: any,
   fmt: (amount: number) => string = (a) => String(a)
 ): string {
+  let raw: string
+
   // Explicit flags take priority
   if (coverage.isUnlimited) {
-    return t.global.unlimited
-  }
-  if (coverage.isMarketValue) {
-    return t.global.marketValue
-  }
-
-  // Use kasko knowledge hub for intelligent detection
-  if (shouldShowUnlimited(coverage.name, coverage.limit)) {
-    return t.global.unlimited
-  }
-  if (shouldShowIncluded(coverage.name, coverage.limit)) {
-    return t.global.included
-  }
-
-  // Legacy fallback checks
-  if (coverage.limit === 0) {
+    raw = t.global.unlimited
+  } else if (coverage.isMarketValue) {
+    raw = t.global.marketValue
+  } else if (shouldShowUnlimited(coverage.name, coverage.limit)) {
+    raw = t.global.unlimited
+  } else if (shouldShowIncluded(coverage.name, coverage.limit)) {
+    raw = t.global.included
+  } else if (coverage.limit === 0) {
     const nameLower = coverage.name.toLowerCase()
     if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
-      return t.global.unlimited
-    }
-    if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
-      return t.global.marketValue
-    }
-    // Services without numeric limits
-    if (
+      raw = t.global.unlimited
+    } else if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
+      raw = t.global.marketValue
+    } else if (
       nameLower.includes('asistans') ||
       nameLower.includes('hizmet') ||
       nameLower.includes('ikame') ||
       nameLower.includes('onarım')
     ) {
-      return t.global.included
+      raw = t.global.included
+    } else {
+      raw = t.global.included
     }
-    return t.global.included // Default to "Dahil" instead of ₺0 for zero-limit coverages
+  } else {
+    raw = fmt(coverage.limit)
   }
-  return fmt(coverage.limit)
+
+  // Pass through display interpreter safe wording filter
+  return applySafeWording(raw)
 }
 
 /**
@@ -224,11 +222,11 @@ function getCoverageInfoText(
 
   // Add info about special values
   if (coverage.isMarketValue) {
-    parts.push(t.policy.paidByMarketValue)
+    parts.push(applySafeWording(t.policy.paidByMarketValue))
   }
 
   if (coverage.isUnlimited) {
-    parts.push(t.policy.noUpperLimit)
+    parts.push(applySafeWording(t.policy.noUpperLimit))
   }
 
   return parts.length > 0 ? parts.join(' • ') : null
@@ -406,7 +404,9 @@ function CollapsibleCoverageCategory({
                       <span
                         className={`font-medium flex-shrink-0 ${subLimit.isUnlimited ? 'text-blue-600' : 'text-gray-900'}`}
                       >
-                        {subLimit.isUnlimited ? t.global.unlimited : formatAmount(subLimit.limit)}
+                        {subLimit.isUnlimited
+                          ? applySafeWording(t.global.unlimited)
+                          : formatAmount(subLimit.limit)}
                       </span>
                     </div>
                   ))}
@@ -1126,7 +1126,7 @@ export function PolicyDetailView() {
       `=== ${t.policy.coveragesTitleExport} ===`,
       ...policy.coverages.map(
         (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? t.global.unlimited : formatConverted(c.limit)}`
+          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? applySafeWording(t.global.unlimited) : formatConverted(c.limit)}`
       ),
       '',
       `=== ${t.policy.exclusionsTitleExport} ===`,
@@ -1134,7 +1134,8 @@ export function PolicyDetailView() {
       '',
       `=== ${t.policy.aiInsightsTitleExport} ===`,
       ...policy.aiInsights.map(
-        (_, i) => `• ${getLocalizedInsight(policy, i, locale, t.insightTranslations)}`
+        (_, i) =>
+          `• ${applySafeWording(getLocalizedInsight(policy, i, locale, t.insightTranslations))}`
       ),
     ].join('\n')
 
@@ -1585,7 +1586,9 @@ export function PolicyDetailView() {
                         t.insightTranslations
                       )
                       // Strip any existing prefix characters from the text for clean display
-                      const displayText = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      const displayText = applySafeWording(
+                        rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      )
 
                       const originalInsight = policy.aiInsights[i]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
@@ -1956,7 +1959,9 @@ export function PolicyDetailView() {
                     return (
                       <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
                         <TruncatableText
-                          text={getLocalizedInsight(policy, i, locale, t.insightTranslations)}
+                          text={applySafeWording(
+                            getLocalizedInsight(policy, i, locale, t.insightTranslations)
+                          )}
                           maxLength={150}
                           showFullTextTranslation={t.policy.showFullText}
                           showLessTranslation={t.common.showLess}

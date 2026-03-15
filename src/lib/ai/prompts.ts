@@ -282,11 +282,11 @@ export const OCR_CONFUSION_PAIRS: Record<string, string[]> = {
  */
 export const EXTRACTION_SCHEMA_PROMPT = `Extract insurance policy data from the following text into the JSON schema provided. Follow these rules:
 
-1. Extract ONLY what is explicitly stated in the text
-2. Use [MISSING] for fields that cannot be found
-3. Use [UNCLEAR] for fields that are ambiguous or partially readable
-4. Preserve all numbers, dates, and identifiers exactly
-5. Include brief citation snippets for key fields
+1. Extract ONLY what is explicitly stated in the text. Do NOT guess or assume values.
+2. Use \`null\` for fields that cannot be found. Do NOT use default values (e.g., do NOT default currency to TRY, do NOT default deductible to 0).
+3. Use \`null\` and document the ambiguity in the \`uncertainties\` array if a value is ambiguous or partially readable.
+4. Preserve all numbers, dates, and identifiers exactly as they appear.
+5. Include brief citation snippets for key fields to prove their origin.
 
 Output valid JSON matching the schema. Do not add fields not in the schema.`
 
