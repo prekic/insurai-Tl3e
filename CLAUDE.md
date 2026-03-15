@@ -124,7 +124,7 @@ insurai/
 | File | Purpose |
 |------|---------|
 | `src/App.tsx` | Main app with routing and lazy-loaded components |
-| `src/types/policy.ts` | Core policy data structures and types |
+| `src/types/policy.ts`, `analysis.ts`, `display.ts` | Core policy data structures and types, analysis modes, and display summaries |
 | `src/lib/policy-context.tsx` | React Context for policy state management |
 | `src/lib/policy-utils.ts` | **NEW** Duplicate detection, fuzzy matching, policy comparison |
 | `src/lib/policy-upload-check.ts` | **NEW** Pre-upload conflict detection service |
@@ -143,7 +143,10 @@ insurai/
 | `src/lib/ai/document-ocr.ts` | Document AI OCR with chunked extraction |
 | `src/lib/ai/pdf-splitter.ts` | PDF splitting for >10 page documents (limit lowered from 15) |
 | `src/lib/ai/validator.ts` | **NEW** (Phase 7) Cross-field consistency and rule validation checking |
+| `src/lib/ai/extraction-normalizer.ts` | **NEW** Deterministic document normalization before validation |
+| `src/lib/ai/relationship-resolver.ts` | **NEW** AI clause logic resolver |
 | `src/lib/analysis/engine.ts` | **NEW** Orchestrator replacing direct LLM component consumption |
+| `src/lib/analysis/benchmarks.ts`, `insights.ts`, `scoring.ts` | **NEW** Modularized logic for extraction analysis |
 | `src/lib/analysis/display-interpreter.ts` | **NEW** Generates safe summaries, sanitizes forbidden LLM strings (e.g. 'sınırsız') |
 | `src/lib/analysis/review-thresholds.ts` | **NEW** Evaluates parsed metrics and assigns modes (`full`, `restricted`, `human_review_required`) |
 | `src/lib/analysis/kasko-pilot-gate.ts` | **NEW** Manages KASKO internal product pilot logic and reviewer allocation |
@@ -345,6 +348,8 @@ insurai/
 | `supabase/migrations/033_seed_hardcoded_configs.sql` | **NEW** Seeds 29 hardcoded backend config keys across 8 categories into `app_settings` |
 | `supabase/migrations/035_admin_users_schema_alignment.sql` | **NEW** Schema alignment for admin_users (`display_name`, `locked_until`) |
 | `supabase/migrations/036_update_anthropic_haiku_model.sql` | **NEW** Updates `claude-3-5-haiku-20241022` to `claude-3-5-haiku-latest` |
+| `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** Traceability columns (span_maps, clause_graph, validation) for High-Trust pipeline |
+| `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** Versioned persistence for tracking schema and text versions |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |

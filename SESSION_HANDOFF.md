@@ -43,12 +43,19 @@
 | File | Change |
 |------|--------|
 | `src/lib/analysis/display-interpreter.ts` | **NEW** Core UI safety boundary and text sanitization layer |
+| `src/lib/ai/extraction-normalizer.ts` | **NEW** Deterministic document normalization before validation |
 | `src/lib/ai/validator.ts` | **NEW** Cross-field consistency and rule validation |
+| `src/lib/ai/relationship-resolver.ts` | **NEW** AI clause logic resolver |
 | `src/lib/analysis/engine.ts` | **NEW** Orchestrator combining LLM output, validation, and review thresholds |
 | `src/lib/analysis/review-thresholds.ts` | **NEW** Logic converting confidence and warning flags into UI display modes (`full`, `restricted`, `human_review_required`) |
+| `src/lib/analysis/benchmarks.ts`, `insights.ts`, `scoring.ts` | **NEW** Extraction analysis utility split |
 | `src/lib/analysis/kasko-pilot-gate.ts` | **NEW** Feature flag checks, reviewer segment enforcement, and QA logging for the pilot |
+| `src/types/analysis.ts`, `src/types/display.ts` | **NEW** Typings for analysis and display outputs |
+| `src/components/ui/SafetyLabel.tsx`, `SourceQuoteTooltip.tsx` | **NEW** Components for rendering safe UI insights and source context |
 | `src/hooks/useDisplaySafeSummary.ts` | **UPDATED** Hook now evaluates the pilot gate and attaches pilot metadata |
-| `src/components/AIInsightsPanel.tsx` | **UPDATED** UI now renders a prominent banner if the extraction is a pilot result |
+| `src/components/AIInsightsPanel.tsx`, `PolicyDetailView.tsx`, `SharedResult.tsx` | **UPDATED** Consumers of the new Display Interpreter pipeline |
+| `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** DB migration adding traceability, span maps, and validation outputs |
+| `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** DB migration adding versioned persistence to track schema/text versions |
 | `docs/BRANCH_READINESS_SCORECARD.md` | **NEW** Markdown scorecard evaluating the pilot and production readiness of all branches |
 | `docs/REAL_DOCUMENT_DEFECT_LOG.csv` | **NEW** Centralized tracking for extraction and validation defects found during real-document testing |
 | `src/lib/analysis/__tests__/pilot-8h-batch.test.ts` | **NEW** Automated harness simulating the first 5-document pilot batch |
