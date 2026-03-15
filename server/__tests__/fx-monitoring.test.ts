@@ -11,8 +11,8 @@ vi.mock('../middleware/admin-auth.js', async () => {
   }
 })
 
-vi.mock('../lib/logger.js', () => ({
-  default: {
+vi.mock('../lib/logger.js', () => {
+  const child = {
     child: vi.fn(() => ({
       info: vi.fn(),
       warn: vi.fn(),
@@ -21,8 +21,12 @@ vi.mock('../lib/logger.js', () => ({
     info: vi.fn(),
     error: vi.fn(),
     warn: vi.fn(),
-  },
-}))
+  }
+  return {
+    default: child,
+    logger: child,
+  }
+})
 
 describe('FX Monitoring - fetchLiveRates Alerts', () => {
   const mockInsert = vi.fn()

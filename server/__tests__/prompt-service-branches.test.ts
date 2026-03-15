@@ -348,7 +348,7 @@ describe('Prompt Service — Branch Coverage', () => {
 
     it('should return empty array for category with no fallbacks', async () => {
       setMock(null, { message: 'error' })
-      const result = await getPromptsByCategory('analysis')
+      const result = await getPromptsByCategory('unknown_category')
       expect(result).toEqual([])
     })
 

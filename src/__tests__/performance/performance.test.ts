@@ -48,7 +48,7 @@ describe('Performance Optimizations', () => {
       const appContent = fs.readFileSync(appPath, 'utf-8')
 
       // Verify lazy loading is used for route components
-      expect(appContent).toContain("lazy(() =>")
+      expect(appContent).toContain('lazyRetry(')
       expect(appContent).toContain('LandingPage')
       expect(appContent).toContain('PolicyUpload')
       expect(appContent).toContain('PolicyDashboard')
@@ -261,10 +261,7 @@ describe('Bundle Size Expectations', () => {
 
     // Only truly independent large libraries are split to avoid circular deps
     // (see Known Issue #51-52 for why aggressive chunking was removed)
-    const largeVendors = [
-      'pdfjs-dist',
-      'pdf-lib',
-    ]
+    const largeVendors = ['pdfjs-dist', 'pdf-lib']
 
     for (const vendor of largeVendors) {
       expect(configContent).toContain(vendor)

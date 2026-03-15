@@ -16,24 +16,19 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // Mock Setup using vi.hoisted
 // ============================================================================
 
-const {
-  mockGetDocument,
-  mockGlobalWorkerOptions,
-  mockVersion,
-  mockFetch,
-  mockLoadingTaskDestroy,
-} = vi.hoisted(() => {
-  const mockLoadingTaskDestroy = vi.fn()
-  const mockGlobalWorkerOptions = { workerSrc: '' }
+const { mockGetDocument, mockGlobalWorkerOptions, mockVersion, mockFetch, mockLoadingTaskDestroy } =
+  vi.hoisted(() => {
+    const mockLoadingTaskDestroy = vi.fn()
+    const mockGlobalWorkerOptions = { workerSrc: '' }
 
-  return {
-    mockGetDocument: vi.fn(),
-    mockGlobalWorkerOptions,
-    mockVersion: '4.8.69',
-    mockFetch: vi.fn(),
-    mockLoadingTaskDestroy,
-  }
-})
+    return {
+      mockGetDocument: vi.fn(),
+      mockGlobalWorkerOptions,
+      mockVersion: '4.8.69',
+      mockFetch: vi.fn(),
+      mockLoadingTaskDestroy,
+    }
+  })
 
 // Mock pdfjs-dist
 vi.mock('pdfjs-dist', () => ({
@@ -156,7 +151,7 @@ function setupMockDocument(doc: ReturnType<typeof createMockPDFDocument>) {
 function setupMockDocumentError(error: Error | string) {
   const err = typeof error === 'string' ? new Error(error) : error
   mockGetDocument.mockReturnValue({
-    promise: Promise.reject(err),
+    promise: new Promise((_, reject) => setTimeout(() => reject(err), 0)),
     destroy: mockLoadingTaskDestroy,
   })
 }
@@ -410,9 +405,7 @@ describe('extractTextFromPDF', () => {
     await vi.runAllTimersAsync()
     await resultPromise
 
-    expect(mockGetDocument).toHaveBeenCalledWith(
-      expect.objectContaining({ useSystemFonts: true })
-    )
+    expect(mockGetDocument).toHaveBeenCalledWith(expect.objectContaining({ useSystemFonts: true }))
   })
 
   it('normalizes whitespace in extracted text', async () => {
@@ -1035,9 +1028,7 @@ describe('extractTextFromPDFWithRetry', () => {
 
     expect(result.success).toBe(true)
     // Verify the load error reset message was logged
-    const loadErrorResetCalls = capturedWarnCalls.filter((c) =>
-      String(c[0]).includes('Load error')
-    )
+    const loadErrorResetCalls = capturedWarnCalls.filter((c) => String(c[0]).includes('Load error'))
     expect(loadErrorResetCalls.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -1190,9 +1181,7 @@ describe('extractTextFromPDFWithRetry', () => {
 
     expect(result.success).toBe(true)
     // Verify worker error was detected
-    const workerErrorCalls = capturedWarnCalls.filter((c) =>
-      String(c[0]).includes('Worker error')
-    )
+    const workerErrorCalls = capturedWarnCalls.filter((c) => String(c[0]).includes('Worker error'))
     expect(workerErrorCalls.length).toBeGreaterThanOrEqual(1)
   })
 
@@ -1224,9 +1213,7 @@ describe('extractTextFromPDFWithRetry', () => {
     await resultPromise
 
     // Check logged backoff delays: 1000ms (between attempt 1-2), 2000ms (between attempt 2-3)
-    const waitingCalls = warnSpy.mock.calls.filter((c) =>
-      String(c[0]).includes('Waiting')
-    )
+    const waitingCalls = warnSpy.mock.calls.filter((c) => String(c[0]).includes('Waiting'))
     expect(waitingCalls.length).toBe(2)
     expect(String(waitingCalls[0]![0])).toContain('1000ms')
     expect(String(waitingCalls[1]![0])).toContain('2000ms')
@@ -1247,9 +1234,7 @@ describe('extractTextFromPDFWithRetry', () => {
     await resultPromise
 
     // With 5 attempts: delays are 1000, 2000, 4000, 4000 (capped)
-    const waitingCalls = warnSpy.mock.calls.filter((c) =>
-      String(c[0]).includes('Waiting')
-    )
+    const waitingCalls = warnSpy.mock.calls.filter((c) => String(c[0]).includes('Waiting'))
     expect(waitingCalls.length).toBe(4) // 4 waits between 5 attempts
     expect(String(waitingCalls[0]![0])).toContain('1000ms')
     expect(String(waitingCalls[1]![0])).toContain('2000ms')

@@ -408,7 +408,9 @@ async function _selfLoadServerConfig(): Promise<void> {
   }
 }
 // Fire-and-forget after a short delay to let Supabase client initialize
-setTimeout(() => _selfLoadServerConfig(), 2000)
+if (process.env.NODE_ENV !== 'test') {
+  setTimeout(() => _selfLoadServerConfig(), 2000)
+}
 
 function getFromCache<T>(key: string): T | null {
   const entry = cache.get(key)

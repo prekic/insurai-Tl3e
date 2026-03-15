@@ -166,7 +166,7 @@ describe('normalizeCurrency', () => {
   })
 
   it('handles dot-as-decimal when last part is not 3 digits', () => {
-    expect(normalizeCurrency('15.50')).toBe(15.50)
+    expect(normalizeCurrency('15.50')).toBe(15.5)
   })
 
   it('returns 0 for empty/invalid', () => {
@@ -250,7 +250,7 @@ describe('extractWithPatterns', () => {
   it('extracts premium', () => {
     const result = extractWithPatterns('Toplam Prim: ₺15.000,50')
     expect(result.premium).toBeDefined()
-    expect(result.premium!.value).toBe(15000.50)
+    expect(result.premium!.value).toBe(15000.5)
     expect(result.premium!.isValid).toBe(true)
   })
 
@@ -303,29 +303,20 @@ describe('extractWithPatterns', () => {
 // ==================================================================
 describe('validateAndEnhanceExtraction', () => {
   it('validates valid TC Kimlik from AI', () => {
-    const result = validateAndEnhanceExtraction(
-      { tcKimlik: '10000000146' },
-      ''
-    )
+    const result = validateAndEnhanceExtraction({ tcKimlik: '10000000146' }, '')
     expect(result.errors).toHaveLength(0)
   })
 
   it('corrects invalid TC Kimlik from pattern', () => {
     const text = 'T.C. Kimlik No: 10000000146'
-    const result = validateAndEnhanceExtraction(
-      { tcKimlik: '00000000000' },
-      text
-    )
-    expect(result.warnings.some(w => w.includes('TC Kimlik corrected'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ tcKimlik: '00000000000' }, text)
+    expect(result.warnings.some((w) => w.includes('TC Kimlik / VKN corrected'))).toBe(true)
     expect(result.enhancements.tcKimlik).toBe('10000000146')
   })
 
   it('errors on invalid TC Kimlik without pattern match', () => {
-    const result = validateAndEnhanceExtraction(
-      { tcKimlik: '00000000000' },
-      'no tc kimlik here'
-    )
-    expect(result.errors.some(e => e.includes('Invalid TC Kimlik'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ tcKimlik: '00000000000' }, 'no tc kimlik here')
+    expect(result.errors.some((e) => e.includes('Invalid TC Kimlik'))).toBe(true)
   })
 
   it('fills missing TC Kimlik from pattern', () => {
@@ -335,28 +326,19 @@ describe('validateAndEnhanceExtraction', () => {
   })
 
   it('validates valid VIN from AI', () => {
-    const result = validateAndEnhanceExtraction(
-      { vin: 'WVWZZZ1KZXW123456' },
-      ''
-    )
-    expect(result.warnings.filter(w => w.includes('VIN'))).toHaveLength(0)
+    const result = validateAndEnhanceExtraction({ vin: 'WVWZZZ1KZXW123456' }, '')
+    expect(result.warnings.filter((w) => w.includes('VIN'))).toHaveLength(0)
   })
 
   it('corrects invalid VIN from pattern', () => {
     const text = 'Şasi No: WVWZZZ1KZXW123456'
-    const result = validateAndEnhanceExtraction(
-      { vin: 'invalid' },
-      text
-    )
-    expect(result.warnings.some(w => w.includes('VIN corrected'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ vin: 'invalid' }, text)
+    expect(result.warnings.some((w) => w.includes('VIN corrected'))).toBe(true)
   })
 
   it('warns on invalid VIN without pattern match', () => {
-    const result = validateAndEnhanceExtraction(
-      { vin: 'invalid' },
-      'no vin here'
-    )
-    expect(result.warnings.some(w => w.includes('VIN may be invalid'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ vin: 'invalid' }, 'no vin here')
+    expect(result.warnings.some((w) => w.includes('VIN may be invalid'))).toBe(true)
   })
 
   it('fills missing VIN from pattern', () => {
@@ -367,19 +349,13 @@ describe('validateAndEnhanceExtraction', () => {
 
   it('validates plate and corrects from pattern', () => {
     const text = 'Plaka No: 34 ABC 1234'
-    const result = validateAndEnhanceExtraction(
-      { vehiclePlate: 'invalid' },
-      text
-    )
-    expect(result.warnings.some(w => w.includes('Plate corrected'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ vehiclePlate: 'invalid' }, text)
+    expect(result.warnings.some((w) => w.includes('Plate corrected'))).toBe(true)
   })
 
   it('warns on invalid plate without pattern match', () => {
-    const result = validateAndEnhanceExtraction(
-      { vehiclePlate: 'XXXXX' },
-      ''
-    )
-    expect(result.warnings.some(w => w.includes('plate may be invalid'))).toBe(true)
+    const result = validateAndEnhanceExtraction({ vehiclePlate: 'XXXXX' }, '')
+    expect(result.warnings.some((w) => w.includes('plate may be invalid'))).toBe(true)
   })
 
   it('fills missing plate from pattern', () => {
@@ -393,7 +369,7 @@ describe('validateAndEnhanceExtraction', () => {
       { startDate: '2027-01-01', endDate: '2026-01-01' },
       ''
     )
-    expect(result.errors.some(e => e.includes('Start date must be before'))).toBe(true)
+    expect(result.errors.some((e) => e.includes('Start date must be before'))).toBe(true)
   })
 
   it('fills missing dates from patterns', () => {
@@ -410,10 +386,7 @@ describe('validateAndEnhanceExtraction', () => {
   })
 
   it('normalizes string premium from AI', () => {
-    const result = validateAndEnhanceExtraction(
-      { premium: '15.000,50' },
-      ''
-    )
+    const result = validateAndEnhanceExtraction({ premium: '15.000,50' }, '')
     // String premium is normalized - no error expected
     expect(result.errors).toHaveLength(0)
   })

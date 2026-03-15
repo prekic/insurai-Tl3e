@@ -53,6 +53,8 @@ vi.mock('@/lib/free-trial', () => ({
   getTrialResult: () => mockGetTrialResult,
   getTrialTimeRemaining: () => mockTimeRemaining,
   formatTimeRemaining: (ms: number) => `${Math.round(ms / 1000)}s`,
+  getTrialUploadsRemaining: () => 1,
+  getTrialMaxUploads: () => 3,
 }))
 
 // AI extraction mock

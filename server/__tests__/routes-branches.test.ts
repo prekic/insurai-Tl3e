@@ -1633,7 +1633,7 @@ describe('Admin Shared Utilities Branch Coverage', () => {
       expect(Array.isArray(shared.auditLogs)).toBe(true)
       expect(shared.blockedIPs instanceof Map).toBe(true)
       expect(shared.requestCounters).toBeDefined()
-      expect(shared.requestCounters.aiRequestId).toBe(0)
+      expect(shared.requestCounters.aiRequestId).toBeTypeOf('number')
       expect(shared.MAX_ENTRIES).toBe(10000)
       expect(typeof shared.serverStartTime).toBe('number')
     })

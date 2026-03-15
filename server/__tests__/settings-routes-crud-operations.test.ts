@@ -987,6 +987,7 @@ describe('Settings Routes — CRUD Operations', () => {
       }
       // First call: fetch existing — success
       // Second call: update — error
+      mockFrom.mockReset()
       mockFrom
         .mockReturnValueOnce(buildQueryChain({ data: existingSetting, error: null }))
         .mockReturnValueOnce(buildQueryChain({ data: null, error: { message: 'update failed' } }))
@@ -1008,6 +1009,7 @@ describe('Settings Routes — CRUD Operations', () => {
       }
       const updatedSetting = { ...existingSetting, value: 0.7, updated_at: '2026-02-20T00:00:00Z' }
 
+      mockFrom.mockReset()
       mockFrom
         .mockReturnValueOnce(buildQueryChain({ data: existingSetting, error: null }))
         .mockReturnValueOnce(buildQueryChain({ data: updatedSetting, error: null }))

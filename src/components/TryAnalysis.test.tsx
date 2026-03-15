@@ -94,6 +94,8 @@ vi.mock('@/lib/free-trial', () => ({
   getTrialEmail: () => mockGetTrialEmail(),
   saveTrialEmail: (...args: unknown[]) => mockSaveTrialEmail(...args),
   getShareUrl: () => mockGetShareUrl(),
+  getTrialUploadsRemaining: () => 1,
+  getTrialMaxUploads: () => 3,
 }))
 
 // Mock analytics

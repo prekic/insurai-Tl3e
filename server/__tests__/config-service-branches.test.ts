@@ -132,6 +132,7 @@ describe('config-service branches', () => {
       })
 
       const mod = await freshImport()
+      mockCreateClient.mockClear()
       await mod.getAIConfig()
       mod.invalidateCache() // clear cache so second call goes to DB
       await mod.getRateLimitsConfig()

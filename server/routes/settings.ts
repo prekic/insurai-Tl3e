@@ -175,7 +175,9 @@ async function _loadPerfConfig(): Promise<void> {
     // Keep defaults
   }
 }
-_loadPerfConfig()
+if (process.env.NODE_ENV !== 'test') {
+  _loadPerfConfig()
+}
 
 let serverAlertThresholds: ServerAlertThresholds = {
   cacheHitRateWarning: 0.5,

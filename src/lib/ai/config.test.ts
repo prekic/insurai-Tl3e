@@ -707,8 +707,8 @@ describe('AI Config (config.ts)', () => {
       mockEnv.proxyUrl = 'http://localhost:4001'
       globalThis.fetch = vi.fn().mockResolvedValue({
         ok: false,
-        status: 502,
-        statusText: 'Bad Gateway',
+        status: 400,
+        statusText: 'Bad Request',
         json: async () => ({}),
       })
 
@@ -719,7 +719,7 @@ describe('AI Config (config.ts)', () => {
       errorSpy.mockRestore()
 
       expect(result.success).toBe(false)
-      expect(result.error).toBe('HTTP 502')
+      expect(result.error).toBe('HTTP 400')
     })
 
     it('should handle HTTP error with details but no error field', async () => {
