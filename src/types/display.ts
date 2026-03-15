@@ -209,4 +209,35 @@ export interface DisplaySafePolicySummary {
 
   /** Interpreter-level warnings for the consuming component */
   displayWarnings: string[]
+
+  // =========================================================================
+  // PILOT METADATA (optional — only present when pilot is active)
+  // =========================================================================
+
+  /** Whether this result comes from an active pilot flow */
+  isPilotResult?: boolean
+
+  /** Whether human review is required before trusting this result */
+  requiresHumanReview?: boolean
+
+  /** Current review status in the pilot workflow */
+  pilotReviewStatus?:
+    | 'pending_review'
+    | 'review_in_progress'
+    | 'accepted'
+    | 'corrected_minor'
+    | 'corrected_major'
+    | 'rejected'
+
+  /** Feature flag name controlling this pilot */
+  pilotFlagName?: string
+
+  /** Segment required for pilot access */
+  pilotReviewerSegment?: string
+
+  /** Draft/review warning banner text for the UI */
+  pilotReviewBanner?: string
+
+  /** Whether the result should be labeled as draft */
+  isDraft?: boolean
 }

@@ -3,6 +3,7 @@ import type { AnalyzedPolicy } from '@/types/policy'
 import type { DisplaySafePolicySummary } from '@/types/display'
 import { generateDisplaySafeSummary } from '@/lib/analysis/display-interpreter'
 import { generateAnalysisBundle } from '@/lib/analysis/engine'
+import { evaluateKaskoPilotGate } from '@/lib/analysis/kasko-pilot-gate'
 
 /**
  * Hook that converts an AnalyzedPolicy into a DisplaySafePolicySummary.
@@ -15,9 +16,17 @@ import { generateAnalysisBundle } from '@/lib/analysis/engine'
  * - ExtractedPolicyData — reconstructed from AnalyzedPolicy fields
  * - ValidationResult — from policy.safetyFlags
  * - AnalysisBundle — from policy.analysisBundle or generated fresh
+ *
+ * When the KASKO pilot is active, additional pilot metadata is attached
+ * to the result including review status, draft labeling, and banner text.
  */
 export function useDisplaySafeSummary(
-  policy: AnalyzedPolicy | undefined | null
+  policy: AnalyzedPolicy | undefined | null,
+  options?: {
+    featureFlags?: Record<string, boolean>
+    userSegments?: string[]
+    userId?: string
+  }
 ): DisplaySafePolicySummary | null {
   return useMemo(() => {
     if (!policy) return null
@@ -72,6 +81,28 @@ export function useDisplaySafeSummary(
     const analysis =
       policy.analysisBundle || generateAnalysisBundle(policy.id, extractedData, validation)
 
-    return generateDisplaySafeSummary(extractedData, validation, analysis)
-  }, [policy])
+    const summary = generateDisplaySafeSummary(extractedData, validation, analysis)
+
+    // --- PILOT GATE INTEGRATION ---
+    // Check if the KASKO pilot is active for this extraction
+    const branch = policy.type || 'unknown'
+    const pilotGate = evaluateKaskoPilotGate(
+      branch,
+      options?.userId,
+      options?.featureFlags || {},
+      options?.userSegments || []
+    )
+
+    if (pilotGate.isPilotActive) {
+      summary.isPilotResult = true
+      summary.requiresHumanReview = pilotGate.requiresHumanReview
+      summary.pilotReviewStatus = pilotGate.reviewStatus
+      summary.pilotFlagName = 'kasko_ai_extraction_pilot'
+      summary.pilotReviewerSegment = 'kasko_pilot_reviewers'
+      summary.pilotReviewBanner = pilotGate.reviewBannerText
+      summary.isDraft = pilotGate.isDraft
+    }
+
+    return summary
+  }, [policy, options?.featureFlags, options?.userSegments, options?.userId])
 }

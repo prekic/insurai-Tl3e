@@ -154,3 +154,164 @@ export function generatePilotDocumentId(): string {
   const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '')
   return `PILOT-KASKO-${timestamp}-${String(_pilotCounter).padStart(3, '0')}`
 }
+
+// ============================================================================
+// QA OUTCOME LOGGING
+// ============================================================================
+
+export type CorrectionCategory =
+  | 'policy_number'
+  | 'provider'
+  | 'dates'
+  | 'premium'
+  | 'coverage_count'
+  | 'coverage_detail'
+  | 'deductible'
+  | 'conditional_deductible'
+  | 'special_conditions'
+  | 'endorsements'
+  | 'exclusions'
+  | 'unlimited_handling'
+  | 'rayic_deger'
+  | 'service_type'
+  | 'display_mode'
+  | 'prohibited_phrase'
+  | 'other'
+
+export interface PilotQARecord {
+  documentId: string
+  filename: string
+  branch: string
+  reviewDate: string
+  reviewerUserId: string
+
+  extractionSuccess: boolean
+  extractionModel: string
+  textCharCount: number
+  pageCount: number
+
+  reviewerOutcome: PilotReviewStatus
+  reviewTimeMinutes: number
+  correctionCategories: CorrectionCategory[]
+  criticalFieldsMissed: string[]
+
+  displayMode: string
+  triggersFired: string[]
+  phraseClean: boolean
+  foundProhibitedPhrases: string[]
+
+  coverageCountExtracted: number
+  specialConditionCount: number
+  hasRayicDeger: boolean
+  hasConditionalDeductible: boolean
+  sourceQuoteCount: number
+  confidenceScore: number
+
+  zeroCoverage: boolean
+  deductibleMiss: boolean
+  specialConditionMiss: boolean
+  majorCorrection: boolean
+
+  reviewerNotes: string
+}
+
+/**
+ * Create a new pilot QA record with defaults.
+ */
+export function createPilotQARecord(
+  documentId: string,
+  filename: string,
+  reviewerUserId: string
+): PilotQARecord {
+  return {
+    documentId,
+    filename,
+    branch: 'kasko',
+    reviewDate: new Date().toISOString(),
+    reviewerUserId,
+    extractionSuccess: false,
+    extractionModel: 'unknown',
+    textCharCount: 0,
+    pageCount: 0,
+    reviewerOutcome: 'pending_review',
+    reviewTimeMinutes: 0,
+    correctionCategories: [],
+    criticalFieldsMissed: [],
+    displayMode: 'unknown',
+    triggersFired: [],
+    phraseClean: true,
+    foundProhibitedPhrases: [],
+    coverageCountExtracted: 0,
+    specialConditionCount: 0,
+    hasRayicDeger: false,
+    hasConditionalDeductible: false,
+    sourceQuoteCount: 0,
+    confidenceScore: 0,
+    zeroCoverage: false,
+    deductibleMiss: false,
+    specialConditionMiss: false,
+    majorCorrection: false,
+    reviewerNotes: '',
+  }
+}
+
+/**
+ * Serialize and log a QA record. In production this would go to Supabase;
+ * during pilot it appends to a local JSONL file.
+ */
+export function logPilotQARecord(record: PilotQARecord): string {
+  const json = JSON.stringify(record)
+
+  // In Node.js environments, append to JSONL file
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).process !== 'undefined') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const fs = require('fs')
+      fs.appendFileSync('/tmp/kasko-pilot-qa-log.jsonl', json + '\n')
+    } catch {
+      // Silently fail in browser environments
+    }
+  }
+
+  return json
+}
+
+/**
+ * Check rollback trigger status based on accumulated QA records.
+ */
+export function getRollbackTriggerStatus(records: PilotQARecord[]): {
+  shouldPause: boolean
+  triggers: string[]
+} {
+  if (records.length === 0) return { shouldPause: false, triggers: [] }
+
+  const triggers: string[] = []
+
+  const zeroCovRate = records.filter((r) => r.zeroCoverage).length / records.length
+  if (zeroCovRate > 0.2)
+    triggers.push(`ZERO_COVERAGE_RATE: ${(zeroCovRate * 100).toFixed(0)}% > 20%`)
+
+  const phraseLeaks = records.filter((r) => !r.phraseClean).length
+  if (phraseLeaks > 0)
+    triggers.push(`PHRASE_LEAK: ${phraseLeaks} document(s) with prohibited phrases`)
+
+  const majorRate = records.filter((r) => r.majorCorrection).length / records.length
+  if (majorRate > 0.5)
+    triggers.push(`MAJOR_CORRECTION_RATE: ${(majorRate * 100).toFixed(0)}% > 50%`)
+
+  // Check for consecutive deductible misses
+  let consecutiveMisses = 0
+  for (const r of records) {
+    if (r.deductibleMiss) {
+      consecutiveMisses++
+      if (consecutiveMisses >= 3) {
+        triggers.push(`CONSECUTIVE_DEDUCTIBLE_MISS: ${consecutiveMisses} in a row`)
+        break
+      }
+    } else {
+      consecutiveMisses = 0
+    }
+  }
+
+  return { shouldPause: triggers.length > 0, triggers }
+}

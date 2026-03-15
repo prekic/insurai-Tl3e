@@ -108,6 +108,38 @@ export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
       </CardHeader>
 
       <CardContent className="p-0">
+        {/* === PILOT REVIEW BANNER (KASKO internal pilot) === */}
+        {displaySummary?.isPilotResult && (
+          <div
+            className="p-4 border-b-2 border-amber-400 bg-amber-50"
+            role="alert"
+            aria-live="polite"
+            data-testid="pilot-review-banner"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-amber-800 text-sm">
+                  ⚠️ TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
+                </p>
+                <p className="text-xs text-amber-700 mt-1">
+                  {displaySummary.pilotReviewBanner ||
+                    'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'}
+                </p>
+                {displaySummary.pilotReviewStatus && (
+                  <Badge className="mt-2 bg-amber-100 text-amber-800 border border-amber-300">
+                    {displaySummary.pilotReviewStatus === 'pending_review'
+                      ? 'İnceleme Bekliyor / Pending Review'
+                      : displaySummary.pilotReviewStatus === 'review_in_progress'
+                        ? 'İnceleniyor / Review In Progress'
+                        : displaySummary.pilotReviewStatus}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Analysis Quality Summary */}
         <div
           className={`p-4 border-b ${qualityColors[qualityLevel].replace('text-', 'bg-').replace('-600', '-50')}`}
