@@ -1,6 +1,7 @@
 import { AnalysisBundle } from '@/types/analysis'
 import { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { ValidationResult } from '@/lib/ai/validator'
+import { normalizeBranchExtraction } from '@/lib/ai/extraction-normalizer'
 
 import { generateScoreBundle } from './scoring'
 import { generateInsightBundle } from './insights'
@@ -12,15 +13,17 @@ const ANALYSIS_MODEL_VERSION = '1.0.0'
  * The core orchestration function for Phase 4 Analysis.
  * Generates the unified AnalysisBundle required by downstream consumers.
  *
+ * Pipeline order:
+ * 0. Branch-specific post-extraction normalization (Phase 6B)
+ * 1. Benchmarks (Workstream C)
+ * 2. Scoring (Workstream A)
+ * 3. Insights (Workstream B)
+ *
  * Strict separation of concerns:
  * - Benchmarks are generated first, then passed to scoring so competitivenessScore
  *   can determine whether to suppress itself based on provenance.
  * - Scores don't write benchmarks.
  * - Insights don't mutate facts.
- *
- * The AnalysisBundle is attached in-memory to AnalyzedPolicy.
- * It is NOT yet independently persisted to the database.
- * Persistence occurs when AnalyzedPolicy is saved via the existing persistence layer.
  *
  * @param policyId    The ID of the stored policy to attach this analysis to
  * @param data        The structured extraction data produced by Phase 3 AI Pipeline
@@ -33,6 +36,10 @@ export function generateAnalysisBundle(
   validation: ValidationResult
 ): AnalysisBundle {
   const generatedAt = new Date().toISOString()
+
+  // 0. Branch-specific post-extraction normalization (Phase 6B)
+  // Classifies coverages, extracts structured markers, tags branch-specific fields
+  normalizeBranchExtraction(data)
 
   // 1. Benchmarks first (Workstream C) — needed by scoring to gate competitivenessScore
   const benchmarkBundle = generateBenchmarkBundle(data)
