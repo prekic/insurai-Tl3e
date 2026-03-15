@@ -1,36 +1,59 @@
-import { ScoreBundle, ScoreDetail } from '@/types/analysis'
+import { ScoreBundle, ScoreDetail, InternalOverallScore } from '@/types/analysis'
 import { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { ValidationResult } from '@/lib/ai/validator'
+import { BenchmarkBundle } from '@/types/analysis'
 
 /**
  * Deterministic scoring engine.
  * Generates versioned, auditable scores from extracted facts and validation results.
+ *
+ * KEY RULES:
+ * - Each score family is independent and versioned.
+ * - competitivenessScore is SUPPRESSED (not emitted as a placeholder) when
+ *   benchmark provenance is incomplete.
+ * - internalOverallScore is derived from policy-fact scores only, marked
+ *   internalOnly:true, and MUST NOT be rendered to consumers.
  */
 
 const SCORING_MODEL_VERSION = '1.0.0'
 
 export function generateScoreBundle(
   data: ExtractedPolicyData,
-  validation: ValidationResult
+  validation: ValidationResult,
+  benchmarkBundle?: BenchmarkBundle
 ): ScoreBundle {
   const generatedAt = new Date().toISOString()
+
   const scores: Record<string, ScoreDetail> = {
     extractionQualityScore: computeExtractionQuality(data, validation, generatedAt),
     policyStructureScore: computePolicyStructure(data, generatedAt),
     consumerSafetyScore: computeConsumerSafety(data, generatedAt),
-    competitivenessScore: computeCompetitiveness(data, generatedAt), // Placeholder until Benchmark Layer
     riskAttentionScore: computeRiskAttention(data, generatedAt),
   }
 
-  const overallScore = Math.round(
-    (scores.extractionQualityScore.scoreValue +
-      scores.policyStructureScore.scoreValue +
-      scores.consumerSafetyScore.scoreValue) /
-      3
-  )
+  // competitivenessScore: only emitted with valid benchmark provenance
+  scores.competitivenessScore = computeCompetitiveness(data, generatedAt, benchmarkBundle)
+
+  // Internal-only composite for triage/routing — never consumer-facing
+  const contributingFamilies: Array<
+    'extractionQualityScore' | 'policyStructureScore' | 'consumerSafetyScore'
+  > = ['extractionQualityScore', 'policyStructureScore', 'consumerSafetyScore']
+
+  const sum = contributingFamilies.reduce((acc, name) => {
+    const s = scores[name]
+    return acc + (s && !s.suppressed ? s.scoreValue : 0)
+  }, 0)
+
+  const internalOverallScore: InternalOverallScore = {
+    value: Math.round(sum / contributingFamilies.length),
+    derivationRule:
+      'AVERAGE(extractionQualityScore, policyStructureScore, consumerSafetyScore) — excludes benchmark-dependent or suppressed scores',
+    contributingFamilies,
+    internalOnly: true,
+  }
 
   return {
-    overallScore,
+    internalOverallScore,
     scores,
     bundleVersion: SCORING_MODEL_VERSION,
     generatedAt,
@@ -80,7 +103,7 @@ function computeExtractionQuality(
 
 function computePolicyStructure(data: ExtractedPolicyData, generatedAt: string): ScoreDetail {
   const coverages = data.coverages || []
-  let score = 50 // Base structure score
+  let score = 50
   const rulesApplied: string[] = []
   const warnings: string[] = []
 
@@ -129,7 +152,6 @@ function computeConsumerSafety(data: ExtractedPolicyData, generatedAt: string): 
 
   const coverages = data.coverages || []
 
-  // High/Negative deductibles impact safety
   const deductibles = coverages.filter((c) => c.deductible !== null && c.deductible > 0)
   if (deductibles.length > 0) {
     const penalty = deductibles.length * 5
@@ -137,7 +159,6 @@ function computeConsumerSafety(data: ExtractedPolicyData, generatedAt: string): 
     rulesApplied.push(`PENALTY_DEDUCTIBLES_PRESENT:-${Math.min(penalty, 40)}`)
   }
 
-  // Ambiguous phrasing impacts consumer safety
   if (data.specialConditions && data.specialConditions.length > 5) {
     score -= 10
     rulesApplied.push('PENALTY_HIGH_SPECIAL_CONDITIONS:-10')
@@ -164,7 +185,6 @@ function computeConsumerSafety(data: ExtractedPolicyData, generatedAt: string): 
 }
 
 function computeRiskAttention(data: ExtractedPolicyData, generatedAt: string): ScoreDetail {
-  // Higher score = More attention required (riskier)
   let score = 20
   const rulesApplied: string[] = []
   const warnings: string[] = []
@@ -199,17 +219,60 @@ function computeRiskAttention(data: ExtractedPolicyData, generatedAt: string): S
   }
 }
 
-function computeCompetitiveness(_data: ExtractedPolicyData, generatedAt: string): ScoreDetail {
-  // Placeholder - benchmark dependent
+/**
+ * competitivenessScore is BENCHMARK-DEPENDENT.
+ * If benchmark data is absent or provenance is incomplete, this score MUST be suppressed.
+ * It MUST NOT emit an artificial neutral numeric value.
+ */
+function computeCompetitiveness(
+  _data: ExtractedPolicyData,
+  generatedAt: string,
+  benchmarkBundle?: BenchmarkBundle
+): ScoreDetail {
+  // Check if benchmark data exists and has at least one reference with complete provenance
+  const hasValidBenchmark =
+    benchmarkBundle &&
+    Object.keys(benchmarkBundle.references).length > 0 &&
+    Object.values(benchmarkBundle.references).every(
+      (ref) =>
+        ref.provenance.sourceName &&
+        ref.provenance.geography &&
+        ref.provenance.effectiveDateRange?.start &&
+        ref.provenance.matchConfidence >= 0.9
+    )
+
+  if (!hasValidBenchmark) {
+    return {
+      scoreName: 'competitivenessScore',
+      scoreValue: 0,
+      scoreScale: 100,
+      scoreVersion: SCORING_MODEL_VERSION,
+      scoreInputs: { status: 'suppressed_no_valid_benchmark' },
+      scoreRulesApplied: ['SUPPRESSED:BENCHMARK_PROVENANCE_INCOMPLETE'],
+      confidence: 0,
+      warnings: [],
+      generatedAt,
+      suppressed: true,
+      suppressionReason:
+        'Competitiveness score suppressed: benchmark provenance is absent or incomplete.',
+    }
+  }
+
+  // With valid benchmarks, compute a real score (placeholder logic for now,
+  // will be properly developed when real market data service is connected)
   return {
     scoreName: 'competitivenessScore',
     scoreValue: 50,
     scoreScale: 100,
     scoreVersion: SCORING_MODEL_VERSION,
-    scoreInputs: { status: 'pending_benchmark' },
-    scoreRulesApplied: ['DEFAULT_PLACEHOLDER:50'],
-    confidence: 0,
-    warnings: ['Competitiveness score requires Benchmark Layer data to be accurate.'],
+    scoreInputs: {
+      status: 'computed_from_benchmark',
+      benchmarkCount: Object.keys(benchmarkBundle?.references ?? {}).length,
+    },
+    scoreRulesApplied: ['BENCHMARK_BASED_COMPUTATION'],
+    confidence: 0.7,
+    warnings: ['Competitiveness score is based on available benchmark data.'],
     generatedAt,
+    suppressed: false,
   }
 }

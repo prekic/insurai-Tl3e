@@ -24,10 +24,30 @@ export interface ScoreDetail {
   benchmarkRefs?: string[]
   warnings: string[]
   generatedAt: string
+  /** When true, this score was suppressed because required inputs are missing */
+  suppressed?: boolean
+  /** Human-readable reason explaining why this score was suppressed */
+  suppressionReason?: string
+}
+
+/**
+ * Internal-only composite score derived from policy-fact scores only.
+ * MUST NOT be rendered to consumers. Exists solely for internal triage/routing.
+ */
+export interface InternalOverallScore {
+  /** The numerical composite value */
+  value: number
+  /** Derivation rule describing how the value was computed */
+  derivationRule: string
+  /** Which score families contributed to this composite */
+  contributingFamilies: ScoreFamily[]
+  /** Hard flag: this value is never consumer-facing */
+  internalOnly: true
 }
 
 export interface ScoreBundle {
-  overallScore: number
+  /** Internal-only composite score for triage. Never rendered to consumers. */
+  internalOverallScore: InternalOverallScore
   scores: Record<string, ScoreDetail>
   bundleVersion: string
   generatedAt: string
@@ -75,22 +95,32 @@ export interface InsightBundle {
 // WORKSTREAM C: BENCHMARK BUNDLE
 // ============================================================================
 
+/**
+ * Full provenance object for a benchmark data source.
+ * Every field is mandatory for display eligibility except `notes` and `referenceId`.
+ */
+export interface BenchmarkProvenance {
+  sourceName: string
+  sourceVersion: string
+  geography: string
+  effectiveDateRange: { start: string; end?: string }
+  marketSegment: string
+  productType: string
+  matchType: 'exact' | 'approximate' | 'inferred'
+  matchConfidence: number
+  dataQuality: 'high' | 'medium' | 'low'
+  notes?: string
+  /** Optional secondary identifier for cross-referencing */
+  referenceId?: string
+}
+
 export interface BenchmarkReference {
   benchmarkId: string
   branch: string
-  productType: string
-  marketSegment: string
-  geography: string
-  effectiveDateRange: { start: string; end?: string }
-  sourceName: string
-  sourceVersion: string
-  dataQuality: 'high' | 'medium' | 'low'
-  matchType: 'exact' | 'approximate' | 'inferred'
-  matchConfidence: number
+  provenance: BenchmarkProvenance
   metricName: string
   metricValue: number | string
   currency?: string
-  notes?: string
 }
 
 export interface BenchmarkComparison {

@@ -3,8 +3,8 @@ import { generateAnalysisBundle } from '../engine'
 import { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { ValidationResult } from '@/lib/ai/validator'
 
-describe('generateAnalysisBundle', () => {
-  it('correctly generates separated analysis bundles for a KASKO policy', () => {
+describe('generateAnalysisBundle (integration)', () => {
+  it('KASKO-first proof: correctly generates full analysis bundle with separation', () => {
     const mockData: ExtractedPolicyData = {
       policyType: 'kasko',
       policyNumber: '12345',
@@ -19,76 +19,72 @@ describe('generateAnalysisBundle', () => {
         dates: 0.99,
       },
       coverages: [
-        {
-          name: 'Kasko',
-          isMarketValue: true, // Rayiç değer flag
-          deductible: 0,
-        },
-        {
-          name: 'İMM',
-          limit: 10000000, // 10 Million IMM
-          isUnlimited: false,
-          deductible: 0,
-        },
+        { name: 'Kasko', isMarketValue: true, deductible: 0 },
+        { name: 'İMM', limit: 10000000, isUnlimited: false, deductible: 0 },
       ],
       exclusions: [],
       specialConditions: [],
     } as ExtractedPolicyData
 
-    const mockValidation: ValidationResult = {
-      isValid: true,
-      flags: [],
-    }
+    const mockValidation: ValidationResult = { isValid: true, flags: [] }
 
     const bundle = generateAnalysisBundle('test-pol-1', mockData, mockValidation)
 
-    // 1. Check Root
+    // Root structure
     expect(bundle.policyId).toBe('test-pol-1')
     expect(bundle.analysisVersion).toBe('1.0.0')
+    expect(bundle.validatorResult).toEqual(mockValidation)
 
-    // 2. Check Scores (Workstream A)
-    expect(bundle.scoreBundle.overallScore).toBeGreaterThan(0)
-    // Structure score should be high due to Rayic Deger and high IMM
-    const structScore = bundle.scoreBundle.scores.policyStructureScore
-    expect(structScore?.scoreValue).toBeGreaterThanOrEqual(8)
+    // Score bundle: internalOverallScore is internal-only
+    expect(bundle.scoreBundle.internalOverallScore.internalOnly).toBe(true)
+    expect(bundle.scoreBundle.internalOverallScore.value).toBeGreaterThan(0)
 
-    // Consumer Safety should be high due to no deductibles
-    const safetyScore = bundle.scoreBundle.scores.consumerSafetyScore
-    expect(safetyScore?.scoreValue).toBeGreaterThanOrEqual(70)
+    // extractionQualityScore should be ~95
+    const ext = bundle.scoreBundle.scores.extractionQualityScore
+    expect(ext.scoreValue).toBe(95)
+    expect(ext.suppressed).toBeUndefined()
 
-    // 3. Check Insights (Workstream B)
-    // Should have deterministic Rayic Deger insight
-    const rayicInsight = bundle.insightBundle.insights.find(
+    // policyStructureScore should include market value bonus
+    const struct = bundle.scoreBundle.scores.policyStructureScore
+    expect(struct.scoreValue).toBeGreaterThanOrEqual(50)
+
+    // consumerSafetyScore: no deductibles so base 70
+    const safety = bundle.scoreBundle.scores.consumerSafetyScore
+    expect(safety.scoreValue).toBe(70)
+
+    // competitivenessScore: has benchmark provenance (mock), so should NOT be suppressed
+    const comp = bundle.scoreBundle.scores.competitivenessScore
+    expect(comp.suppressed).toBe(false)
+
+    // Insights: rayic deger confirmed
+    const rayic = bundle.insightBundle.insights.find(
       (i) => i.generatedByRule === 'DETERMINISTIC_RAYIC_DEGER'
     )
-    expect(rayicInsight).toBeDefined()
-    expect(rayicInsight?.type).toBe('positive_confirmed')
+    expect(rayic).toBeDefined()
+    expect(rayic!.type).toBe('positive_confirmed')
+    expect(rayic!.basisType).toBe('policy_fact')
 
-    // 4. Check Benchmarks (Workstream C)
-    // Should have reference and comparison
-    expect(bundle.benchmarkBundle.comparisons.length).toBeGreaterThan(0)
-    const premiumComp = bundle.benchmarkBundle.comparisons.find(
-      (c) => c.comparedField === 'premium'
-    )
-    expect(premiumComp).toBeDefined()
-    // Since confidence is high (0.95), display must be true
-    expect(premiumComp?.displayEligibility).toBe(true)
+    // Benchmarks: premium comparison eligible
+    const premComp = bundle.benchmarkBundle.comparisons.find((c) => c.comparedField === 'premium')
+    expect(premComp).toBeDefined()
+    expect(premComp!.displayEligibility).toBe(true)
+
+    // Benchmark references have full provenance
+    for (const ref of Object.values(bundle.benchmarkBundle.references)) {
+      expect(ref.provenance.sourceName).toBeTruthy()
+      expect(ref.provenance.geography).toBeTruthy()
+      expect(ref.provenance.effectiveDateRange.start).toBeTruthy()
+    }
   })
 
-  it('suppresses benchmark display and insights appropriately for low confidence extractions', () => {
+  it('suppresses benchmark and competitiveness when confidence is low', () => {
     const mockData: ExtractedPolicyData = {
       policyType: 'kasko',
       premium: 12000,
-      confidence: {
-        overall: 0.6,
-        premium: 0.6, // LOW CONFIDENCE
-        coverages: 0.5,
-      },
+      confidence: { overall: 0.6, premium: 0.6, coverages: 0.5 },
       coverages: [{ name: 'Kasko', isMarketValue: false, deductible: 5000 }],
       evidence: {
-        insights: [
-          { text: 'Has strict deductible', textEn: 'fully covered', quote: 'test' }, // Danger word
-        ],
+        insights: [{ text: 'Has strict deductible', textEn: 'fully covered', quote: 'test' }],
       },
     } as ExtractedPolicyData
 
@@ -99,22 +95,49 @@ describe('generateAnalysisBundle', () => {
 
     const bundle = generateAnalysisBundle('test-pol-2', mockData, mockValidation)
 
-    // Benchmark comparison should be suppressed due to low confidence (0.60 < 0.90)
-    const premiumComp = bundle.benchmarkBundle.comparisons.find(
-      (c) => c.comparedField === 'premium'
-    )
-    expect(premiumComp?.displayEligibility).toBe(false)
-    expect(premiumComp?.reasonIfSuppressed).toContain('Suppressed')
+    // Benchmark suppressed
+    const premComp = bundle.benchmarkBundle.comparisons.find((c) => c.comparedField === 'premium')
+    expect(premComp?.displayEligibility).toBe(false)
+    expect(premComp?.reasonIfSuppressed).toContain('Suppressed')
 
-    // Dangerous insight word ('fully covered') should be suppressed
-    const filteredAiInsight = bundle.insightBundle.insights.find(
+    // The benchmark references have valid provenance, but the COMPARISON
+    // is suppressed because extraction confidence is low.
+    expect(premComp?.displayEligibility).toBe(false)
+
+    // Dangerous insight suppressed
+    const filtered = bundle.insightBundle.insights.find(
       (i) => i.generatedByRule === 'AI_RAW_FILTERED'
     )
-    expect(filteredAiInsight).toBeDefined()
-    expect(filteredAiInsight?.displayEligibility).toBe(false)
+    expect(filtered).toBeDefined()
+    expect(filtered!.displayEligibility).toBe(false)
 
-    // Extraction quality score should be penalized for warning flag
-    const extScore = bundle.scoreBundle.scores.extractionQualityScore
-    expect(extScore?.scoreValue).toBe(50)
+    // Extraction quality penalized
+    const ext = bundle.scoreBundle.scores.extractionQualityScore
+    expect(ext.scoreValue).toBe(50) // 60 - 10 warning
+  })
+
+  it('works correctly when benchmark data is entirely absent', () => {
+    const mockData: ExtractedPolicyData = {
+      policyType: undefined as unknown as string, // Simulate missing policy type
+      coverages: [],
+    } as ExtractedPolicyData
+
+    const mockValidation: ValidationResult = { isValid: true, flags: [] }
+
+    const bundle = generateAnalysisBundle('test-pol-3', mockData, mockValidation)
+
+    // Benchmark bundle should be empty
+    expect(bundle.benchmarkBundle.comparisons).toHaveLength(0)
+    expect(Object.keys(bundle.benchmarkBundle.references)).toHaveLength(0)
+
+    // competitivenessScore should be suppressed
+    const comp = bundle.scoreBundle.scores.competitivenessScore
+    expect(comp.suppressed).toBe(true)
+    expect(comp.suppressionReason).toContain('suppressed')
+
+    // Score bundle should still have other scores
+    expect(bundle.scoreBundle.scores.extractionQualityScore).toBeDefined()
+    expect(bundle.scoreBundle.scores.policyStructureScore).toBeDefined()
+    expect(bundle.scoreBundle.scores.consumerSafetyScore).toBeDefined()
   })
 })
