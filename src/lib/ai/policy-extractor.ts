@@ -51,6 +51,12 @@ import { ensureExclusionsEn } from '@/lib/i18n/exclusion-translations'
 import { TR_TRANSLATIONS } from '@/lib/i18n/translations-tr'
 import { validateExtractionSafety } from './validator'
 import { resolveClauseRelationships } from './relationship-resolver'
+import {
+  evaluatePilotAdmission,
+  createPilotQARecord,
+  type PilotAdmissionGateResult,
+  type PilotQARecord,
+} from '@/lib/analysis/kasko-pilot-gate'
 
 export interface ExtractionResult {
   success: true
@@ -98,6 +104,12 @@ export interface ExtractionResult {
   }
   /** Client-side pipeline phase timing breakdown (ms) */
   clientPhaseTiming?: Record<string, number>
+  /** Pilot admission gate result (KASKO only, when pilot is active) */
+  pilotAdmission?: {
+    status: string
+    reason: string
+    countedInPilotMetrics: boolean
+  }
 }
 
 export interface ExtractionError {
@@ -1374,6 +1386,43 @@ export async function extractPolicyFromDocument(
     console.warn('[PolicyExtractor] Pipeline timing breakdown:', clientPhaseTiming)
     logger?.complete()
 
+    // ========== KASKO PILOT ADMISSION GATE ==========
+    // For KASKO extractions, evaluate document admission and create QA record
+    let pilotAdmission: PilotAdmissionGateResult | undefined
+    if (policy.type === 'kasko') {
+      pilotAdmission = evaluatePilotAdmission(policy, {
+        textCharCount: documentText.length,
+      })
+      console.warn('[PolicyExtractor] KASKO pilot admission:', pilotAdmission.status, pilotAdmission.reason)
+
+      // Create and persist QA record for pilot-eligible documents
+      if (pilotAdmission.countedInPilotMetrics) {
+        try {
+          const qaRecord = createPilotQARecord(
+            policy.id || crypto.randomUUID(),
+            file.name,
+            userId || 'anonymous'
+          )
+          qaRecord.extractionSuccess = true
+          qaRecord.extractionModel = primaryProvider || 'auto'
+          qaRecord.textCharCount = documentText.length
+          qaRecord.pageCount = pageCount
+          qaRecord.admissionStatus = pilotAdmission.status
+          qaRecord.admissionReason = pilotAdmission.reason
+          qaRecord.countedInPilotMetrics = pilotAdmission.countedInPilotMetrics
+          qaRecord.coverageCountExtracted = policy.coverages?.length || 0
+          qaRecord.confidenceScore = confidenceOverall
+
+          // Fire-and-forget: persist QA record to Supabase
+          persistPilotQARecord(qaRecord).catch((err) =>
+            console.warn('[PolicyExtractor] Failed to persist pilot QA record:', err instanceof Error ? err.message : String(err))
+          )
+        } catch (err) {
+          console.warn('[PolicyExtractor] Failed to create pilot QA record:', err instanceof Error ? err.message : String(err))
+        }
+      }
+    }
+
     return {
       success: true,
       policy,
@@ -1384,6 +1433,13 @@ export async function extractPolicyFromDocument(
       consensus: consensusInfo,
       cleanRoomOutput: cleanRoomResult,
       clientPhaseTiming, // Diagnostic: per-phase timing breakdown
+      pilotAdmission: pilotAdmission
+        ? {
+            status: pilotAdmission.status,
+            reason: pilotAdmission.reason,
+            countedInPilotMetrics: pilotAdmission.countedInPilotMetrics,
+          }
+        : undefined,
       patternValidation: patternValidation
         ? {
             errors: patternValidation.errors,
@@ -2551,4 +2607,68 @@ export function comprehensiveToAnalyzedPolicy(
   policy.aiInsightsTr = translateInsightsToTr(policy.aiInsights)
 
   return policy
+}
+
+// ============================================================================
+// KASKO PILOT QA RECORD PERSISTENCE
+// ============================================================================
+
+/**
+ * Persist a pilot QA record to Supabase kasko_pilot_qa_records table.
+ * Fire-and-forget: failures are logged but never block the extraction pipeline.
+ */
+async function persistPilotQARecord(record: PilotQARecord): Promise<void> {
+  try {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseKey) {
+      console.warn('[PilotQA] Supabase not configured, skipping QA record persistence')
+      return
+    }
+
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(supabaseUrl, supabaseKey)
+
+    const { error } = await supabase.from('kasko_pilot_qa_records').insert({
+      document_id: record.documentId,
+      filename: record.filename,
+      branch: record.branch,
+      review_date: record.reviewDate,
+      reviewer_user_id: record.reviewerUserId,
+      extraction_success: record.extractionSuccess,
+      extraction_model: record.extractionModel,
+      text_char_count: record.textCharCount,
+      page_count: record.pageCount,
+      reviewer_outcome: record.reviewerOutcome,
+      review_time_minutes: record.reviewTimeMinutes,
+      correction_categories: record.correctionCategories,
+      critical_fields_missed: record.criticalFieldsMissed,
+      display_mode: record.displayMode,
+      triggers_fired: record.triggersFired,
+      phrase_clean: record.phraseClean,
+      found_prohibited_phrases: record.foundProhibitedPhrases,
+      admission_status: record.admissionStatus,
+      admission_reason: record.admissionReason,
+      counted_in_pilot_metrics: record.countedInPilotMetrics,
+      coverage_count_extracted: record.coverageCountExtracted,
+      special_condition_count: record.specialConditionCount,
+      has_rayic_deger: record.hasRayicDeger,
+      has_conditional_deductible: record.hasConditionalDeductible,
+      source_quote_count: record.sourceQuoteCount,
+      confidence_score: record.confidenceScore,
+      zero_coverage: record.zeroCoverage,
+      deductible_miss: record.deductibleMiss,
+      special_condition_miss: record.specialConditionMiss,
+      major_correction: record.majorCorrection,
+      reviewer_notes: record.reviewerNotes,
+    })
+
+    if (error) {
+      console.warn('[PilotQA] Failed to insert QA record:', error.message)
+    } else {
+      console.warn('[PilotQA] QA record persisted for document:', record.documentId)
+    }
+  } catch (err) {
+    console.warn('[PilotQA] Persistence error:', err instanceof Error ? err.message : String(err))
+  }
 }

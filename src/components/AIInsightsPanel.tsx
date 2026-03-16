@@ -33,6 +33,7 @@ import { useI18n } from '@/lib/i18n'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
 import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
 
 interface AIInsightsPanelProps {
   policy: AnalyzedPolicy
@@ -41,7 +42,8 @@ interface AIInsightsPanelProps {
 export function AIInsightsPanel({ policy }: AIInsightsPanelProps) {
   const { t, locale } = useI18n()
   const { formatConverted } = useDisplayCurrency()
-  const displaySummary = useDisplaySafeSummary(policy)
+  const pilotOptions = usePilotGateOptions()
+  const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['summary']))
 
   const toggleSection = (section: string) => {

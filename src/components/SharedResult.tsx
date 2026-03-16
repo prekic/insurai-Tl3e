@@ -29,6 +29,7 @@ import { useI18n } from '@/lib/i18n'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { AnalyzedPolicy } from '@/types/policy'
 import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
 
 type ViewState = 'loading' | 'found' | 'not_found' | 'expired'
 
@@ -39,7 +40,8 @@ export function SharedResult() {
   const { formatConverted } = useDisplayCurrency()
   const [state, setState] = useState<ViewState>('loading')
   const [policy, setPolicy] = useState<AnalyzedPolicy | null>(null)
-  const displaySummary = useDisplaySafeSummary(policy)
+  const pilotOptions = usePilotGateOptions()
+  const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
   const [fileName, setFileName] = useState<string>('')
   const [timeRemaining, setTimeRemaining] = useState<number>(0)
 
