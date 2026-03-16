@@ -1,70 +1,22 @@
-# Session Handoff — March 15, 2026 (AI Extraction Hardening & KASKO Internal Pilot)
+# SESSION HANDOFF
 
-## Current Status
+## CURRENT STATUS
+We are in the middle of executing the **Controlled Rollout** for the KASKO AI Extraction Pilot.
+- **Completed:** Phase 8I (Admission Rules), Phase 8J (Batch 2 Simulation & Logic), Phase 8K (Operational Mock Scale Evaluation).
+- **Blocked:** Phase 8L (Actual Broader Guarded Internal KASKO Pilot) is currently blocked due to a lack of actual real-world operational inputs or existing QA logs. 
 
-| Metric | Status |
-|--------|--------|
-| **Build** | ✅ Passing |
-| **ESLint** | 0 errors |
-| **Tests** | All tests passing (including 19/19 on KASKO pilot batch) |
-| **Branch** | `insuraigemini202603151438` — Ready to push |
-| **Deployment** | Internal KASKO pilot active |
+## WHAT WAS ACCOMPLISHED THIS SESSION
+1. **Admission Gating Specifications & Logic:** Drafted explicit rules in `docs/KASKO_PILOT_ADMISSION_RULES.md` and implemented `evaluatePilotAdmission` to protect pilot metrics from noisy/broken inputs (e.g. garbled text, totally missing layouts).
+2. **Success Criteria Stratification:** Safety metrics are evaluated against ALL inputs. Quality metrics (fields, accuracy) are evaluated ONLY against eligible inputs (`docs/KASKO_PILOT_QA_SCHEMA.md`).
+3. **Phase 8J (Batch 2 Simulation):** Authored `docs/KASKO_PILOT_BATCH_2_PLAN.md` and created simulated inputs (`src/lib/analysis/pilot-batch2-samples.ts`) to validate the new admission gate logic (`src/lib/analysis/__tests__/pilot-8j-batch2.test.ts`).
+4. **Phase 8K (Simulated Operational Scale Completion):** Hand-wrote mock operational inputs (`src/lib/analysis/pilot-8k-real-docs.ts`) to simulate a broader guarded queue (`src/lib/analysis/__tests__/pilot-8k-operational.test.ts`). The wording across `CONTROLLED_ROLLOUT_GATES.md`, `BRANCH_READINESS_SCORECARD.md`, and the defect logs was scrubbed to heavily emphasize that Stage 8K was simulated/mocked evidence, NOT live evidence.
+5. **Phase 8L Block:** Halted Phase 8L execution intentionally under the NON-SIMULATION guard. The repository only contains 3 KASKO PDFs, and there is no existing `kasko_pilot_qa_log.csv` to evaluate.
 
----
+## KNOWN ISSUES & GOTCHAS
+- **Phase 8L Block:** Do not proceed with Phase 8L without either (a) a real QA export containing human review outcomes or (b) at least 7 *more* real KASKO PDF policies uploaded to the workspace to perform live extraction against.
+- **Provider Accuracy:** Simulated documents with generic names often resulted in missing provider assignments if not explicitly mocked. Ensure real documents have clear provider letterheads for the unified processor to catch.
 
-## This Session — Completed Work
-
-### 1. Phase 5 & 6: Display Interpreter & Branch Expansion
-**Feature**: Re-architected how AI outputs reach the UI to ensure strict safety, replacing direct LLM pass-through.
-**Details**: 
-- Implemented `display-interpreter.ts` to sanitize and enforce UI boundaries (preventing prohibited phrases like "sınırsız" from leaking).
-- Expanded validation, insights, and scoring rules for all 7 insurance branches (Kasko, Traffic, Home, Health, Life, Dask, Business, Nakliyat).
-
-### 2. Phase 7: Validation Harness & Safety Hardening
-**Feature**: Built a robust validation layer to detect AI hallucinations and contradictory conditions.
-**Details**: 
-- Created `validator.ts`, `engine.ts`, and `review-thresholds.ts`.
-- Implemented synthetic testing fixtures.
-- Added explicit condition-contradiction detection (e.g., identifying when an AI claims a condition exists but the text says it doesn't) to force `human_review_required` or `restricted` modes.
-
-### 3. Phase 8: KASKO Internal Pilot Execution
-**Feature**: Operationalized a highly-controlled internal pilot for the KASKO branch using real documents.
-**Details**: 
-- Ran E2E extraction on actual KASKO PDFs.
-- Integrated the `kasko-pilot-gate.ts` into the `useDisplaySafeSummary` product hook.
-- Enforced a max-5 user limit and a mandatory bilingual "Draft / Review Required" banner on the frontend.
-- Ran the first 5-document internal pilot batch: 3 clean documents accepted, 1 noisy document rejected (safely), 1 moderate document with a generic provider name prompted a major correction.
-- Confirmed rollback triggers (phrase leaks, >20% zero-coverage docs) did not fire.
-
----
-
-## Key Files Changed
-
-| File | Change |
-|------|--------|
-| `src/lib/analysis/display-interpreter.ts` | **NEW** Core UI safety boundary and text sanitization layer |
-| `src/lib/ai/extraction-normalizer.ts` | **NEW** Deterministic document normalization before validation |
-| `src/lib/ai/validator.ts` | **NEW** Cross-field consistency and rule validation |
-| `src/lib/ai/relationship-resolver.ts` | **NEW** AI clause logic resolver |
-| `src/lib/analysis/engine.ts` | **NEW** Orchestrator combining LLM output, validation, and review thresholds |
-| `src/lib/analysis/review-thresholds.ts` | **NEW** Logic converting confidence and warning flags into UI display modes (`full`, `restricted`, `human_review_required`) |
-| `src/lib/analysis/benchmarks.ts`, `insights.ts`, `scoring.ts` | **NEW** Extraction analysis utility split |
-| `src/lib/analysis/kasko-pilot-gate.ts` | **NEW** Feature flag checks, reviewer segment enforcement, and QA logging for the pilot |
-| `src/types/analysis.ts`, `src/types/display.ts` | **NEW** Typings for analysis and display outputs |
-| `src/components/ui/SafetyLabel.tsx`, `SourceQuoteTooltip.tsx` | **NEW** Components for rendering safe UI insights and source context |
-| `src/hooks/useDisplaySafeSummary.ts` | **UPDATED** Hook now evaluates the pilot gate and attaches pilot metadata |
-| `src/components/AIInsightsPanel.tsx`, `PolicyDetailView.tsx`, `SharedResult.tsx` | **UPDATED** Consumers of the new Display Interpreter pipeline |
-| `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** DB migration adding traceability, span maps, and validation outputs |
-| `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** DB migration adding versioned persistence to track schema/text versions |
-| `docs/BRANCH_READINESS_SCORECARD.md` | **NEW** Markdown scorecard evaluating the pilot and production readiness of all branches |
-| `docs/REAL_DOCUMENT_DEFECT_LOG.csv` | **NEW** Centralized tracking for extraction and validation defects found during real-document testing |
-| `src/lib/analysis/__tests__/pilot-8h-batch.test.ts` | **NEW** Automated harness simulating the first 5-document pilot batch |
-
----
-
-## Priority Next Steps
-
-1. **Continue KASKO Pilot to 20 Documents**: The pilot successfully processed 5 documents. The immediate next step is to run 15 more clean/real KASKO policies through the system, maintaining mandatory human review.
-2. **Address Extraction Variability**: LLM non-determinism occasionally misses conditional deductibles or fluctuates coverage counts. Consider prompt engineering tweaks or secondary verification passes for these specific fields before broadening the pilot.
-3. **Expand to Traffic/Home**: Once KASKO reaches the 20-document milestone and extraction variability is mitigated, prepare the Traffic or Home branch for Phase 8 real-document validation.
-4. **Merge & Deploy**: Push the `insuraigemini202603151438` branch, create a PR with the title `feat(analysis): implement display interpreter and kasko pilot pipeline`, and deploy to the staging environment to let internal reviewers test the KASKO pilot live.
+## NEXT STEPS FOR THE NEXT SESSION
+1. **Acquire Live Pilot Data:** Await the upload of `kasko_pilot_qa_log.csv` or additional real PDFs.
+2. **Execute Phase 8L:** Once data is available, parse the outcomes, calculate the *real* all-doc safety metrics and *real* eligible-doc quality metrics.
+3. **Production Validation Planning:** If Phase 8L metrics are genuinely strong, plot the final production-readiness validation phase for KASKO.

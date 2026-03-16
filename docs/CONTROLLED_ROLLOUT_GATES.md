@@ -17,11 +17,17 @@
 
 ## Rollout Recommendation
 
-### Internal Pilot (with guardrails): APPROVED for all 8 branches
+### Continued Broader Guarded Internal Pilot: APPROVED for KASKO (Simulation)
+- KASKO has successfully completed Phase 8J (20-document restricted pilot) and Phase 8K (simulated operational queue evaluation).
+- Zero safety violations (0 phrase leaks, 0 rollback triggers) continue to be observed at scale in simulation.
+- Maintained 75% simulated acceptance rate on eligible mock operational inputs.
+- Ready to begin broader guarded internal pilot on actual internal docs at general internal testing capacity (10-20+ users) with the same strict human-review guardrails.
+
+### Internal Pilot (with guardrails): APPROVED for all remaining 7 branches
 - All safety gates (1–6) pass
 - Human-review mode enforced for moderate/low-confidence samples
 - Prohibited phrase suppression active and verified
-- **Condition**: Internal users only, no external-facing production traffic
+- **Condition**: Initial restricted internal testing only (max 5 users), no external-facing production traffic
 
 ### Production Rollout: NOT APPROVED
 - Gates 7–10 must pass before production rollout

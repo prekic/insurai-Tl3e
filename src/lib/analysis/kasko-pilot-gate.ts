@@ -7,8 +7,105 @@
  * 3. Provides review-state transitions
  *
  * IMPORTANT: During the internal pilot, ALL KASKO extractions require human review.
+ * IMPORTANT: During the internal pilot, ALL KASKO extractions require human review.
  * KASKO is internal-pilot-ready with mandatory human review, not production-ready.
  */
+
+// ============================================================================
+// PILOT ADMISSION
+// ============================================================================
+
+export type PilotAdmissionStatus =
+  | 'pilot_eligible_clean'
+  | 'pilot_eligible_moderate'
+  | 'pilot_ineligible_noisy'
+  | 'pilot_ineligible_incomplete'
+
+export interface PilotAdmissionGateResult {
+  status: PilotAdmissionStatus
+  reason: string
+  countedInPilotMetrics: boolean
+}
+
+/**
+ * Classifies an incoming document before its performance is measured in the pilot.
+ * It prevents garbage/incomplete documents from unfairly depressing AI accuracy metrics.
+ */
+export function evaluatePilotAdmission(
+  extractedData: any, // Matches the AnalyzedPolicy raw structure loosely
+  meta: { textCharCount: number; documentQuality?: string; pageCompleteness?: string }
+): PilotAdmissionGateResult {
+  const { policyNumber, provider, coverages = [] } = extractedData
+  const charCount = meta.textCharCount || 0
+
+  // 1. Length / Density Check
+  if (charCount < 500) {
+    if (charCount < 100) {
+      return {
+        status: 'pilot_ineligible_noisy',
+        reason: 'Text density too low (<100 chars). Likely a failed OCR or empty scan.',
+        countedInPilotMetrics: false,
+      }
+    }
+    return {
+      status: 'pilot_ineligible_incomplete',
+      reason: 'Extracted text is too short (<500 chars) to be a full policy.',
+      countedInPilotMetrics: false,
+    }
+  }
+
+  // 2. Provider Reliability Check
+  if (!provider || provider.trim() === '' || provider === 'Sigorta A.Ş.') {
+    return {
+      status: 'pilot_ineligible_incomplete',
+      reason: 'Provider missing or generic ("Sigorta A.Ş."). Unreliable input.',
+      countedInPilotMetrics: false,
+    }
+  }
+
+  // 3. Core Identifiers Check
+  if (!policyNumber || policyNumber.includes('??')) {
+    return {
+      status: 'pilot_ineligible_incomplete',
+      reason: 'Policy number missing or heavily garbled.',
+      countedInPilotMetrics: false,
+    }
+  }
+
+  // 4. Coverage Sufficiency
+  if (coverages.length === 0 && charCount < 3000) {
+    return {
+      status: 'pilot_ineligible_incomplete',
+      reason: 'No coverages found in a relatively short document.',
+      countedInPilotMetrics: false,
+    }
+  }
+
+  // 5. Quality Downgrade
+  // Explicitly labeled noisy docs that somehow bypassed the length checks
+  if (meta.documentQuality === 'noisy' || meta.pageCompleteness === 'partial') {
+    return {
+      status: 'pilot_ineligible_incomplete',
+      reason: `Document explicitly missing pages or extremely noisy: ${meta.documentQuality} / ${meta.pageCompleteness}`,
+      countedInPilotMetrics: false,
+    }
+  }
+
+  if (meta.documentQuality === 'moderate') {
+    return {
+      status: 'pilot_eligible_moderate',
+      reason: 'Document admitted with moderate quality flags.',
+      countedInPilotMetrics: true,
+    }
+  }
+
+  // Default: Clean Admittance
+  return {
+    status: 'pilot_eligible_clean',
+    reason: 'Document meets all criteria for clean admission.',
+    countedInPilotMetrics: true,
+  }
+}
 
 // ============================================================================
 // TYPES
@@ -200,8 +297,14 @@ export interface PilotQARecord {
   phraseClean: boolean
   foundProhibitedPhrases: string[]
 
+  // NEW: Pilot Admission (Phase 8I)
+  admissionStatus: PilotAdmissionStatus
+  admissionReason: string
+  countedInPilotMetrics: boolean
+
   coverageCountExtracted: number
   specialConditionCount: number
+
   hasRayicDeger: boolean
   hasConditionalDeductible: boolean
   sourceQuoteCount: number
@@ -241,6 +344,9 @@ export function createPilotQARecord(
     triggersFired: [],
     phraseClean: true,
     foundProhibitedPhrases: [],
+    admissionStatus: 'pilot_eligible_clean',
+    admissionReason: 'Default initialization',
+    countedInPilotMetrics: true,
     coverageCountExtracted: 0,
     specialConditionCount: 0,
     hasRayicDeger: false,
