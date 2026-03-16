@@ -17,11 +17,17 @@
 
 ## Rollout Recommendation
 
-### Internal Pilot (with guardrails): APPROVED for all 8 branches
+### Broader Guarded Internal Pilot: APPROVED for KASKO
+- KASKO has successfully completed the initial 20-document restricted pilot.
+- Zero safety violations (0 phrase leaks, 0 rollback triggers).
+- Achieved 75% acceptance rate on eligible inputs.
+- Ready to expand to 10-20 internal users with the same human-review guardrails.
+
+### Internal Pilot (with guardrails): APPROVED for all remaining 7 branches
 - All safety gates (1–6) pass
 - Human-review mode enforced for moderate/low-confidence samples
 - Prohibited phrase suppression active and verified
-- **Condition**: Internal users only, no external-facing production traffic
+- **Condition**: Initial restricted internal testing only (max 5 users), no external-facing production traffic
 
 ### Production Rollout: NOT APPROVED
 - Gates 7–10 must pass before production rollout
