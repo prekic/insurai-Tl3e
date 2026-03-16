@@ -1,22 +1,22 @@
-# Phase 8I — KASKO Pilot Continuation with Document-Admission Gating
+# SESSION HANDOFF
 
-This session focused on separating actual AI extraction quality from simple poor-input noise for the KASKO internal pilot. 
+## CURRENT STATUS
+We are in the middle of executing the **Controlled Rollout** for the KASKO AI Extraction Pilot.
+- **Completed:** Phase 8I (Admission Rules), Phase 8J (Batch 2 Simulation & Logic), Phase 8K (Operational Mock Scale Evaluation).
+- **Blocked:** Phase 8L (Actual Broader Guarded Internal KASKO Pilot) is currently blocked due to a lack of actual real-world operational inputs or existing QA logs. 
 
-## Admission Gate Logic
-We introduced the `evaluatePilotAdmission` function which evaluates raw document properties before the extraction is evaluated for metrics.
-**Key Classifications:**
-1. `pilot_eligible_clean`
-2. `pilot_eligible_moderate`
-3. `pilot_ineligible_noisy` (Excluded from quality metrics)
-4. `pilot_ineligible_incomplete` (Excluded from quality metrics)
+## WHAT WAS ACCOMPLISHED THIS SESSION
+1. **Admission Gating Specifications & Logic:** Drafted explicit rules in `docs/KASKO_PILOT_ADMISSION_RULES.md` and implemented `evaluatePilotAdmission` to protect pilot metrics from noisy/broken inputs (e.g. garbled text, totally missing layouts).
+2. **Success Criteria Stratification:** Safety metrics are evaluated against ALL inputs. Quality metrics (fields, accuracy) are evaluated ONLY against eligible inputs (`docs/KASKO_PILOT_QA_SCHEMA.md`).
+3. **Phase 8J (Batch 2 Simulation):** Authored `docs/KASKO_PILOT_BATCH_2_PLAN.md` and created simulated inputs (`src/lib/analysis/pilot-batch2-samples.ts`) to validate the new admission gate logic (`src/lib/analysis/__tests__/pilot-8j-batch2.test.ts`).
+4. **Phase 8K (Simulated Operational Scale Completion):** Hand-wrote mock operational inputs (`src/lib/analysis/pilot-8k-real-docs.ts`) to simulate a broader guarded queue (`src/lib/analysis/__tests__/pilot-8k-operational.test.ts`). The wording across `CONTROLLED_ROLLOUT_GATES.md`, `BRANCH_READINESS_SCORECARD.md`, and the defect logs was scrubbed to heavily emphasize that Stage 8K was simulated/mocked evidence, NOT live evidence.
+5. **Phase 8L Block:** Halted Phase 8L execution intentionally under the NON-SIMULATION guard. The repository only contains 3 KASKO PDFs, and there is no existing `kasko_pilot_qa_log.csv` to evaluate.
 
-## Success Criteria Separation
-KASKO pilot success criteria is now correctly stratified:
-- **Safety Metrics** (Prohibited phrase leakage, rollback triggers) still apply to **100%** of input documents.
-- **Quality Metrics** (Critical field extraction, coverage count, deductible accuracy) apply **ONLY** to documents labeled `pilot_eligible_clean` or `pilot_eligible_moderate`.
+## KNOWN ISSUES & GOTCHAS
+- **Phase 8L Block:** Do not proceed with Phase 8L without either (a) a real QA export containing human review outcomes or (b) at least 7 *more* real KASKO PDF policies uploaded to the workspace to perform live extraction against.
+- **Provider Accuracy:** Simulated documents with generic names often resulted in missing provider assignments if not explicitly mocked. Ensure real documents have clear provider letterheads for the unified processor to catch.
 
-## First Batch Reclassification
-The 5 documents from the `pilot-8h-batch` were tested through the admission gate. The 2 documents suffering from garbled OCR and generic missing provider names were successfully trapped by the admission gate. The 3 remaining documents had a **100% acceptance rate**.
-
-## Next Steps
-The pilot test script now lists the explicit target structure for the remaining 15 documents down the road. Phase 8I is complete.
+## NEXT STEPS FOR THE NEXT SESSION
+1. **Acquire Live Pilot Data:** Await the upload of `kasko_pilot_qa_log.csv` or additional real PDFs.
+2. **Execute Phase 8L:** Once data is available, parse the outcomes, calculate the *real* all-doc safety metrics and *real* eligible-doc quality metrics.
+3. **Production Validation Planning:** If Phase 8L metrics are genuinely strong, plot the final production-readiness validation phase for KASKO.
