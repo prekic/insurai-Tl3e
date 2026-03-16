@@ -4,9 +4,10 @@
 -- An admin must explicitly enable it via the Feature Flags admin panel.
 
 -- 1. Seed the kasko_ai_extraction_pilot feature flag (disabled by default)
-INSERT INTO public.feature_flags (key, enabled, description, rollout_percentage)
+INSERT INTO public.feature_flags (key, name, enabled, description, rollout_percentage)
 VALUES (
   'kasko_ai_extraction_pilot',
+  'KASKO AI Extraction Pilot',
   false,
   'KASKO internal pilot: when enabled, all KASKO extractions require human review. Pilot-eligible users see draft banners and results are logged for QA.',
   0
