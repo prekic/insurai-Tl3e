@@ -103,7 +103,7 @@ export interface ExtractedCoverage {
   nameTr?: string | null
   limit: number | null
   deductible: number | null
-  description: string | null
+  description?: string | null
   /** True if coverage shows "Sınırsız" (unlimited) */
   isUnlimited?: boolean
   /** True if limit is "Rayiç Değer" (market value) */

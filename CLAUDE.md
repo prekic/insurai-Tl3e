@@ -354,6 +354,7 @@ insurai/
 | `supabase/migrations/036_update_anthropic_haiku_model.sql` | **NEW** Updates `claude-3-5-haiku-20241022` to `claude-3-5-haiku-latest` |
 | `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** Traceability columns (span_maps, clause_graph, validation) for High-Trust pipeline |
 | `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** Versioned persistence for tracking schema and text versions |
+| `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` | **NEW** KASKO pilot feature flag seed, `user_segments` table, `kasko_pilot_qa_records` table |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
@@ -765,6 +766,7 @@ xl: 1280px  /* Large desktop */
 | `/api/admin/monitoring/extraction-health/historical` | GET | **NEW** Fetch daily aggregated 30-day extraction health stats | Admin |
 | `/api/admin/monitoring/alerts/status` | GET | Alert cooldown state (last fired timestamps per alert type) | Admin |
 | `/api/admin/monitoring/cron-jobs` | GET | **NEW** List configured pg_cron jobs and recent run execution details | Admin |
+| `/api/admin/monitoring/pilot-rollback-status` | GET | **NEW** KASKO pilot rollback trigger status (4 safety thresholds) | Admin |
 | `/api/admin/notifications` | DELETE | Bulk delete notifications by IDs or filtered mass delete | Admin |
 | `/api/admin/processing-logs` | GET | List processing logs with filters, search, pagination | Admin |
 | `/api/admin/processing-logs/export` | GET | **NEW** Export complete filtered processing logs as CSV bypassing pagination | Admin |
@@ -837,6 +839,8 @@ xl: 1280px  /* Large desktop */
 | `translations` | **NEW** Actual translation strings per locale per key |
 | `translation_audit_log` | **NEW** Audit trail for translation changes |
 | `translation_metadata` | **NEW** Translation system metadata (versions, stats) |
+| `user_segments` | **NEW** User-to-segment assignments for feature gating (e.g., `kasko_pilot_reviewers`) |
+| `kasko_pilot_qa_records` | **NEW** 34-column QA records for KASKO pilot extraction metrics |
 
 ### Policy Table Schema
 ```sql
@@ -1658,6 +1662,7 @@ Base components built with Tailwind CSS, following shadcn/ui patterns:
 | `useUserPreferences` | Three-tier config override | `{ preferences, updatePreference }` |
 | `useDisplayCurrency` | FX-aware currency formatting | `{ displayCurrency, convert, formatConverted, formatConvertedCompact, isReady }` |
 | `usePushNotifications` | Browser push notification management | `{ isSupported, permission, isSubscribed, subscribe, unsubscribe }` |
+| `usePilotGateOptions` | Loads pilot feature flags + user segments for gate evaluation | `{ featureFlags, userSegments, userId, isLoading }` |
 
 > **Removed (Feb 8, 2026)**: `useAnalytics`, `usePrivacy`, `useMarketData`, `useIndustryRisk`, `usePolicyTemplates` — zero production imports, functionality served by other modules (see Known Issue #75).
 
@@ -5723,6 +5728,19 @@ connectSrc: [
 - Rollback monitoring: `GET /api/admin/monitoring/pilot-rollback-status` checks 4 safety thresholds (zero-coverage >20%, phrase leak, major correction >50%, 3+ consecutive deductible misses)
 - **Migration 040 schema fix**: Original INSERT omitted `name` column (NOT NULL in `feature_flags` table from migration 012). Fixed in commit `71a5113` — always use the current version of the migration file
 - Full audit report: `docs/KASKO_PILOT_OPERATIONAL_AUDIT_2026_03_16.md`
+
+**KASKO Pilot Cross-Realm Dynamic Import Gotcha (Added Mar 16, 2026):**
+- `server/routes/admin/monitoring.ts:640` uses `await import('../../src/lib/analysis/kasko-pilot-gate.js' as string)` — a server-side Express route dynamically importing a client-side `src/lib/` module
+- This works because both server and client use the same TypeScript compilation target, but could break if server and client builds diverge (e.g., separate ESM/CJS targets or different bundling strategies)
+- The `as string` cast suppresses TypeScript path resolution errors
+- If you see `Cannot find module` errors on the pilot-rollback-status endpoint, check that the server build output includes the `kasko-pilot-gate.js` file at the expected relative path
+
+**KASKO Pilot RLS Policy — Misleading Comment (Added Mar 16, 2026):**
+- Migration 040 comments say "admin-only access via service role" on both `kasko_pilot_qa_records` and `user_segments` tables
+- **Actual RLS policy**: `USING (true) WITH CHECK (true)` — open to ALL roles including `anon`
+- Both `persistPilotQARecord()` (in `policy-extractor.ts`) and `usePilotGateOptions` (hook) use the **anon key** (`VITE_SUPABASE_ANON_KEY`), which works ONLY because the policy is open
+- **Risk**: If someone tightens the RLS based on the misleading comment (e.g., restricts to `service_role`), both `persistPilotQARecord()` and `usePilotGateOptions` will silently fail — pilot QA records won't persist and the gate will always return inactive
+- To properly restrict: update RLS to allow `anon` SELECT on `user_segments` and `anon` INSERT on `kasko_pilot_qa_records`, then restrict other operations to `service_role`
 
 ---
 
