@@ -19,11 +19,13 @@ import monitoringRouter from './monitoring.js'
 import contentRouter from './content.js'
 import actuarialRouter from './actuarial.js'
 import fxMonitoringRouter from './fx-monitoring.js'
+import segmentsRouter from './segments.js'
 
 const router = Router()
 
 router.use('/', authRouter)
 router.use('/', usersRouter)
+router.use('/', segmentsRouter)
 router.use('/', operationsRouter)
 router.use('/', promptsRouter)
 router.use('/', costRouter)
