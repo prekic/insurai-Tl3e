@@ -563,7 +563,20 @@ router.get(
   authenticateAdmin,
   async (_req: AuthenticatedRequest, res: Response) => {
     try {
-      const supabase = getSupabaseWithError()
+      const { client: supabase, error: dbError } = getSupabaseWithError()
+
+      if (!supabase) {
+        log.warn('Supabase not configured for pilot rollback status', { error: dbError })
+        return res.json({
+          success: true,
+          data: {
+            totalRecords: 0,
+            shouldPause: false,
+            triggers: [],
+            message: dbError || 'Supabase not configured',
+          },
+        })
+      }
 
       // Fetch recent QA records (last 30 days, ordered by review_date)
       const { data: rows, error } = await supabase
@@ -633,19 +646,31 @@ router.get(
       }))
 
       // Only evaluate records that are counted in pilot metrics
-      const metricsRecords = records.filter((r: { countedInPilotMetrics: boolean }) => r.countedInPilotMetrics)
+      const metricsRecords = records.filter(
+        (r: { countedInPilotMetrics: boolean }) => r.countedInPilotMetrics
+      )
 
       // Import and evaluate rollback triggers
       // Note: This is a shared module — we import it dynamically to avoid bundling client code in server
-      const { getRollbackTriggerStatus } = await import('../../src/lib/analysis/kasko-pilot-gate.js' as string)
+      const { getRollbackTriggerStatus } = await import(
+        '../../src/lib/analysis/kasko-pilot-gate.js' as string
+      )
       const rollbackStatus = getRollbackTriggerStatus(metricsRecords)
 
       // Compute admission breakdown
       const admissionBreakdown = {
-        pilot_eligible_clean: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_clean').length,
-        pilot_eligible_moderate: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_moderate').length,
-        pilot_ineligible_noisy: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_noisy').length,
-        pilot_ineligible_incomplete: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_incomplete').length,
+        pilot_eligible_clean: records.filter(
+          (r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_clean'
+        ).length,
+        pilot_eligible_moderate: records.filter(
+          (r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_moderate'
+        ).length,
+        pilot_ineligible_noisy: records.filter(
+          (r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_noisy'
+        ).length,
+        pilot_ineligible_incomplete: records.filter(
+          (r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_incomplete'
+        ).length,
       }
 
       res.json({
