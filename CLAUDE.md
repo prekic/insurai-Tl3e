@@ -3,9 +3,9 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Merge & Deploy**: Merge the `insuraigemini202603151015` branch. `release-please` should run and draft a new release. Deploy to the staging Railway environment.
-2. **Verify Admin Insights Rules**: Navigate to `/admin/insights` on staging and create a test rule (e.g., `Verify TC Kimlik numbers strictly` for region `*` and type `*`) to ensure the backend DB extraction correctly fetches and injects dynamic guidelines over the fallback prompt.
-3. **Run Supabase Migration**: Ensure `037_update_master_extraction_prompt.sql` processes cleanly on the Railway Supabase DB instance.
+1. **KASKO Pilot Activation (MANUAL)**: Apply migration `040_kasko_pilot_flag_and_segment.sql` to production Supabase, assign reviewers to `kasko_pilot_reviewers` segment, enable `kasko_ai_extraction_pilot` flag. See `SESSION_HANDOFF.md` for exact SQL.
+2. **Collect Live Artifacts**: After activation, upload a real KASKO PDF as an assigned reviewer. Collect: result-object snippet (browser console), QA log row (`SELECT * FROM kasko_pilot_qa_records`), banner screenshot.
+3. **Execute Phase 8L**: Once real data exists, evaluate live safety + quality metrics from `kasko_pilot_qa_records`.
 4. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
@@ -29,7 +29,7 @@
 - **Owner**: Erdem (personal project)
 - **Current State**: Full-stack with AI extraction, multi-turn chat, policy evaluation, duplicate detection, performance optimizations, kasko coverage improvements, combined document processing pipeline, admin-managed AI prompts, OCR cleanup pipeline with Unicode-safe Turkish matching, enhanced Document Journey viewer with full content capture, configuration-driven OCR Decision Engine with Document Journey metadata, PDF splitting for Document AI 10-page limit, session-based free trial for anonymous users with 90s extraction timeout, bundle optimization with dynamic SDK imports, GA4 analytics with KVKK consent, comprehensive configuration system with 843+ configurable settings, Admin Settings UI with validation and audit history, settings export/import for backup/restore, config fetch performance monitoring with TTL recommendations, **modular admin route architecture (9 modules)**, **structured server logging**, **user preferences with three-tier config override**, **config drift detection**, **settings webhooks/templates/batch updates**, **production extraction pipeline fully operational**, **dead code cleanup (~17,800 lines removed)**, **Phases 1-8K (Display Interpreter, Validation Engine, KASKO Internal Pilot Admission Gating & Simulated Scale Validation) complete**, **comprehensive audit hardening (JSON.parse guards, structured logging, rate limiting)**, **critical module test coverage (admin-auth, email, cost-control, free-trial)**, **market data DB migration**, **major dependency upgrades (React 19, Express 5, Vite 7, Vitest 4)**, **tiered confidence system**, **mobile landing page UX overhaul**, **comprehensive i18n for all user-facing components**, **nav bar consistency overhaul with Globe language picker**, **i18n for auth, help, shared result, sample policies pages**, **database-driven i18n translation system with admin management**, **stale HTML cache fix (immutable hashed assets)**, **sample policy cards with expandable detail view**, **admin settings route ordering fix**, **coverage nameTr extraction-time resolution**, **i18n for MyAccount/Settings/ComparePolicies**, **nav ArrowLeft cleanup complete**, **UnsubscribePage i18n**, **AI insights translated at extraction time (aiInsightsTr)**, **massive branch/coverage test push (14,484 tests across 299 files, 0 ESLint errors)**, **Lighthouse optimization (Performance 99, Accessibility 100, CLS 0.005)**, **server-side config performance monitoring wired**, **flaky test hardening**, **production Lighthouse verification (CLS 0, A11y 100, gzip compression middleware)**, **branch coverage improvement (77% → 84% branches, 14,960 tests across 304 files)**, **sortPolicies() status ordering bugfix (|| 4 → ?? 4)**, **migration 020 unsubscribe translations applied to production**, **CI pipeline with Playwright E2E tests (staging + production workflows)**, **no-non-null-assertion warnings eliminated (0 ESLint warnings)**, **branch coverage gap resolved (85.91% branches, 15,316 tests across 312 files)**, **residual ESLint warnings cleared (9 warnings → 0, all files)**, **PWA push notifications (VAPID, Web Push API, server + client infrastructure)**, **framer-motion removed from main bundle (CSS animations, −38 KB gzip)**, **policy expiry via pg_cron Edge Function**, **Real Supabase E2E integration**, **TR translations lazy-loaded as async Vite chunk (−14 KB gzip from main bundle)**, **EN translations lazy-loaded as async Vite chunk (−8.7 KB gzip, completes lazy-i18n)**, **automated semantic versioning via release-please**, **TruffleHog secret scanning in CI**, **realistic AI domain-specific testimonials**, **export dropdown (PDF/CSV/text)**, **automated user onboarding flow**, **extraction error observability (Sentry + ring buffer + admin notifications)**, **admin dashboard mobile-responsive**, **notification bulk select/delete**, **processing logger for anonymous uploads**, **extraction health hourly chart with auto-refresh**, **processing log auto-cleanup via pg_cron (90-day retention)**, **extraction health alerting (configurable thresholds + admin notifications)**, **admin-configurable retention (monitoring + retention settings categories, configurable pg_cron functions)**, **admin UIs for market and premium benchmarks**, **bundle optimization for xlsx**, **historical trend charts (extraction health)**, **processing logs CSV export**, **cron job monitoring UI**, **modular actuarial engine (4-layer, Monte Carlo EOOP, TOPSIS ranking)**, **output evaluation test suite (162 tests)**, **Railway deployment hardening (nixpacks.toml, healthcheck)**, **Actuarial engine UI integration (ComparePolicies TOPSIS rank, PolicyDetailView EOOP breakdown)**, **actuarial engine observability (LayerTimings instrumentation, evidence coverage dashboard, 40 golden regression tests)**, **i18n ternary migration complete for S1+S2 (99 ternaries → translation keys, 8 components, ~163 new translation keys)**, **PolicyDetailView isolated branch coverage fixed (180 tests, `@testing-library/jest-dom` global type declarations wired)**, **FX conversion system (server proxy + client hook + currency switcher)**, **PolicyDetailView i18n complete (132 ternaries migrated)**, **migration 030 seeds 426 missing translation keys to DB**, **recharts + d3 split into dedicated vendor chunk (−4 KB main bundle)**, **useDisplayCurrency wired into all 12 React components (FX system fully operational)**, **E2E coverage applied to FX UI with conditional auth bypass**, **AI Evidence Display pipeline fully wired into DB persistence with explicitly prompted JSON Array quote requirements**, **E2E assertions and missing translations fixed for Interactive Quotes**, **extraction timeout resilience (abort-on-unmount, 120s fetch timeout, pipeline phase timing diagnostics, diagnostic error threading)**, **Dynamic AI Insights Rules Engine (Admin UI + DB + Backend Endpoint integration)**, **VKN vs TC Kimlik false positive fixes**, **502/504 Proxy Extraction timeout handling for graceful user feedback**, **Duplicate AI Insights generated fix**, **Database-editable AI Prompt pipeline**, **Admin UI compiled AI execution map**, **PDF extraction cross-realm ArrayBuffer/Uint8Array fixes**, **Node/jsdom pdf.js worker ESM crash fix**, **hardcoded config migration to DB**, **Phase 8L Broader Guarded Pilot blocked on live operational data**.
 - **Production Readiness**: ~10/10 (15,850+ tests, 0 lint errors, 100% test pass rate, PWA support, server hardening, Dynamic AI Rules, DB AI Prompts, UI Evidence Tracking)
-- **Last Updated**: March 16, 2026 (KASKO Pilot Document Admission Gating, Phase 8K Simulated Scale Validation, Mock Extraction Harness, Operational Block tracking)
+- **Last Updated**: March 16, 2026 (KASKO Pilot operational audit complete, migration 040 schema fix, 12-section evidence report, activation-ready pending 3 manual admin steps)
 
 ---
 
@@ -4645,6 +4645,20 @@ function PolicySearch({ onSearch }: { onSearch: (query: string) => void }) {
 - **Default Credentials** (from migration `005b_admin_tables.sql`): `admin@insurai.com` / `secure-password`
 - **Note**: The `admin_users` table may lack `display_name`, `failed_login_attempts`, and `locked_until` columns if `005a_admin_schema.sql` ran instead of `005b_admin_tables.sql`. The login code only requires `id`, `email`, `password_hash`, `role`, `status`, and `permissions`.
 
+### 174. Migration 040 NOT NULL Constraint Fix (Fixed Mar 16, 2026)
+- **Problem**: Migration 040 failed with `null value in column "name" of relation "feature_flags" violates not-null constraint`
+- **Root Cause**: `feature_flags` table (created in migration 012) has `name VARCHAR(200) NOT NULL`, but migration 040's INSERT omitted the `name` column
+- **Solution**: Added `name` to INSERT column list and `'KASKO AI Extraction Pilot'` as the value
+- **File Changed**: `supabase/migrations/040_kasko_pilot_flag_and_segment.sql`
+- **Commit**: `71a5113`
+
+### 175. KASKO Pilot 12-Section Operational Audit (Added Mar 16, 2026)
+- **Feature**: Comprehensive evidence-structured audit report for KASKO pilot readiness
+- **File**: `docs/KASKO_PILOT_OPERATIONAL_AUDIT_2026_03_16.md` (515 lines)
+- **Sections**: Executive verdict, pass/fail table (9/9 pass at code level), feature-flag evidence, flow wiring audit, result-object proof (expected JSON), banner UI audit, QA logging audit, rollback trigger audit (4 thresholds), admission gate audit (5 checks), safety behavior (7 failure modes → safe-off), docs-vs-reality mismatches (6 items checked, 1 minor dead path), required fixes table, go/no-go recommendation (CONDITIONAL GO), SQL appendix for 3 manual actions
+- **Verdict**: Code-level GO. Operationally blocked on 3 manual admin actions (apply migration, assign reviewers, enable flag)
+- **Commit**: `2d3f540`
+
 ---
 
 ## Turkish Market Considerations
@@ -5696,6 +5710,20 @@ connectSrc: [
 - If you need confidence data, use `policy.aiConfidence` not `policy.rawData?.confidence`
 - The `rawData` JSONB field exists on the `policies` DB table (`raw_data JSONB`) but is NOT on the TypeScript `AnalyzedPolicy` type used in React components
 
+**KASKO Pilot Activation — 3 Manual Steps Required (Added Mar 16, 2026):**
+- The KASKO pilot is **code-complete and activation-ready** but NOT live — requires 3 manual admin SQL steps
+- **Step 1**: Apply `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` to production Supabase (creates `user_segments` + `kasko_pilot_qa_records` tables, seeds disabled feature flag)
+- **Step 2**: Assign pilot reviewers: `INSERT INTO user_segments (user_id, segment_name, assigned_by) VALUES ('UUID', 'kasko_pilot_reviewers', 'admin')`
+- **Step 3**: Enable flag: `UPDATE feature_flags SET enabled = true, rollout_percentage = 100 WHERE key = 'kasko_ai_extraction_pilot'`
+- All 3 steps are documented with verification queries in `SESSION_HANDOFF.md`
+- **Safe-off design**: All 7 failure modes (migration not applied, flag missing, user not in segment, non-KASKO branch, no options passed, QA persist fails, Supabase unreachable) default to pilot **inactive**
+- **Triple-guard gate**: `evaluateKaskoPilotGate()` requires branch === 'kasko' AND flag enabled AND user in segment — all 3 must pass
+- `usePilotGateOptions.ts` loads flags + segments; degrades gracefully (empty `{}` / `[]`) if migration not applied or Supabase unreachable
+- QA records persist to `kasko_pilot_qa_records` table via `persistPilotQARecord()` (fire-and-forget) — NOT to `/tmp` JSONL
+- Rollback monitoring: `GET /api/admin/monitoring/pilot-rollback-status` checks 4 safety thresholds (zero-coverage >20%, phrase leak, major correction >50%, 3+ consecutive deductible misses)
+- **Migration 040 schema fix**: Original INSERT omitted `name` column (NOT NULL in `feature_flags` table from migration 012). Fixed in commit `71a5113` — always use the current version of the migration file
+- Full audit report: `docs/KASKO_PILOT_OPERATIONAL_AUDIT_2026_03_16.md`
+
 ---
 
 ## CI/CD
@@ -5767,4 +5795,4 @@ npm run build:analyze
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
-**Last Updated**: March 14, 2026 (TryAnalysis rawData TS2339 build fix, admin password reset procedure, confidence diagnostic checkpoints)
+**Last Updated**: March 16, 2026 (KASKO Pilot operational audit, migration 040 NOT NULL fix, 12-section evidence report)

@@ -549,4 +549,123 @@ router.get(
   }
 )
 
+// ============================================================================
+// KASKO PILOT ROLLBACK TRIGGER MONITORING
+// ============================================================================
+
+/**
+ * Get KASKO pilot rollback trigger status
+ * Fetches QA records from kasko_pilot_qa_records and evaluates rollback thresholds.
+ * GET /api/admin/monitoring/pilot-rollback-status
+ */
+router.get(
+  '/monitoring/pilot-rollback-status',
+  authenticateAdmin,
+  async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      const supabase = getSupabaseWithError()
+
+      // Fetch recent QA records (last 30 days, ordered by review_date)
+      const { data: rows, error } = await supabase
+        .from('kasko_pilot_qa_records')
+        .select('*')
+        .gte('review_date', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
+        .order('review_date', { ascending: true })
+
+      if (error) {
+        log.warn('Failed to fetch pilot QA records', { error: error.message })
+        return res.json({
+          success: true,
+          data: {
+            totalRecords: 0,
+            shouldPause: false,
+            triggers: [],
+            message: 'No QA records available (table may not exist yet)',
+          },
+        })
+      }
+
+      if (!rows || rows.length === 0) {
+        return res.json({
+          success: true,
+          data: {
+            totalRecords: 0,
+            shouldPause: false,
+            triggers: [],
+            message: 'No pilot QA records found in the last 30 days',
+          },
+        })
+      }
+
+      // Map DB rows to PilotQARecord shape for getRollbackTriggerStatus
+      const records = rows.map((r: Record<string, unknown>) => ({
+        documentId: r.document_id as string,
+        filename: r.filename as string,
+        branch: r.branch as string,
+        reviewDate: r.review_date as string,
+        reviewerUserId: r.reviewer_user_id as string,
+        extractionSuccess: r.extraction_success as boolean,
+        extractionModel: r.extraction_model as string,
+        textCharCount: r.text_char_count as number,
+        pageCount: r.page_count as number,
+        reviewerOutcome: r.reviewer_outcome as string,
+        reviewTimeMinutes: r.review_time_minutes as number,
+        correctionCategories: r.correction_categories as string[],
+        criticalFieldsMissed: r.critical_fields_missed as string[],
+        displayMode: r.display_mode as string,
+        triggersFired: r.triggers_fired as string[],
+        phraseClean: r.phrase_clean as boolean,
+        foundProhibitedPhrases: r.found_prohibited_phrases as string[],
+        admissionStatus: r.admission_status as string,
+        admissionReason: r.admission_reason as string,
+        countedInPilotMetrics: r.counted_in_pilot_metrics as boolean,
+        coverageCountExtracted: r.coverage_count_extracted as number,
+        specialConditionCount: r.special_condition_count as number,
+        hasRayicDeger: r.has_rayic_deger as boolean,
+        hasConditionalDeductible: r.has_conditional_deductible as boolean,
+        sourceQuoteCount: r.source_quote_count as number,
+        confidenceScore: r.confidence_score as number,
+        zeroCoverage: r.zero_coverage as boolean,
+        deductibleMiss: r.deductible_miss as boolean,
+        specialConditionMiss: r.special_condition_miss as boolean,
+        majorCorrection: r.major_correction as boolean,
+        reviewerNotes: r.reviewer_notes as string,
+      }))
+
+      // Only evaluate records that are counted in pilot metrics
+      const metricsRecords = records.filter((r: { countedInPilotMetrics: boolean }) => r.countedInPilotMetrics)
+
+      // Import and evaluate rollback triggers
+      // Note: This is a shared module — we import it dynamically to avoid bundling client code in server
+      const { getRollbackTriggerStatus } = await import('../../src/lib/analysis/kasko-pilot-gate.js' as string)
+      const rollbackStatus = getRollbackTriggerStatus(metricsRecords)
+
+      // Compute admission breakdown
+      const admissionBreakdown = {
+        pilot_eligible_clean: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_clean').length,
+        pilot_eligible_moderate: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_eligible_moderate').length,
+        pilot_ineligible_noisy: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_noisy').length,
+        pilot_ineligible_incomplete: records.filter((r: { admissionStatus: string }) => r.admissionStatus === 'pilot_ineligible_incomplete').length,
+      }
+
+      res.json({
+        success: true,
+        data: {
+          totalRecords: rows.length,
+          metricsRecords: metricsRecords.length,
+          shouldPause: rollbackStatus.shouldPause,
+          triggers: rollbackStatus.triggers,
+          admissionBreakdown,
+          recentRecords: rows.slice(-10).reverse(), // Last 10 records for display
+        },
+      })
+    } catch (error) {
+      log.error('Failed to get pilot rollback status', {
+        error: error instanceof Error ? error.message : String(error),
+      })
+      res.status(500).json({ success: false, error: 'Failed to get pilot rollback status' })
+    }
+  }
+)
+
 export default router

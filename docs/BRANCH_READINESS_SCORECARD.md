@@ -1,7 +1,14 @@
-# Branch Readiness Scorecard — Post Phase 8B
+# Branch Readiness Scorecard — Post Phase 8K + Pilot Wiring
 
-> **Last updated**: Phase 8B remediation pass
+> **Last updated**: March 2026 — Pilot wiring session (all 6 blocking audit failures resolved)
 > **Based on**: 27 document-realistic synthetic samples + 23 Phase 7 validation samples
+>
+> ## ⚠️ IMPORTANT: SIMULATED EVIDENCE ONLY
+> **All Phase 8H–8K metrics below were produced from simulated/mocked data in test files.**
+> Zero real documents have been processed through the live pilot pipeline.
+> The pilot code is now fully wired into the extraction pipeline, but the feature flag
+> (`kasko_ai_extraction_pilot`) remains **disabled** until an admin explicitly enables it.
+> See `SESSION_HANDOFF.md` for activation steps.
 
 ## Readiness Classification
 
@@ -231,4 +238,24 @@
 
 ### Updated KASKO Readiness Classification
 **Ready to begin broader guarded internal pilot on actual internal docs** — Guardrails continue to perform exactly as needed during scaling in simulation. Ready to start processing actual larger volumes under human verification.
+
+## Pilot Pipeline Wiring Status (March 2026)
+
+A comprehensive audit found that the pilot was "code-complete but operationally dead." All 6 blocking issues identified have been resolved:
+
+| # | Issue | Resolution | Status |
+|---|-------|------------|--------|
+| 1 | Feature flag not in DB | Migration 040 seeds `kasko_ai_extraction_pilot` (disabled) | ✅ RESOLVED |
+| 2 | Components never pass pilot options | `usePilotGateOptions` hook wired into AIInsightsPanel + SharedResult | ✅ RESOLVED |
+| 3 | Admission gating never called | `evaluatePilotAdmission()` called in extraction pipeline for KASKO | ✅ RESOLVED |
+| 4 | QA logging only in tests | `persistPilotQARecord()` writes to Supabase `kasko_pilot_qa_records` | ✅ RESOLVED |
+| 5 | Rollback monitoring not operational | Admin endpoint `GET /api/admin/monitoring/pilot-rollback-status` | ✅ RESOLVED |
+| 6 | Docs vs reality mismatch | SESSION_HANDOFF.md + this file updated with operational status | ✅ RESOLVED |
+
+### Activation Checklist (Admin Actions Required)
+- [ ] Apply migration `040_kasko_pilot_flag_and_segment.sql` to production Supabase
+- [ ] Assign reviewer user IDs to `user_segments` with `segment_name = 'kasko_pilot_reviewers'`
+- [ ] Enable `kasko_ai_extraction_pilot` feature flag via admin panel
+- [ ] Process first real KASKO PDF and verify QA record appears in `kasko_pilot_qa_records`
+- [ ] Check rollback status endpoint returns valid data
 
