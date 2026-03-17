@@ -1,4 +1,3 @@
-import React from 'react'
 import type { StatementType } from '@/types/display'
 
 interface SafetyLabelProps {
