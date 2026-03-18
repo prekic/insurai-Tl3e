@@ -563,7 +563,7 @@ export function PolicyUpload() {
       const displayName = sanitizeFileName(file.name)
       const storageNote = savedToCloud ? ` ${t.upload.savedToCloud}` : ''
       const aiNote =
-        source === 'ai'
+        source === 'ai' || source === 'ocr'
           ? ` (${Math.round(extractedData.confidence.overall * 100)}% ${t.upload.confidence})`
           : ` ${t.upload.demoMode}`
 
@@ -1342,7 +1342,8 @@ export function PolicyUpload() {
                           ) : (
                             <Check size={14} />
                           )}
-                          {uploadedFile.extractionSource === 'ai' ? (
+                          {uploadedFile.extractionSource === 'ai' ||
+                          uploadedFile.extractionSource === 'ocr' ? (
                             <>
                               {uploadedFile.lowConfidence
                                 ? t.upload.lowConfidenceStatus
