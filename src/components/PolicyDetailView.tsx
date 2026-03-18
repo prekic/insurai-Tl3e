@@ -1627,31 +1627,34 @@ export function PolicyDetailView() {
               <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 sm:space-y-3">
                   {(() => {
-                    // Deduplicate insights: strip emoji prefixes, normalize, keep first occurrence
-                    const seen = new Set<string>()
-                    const deduped = policy.aiInsights.filter((insight) => {
-                      const normalized = insight
-                        .replace(/^(?:[✓✔☑⚠💡❌🔍]|\uFE0F)\s*/gu, '')
-                        .trim()
-                        .toLowerCase()
-                      if (seen.has(normalized)) return false
-                      seen.add(normalized)
-                      return true
-                    })
-                    return (insightsExpanded ? deduped : deduped.slice(0, 3)).map((_insight, i) => {
-                      // Get localized insight: pre-translated (new) or display-time translated (legacy)
+                    // Deduplicate insights using LOCALIZED text to catch cross-language duplicates.
+                    // Track original indices so evidence lookup and TR/EN parallel arrays stay correct.
+                    const seenLocalized = new Set<string>()
+                    const dedupedEntries: { originalIndex: number; localizedText: string }[] = []
+                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
                       const rawLocalized = getLocalizedInsight(
                         policy,
-                        i,
+                        idx,
                         locale,
                         t.insightTranslations
                       )
-                      // Strip any existing prefix characters from the text for clean display
-                      const displayText = applySafeWording(
+                      const normalized = applySafeWording(
                         rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
                       )
+                        .toLowerCase()
+                        .replace(/\s+/g, ' ')
+                      if (!seenLocalized.has(normalized)) {
+                        seenLocalized.add(normalized)
+                        dedupedEntries.push({ originalIndex: idx, localizedText: rawLocalized })
+                      }
+                    }
+                    const visible = insightsExpanded ? dedupedEntries : dedupedEntries.slice(0, 3)
+                    return visible.map(({ originalIndex, localizedText }, renderIdx) => {
+                      const displayText = applySafeWording(
+                        localizedText.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      )
 
-                      const originalInsight = policy.aiInsights[i]
+                      const originalInsight = policy.aiInsights[originalIndex]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
                       const hasEvidence =
                         policy.evidenceData?.insights &&
@@ -1659,7 +1662,7 @@ export function PolicyDetailView() {
 
                       return (
                         <div
-                          key={i}
+                          key={renderIdx}
                           className="flex flex-col gap-1 p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700"
                         >
                           <div className="flex items-start gap-2">
@@ -1688,17 +1691,19 @@ export function PolicyDetailView() {
                     })
                   })()}
                   {(() => {
-                    // Compute deduped count for expand button
-                    const seenBtn = new Set<string>()
-                    const dedupedCount = policy.aiInsights.filter((insight) => {
-                      const n = insight
-                        .replace(/^(?:[✓✔☑⚠💡❌🔍]|\uFE0F)\s*/gu, '')
-                        .trim()
+                    // Compute deduped count using localized text (same logic as render dedup)
+                    const seenBtnL = new Set<string>()
+                    let dedupedCount = 0
+                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
+                      const raw = getLocalizedInsight(policy, idx, locale, t.insightTranslations)
+                      const n = applySafeWording(raw.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim())
                         .toLowerCase()
-                      if (seenBtn.has(n)) return false
-                      seenBtn.add(n)
-                      return true
-                    }).length
+                        .replace(/\s+/g, ' ')
+                      if (!seenBtnL.has(n)) {
+                        seenBtnL.add(n)
+                        dedupedCount++
+                      }
+                    }
                     return dedupedCount > 3 ? (
                       <button
                         onClick={() => setInsightsExpanded(!insightsExpanded)}
@@ -2219,6 +2224,20 @@ export function PolicyDetailView() {
                         ) || t.global.unspecified}
                       </span>
                     </p>
+                    {/* Actuarial caveat when inputs are incomplete */}
+                    {(actuarialResult.needsReview ||
+                      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+                      actuarialResult.indemnityMechanics?.repairNetworkRule?.value ===
+                        'unspecified') && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
+                        <AlertTriangle className="flex-shrink-0 mt-0.5" size={12} />
+                        <span>
+                          {locale === 'tr'
+                            ? 'Tahmini puan, belirtilmemiş sözleşme detayları nedeniyle geçici niteliktedir'
+                            : 'Score is provisional — some contract-detail inputs could not be confirmed'}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

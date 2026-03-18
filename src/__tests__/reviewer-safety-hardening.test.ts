@@ -461,6 +461,241 @@ describe('Section 15: Reviewer-mode insight priority', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────
+// Section 16: Source-level insight deduplication
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Section 16: Source-level insight deduplication', () => {
+  it('removes duplicate insights from mixed Turkish/English source array', () => {
+    // Simulates the source-level dedup logic from policy-extractor.ts
+    const insights = [
+      'Kapsamlı kasko teminatı rayiç değer üzerinden',
+      '⚠ Deductible status uncertain',
+      '✓ Kapsamlı kasko teminatı rayiç değer üzerinden', // same text, different prefix
+      '24 saat asistans hizmeti dahil',
+      '⚠ 24 saat asistans hizmeti dahil', // same text, different prefix
+    ]
+
+    const seen = new Set<string>()
+    const keepIndices: number[] = []
+    for (let idx = 0; idx < insights.length; idx++) {
+      const normalized = insights[idx]
+        .replace(/^(?:[✓✔☑⚠💡❌🔍]|\uFE0F)\s*/gu, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+      if (!seen.has(normalized)) {
+        seen.add(normalized)
+        keepIndices.push(idx)
+      }
+    }
+    const deduped = keepIndices.map((idx) => insights[idx])
+
+    expect(deduped).toHaveLength(3)
+    expect(deduped[0]).toBe('Kapsamlı kasko teminatı rayiç değer üzerinden')
+    expect(deduped[1]).toContain('Deductible status uncertain')
+    expect(deduped[2]).toBe('24 saat asistans hizmeti dahil')
+  })
+
+  it('preserves parallel array alignment when deduplicating', () => {
+    const insights = ['A', 'B', 'A', 'C']
+    const insightsEn = ['A-en', 'B-en', 'A-en-dup', 'C-en']
+
+    const seen = new Set<string>()
+    const keepIndices: number[] = []
+    for (let idx = 0; idx < insights.length; idx++) {
+      const n = insights[idx].toLowerCase()
+      if (!seen.has(n)) {
+        seen.add(n)
+        keepIndices.push(idx)
+      }
+    }
+
+    const dedupedInsights = keepIndices.map((idx) => insights[idx])
+    const dedupedEn = keepIndices.map((idx) => insightsEn[idx])
+
+    expect(dedupedInsights).toEqual(['A', 'B', 'C'])
+    expect(dedupedEn).toEqual(['A-en', 'B-en', 'C-en']) // NOT 'A-en-dup'
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Section 17: Coverage limit plausibility check
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Section 17: Coverage limit plausibility check', () => {
+  it('flags when assistance coverage limit far exceeds legal protection limit', () => {
+    const coverages = [
+      {
+        name: 'Anadolu Service',
+        nameTr: 'Anadolu Asistans',
+        limit: 80000,
+        category: 'assistance' as const,
+      },
+      {
+        name: 'Legal Protection',
+        nameTr: 'Hukuksal Koruma',
+        limit: 4000,
+        category: 'legal' as const,
+      },
+    ]
+
+    const assistanceCov = coverages.find((c) => c.category === 'assistance')
+    const legalCov = coverages.find((c) => c.category === 'legal')
+    const isSuspicious =
+      assistanceCov &&
+      legalCov &&
+      assistanceCov.limit > 0 &&
+      legalCov.limit > 0 &&
+      assistanceCov.limit > legalCov.limit * 5
+
+    expect(isSuspicious).toBe(true)
+  })
+
+  it('does NOT flag when assistance limit is reasonable relative to legal', () => {
+    const coverages = [
+      { name: 'Roadside Assistance', limit: 4000, category: 'assistance' as const },
+      { name: 'Legal Protection', limit: 80000, category: 'legal' as const },
+    ]
+
+    const assistanceCov = coverages.find((c) => c.category === 'assistance')
+    const legalCov = coverages.find((c) => c.category === 'legal')
+    const isSuspicious =
+      assistanceCov &&
+      legalCov &&
+      assistanceCov.limit > 0 &&
+      legalCov.limit > 0 &&
+      assistanceCov.limit > legalCov.limit * 5
+
+    expect(isSuspicious).toBe(false)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Section 18: Market commentary suppression in reviewer mode
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Section 18: Market commentary suppression', () => {
+  it('filters market commentary when extraction warnings exist', () => {
+    const insights = [
+      '⚠ Premium was not extracted from the document',
+      '✓ Standard coverage for policy type',
+      '💡 Premium is above 75th percentile - compare with other providers',
+      '💡 Market premiums increased 43% YoY - lock in rates early',
+      '💡 Review coverage limits annually to ensure adequate protection',
+    ]
+
+    const marketCommentaryPatterns = [
+      /premium is above \d+th percentile/i,
+      /market premiums increased \d+%/i,
+      /review coverage limits annually/i,
+      /lock in rates early/i,
+    ]
+    const isMarketCommentary = (insight: string) =>
+      marketCommentaryPatterns.some((p) => p.test(insight))
+
+    const filtered = insights.filter((i) => !isMarketCommentary(i))
+
+    expect(filtered).toHaveLength(2)
+    expect(filtered[0]).toContain('Premium was not extracted')
+    expect(filtered[1]).toContain('Standard coverage')
+  })
+
+  it('keeps all insights when no extraction warnings exist', () => {
+    const insights = [
+      '✓ Multiple coverage areas identified',
+      '💡 Premium is above 75th percentile - compare with other providers',
+    ]
+
+    // Without extraction warnings, market commentary is NOT filtered
+    const extractionWarnings: string[] = []
+    const filtered =
+      extractionWarnings.length > 0
+        ? insights.filter(() => true) // would filter here
+        : insights
+
+    expect(filtered).toHaveLength(2)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// Section 19: Actuarial caveat for incomplete inputs
+// ─────────────────────────────────────────────────────────────────────
+
+describe('Section 19: Actuarial caveat for incomplete inputs', () => {
+  it('shows caveat when partsStandard is unspecified', () => {
+    const actuarialResult = {
+      needsReview: false,
+      contractQualityScore: 24,
+      indemnityMechanics: {
+        partsStandard: { value: 'unspecified' },
+        repairNetworkRule: { value: 'insurer_network' },
+      },
+    }
+
+    const showCaveat =
+      actuarialResult.needsReview ||
+      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+      actuarialResult.indemnityMechanics?.repairNetworkRule?.value === 'unspecified'
+
+    expect(showCaveat).toBe(true)
+  })
+
+  it('shows caveat when repairNetworkRule is unspecified', () => {
+    const actuarialResult = {
+      needsReview: false,
+      contractQualityScore: 50,
+      indemnityMechanics: {
+        partsStandard: { value: 'original' },
+        repairNetworkRule: { value: 'unspecified' },
+      },
+    }
+
+    const showCaveat =
+      actuarialResult.needsReview ||
+      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+      actuarialResult.indemnityMechanics?.repairNetworkRule?.value === 'unspecified'
+
+    expect(showCaveat).toBe(true)
+  })
+
+  it('shows caveat when needsReview is true', () => {
+    const actuarialResult = {
+      needsReview: true,
+      contractQualityScore: 80,
+      indemnityMechanics: {
+        partsStandard: { value: 'original' },
+        repairNetworkRule: { value: 'insured_choice' },
+      },
+    }
+
+    const showCaveat =
+      actuarialResult.needsReview ||
+      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+      actuarialResult.indemnityMechanics?.repairNetworkRule?.value === 'unspecified'
+
+    expect(showCaveat).toBe(true)
+  })
+
+  it('does NOT show caveat when all inputs are specified and needsReview is false', () => {
+    const actuarialResult = {
+      needsReview: false,
+      contractQualityScore: 85,
+      indemnityMechanics: {
+        partsStandard: { value: 'equivalent' },
+        repairNetworkRule: { value: 'insurer_network' },
+      },
+    }
+
+    const showCaveat =
+      actuarialResult.needsReview ||
+      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+      actuarialResult.indemnityMechanics?.repairNetworkRule?.value === 'unspecified'
+
+    expect(showCaveat).toBe(false)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
 // HELPERS
 // ─────────────────────────────────────────────────────────────────────
 

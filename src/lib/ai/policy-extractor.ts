@@ -1792,6 +1792,28 @@ async function convertToAnalyzedPolicy(
     )
   }
 
+  // Coverage-limit plausibility check: flag potential AI mis-mapping
+  // Assistance/service coverages typically have lower limits than legal protection
+  if (isKaskoForDeductible) {
+    const assistanceCov = coverages.find(
+      (c) =>
+        c.category === 'assistance' ||
+        /\b(asistans|assist|service|servis|yol\s*yard)/i.test(c.name + ' ' + (c.nameTr || ''))
+    )
+    const legalCov = coverages.find(
+      (c) =>
+        c.category === 'legal' ||
+        /\b(hukuk|legal|protection|koruma)/i.test(c.name + ' ' + (c.nameTr || ''))
+    )
+    if (assistanceCov && legalCov && assistanceCov.limit > 0 && legalCov.limit > 0) {
+      if (assistanceCov.limit > legalCov.limit * 5) {
+        extractionWarnings.push(
+          `Coverage limit mapping may need review: ${assistanceCov.name} (${assistanceCov.limit.toLocaleString()}) vs ${legalCov.name} (${legalCov.limit.toLocaleString()})`
+        )
+      }
+    }
+  }
+
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
     id: crypto.randomUUID(),
@@ -1908,6 +1930,25 @@ async function convertToAnalyzedPolicy(
     }
   }
 
+  // ── Reviewer-mode: suppress low-value market commentary ─────────────
+  // When extraction warnings exist (reviewer-critical issues), market
+  // commentary like "Premium above 75th percentile" and "Market premiums
+  // increased N% YoY" provides no correction value and clutters the output.
+  if (extractionWarnings.length > 0) {
+    const marketCommentaryPatterns = [
+      /premium is above \d+th percentile/i,
+      /market premiums increased \d+%/i,
+      /review coverage limits annually/i,
+      /lock in rates early/i,
+    ]
+    const isMarketCommentary = (insight: string) =>
+      marketCommentaryPatterns.some((p) => p.test(insight))
+    basePolicy.aiInsights = basePolicy.aiInsights.filter((i) => !isMarketCommentary(i))
+    if (basePolicy.aiInsightsEn) {
+      basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter((i) => !isMarketCommentary(i))
+    }
+  }
+
   // Merge AI generated evidence-based exclusions if they aren't already grouped
   if (data.evidence?.exclusions) {
     const existingExclusions = new Set(basePolicy.exclusions.map((e) => e.toLowerCase().trim()))
@@ -1991,6 +2032,35 @@ async function convertToAnalyzedPolicy(
     basePolicy.analysisBundle = generateAnalysisBundle(basePolicy.id, data, validationRes)
   } catch (err) {
     console.error('[PolicyExtractor] Failed to generate AnalysisBundle', err)
+  }
+
+  // ── Source-level deduplication ──────────────────────────────────────
+  // Evidence-based insights (Turkish) and generated insights (English) can
+  // express the same idea. Dedup BEFORE translation so parallel arrays
+  // (aiInsights, aiInsightsTr, aiInsightsEn) stay index-aligned.
+  {
+    const seen = new Set<string>()
+    const keepIndices: number[] = []
+    for (let idx = 0; idx < basePolicy.aiInsights.length; idx++) {
+      // Normalize: strip emoji prefix, lowercase, collapse whitespace
+      const raw = basePolicy.aiInsights[idx]
+      // eslint-disable-next-line no-misleading-character-class
+      const normalized = raw
+        .replace(/^[✓✔☑⚠💡❌🔍\uFE0F]\s*/gu, '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ')
+      if (!seen.has(normalized)) {
+        seen.add(normalized)
+        keepIndices.push(idx)
+      }
+    }
+    if (keepIndices.length < basePolicy.aiInsights.length) {
+      basePolicy.aiInsights = keepIndices.map((idx) => basePolicy.aiInsights[idx])
+      if (basePolicy.aiInsightsEn) {
+        basePolicy.aiInsightsEn = keepIndices.map((idx) => basePolicy.aiInsightsEn![idx])
+      }
+    }
   }
 
   // Translate final aiInsights to Turkish (after all modifications like validation warnings)
@@ -2183,14 +2253,6 @@ async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<strin
 function generateStrengths(data: ExtractedPolicyData): string[] {
   const strengths: string[] = []
 
-  if (data.coverages.length > 3) {
-    strengths.push('Multiple coverage areas identified in policy')
-  }
-
-  if (data.coverages.some((c) => c.limit && c.limit > 500000)) {
-    strengths.push('Coverage limits above 500,000 TL for some items')
-  }
-
   // Only claim zero deductible if there are also positive deductibles elsewhere
   // (proving the AI actually extracted deductible data rather than defaulting everything to 0)
   const hasPositiveDeductible = data.coverages.some((c) => c.deductible && c.deductible > 0)
@@ -2199,9 +2261,14 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
   }
 
   if (data.specialConditions.length > 0) {
-    strengths.push('Special endorsements included')
+    strengths.push(
+      `${data.specialConditions.length} special endorsement(s) — verify conditions apply`
+    )
   }
 
+  // Generic structural observations (coverage count, limit thresholds) are suppressed
+  // in reviewer mode because they provide no actionable correction information.
+  // If no specific strengths were found, note standard coverage.
   if (strengths.length === 0) {
     strengths.push('Standard coverage for policy type')
   }
