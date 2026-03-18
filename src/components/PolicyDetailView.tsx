@@ -1580,7 +1580,7 @@ export function PolicyDetailView() {
                     <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
                     <div>
                       <p className="font-semibold text-amber-800 text-xs">
-                        TASLAK / DRAFT — {t.policy.humanReviewRequired || 'Human Review Required'}
+                        TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
                       </p>
                       <p className="text-xs text-amber-700 mt-0.5">
                         {displaySummary?.pilotReviewBanner ||
@@ -1977,7 +1977,7 @@ export function PolicyDetailView() {
                     <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
                     <div>
                       <p className="font-semibold text-amber-800 text-sm">
-                        TASLAK / DRAFT — {t.policy.humanReviewRequired || 'Human Review Required'}
+                        TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
                       </p>
                       <p className="text-xs text-amber-700 mt-1">
                         {displaySummary?.pilotReviewBanner ||
