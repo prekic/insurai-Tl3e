@@ -233,3 +233,4 @@ coverage-temp/
 
 # Generated export files
 *.xlsx
+supabase/.temp/
