@@ -562,10 +562,7 @@ export function PolicyUpload() {
       // Get the file name for the toast
       const displayName = sanitizeFileName(file.name)
       const storageNote = savedToCloud ? ` ${t.upload.savedToCloud}` : ''
-      const aiNote =
-        source === 'ai' || source === 'ocr'
-          ? ` (${Math.round(extractedData.confidence.overall * 100)}% ${t.upload.confidence})`
-          : ` ${t.upload.demoMode}`
+      const aiNote = ` (${Math.round(extractedData.confidence.overall * 100)}% ${t.upload.confidence})`
 
       if (isLowConfidence) {
         toast.warning(t.upload.analysisCompleteLowConfidence, {
@@ -1342,20 +1339,13 @@ export function PolicyUpload() {
                           ) : (
                             <Check size={14} />
                           )}
-                          {uploadedFile.extractionSource === 'ai' ||
-                          uploadedFile.extractionSource === 'ocr' ? (
-                            <>
-                              {uploadedFile.lowConfidence
-                                ? t.upload.lowConfidenceStatus
-                                : t.upload.aiExtractedStatus}
-                              {uploadedFile.aiConfidence !== undefined && (
-                                <span className="text-gray-500 ml-1">
-                                  ({Math.round(uploadedFile.aiConfidence * 100)}%)
-                                </span>
-                              )}
-                            </>
-                          ) : (
-                            t.upload.demoDataStatus
+                          {uploadedFile.lowConfidence
+                            ? t.upload.lowConfidenceStatus
+                            : t.upload.aiExtractedStatus}
+                          {uploadedFile.aiConfidence !== undefined && (
+                            <span className="text-gray-500 ml-1">
+                              ({Math.round(uploadedFile.aiConfidence * 100)}%)
+                            </span>
                           )}
                         </span>
                       )}
