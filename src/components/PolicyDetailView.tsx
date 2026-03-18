@@ -1120,20 +1120,55 @@ export function PolicyDetailView() {
   const handleExportText = useCallback(() => {
     if (!policy) return
     setExportMenuOpen(false)
+
+    // Format a coverage item limit using the same canonical logic as the UI
+    // (formatCoverageLimit function at line 70). This ensures text export
+    // never diverges from the reviewer UI for market-value, included, or
+    // unlimited coverages.
+    const fmtCovLimit = (c: Coverage): string => {
+      return formatCoverageLimit(c, locale, t, formatConverted)
+    }
+
+    // Canonical insured: same fallback as UI (line 1461)
+    const insuredText = policy.insuredPerson
+      ? policy.insuredPerson
+      : policy.insuredMissing
+        ? locale === 'tr'
+          ? 'Belirtilmemiş'
+          : 'Not specified'
+        : '-'
+
+    // Canonical premium: same double-check as UI (lines 1422-1426)
+    const premiumText =
+      policy.premiumMissing || !policy.premium || policy.premium <= 0
+        ? t.policy.notSpecified
+        : formatConverted(policy.premium)
+
+    // Canonical deductible: same logic as UI (lines 1441-1448)
+    const deductibleText =
+      policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)
+        ? locale === 'tr'
+          ? 'Koşullu / inceleme gerekli'
+          : 'Conditional / requires review'
+        : policy.deductible > 0
+          ? formatConverted(policy.deductible)
+          : locale === 'tr'
+            ? 'Yok'
+            : 'None'
+
     const summary = [
       `${t.policy.policy}: ${policy.policyNumber}`,
       `${t.policy.provider}: ${getShortCompanyName(policy.provider)}`,
       `${t.policy.type}: ${policy.typeTr}`,
-      `${t.policy.insured}: ${policy.insuredPerson}`,
+      `${t.policy.insured}: ${insuredText}`,
       `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
-      `${t.policy.premiumLabel}: ${policy.premiumMissing ? t.policy.notSpecified : formatConverted(policy.premium)}`,
-      `${t.policy.deductibleLabel}: ${policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0) ? (locale === 'tr' ? 'Koşullu / inceleme gerekli' : 'Conditional / requires review') : formatConverted(policy.deductible)}`,
+      `${t.policy.premiumLabel}: ${premiumText}`,
+      `${t.policy.deductibleLabel}: ${deductibleText}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${t.policy.coveragesTitleExport} ===`,
       ...policy.coverages.map(
-        (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? applySafeWording(t.global.unlimited) : formatConverted(c.limit)}`
+        (c) => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${fmtCovLimit(c)}`
       ),
       '',
       `=== ${t.policy.exclusionsTitleExport} ===`,
