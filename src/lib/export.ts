@@ -3,8 +3,51 @@
  * Supports PDF and Excel (CSV) export
  */
 
-import { AnalyzedPolicy } from '@/types/policy'
+import { AnalyzedPolicy, Coverage } from '@/types/policy'
 import { formatCurrency, formatDate } from './utils'
+
+/**
+ * Check if a policy's main coverage is market-value-based (rayiç değer).
+ * Driven by actual extracted coverage data, not policy type alone.
+ */
+function isMarketValueCoverage(policy: AnalyzedPolicy): boolean {
+  return policy.coverages.some((c) => c.isMarketValue)
+}
+
+/**
+ * Format the top-level coverage total for a policy.
+ * For market-value kasko, returns descriptive text instead of "TRY 0".
+ */
+function formatCoverageTotal(policy: AnalyzedPolicy, locale: string): string {
+  const isTr = locale === 'tr'
+  if (isMarketValueCoverage(policy)) {
+    return isTr ? 'Rayiç Değer (Piyasa Değeri)' : 'Market Value Basis'
+  }
+  if (policy.type === 'kasko' && policy.coverage === 0) {
+    // Kasko with zero coverage and no explicit isMarketValue flag:
+    // likely market-value-based but AI didn't set the flag
+    return isTr ? 'Rayiç Değer (Piyasa Değeri)' : 'Market Value Basis'
+  }
+  return formatCurrency(policy.coverage, 'TRY', locale)
+}
+
+/**
+ * Format an individual coverage item's limit for export.
+ * Handles isUnlimited, isMarketValue, and zero-limit special cases.
+ */
+function formatCoverageItemLimit(c: Coverage, locale: string): string {
+  const isTr = locale === 'tr'
+  if (c.isUnlimited) return isTr ? 'Sınırsız' : 'Unlimited'
+  if (c.isMarketValue) return isTr ? 'Rayiç Değer' : 'Market Value'
+  if (c.limit === 0 && c.included) {
+    const nameLower = c.name.toLowerCase()
+    if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
+      return isTr ? 'Rayiç Değer' : 'Market Value'
+    }
+    return isTr ? 'Dahil' : 'Included'
+  }
+  return formatCurrency(c.limit, 'TRY', locale)
+}
 
 /**
  * Export policies to CSV format
@@ -36,7 +79,9 @@ export function exportToCSV(policies: AnalyzedPolicy[], filename = 'policies'): 
     policy.type,
     policy.typeTr,
     policy.status,
-    policy.coverage.toString(),
+    isMarketValueCoverage(policy) || (policy.type === 'kasko' && policy.coverage === 0)
+      ? 'Market Value'
+      : policy.coverage.toString(),
     policy.premium.toString(),
     policy.monthlyPremium.toString(),
     policy.deductible.toString(),
@@ -151,7 +196,7 @@ export async function exportSinglePolicyToExcel(
       [isTr ? 'Tür' : 'Type', policy.typeTr],
       [isTr ? 'Durum' : 'Status', policy.status],
       [isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson || ''],
-      [isTr ? 'Teminat' : 'Coverage', formatCurrency(policy.coverage, 'TRY', locale)],
+      [isTr ? 'Teminat' : 'Coverage', formatCoverageTotal(policy, locale)],
       [isTr ? 'Prim' : 'Premium', formatCurrency(policy.premium, 'TRY', locale)],
       [isTr ? 'Muafiyet' : 'Deductible', formatCurrency(policy.deductible, 'TRY', locale)],
       [isTr ? 'Başlangıç' : 'Start Date', formatDate(policy.startDate, locale)],
@@ -181,7 +226,11 @@ export async function exportSinglePolicyToExcel(
             ? isTr
               ? 'Rayiç Değer'
               : 'Market Value'
-            : c.limit,
+            : c.limit === 0 && c.included
+              ? isTr
+                ? 'Dahil'
+                : 'Included'
+              : c.limit,
         c.deductible,
         c.included ? (isTr ? 'Evet' : 'Yes') : isTr ? 'Hayır' : 'No',
       ]),
@@ -366,7 +415,7 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
     <div class="grid">
       <div>
         <div class="label">Total Coverage</div>
-        <div class="value">${formatCurrency(policy.coverage, 'TRY', locale)}</div>
+        <div class="value">${formatCoverageTotal(policy, locale)}</div>
       </div>
       <div>
         <div class="label">Annual Premium</div>
@@ -427,7 +476,7 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
         (c) => `
     <div class="coverage-item">
       <span>${c.nameTr || c.name}</span>
-      <span>${formatCurrency(c.limit, 'TRY', locale)}</span>
+      <span>${formatCoverageItemLimit(c, locale)}</span>
     </div>
     `
       )
@@ -649,14 +698,7 @@ export function exportSinglePolicyToCSV(policy: AnalyzedPolicy, locale: 'en' | '
     [isTr ? 'Durum' : 'Status', policy.status],
     [isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson || ''],
     [isTr ? 'Konum' : 'Location', policy.location || ''],
-    [
-      isTr ? 'Teminat' : 'Coverage',
-      policy.type === 'kasko'
-        ? isTr
-          ? 'Araç Rayiç Bedeli'
-          : 'Market Value'
-        : formatCurrency(policy.coverage, 'TRY', locale),
-    ],
+    [isTr ? 'Teminat' : 'Coverage', formatCoverageTotal(policy, locale)],
     [isTr ? 'Prim' : 'Premium', formatCurrency(policy.premium, 'TRY', locale)],
     [isTr ? 'Aylık Prim' : 'Monthly Premium', formatCurrency(policy.monthlyPremium, 'TRY', locale)],
     [isTr ? 'Muafiyet' : 'Deductible', formatCurrency(policy.deductible, 'TRY', locale)],
@@ -770,7 +812,7 @@ export function exportComparisonToCSV(
     ['Policy Number', ...policies.map((p) => p.policyNumber)],
     ['Type', ...policies.map((p) => p.typeTr)],
     ['Status', ...policies.map((p) => p.status)],
-    ['Coverage', ...policies.map((p) => formatCurrency(p.coverage, 'TRY', locale))],
+    ['Coverage', ...policies.map((p) => formatCoverageTotal(p, locale))],
     ['Premium', ...policies.map((p) => formatCurrency(p.premium, 'TRY', locale))],
     ['Monthly Premium', ...policies.map((p) => formatCurrency(p.monthlyPremium, 'TRY', locale))],
     ['Deductible', ...policies.map((p) => formatCurrency(p.deductible, 'TRY', locale))],

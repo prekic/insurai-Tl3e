@@ -53,6 +53,8 @@ const PROHIBITED_PHRASES = [
   'muafiyetsiz',
   'tamamen kapsar',
   'sınırsız',
+  'tam koruma',
+  'mükemmel',
 ]
 
 /**
@@ -95,6 +97,19 @@ export function applySafeWording(text: string): string {
       /sınırsız cam onarımı[^.]*hasarsızlığı etkilemiyor/gi,
       'Cam teminatı özel şartlara bağlı olabilir — insan incelemesiyle doğrulanmalı',
     ],
+    // Issue 2: Neutralize promotional KASKO insight phrasing
+    [
+      /mükemmel\s+kapsamlı\s+kasko\s+teminatı[^.]*rayiç\s+değer\s+üzerinden\s+tam\s+koruma/gi,
+      'Ana teminat rayiç değer esasına dayanıyor',
+    ],
+    [/mükemmel[^.]*teminat[ıi]/gi, 'Teminat yapısı tespit edildi — koşullar doğrulanmalı'],
+    [/\btam koruma\b/gi, 'Koruma kapsamı koşullara bağlıdır'],
+    // Issue 3: Fix broken Turkish "kadenizi" in glass-related insights
+    [
+      /cam\s+değişimi[^.]*hasarsızlık\s+kade[a-zğüşöçı]*\s+etkile[a-zğüşöçı]*/gi,
+      'Cam değişimi ve hasarsızlık indirimi ilişkisi özel şartlarla doğrulanmalı',
+    ],
+    [/değerli\s+bir\s+avantaj/gi, 'detay için özel şartlara bakılmalı'],
     [/\bsınırsız\b/gi, 'Özel şartlara bağlı olabilir'],
     [/\btamamen kapsar\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
   ]

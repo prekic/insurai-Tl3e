@@ -227,7 +227,7 @@ export function generatePolicyDetailHTML(
           (c) => `
         <tr>
           <td>${isTr ? c.nameTr : c.name}</td>
-          <td style="text-align: right;">${formatCurrency(c.limit, 'TRY', locale)}</td>
+          <td style="text-align: right;">${c.isUnlimited ? (isTr ? 'Sınırsız' : 'Unlimited') : c.isMarketValue ? (isTr ? 'Rayiç Değer' : 'Market Value') : c.limit === 0 && c.included ? (isTr ? 'Dahil' : 'Included') : formatCurrency(c.limit, 'TRY', locale)}</td>
           <td style="text-align: right;">${formatCurrency(c.deductible, 'TRY', locale)}</td>
           <td style="text-align: center;">${c.included ? '✓' : '—'}</td>
         </tr>
