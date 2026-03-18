@@ -1393,7 +1393,11 @@ export async function extractPolicyFromDocument(
       pilotAdmission = evaluatePilotAdmission(policy, {
         textCharCount: documentText.length,
       })
-      console.warn('[PolicyExtractor] KASKO pilot admission:', pilotAdmission.status, pilotAdmission.reason)
+      console.warn(
+        '[PolicyExtractor] KASKO pilot admission:',
+        pilotAdmission.status,
+        pilotAdmission.reason
+      )
 
       // Create and persist QA record for pilot-eligible documents
       if (pilotAdmission.countedInPilotMetrics) {
@@ -1415,10 +1419,16 @@ export async function extractPolicyFromDocument(
 
           // Fire-and-forget: persist QA record to Supabase
           persistPilotQARecord(qaRecord).catch((err) =>
-            console.warn('[PolicyExtractor] Failed to persist pilot QA record:', err instanceof Error ? err.message : String(err))
+            console.warn(
+              '[PolicyExtractor] Failed to persist pilot QA record:',
+              err instanceof Error ? err.message : String(err)
+            )
           )
         } catch (err) {
-          console.warn('[PolicyExtractor] Failed to create pilot QA record:', err instanceof Error ? err.message : String(err))
+          console.warn(
+            '[PolicyExtractor] Failed to create pilot QA record:',
+            err instanceof Error ? err.message : String(err)
+          )
         }
       }
     }
@@ -1723,10 +1733,16 @@ async function convertToAnalyzedPolicy(
 
   // Handle premium - AI might return a number or an object with 'amount' field
   let premiumValue = 0
-  if (typeof data.premium === 'number') {
+  let premiumMissing = true
+  if (typeof data.premium === 'number' && data.premium > 0) {
     premiumValue = data.premium
+    premiumMissing = false
   } else if (data.premium && typeof data.premium === 'object' && 'amount' in data.premium) {
-    premiumValue = (data.premium as { amount: number }).amount
+    const amt = (data.premium as { amount: number }).amount
+    if (amt > 0) {
+      premiumValue = amt
+      premiumMissing = false
+    }
     console.warn('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
   }
 
@@ -1735,6 +1751,46 @@ async function convertToAnalyzedPolicy(
 
   // Handle provider - AI might return camelCase or snake_case
   const provider = data.provider ?? (rawData.provider as string) ?? 'Unknown Provider'
+
+  // Handle insured - check multiple AI response patterns
+  const insuredPerson =
+    data.insuredName ??
+    (rawData.insured_name as string) ??
+    (rawData.insuredPerson as string) ??
+    (rawData.policyholder as string) ??
+    (rawData.sigortalı as string) ??
+    (rawData.sigortali as string) ??
+    undefined
+  const insuredMissing =
+    !insuredPerson ||
+    insuredPerson.trim() === '' ||
+    insuredPerson.toLowerCase() === 'unknown' ||
+    insuredPerson.toLowerCase() === 'bilinmiyor'
+
+  // Determine deductible uncertainty for KASKO
+  // For KASKO, deductible=0 from first coverage is NOT proof of zero deductible —
+  // it may just mean the AI didn't extract a specific deductible
+  const rawPolicyTypeForDeductible = data.policyType ?? (rawData.policy_type as string | undefined)
+  const isKaskoForDeductible = rawPolicyTypeForDeductible?.toLowerCase().includes('kasko') ?? false
+  const topDeductible = coverages[0]?.deductible ?? 0
+  const hasExplicitDeductible = data.coverages.some(
+    (c) => c.deductible !== undefined && c.deductible !== null && c.deductible > 0
+  )
+  const deductibleUncertain = isKaskoForDeductible && topDeductible === 0 && !hasExplicitDeductible
+
+  // Build extraction warnings for reviewer mode
+  const extractionWarnings: string[] = []
+  if (premiumMissing) {
+    extractionWarnings.push('Premium was not extracted from the document')
+  }
+  if (insuredMissing) {
+    extractionWarnings.push('Insured person name was not extracted from the document')
+  }
+  if (deductibleUncertain) {
+    extractionWarnings.push(
+      'Deductible status could not be confirmed — may have conditional deductibles'
+    )
+  }
 
   // Build the base policy first for risk assessment
   const basePolicy: AnalyzedPolicy = {
@@ -1755,7 +1811,7 @@ async function convertToAnalyzedPolicy(
     fileName: file.name,
     documentType: 'PDF',
     documentUrl: URL.createObjectURL(file),
-    insuredPerson: data.insuredName ?? (rawData.insured_name as string) ?? undefined,
+    insuredPerson: insuredMissing ? undefined : insuredPerson,
     location: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     coverages,
@@ -1807,6 +1863,10 @@ async function convertToAnalyzedPolicy(
     })(),
     safetyFlags: safetyResult?.flags,
     safetyBlockReason: safetyResult?.blockReason,
+    premiumMissing,
+    insuredMissing,
+    deductibleUncertain,
+    extractionWarnings: extractionWarnings.length > 0 ? extractionWarnings : undefined,
   }
 
   // Prepend AI generated evidence-based insights
@@ -1822,12 +1882,30 @@ async function convertToAnalyzedPolicy(
 
   // Generate base strings (Strengths, Gaps, Recs)
   const generatedInsights = await generateAIInsightsAsync(data)
-  basePolicy.aiInsights.push(...generatedInsights)
+
+  // ── Reviewer-mode prioritization ──────────────────────────────────────
+  // Prepend extraction-quality warnings BEFORE generic insights so reviewers
+  // see the most critical correction points first.
+  if (extractionWarnings.length > 0) {
+    const warningInsights = extractionWarnings.map((w) => `⚠ ${w}`)
+    basePolicy.aiInsights = [...warningInsights, ...basePolicy.aiInsights, ...generatedInsights]
+  } else {
+    basePolicy.aiInsights.push(...generatedInsights)
+  }
 
   // Pad the English array with the same generated insights
   // (The UI will translate "Missing common coverage: X" automatically)
   if (basePolicy.aiInsightsEn) {
-    basePolicy.aiInsightsEn.push(...generatedInsights)
+    if (extractionWarnings.length > 0) {
+      const warningInsightsEn = extractionWarnings.map((w) => `⚠ ${w}`)
+      basePolicy.aiInsightsEn = [
+        ...warningInsightsEn,
+        ...basePolicy.aiInsightsEn,
+        ...generatedInsights,
+      ]
+    } else {
+      basePolicy.aiInsightsEn.push(...generatedInsights)
+    }
   }
 
   // Merge AI generated evidence-based exclusions if they aren't already grouped
@@ -2105,19 +2183,22 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
   const strengths: string[] = []
 
   if (data.coverages.length > 3) {
-    strengths.push('Comprehensive coverage with multiple protection areas')
+    strengths.push('Multiple coverage areas identified in policy')
   }
 
   if (data.coverages.some((c) => c.limit && c.limit > 500000)) {
-    strengths.push('High coverage limits for major risks')
+    strengths.push('Coverage limits above 500,000 TL for some items')
   }
 
-  if (data.coverages.some((c) => c.deductible === 0)) {
+  // Only claim zero deductible if there are also positive deductibles elsewhere
+  // (proving the AI actually extracted deductible data rather than defaulting everything to 0)
+  const hasPositiveDeductible = data.coverages.some((c) => c.deductible && c.deductible > 0)
+  if (hasPositiveDeductible && data.coverages.some((c) => c.deductible === 0)) {
     strengths.push('Zero deductible on some coverages')
   }
 
   if (data.specialConditions.length > 0) {
-    strengths.push('Includes special endorsements for enhanced protection')
+    strengths.push('Special endorsements included')
   }
 
   if (strengths.length === 0) {
@@ -2152,14 +2233,18 @@ const KASKO_IMPLICIT_COVERAGES = [
   'çarpma',
   'çarpışma',
   'collision',
+  'collision damage',
   'hırsızlık',
   'theft',
   'yangın',
   'fire',
+  'fire damage',
   'doğal afet',
   'natural disaster',
+  'natural disasters',
   'sel',
   'flood',
+  'flood damage',
   'deprem',
   'earthquake',
   'ani hareket',
@@ -2168,6 +2253,20 @@ const KASKO_IMPLICIT_COVERAGES = [
   'storm',
   'dolu',
   'hail',
+  // Additional benchmark names that are inherent in KASKO products
+  'kara araçları',
+  'motor own damage',
+  'own damage',
+  'kasko',
+  'comprehensive',
+  'vandalism',
+  'vandalizm',
+  'terör',
+  'terrorism',
+  'grev',
+  'strike',
+  'toprak kayması',
+  'landslide',
 ]
 
 /**
@@ -2199,9 +2298,12 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
     const criticalNameLower = critical.nameTr.toLowerCase()
 
     if (hasBaseKasko) {
+      // For KASKO policies with base coverage identified, suppress all implicit coverage
+      // warnings. KASKO by definition includes collision, theft, fire, natural disasters etc.
+      // Flagging these as "missing" contradicts the comprehensive KASKO classification.
+      const criticalNameEn = getCoverageName(critical)
       const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(
-        (implicit) =>
-          criticalNameLower.includes(implicit) || getCoverageName(critical).includes(implicit)
+        (implicit) => criticalNameLower.includes(implicit) || criticalNameEn.includes(implicit)
       )
       if (isImplicitCoverage) continue
     }

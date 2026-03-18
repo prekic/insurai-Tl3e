@@ -1126,8 +1126,8 @@ export function PolicyDetailView() {
       `${t.policy.type}: ${policy.typeTr}`,
       `${t.policy.insured}: ${policy.insuredPerson}`,
       `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
-      `${t.policy.premiumLabel}: ${formatConverted(policy.premium)}`,
-      `${t.policy.deductibleLabel}: ${formatConverted(policy.deductible)}`,
+      `${t.policy.premiumLabel}: ${policy.premiumMissing ? t.policy.notSpecified : formatConverted(policy.premium)}`,
+      `${t.policy.deductibleLabel}: ${policy.deductibleUncertain ? (locale === 'tr' ? 'Doğrulanamadı' : 'Not confirmed') : formatConverted(policy.deductible)}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${t.policy.coveragesTitleExport} ===`,
@@ -1416,16 +1416,30 @@ export function PolicyDetailView() {
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
                       {t.policy.premiumLabel}
                     </p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.premium > 0 ? formatConverted(policy.premium) : t.policy.notSpecified}
+                    <p
+                      className={`text-sm font-semibold truncate ${policy.premiumMissing ? 'text-amber-600' : 'text-gray-900'}`}
+                    >
+                      {policy.premiumMissing
+                        ? t.policy.notSpecified
+                        : policy.premium > 0
+                          ? formatConverted(policy.premium)
+                          : t.policy.notSpecified}
                     </p>
                   </div>
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
                       {t.policy.deductibleLabel}
                     </p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.deductible > 0 ? formatConverted(policy.deductible) : t.global.none}
+                    <p
+                      className={`text-sm font-semibold truncate ${policy.deductibleUncertain ? 'text-amber-600' : 'text-gray-900'}`}
+                    >
+                      {policy.deductibleUncertain
+                        ? locale === 'tr'
+                          ? 'Doğrulanamadı'
+                          : 'Not confirmed'
+                        : policy.deductible > 0
+                          ? formatConverted(policy.deductible)
+                          : t.global.none}
                     </p>
                   </div>
 

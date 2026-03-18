@@ -274,6 +274,16 @@ export interface AnalyzedPolicy extends Policy {
   safetyBlockReason?: string
   // Phase 4: Unified structured analysis containing scores, insights, benchmarks
   analysisBundle?: import('@/types/analysis').AnalysisBundle
+
+  // ── Extraction completeness flags (reviewer safety) ──────────────────
+  /** True when premium was not extracted from the document (value is 0 as placeholder) */
+  premiumMissing?: boolean
+  /** True when insured person was not extracted from the document */
+  insuredMissing?: boolean
+  /** True when deductible status could not be determined (value is 0 as placeholder) */
+  deductibleUncertain?: boolean
+  /** Reviewer-facing warnings about extraction quality (missing fields, contradictions) */
+  extractionWarnings?: string[]
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {

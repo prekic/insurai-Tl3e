@@ -100,7 +100,11 @@ export function runFullEvaluation(
 
   const scenarios = options?.scenarioOverrides ?? getScenariosForPolicyType(policy.policyType)
 
-  const eoopResult = calculateEOOP(policy, scenarios, mcConfig, semanticExclusions)
+  // Safety guard: block EOOP computation when premium is missing/zero
+  const isPremiumMissing = policy.premium.amount <= 0 || (policy as any)._premiumMissing === true
+  const eoopResult = isPremiumMissing
+    ? buildInsufficientDataEOOP(policy, scenarios, mcConfig)
+    : calculateEOOP(policy, scenarios, mcConfig, semanticExclusions)
   const layerC_ms = performance.now() - layerCStart
 
   // Compute supporting scores for TOPSIS
@@ -398,6 +402,28 @@ function buildBlockedResult(params: {
     needsReview: params.needsReview,
     evaluatedAt: params.now.toISOString(),
   }
+}
+
+/**
+ * Returns an EOOP result indicating insufficient data instead of computing with zeros.
+ * Used when premium is missing/zero — prevents misleading 0 TRY EOOP output.
+ */
+function buildInsufficientDataEOOP(
+  policy: ActuarialPolicyInput,
+  _scenarios: import('./types').RiskScenario[],
+  config: MonteCarloConfig
+): import('./types').EOOPResult {
+  const insufficientMoney: Money = { currency: policy.premium.currency, amount: -1 }
+  return {
+    expectedCost: insufficientMoney,
+    premium: { ...policy.premium },
+    expectedUncoveredLoss: insufficientMoney,
+    percentiles: { p5: -1, p25: -1, p50: -1, p75: -1, p95: -1 },
+    scenarioBreakdown: [],
+    config,
+    contractQualityFactor: -1,
+    _insufficientData: true,
+  } as import('./types').EOOPResult & { _insufficientData: boolean }
 }
 
 function closenessToGrade(closeness: number): string {

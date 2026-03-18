@@ -84,7 +84,11 @@ export function evaluatePolicy(
   let gradeThresholds: GradeThresholds
   let statusThresholds: StatusThresholds
 
-  if ('config' in configOrOptions || 'gradeThresholds' in configOrOptions || 'statusThresholds' in configOrOptions) {
+  if (
+    'config' in configOrOptions ||
+    'gradeThresholds' in configOrOptions ||
+    'statusThresholds' in configOrOptions
+  ) {
     // New signature with options object
     const options = configOrOptions as EvaluatePolicyOptions
     config = options.config || {}
@@ -126,13 +130,25 @@ export function evaluatePolicy(
   // Generate recommendations
   const recommendations = generateRecommendations(
     policy,
-    { premium: premiumScore, coverage: coverageScore, deductible: deductibleScore, compliance: complianceResult, value: valueScore },
+    {
+      premium: premiumScore,
+      coverage: coverageScore,
+      deductible: deductibleScore,
+      compliance: complianceResult,
+      value: valueScore,
+    },
     complianceResult.complianceIssues
   )
 
   // Generate summary
   const summary = generateSummary(
-    { premium: premiumScore, coverage: coverageScore, deductible: deductibleScore, compliance: complianceResult, value: valueScore },
+    {
+      premium: premiumScore,
+      coverage: coverageScore,
+      deductible: deductibleScore,
+      compliance: complianceResult,
+      value: valueScore,
+    },
     recommendations
   )
 
@@ -157,9 +173,14 @@ export function evaluatePolicy(
     marketComparison,
 
     compliance: {
-      isCompliant: complianceResult.complianceIssues.filter(i => i.severity === 'critical').length === 0,
-      mandatoryMet: complianceResult.complianceIssues.filter(i => i.type === 'missing_coverage' && i.severity === 'critical').length === 0,
-      minimumLimitsMet: complianceResult.complianceIssues.filter(i => i.type === 'below_minimum').length === 0,
+      isCompliant:
+        complianceResult.complianceIssues.filter((i) => i.severity === 'critical').length === 0,
+      mandatoryMet:
+        complianceResult.complianceIssues.filter(
+          (i) => i.type === 'missing_coverage' && i.severity === 'critical'
+        ).length === 0,
+      minimumLimitsMet:
+        complianceResult.complianceIssues.filter((i) => i.type === 'below_minimum').length === 0,
       issues: complianceResult.complianceIssues,
     },
 
@@ -177,6 +198,23 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
   const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
   const issues: string[] = []
   const issuesTR: string[] = []
+
+  // Check if premium is missing (flagged by extractor or zero without explicit data)
+  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
+  const isPremiumMissing = analyzedPolicy.premiumMissing === true || policy.premium <= 0
+
+  if (isPremiumMissing) {
+    return {
+      category: 'Premium',
+      categoryTR: 'Prim',
+      score: -1, // Sentinel: insufficient data
+      weight: config.weights.premium,
+      details: 'Premium was not extracted — insufficient data for scoring',
+      detailsTR: 'Prim bilgisi çıkarılamadı — puanlama için yeterli veri yok',
+      issues: ['Premium not available in extracted data'],
+      issuesTR: ['Prim bilgisi çıkarılan veride mevcut değil'],
+    }
+  }
 
   let score = 70 // Default score
   let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market average`
@@ -210,7 +248,7 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
         issuesTR.push('Prim piyasa minimumunun altında - teminatın yeterli olduğunu doğrulayın')
       } else if (policy.premium <= avgPremium) {
         // Great - at or below average
-        score = 90 + Math.round((avgPremium - policy.premium) / avgPremium * 10)
+        score = 90 + Math.round(((avgPremium - policy.premium) / avgPremium) * 10)
         score = Math.min(100, score)
       } else if (policy.premium <= maxPremium) {
         // Above average but within range
@@ -232,7 +270,10 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
   // Check premium relative to coverage (skip for market value policies where coverage is 0)
   if (policy.coverage > 0) {
     const premiumToCoverageRatio = policy.premium / policy.coverage
-    const avgRatio = MARKET_DATA_2024.averagePremiums[insuranceType as keyof typeof MARKET_DATA_2024.averagePremiums] || 5000
+    const avgRatio =
+      MARKET_DATA_2024.averagePremiums[
+        insuranceType as keyof typeof MARKET_DATA_2024.averagePremiums
+      ] || 5000
     const expectedRatio = avgRatio / 100000 // Rough expected ratio
 
     if (premiumToCoverageRatio > expectedRatio * 2) {
@@ -265,9 +306,9 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
 
   // Kasko-specific evaluation
   const isKasko = policy.type === 'kasko'
-  const hasMarketValueCoverage = policy.coverages.some(c => c.isMarketValue)
-  const hasUnlimitedLiability = policy.coverages.some(c =>
-    c.isUnlimited && c.name.toLowerCase().includes('mali sorumluluk')
+  const hasMarketValueCoverage = policy.coverages.some((c) => c.isMarketValue)
+  const hasUnlimitedLiability = policy.coverages.some(
+    (c) => c.isUnlimited && c.name.toLowerCase().includes('mali sorumluluk')
   )
 
   if (isKasko) {
@@ -286,14 +327,14 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     }
 
     // Check for valuable kasko additions
-    const coverageNames = policy.coverages.map(c => c.name.toLowerCase())
-    if (coverageNames.some(n => n.includes('ferdi kaza') || n.includes('koltuk'))) {
+    const coverageNames = policy.coverages.map((c) => c.name.toLowerCase())
+    if (coverageNames.some((n) => n.includes('ferdi kaza') || n.includes('koltuk'))) {
       score += 5 // Personal accident coverage
     }
-    if (coverageNames.some(n => n.includes('ikame') || n.includes('replacement'))) {
+    if (coverageNames.some((n) => n.includes('ikame') || n.includes('replacement'))) {
       score += 5 // Replacement vehicle
     }
-    if (coverageNames.some(n => n.includes('hukuki') || n.includes('legal'))) {
+    if (coverageNames.some((n) => n.includes('hukuki') || n.includes('legal'))) {
       score += 3 // Legal protection
     }
   } else {
@@ -309,7 +350,7 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
   }
 
   // Check number of coverages (applies to all policy types)
-  const includedCoverages = policy.coverages.filter(c => c.included !== false)
+  const includedCoverages = policy.coverages.filter((c) => c.included !== false)
   const coverageCount = includedCoverages.length
 
   if (coverageCount >= 10) {
@@ -329,7 +370,7 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
     // For kasko, missing "essentials" are recommendations, not critical gaps
     const penalty = isKasko ? 5 : 10
     score -= missingEssential.length * penalty
-    missingEssential.forEach(m => {
+    missingEssential.forEach((m) => {
       if (isKasko) {
         issues.push(`Recommended coverage: ${m.en}`)
         issuesTR.push(`Önerilen teminat: ${m.tr}`)
@@ -342,7 +383,9 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
 
   // Check coverage limits (skip for kasko - supplementary coverages like glass, roadside often have low limits)
   if (!isKasko) {
-    const lowLimitCoverages = includedCoverages.filter(c => c.limit > 0 && c.limit < 50000 && !c.isUnlimited)
+    const lowLimitCoverages = includedCoverages.filter(
+      (c) => c.limit > 0 && c.limit < 50000 && !c.isUnlimited
+    )
     if (lowLimitCoverages.length > 2) {
       score -= 10
       issues.push('Several coverages have low limits')
@@ -379,7 +422,7 @@ function evaluateCoverage(policy: Policy, config: EvaluationConfig): ScoreBreakd
 
 function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: string }[] {
   const missing: { en: string; tr: string }[] = []
-  const coverageNames = policy.coverages.filter(c => c.included).map(c => c.name.toLowerCase())
+  const coverageNames = policy.coverages.filter((c) => c.included).map((c) => c.name.toLowerCase())
 
   // IMPORTANT: For kasko, Collision, Theft, Fire, Natural Disasters are IMPLICIT
   // They are included in the base kasko premium - don't flag them as missing!
@@ -405,12 +448,8 @@ function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: strin
       { en: 'Hospitalization', tr: 'Yatarak Tedavi' },
       { en: 'Surgery', tr: 'Ameliyat' },
     ],
-    life: [
-      { en: 'Death Benefit', tr: 'Vefat Teminatı' },
-    ],
-    dask: [
-      { en: 'Earthquake', tr: 'Deprem' },
-    ],
+    life: [{ en: 'Death Benefit', tr: 'Vefat Teminatı' }],
+    dask: [{ en: 'Earthquake', tr: 'Deprem' }],
     business: [
       { en: 'Fire', tr: 'Yangın' },
       { en: 'Theft', tr: 'Hırsızlık' },
@@ -426,9 +465,9 @@ function checkMissingEssentialCoverages(policy: Policy): { en: string; tr: strin
   const essentials = essentialByType[policy.type] || []
 
   for (const essential of essentials) {
-    const found = coverageNames.some(name =>
-      name.includes(essential.en.toLowerCase()) ||
-      name.includes(essential.tr.toLowerCase())
+    const found = coverageNames.some(
+      (name) =>
+        name.includes(essential.en.toLowerCase()) || name.includes(essential.tr.toLowerCase())
     )
     if (!found) {
       missing.push({ en: essential.en, tr: essential.tr })
@@ -449,18 +488,38 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
 
   // Handle market value policies where coverage field is 0
   // In this case, we can only evaluate the absolute deductible amount
-  const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+  const hasMarketValueCoverage =
+    policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
+
+  // Check if deductible status is uncertain (flagged by extractor)
+  const analyzedPolicyDed = policy as import('@/types/policy').AnalyzedPolicy
+  const isDeductibleUncertain = analyzedPolicyDed.deductibleUncertain === true
 
   if (policy.deductible === 0) {
-    // No deductible is excellent
+    if (isDeductibleUncertain) {
+      // Deductible was not confidently extracted — do not claim "no deductible"
+      return {
+        category: 'Deductible',
+        categoryTR: 'Muafiyet',
+        score: -1, // Sentinel: insufficient data
+        weight: config.weights.deductible,
+        details:
+          'Deductible status not confirmed — may have conditional or scenario-specific deductibles',
+        detailsTR:
+          'Muafiyet durumu doğrulanamadı — koşullu veya senaryoya özel muafiyetler olabilir',
+        issues: ['Deductible information not confidently extracted'],
+        issuesTR: ['Muafiyet bilgisi güvenilir şekilde çıkarılamadı'],
+      }
+    }
+    // Explicitly confirmed zero deductible
     score = 95
     return {
       category: 'Deductible',
       categoryTR: 'Muafiyet',
       score,
       weight: config.weights.deductible,
-      details: 'No deductible - full coverage from first TL',
-      detailsTR: 'Muafiyet yok - ilk TL\'den itibaren tam teminat',
+      details: 'No unconditional deductible identified in policy wording',
+      detailsTR: 'Poliçe metninde koşulsuz muafiyet tespit edilmedi',
       issues: [],
       issuesTR: [],
     }
@@ -508,20 +567,20 @@ function evaluateDeductible(policy: Policy, config: EvaluationConfig): ScoreBrea
   } else if (deductibleRatio < 0.05) {
     score = 65
     issues.push('Deductible is moderately high (2-5% of coverage)')
-    issuesTR.push('Muafiyet orta düzeyde yüksek (teminatın %2-5\'i)')
-  } else if (deductibleRatio < 0.10) {
+    issuesTR.push("Muafiyet orta düzeyde yüksek (teminatın %2-5'i)")
+  } else if (deductibleRatio < 0.1) {
     score = 50
     issues.push('Deductible is high (5-10% of coverage)')
-    issuesTR.push('Muafiyet yüksek (teminatın %5-10\'u)')
+    issuesTR.push("Muafiyet yüksek (teminatın %5-10'u)")
   } else {
     score = 30
     issues.push('Deductible is very high (>10% of coverage)')
-    issuesTR.push('Muafiyet çok yüksek (teminatın >%10\'u)')
+    issuesTR.push("Muafiyet çok yüksek (teminatın >%10'u)")
   }
 
   // Check individual coverage deductibles
-  const highDeductibleCoverages = policy.coverages.filter(c =>
-    c.included && c.deductible > 0 && c.limit > 0 && (c.deductible / c.limit) > 0.1
+  const highDeductibleCoverages = policy.coverages.filter(
+    (c) => c.included && c.deductible > 0 && c.limit > 0 && c.deductible / c.limit > 0.1
   )
 
   if (highDeductibleCoverages.length > 0) {
@@ -598,7 +657,9 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   // Check minimum limits for traffic insurance
   if (policy.type === 'traffic') {
     const limits = getCurrentTrafficLimits()
-    const autoLimit = limits.limits.find(l => l.vehicleType === 'automobile' && l.coverageType === 'bodily_injury_per_person')
+    const autoLimit = limits.limits.find(
+      (l) => l.vehicleType === 'automobile' && l.coverageType === 'bodily_injury_per_person'
+    )
 
     if (autoLimit && policy.coverage < (autoLimit.perPerson || 0)) {
       score -= 30
@@ -619,7 +680,9 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   // Check DASK compliance
   if (policy.type === 'dask') {
     const daskLimits = getCurrentDaskLimits()
-    const maxCoverage = daskLimits.limits.find(l => l.coverageType === 'max_coverage')?.maxLimit || DASK_PREMIUM_RATES_2026.maxCoverage
+    const maxCoverage =
+      daskLimits.limits.find((l) => l.coverageType === 'max_coverage')?.maxLimit ||
+      DASK_PREMIUM_RATES_2026.maxCoverage
 
     if (policy.coverage > maxCoverage) {
       // Over-insured - unusual but not critical
@@ -636,12 +699,15 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
 
     // Check deductible is 2%
     const expectedDeductible = policy.coverage * 0.02
-    if (policy.deductible > 0 && Math.abs(policy.deductible - expectedDeductible) > expectedDeductible * 0.1) {
+    if (
+      policy.deductible > 0 &&
+      Math.abs(policy.deductible - expectedDeductible) > expectedDeductible * 0.1
+    ) {
       issues.push({
         type: 'regulatory',
         severity: 'medium',
         description: 'DASK deductible should be 2% of insured value',
-        descriptionTR: 'DASK muafiyeti sigorta bedelinin %2\'si olmalıdır',
+        descriptionTR: "DASK muafiyeti sigorta bedelinin %2'si olmalıdır",
         requiredValue: expectedDeductible,
         actualValue: policy.deductible,
       })
@@ -656,8 +722,14 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
     categoryTR: 'Uyumluluk',
     score,
     weight: config.weights.compliance,
-    details: issues.length === 0 ? 'Policy meets all regulatory requirements' : `${issues.length} compliance issue(s) found`,
-    detailsTR: issues.length === 0 ? 'Poliçe tüm yasal gereksinimleri karşılıyor' : `${issues.length} uyumluluk sorunu bulundu`,
+    details:
+      issues.length === 0
+        ? 'Policy meets all regulatory requirements'
+        : `${issues.length} compliance issue(s) found`,
+    detailsTR:
+      issues.length === 0
+        ? 'Poliçe tüm yasal gereksinimleri karşılıyor'
+        : `${issues.length} uyumluluk sorunu bulundu`,
     issues: textIssues,
     issuesTR: textIssuesTR,
     complianceIssues: issues,
@@ -678,17 +750,43 @@ function evaluateValue(
   const issuesTR: string[] = []
 
   // Handle market value policies where coverage is 0
-  const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+  const hasMarketValueCoverage =
+    policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
+
+  // If premium score is insufficient data (-1), value score is also insufficient
+  if (premiumScore < 0) {
+    return {
+      category: 'Value',
+      categoryTR: 'Değer',
+      score: -1,
+      weight: config.weights.value,
+      details: 'Value assessment requires premium data — insufficient data',
+      detailsTR: 'Değer değerlendirmesi prim bilgisi gerektirir — yeterli veri yok',
+      issues: ['Cannot assess value without premium data'],
+      issuesTR: ['Prim verisi olmadan değer değerlendirilemez'],
+    }
+  }
 
   // Calculate base value score
-  let score = (premiumScore * 0.4 + coverageScore * 0.6)
+  let score = premiumScore * 0.4 + coverageScore * 0.6
 
   // For market value policies, evaluate based on coverage quality and features
   if (hasMarketValueCoverage) {
     // Check for value-added coverages
-    const valueCoverages = ['roadside assistance', 'yol yardım', 'anadolu hizmet', 'replacement vehicle', 'ikame araç', 'legal protection', 'hukuki koruma', 'mini onarım', 'cam', 'glass']
-    const valueAddedCount = policy.coverages.filter(c =>
-      c.included && valueCoverages.some(vc => c.name.toLowerCase().includes(vc))
+    const valueCoverages = [
+      'roadside assistance',
+      'yol yardım',
+      'anadolu hizmet',
+      'replacement vehicle',
+      'ikame araç',
+      'legal protection',
+      'hukuki koruma',
+      'mini onarım',
+      'cam',
+      'glass',
+    ]
+    const valueAddedCount = policy.coverages.filter(
+      (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
     ).length
 
     if (valueAddedCount >= 3) {
@@ -737,9 +835,16 @@ function evaluateValue(
   }
 
   // Check for value-added coverages
-  const valueCoverages = ['roadside assistance', 'yol yardım', 'replacement vehicle', 'ikame araç', 'legal protection', 'hukuki koruma']
-  const hasValueAdded = policy.coverages.some(c =>
-    c.included && valueCoverages.some(vc => c.name.toLowerCase().includes(vc))
+  const valueCoverages = [
+    'roadside assistance',
+    'yol yardım',
+    'replacement vehicle',
+    'ikame araç',
+    'legal protection',
+    'hukuki koruma',
+  ]
+  const hasValueAdded = policy.coverages.some(
+    (c) => c.included && valueCoverages.some((vc) => c.name.toLowerCase().includes(vc))
   )
 
   if (hasValueAdded) {
@@ -780,6 +885,8 @@ function calculateOverallScore(
 
   for (const [category, score] of Object.entries(scores)) {
     const weight = weights[category] || 0
+    // Skip categories with -1 sentinel (insufficient data) — do not include in score
+    if (score < 0) continue
     weightedSum += score * weight
     totalWeight += weight
   }
@@ -805,9 +912,10 @@ function generateMarketComparison(
       const rateRange = (benchmark.valueMaxRate || 0) - (benchmark.valueMinRate || 0)
 
       if (rateRange > 0 && benchmark.valueMinRate) {
-        premiumPercentile = Math.max(0, Math.min(100,
-          100 - ((actualRate - benchmark.valueMinRate) / rateRange * 100)
-        ))
+        premiumPercentile = Math.max(
+          0,
+          Math.min(100, 100 - ((actualRate - benchmark.valueMinRate) / rateRange) * 100)
+        )
       }
 
       // Coverage percentile is less meaningful for value-based, use 70 as neutral
@@ -816,16 +924,16 @@ function generateMarketComparison(
       // Direct premium comparison
       const premiumRange = benchmark.maxPremium - benchmark.minPremium
       if (premiumRange > 0) {
-        premiumPercentile = Math.max(0, Math.min(100,
-          100 - ((policy.premium - benchmark.minPremium) / premiumRange * 100)
-        ))
+        premiumPercentile = Math.max(
+          0,
+          Math.min(100, 100 - ((policy.premium - benchmark.minPremium) / premiumRange) * 100)
+        )
       }
 
       // Estimate coverage percentile based on premium
       const expectedCoverage = policy.premium * 20 // Rough estimate
-      coveragePercentile = policy.coverage > 0
-        ? Math.min(100, (policy.coverage / expectedCoverage) * 50)
-        : 50
+      coveragePercentile =
+        policy.coverage > 0 ? Math.min(100, (policy.coverage / expectedCoverage) * 50) : 50
     }
   }
 
@@ -854,7 +962,7 @@ function generateRecommendations(
   const recommendations: Recommendation[] = []
 
   // Critical compliance issues first - with specific details
-  for (const issue of complianceIssues.filter(i => i.severity === 'critical')) {
+  for (const issue of complianceIssues.filter((i) => i.severity === 'critical')) {
     let specificTitle = 'Address Compliance Issue'
     let specificTitleTR = 'Uyumluluk Sorununu Giderin'
 
@@ -878,24 +986,38 @@ function generateRecommendations(
 
   // Coverage improvements - with specific missing coverages
   if (scores.coverage.score < 70) {
-    const missingIssues = scores.coverage.issues.filter(i => i.includes('Missing') || i.includes('essential'))
-    const missingCoverages = missingIssues.length > 0
-      ? missingIssues.map(i => i.replace('Missing essential coverage: ', '')).join(', ')
-      : null
+    const missingIssues = scores.coverage.issues.filter(
+      (i) => i.includes('Missing') || i.includes('essential')
+    )
+    const missingCoverages =
+      missingIssues.length > 0
+        ? missingIssues.map((i) => i.replace('Missing essential coverage: ', '')).join(', ')
+        : null
 
     const specificDescription = missingCoverages
       ? `Add missing coverages: ${missingCoverages}. These are standard in most ${policy.type} policies.`
       : 'Your policy has fewer coverages than typical market offerings. Request quotes with additional protections.'
 
     const specificDescriptionTR = missingCoverages
-      ? `Eksik teminatları ekleyin: ${scores.coverage.issuesTR.filter(i => i.includes('Eksik')).map(i => i.replace('Eksik temel teminat: ', '')).join(', ')}. Bunlar çoğu ${policy.typeTr} poliçesinde standart olarak bulunur.`
+      ? `Eksik teminatları ekleyin: ${scores.coverage.issuesTR
+          .filter((i) => i.includes('Eksik'))
+          .map((i) => i.replace('Eksik temel teminat: ', ''))
+          .join(', ')}. Bunlar çoğu ${policy.typeTr} poliçesinde standart olarak bulunur.`
       : 'Poliçenizde piyasa ortalamasından daha az teminat var. Ek korumalar içeren teklifler isteyin.'
 
     recommendations.push({
       priority: 'high',
       type: 'add_coverage',
-      title: missingCoverages ? `Add Missing: ${missingCoverages.substring(0, 30)}${missingCoverages.length > 30 ? '...' : ''}` : 'Expand Coverage Portfolio',
-      titleTR: missingCoverages ? `Eksik Ekleyin: ${scores.coverage.issuesTR.filter(i => i.includes('Eksik')).map(i => i.replace('Eksik temel teminat: ', '')).join(', ').substring(0, 30)}` : 'Teminat Portföyünü Genişletin',
+      title: missingCoverages
+        ? `Add Missing: ${missingCoverages.substring(0, 30)}${missingCoverages.length > 30 ? '...' : ''}`
+        : 'Expand Coverage Portfolio',
+      titleTR: missingCoverages
+        ? `Eksik Ekleyin: ${scores.coverage.issuesTR
+            .filter((i) => i.includes('Eksik'))
+            .map((i) => i.replace('Eksik temel teminat: ', ''))
+            .join(', ')
+            .substring(0, 30)}`
+        : 'Teminat Portföyünü Genişletin',
       description: specificDescription,
       descriptionTR: specificDescriptionTR,
       estimatedImpact: {
@@ -910,7 +1032,8 @@ function generateRecommendations(
   if (scores.deductible.score < 60 && policy.deductible > 0) {
     const deductibleAmount = policy.deductible.toLocaleString('tr-TR')
     // Handle market value policies where coverage is 0
-    const hasMarketValueCoverage = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+    const hasMarketValueCoverage =
+      policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
     const deductibleDesc = hasMarketValueCoverage
       ? `Your deductible of ₺${deductibleAmount} is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it.`
       : `Your deductible of ₺${deductibleAmount} (${((policy.deductible / policy.coverage) * 100).toFixed(1)}% of coverage) is high. In a claim, you'd pay this amount out-of-pocket. Ask your agent about reducing it by 50%.`
@@ -952,7 +1075,8 @@ function generateRecommendations(
 
   // Value optimization - specific suggestions
   // Skip for market value policies where coverage is 0 (ratio would be 0/premium = 0)
-  const hasMarketValuePolicyValue = policy.coverage === 0 || policy.coverages.some(c => c.isMarketValue)
+  const hasMarketValuePolicyValue =
+    policy.coverage === 0 || policy.coverages.some((c) => c.isMarketValue)
   if (scores.value.score < 60 && !hasMarketValuePolicyValue) {
     const coverageToPremium = (policy.coverage / policy.premium).toFixed(1)
 
@@ -973,8 +1097,10 @@ function generateRecommendations(
       type: 'optimize',
       title: 'Policy Well-Structured',
       titleTR: 'Poliçe İyi Yapılandırılmış',
-      description: 'Your policy offers good value. Consider reviewing annually before renewal to ensure continued competitiveness.',
-      descriptionTR: 'Poliçeniz iyi değer sunuyor. Rekabetçiliğin devam etmesini sağlamak için yenileme öncesi yıllık incelemeyi düşünün.',
+      description:
+        'Your policy offers good value. Consider reviewing annually before renewal to ensure continued competitiveness.',
+      descriptionTR:
+        'Poliçeniz iyi değer sunuyor. Rekabetçiliğin devam etmesini sağlamak için yenileme öncesi yıllık incelemeyi düşünün.',
     })
   }
 
@@ -1001,12 +1127,12 @@ function generateSummary(
   }
 
   const immediateActions = recommendations
-    .filter(r => r.priority === 'critical' || r.priority === 'high')
-    .map(r => r.title)
+    .filter((r) => r.priority === 'critical' || r.priority === 'high')
+    .map((r) => r.title)
 
   const immediateActionsTR = recommendations
-    .filter(r => r.priority === 'critical' || r.priority === 'high')
-    .map(r => r.titleTR)
+    .filter((r) => r.priority === 'critical' || r.priority === 'high')
+    .map((r) => r.titleTR)
 
   return {
     strengths,

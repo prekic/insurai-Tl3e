@@ -315,6 +315,14 @@ export interface PilotQARecord {
   specialConditionMiss: boolean
   majorCorrection: boolean
 
+  // Reviewer-critical extraction quality fields
+  premiumMissing: boolean
+  insuredMissing: boolean
+  deductibleUncertain: boolean
+  coverageContradiction: boolean
+  actuarialBlockedDueToMissingInputs: boolean
+  reviewerMajorCorrectionReason: string
+
   reviewerNotes: string
 }
 
@@ -357,6 +365,12 @@ export function createPilotQARecord(
     deductibleMiss: false,
     specialConditionMiss: false,
     majorCorrection: false,
+    premiumMissing: false,
+    insuredMissing: false,
+    deductibleUncertain: false,
+    coverageContradiction: false,
+    actuarialBlockedDueToMissingInputs: false,
+    reviewerMajorCorrectionReason: '',
     reviewerNotes: '',
   }
 }
