@@ -107,9 +107,7 @@ export function FeatureFlagsPanel() {
       const data = await response.json()
       if (data.success) {
         setFlags((prev) =>
-          prev.map((f) =>
-            f.key === flag.key ? { ...f, rolloutPercentage: editRollout } : f
-          )
+          prev.map((f) => (f.key === flag.key ? { ...f, rolloutPercentage: editRollout } : f))
         )
         setEditingFlag(null)
       } else {
@@ -130,13 +128,19 @@ export function FeatureFlagsPanel() {
 
   const getFlagStatusBadge = (flag: FeatureFlag) => {
     if (!flag.enabled) {
-      return <Badge variant="outline" className="bg-gray-100 text-gray-600">Disabled</Badge>
+      return (
+        <Badge variant="outline" className="bg-gray-100 text-gray-600">
+          Disabled
+        </Badge>
+      )
     }
     if (flag.rolloutPercentage === 100) {
       return <Badge className="bg-green-100 text-green-700">Fully Enabled</Badge>
     }
     if (flag.rolloutPercentage > 0) {
-      return <Badge className="bg-yellow-100 text-yellow-700">{flag.rolloutPercentage}% Rollout</Badge>
+      return (
+        <Badge className="bg-yellow-100 text-yellow-700">{flag.rolloutPercentage}% Rollout</Badge>
+      )
     }
     return <Badge className="bg-blue-100 text-blue-700">Enabled (0%)</Badge>
   }
@@ -222,18 +226,14 @@ export function FeatureFlagsPanel() {
         {flags.map((flag) => (
           <Card
             key={flag.key}
-            className={`transition-colors ${
-              flag.enabled ? 'border-green-200' : 'border-gray-200'
-            }`}
+            className={`transition-colors ${flag.enabled ? 'border-green-200' : 'border-gray-200'}`}
           >
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-semibold text-lg">
-                      {flag.key
-                        .replace(/_/g, ' ')
-                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                      {flag.key.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
                     </h3>
                     {getFlagStatusBadge(flag)}
                   </div>
@@ -290,28 +290,16 @@ export function FeatureFlagsPanel() {
                     </span>
                     {editingFlag === flag.key ? (
                       <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => updateRollout(flag)}
-                          disabled={isSaving}
-                        >
+                        <Button size="sm" onClick={() => updateRollout(flag)} disabled={isSaving}>
                           <Save className="h-4 w-4 mr-1" />
                           Save
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setEditingFlag(null)}
-                        >
+                        <Button size="sm" variant="outline" onClick={() => setEditingFlag(null)}>
                           Cancel
                         </Button>
                       </div>
                     ) : (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => startEditingRollout(flag)}
-                      >
+                      <Button size="sm" variant="ghost" onClick={() => startEditingRollout(flag)}>
                         Edit
                       </Button>
                     )}
@@ -393,6 +381,43 @@ export function FeatureFlagsPanel() {
           </CardContent>
         </Card>
       )}
+
+      {/* KASKO Pilot status callout */}
+      {(() => {
+        const pilotFlag = flags.find((f) => f.key === 'kasko_ai_extraction_pilot')
+        if (!pilotFlag) return null
+        const isActive = pilotFlag.enabled && pilotFlag.rolloutPercentage > 0
+        return (
+          <div
+            className={`p-4 rounded-lg flex items-start gap-3 border ${
+              isActive
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-gray-50 border-gray-200 text-gray-700'
+            }`}
+            data-testid="kasko-pilot-callout"
+          >
+            <Flag className="h-5 w-5 mt-0.5 flex-shrink-0" />
+            <div className="text-sm">
+              <strong>KASKO Pilot Status:</strong>{' '}
+              {isActive ? (
+                <>
+                  Active at {pilotFlag.rolloutPercentage}% rollout.
+                  {pilotFlag.userSegments.length > 0 && (
+                    <> Segments: {pilotFlag.userSegments.join(', ')}.</>
+                  )}{' '}
+                  Manage reviewers in the Users tab.
+                </>
+              ) : (
+                <>
+                  Inactive. To activate: (1) assign users to{' '}
+                  <code className="px-1 bg-gray-200 rounded text-xs">kasko_pilot_reviewers</code>{' '}
+                  segment in the Users tab, then (2) enable this flag and set rollout to 100%.
+                </>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Info box */}
       <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3 text-blue-700">
