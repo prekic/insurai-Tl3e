@@ -134,6 +134,19 @@ vi.mock('@/lib/export', () => ({
   exportSinglePolicyToCSV: vi.fn(),
 }))
 
+vi.mock('@/hooks/usePilotGateOptions', () => ({
+  usePilotGateOptions: () => ({
+    featureFlags: {},
+    userSegments: [],
+    userId: undefined,
+    isLoading: false,
+  }),
+}))
+
+vi.mock('@/hooks/useDisplaySafeSummary', () => ({
+  useDisplaySafeSummary: () => null,
+}))
+
 function renderPolicyDetailView(policyId = 'policy-1') {
   return render(
     <MemoryRouter initialEntries={[`/policy/${policyId}`]}>

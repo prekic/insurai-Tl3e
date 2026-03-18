@@ -59,6 +59,8 @@ import {
 } from '@/lib/actuarial-engine'
 import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryChart'
 import { applySafeWording } from '@/lib/analysis/display-interpreter'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
+import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
 
 /**
  * Format coverage limit with display-safe wording governance.
@@ -1046,6 +1048,11 @@ export function PolicyDetailView() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const { exportPolicy, isGenerating: isPdfGenerating } = usePdfExport()
 
+  // KASKO pilot gate — checks feature flag + user segment
+  const pilotOptions = usePilotGateOptions()
+  const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
+  const isPilotResult = displaySummary?.isPilotResult ?? false
+
   // Close export menu on outside click
   useEffect(() => {
     if (!exportMenuOpen) return
@@ -1562,6 +1569,29 @@ export function PolicyDetailView() {
 
             {/* AI Insights - Mobile only (high priority) */}
             <Card className="lg:hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              {isPilotResult && (
+                <div
+                  className="p-3 border-b-2 border-amber-400 bg-amber-50 rounded-t-lg"
+                  role="alert"
+                  aria-live="polite"
+                  data-testid="pilot-review-banner"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
+                    <div>
+                      <p className="font-semibold text-amber-800 text-xs">
+                        TASLAK / DRAFT — {t.policy.humanReviewRequired || 'Human Review Required'}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        {displaySummary?.pilotReviewBanner ||
+                          (locale === 'tr'
+                            ? 'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'
+                            : 'These results are AI-generated. Not finalized without human approval.')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
@@ -1936,6 +1966,42 @@ export function PolicyDetailView() {
 
             {/* AI Insights */}
             <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              {isPilotResult && (
+                <div
+                  className="p-4 border-b-2 border-amber-400 bg-amber-50 rounded-t-lg"
+                  role="alert"
+                  aria-live="polite"
+                  data-testid="pilot-review-banner-desktop"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <p className="font-semibold text-amber-800 text-sm">
+                        TASLAK / DRAFT — {t.policy.humanReviewRequired || 'Human Review Required'}
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        {displaySummary?.pilotReviewBanner ||
+                          (locale === 'tr'
+                            ? 'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'
+                            : 'These results are AI-generated. Not finalized without human approval.')}
+                      </p>
+                      {displaySummary?.pilotReviewStatus && (
+                        <Badge className="mt-2 bg-amber-100 text-amber-800 border border-amber-300">
+                          {displaySummary.pilotReviewStatus === 'pending_review'
+                            ? locale === 'tr'
+                              ? 'İnceleme Bekliyor'
+                              : 'Pending Review'
+                            : displaySummary.pilotReviewStatus === 'review_in_progress'
+                              ? locale === 'tr'
+                                ? 'İnceleniyor'
+                                : 'Review In Progress'
+                              : displaySummary.pilotReviewStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-900">
                   <Sparkles className="text-purple-600" size={20} />
