@@ -2130,8 +2130,9 @@ function translateInsightsToTr(insights: string[]): string[] {
  */
 async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const insights: string[] = []
-  insights.push(...generateStrengths(data).map((s) => `✓ ${s}`))
+  // Reviewer-mode priority order: gaps/warnings first, then strengths, then recommendations
   insights.push(...(await generateGapsAsync(data)).map((g) => `⚠ ${g}`))
+  insights.push(...generateStrengths(data).map((s) => `✓ ${s}`))
   insights.push(...(await generateRecommendationsAsync(data)).map((r) => `💡 ${r}`))
 
   const currency = data.currency ?? 'TRY'
@@ -2399,7 +2400,10 @@ async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<
     )
   }
 
-  recommendations.push('Review coverage limits annually to ensure adequate protection')
+  // Only add generic advice when no more critical recommendations were found
+  if (recommendations.length === 0) {
+    recommendations.push('Review coverage limits annually to ensure adequate protection')
+  }
   return recommendations.slice(0, 5)
 }
 

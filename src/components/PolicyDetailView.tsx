@@ -1127,7 +1127,7 @@ export function PolicyDetailView() {
       `${t.policy.insured}: ${policy.insuredPerson}`,
       `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
       `${t.policy.premiumLabel}: ${policy.premiumMissing ? t.policy.notSpecified : formatConverted(policy.premium)}`,
-      `${t.policy.deductibleLabel}: ${policy.deductibleUncertain ? (locale === 'tr' ? 'Doğrulanamadı' : 'Not confirmed') : formatConverted(policy.deductible)}`,
+      `${t.policy.deductibleLabel}: ${policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0) ? (locale === 'tr' ? 'Koşullu / inceleme gerekli' : 'Conditional / requires review') : formatConverted(policy.deductible)}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${t.policy.coveragesTitleExport} ===`,
@@ -1431,12 +1431,18 @@ export function PolicyDetailView() {
                       {t.policy.deductibleLabel}
                     </p>
                     <p
-                      className={`text-sm font-semibold truncate ${policy.deductibleUncertain ? 'text-amber-600' : 'text-gray-900'}`}
+                      className={`text-sm font-semibold truncate ${
+                        policy.deductibleUncertain ||
+                        (policy.type === 'kasko' && policy.deductible === 0)
+                          ? 'text-amber-600'
+                          : 'text-gray-900'
+                      }`}
                     >
-                      {policy.deductibleUncertain
+                      {policy.deductibleUncertain ||
+                      (policy.type === 'kasko' && policy.deductible === 0)
                         ? locale === 'tr'
-                          ? 'Doğrulanamadı'
-                          : 'Not confirmed'
+                          ? 'Koşullu / inceleme gerekli'
+                          : 'Conditional / requires review'
                         : policy.deductible > 0
                           ? formatConverted(policy.deductible)
                           : t.global.none}
@@ -1620,8 +1626,19 @@ export function PolicyDetailView() {
               </CardHeader>
               <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 sm:space-y-3">
-                  {(insightsExpanded ? policy.aiInsights : policy.aiInsights.slice(0, 3)).map(
-                    (_insight, i) => {
+                  {(() => {
+                    // Deduplicate insights: strip emoji prefixes, normalize, keep first occurrence
+                    const seen = new Set<string>()
+                    const deduped = policy.aiInsights.filter((insight) => {
+                      const normalized = insight
+                        .replace(/^(?:[✓✔☑⚠💡❌🔍]|\uFE0F)\s*/gu, '')
+                        .trim()
+                        .toLowerCase()
+                      if (seen.has(normalized)) return false
+                      seen.add(normalized)
+                      return true
+                    })
+                    return (insightsExpanded ? deduped : deduped.slice(0, 3)).map((_insight, i) => {
                       // Get localized insight: pre-translated (new) or display-time translated (legacy)
                       const rawLocalized = getLocalizedInsight(
                         policy,
@@ -1668,26 +1685,38 @@ export function PolicyDetailView() {
                           )}
                         </div>
                       )
-                    }
-                  )}
-                  {policy.aiInsights.length > 3 && (
-                    <button
-                      onClick={() => setInsightsExpanded(!insightsExpanded)}
-                      className="flex items-center justify-center gap-1 w-full mt-1 py-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium"
-                    >
-                      {insightsExpanded ? (
-                        <>
-                          <ChevronUp size={14} />
-                          {t.common.showLess}
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown size={14} />+{policy.aiInsights.length - 3}{' '}
-                          {t.policy.moreInsights}
-                        </>
-                      )}
-                    </button>
-                  )}
+                    })
+                  })()}
+                  {(() => {
+                    // Compute deduped count for expand button
+                    const seenBtn = new Set<string>()
+                    const dedupedCount = policy.aiInsights.filter((insight) => {
+                      const n = insight
+                        .replace(/^(?:[✓✔☑⚠💡❌🔍]|\uFE0F)\s*/gu, '')
+                        .trim()
+                        .toLowerCase()
+                      if (seenBtn.has(n)) return false
+                      seenBtn.add(n)
+                      return true
+                    }).length
+                    return dedupedCount > 3 ? (
+                      <button
+                        onClick={() => setInsightsExpanded(!insightsExpanded)}
+                        className="flex items-center justify-center gap-1 w-full mt-1 py-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        {insightsExpanded ? (
+                          <>
+                            <ChevronUp size={14} />
+                            {t.common.showLess}
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={14} />+{dedupedCount - 3} {t.policy.moreInsights}
+                          </>
+                        )}
+                      </button>
+                    ) : null
+                  })()}
                 </div>
               </CardContent>
             </Card>

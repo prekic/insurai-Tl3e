@@ -91,6 +91,12 @@ export function applySafeWording(text: string): string {
     ],
     [/\bfully compliant\b/gi, 'Compliance status based on available policy data'],
     [/\bmuafiyetsiz\b/gi, 'Muafiyet durumu senaryoya bağlıdır'],
+    [
+      /sınırsız cam onarımı[^.]*hasarsızlığı etkilemiyor/gi,
+      'Cam teminatı özel şartlara bağlı olabilir — insan incelemesiyle doğrulanmalı',
+    ],
+    [/\bsınırsız\b/gi, 'Özel şartlara bağlı olabilir'],
+    [/\btamamen kapsar\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
   ]
 
   for (const [pattern, replacement] of replacements) {

@@ -724,11 +724,11 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
     weight: config.weights.compliance,
     details:
       issues.length === 0
-        ? 'Policy meets all regulatory requirements'
+        ? 'No compliance issue detected in extracted fields'
         : `${issues.length} compliance issue(s) found`,
     detailsTR:
       issues.length === 0
-        ? 'Poliçe tüm yasal gereksinimleri karşılıyor'
+        ? 'Çıkarılan alanlarda uyumluluk sorunu tespit edilmedi'
         : `${issues.length} uyumluluk sorunu bulundu`,
     issues: textIssues,
     issuesTR: textIssuesTR,
