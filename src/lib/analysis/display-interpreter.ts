@@ -122,6 +122,14 @@ export function applySafeWording(text: string): string {
       'Cam değişimi ve hasarsızlık indirimi ilişkisi özel şartlarla doğrulanmalı',
     ],
     [/değerli\s+bir\s+avantaj/gi, 'detay için özel şartlara bakılmalı'],
+    // Issue 5: Catch long awkward glass-repair insight before generic "sınırsız" replacement
+    // "sınırsız cam onarımı imkanı ile değişim yerine onarım yapıldığında araç değeri korunur"
+    // The optional prefix handles: bare "cam onarımı...", "sınırsız cam onarımı...",
+    // or post-cascade "Özel şartlara bağlı olabilir cam onarımı..."
+    [
+      /(?:sınırsız\s+|özel şartlara bağlı olabilir\s+)?cam\s+onar[ıi]m[ıi]\s+imkan[ıi]\s+ile[^.]*ara[çc]\s+de[ğg]eri\s+korunur/gi,
+      'Cam hasarında onarım önceliği özel şartlara bağlı olabilir',
+    ],
     [/\bsınırsız\b/gi, 'Özel şartlara bağlı olabilir'],
     [/\btamamen kapsar\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
   ]

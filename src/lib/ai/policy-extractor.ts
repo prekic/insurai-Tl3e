@@ -1778,18 +1778,16 @@ async function convertToAnalyzedPolicy(
   )
   const deductibleUncertain = isKaskoForDeductible && topDeductible === 0 && !hasExplicitDeductible
 
-  // Build extraction warnings for reviewer mode
+  // Build extraction warnings for reviewer mode (Turkish for language consistency)
   const extractionWarnings: string[] = []
   if (premiumMissing) {
-    extractionWarnings.push('Premium was not extracted from the document')
+    extractionWarnings.push('Prim bilgisi belgeden çıkarılamadı')
   }
   if (insuredMissing) {
-    extractionWarnings.push('Insured person name was not extracted from the document')
+    extractionWarnings.push('Sigortalı kişi adı belgeden çıkarılamadı')
   }
   if (deductibleUncertain) {
-    extractionWarnings.push(
-      'Deductible status could not be confirmed — may have conditional deductibles'
-    )
+    extractionWarnings.push('Muafiyet durumu doğrulanamadı — koşullu muafiyetler olabilir')
   }
 
   // Coverage-limit plausibility check: flag potential AI mis-mapping
@@ -1807,9 +1805,9 @@ async function convertToAnalyzedPolicy(
     )
     if (assistanceCov && legalCov && assistanceCov.limit > 0 && legalCov.limit > 0) {
       if (assistanceCov.limit > legalCov.limit * 5) {
-        extractionWarnings.push(
-          `${assistanceCov.nameTr || assistanceCov.name} ve ${legalCov.nameTr || legalCov.name} limit eşleşmesi insan incelemesiyle doğrulanmalı`
-        )
+        // Use a clean generic Turkish warning — avoid raw AI-extracted names
+        // which may have broken casing (e.g. "ANAdolu Hizmet")
+        extractionWarnings.push('Bazı teminat-limit eşleşmeleri ek kontrol gerektiriyor')
       }
     }
   }
@@ -1952,6 +1950,15 @@ async function convertToAnalyzedPolicy(
     if (basePolicy.aiInsightsEn) {
       basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter((i) => !isMarketCommentary(i))
     }
+  }
+
+  // ── Final personalization leak sweep ─────────────────────────────────
+  // The initial filter runs on evidence.insights, but AI-generated insights
+  // from generateStrengths/generateGapsAsync or the sense-check endpoint
+  // can also inject identity comparisons. Sweep the final merged array.
+  basePolicy.aiInsights = basePolicy.aiInsights.filter((i) => !isPersonalizationLeak(i))
+  if (basePolicy.aiInsightsEn) {
+    basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter((i) => !isPersonalizationLeak(i))
   }
 
   // Merge AI generated evidence-based exclusions if they aren't already grouped
@@ -2206,9 +2213,13 @@ function translateInsightsToTr(insights: string[]): string[] {
 async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const insights: string[] = []
   // Reviewer-mode priority order: gaps/warnings first, then strengths, then recommendations
-  insights.push(...(await generateGapsAsync(data)).map((g) => `⚠ ${g}`))
+  // Gaps and recommendations are generated in English, then translated to Turkish
+  // for language-consistent reviewer output. Strengths are already Turkish.
+  const gaps = await generateGapsAsync(data)
+  insights.push(...gaps.map((g) => `⚠ ${translateInsightToTr(g)}`))
   insights.push(...generateStrengths(data).map((s) => `✓ ${s}`))
-  insights.push(...(await generateRecommendationsAsync(data)).map((r) => `💡 ${r}`))
+  const recs = await generateRecommendationsAsync(data)
+  insights.push(...recs.map((r) => `💡 ${translateInsightToTr(r)}`))
 
   const currency = data.currency ?? 'TRY'
   const address = data.insuredAddress
@@ -2266,6 +2277,26 @@ function isPersonalizationLeak(text: string): boolean {
   if (/not\s+\w+\s*\(insured\s+name/i.test(lower)) return true
   // Generic "insured.*is not <proper noun>" comparison
   if (/insured\s+(?:person|name|party)\s+is\s+not\b/i.test(lower)) return true
+  // Turkish variants: "poliçe sahibi ... değil" identity comparison
+  if (/poli[çc]e\s+sahibi\b.*\bde[ğg]il/i.test(lower)) return true
+  // "owner is not" / "sahibi ... değil" with any prefix
+  if (/\bowner\s+is\s+not\b/i.test(lower)) return true
+  // Catch "is not <ProperName>." at end of sentence (the period-terminated form)
+  // Exclude common non-identity phrases: "is not included", "is not covered", "is not available"
+  if (/\bis\s+not\s+[A-ZÇĞİÖŞÜ][a-zçğıöşü]+\.?\s*$/.test(text)) {
+    const trailingWord = text.match(/\bis\s+not\s+(\w+)\.?\s*$/)?.[1]?.toLowerCase()
+    const nonIdentityWords = [
+      'included',
+      'covered',
+      'available',
+      'applicable',
+      'recommended',
+      'required',
+      'specified',
+      'confirmed',
+    ]
+    if (trailingWord && !nonIdentityWords.includes(trailingWord)) return true
+  }
   return false
 }
 
@@ -2324,7 +2355,9 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
 }
 
 /**
- * Check if policy has kasko base coverage that includes fundamental protections
+ * Check if policy has kasko base coverage that includes fundamental protections.
+ * Expanded to detect market-value main coverages and comprehensive auto naming
+ * that AI may produce without the literal word "kasko".
  */
 function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
   return coverages.some((c) => {
@@ -2335,7 +2368,13 @@ function hasKaskoBaseCoverage(coverages: ExtractedCoverage[]): boolean {
       nameLower.includes('full kasko') ||
       nameLower.includes('mini kasko') ||
       nameLower.includes('kasko sigortası') ||
-      (nameLower.includes('kasko') && c.category === 'main')
+      (nameLower.includes('kasko') && c.category === 'main') ||
+      // AI may extract main coverage as "Comprehensive Auto Insurance" or
+      // "Market Value Coverage" without "kasko" in the name — these are KASKO
+      (nameLower.includes('comprehensive') && nameLower.includes('auto')) ||
+      nameLower.includes('motor own damage') ||
+      // isMarketValue on a main category coverage is a strong KASKO signal
+      (c.isMarketValue === true && c.category === 'main')
     )
   })
 }
@@ -2409,18 +2448,35 @@ async function generateGapsAsync(data: ExtractedPolicyData): Promise<string[]> {
   const hasBaseKasko = isKaskoPolicy && hasKaskoBaseCoverage(data.coverages)
   const isTrafficPolicy = policyType === 'traffic'
 
+  // For KASKO policies where base coverage was NOT positively identified by name,
+  // but policyType is 'kasko', emit ONE coherent uncertainty message instead of
+  // individual "Missing common coverage: X" for each implicit peril.
+  // This avoids the contradiction of labeling a policy as KASKO while also
+  // claiming collision/fire/theft are missing.
+  let kaskoImplicitUncertaintyEmitted = false
+
   for (const critical of criticalCoverages) {
     const criticalNameLower = critical.nameTr.toLowerCase()
+    const criticalNameEn = getCoverageName(critical)
+    const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(
+      (implicit) => criticalNameLower.includes(implicit) || criticalNameEn.includes(implicit)
+    )
 
-    if (hasBaseKasko) {
-      // For KASKO policies with base coverage identified, suppress all implicit coverage
-      // warnings. KASKO by definition includes collision, theft, fire, natural disasters etc.
-      // Flagging these as "missing" contradicts the comprehensive KASKO classification.
-      const criticalNameEn = getCoverageName(critical)
-      const isImplicitCoverage = KASKO_IMPLICIT_COVERAGES.some(
-        (implicit) => criticalNameLower.includes(implicit) || criticalNameEn.includes(implicit)
-      )
-      if (isImplicitCoverage) continue
+    if (hasBaseKasko && isImplicitCoverage) {
+      // KASKO base coverage positively identified — suppress implicit warnings
+      continue
+    }
+
+    if (isKaskoPolicy && !hasBaseKasko && isImplicitCoverage) {
+      // policyType is 'kasko' but base coverage not identified by name —
+      // emit a single reviewer-safe uncertainty message, not individual warnings
+      if (!kaskoImplicitUncertaintyEmitted) {
+        gaps.push(
+          'Ana teminat kapsamı standart kasko risklerini işaret ediyor, ancak temel teminatların açık listesi insan incelemesiyle doğrulanmalı'
+        )
+        kaskoImplicitUncertaintyEmitted = true
+      }
+      continue
     }
 
     const baseNameMatch = criticalNameLower.match(/^([^(]+)/)
