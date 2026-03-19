@@ -10,13 +10,13 @@ import type { PolicyType } from './policy'
  * Turkish geographic regions for regional pricing
  */
 export type TurkishRegion =
-  | 'marmara'      // Istanbul, Bursa, Kocaeli, etc.
-  | 'ege'          // Izmir, Denizli, Aydın, etc.
-  | 'akdeniz'      // Antalya, Adana, Mersin, etc.
-  | 'ic_anadolu'   // Ankara, Konya, Eskişehir, etc.
-  | 'karadeniz'    // Samsun, Trabzon, etc.
+  | 'marmara' // Istanbul, Bursa, Kocaeli, etc.
+  | 'ege' // Izmir, Denizli, Aydın, etc.
+  | 'akdeniz' // Antalya, Adana, Mersin, etc.
+  | 'ic_anadolu' // Ankara, Konya, Eskişehir, etc.
+  | 'karadeniz' // Samsun, Trabzon, etc.
   | 'dogu_anadolu' // Erzurum, Van, Elazığ, etc.
-  | 'guneydogu'    // Gaziantep, Diyarbakır, Şanlıurfa, etc.
+  | 'guneydogu' // Gaziantep, Diyarbakır, Şanlıurfa, etc.
 
 /**
  * Major Turkish insurance providers
@@ -116,6 +116,28 @@ export interface PolicyTypeMarketData {
   // Last updated
   dataDate: string
   source: string
+
+  /**
+   * Provenance metadata for benchmark claims.
+   * When present and valid, reviewer-mode recommendations may cite
+   * percentile rankings and YoY trends. When absent, those claims
+   * are suppressed in favour of a safe "needs verification" fallback.
+   */
+  provenance?: BenchmarkProvenance
+}
+
+/**
+ * Provenance metadata proving a benchmark dataset's origin.
+ * All three fields must be non-empty for the gate to open.
+ *
+ * - source: authoritative data source (e.g. "TSB/SEDDK 2025 Yıllık İstatistik")
+ * - date:   ISO-8601 date the dataset was published or last refreshed
+ * - cohort: description of the comparison group (e.g. "Türkiye kasko poliçeleri, 2024 Q4")
+ */
+export interface BenchmarkProvenance {
+  source: string
+  date: string
+  cohort: string
 }
 
 /**

@@ -260,11 +260,34 @@ describe('Issue 5: Benchmark / market insight provenance gate', () => {
     expect(result).toEqual(insights) // sanitizer preserves, filter removes
   })
 
-  it('the benchmark provenance gate suppresses percentile claims at generation', () => {
-    // Verify the design: generateRecommendationsAsync has hasBenchmarkProvenance = false
-    // so percentile and YoY insights are not generated at all.
-    // This is a structural test — the constant is false.
-    const hasBenchmarkProvenance = false // mirrors production code
+  it('provenance gate opens when source + date + cohort are all present', () => {
+    const p = { source: 'TSB/SEDDK 2025', date: '2025-03-01', cohort: 'Kasko 2024 Q4' }
+    const hasBenchmarkProvenance = !!(p?.source && p?.date && p?.cohort)
+    expect(hasBenchmarkProvenance).toBe(true)
+  })
+
+  it('provenance gate stays closed when any field is missing', () => {
+    const noSource = { source: '', date: '2025-03-01', cohort: 'Kasko 2024 Q4' }
+    expect(!!(noSource.source && noSource.date && noSource.cohort)).toBe(false)
+
+    const noDate = { source: 'TSB', date: '', cohort: 'Kasko 2024 Q4' }
+    expect(!!(noDate.source && noDate.date && noDate.cohort)).toBe(false)
+
+    const noCohort = { source: 'TSB', date: '2025-03-01', cohort: '' }
+    expect(!!(noCohort.source && noCohort.date && noCohort.cohort)).toBe(false)
+  })
+
+  it('provenance gate stays closed when provenance is undefined', () => {
+    const p = undefined as { source: string; date: string; cohort: string } | undefined
+    const hasBenchmarkProvenance = !!(p?.source && p?.date && p?.cohort)
+    expect(hasBenchmarkProvenance).toBe(false)
+  })
+
+  it('static benchmarks have no provenance (gate closed by default)', async () => {
+    const { MARKET_BENCHMARKS } = await import('@/data/market-data/benchmarks')
+    const kasko = MARKET_BENCHMARKS.kasko
+    const p = kasko.provenance
+    const hasBenchmarkProvenance = !!(p?.source && p?.date && p?.cohort)
     expect(hasBenchmarkProvenance).toBe(false)
   })
 })

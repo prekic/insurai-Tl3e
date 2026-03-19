@@ -2757,11 +2757,9 @@ async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<
 
   // ── Benchmark provenance gate ──────────────────────────────────────
   // Percentile and YoY claims require provenance: source, date, cohort.
-  // Current static/DB benchmarks lack this metadata, so these insights
-  // are suppressed to avoid presenting unverified market claims.
-  // When benchmark data includes provenance, enable these with:
-  //   if (benchmark.provenance?.source && benchmark.provenance?.date) { ... }
-  const hasBenchmarkProvenance = false // TODO: wire when benchmark provenance exists
+  // All three fields must be non-empty strings for the gate to open.
+  const p = benchmark.provenance
+  const hasBenchmarkProvenance = !!(p?.source && p?.date && p?.cohort)
 
   if (hasBenchmarkProvenance) {
     if (data.premium && data.premium > benchmark.premiumRange.percentile75) {

@@ -10,22 +10,21 @@
  */
 
 import type { PolicyType } from '@/types/policy'
-import type {
-  PolicyTypeMarketData,
-  TurkishRegion,
-  CoverageBenchmark,
-} from '@/types/market-data'
+import type { PolicyTypeMarketData, TurkishRegion, CoverageBenchmark } from '@/types/market-data'
 
 /**
  * Regional adjustment factors
  * Based on risk profiles, claim frequencies, and cost of living
  */
-export const REGIONAL_FACTORS: Record<TurkishRegion, { name: string; nameTr: string; factor: number }> = {
+export const REGIONAL_FACTORS: Record<
+  TurkishRegion,
+  { name: string; nameTr: string; factor: number }
+> = {
   marmara: { name: 'Marmara', nameTr: 'Marmara', factor: 1.15 },
   ege: { name: 'Aegean', nameTr: 'Ege', factor: 1.05 },
   akdeniz: { name: 'Mediterranean', nameTr: 'Akdeniz', factor: 1.08 },
   ic_anadolu: { name: 'Central Anatolia', nameTr: 'İç Anadolu', factor: 0.95 },
-  karadeniz: { name: 'Black Sea', nameTr: 'Karadeniz', factor: 0.90 },
+  karadeniz: { name: 'Black Sea', nameTr: 'Karadeniz', factor: 0.9 },
   dogu_anadolu: { name: 'Eastern Anatolia', nameTr: 'Doğu Anadolu', factor: 0.85 },
   guneydogu: { name: 'Southeastern Anatolia', nameTr: 'Güneydoğu Anadolu', factor: 0.88 },
 }
@@ -725,7 +724,21 @@ const NAKLIYAT_EXCLUSIONS = [
 ]
 
 /**
- * Complete market data for all policy types
+ * Complete market data for all policy types.
+ *
+ * BENCHMARK PROVENANCE GATE
+ * ─────────────────────────
+ * Reviewer-mode insights like "Premium is above 75th percentile" are gated
+ * behind `provenance`. To enable them for a policy type, add:
+ *
+ *   provenance: {
+ *     source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+ *     date: '2025-03-01',
+ *     cohort: 'Türkiye kasko poliçeleri, 2024 tam yıl',
+ *   },
+ *
+ * All three fields must be non-empty. Without `provenance`, the recommendation
+ * generator suppresses percentile and YoY claims.
  */
 export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
   kasko: {
@@ -753,8 +766,8 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       marketGrowth: 35.8,
     },
     regionalFactors: {
-      marmara: 1.20,
-      ege: 1.10,
+      marmara: 1.2,
+      ege: 1.1,
       akdeniz: 1.12,
       ic_anadolu: 0.95,
       karadeniz: 0.88,
@@ -827,7 +840,7 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
     regionalFactors: {
       marmara: 1.18,
       ege: 1.08,
-      akdeniz: 1.10,
+      akdeniz: 1.1,
       ic_anadolu: 0.92,
       karadeniz: 0.88,
       dogu_anadolu: 0.85,
@@ -865,9 +878,9 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       ege: 1.05,
       akdeniz: 1.02,
       ic_anadolu: 0.95,
-      karadeniz: 0.90,
+      karadeniz: 0.9,
       dogu_anadolu: 0.88,
-      guneydogu: 0.90,
+      guneydogu: 0.9,
     },
     dataDate: '2024-12-01',
     source: 'TSB/SEDDK',
@@ -899,7 +912,7 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
     regionalFactors: {
       marmara: 1.08,
       ege: 1.02,
-      akdeniz: 1.00,
+      akdeniz: 1.0,
       ic_anadolu: 0.98,
       karadeniz: 0.95,
       dogu_anadolu: 0.92,
@@ -935,11 +948,11 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
     regionalFactors: {
       marmara: 1.45, // High earthquake risk
       ege: 1.35,
-      akdeniz: 1.20,
-      ic_anadolu: 1.00,
+      akdeniz: 1.2,
+      ic_anadolu: 1.0,
       karadeniz: 0.85,
       dogu_anadolu: 1.25,
-      guneydogu: 1.10,
+      guneydogu: 1.1,
     },
     dataDate: '2024-12-01',
     source: 'DASK',
@@ -970,12 +983,12 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
     },
     regionalFactors: {
       marmara: 1.22,
-      ege: 1.10,
+      ege: 1.1,
       akdeniz: 1.08,
       ic_anadolu: 0.95,
       karadeniz: 0.88,
       dogu_anadolu: 0.85,
-      guneydogu: 0.90,
+      guneydogu: 0.9,
     },
     dataDate: '2024-12-01',
     source: 'TSB/SEDDK',
@@ -1005,7 +1018,7 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       marketGrowth: 28.2,
     },
     regionalFactors: {
-      marmara: 1.10, // Major ports and logistics hubs
+      marmara: 1.1, // Major ports and logistics hubs
       ege: 1.05,
       akdeniz: 1.08, // Mersin port
       ic_anadolu: 0.95,
@@ -1063,10 +1076,7 @@ export function calculatePremiumPercentile(
 /**
  * Calculate coverage percentile
  */
-export function calculateCoveragePercentile(
-  coverage: number,
-  policyType: PolicyType
-): number {
+export function calculateCoveragePercentile(coverage: number, policyType: PolicyType): number {
   const benchmark = MARKET_BENCHMARKS[policyType]
   const { min, max } = benchmark.coverageRange
 
