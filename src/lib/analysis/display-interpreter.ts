@@ -53,6 +53,8 @@ const PROHIBITED_PHRASES = [
   'muafiyetsiz',
   'tamamen kapsar',
   'sınırsız',
+  'tam koruma',
+  'mükemmel',
 ]
 
 /**
@@ -76,7 +78,7 @@ export function applySafeWording(text: string): string {
   let safe = text
   const replacements: [RegExp, string][] = [
     [/\bno deductible\b/gi, 'Deductible treatment depends on the specific scenario'],
-    [/\bunlimited\b/gi, 'Coverage is generally available, but may be narrowed in some cases'],
+    [/\bunlimited\b/gi, 'Generally unlimited, subject to sublimits and specific carve-outs'],
     [/\bfully covered\b/gi, 'Policy wording indicates coverage, subject to conditions'],
     [/\btam kapsamlı\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
     [/\bguaranteed\b/gi, 'Policy wording indicates this protection, subject to conditions'],
@@ -91,6 +93,37 @@ export function applySafeWording(text: string): string {
     ],
     [/\bfully compliant\b/gi, 'Compliance status based on available policy data'],
     [/\bmuafiyetsiz\b/gi, 'Muafiyet durumu senaryoya bağlıdır'],
+    [
+      /sınırsız cam onarımı[^.]*hasarsızlığı etkilemiyor/gi,
+      'Cam teminatı özel şartlara bağlı olabilir — insan incelemesiyle doğrulanmalı',
+    ],
+    // Issue 2: Neutralize promotional KASKO insight phrasing
+    // Order matters: catch the FULL promotional sentence first, then shorter fallbacks
+    [
+      /mükemmel\s+kapsamlı\s+kasko\s+teminatı[^.]*rayiç\s+değer[^.]*(?:sınırsız|tam\s+koruma)[^.]*/gi,
+      'Teminat yapısı rayiç değer esasını işaret ediyor, ancak özel şartlar doğrulanmalı',
+    ],
+    [
+      /mükemmel\s+kapsamlı\s+kasko\s+teminatı[^.]*rayiç\s+değer\s+üzerinden\s+tam\s+koruma/gi,
+      'Ana teminat rayiç değer esasına dayanıyor; özel şartların ayrıca kontrolü gerekli',
+    ],
+    [
+      /teminat\s+yapısı[^.]*rayiç\s+değer[^.]*sınırsız[^.]*/gi,
+      'Teminat yapısı rayiç değer esasını işaret ediyor, ancak özel şartlar doğrulanmalı',
+    ],
+    [
+      /mükemmel[^.]*teminat[ıi]/gi,
+      'Teminat yapısı tespit edildi; özel şartların ayrıca kontrolü gerekli',
+    ],
+    [/\btam koruma\b/gi, 'Koruma kapsamı koşullara bağlıdır'],
+    // Issue 3: Fix broken Turkish "kadenizi" in glass-related insights
+    [
+      /cam\s+değişimi[^.]*hasarsızlık\s+kade[a-zğüşöçı]*\s+etkile[a-zğüşöçı]*/gi,
+      'Cam değişimi ve hasarsızlık indirimi ilişkisi özel şartlarla doğrulanmalı',
+    ],
+    [/değerli\s+bir\s+avantaj/gi, 'detay için özel şartlara bakılmalı'],
+    [/\bsınırsız\b/gi, 'Özel şartlara bağlı olabilir'],
+    [/\btamamen kapsar\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
   ]
 
   for (const [pattern, replacement] of replacements) {
@@ -183,7 +216,7 @@ function buildProtectionBasisCard(
   } else if (hasUnlimited) {
     basisType = 'liability_limit'
     basisDetail =
-      'Coverage is generally available, but may be narrowed in some cases. Exact limits depend on the specific coverage item and conditions.'
+      'Policy includes items marked as unlimited, but sublimits and scenario-specific carve-outs may apply. Review specific coverage items for details.'
   }
 
   const quoteRef = sourceQuotes.length > 0 ? [sourceQuotes[0]] : []
@@ -229,8 +262,8 @@ function buildCoverageCards(
     // Limit wording
     let limitStr: string | undefined
     if (cov.isUnlimited) {
-      // NEVER say "unlimited" — use safe wording
-      limitStr = 'Coverage is generally available, but may be narrowed in some cases.'
+      // Use safe wording — consistent with unlimited reconciliation
+      limitStr = 'Generally unlimited, subject to sublimits and specific carve-outs'
       conditionMarkers.push('limit_conditional')
     } else if (cov.limit) {
       limitStr = `${cov.limit.toLocaleString('tr-TR')} TRY`
@@ -736,7 +769,7 @@ function missCard(
 }
 
 function limStr(c: { limit?: number | null; isUnlimited?: boolean }): string | undefined {
-  if (c.isUnlimited) return 'Coverage is generally available, but may be narrowed in some cases.'
+  if (c.isUnlimited) return 'Generally unlimited, subject to sublimits and specific carve-outs'
   if (c.limit) return `${c.limit.toLocaleString('tr-TR')} TRY`
   return undefined
 }

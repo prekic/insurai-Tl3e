@@ -59,6 +59,8 @@ import {
 } from '@/lib/actuarial-engine'
 import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryChart'
 import { applySafeWording } from '@/lib/analysis/display-interpreter'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
+import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
 
 /**
  * Format coverage limit with display-safe wording governance.
@@ -1046,6 +1048,11 @@ export function PolicyDetailView() {
   const exportMenuRef = useRef<HTMLDivElement>(null)
   const { exportPolicy, isGenerating: isPdfGenerating } = usePdfExport()
 
+  // KASKO pilot gate — checks feature flag + user segment
+  const pilotOptions = usePilotGateOptions()
+  const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
+  const isPilotResult = displaySummary?.isPilotResult ?? false
+
   // Close export menu on outside click
   useEffect(() => {
     if (!exportMenuOpen) return
@@ -1113,20 +1120,55 @@ export function PolicyDetailView() {
   const handleExportText = useCallback(() => {
     if (!policy) return
     setExportMenuOpen(false)
+
+    // Format a coverage item limit using the same canonical logic as the UI
+    // (formatCoverageLimit function at line 70). This ensures text export
+    // never diverges from the reviewer UI for market-value, included, or
+    // unlimited coverages.
+    const fmtCovLimit = (c: Coverage): string => {
+      return formatCoverageLimit(c, locale, t, formatConverted)
+    }
+
+    // Canonical insured: same fallback as UI (line 1461)
+    const insuredText = policy.insuredPerson
+      ? policy.insuredPerson
+      : policy.insuredMissing
+        ? locale === 'tr'
+          ? 'Belirtilmemiş'
+          : 'Not specified'
+        : '-'
+
+    // Canonical premium: same double-check as UI (lines 1422-1426)
+    const premiumText =
+      policy.premiumMissing || !policy.premium || policy.premium <= 0
+        ? t.policy.notSpecified
+        : formatConverted(policy.premium)
+
+    // Canonical deductible: same logic as UI (lines 1441-1448)
+    const deductibleText =
+      policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)
+        ? locale === 'tr'
+          ? 'Koşullu / inceleme gerekli'
+          : 'Conditional / requires review'
+        : policy.deductible > 0
+          ? formatConverted(policy.deductible)
+          : locale === 'tr'
+            ? 'Yok'
+            : 'None'
+
     const summary = [
       `${t.policy.policy}: ${policy.policyNumber}`,
       `${t.policy.provider}: ${getShortCompanyName(policy.provider)}`,
       `${t.policy.type}: ${policy.typeTr}`,
-      `${t.policy.insured}: ${policy.insuredPerson}`,
+      `${t.policy.insured}: ${insuredText}`,
       `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
-      `${t.policy.premiumLabel}: ${formatConverted(policy.premium)}`,
-      `${t.policy.deductibleLabel}: ${formatConverted(policy.deductible)}`,
+      `${t.policy.premiumLabel}: ${premiumText}`,
+      `${t.policy.deductibleLabel}: ${deductibleText}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
       `=== ${t.policy.coveragesTitleExport} ===`,
       ...policy.coverages.map(
-        (c) =>
-          `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${c.isUnlimited ? applySafeWording(t.global.unlimited) : formatConverted(c.limit)}`
+        (c) => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${fmtCovLimit(c)}`
       ),
       '',
       `=== ${t.policy.exclusionsTitleExport} ===`,
@@ -1409,16 +1451,36 @@ export function PolicyDetailView() {
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
                       {t.policy.premiumLabel}
                     </p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.premium > 0 ? formatConverted(policy.premium) : t.policy.notSpecified}
+                    <p
+                      className={`text-sm font-semibold truncate ${policy.premiumMissing ? 'text-amber-600' : 'text-gray-900'}`}
+                    >
+                      {policy.premiumMissing
+                        ? t.policy.notSpecified
+                        : policy.premium > 0
+                          ? formatConverted(policy.premium)
+                          : t.policy.notSpecified}
                     </p>
                   </div>
                   <div className="p-2 sm:p-2.5 bg-gray-50 rounded-lg overflow-hidden">
                     <p className="text-[10px] sm:text-xs text-gray-500 mb-0.5">
                       {t.policy.deductibleLabel}
                     </p>
-                    <p className="text-sm font-semibold text-gray-900 truncate">
-                      {policy.deductible > 0 ? formatConverted(policy.deductible) : t.global.none}
+                    <p
+                      className={`text-sm font-semibold truncate ${
+                        policy.deductibleUncertain ||
+                        (policy.type === 'kasko' && policy.deductible === 0)
+                          ? 'text-amber-600'
+                          : 'text-gray-900'
+                      }`}
+                    >
+                      {policy.deductibleUncertain ||
+                      (policy.type === 'kasko' && policy.deductible === 0)
+                        ? locale === 'tr'
+                          ? 'Koşullu / inceleme gerekli'
+                          : 'Conditional / requires review'
+                        : policy.deductible > 0
+                          ? formatConverted(policy.deductible)
+                          : t.global.none}
                     </p>
                   </div>
 
@@ -1562,6 +1624,29 @@ export function PolicyDetailView() {
 
             {/* AI Insights - Mobile only (high priority) */}
             <Card className="lg:hidden bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              {isPilotResult && (
+                <div
+                  className="p-3 border-b-2 border-amber-400 bg-amber-50 rounded-t-lg"
+                  role="alert"
+                  aria-live="polite"
+                  data-testid="pilot-review-banner"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={16} />
+                    <div>
+                      <p className="font-semibold text-amber-800 text-xs">
+                        TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
+                      </p>
+                      <p className="text-xs text-amber-700 mt-0.5">
+                        {displaySummary?.pilotReviewBanner ||
+                          (locale === 'tr'
+                            ? 'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'
+                            : 'These results are AI-generated. Not finalized without human approval.')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
               <CardHeader className="py-2 px-3 sm:py-4 sm:px-6">
                 <CardTitle className="flex items-center gap-2 text-sm sm:text-base text-purple-900">
                   <Sparkles className="text-purple-600 flex-shrink-0" size={18} />
@@ -1576,21 +1661,35 @@ export function PolicyDetailView() {
               </CardHeader>
               <CardContent className="p-3 sm:p-6">
                 <div className="space-y-2 sm:space-y-3">
-                  {(insightsExpanded ? policy.aiInsights : policy.aiInsights.slice(0, 3)).map(
-                    (_insight, i) => {
-                      // Get localized insight: pre-translated (new) or display-time translated (legacy)
+                  {(() => {
+                    // Deduplicate insights using LOCALIZED text to catch cross-language duplicates.
+                    // Track original indices so evidence lookup and TR/EN parallel arrays stay correct.
+                    const seenLocalized = new Set<string>()
+                    const dedupedEntries: { originalIndex: number; localizedText: string }[] = []
+                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
                       const rawLocalized = getLocalizedInsight(
                         policy,
-                        i,
+                        idx,
                         locale,
                         t.insightTranslations
                       )
-                      // Strip any existing prefix characters from the text for clean display
-                      const displayText = applySafeWording(
+                      const normalized = applySafeWording(
                         rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
                       )
+                        .toLowerCase()
+                        .replace(/\s+/g, ' ')
+                      if (!seenLocalized.has(normalized)) {
+                        seenLocalized.add(normalized)
+                        dedupedEntries.push({ originalIndex: idx, localizedText: rawLocalized })
+                      }
+                    }
+                    const visible = insightsExpanded ? dedupedEntries : dedupedEntries.slice(0, 3)
+                    return visible.map(({ originalIndex, localizedText }, renderIdx) => {
+                      const displayText = applySafeWording(
+                        localizedText.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                      )
 
-                      const originalInsight = policy.aiInsights[i]
+                      const originalInsight = policy.aiInsights[originalIndex]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
                       const hasEvidence =
                         policy.evidenceData?.insights &&
@@ -1598,7 +1697,7 @@ export function PolicyDetailView() {
 
                       return (
                         <div
-                          key={i}
+                          key={renderIdx}
                           className="flex flex-col gap-1 p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700"
                         >
                           <div className="flex items-start gap-2">
@@ -1624,26 +1723,40 @@ export function PolicyDetailView() {
                           )}
                         </div>
                       )
+                    })
+                  })()}
+                  {(() => {
+                    // Compute deduped count using localized text (same logic as render dedup)
+                    const seenBtnL = new Set<string>()
+                    let dedupedCount = 0
+                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
+                      const raw = getLocalizedInsight(policy, idx, locale, t.insightTranslations)
+                      const n = applySafeWording(raw.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim())
+                        .toLowerCase()
+                        .replace(/\s+/g, ' ')
+                      if (!seenBtnL.has(n)) {
+                        seenBtnL.add(n)
+                        dedupedCount++
+                      }
                     }
-                  )}
-                  {policy.aiInsights.length > 3 && (
-                    <button
-                      onClick={() => setInsightsExpanded(!insightsExpanded)}
-                      className="flex items-center justify-center gap-1 w-full mt-1 py-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium"
-                    >
-                      {insightsExpanded ? (
-                        <>
-                          <ChevronUp size={14} />
-                          {t.common.showLess}
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown size={14} />+{policy.aiInsights.length - 3}{' '}
-                          {t.policy.moreInsights}
-                        </>
-                      )}
-                    </button>
-                  )}
+                    return dedupedCount > 3 ? (
+                      <button
+                        onClick={() => setInsightsExpanded(!insightsExpanded)}
+                        className="flex items-center justify-center gap-1 w-full mt-1 py-1.5 text-xs text-purple-600 hover:text-purple-700 font-medium"
+                      >
+                        {insightsExpanded ? (
+                          <>
+                            <ChevronUp size={14} />
+                            {t.common.showLess}
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown size={14} />+{dedupedCount - 3} {t.policy.moreInsights}
+                          </>
+                        )}
+                      </button>
+                    ) : null
+                  })()}
                 </div>
               </CardContent>
             </Card>
@@ -1936,6 +2049,42 @@ export function PolicyDetailView() {
 
             {/* AI Insights */}
             <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200">
+              {isPilotResult && (
+                <div
+                  className="p-4 border-b-2 border-amber-400 bg-amber-50 rounded-t-lg"
+                  role="alert"
+                  aria-live="polite"
+                  data-testid="pilot-review-banner-desktop"
+                >
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div>
+                      <p className="font-semibold text-amber-800 text-sm">
+                        TASLAK / DRAFT — İnsan İncelemesi Gerekli / Human Review Required
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        {displaySummary?.pilotReviewBanner ||
+                          (locale === 'tr'
+                            ? 'Bu sonuçlar yapay zeka tarafından oluşturulmuştur. İnsan onayı olmadan kesinleşmiş değildir.'
+                            : 'These results are AI-generated. Not finalized without human approval.')}
+                      </p>
+                      {displaySummary?.pilotReviewStatus && (
+                        <Badge className="mt-2 bg-amber-100 text-amber-800 border border-amber-300">
+                          {displaySummary.pilotReviewStatus === 'pending_review'
+                            ? locale === 'tr'
+                              ? 'İnceleme Bekliyor'
+                              : 'Pending Review'
+                            : displaySummary.pilotReviewStatus === 'review_in_progress'
+                              ? locale === 'tr'
+                                ? 'İnceleniyor'
+                                : 'Review In Progress'
+                              : displaySummary.pilotReviewStatus}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-purple-900">
                   <Sparkles className="text-purple-600" size={20} />
@@ -2110,6 +2259,20 @@ export function PolicyDetailView() {
                         ) || t.global.unspecified}
                       </span>
                     </p>
+                    {/* Actuarial caveat when inputs are incomplete */}
+                    {(actuarialResult.needsReview ||
+                      actuarialResult.indemnityMechanics?.partsStandard?.value === 'unspecified' ||
+                      actuarialResult.indemnityMechanics?.repairNetworkRule?.value ===
+                        'unspecified') && (
+                      <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
+                        <AlertTriangle className="flex-shrink-0 mt-0.5" size={12} />
+                        <span>
+                          {locale === 'tr'
+                            ? 'Tahmini puan, belirtilmemiş sözleşme detayları nedeniyle geçici niteliktedir'
+                            : 'Score is provisional — some contract-detail inputs could not be confirmed'}
+                        </span>
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

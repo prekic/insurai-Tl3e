@@ -12,13 +12,36 @@ import type {
   GapAnalysisReportData,
   PortfolioReportData,
 } from '@/types/pdf-report'
+import type { Coverage } from '@/types/policy'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { shouldShowUnlimited, shouldShowIncluded } from '@/lib/knowledge/kasko-knowledge'
 import {
   generateBaseStyles,
   generateHeaderHTML,
   generateFooterHTML,
   generateWatermarkHTML,
 } from './branding'
+
+/**
+ * Format a coverage item limit for PDF export.
+ * Canonical logic aligned with PolicyDetailView.formatCoverageLimit().
+ */
+function fmtCovLimitPDF(c: Coverage, locale: string): string {
+  const isTr = locale === 'tr'
+  if (c.isUnlimited) return isTr ? 'Sınırsız' : 'Unlimited'
+  if (c.isMarketValue) return isTr ? 'Rayiç Değer' : 'Market Value'
+  if (shouldShowUnlimited(c.name, c.limit)) return isTr ? 'Sınırsız' : 'Unlimited'
+  if (shouldShowIncluded(c.name, c.limit)) return isTr ? 'Dahil' : 'Included'
+  if (c.limit === 0) {
+    const nameLower = c.name.toLowerCase()
+    if (nameLower.includes('sınırsız') || nameLower.includes('unlimited'))
+      return isTr ? 'Sınırsız' : 'Unlimited'
+    if (nameLower.includes('rayiç') || nameLower.includes('market value'))
+      return isTr ? 'Rayiç Değer' : 'Market Value'
+    return isTr ? 'Dahil' : 'Included'
+  }
+  return formatCurrency(c.limit, 'TRY', locale)
+}
 
 // =============================================================================
 // Template Helpers
@@ -227,7 +250,7 @@ export function generatePolicyDetailHTML(
           (c) => `
         <tr>
           <td>${isTr ? c.nameTr : c.name}</td>
-          <td style="text-align: right;">${formatCurrency(c.limit, 'TRY', locale)}</td>
+          <td style="text-align: right;">${fmtCovLimitPDF(c, locale)}</td>
           <td style="text-align: right;">${formatCurrency(c.deductible, 'TRY', locale)}</td>
           <td style="text-align: center;">${c.included ? '✓' : '—'}</td>
         </tr>

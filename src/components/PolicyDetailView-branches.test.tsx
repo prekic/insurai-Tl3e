@@ -259,6 +259,19 @@ vi.mock('@/lib/export', () => ({
   exportSinglePolicyToCSV: (...args: unknown[]) => mockExportSinglePolicyToCSV(...args),
 }))
 
+vi.mock('@/hooks/usePilotGateOptions', () => ({
+  usePilotGateOptions: () => ({
+    featureFlags: {},
+    userSegments: [],
+    userId: undefined,
+    isLoading: false,
+  }),
+}))
+
+vi.mock('@/hooks/useDisplaySafeSummary', () => ({
+  useDisplaySafeSummary: () => null,
+}))
+
 // Mock kasko-knowledge functions
 vi.mock('@/lib/knowledge/kasko-knowledge', () => ({
   KASKO_COVERAGE_CATEGORIES: {

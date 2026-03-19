@@ -121,7 +121,9 @@ function mapCoverageToCanonical(c: Coverage): CanonicalCoverage {
  * @param policy - The standardized AnalyzedPolicy object from DB / Redux
  * @returns An ActuarialPolicyInput suitable for the Actuarial Engine
  */
-export function mapAnalyzedToActuarialInput(policy: AnalyzedPolicy): ActuarialPolicyInput {
+export function mapAnalyzedToActuarialInput(
+  policy: AnalyzedPolicy
+): ActuarialPolicyInput & { _premiumMissing?: boolean } {
   // Try to find marked value or infer it from coverage/premium limits
   const insuredValueAmount = policy.coverage || 0
 
@@ -169,5 +171,6 @@ export function mapAnalyzedToActuarialInput(policy: AnalyzedPolicy): ActuarialPo
     exclusionTexts: policy.exclusions || [],
     indemnityMechanics,
     insuredValue: insuredValueAmount > 0 ? toMoney(insuredValueAmount, policy.currency) : undefined,
+    _premiumMissing: policy.premiumMissing === true,
   }
 }

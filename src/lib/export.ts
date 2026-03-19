@@ -3,8 +3,132 @@
  * Supports PDF and Excel (CSV) export
  */
 
-import { AnalyzedPolicy } from '@/types/policy'
+import { AnalyzedPolicy, Coverage } from '@/types/policy'
 import { formatCurrency, formatDate } from './utils'
+import { shouldShowUnlimited, shouldShowIncluded } from '@/lib/knowledge/kasko-knowledge'
+
+/**
+ * Format premium for export — canonical logic matching UI path.
+ * Checks premiumMissing flag AND premium > 0 to avoid showing TRY 0.
+ */
+function formatPremiumForExport(policy: AnalyzedPolicy, locale: string): string {
+  const isTr = locale === 'tr'
+  if (policy.premiumMissing || !policy.premium || policy.premium <= 0) {
+    return isTr ? 'Belirtilmemiş' : 'Not Specified'
+  }
+  return formatCurrency(policy.premium, 'TRY', locale)
+}
+
+/**
+ * Format monthly premium for export.
+ */
+function formatMonthlyPremiumForExport(policy: AnalyzedPolicy, locale: string): string {
+  const isTr = locale === 'tr'
+  if (policy.premiumMissing || !policy.premium || policy.premium <= 0) {
+    return isTr ? 'Belirtilmemiş' : 'Not Specified'
+  }
+  return formatCurrency(policy.monthlyPremium, 'TRY', locale)
+}
+
+/**
+ * Format insured person for export — canonical logic matching UI path.
+ * Never renders "undefined" — shows fallback text.
+ */
+function formatInsuredForExport(policy: AnalyzedPolicy, locale: string): string {
+  if (policy.insuredPerson) return policy.insuredPerson
+  const isTr = locale === 'tr'
+  return (policy as any).insuredMissing ? (isTr ? 'Belirtilmemiş' : 'Not Specified') : '-'
+}
+
+/**
+ * Format deductible for export — canonical logic matching UI path.
+ * Checks deductibleUncertain flag and kasko zero case.
+ */
+function formatDeductibleForExport(policy: AnalyzedPolicy, locale: string): string {
+  const isTr = locale === 'tr'
+  if ((policy as any).deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)) {
+    return isTr ? 'Koşullu / inceleme gerekli' : 'Conditional / requires review'
+  }
+  if (policy.deductible > 0) {
+    return formatCurrency(policy.deductible, 'TRY', locale)
+  }
+  return isTr ? 'Yok' : 'None'
+}
+
+/**
+ * Check if a policy's main coverage is market-value-based (rayiç değer).
+ * Driven by actual extracted coverage data, not policy type alone.
+ */
+function isMarketValueCoverage(policy: AnalyzedPolicy): boolean {
+  return policy.coverages.some((c) => c.isMarketValue)
+}
+
+/**
+ * Format the top-level coverage total for a policy.
+ * For market-value kasko, returns descriptive text instead of "TRY 0".
+ */
+function formatCoverageTotal(policy: AnalyzedPolicy, locale: string): string {
+  const isTr = locale === 'tr'
+  if (isMarketValueCoverage(policy)) {
+    return isTr ? 'Rayiç Değer (Piyasa Değeri)' : 'Market Value Basis'
+  }
+  if (policy.type === 'kasko' && policy.coverage === 0) {
+    // Kasko with zero coverage and no explicit isMarketValue flag:
+    // likely market-value-based but AI didn't set the flag
+    return isTr ? 'Rayiç Değer (Piyasa Değeri)' : 'Market Value Basis'
+  }
+  return formatCurrency(policy.coverage, 'TRY', locale)
+}
+
+/**
+ * Format an individual coverage item's limit for export.
+ * Canonical logic aligned with PolicyDetailView.formatCoverageLimit() —
+ * ensures text/CSV/Excel export never diverges from the reviewer UI.
+ *
+ * Cascade:
+ * 1. Explicit isUnlimited flag
+ * 2. Explicit isMarketValue flag
+ * 3. Name-based unlimited detection (shouldShowUnlimited)
+ * 4. Name-based included-service detection (shouldShowIncluded)
+ * 5. Zero-limit with name heuristics (rayiç, asistans, hizmet, etc.)
+ * 6. Numeric limit
+ */
+function formatCoverageItemLimit(c: Coverage, locale: string): string {
+  const isTr = locale === 'tr'
+
+  // 1. Explicit flags
+  if (c.isUnlimited) return isTr ? 'Sınırsız' : 'Unlimited'
+  if (c.isMarketValue) return isTr ? 'Rayiç Değer' : 'Market Value'
+
+  // 2. Name-based detection from kasko knowledge hub
+  if (shouldShowUnlimited(c.name, c.limit)) return isTr ? 'Sınırsız' : 'Unlimited'
+  if (shouldShowIncluded(c.name, c.limit)) return isTr ? 'Dahil' : 'Included'
+
+  // 3. Zero-limit with name heuristics
+  if (c.limit === 0) {
+    const nameLower = c.name.toLowerCase()
+    if (nameLower.includes('sınırsız') || nameLower.includes('unlimited')) {
+      return isTr ? 'Sınırsız' : 'Unlimited'
+    }
+    if (nameLower.includes('rayiç') || nameLower.includes('market value')) {
+      return isTr ? 'Rayiç Değer' : 'Market Value'
+    }
+    if (
+      nameLower.includes('asistans') ||
+      nameLower.includes('hizmet') ||
+      nameLower.includes('ikame') ||
+      nameLower.includes('onarım') ||
+      c.included
+    ) {
+      return isTr ? 'Dahil' : 'Included'
+    }
+    // Truly unknown zero — safer than TRY 0
+    return isTr ? 'Dahil' : 'Included'
+  }
+
+  // 4. Numeric limit
+  return formatCurrency(c.limit, 'TRY', locale)
+}
 
 /**
  * Export policies to CSV format
@@ -36,13 +160,13 @@ export function exportToCSV(policies: AnalyzedPolicy[], filename = 'policies'): 
     policy.type,
     policy.typeTr,
     policy.status,
-    policy.coverage.toString(),
-    policy.premium.toString(),
-    policy.monthlyPremium.toString(),
-    policy.deductible.toString(),
+    formatCoverageTotal(policy, 'en'),
+    formatPremiumForExport(policy, 'en'),
+    formatMonthlyPremiumForExport(policy, 'en'),
+    formatDeductibleForExport(policy, 'en'),
     policy.startDate,
     policy.expiryDate,
-    policy.insuredPerson || '',
+    formatInsuredForExport(policy, 'en'),
     policy.location || '',
     (policy.aiConfidence * 100).toFixed(0) + '%',
     policy.uploadDate,
@@ -150,10 +274,10 @@ export async function exportSinglePolicyToExcel(
       [isTr ? 'Şirket' : 'Provider', policy.provider],
       [isTr ? 'Tür' : 'Type', policy.typeTr],
       [isTr ? 'Durum' : 'Status', policy.status],
-      [isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson || ''],
-      [isTr ? 'Teminat' : 'Coverage', formatCurrency(policy.coverage, 'TRY', locale)],
-      [isTr ? 'Prim' : 'Premium', formatCurrency(policy.premium, 'TRY', locale)],
-      [isTr ? 'Muafiyet' : 'Deductible', formatCurrency(policy.deductible, 'TRY', locale)],
+      [isTr ? 'Sigortalı' : 'Insured Person', formatInsuredForExport(policy, locale)],
+      [isTr ? 'Teminat' : 'Coverage', formatCoverageTotal(policy, locale)],
+      [isTr ? 'Prim' : 'Premium', formatPremiumForExport(policy, locale)],
+      [isTr ? 'Muafiyet' : 'Deductible', formatDeductibleForExport(policy, locale)],
       [isTr ? 'Başlangıç' : 'Start Date', formatDate(policy.startDate, locale)],
       [isTr ? 'Bitiş' : 'Expiry Date', formatDate(policy.expiryDate, locale)],
       [isTr ? 'AI Güven' : 'AI Confidence', `${(policy.aiConfidence * 100).toFixed(0)}%`],
@@ -181,7 +305,11 @@ export async function exportSinglePolicyToExcel(
             ? isTr
               ? 'Rayiç Değer'
               : 'Market Value'
-            : c.limit,
+            : c.limit === 0 && c.included
+              ? isTr
+                ? 'Dahil'
+                : 'Included'
+              : c.limit,
         c.deductible,
         c.included ? (isTr ? 'Evet' : 'Yes') : isTr ? 'Hayır' : 'No',
       ]),
@@ -366,11 +494,11 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
     <div class="grid">
       <div>
         <div class="label">Total Coverage</div>
-        <div class="value">${formatCurrency(policy.coverage, 'TRY', locale)}</div>
+        <div class="value">${formatCoverageTotal(policy, locale)}</div>
       </div>
       <div>
         <div class="label">Annual Premium</div>
-        <div class="value">${formatCurrency(policy.premium, 'TRY', locale)}</div>
+        <div class="value">${formatPremiumForExport(policy, locale)}</div>
       </div>
     </div>
   </div>
@@ -383,7 +511,7 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
     </div>
     <div class="field">
       <div class="label">Insured Person</div>
-      <div class="value">${policy.insuredPerson || 'N/A'}</div>
+      <div class="value">${formatInsuredForExport(policy, locale)}</div>
     </div>
     <div class="field">
       <div class="label">Start Date</div>
@@ -399,7 +527,7 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
     </div>
     <div class="field">
       <div class="label">Deductible</div>
-      <div class="value">${formatCurrency(policy.deductible, 'TRY', locale)}</div>
+      <div class="value">${formatDeductibleForExport(policy, locale)}</div>
     </div>
     ${
       policy.location
@@ -427,7 +555,7 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
         (c) => `
     <div class="coverage-item">
       <span>${c.nameTr || c.name}</span>
-      <span>${formatCurrency(c.limit, 'TRY', locale)}</span>
+      <span>${formatCoverageItemLimit(c, locale)}</span>
     </div>
     `
       )
@@ -615,8 +743,8 @@ function generatePoliciesSummaryHTML(
         <td>${p.provider}</td>
         <td>${p.typeTr}</td>
         <td><span class="status status-${p.status}">${p.status}</span></td>
-        <td>${formatCurrency(p.coverage, 'TRY', locale)}</td>
-        <td>${formatCurrency(p.premium, 'TRY', locale)}</td>
+        <td>${formatCoverageTotal(p, locale)}</td>
+        <td>${formatPremiumForExport(p, locale)}</td>
         <td>${formatDate(p.expiryDate, locale)}</td>
       </tr>
       `
@@ -647,19 +775,12 @@ export function exportSinglePolicyToCSV(policy: AnalyzedPolicy, locale: 'en' | '
     [isTr ? 'Şirket' : 'Provider', policy.provider],
     [isTr ? 'Tür' : 'Type', policy.typeTr],
     [isTr ? 'Durum' : 'Status', policy.status],
-    [isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson || ''],
+    [isTr ? 'Sigortalı' : 'Insured Person', formatInsuredForExport(policy, locale)],
     [isTr ? 'Konum' : 'Location', policy.location || ''],
-    [
-      isTr ? 'Teminat' : 'Coverage',
-      policy.type === 'kasko'
-        ? isTr
-          ? 'Araç Rayiç Bedeli'
-          : 'Market Value'
-        : formatCurrency(policy.coverage, 'TRY', locale),
-    ],
-    [isTr ? 'Prim' : 'Premium', formatCurrency(policy.premium, 'TRY', locale)],
-    [isTr ? 'Aylık Prim' : 'Monthly Premium', formatCurrency(policy.monthlyPremium, 'TRY', locale)],
-    [isTr ? 'Muafiyet' : 'Deductible', formatCurrency(policy.deductible, 'TRY', locale)],
+    [isTr ? 'Teminat' : 'Coverage', formatCoverageTotal(policy, locale)],
+    [isTr ? 'Prim' : 'Premium', formatPremiumForExport(policy, locale)],
+    [isTr ? 'Aylık Prim' : 'Monthly Premium', formatMonthlyPremiumForExport(policy, locale)],
+    [isTr ? 'Muafiyet' : 'Deductible', formatDeductibleForExport(policy, locale)],
     [isTr ? 'Başlangıç' : 'Start Date', formatDate(policy.startDate, locale)],
     [isTr ? 'Bitiş' : 'Expiry Date', formatDate(policy.expiryDate, locale)],
     [isTr ? 'AI Güven' : 'AI Confidence', (policy.aiConfidence * 100).toFixed(0) + '%'],
@@ -770,10 +891,10 @@ export function exportComparisonToCSV(
     ['Policy Number', ...policies.map((p) => p.policyNumber)],
     ['Type', ...policies.map((p) => p.typeTr)],
     ['Status', ...policies.map((p) => p.status)],
-    ['Coverage', ...policies.map((p) => formatCurrency(p.coverage, 'TRY', locale))],
-    ['Premium', ...policies.map((p) => formatCurrency(p.premium, 'TRY', locale))],
-    ['Monthly Premium', ...policies.map((p) => formatCurrency(p.monthlyPremium, 'TRY', locale))],
-    ['Deductible', ...policies.map((p) => formatCurrency(p.deductible, 'TRY', locale))],
+    ['Coverage', ...policies.map((p) => formatCoverageTotal(p, locale))],
+    ['Premium', ...policies.map((p) => formatPremiumForExport(p, locale))],
+    ['Monthly Premium', ...policies.map((p) => formatMonthlyPremiumForExport(p, locale))],
+    ['Deductible', ...policies.map((p) => formatDeductibleForExport(p, locale))],
     ['Start Date', ...policies.map((p) => formatDate(p.startDate, locale))],
     ['Expiry Date', ...policies.map((p) => formatDate(p.expiryDate, locale))],
     ['AI Confidence', ...policies.map((p) => `${(p.aiConfidence * 100).toFixed(0)}%`)],
