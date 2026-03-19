@@ -46,7 +46,14 @@ function formatInsuredForExport(policy: AnalyzedPolicy, locale: string): string 
  */
 function formatDeductibleForExport(policy: AnalyzedPolicy, locale: string): string {
   const isTr = locale === 'tr'
+  const hasConditional =
+    (policy as any).conditionalDeductibles && (policy as any).conditionalDeductibles.length > 0
   if ((policy as any).deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)) {
+    if (hasConditional) {
+      return isTr
+        ? 'Genel muafiyet yapısı net değil; koşullu muafiyetler tespit edildi'
+        : 'General deductible structure unclear; conditional deductibles detected'
+    }
     return isTr ? 'Koşullu / inceleme gerekli' : 'Conditional / requires review'
   }
   if (policy.deductible > 0) {

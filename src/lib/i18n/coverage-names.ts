@@ -11,7 +11,11 @@
  */
 export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   // Comprehensive / Main
-  'Comprehensive Coverage': 'Kapsamlı Teminat',
+  'Comprehensive Coverage': 'Kasko Ana Teminatı',
+  'Comprehensive Auto Insurance': 'Kasko Ana Teminatı',
+  'Motor Own Damage': 'Kasko Ana Teminatı',
+  'Vehicle Market Value': 'Araç Piyasa Değeri',
+  'Extended Liability Insurance': 'İhtiyari Mali Mesuliyet',
 
   // Collision
   Collision: 'Çarpma/Çarpışma',
@@ -37,9 +41,9 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Water Damage': 'Su Hasarı',
 
   // Liability
-  'Extended Liability': 'Genişletilmiş Mali Sorumluluk',
-  'Extended Third Party Liability': 'İhtiyari Mali Sorumluluk',
-  'Extended Liability Moral Compensation': 'Genişletilmiş Sorumluluk Manevi Tazminat',
+  'Extended Liability': 'İhtiyari Mali Mesuliyet',
+  'Extended Third Party Liability': 'İhtiyari Mali Mesuliyet',
+  'Extended Liability Moral Compensation': 'Manevi Tazminat',
   'Increased Liability': 'Artan Mali Sorumluluk',
   'Third Party Liability': 'Üçüncü Şahıs Mali Sorumluluk',
   'Third Party Property Damage': 'Üçüncü Şahıs Maddi Hasar',
@@ -91,8 +95,9 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Towing Service': 'Çekici Hizmeti',
   'Replacement Vehicle': 'İkame Araç',
   'Rental Car': 'Kiralık Araç',
-  'Anadolu Service': 'Asistans Hizmeti (Anadolu)',
-  'Mini Repair Service': 'Mini Onarım Hizmeti',
+  'Anadolu Service': 'Anadolu Hizmet Paketi',
+  'Anadolu Servis': 'Anadolu Hizmet Paketi',
+  'Mini Repair Service': 'Mini Onarım',
   'Mini Repair': 'Mini Onarım',
   'Excess Liability': 'İhtiyari Mali Mesuliyet',
   'Excess Liability Moral Compensation': 'İhtiyari Mali Mesuliyet Manevi Tazminat',

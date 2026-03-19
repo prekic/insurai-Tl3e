@@ -2015,6 +2015,52 @@ async function convertToAnalyzedPolicy(
     }
   }
 
+  // ── Classify exclusions vs conditional deductibles ──────────────────
+  // AI extraction dumps everything into exclusions[]. Items that describe
+  // scenario-based deductibles (e.g. "%35 tenzili muafiyet") or repair
+  // conditions belong in a separate conditionalDeductibles section.
+  {
+    const classified = classifyExclusions(basePolicy.exclusions)
+    basePolicy.exclusions = classified.trueExclusions
+    basePolicy.conditionalDeductibles = classified.conditionalDeductibles
+    // Rebuild English arrays if they exist
+    if (basePolicy.exclusionsEn && basePolicy.exclusionsEn.length > 0) {
+      const trueIndices = classified.trueExclusionIndices
+      basePolicy.exclusionsEn = basePolicy.exclusionsEn.filter((_, idx) => trueIndices.has(idx))
+    }
+  }
+
+  // ── Two-layer deductible reporting ─────────────────────────────────
+  // If conditional deductibles were detected, upgrade the header text
+  if (
+    basePolicy.conditionalDeductibles &&
+    basePolicy.conditionalDeductibles.length > 0 &&
+    basePolicy.deductibleUncertain
+  ) {
+    // The deductible display logic reads deductibleUncertain — keep it true
+    // but the display function will now use the richer text when conditionals exist
+  }
+
+  // ── Mini repair confidence downgrade ───────────────────────────────
+  // Mini repair/onarım coverages with numeric limits may be AI mis-extractions.
+  // If the limit seems implausible for a service-type coverage, downgrade to
+  // a reviewer-safe label instead of presenting a possibly incorrect amount.
+  for (const c of basePolicy.coverages) {
+    const nameLower = (c.name + ' ' + (c.nameTr || '')).toLowerCase()
+    if (/mini\s*(onar[ıi]m|repair)/i.test(nameLower)) {
+      if (c.limit > 0 && !c.isMarketValue) {
+        // Service-type coverages rarely have explicit monetary limits.
+        // Downgrade to included-with-review unless the amount is very small
+        // (under 5000 TRY) which could be a legitimate mini repair cap.
+        if (c.limit > 5000) {
+          c.limit = 0
+          c.included = true
+          // nameTr will be set by the coverage-names map during rendering
+        }
+      }
+    }
+  }
+
   // Calculate ML-based risk score
   try {
     const quickRisk = RiskAssessmentService.getQuickRiskScore(basePolicy)
@@ -2406,6 +2452,11 @@ function sanitizeReviewerInsights(insights: string[]): string[] {
       body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
     }
 
+    // ── Evidence-softening: replace overclaiming with hedged observation ──
+    // "X teminatı mevcut" → "X teminatı mevcut görünüyor; ... doğrulanmalı"
+    // "X teminat altında" → "X teminat altında olabilir; ... doğrulanmalı"
+    body = softenReviewerInsight(body)
+
     result.push(prefix ? `${prefix}${body}` : body)
   }
 
@@ -2439,6 +2490,44 @@ function applySafeWordingForInsight(text: string): string {
 }
 
 /**
+ * Soften overclaiming Turkish insight phrasing to reviewer-safe evidence language.
+ * Transforms assertive claims into hedged observations.
+ */
+function softenReviewerInsight(text: string): string {
+  let s = text
+
+  // "X teminatı mevcut" → "X teminatı mevcut görünüyor; uygulama koşulları doğrulanmalı"
+  // but only if not already hedged
+  if (/teminat[ıi]\s+mevcut\b/i.test(s) && !/görünüyor|doğrulanmalı|olabilir/.test(s)) {
+    s = s.replace(
+      /teminat([ıi])\s+mevcut\b/gi,
+      'teminat$1 mevcut görünüyor; uygulama koşulları doğrulanmalı'
+    )
+  }
+
+  // "X teminat altında" → "X teminat altında olabilir; kapsam doğrulanmalı"
+  if (/teminat\s+altında\b/i.test(s) && !/olabilir|doğrulanmalı|görünüyor/.test(s)) {
+    s = s.replace(/teminat\s+altında\b/gi, 'teminat altında olabilir; kapsam ve limit doğrulanmalı')
+  }
+
+  // "da teminat altında" at end → soften
+  if (/da\s+teminat\s+altında\s*$/i.test(s) && !/olabilir|doğrulanmalı/.test(s)) {
+    s = s.replace(
+      /da\s+teminat\s+altında\s*$/i,
+      'ilişkin ek teminat kaydı bulunuyor olabilir; kapsam ve limit doğrulanmalı'
+    )
+  }
+
+  // "tespit edildi" without hedge → "tespit edilmiş görünüyor; ... doğrulanmalı"
+  // But only for ✓ style observations, not ⚠ warnings
+  if (/tespit edildi\b/i.test(s) && !/görünüyor|doğrulanmalı|gözden geçirilmeli/.test(s)) {
+    s = s.replace(/tespit edildi\b/gi, 'tespit edilmiş görünüyor; uygulama koşulları doğrulanmalı')
+  }
+
+  return s
+}
+
+/**
  * Normalize Turkish legal entity name spacing.
  * Handles OCR/AI artifacts like "LİMİTEDŞİRKETİ" → "LİMİTED ŞİRKETİ"
  */
@@ -2468,6 +2557,67 @@ function normalizeTurkishLegalEntityName(name: string): string {
  * Groups exclusions by semantic key-phrase clusters. When two exclusions
  * share a cluster, the longer (more informative) one is kept.
  */
+/**
+ * Classify exclusions into true exclusions vs conditional deductibles.
+ * Items that describe percentage-based deductibles, repair conditions,
+ * or application-specific muafiyet rules are separated from true
+ * non-coverage exclusions (theft scenarios, licence requirements, etc.).
+ */
+function classifyExclusions(exclusions: string[]): {
+  trueExclusions: string[]
+  conditionalDeductibles: string[]
+  trueExclusionIndices: Set<number>
+} {
+  const conditionalPatterns = [
+    /muafiyet/i, // "muafiyet" = deductible
+    /tenzil/i, // "tenzili muafiyet" = applied deductible
+    /%\s*\d+/i, // percentage like %35
+    /\d+\s*%/i, // percentage like 35%
+    /anlaşmalı olmayan.*servis/i, // non-contracted repair
+    /anlaşmasız.*servis/i, // same variant
+    /onarım.*muafiyet/i, // repair deductible
+    /pert.*muafiyet/i, // total loss deductible
+    /pert.*tenzil/i, // total loss applied deductible
+  ]
+
+  const trueExclusions: string[] = []
+  const conditionalDeductibles: string[] = []
+  const trueExclusionIndices = new Set<number>()
+
+  for (let i = 0; i < exclusions.length; i++) {
+    const text = exclusions[i]
+    const isConditional = conditionalPatterns.some((p) => p.test(text))
+    if (isConditional) {
+      // Apply evidence-softened wording
+      conditionalDeductibles.push(softenConditionalDeductible(text))
+    } else {
+      trueExclusions.push(text)
+      trueExclusionIndices.add(i)
+    }
+  }
+
+  return { trueExclusions, conditionalDeductibles, trueExclusionIndices }
+}
+
+/**
+ * Soften a conditional deductible statement to reviewer-safe evidence language.
+ * Replaces assertive phrasing with hedged observation language.
+ */
+function softenConditionalDeductible(text: string): string {
+  let softened = text
+  // "uygulanır" (is applied) → "uygulanabileceği görülüyor" (appears to be applicable)
+  softened = softened.replace(/uygulanır\b/gi, 'uygulanabileceği görülüyor')
+  // "uygulanması" (application of) → "uygulanabileceği görülüyor" if at end
+  if (/uygulanması\s*$/.test(softened)) {
+    softened = softened.replace(/uygulanması\s*$/, 'uygulanabileceği görülüyor')
+  }
+  // If no transformation happened, add a hedge
+  if (softened === text && !/görülüyor|görünüyor|anlaşılıyor|olabilir/.test(softened)) {
+    softened = softened + ' şartı bulunduğu anlaşılıyor'
+  }
+  return softened
+}
+
 function deduplicateExclusions(exclusions: string[]): string[] {
   if (exclusions.length <= 1) return exclusions
 

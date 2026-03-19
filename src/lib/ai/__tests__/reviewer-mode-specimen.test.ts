@@ -334,7 +334,7 @@ describe('Issue 6: Coverage label normalization', () => {
 
   it('has Turkish label for "Anadolu Service"', async () => {
     const { COVERAGE_NAMES_EN_TO_TR } = await import('@/lib/i18n/coverage-names')
-    expect(COVERAGE_NAMES_EN_TO_TR['Anadolu Service']).toMatch(/Asistans Hizmeti/)
+    expect(COVERAGE_NAMES_EN_TO_TR['Anadolu Service']).toMatch(/Anadolu Hizmet Paketi/)
   })
 
   it('has Turkish label for "Personal Items"', async () => {
