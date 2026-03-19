@@ -100,10 +100,57 @@ If Phase 8L metrics pass, plot the final production-readiness validation phase f
     - Legal entity spacing: `normalizeTurkishLegalEntityName()` handles merged tokens
 
 ### Test Coverage
-- 21 new reviewer-insight-cleanup tests (personalization, safe wording, mapping, language, spacing)
-- 6 new text-export-parity tests
-- Updated `policy-extractor-validation.test.ts` assertions for Turkish strings
+- 21 new tests in `src/lib/ai/__tests__/reviewer-insight-cleanup.test.ts` (personalization, safe wording, mapping, language, spacing)
+- 6 new tests in `src/__tests__/reviewer-safety-hardening.test.ts` (text export parity)
+- Updated `src/lib/ai/policy-extractor-validation.test.ts` assertions for Turkish strings
+- Updated `src/components/PolicyDetailView-branches.test.tsx` and `src/components/PolicyDetailView.test.tsx` for TASLAK banner
 - All new tests passing (21/21 + 6/6)
+
+### Complete File Change Manifest (20 files)
+| File | Change Type | Commit(s) |
+|------|------------|-----------|
+| `.gitignore` | Modified | `d4e561c` — ignore supabase CLI temp |
+| `CLAUDE.md` | Modified | `67fdc6b` — docs update |
+| `SESSION_HANDOFF.md` | Modified | `67fdc6b` — docs update |
+| `src/__tests__/reviewer-safety-hardening.test.ts` | **NEW** | `b25d61d` — text/export parity tests |
+| `src/components/PolicyDetailView-branches.test.tsx` | Modified | `28ba86a` — TASLAK banner test updates |
+| `src/components/PolicyDetailView.test.tsx` | Modified | `28ba86a` — TASLAK banner test updates |
+| `src/components/PolicyDetailView.tsx` | Modified | `28ba86a`, `5067c79`, `d0c63d5`, `60104bd`, `0d31e25`, `b25d61d` — banner, safety flags, coverage rendering, export parity |
+| `src/components/PolicyUpload.tsx` | Modified | `ad3baf5`, `6a28588` — OCR labeling fix, demo label removal |
+| `src/lib/actuarial-engine/adapter.ts` | Modified | `5067c79` — pass `_premiumMissing` flag through actuarial pipeline |
+| `src/lib/actuarial-engine/engine.ts` | Modified | `5067c79` — skip premium scoring when `_premiumMissing` is true |
+| `src/lib/ai/__tests__/reviewer-insight-cleanup.test.ts` | **NEW** | `6e12f51` — 21 targeted cleanup tests |
+| `src/lib/ai/policy-extractor-validation.test.ts` | Modified | `6e12f51` — Turkish string assertions |
+| `src/lib/ai/policy-extractor.ts` | Modified | `5067c79`, `d0c63d5`, `60104bd`, `0d31e25`, `b25d61d`, `6e12f51` — safety flags, insight generation, personalization filter, name spacing |
+| `src/lib/analysis/display-interpreter.ts` | Modified | `0d31e25`, `6e12f51` — applySafeWording cascade fix |
+| `src/lib/analysis/kasko-pilot-gate.ts` | Modified | `5067c79` — contradiction detection for coverage vs exclusion lists |
+| `src/lib/export.ts` | Modified | `0d31e25`, `b25d61d` — text/CSV export aligned with UI rendering |
+| `src/lib/pdf-export/templates.ts` | Modified | `0d31e25`, `b25d61d` — PDF export aligned with UI rendering |
+| `src/lib/policy-evaluation/evaluator.ts` | Modified | `5067c79`, `d0c63d5` — skip premium scoring for missing premiums |
+| `src/types/policy.ts` | Modified | `5067c79` — added `premiumMissing`, `insuredMissing`, `deductibleUncertain`, `extractionWarnings` to `AnalyzedPolicy` |
+| `supabase/migrations/041_supabase_linter_security_fixes.sql` | **NEW** | `b13c612` — 20 Supabase database linter fixes |
+
+### New Migration: 041_supabase_linter_security_fixes.sql
+This migration fixes all 20 Supabase database linter security errors:
+1. **SECURITY INVOKER views**: Recreated `vw_cron_jobs` and `vw_cron_job_runs` as `SECURITY INVOKER` (were `SECURITY DEFINER`)
+2. **RLS enabled**: `admin_sessions`, `admin_notifications`, `settings_audit_log`, `settings_webhooks`, `settings_webhook_deliveries`, `config_drift_baselines`, `extraction_metrics`
+3. **service_role-only policies**: All newly RLS-enabled tables get `USING (true)` policies for `service_role` only
+4. **Cron schema grants**: `GRANT USAGE ON SCHEMA cron TO service_role` + `SELECT` on `cron.job` and `cron.job_run_details`
+
+**⚠️ Must be applied to production Supabase** after merging this branch. Safe to re-run (idempotent).
+
+### New Type Fields on AnalyzedPolicy (src/types/policy.ts)
+```typescript
+premiumMissing?: boolean      // True when premium was not extracted (0 is placeholder)
+insuredMissing?: boolean      // True when insured person was not extracted
+deductibleUncertain?: boolean // True when deductible status is indeterminate (0 is placeholder)
+extractionWarnings?: string[] // Reviewer-facing extraction quality warnings
+```
+These flags drive conditional rendering in `PolicyDetailView.tsx` (show "Not specified" / "Conditional / requires review" instead of "₺0").
+
+### Actuarial Engine Changes
+- `adapter.ts`: Return type extended with `_premiumMissing?: boolean` — propagates the flag so actuarial scoring can skip premium-based calculations when premium was not extracted
+- `engine.ts`: When `_premiumMissing` is true, the EOOP simulation avoids penalizing missing premiums as "zero premium"
 
 ## WHAT WAS ACCOMPLISHED — PREVIOUS SESSION (March 16, 2026)
 

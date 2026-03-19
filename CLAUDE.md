@@ -3,10 +3,12 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **KASKO Pilot Activation (MANUAL)**: Apply migration `040_kasko_pilot_flag_and_segment.sql` to production Supabase, assign reviewers to `kasko_pilot_reviewers` segment, enable `kasko_ai_extraction_pilot` flag. See `SESSION_HANDOFF.md` for exact SQL.
-2. **Collect Live Artifacts**: After activation, upload a real KASKO PDF as an assigned reviewer. Collect: result-object snippet (browser console), QA log row (`SELECT * FROM kasko_pilot_qa_records`), banner screenshot.
-3. **Execute Phase 8L**: Once real data exists, evaluate live safety + quality metrics from `kasko_pilot_qa_records`.
-4. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Merge Branch**: Create PR from `claude/load-project-context-cHYgY` with title `fix(kasko): harden reviewer-mode output quality — personalization filter, Turkish insights, export parity`
+2. **Apply Migrations to Production Supabase (MANUAL)**: Apply `040_kasko_pilot_flag_and_segment.sql` AND `041_supabase_linter_security_fixes.sql` in Supabase Dashboard → SQL Editor. Both are idempotent.
+3. **KASKO Pilot Activation (MANUAL)**: Assign reviewers to `kasko_pilot_reviewers` segment, enable `kasko_ai_extraction_pilot` flag. See `SESSION_HANDOFF.md` for exact SQL.
+4. **Collect Live Artifacts**: After activation, upload a real KASKO PDF as an assigned reviewer. Collect: result-object snippet (browser console), QA log row (`SELECT * FROM kasko_pilot_qa_records`), banner screenshot.
+5. **Execute Phase 8L**: Once real data exists, evaluate live safety + quality metrics from `kasko_pilot_qa_records`.
+6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
@@ -27,6 +29,10 @@
 7. **generateStrengths() Outputs Must Be Turkish**: All insight strings from `generateStrengths()`, `generateGapsAsync()`, and `generateRecommendationsAsync()` in `policy-extractor.ts` should be in Turkish for reviewer-mode consistency. If adding new insight strings, write them in Turkish. The `aiInsightsTr` extraction-time translation covers the standard English→Turkish path, but reviewer-facing warnings bypass it.
 
 8. **Turkish Legal Entity Name Spacing**: AI extraction can return merged legal entity names like `"LİMİTEDŞİRKETİ"`. `normalizeTurkishLegalEntityName()` in `policy-extractor.ts` handles common patterns (LİMİTED+ŞİRKET, ANONİM+ŞİRKET, TİCARET+LİMİTED). If new merged patterns appear in production, add them to this function. The function runs on `insuredPerson` during `convertToAnalyzedPolicy()`.
+
+9. **Migration 041 RLS Impact on Admin Tables**: Migration `041_supabase_linter_security_fixes.sql` enables RLS on 7 admin/system tables (`admin_sessions`, `admin_notifications`, `settings_audit_log`, `settings_webhooks`, `settings_webhook_deliveries`, `config_drift_baselines`, `extraction_metrics`) and adds `service_role`-only policies. After applying this migration, any code that accesses these tables with the `anon` key will get empty results. All current admin code uses `SUPABASE_SERVICE_ROLE_KEY` so this is safe, but verify before writing new queries against these tables.
+
+10. **AnalyzedPolicy Type Extension — premiumMissing/insuredMissing/deductibleUncertain**: These optional boolean flags were added to `src/types/policy.ts` in this session. They drive conditional rendering in `PolicyDetailView.tsx` (e.g., "Not specified" instead of "₺0" for missing premium). The actuarial engine adapter (`adapter.ts`) propagates `_premiumMissing` to avoid penalizing missing premiums in EOOP scoring. When adding new extraction flags, follow this same pattern: add to `AnalyzedPolicy`, set in `convertToAnalyzedPolicy()`, consume in `PolicyDetailView.tsx`.
 
 ---
 
@@ -363,6 +369,7 @@ insurai/
 | `supabase/migrations/038_extraction_redesign_schema.sql` | **NEW** Traceability columns (span_maps, clause_graph, validation) for High-Trust pipeline |
 | `supabase/migrations/039_extraction_versioned_persistence.sql` | **NEW** Versioned persistence for tracking schema and text versions |
 | `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` | **NEW** KASKO pilot feature flag seed, `user_segments` table, `kasko_pilot_qa_records` table |
+| `supabase/migrations/041_supabase_linter_security_fixes.sql` | **NEW** 20 Supabase database linter fixes — SECURITY INVOKER views, RLS on admin/system tables, service_role-only policies |
 
 ### Database-Driven i18n System (Added Feb 12, 2026)
 | File | Purpose |
