@@ -98,11 +98,23 @@ export function applySafeWording(text: string): string {
       'Cam teminatı özel şartlara bağlı olabilir — insan incelemesiyle doğrulanmalı',
     ],
     // Issue 2: Neutralize promotional KASKO insight phrasing
+    // Order matters: catch the FULL promotional sentence first, then shorter fallbacks
+    [
+      /mükemmel\s+kapsamlı\s+kasko\s+teminatı[^.]*rayiç\s+değer[^.]*(?:sınırsız|tam\s+koruma)[^.]*/gi,
+      'Teminat yapısı rayiç değer esasını işaret ediyor, ancak özel şartlar doğrulanmalı',
+    ],
     [
       /mükemmel\s+kapsamlı\s+kasko\s+teminatı[^.]*rayiç\s+değer\s+üzerinden\s+tam\s+koruma/gi,
-      'Ana teminat rayiç değer esasına dayanıyor',
+      'Ana teminat rayiç değer esasına dayanıyor; özel şartların ayrıca kontrolü gerekli',
     ],
-    [/mükemmel[^.]*teminat[ıi]/gi, 'Teminat yapısı tespit edildi — koşullar doğrulanmalı'],
+    [
+      /teminat\s+yapısı[^.]*rayiç\s+değer[^.]*sınırsız[^.]*/gi,
+      'Teminat yapısı rayiç değer esasını işaret ediyor, ancak özel şartlar doğrulanmalı',
+    ],
+    [
+      /mükemmel[^.]*teminat[ıi]/gi,
+      'Teminat yapısı tespit edildi; özel şartların ayrıca kontrolü gerekli',
+    ],
     [/\btam koruma\b/gi, 'Koruma kapsamı koşullara bağlıdır'],
     // Issue 3: Fix broken Turkish "kadenizi" in glass-related insights
     [

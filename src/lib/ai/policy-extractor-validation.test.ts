@@ -986,7 +986,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some((i) => i.includes('Zero deductible on some coverages'))).toBe(true)
+      expect(insights.some((i) => i.includes('Bazı teminatlarda muafiyet uygulanmıyor'))).toBe(true)
     }
   })
 
@@ -1022,9 +1022,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) => i.includes('Includes special endorsements for enhanced protection'))
-      ).toBe(true)
+      expect(insights.some((i) => i.includes('özel kloz tespit edildi'))).toBe(true)
     }
   })
 
@@ -1061,7 +1059,9 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some((i) => i.includes('Standard coverage for policy type'))).toBe(true)
+      expect(insights.some((i) => i.includes('Poliçe türüne uygun standart teminat yapısı'))).toBe(
+        true
+      )
     }
   })
 })

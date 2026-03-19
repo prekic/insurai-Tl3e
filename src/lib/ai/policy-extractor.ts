@@ -1808,7 +1808,7 @@ async function convertToAnalyzedPolicy(
     if (assistanceCov && legalCov && assistanceCov.limit > 0 && legalCov.limit > 0) {
       if (assistanceCov.limit > legalCov.limit * 5) {
         extractionWarnings.push(
-          `Coverage limit mapping may need review: ${assistanceCov.name} (${assistanceCov.limit.toLocaleString()}) vs ${legalCov.name} (${legalCov.limit.toLocaleString()})`
+          `${assistanceCov.nameTr || assistanceCov.name} ve ${legalCov.nameTr || legalCov.name} limit eşleşmesi insan incelemesiyle doğrulanmalı`
         )
       }
     }
@@ -1833,7 +1833,9 @@ async function convertToAnalyzedPolicy(
     fileName: file.name,
     documentType: 'PDF',
     documentUrl: URL.createObjectURL(file),
-    insuredPerson: insuredMissing ? undefined : insuredPerson,
+    insuredPerson: insuredMissing
+      ? undefined
+      : normalizeTurkishLegalEntityName(insuredPerson ?? ''),
     location: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     coverages,
@@ -1892,13 +1894,16 @@ async function convertToAnalyzedPolicy(
   }
 
   // Prepend AI generated evidence-based insights
+  // Filter out personalization leaks: insights that compare the insured name
+  // against user identity (e.g., "This policy owner is not Erdem")
   const aiInsightsEn = [...(basePolicy.aiInsightsEn || [])]
   if (data.evidence?.insights) {
+    const filteredInsights = data.evidence.insights.filter((i) => !isPersonalizationLeak(i.text))
     basePolicy.aiInsights = [
-      ...data.evidence.insights.map((i) => i.text.trim()),
+      ...filteredInsights.map((i) => i.text.trim()),
       ...basePolicy.aiInsights,
     ]
-    const prependEn = data.evidence.insights.map((i) => i.textEn?.trim() || i.text.trim())
+    const prependEn = filteredInsights.map((i) => i.textEn?.trim() || i.text.trim())
     basePolicy.aiInsightsEn = [...prependEn, ...aiInsightsEn]
   }
 
@@ -2044,8 +2049,8 @@ async function convertToAnalyzedPolicy(
     for (let idx = 0; idx < basePolicy.aiInsights.length; idx++) {
       // Normalize: strip emoji prefix, lowercase, collapse whitespace
       const raw = basePolicy.aiInsights[idx]
-      // eslint-disable-next-line no-misleading-character-class
       const normalized = raw
+        // eslint-disable-next-line no-misleading-character-class
         .replace(/^[✓✔☑⚠💡❌🔍\uFE0F]\s*/gu, '')
         .trim()
         .toLowerCase()
@@ -2248,6 +2253,48 @@ async function generateAIInsightsAsync(data: ExtractedPolicyData): Promise<strin
 }
 
 /**
+ * Detect personalization leaks in AI-generated insights.
+ * The AI sometimes injects identity comparisons like
+ * "This policy owner is not Erdem" which must never appear in output.
+ */
+function isPersonalizationLeak(text: string): boolean {
+  const lower = text.toLowerCase()
+  // "policy owner is not X" / "insured name: X" identity comparison patterns
+  if (/policy\s+owner\s+is\s+not\b/i.test(lower)) return true
+  if (/this\s+policy\s+.*\s+is\s+not\s+/i.test(lower)) return true
+  // "✗ ... not <Name> (insured name: ...)" pattern
+  if (/not\s+\w+\s*\(insured\s+name/i.test(lower)) return true
+  // Generic "insured.*is not <proper noun>" comparison
+  if (/insured\s+(?:person|name|party)\s+is\s+not\b/i.test(lower)) return true
+  return false
+}
+
+/**
+ * Normalize Turkish legal entity name spacing.
+ * Handles OCR/AI artifacts like "LİMİTEDŞİRKETİ" → "LİMİTED ŞİRKETİ"
+ */
+function normalizeTurkishLegalEntityName(name: string): string {
+  if (!name) return name
+  let result = name
+  // Insert space before common Turkish legal suffixes that are merged
+  // LİMİTEDŞİRKETİ → LİMİTED ŞİRKETİ
+  result = result.replace(/LİMİTED(?=ŞİRKET)/g, 'LİMİTED ')
+  // ANONİMŞİRKETİ → ANONİM ŞİRKETİ
+  result = result.replace(/ANONİM(?=ŞİRKET)/g, 'ANONİM ')
+  // TİCARETLİMİTED → TİCARET LİMİTED
+  result = result.replace(/TİCARET(?=LİMİTED)/g, 'TİCARET ')
+  // SANAYİVE → SANAYİ VE
+  result = result.replace(/SANAYİ(?=VE\s)/g, 'SANAYİ ')
+  // Lowercase variants
+  result = result.replace(/limited(?=şirket)/gi, 'limited ')
+  result = result.replace(/anonim(?=şirket)/gi, 'anonim ')
+  result = result.replace(/ticaret(?=limited)/gi, 'ticaret ')
+  // Collapse any resulting double spaces
+  result = result.replace(/\s{2,}/g, ' ').trim()
+  return result
+}
+
+/**
  * Generate policy strengths based on extracted data
  */
 function generateStrengths(data: ExtractedPolicyData): string[] {
@@ -2257,12 +2304,12 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
   // (proving the AI actually extracted deductible data rather than defaulting everything to 0)
   const hasPositiveDeductible = data.coverages.some((c) => c.deductible && c.deductible > 0)
   if (hasPositiveDeductible && data.coverages.some((c) => c.deductible === 0)) {
-    strengths.push('Zero deductible on some coverages')
+    strengths.push('Bazı teminatlarda muafiyet uygulanmıyor')
   }
 
   if (data.specialConditions.length > 0) {
     strengths.push(
-      `${data.specialConditions.length} special endorsement(s) — verify conditions apply`
+      `${data.specialConditions.length} özel kloz tespit edildi — koşulların geçerliliği doğrulanmalı`
     )
   }
 
@@ -2270,7 +2317,7 @@ function generateStrengths(data: ExtractedPolicyData): string[] {
   // in reviewer mode because they provide no actionable correction information.
   // If no specific strengths were found, note standard coverage.
   if (strengths.length === 0) {
-    strengths.push('Standard coverage for policy type')
+    strengths.push('Poliçe türüne uygun standart teminat yapısı')
   }
 
   return strengths
