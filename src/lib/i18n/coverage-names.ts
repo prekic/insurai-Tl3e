@@ -14,26 +14,26 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Comprehensive Coverage': 'Kapsamlı Teminat',
 
   // Collision
-  'Collision': 'Çarpma/Çarpışma',
+  Collision: 'Çarpma/Çarpışma',
   'Collision Damage': 'Çarpma/Çarpışma',
   'Collision Coverage': 'Çarpma/Çarpışma Teminatı',
 
   // Theft
-  'Theft': 'Hırsızlık',
+  Theft: 'Hırsızlık',
   'Theft Protection': 'Hırsızlık Koruması',
 
   // Fire
-  'Fire': 'Yangın',
+  Fire: 'Yangın',
   'Fire Coverage': 'Yangın Teminatı',
 
   // Natural Disasters
   'Natural Disasters': 'Doğal Afetler',
   'Natural Disaster': 'Doğal Afet',
-  'Flood': 'Sel/Su Baskını',
+  Flood: 'Sel/Su Baskını',
   'Storm/Flood': 'Fırtına/Sel',
-  'Earthquake': 'Deprem',
-  'Hail': 'Dolu',
-  'Storm': 'Fırtına',
+  Earthquake: 'Deprem',
+  Hail: 'Dolu',
+  Storm: 'Fırtına',
   'Water Damage': 'Su Hasarı',
 
   // Liability
@@ -45,7 +45,7 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Third Party Property Damage': 'Üçüncü Şahıs Maddi Hasar',
   'Third Party Bodily Injury': 'Üçüncü Şahıs Bedeni Hasar',
   'Moral Damages': 'Manevi Tazminat',
-  'Liability': 'Sorumluluk',
+  Liability: 'Sorumluluk',
 
   // Personal Accident
   'Personal Accident': 'Ferdi Kaza',
@@ -71,7 +71,7 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   // Glass
   'Glass Coverage': 'Cam Kırılması',
   'Glass Breakage': 'Cam Kırılması',
-  'Windscreen': 'Ön Cam',
+  Windscreen: 'Ön Cam',
 
   // Misc Auto
   'Key Loss': 'Anahtar Kaybı',
@@ -80,20 +80,25 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Tire Damage': 'Lastik Hasarı',
 
   // Property
-  'Contents': 'Eşya',
+  Contents: 'Eşya',
   'Rent Loss': 'Kira Kaybı',
 
   // Assistance
   'Road Assistance': 'Yol Yardım',
   'Roadside Assistance': 'Yol Yardım',
   'Roadside Assist': 'Yol Yardım',
-  'Towing': 'Çekici Hizmeti',
+  Towing: 'Çekici Hizmeti',
   'Towing Service': 'Çekici Hizmeti',
   'Replacement Vehicle': 'İkame Araç',
   'Rental Car': 'Kiralık Araç',
-  'Anadolu Service': 'Anadolu Servis',
+  'Anadolu Service': 'Asistans Hizmeti (Anadolu)',
   'Mini Repair Service': 'Mini Onarım Hizmeti',
   'Mini Repair': 'Mini Onarım',
+  'Excess Liability': 'İhtiyari Mali Mesuliyet',
+  'Excess Liability Moral Compensation': 'İhtiyari Mali Mesuliyet Manevi Tazminat',
+  'Seat Personal Accident - Death': 'Koltuk Ferdi Kaza - Vefat',
+  'Seat Personal Accident - Permanent Disability': 'Koltuk Ferdi Kaza - Sürekli Sakatlık',
+  'Personal Items': 'Kişisel Eşya',
 
   // Legal
   'Legal Protection': 'Hukuksal Koruma',
@@ -101,13 +106,13 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   'Bail Advance': 'Kefalet Avansı',
 
   // Health
-  'Hospitalization': 'Yatarak Tedavi',
-  'Outpatient': 'Ayakta Tedavi',
-  'Surgery': 'Ameliyat',
+  Hospitalization: 'Yatarak Tedavi',
+  Outpatient: 'Ayakta Tedavi',
+  Surgery: 'Ameliyat',
   'Prescription Drugs': 'İlaç',
-  'Maternity': 'Doğum',
-  'Dental': 'Diş',
-  'Optical': 'Göz',
+  Maternity: 'Doğum',
+  Dental: 'Diş',
+  Optical: 'Göz',
   'Emergency Abroad': 'Yurtdışı Acil',
   'Medical Expenses': 'Tedavi Masrafları',
   'Emergency Treatment': 'Acil Tedavi',
@@ -116,9 +121,9 @@ export const COVERAGE_NAMES_EN_TO_TR: Record<string, string> = {
   // Business
   'Building Damage': 'Bina Hasarı',
   'Business Interruption': 'İş Durması',
-  'Equipment': 'Makine Kırılması',
+  Equipment: 'Makine Kırılması',
   'Employee Injury': 'İşçi Kazası',
-  'Cyber': 'Siber',
+  Cyber: 'Siber',
 
   // Cargo / Nakliyat
   'Cargo Damage - All Risks (ICC-A)': 'Emtia Hasarı - Tüm Riskler',

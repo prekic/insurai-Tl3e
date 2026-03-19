@@ -1340,8 +1340,9 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      // Now translated to Turkish by generateAIInsightsAsync
-      expect(insights.some((i) => i.includes('Prim 75. yüzdeliğin üzerinde'))).toBe(true)
+      // Benchmark provenance gate: percentile insight now suppressed (no provenance)
+      // Instead, a safe fallback is generated
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1385,8 +1386,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      // Now translated to Turkish by generateAIInsightsAsync
-      expect(insights.some((i) => i.includes('Teminat piyasa ortancasının altında'))).toBe(true)
+      // Benchmark provenance gate: coverage median insight now suppressed
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1422,11 +1423,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) =>
-          i.includes('Review coverage limits annually to ensure adequate protection')
-        )
-      ).toBe(true)
+      // Benchmark provenance gate: annual review replaced with safe Turkish fallback
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1470,8 +1468,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      // Now translated to Turkish by generateAIInsightsAsync
-      expect(insights.some((i) => i.includes('Piyasa primleri yıllık %35 arttı'))).toBe(true)
+      // Benchmark provenance gate: YoY insight now suppressed
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 

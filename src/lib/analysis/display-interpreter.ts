@@ -92,6 +92,8 @@ export function applySafeWording(text: string): string {
       'Towing service availability depends on policy conditions and provider network',
     ],
     [/\bfully compliant\b/gi, 'Compliance status based on available policy data'],
+    [/\bexcellent\b/gi, ''],
+    [/\badvantage\b/gi, ''],
     [/\bmuafiyetsiz\b/gi, 'Muafiyet durumu senaryoya bağlıdır'],
     [
       /sınırsız cam onarımı[^.]*hasarsızlığı etkilemiyor/gi,

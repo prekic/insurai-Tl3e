@@ -1933,16 +1933,20 @@ async function convertToAnalyzedPolicy(
     }
   }
 
-  // ── Reviewer-mode: suppress low-value market commentary ─────────────
-  // When extraction warnings exist (reviewer-critical issues), market
-  // commentary like "Premium above 75th percentile" and "Market premiums
-  // increased N% YoY" provides no correction value and clutters the output.
-  if (extractionWarnings.length > 0) {
+  // ── Suppress unprovenanced market commentary ─────────────────────────
+  // Percentile and YoY claims lack benchmark provenance metadata.
+  // Until provenance is wired, suppress these universally (not just when
+  // extraction warnings exist) to avoid presenting unverified market claims.
+  // Matches both English originals and Turkish translations.
+  {
     const marketCommentaryPatterns = [
       /premium is above \d+th percentile/i,
+      /prim \d+\.\s*yüzdeliğin üzerinde/i,
       /market premiums increased \d+%/i,
+      /piyasa primleri yıllık %\d+ arttı/i,
       /review coverage limits annually/i,
       /lock in rates early/i,
+      /oranları erkenden sabitleyin/i,
     ]
     const isMarketCommentary = (insight: string) =>
       marketCommentaryPatterns.some((p) => p.test(insight))
@@ -1990,6 +1994,26 @@ async function convertToAnalyzedPolicy(
 
   // Final pass: ensure every exclusion has an English translation
   basePolicy.exclusionsEn = ensureExclusionsEn(basePolicy.exclusions, basePolicy.exclusionsEn)
+
+  // ── Semantic exclusion deduplication ──────────────────────────────────
+  // AI extraction often produces overlapping exclusions that describe the
+  // same restriction differently (e.g. "key left in ignition → theft" and
+  // "vehicle left running → theft"). Collapse semantically similar pairs.
+  {
+    const dedupResult = deduplicateExclusions(basePolicy.exclusions)
+    if (dedupResult.length < basePolicy.exclusions.length) {
+      // Rebuild English array from the kept indices
+      const keptIndicesSet = new Set(
+        dedupResult.map((kept) => basePolicy.exclusions.findIndex((e) => e === kept))
+      )
+      basePolicy.exclusions = dedupResult
+      if (basePolicy.exclusionsEn && basePolicy.exclusionsEn.length > 0) {
+        basePolicy.exclusionsEn = basePolicy.exclusionsEn.filter((_, idx) =>
+          keptIndicesSet.has(idx)
+        )
+      }
+    }
+  }
 
   // Calculate ML-based risk score
   try {
@@ -2073,6 +2097,18 @@ async function convertToAnalyzedPolicy(
         basePolicy.aiInsightsEn = keepIndices.map((idx) => basePolicy.aiInsightsEn![idx])
       }
     }
+  }
+
+  // ── Reviewer-mode insight sanitization ────────────────────────────────
+  // Runs on the final merged array BEFORE translation. Handles:
+  // - Promotional/sales wording removal (Excellent, advantage, etc.)
+  // - English→Turkish normalization for mixed-language bullets
+  // - Duplicated fragment cleanup (e.g. "unlimited...unlimited" assembly)
+  // - Evidence-first ordering
+  basePolicy.aiInsights = sanitizeReviewerInsights(basePolicy.aiInsights)
+  if (basePolicy.aiInsightsEn) {
+    // Keep English array aligned by length (may be shorter after sanitization)
+    basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.slice(0, basePolicy.aiInsights.length)
   }
 
   // Translate final aiInsights to Turkish (after all modifications like validation warnings)
@@ -2301,6 +2337,108 @@ function isPersonalizationLeak(text: string): boolean {
 }
 
 /**
+ * Sanitize reviewer-mode insights: enforce Turkish, strip promotional wording,
+ * fix duplicated fragment assembly, reorder to evidence-first.
+ *
+ * Runs AFTER dedup, BEFORE translation. The primary aiInsights array is the
+ * canonical source; aiInsightsTr is derived from it.
+ */
+function sanitizeReviewerInsights(insights: string[]): string[] {
+  const result: string[] = []
+
+  for (const raw of insights) {
+    const line = raw
+
+    // ── Strip emoji prefix for analysis, re-add later ──
+    // eslint-disable-next-line no-misleading-character-class
+    const prefixMatch = line.match(/^([✓✔☑⚠💡❌🔍\uFE0F]\s*)/u)
+    const prefix = prefixMatch ? prefixMatch[1] : ''
+    let body = prefix ? line.slice(prefix.length).trim() : line.trim()
+
+    // ── BLOCK: Promotional / sales wording ──
+    // "Excellent", "advantage", "perfect", "best", "superior"
+    if (/\b(excellent|advantage|perfect|best|superior|outstanding)\b/i.test(body)) {
+      // Rewrite to neutral Turkish evidence phrasing
+      if (/comprehensive.*coverage|kasko.*coverage|market.*value/i.test(body)) {
+        body =
+          'Kasko ana teminatı araç piyasa değeri üzerinden tanımlanmış görünüyor; standart kapsam ayrıntıları poliçe şartlarıyla doğrulanmalı'
+      } else if (/glass|cam/i.test(body)) {
+        body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+      } else if (/excess.*liab|mali.*mesuliyet|ihtiyari/i.test(body)) {
+        body =
+          'İhtiyari mali mesuliyet teminatı mevcut görünüyor; kapsam üst sınırı ve istisnalar poliçe şartlarından doğrulanmalı'
+      } else {
+        // Generic neutralization
+        body = body
+          .replace(/\b(excellent|advantage|perfect|best|superior|outstanding)\b/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim()
+        if (!body) continue // empty after stripping
+      }
+    }
+
+    // ── FIX: Duplicated fragment assembly ──
+    // Detect patterns like "X - X protection for Y" where X repeats
+    // e.g. "Generally unlimited...sublimits...carve-outs excess liability - Generally unlimited...sublimits...carve-outs protection"
+    if (/generally unlimited.*generally unlimited/i.test(body)) {
+      body =
+        'İhtiyari mali mesuliyet teminatı mevcut görünüyor; kapsam üst sınırı genel olarak geniş olmakla birlikte alt limitler ve istisnalar poliçe şartlarından doğrulanmalı'
+    }
+
+    // ── FIX: Remaining English-only insights → Turkish ──
+    // Evidence insights from AI may be fully English. Translate known patterns.
+    if (/^[A-Za-z]/.test(body) && !/[çğıöşüÇĞİÖŞÜ]/.test(body)) {
+      // Fully English body — translate via the insight translator
+      const translated = translateInsightToTr(body)
+      if (translated !== body) {
+        body = translated
+      } else {
+        // No translation found — try applySafeWording to at least neutralize
+        body = applySafeWordingForInsight(body)
+      }
+    }
+
+    // ── FIX: Glass-related promotional patterns ──
+    if (/glass.*(?:bonus|advantage|doesn.?t affect)/i.test(body)) {
+      body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+    }
+    if (/first.*glass.*replacement.*(?:no.?claims|bonus)/i.test(body)) {
+      body = 'Cam teminatı koşulları özel şartlarla doğrulanmalı'
+    }
+
+    result.push(prefix ? `${prefix}${body}` : body)
+  }
+
+  // ── Evidence-first ordering ──
+  // a) ⚠ review-required / uncertainty
+  // b) ✓ material coverage observations
+  // c) other (special conditions etc.)
+  // d) 💡 benchmark / recommendations (last)
+  const warnings = result.filter((i) => i.startsWith('⚠'))
+  const observations = result.filter((i) => i.startsWith('✓'))
+  const recommendations = result.filter((i) => i.startsWith('💡'))
+  const other = result.filter(
+    (i) => !i.startsWith('⚠') && !i.startsWith('✓') && !i.startsWith('💡')
+  )
+
+  return [...warnings, ...observations, ...other, ...recommendations]
+}
+
+/**
+ * Lightweight safe-wording for insight strings that remain in English.
+ * Mirrors the key patterns from display-interpreter's applySafeWording
+ * without importing it (to avoid circular dependency).
+ */
+function applySafeWordingForInsight(text: string): string {
+  return text
+    .replace(/\bunlimited\b/gi, 'genel olarak geniş kapsamlı, alt limitler ve istisnalara tabi')
+    .replace(/\bfully covered\b/gi, 'poliçe koşullarına tabi kapsam')
+    .replace(/\bfull protection\b/gi, 'poliçe koşullarına tabi koruma')
+    .replace(/\bno deductible\b/gi, 'muafiyet durumu senaryoya bağlıdır')
+    .replace(/\bguaranteed\b/gi, 'poliçe şartlarına tabi')
+}
+
+/**
  * Normalize Turkish legal entity name spacing.
  * Handles OCR/AI artifacts like "LİMİTEDŞİRKETİ" → "LİMİTED ŞİRKETİ"
  */
@@ -2323,6 +2461,68 @@ function normalizeTurkishLegalEntityName(name: string): string {
   // Collapse any resulting double spaces
   result = result.replace(/\s{2,}/g, ' ').trim()
   return result
+}
+
+/**
+ * Deduplicate semantically overlapping exclusions.
+ * Groups exclusions by semantic key-phrase clusters. When two exclusions
+ * share a cluster, the longer (more informative) one is kept.
+ */
+function deduplicateExclusions(exclusions: string[]): string[] {
+  if (exclusions.length <= 1) return exclusions
+
+  // Semantic clusters: each array of keywords defines one concept.
+  // If two exclusions both match the same cluster, they are duplicates.
+  const clusters: string[][] = [
+    ['anahtar', 'kontak', 'çalın'], // key-in-ignition theft
+    ['çalışır', 'vaziyette', 'çalın'], // vehicle-left-running theft
+    ['ehliyet', 'sürücü belgesi', 'kullanım'], // no valid licence
+    ['özel tertibatlı', 'ruhsat', 'tescil'], // special vehicle registration
+  ]
+
+  // For each exclusion, find which clusters it matches
+  const exclusionClusters: Map<number, number[]> = new Map()
+  for (let i = 0; i < exclusions.length; i++) {
+    const lower = exclusions[i].toLowerCase()
+    const matched: number[] = []
+    for (let c = 0; c < clusters.length; c++) {
+      const hits = clusters[c].filter((kw) => lower.includes(kw))
+      if (hits.length >= 2) matched.push(c) // require 2+ keyword hits
+    }
+    exclusionClusters.set(i, matched)
+  }
+
+  // Group exclusions by cluster. For each cluster, keep the longest.
+  const keptIndices = new Set<number>()
+  const clusterWinner = new Map<number, number>() // cluster → winning exclusion index
+
+  for (let i = 0; i < exclusions.length; i++) {
+    const myClust = exclusionClusters.get(i) || []
+    if (myClust.length === 0) {
+      keptIndices.add(i) // no cluster match → always keep
+      continue
+    }
+    let dominated = false
+    for (const c of myClust) {
+      const existing = clusterWinner.get(c)
+      if (existing !== undefined) {
+        // This cluster already has a winner — keep the longer one
+        if (exclusions[i].length > exclusions[existing].length) {
+          keptIndices.delete(existing)
+          keptIndices.add(i)
+          clusterWinner.set(c, i)
+        }
+        dominated = true
+      } else {
+        clusterWinner.set(c, i)
+        keptIndices.add(i)
+      }
+    }
+    if (!dominated) keptIndices.add(i)
+  }
+
+  // Preserve original order
+  return exclusions.filter((_, idx) => keptIndices.has(idx))
 }
 
 /**
@@ -2555,24 +2755,34 @@ async function generateRecommendationsAsync(data: ExtractedPolicyData): Promise<
   const policyType = (data.policyType ?? 'home') as PolicyType
   const benchmark = await marketDataProvider.getBenchmark(policyType)
 
-  if (data.premium && data.premium > benchmark.premiumRange.percentile75) {
-    recommendations.push('Premium is above 75th percentile - compare with other providers')
-  }
+  // ── Benchmark provenance gate ──────────────────────────────────────
+  // Percentile and YoY claims require provenance: source, date, cohort.
+  // Current static/DB benchmarks lack this metadata, so these insights
+  // are suppressed to avoid presenting unverified market claims.
+  // When benchmark data includes provenance, enable these with:
+  //   if (benchmark.provenance?.source && benchmark.provenance?.date) { ... }
+  const hasBenchmarkProvenance = false // TODO: wire when benchmark provenance exists
 
-  const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
-  if (totalCoverage < benchmark.coverageRange.median) {
-    recommendations.push('Coverage below market median - consider increasing limits')
-  }
+  if (hasBenchmarkProvenance) {
+    if (data.premium && data.premium > benchmark.premiumRange.percentile75) {
+      recommendations.push('Premium is above 75th percentile - compare with other providers')
+    }
 
-  if (benchmark.trends.premiumChangeYoY > 30) {
-    recommendations.push(
-      `Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`
-    )
+    const totalCoverage = data.coverages.reduce((sum, c) => sum + (c.limit ?? 0), 0)
+    if (totalCoverage < benchmark.coverageRange.median) {
+      recommendations.push('Coverage below market median - consider increasing limits')
+    }
+
+    if (benchmark.trends.premiumChangeYoY > 30) {
+      recommendations.push(
+        `Market premiums increased ${Math.round(benchmark.trends.premiumChangeYoY)}% YoY - lock in rates early`
+      )
+    }
   }
 
   // Only add generic advice when no more critical recommendations were found
   if (recommendations.length === 0) {
-    recommendations.push('Review coverage limits annually to ensure adequate protection')
+    recommendations.push('Prim ve teminat karşılaştırması için güncel piyasa verisi doğrulanmalı')
   }
   return recommendations.slice(0, 5)
 }
