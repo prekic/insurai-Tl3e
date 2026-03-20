@@ -18,7 +18,7 @@ The KASKO pilot code is now fully wired into the production extraction pipeline,
 ## IMMEDIATE NEXT STEPS (Priority Order)
 
 ### 1. Create & Merge PR from `claude/load-project-context-btKxw`
-Branch is pushed and up-to-date (6 commits ahead of `origin/main`, 17 files, +2,851/−359 lines). PR was not created in the previous session due to missing `gh` CLI authentication.
+Branch is pushed and up-to-date (7 commits ahead of `origin/main`, 17 files, +2,860/−360 lines). PR was not created due to missing `gh` CLI authentication (`gh auth login` needed, or set `GH_TOKEN` env var).
 
 **PR Title**: `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`
 
@@ -115,7 +115,7 @@ If Phase 8L metrics pass, plot the final production-readiness validation phase f
 - Zero typecheck errors, zero lint errors
 - Files: `reviewer-mode-specimen.test.ts` (43), `reviewer-insight-cleanup.test.ts` (21 — expanded), `reviewer-mode-upgrades.test.ts` (26), `policy-reviewer-summary.test.ts` (37), `export-cross-path-alignment.test.ts` (16)
 
-### Complete File Change Manifest (15 files, +2,725 / −350 lines)
+### Complete File Change Manifest (15 code files + 2 docs, +2,860 / −360 lines total)
 | File | Change Type | Purpose |
 |------|------------|---------|
 | `src/lib/reviewer/policy-reviewer-summary.ts` | **NEW** | Canonical reviewer summary builder |
@@ -147,12 +147,18 @@ src/lib/reviewer/
     └── policy-reviewer-summary.test.ts # 37 unit tests
 ```
 
-Key exports:
+Key exports (10 functions, 3 interfaces):
 - `buildPolicyReviewerSummary(policy, options)` — single source of truth for all export paths
+- `formatPremiumForReview()` — premium with "Not specified" for missing values
+- `formatMonthlyPremiumForReview()` — monthly premium derivation
+- `formatInsuredForReview()` — insured person with "Not specified" fallback
+- `formatDeductibleForReview()` — deductible with uncertainty handling
+- `formatCoverageTotalForReview()` — coverage total with market value / unlimited support
 - `formatCoverageItemLimitForReview()` — 6-level coverage limit cascade with safe wording
 - `getLocalizedCoverageName()` — locale-aware coverage name resolution
 - `getLocalizedInsight()` — locale-aware insight text with legacy fallback
 - `translateInsightLegacy()` — runtime Turkish↔English insight translation
+- Interfaces: `ReviewerSummary`, `ReviewerCoverageItem`, `ReviewerSummaryOptions`
 
 ## WHAT WAS ACCOMPLISHED — PREVIOUS SESSION (March 19, 2026)
 

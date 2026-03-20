@@ -3,7 +3,7 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Create & Merge PR**: Branch `claude/load-project-context-btKxw` is pushed and ready. Create PR with title `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`. Previous session attempted `gh pr create` but `gh` CLI lacked auth — either set `GH_TOKEN` env var or create PR manually on GitHub. Base: `main`, Head: `claude/load-project-context-btKxw` (6 commits, 17 files, +2,851/−359 lines).
+1. **Create & Merge PR**: Branch `claude/load-project-context-btKxw` is pushed and ready. Create PR with title `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`. Previous session attempted `gh pr create` but `gh` CLI lacked auth — either set `GH_TOKEN` env var or create PR manually on GitHub. Base: `main`, Head: `claude/load-project-context-btKxw` (7 commits, 17 files, +2,860/−360 lines).
 2. **Apply Migrations to Production Supabase (MANUAL)**: Apply `040_kasko_pilot_flag_and_segment.sql` AND `041_supabase_linter_security_fixes.sql` in Supabase Dashboard → SQL Editor. Both are idempotent.
 3. **KASKO Pilot Activation (MANUAL)**: Assign reviewers to `kasko_pilot_reviewers` segment, enable `kasko_ai_extraction_pilot` flag. See `SESSION_HANDOFF.md` for exact SQL.
 4. **Collect Live Artifacts**: After activation, upload a real KASKO PDF as an assigned reviewer. Collect: result-object snippet (browser console), QA log row (`SELECT * FROM kasko_pilot_qa_records`), banner screenshot.
