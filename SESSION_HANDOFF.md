@@ -11,17 +11,18 @@ The KASKO pilot code is now fully wired into the production extraction pipeline,
 - **Completed:** Comprehensive audit identified 6 blocking failures; all 6 resolved in code.
 - **Completed:** Migration 040 schema fix — `name` column added to `feature_flags` INSERT (commit `71a5113`).
 - **Completed:** Full 12-section operational audit report with evidence structures (commit `2d3f540`).
-- **Completed:** KASKO reviewer-mode output quality hardening — 12 commits on branch `claude/load-project-context-cHYgY` (Mar 19, 2026).
+- **Completed:** KASKO reviewer-mode output quality hardening — 12 commits on branch `claude/load-project-context-cHYgY` (Mar 19, 2026). Merged via PR #296.
+- **Completed:** Reviewer-mode Phase 2 — benchmark provenance gating, specimen hardening, conditional deductible classification, evidence-softening, canonical summary builder, export.ts unification — 5 commits on branch `claude/load-project-context-btKxw` (Mar 20, 2026).
 - **Blocked:** Phase 8L (Actual Broader Guarded Internal KASKO Pilot) — blocked on 3 manual activation steps + real KASKO PDF data.
 
 ## IMMEDIATE NEXT STEPS (Priority Order)
 
-### 1. Merge Branch `claude/load-project-context-cHYgY` (PR)
-This branch contains 12 commits of KASKO reviewer-mode fixes. Create a PR and merge to main.
+### 1. Merge Branch `claude/load-project-context-btKxw` (PR)
+This branch contains 5 commits of reviewer-mode Phase 2 improvements: benchmark provenance gating, specimen hardening, conditional deductible classification, canonical summary builder, and export unification.
 
-**PR Title**: `fix(kasko): harden reviewer-mode output quality — personalization filter, Turkish insights, export parity`
+**PR Title**: `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`
 
-### 2. Apply Migration 040 to Production Supabase (MANUAL)
+### 2. Apply Migration 040 AND 041 to Production Supabase (MANUAL)
 Run `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` in Supabase Dashboard → SQL Editor.
 
 **Verify:**
@@ -66,7 +67,86 @@ Use `GET /api/admin/monitoring/pilot-rollback-status` to check for safety thresh
 ### 8. Production Validation Planning
 If Phase 8L metrics pass, plot the final production-readiness validation phase for KASKO.
 
-## WHAT WAS ACCOMPLISHED — THIS SESSION (March 19, 2026)
+## WHAT WAS ACCOMPLISHED — THIS SESSION (March 20, 2026)
+
+### Reviewer-Mode Phase 2 — Benchmark Provenance, Specimen Hardening, Canonical Summary Builder (5 commits)
+
+1. **Resolve 5 Remaining Reviewer-Mode Insight Issues** (`4c3ad6c`):
+   - Fixed 5 outstanding reviewer-mode issues from the previous session's cleanup
+
+2. **Reviewer-Mode Specimen Hardening — 8 Presentation Issues** (`d4d5124`):
+   - 8 additional specimen-level presentation fixes for reviewer output
+
+3. **Wire BenchmarkProvenance Type for Reviewer-Mode Benchmark Gate** (`fdd4720`):
+   - Added `BenchmarkProvenance` interface (source, date, cohort) to `PolicyTypeMarketData`
+   - Provenance gate in `generateRecommendationsAsync` now reads from `benchmark.provenance` instead of hardcoded false
+   - All three fields must be non-empty strings for the gate to open
+   - Static benchmarks intentionally omit provenance so the gate stays closed by default
+   - 4 provenance gate tests (open, closed-missing-field, closed-undefined, closed-static-benchmarks)
+
+4. **Reviewer-Mode Upgrades — 10 Presentation Issues** (`7d83b1c`):
+   - Full Turkish normalization for text export (section headers, coverage labels)
+   - Raw label normalization: 6 coverage names mapped to proper Turkish
+   - Exclusion vs conditional deductible classification (`classifyExclusions()`)
+   - New `conditionalDeductibles` field on `AnalyzedPolicy` type
+   - Two-layer deductible reporting when uncertain + conditional deductibles detected
+   - Evidence-softening (`softenReviewerInsight()`) — transforms assertive Turkish phrasing
+   - Mini repair confidence downgrade for service-type coverages
+   - Conditional deductibles section in text export
+   - 26 new tests in `reviewer-mode-upgrades.test.ts`
+
+5. **Canonical Policy-Reviewer-Summary Builder + Export.ts Wiring** (`684b11b`):
+   - Introduced `buildPolicyReviewerSummary()` as single source of truth for reviewer-mode output formatting
+   - All 8 inline formatting patterns in `export.ts` replaced with canonical function calls
+   - New `src/lib/reviewer/policy-reviewer-summary.ts` (403 lines)
+   - 37 unit tests in `policy-reviewer-summary.test.ts`
+   - 16 integration tests in `export-cross-path-alignment.test.ts` proving CSV/Excel/PDF paths apply identical governance rules
+
+### Test Coverage
+- 143 new tests across 5 test files (all passing)
+- Zero typecheck errors, zero lint errors
+- Files: `reviewer-mode-specimen.test.ts` (43), `reviewer-insight-cleanup.test.ts` (21 — expanded), `reviewer-mode-upgrades.test.ts` (26), `policy-reviewer-summary.test.ts` (37), `export-cross-path-alignment.test.ts` (16)
+
+### Complete File Change Manifest (15 files, +2,725 / −350 lines)
+| File | Change Type | Purpose |
+|------|------------|---------|
+| `src/lib/reviewer/policy-reviewer-summary.ts` | **NEW** | Canonical reviewer summary builder |
+| `src/lib/reviewer/__tests__/policy-reviewer-summary.test.ts` | **NEW** | 37 unit tests |
+| `src/lib/__tests__/export-cross-path-alignment.test.ts` | **NEW** | 16 cross-path integration tests |
+| `src/lib/ai/__tests__/reviewer-mode-specimen.test.ts` | **NEW** | 43 specimen + provenance gate tests |
+| `src/lib/ai/__tests__/reviewer-mode-upgrades.test.ts` | **NEW** | 26 upgrade tests |
+| `src/lib/ai/__tests__/reviewer-insight-cleanup.test.ts` | Modified | Expanded from 21 to cover new paths |
+| `src/lib/ai/policy-extractor.ts` | Modified | +492 lines — classifyExclusions, softenReviewerInsight, provenance gate, evidence-softening |
+| `src/lib/ai/policy-extractor-validation.test.ts` | Modified | Updated assertions for Turkish strings |
+| `src/lib/export.ts` | Modified | Refactored to use canonical summary builder |
+| `src/lib/analysis/display-interpreter.ts` | Modified | +10 lines — applySafeWording patterns |
+| `src/lib/i18n/coverage-names.ts` | Modified | 6 new coverage name mappings |
+| `src/components/PolicyDetailView.tsx` | Modified | Conditional deductibles section, evidence-softening |
+| `src/data/market-data/benchmarks.ts` | Modified | Provenance documentation + structure |
+| `src/types/market-data.ts` | Modified | BenchmarkProvenance interface |
+| `src/types/policy.ts` | Modified | conditionalDeductibles field |
+
+### New Type Fields on AnalyzedPolicy (src/types/policy.ts)
+```typescript
+conditionalDeductibles?: string[] // Percentage-based deductibles separated from exclusions
+```
+
+### New Module: src/lib/reviewer/
+```
+src/lib/reviewer/
+├── policy-reviewer-summary.ts        # Canonical builder (403 lines)
+└── __tests__/
+    └── policy-reviewer-summary.test.ts # 37 unit tests
+```
+
+Key exports:
+- `buildPolicyReviewerSummary(policy, options)` — single source of truth for all export paths
+- `formatCoverageItemLimitForReview()` — 6-level coverage limit cascade with safe wording
+- `getLocalizedCoverageName()` — locale-aware coverage name resolution
+- `getLocalizedInsight()` — locale-aware insight text with legacy fallback
+- `translateInsightLegacy()` — runtime Turkish↔English insight translation
+
+## WHAT WAS ACCOMPLISHED — PREVIOUS SESSION (March 19, 2026)
 
 ### KASKO Reviewer-Mode Output Quality Hardening (12 commits)
 
