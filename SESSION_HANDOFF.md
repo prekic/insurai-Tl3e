@@ -17,10 +17,18 @@ The KASKO pilot code is now fully wired into the production extraction pipeline,
 
 ## IMMEDIATE NEXT STEPS (Priority Order)
 
-### 1. Merge Branch `claude/load-project-context-btKxw` (PR)
-This branch contains 5 commits of reviewer-mode Phase 2 improvements: benchmark provenance gating, specimen hardening, conditional deductible classification, canonical summary builder, and export unification.
+### 1. Create & Merge PR from `claude/load-project-context-btKxw`
+Branch is pushed and up-to-date (6 commits ahead of `origin/main`, 17 files, +2,851/−359 lines). PR was not created in the previous session due to missing `gh` CLI authentication.
 
 **PR Title**: `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`
+
+**To create manually**: Go to GitHub → New Pull Request → Base: `main`, Compare: `claude/load-project-context-btKxw`
+
+**Or via CLI** (requires `GH_TOKEN` env var):
+```bash
+gh pr create --base main --head claude/load-project-context-btKxw \
+  --title "feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification"
+```
 
 ### 2. Apply Migration 040 AND 041 to Production Supabase (MANUAL)
 Run `supabase/migrations/040_kasko_pilot_flag_and_segment.sql` in Supabase Dashboard → SQL Editor.

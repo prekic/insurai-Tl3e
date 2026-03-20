@@ -3,7 +3,7 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Merge Branch**: Create PR from `claude/load-project-context-btKxw` with title `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`
+1. **Create & Merge PR**: Branch `claude/load-project-context-btKxw` is pushed and ready. Create PR with title `feat(reviewer): reviewer-mode phase 2 — benchmark provenance gate, canonical summary builder, export unification`. Previous session attempted `gh pr create` but `gh` CLI lacked auth — either set `GH_TOKEN` env var or create PR manually on GitHub. Base: `main`, Head: `claude/load-project-context-btKxw` (6 commits, 17 files, +2,851/−359 lines).
 2. **Apply Migrations to Production Supabase (MANUAL)**: Apply `040_kasko_pilot_flag_and_segment.sql` AND `041_supabase_linter_security_fixes.sql` in Supabase Dashboard → SQL Editor. Both are idempotent.
 3. **KASKO Pilot Activation (MANUAL)**: Assign reviewers to `kasko_pilot_reviewers` segment, enable `kasko_ai_extraction_pilot` flag. See `SESSION_HANDOFF.md` for exact SQL.
 4. **Collect Live Artifacts**: After activation, upload a real KASKO PDF as an assigned reviewer. Collect: result-object snippet (browser console), QA log row (`SELECT * FROM kasko_pilot_qa_records`), banner screenshot.
@@ -5874,4 +5874,4 @@ npm run build:analyze
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
-**Last Updated**: March 16, 2026 (KASKO Pilot operational audit, migration 040 NOT NULL fix, 12-section evidence report)
+**Last Updated**: March 20, 2026 (Reviewer-mode Phase 2 — benchmark provenance gate, conditional deductible classification, evidence-softening, canonical summary builder, export path unification)
