@@ -1144,42 +1144,73 @@ export function PolicyDetailView() {
         ? t.policy.notSpecified
         : formatConverted(policy.premium)
 
-    // Canonical deductible: same logic as UI (lines 1441-1448)
+    // Canonical deductible: two-layer display when conditional deductibles exist
+    const hasConditionalDeductibles =
+      policy.conditionalDeductibles && policy.conditionalDeductibles.length > 0
     const deductibleText =
       policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)
-        ? locale === 'tr'
-          ? 'Koşullu / inceleme gerekli'
-          : 'Conditional / requires review'
+        ? hasConditionalDeductibles
+          ? locale === 'tr'
+            ? 'Genel muafiyet yapısı net değil; koşullu muafiyetler tespit edildi'
+            : 'General deductible structure unclear; conditional deductibles detected'
+          : locale === 'tr'
+            ? 'Koşullu / inceleme gerekli'
+            : 'Conditional / requires review'
         : policy.deductible > 0
           ? formatConverted(policy.deductible)
           : locale === 'tr'
             ? 'Yok'
             : 'None'
 
-    const summary = [
+    // Build section labels
+    const isTr = locale === 'tr'
+    const coverageLabel = isTr ? 'Teminat' : t.policy.coverageLabel
+    const deductibleLabel = isTr ? 'Muafiyet' : t.policy.deductibleLabel
+    const coveragesTitle = isTr ? 'Teminatlar' : t.policy.coveragesTitleExport
+    const exclusionsTitle = isTr ? 'İstisnalar' : t.policy.exclusionsTitleExport
+    const condDeductTitle = isTr
+      ? 'Koşullu Muafiyetler / Özel Şartlar'
+      : 'Conditional Deductibles / Special Conditions'
+    const insightsTitle = isTr ? 'AI Görüşleri' : t.policy.aiInsightsTitleExport
+
+    const sections = [
       `${t.policy.policy}: ${policy.policyNumber}`,
       `${t.policy.provider}: ${getShortCompanyName(policy.provider)}`,
       `${t.policy.type}: ${policy.typeTr}`,
       `${t.policy.insured}: ${insuredText}`,
-      `${t.policy.coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
-      `${t.policy.premiumLabel}: ${premiumText}`,
-      `${t.policy.deductibleLabel}: ${deductibleText}`,
+      `${coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
+      `${t.policy.premiumLabel} ${premiumText}`,
+      `${deductibleLabel}: ${deductibleText}`,
       `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
       '',
-      `=== ${t.policy.coveragesTitleExport} ===`,
+      `=== ${coveragesTitle} ===`,
       ...policy.coverages.map(
         (c) => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${fmtCovLimit(c)}`
       ),
       '',
-      `=== ${t.policy.exclusionsTitleExport} ===`,
+      `=== ${exclusionsTitle} ===`,
       ...policy.exclusions.map((e) => `• ${e}`),
+    ]
+
+    // Add conditional deductibles section if present
+    if (hasConditionalDeductibles) {
+      sections.push(
+        '',
+        `=== ${condDeductTitle} ===`,
+        ...policy.conditionalDeductibles!.map((d) => `• ${d}`)
+      )
+    }
+
+    sections.push(
       '',
-      `=== ${t.policy.aiInsightsTitleExport} ===`,
+      `=== ${insightsTitle} ===`,
       ...policy.aiInsights.map(
         (_, i) =>
           `• ${applySafeWording(getLocalizedInsight(policy, i, locale, t.insightTranslations))}`
-      ),
-    ].join('\n')
+      )
+    )
+
+    const summary = sections.join('\n')
 
     const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)

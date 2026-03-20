@@ -284,6 +284,11 @@ export interface AnalyzedPolicy extends Policy {
   deductibleUncertain?: boolean
   /** Reviewer-facing warnings about extraction quality (missing fields, contradictions) */
   extractionWarnings?: string[]
+  /**
+   * Scenario-based conditional deductibles detected in the policy text.
+   * Separated from exclusions during extraction — rendered in their own section.
+   */
+  conditionalDeductibles?: string[]
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {

@@ -1117,9 +1117,10 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
+      // Now translated to Turkish by generateAIInsightsAsync
       expect(
         insights.some((i) =>
-          i.includes('Multiple exclusions may limit coverage in certain scenarios')
+          i.includes('Çok sayıda istisna belirli durumlarda teminatı sınırlayabilir')
         )
       ).toBe(true)
     }
@@ -1165,10 +1166,9 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
+      // Now translated to Turkish by generateAIInsightsAsync
       expect(
-        insights.some((i) =>
-          i.includes('Consider adding DASK earthquake insurance if not included')
-        )
+        insights.some((i) => i.includes('Dahil değilse DASK deprem sigortası eklemeyi düşünün'))
       ).toBe(true)
     }
   })
@@ -1221,8 +1221,8 @@ describe('generateGapsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      // gap: "Missing common coverage: Fire"
-      expect(insights.some((i) => i.includes('Missing common coverage: Fire'))).toBe(true)
+      // gap: translated to Turkish "Yaygın teminat eksik: Fire"
+      expect(insights.some((i) => i.includes('Yaygın teminat eksik: Fire'))).toBe(true)
     }
   })
 
@@ -1340,11 +1340,9 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) =>
-          i.includes('Premium is above 75th percentile - compare with other providers')
-        )
-      ).toBe(true)
+      // Benchmark provenance gate: percentile insight now suppressed (no provenance)
+      // Instead, a safe fallback is generated
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1388,11 +1386,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) =>
-          i.includes('Coverage below market median - consider increasing limits')
-        )
-      ).toBe(true)
+      // Benchmark provenance gate: coverage median insight now suppressed
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1428,11 +1423,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) =>
-          i.includes('Review coverage limits annually to ensure adequate protection')
-        )
-      ).toBe(true)
+      // Benchmark provenance gate: annual review replaced with safe Turkish fallback
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
@@ -1476,9 +1468,8 @@ describe('generateRecommendationsAsync() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(
-        insights.some((i) => i.includes('Market premiums increased 35% YoY - lock in rates early'))
-      ).toBe(true)
+      // Benchmark provenance gate: YoY insight now suppressed
+      expect(insights.some((i) => i.includes('piyasa verisi doğrulanmalı'))).toBe(true)
     }
   })
 
