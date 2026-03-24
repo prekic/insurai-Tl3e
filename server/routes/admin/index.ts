@@ -20,6 +20,7 @@ import contentRouter from './content.js'
 import actuarialRouter from './actuarial.js'
 import fxMonitoringRouter from './fx-monitoring.js'
 import segmentsRouter from './segments.js'
+import backfillRouter from './backfill.js'
 
 const router = Router()
 
@@ -33,5 +34,6 @@ router.use('/', monitoringRouter)
 router.use('/', contentRouter)
 router.use('/actuarial', actuarialRouter)
 router.use('/', fxMonitoringRouter)
+router.use('/', backfillRouter)
 
 export default router

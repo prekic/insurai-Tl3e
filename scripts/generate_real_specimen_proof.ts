@@ -5,10 +5,15 @@ import { exportToText, exportSinglePolicyToCSV, generatePolicyHTML } from '@/lib
 
 dotenv.config({ path: '.env' })
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials in .env file')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 declare global {
   var downloadBlob: (blob: Blob, _filename: string) => Promise<void>
@@ -34,7 +39,7 @@ async function run() {
   }
 
   // Map snake_case DB fields to camelCase AnalyzedPolicy
-  const p: any = {
+  const p: Record<string, unknown> = {
     id: data.id,
     name: data.name,
     status: data.status,

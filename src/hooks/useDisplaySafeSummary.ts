@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { DisplaySafePolicySummary } from '@/types/display'
+import type { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { generateDisplaySafeSummary } from '@/lib/analysis/display-interpreter'
 import { generateAnalysisBundle } from '@/lib/analysis/engine'
 import { evaluateKaskoPilotGate } from '@/lib/analysis/kasko-pilot-gate'
@@ -54,7 +55,7 @@ export function useDisplaySafeSummary(
         amendmentReason: null,
         premiumDifference: null,
       },
-      evidence: (policy as any).evidence || undefined,
+      evidence: policy.evidence || undefined,
       clauseGraph: undefined,
       confidence: {
         overall: policy.aiConfidence || 0.85,
@@ -64,7 +65,7 @@ export function useDisplaySafeSummary(
         premium: 0.9,
         coverages: policy.aiConfidence || 0.85,
       },
-    } as any
+    } as ExtractedPolicyData
 
     // Reconstruct validation from safetyFlags
     const validation = {

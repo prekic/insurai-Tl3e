@@ -164,13 +164,14 @@ export function usePolicyComparison(
       mounted = false
     }
   }, [
+    policies,
     policiesHash,
     memoizedLabels,
     mergedConfig,
     validation.isValid,
     validation.message,
     configLoading,
-  ]) // eslint-disable-line react-hooks/exhaustive-deps
+  ])
 
   return result
 }

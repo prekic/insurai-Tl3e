@@ -4,10 +4,17 @@ import { buildPolicyReviewerSummary } from '../src/lib/reviewer/policy-reviewer-
 
 dotenv.config({ path: '.env.local' })
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
+const supabaseUrl =
+  process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseKey =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials in .env.local')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function run() {
   const { data, error } = await supabase
@@ -15,12 +22,12 @@ async function run() {
     .select('*')
     .eq('policy_number', '1680600025')
     .single()
-    
+
   if (error || !data) {
     console.error('Failed to fetch:', error)
     return
   }
-  
+
   // Transform DB policy to AnalyzedPolicy (assuming our existing transform logic)
   const p = {
     ...data,
@@ -46,11 +53,14 @@ async function run() {
     aiConfidence: data.ai_confidence || 1,
     evidenceData: data.evidence_data || {},
   }
-  
-  const summary = buildPolicyReviewerSummary(p as any, { locale: 'tr' })
+
+  const summary = buildPolicyReviewerSummary(
+    p as Parameters<typeof buildPolicyReviewerSummary>[0],
+    { locale: 'tr' }
+  )
   console.log('--- UI REVIEWER SUMMARY OBJECT ---')
   console.log(JSON.stringify(summary, null, 2))
-  
+
   console.log('--- TEXT EXPORT ---')
   const sections = [
     `Poliçe: ${summary.policyNumber}`,
@@ -63,23 +73,34 @@ async function run() {
     `Tarih: ${summary.period}`,
     '',
     `=== Teminatlar ===`,
-    ...summary.coverages.map((c: any) => `• ${c.name}: ${c.limit}`),
+    ...summary.coverages.map((c: { name: string; limit: string }) => `• ${c.name}: ${c.limit}`),
     '',
     `=== İstisnalar ===`,
     ...summary.exclusions.map((e: string) => `• ${e}`),
   ]
   if (summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0) {
-    sections.push('', `=== Koşullu Muafiyetler / Özel Şartlar ===`, ...summary.conditionalDeductibles.map((d: string) => `• ${d}`))
+    sections.push(
+      '',
+      `=== Koşullu Muafiyetler / Özel Şartlar ===`,
+      ...summary.conditionalDeductibles.map((d: string) => `• ${d}`)
+    )
   }
   if (summary.insights && summary.insights.length > 0) {
-    sections.push('', `=== AI Görüşleri ===`, ...summary.insights.map((insight: string) => `• ${insight}`))
+    sections.push(
+      '',
+      `=== AI Görüşleri ===`,
+      ...summary.insights.map((insight: string) => `• ${insight}`)
+    )
   }
   console.log(sections.join('\n'))
-  
+
   console.log('--- CSV EXPORT ---')
-  const escapeCSV = (value: string) => typeof value === 'string' && (value.includes(',') || value.includes('\n')) ? `"${value.replace(/"/g, '""')}"` : value
-  const toRow = (cells: any[]) => cells.map(escapeCSV).join(',')
-  
+  const escapeCSV = (value: string | number | boolean) =>
+    typeof value === 'string' && (value.includes(',') || value.includes('\n'))
+      ? `"${value.replace(/"/g, '""')}"`
+      : String(value)
+  const toRow = (cells: (string | number | boolean)[]) => cells.map(escapeCSV).join(',')
+
   const infoRows = [
     ['Poliçe No', summary.policyNumber],
     ['Şirket', summary.provider],
@@ -94,21 +115,41 @@ async function run() {
     ['Bitiş', summary.expiryDate],
     ['AI Güven', (summary.aiConfidence * 100).toFixed(0) + '%'],
   ]
-  
-  const covRows = summary.coverages.map((c: any) => [c.name, c.limit, c.deductible, c.included ? 'Evet' : 'Hayır'])
+
+  const covRows = summary.coverages.map(
+    (c: { name: string; limit: string; deductible: string; included: boolean }) => [
+      c.name,
+      c.limit,
+      c.deductible,
+      c.included ? 'Evet' : 'Hayır',
+    ]
+  )
   const exclRows = summary.exclusions.map((e: string) => [e])
   const condDeductRows = summary.conditionalDeductibles.map((d: string) => [d])
   const insightRows = summary.insights.map((insight: string) => [insight])
-  
+
   const csvSections = [
-    '# POLİÇE BİLGİLERİ', toRow(['Alan', 'Değer']), ...infoRows.map(toRow),
-    '', '# TEMİNATLAR', toRow(['Teminat Adı', 'Limit', 'Muafiyet', 'Dahil']), ...covRows.map(toRow),
-    '', '# İSTİSNALAR', toRow(['İstisna']), ...exclRows.map(toRow),
-    ...(condDeductRows.length > 0 ? ['', '# KOŞULLU MUAFİYETLER', toRow(['Koşullu Muafiyet']), ...condDeductRows.map(toRow)] : []),
-    '', '# AI GÖRÜŞLERİ', toRow(['AI Görüşü']), ...insightRows.map(toRow)
+    '# POLİÇE BİLGİLERİ',
+    toRow(['Alan', 'Değer']),
+    ...infoRows.map(toRow),
+    '',
+    '# TEMİNATLAR',
+    toRow(['Teminat Adı', 'Limit', 'Muafiyet', 'Dahil']),
+    ...covRows.map(toRow),
+    '',
+    '# İSTİSNALAR',
+    toRow(['İstisna']),
+    ...exclRows.map(toRow),
+    ...(condDeductRows.length > 0
+      ? ['', '# KOŞULLU MUAFİYETLER', toRow(['Koşullu Muafiyet']), ...condDeductRows.map(toRow)]
+      : []),
+    '',
+    '# AI GÖRÜŞLERİ',
+    toRow(['AI Görüşü']),
+    ...insightRows.map(toRow),
   ]
   console.log(csvSections.join('\n'))
-  
+
   console.log('--- HTML/PDF EXPORT ---')
   console.log(`  <h2>Poliçe Detayları</h2>
   <div class="grid">
@@ -138,18 +179,26 @@ async function run() {
     </div>
   </div>
   <h2>Teminatlar</h2>
-    ${summary.coverages.map((c: any) => `<div class="coverage-item">
+    ${summary.coverages
+      .map(
+        (c: { name: string; limit: string }) => `<div class="coverage-item">
       <span>${c.name}</span>
       <span>${c.limit}</span>
-    </div>`).join('\n')}
+    </div>`
+      )
+      .join('\n')}
   <h2>İstisnalar</h2>
   <ul class="excl-list">
     ${summary.exclusions.map((e: string) => `<li>${e}</li>`).join('\n')}
   </ul>
-  ${summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0 ? `<h2>Koşullu Muafiyetler</h2>
+  ${
+    summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0
+      ? `<h2>Koşullu Muafiyetler</h2>
   <ul class="excl-list">
     ${summary.conditionalDeductibles.map((d: string) => `<li>${d}</li>`).join('\n')}
-  </ul>` : ''}
+  </ul>`
+      : ''
+  }
   <h2>AI Görüşleri</h2>
   <ul class="insight-list">
     ${summary.insights.map((insight: string) => `<li>${insight}</li>`).join('\n')}

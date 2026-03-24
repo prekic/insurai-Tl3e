@@ -790,7 +790,7 @@ export function exportSinglePolicyToCSV(policy: AnalyzedPolicy, locale: 'en' | '
   const insightRows = summary.insights.map((insight) => [insight])
 
   // Build combined CSV with section separators
-  const escapeCSV = (value: any): string => {
+  const escapeCSV = (value: string | number | boolean | null | undefined): string => {
     if (value === null || value === undefined) return ''
     const str = String(value)
     if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -928,8 +928,9 @@ export function exportComparisonToPDF(policies: AnalyzedPolicy[], locale: string
  */
 function downloadBlob(blob: Blob, filename: string) {
   if (typeof window === 'undefined' || typeof document === 'undefined') {
-    if ((globalThis as any).downloadBlob) {
-      void (globalThis as any).downloadBlob(blob, filename)
+    const g = globalThis as Record<string, unknown>
+    if (typeof g.downloadBlob === 'function') {
+      void (g.downloadBlob as (b: Blob, f: string) => void)(blob, filename)
     } else {
       console.warn('Skipping file download in Node environment')
     }

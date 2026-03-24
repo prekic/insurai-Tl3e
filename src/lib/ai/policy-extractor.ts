@@ -2139,8 +2139,9 @@ async function convertToAnalyzedPolicy(
     }
     if (keepIndices.length < basePolicy.aiInsights.length) {
       basePolicy.aiInsights = keepIndices.map((idx) => basePolicy.aiInsights[idx])
-      if (basePolicy.aiInsightsEn) {
-        basePolicy.aiInsightsEn = keepIndices.map((idx) => basePolicy.aiInsightsEn![idx])
+      const insightsEn = basePolicy.aiInsightsEn
+      if (insightsEn) {
+        basePolicy.aiInsightsEn = keepIndices.map((idx) => insightsEn[idx])
       }
     }
   }

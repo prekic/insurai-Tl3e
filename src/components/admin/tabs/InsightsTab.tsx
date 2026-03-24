@@ -160,7 +160,9 @@ export function InsightsTab() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">AI Insight Guidelines</h1>
-          <p className="text-gray-500">Manage rules to guide the AI's sense-checker for insights</p>
+          <p className="text-gray-500">
+            Manage rules to guide the AI&apos;s sense-checker for insights
+          </p>
         </div>
         <div className="flex gap-2">
           <Button

@@ -824,10 +824,10 @@ function buildTrafficCards(
   )
   const otherCovs = coverages.filter((c) => !liabCovs.includes(c))
 
-  const hasEnhanced = liabCovs.some((c) => c.limit !== null && c.limit! > 1_200_000)
+  const hasEnhanced = liabCovs.some((c) => (c.limit ?? 0) > 1_200_000)
 
   for (const c of liabCovs) {
-    const isAboveMin = c.limit !== null && c.limit! > 1_200_000
+    const isAboveMin = (c.limit ?? 0) > 1_200_000
     coverageCards.push(
       covCard(
         c.name || 'Liability Coverage',

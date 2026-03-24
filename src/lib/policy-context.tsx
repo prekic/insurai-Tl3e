@@ -143,8 +143,8 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     evidenceData: rawData.evidenceData,
     // Universal schema mapping
     canonicalText: row.canonical_text || undefined,
-    spanMaps: (row.span_maps as any) || undefined,
-    clauseGraph: (row.clause_graph as any) || undefined,
+    spanMaps: (row.span_maps as AnalyzedPolicy['spanMaps']) || undefined,
+    clauseGraph: (row.clause_graph as AnalyzedPolicy['clauseGraph']) || undefined,
     isUniversalSchema: row.is_universal_schema || false,
     validationErrors: row.validation_errors || undefined,
     validationWarnings: row.validation_warnings || undefined,

@@ -1,11 +1,17 @@
+/* eslint-disable no-console */
 import { createClient } from '@supabase/supabase-js'
 import dotenv from 'dotenv'
 dotenv.config({ path: '.env' })
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY!
-)
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing Supabase credentials in .env file')
+  process.exit(1)
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function scan() {
   const { data: policies, error } = await supabase.from('policies').select('*')
@@ -62,13 +68,16 @@ async function scan() {
   console.log(`Requires Re-extraction: ${buckets.requiresReExtraction.length}`)
   console.log(`Unrecoverable: ${buckets.unrecoverable.length}`)
 
-  const sample = (arr: any[]) =>
-    arr.slice(0, 2).map((p) => ({
-      id: p.id,
-      policy_number: p.policy_number,
-      has_text: !!p.raw_data?.processedText,
-      has_legacy_coverages: !!p.raw_data?.coverages,
-    }))
+  const sample = (arr: Record<string, unknown>[]) =>
+    arr.slice(0, 2).map((p) => {
+      const rawData = p.raw_data as Record<string, unknown> | undefined
+      return {
+        id: p.id,
+        policy_number: p.policy_number,
+        has_text: !!rawData?.processedText,
+        has_legacy_coverages: !!rawData?.coverages,
+      }
+    })
 
   console.log('\nExamples (Modern):', JSON.stringify(sample(buckets.modern), null, 2))
   console.log(

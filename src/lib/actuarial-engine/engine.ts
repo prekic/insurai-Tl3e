@@ -101,7 +101,9 @@ export function runFullEvaluation(
   const scenarios = options?.scenarioOverrides ?? getScenariosForPolicyType(policy.policyType)
 
   // Safety guard: block EOOP computation when premium is missing/zero
-  const isPremiumMissing = policy.premium.amount <= 0 || (policy as any)._premiumMissing === true
+  const isPremiumMissing =
+    policy.premium.amount <= 0 ||
+    (policy as ActuarialPolicyInput & { _premiumMissing?: boolean })._premiumMissing === true
   const eoopResult = isPremiumMissing
     ? buildInsufficientDataEOOP(policy, scenarios, mcConfig)
     : calculateEOOP(policy, scenarios, mcConfig, semanticExclusions)

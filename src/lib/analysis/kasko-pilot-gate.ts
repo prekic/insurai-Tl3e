@@ -32,7 +32,7 @@ export interface PilotAdmissionGateResult {
  * It prevents garbage/incomplete documents from unfairly depressing AI accuracy metrics.
  */
 export function evaluatePilotAdmission(
-  extractedData: any, // Matches the AnalyzedPolicy raw structure loosely
+  extractedData: { policyNumber?: string | null; provider?: string | null; coverages?: unknown[] },
   meta: { textCharCount: number; documentQuality?: string; pageCompleteness?: string }
 ): PilotAdmissionGateResult {
   const { policyNumber, provider, coverages = [] } = extractedData
@@ -383,7 +383,10 @@ export function logPilotQARecord(record: PilotQARecord): string {
   const json = JSON.stringify(record)
 
   // In Node.js environments, append to JSONL file
-  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).process !== 'undefined') {
+  if (
+    typeof globalThis !== 'undefined' &&
+    typeof (globalThis as unknown as { process?: unknown }).process !== 'undefined'
+  ) {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const fs = require('fs')

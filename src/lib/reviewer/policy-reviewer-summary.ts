@@ -431,7 +431,8 @@ export function buildPolicyReviewerSummary(
     }
   })
 
-  const groups: Record<string, any[]> = {
+  type FormattedCoverage = (typeof formattedCoveragesForGrouping)[number] & { name: string }
+  const groups: Record<string, FormattedCoverage[]> = {
     main: [],
     liability: [],
     personal_accident: [],
@@ -521,7 +522,7 @@ export function buildPolicyReviewerSummary(
     groupedCoverages: groupedWithSubLimits,
     exclusions: policy.exclusions,
     groupedExclusions,
-    conditionalDeductibles: hasConditionalDeductibles ? policy.conditionalDeductibles! : [],
+    conditionalDeductibles: hasConditionalDeductibles ? (policy.conditionalDeductibles ?? []) : [],
     hasConditionalDeductibles,
 
     insights,

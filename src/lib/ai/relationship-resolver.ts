@@ -6,7 +6,15 @@ import { AnalyzedPolicy, ClauseGraph, ClauseRelationship } from '@/types/policy'
  */
 export function resolveClauseRelationships(
   policy: AnalyzedPolicy,
-  extractedGraph?: { edges: any[] }
+  extractedGraph?: {
+    edges: Array<{
+      sourceId: string
+      targetId?: string | null
+      relationshipType: string
+      description?: string
+      isCandidate?: boolean
+    }>
+  }
 ): AnalyzedPolicy {
   // 1. Convert extracted raw edges to typed ClauseRelationships
   const targetGraph: ClauseGraph = {

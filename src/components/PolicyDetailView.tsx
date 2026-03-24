@@ -46,13 +46,9 @@ import {
   type ExclusionAnalysisResult,
 } from '@/lib/knowledge/kasko-knowledge'
 import { getShortCompanyName } from '@/lib/insurance-display'
-import { useI18n } from '@/lib/i18n'
+import { useI18n, type TranslationDictionary } from '@/lib/i18n'
 import { usePdfExport } from '@/hooks/usePdfExport'
-import {
-  exportSinglePolicyToCSV,
-  exportSinglePolicyToExcel,
-  exportToText,
-} from '@/lib/export'
+import { exportSinglePolicyToCSV, exportSinglePolicyToExcel, exportToText } from '@/lib/export'
 import {
   evaluateAndRankPolicies,
   mapAnalyzedToActuarialInput,
@@ -72,7 +68,7 @@ import { buildPolicyReviewerSummary } from '@/lib/reviewer/policy-reviewer-summa
 function formatCoverageLimit(
   coverage: Coverage,
   _locale: string,
-  t: any,
+  t: TranslationDictionary,
   fmt: (amount: number) => string = (a) => String(a)
 ): string {
   let raw: string
@@ -204,7 +200,7 @@ function getCategoryInfo(category: CoverageCategory) {
 function getCoverageInfoText(
   coverage: Coverage,
   _locale: string,
-  t: any,
+  t: TranslationDictionary,
   fmt: (amount: number) => string = (a) => String(a)
 ): string | null {
   const parts: string[] = []
@@ -258,8 +254,6 @@ function getLocalizedCoverageName(
   return coverage.nameTr || coverage.name
 }
 
-
-
 /**
  * Collapsible coverage category for mobile-friendly display
  */
@@ -280,7 +274,7 @@ function CollapsibleCoverageCategory({
   CategoryIcon: React.ElementType
   coverages: GroupedCoverage[]
   locale: string
-  t: any
+  t: TranslationDictionary
   defaultExpanded?: boolean
   formatAmount: (amount: number) => string
 }) {
@@ -1007,7 +1001,7 @@ export function PolicyDetailView() {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success(t.exportMenu.textSuccess)
-  }, [reviewerSummary, locale, t])
+  }, [policy, reviewerSummary, locale, t])
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -1032,6 +1026,10 @@ export function PolicyDetailView() {
       </div>
     )
   }
+
+  // After the null guards above, both policy and reviewerSummary are guaranteed non-null.
+  // Extract to a const so TypeScript narrows the type without needing non-null assertions.
+  const summary = reviewerSummary as NonNullable<typeof reviewerSummary>
 
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden">
@@ -1482,9 +1480,11 @@ export function PolicyDetailView() {
                     // Track original indices so evidence lookup and TR/EN parallel arrays stay correct.
                     const seenLocalized = new Set<string>()
                     const dedupedEntries: { originalIndex: number; localizedText: string }[] = []
-                    for (let idx = 0; idx < reviewerSummary!.insights.length; idx++) {
-                      const rawLocalized = reviewerSummary!.insights[idx]
-                      const normalized = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                    for (let idx = 0; idx < summary.insights.length; idx++) {
+                      const rawLocalized = summary.insights[idx]
+                      const normalized = rawLocalized
+                        .replace(/^[✓✔☑⚠💡❌]\s*/gu, '')
+                        .trim()
                         .toLowerCase()
                         .replace(/\s+/g, ' ')
                       if (!seenLocalized.has(normalized)) {
@@ -1496,7 +1496,7 @@ export function PolicyDetailView() {
                     return visible.map(({ originalIndex, localizedText }, i) => {
                       const displayText = localizedText.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
 
-                      const originalInsight = reviewerSummary!.rawInsights[originalIndex]
+                      const originalInsight = summary.rawInsights[originalIndex]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
                       const hasEvidence =
                         policy.evidenceData?.insights &&
@@ -1519,7 +1519,7 @@ export function PolicyDetailView() {
                           {hasEvidence && (
                             <div className="w-full pl-5">
                               <EvidenceQuote
-                                quote={policy.evidenceData!.insights[originalInsightKey]}
+                                quote={policy.evidenceData?.insights[originalInsightKey] ?? ''}
                                 quoteTr={
                                   policy.evidenceData?.quoteTranslations?.insights?.[
                                     originalInsightKey
@@ -1536,9 +1536,11 @@ export function PolicyDetailView() {
                     // Compute deduped count using localized text (same logic as render dedup)
                     const seenBtnL = new Set<string>()
                     let dedupedCount = 0
-                    for (let idx = 0; idx < reviewerSummary!.insights.length; idx++) {
-                      const raw = reviewerSummary!.insights[idx]
-                      const n = raw.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
+                    for (let idx = 0; idx < summary.insights.length; idx++) {
+                      const raw = summary.insights[idx]
+                      const n = raw
+                        .replace(/^[✓✔☑⚠💡❌]\s*/gu, '')
+                        .trim()
                         .toLowerCase()
                         .replace(/\s+/g, ' ')
                       if (!seenBtnL.has(n)) {
@@ -1699,7 +1701,7 @@ export function PolicyDetailView() {
                     <Shield className="text-blue-600" size={20} />
                     {t.policy.coverageDetails}
                     <Badge variant="outline" className="text-xs ml-1">
-                      {reviewerSummary!.coverages.length}
+                      {summary.coverages.length}
                     </Badge>
                   </CardTitle>
                   <ChevronDown
@@ -1711,8 +1713,8 @@ export function PolicyDetailView() {
               {coveragesExpanded && (
                 <CardContent>
                   <CoveragesByCategory
-                    groupedCoverages={reviewerSummary!.groupedCoverages}
-                    policyType={reviewerSummary!.type}
+                    groupedCoverages={summary.groupedCoverages}
+                    policyType={summary.type}
                     locale={locale}
                   />
                 </CardContent>
@@ -1735,7 +1737,7 @@ export function PolicyDetailView() {
                     <AlertTriangle className="text-amber-500" size={20} />
                     {t.policy.exclusionsAndQuestions}
                     <Badge variant="outline" className="text-xs ml-1">
-                      {reviewerSummary!.exclusions.length}
+                      {summary.exclusions.length}
                     </Badge>
                   </CardTitle>
                   <ChevronDown
@@ -1747,7 +1749,7 @@ export function PolicyDetailView() {
               {exclusionsExpanded ? (
                 <CardContent className="pt-0">
                   <ExclusionsSection
-                    analysis={reviewerSummary!.groupedExclusions}
+                    analysis={summary.groupedExclusions}
                     policyType={policy.type}
                     locale={locale}
                     evidenceData={policy.evidenceData?.exclusions}
@@ -1904,8 +1906,8 @@ export function PolicyDetailView() {
                       {Math.round(policy.aiConfidence * 100)}%
                     </span>
                   </div>
-                  {reviewerSummary!.insights.map((insightText, i) => {
-                    const originalInsight = reviewerSummary!.rawInsights[i]
+                  {summary.insights.map((insightText, i) => {
+                    const originalInsight = summary.rawInsights[i]
                     const originalInsightKey = originalInsight.trim().toLowerCase()
                     const hasEvidence =
                       policy.evidenceData?.insights &&
@@ -1920,7 +1922,7 @@ export function PolicyDetailView() {
                         />
                         {hasEvidence && (
                           <EvidenceQuote
-                            quote={policy.evidenceData!.insights[originalInsightKey]}
+                            quote={policy.evidenceData?.insights[originalInsightKey] ?? ''}
                           />
                         )}
                       </div>

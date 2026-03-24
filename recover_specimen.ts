@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { createClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
 import { EXTRACTION_SYSTEM_PROMPT } from './src/lib/ai/extraction-schema'
@@ -56,7 +57,13 @@ async function run() {
       temperature: 0.1,
     })
 
-    const extractedData = JSON.parse(response.choices[0]!.message!.content!)
+    const choice = response.choices[0]
+    const content = choice?.message?.content
+    if (!content) {
+      console.error('No content in AI response')
+      return
+    }
+    const extractedData = JSON.parse(content)
     console.log('Extraction complete! Data:', JSON.stringify(extractedData, null, 2))
 
     // Now update the DB record
