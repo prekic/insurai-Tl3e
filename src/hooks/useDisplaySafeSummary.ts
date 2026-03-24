@@ -55,7 +55,9 @@ export function useDisplaySafeSummary(
         amendmentReason: null,
         premiumDifference: null,
       },
-      evidence: policy.evidence || undefined,
+      evidence: (policy as unknown as Record<string, unknown>).evidence as
+        | Record<string, unknown>[]
+        | undefined,
       clauseGraph: undefined,
       confidence: {
         overall: policy.aiConfidence || 0.85,

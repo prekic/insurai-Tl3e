@@ -1335,7 +1335,10 @@ export async function extractPolicyFromDocument(
     )
 
     // Apply relationship resolution and precedence rules
-    policy = resolveClauseRelationships(policy, enhancedExtractedData.clauseGraph)
+    policy = resolveClauseRelationships(
+      policy,
+      enhancedExtractedData.clauseGraph as Parameters<typeof resolveClauseRelationships>[1]
+    )
 
     // Add validation warnings to AI insights
     if (patternValidation) {

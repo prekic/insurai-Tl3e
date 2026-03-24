@@ -26,7 +26,7 @@ export function resolveClauseRelationships(
     targetGraph.edges = extractedGraph.edges.map((edge) => ({
       sourceId: edge.sourceId,
       targetId: edge.targetId ?? null,
-      relationshipType: edge.relationshipType,
+      relationshipType: edge.relationshipType as import('@/types/policy').RelationshipType,
       description: edge.description ?? undefined,
       isCandidate: edge.isCandidate ?? false,
       precedenceWeight: getPrecedenceWeight(edge.relationshipType),
