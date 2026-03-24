@@ -54,7 +54,7 @@ describe('Phase 8K: Broader Guarded Internal Pilot (Operational Execution)', () 
     // Process all 10 operational documents
     for (const doc of operationalDocs) {
       // 1. Confirm gate is active for user
-      const { isPilotActive } = evaluateKaskoPilotGate('kasko', 'live-reviewer', { kasko_ai_extraction_pilot: true }, ['kasko_pilot_reviewers'])
+      evaluateKaskoPilotGate('kasko', 'live-reviewer', { kasko_ai_extraction_pilot: true }, ['kasko_pilot_reviewers'])
       
       const meta = {
         id: doc.id,

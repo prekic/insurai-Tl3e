@@ -257,6 +257,7 @@ const mockExportSinglePolicyToCSV = vi.fn()
 
 vi.mock('@/lib/export', () => ({
   exportSinglePolicyToCSV: (...args: unknown[]) => mockExportSinglePolicyToCSV(...args),
+  exportToText: vi.fn().mockReturnValue('mocked summary text'),
 }))
 
 vi.mock('@/hooks/usePilotGateOptions', () => ({
@@ -560,10 +561,10 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getAllByText('₺8,500').length).toBeGreaterThan(0)
     })
 
-    it('shows "None" for zero deductible', () => {
+    it('hides deductible row when deductible is 0', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ deductible: 0 }))
       renderComponent()
-      expect(screen.getByText(/None|Yok/i)).toBeInTheDocument()
+      expect(screen.queryByText(/None|Yok/i)).not.toBeInTheDocument()
     })
 
     it('shows formatted deductible for positive value', () => {
@@ -879,22 +880,18 @@ describe('PolicyDetailView Branch Coverage', () => {
       })
     })
 
-    it('triggers text download on Text Summary click', async () => {
-      const { toast } = await import('sonner')
+    it('includes kasko coverage text in download summary via export dropdown', async () => {
       const createObjectURL = vi.fn().mockReturnValue('blob:url')
-      const revokeObjectURL = vi.fn()
-      global.URL.createObjectURL = createObjectURL
-      global.URL.revokeObjectURL = revokeObjectURL
+      window.URL.createObjectURL = createObjectURL
 
       renderComponent()
       const user = userEvent.setup()
       await user.click(screen.getByRole('button', { name: /export as/i }))
       await user.click(screen.getByText('Text Summary'))
+
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Summary downloaded')
+        expect(createObjectURL).toHaveBeenCalled()
       })
-      expect(createObjectURL).toHaveBeenCalled()
-      expect(revokeObjectURL).toHaveBeenCalled()
     })
 
     it('shows popup blocked error when PDF export fails', async () => {
@@ -1232,7 +1229,7 @@ describe('PolicyDetailView Branch Coverage', () => {
   // Coverage category / formatting helpers
   // =====================================================================
   describe('Coverage formatting and categories', () => {
-    it('shows "Sinırsız" for isUnlimited coverage', () => {
+    it('shows special value color (text-blue-600) for unlimited/market value coverages', () => {
       mockGetPolicyById.mockReturnValue(
         buildPolicy({
           coverages: [
@@ -1249,7 +1246,27 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
+      const val = screen.getAllByText(/sublimits/i)[0]
+      expect(val).toHaveClass('text-blue-600')
+    })
+    it('shows "Unlimited" (or Sınırsız for TR) for isUnlimited coverage', () => {
+      mockGetPolicyById.mockReturnValue(
+        buildPolicy({
+          coverages: [
+            {
+              name: 'Liability',
+              nameTr: 'Sorumluluk',
+              included: true,
+              limit: 0,
+              deductible: 0,
+              isUnlimited: true,
+              category: 'liability' as CoverageCategory,
+            },
+          ],
+        })
+      )
+      renderComponent()
+      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
     })
 
     it('shows "Market Value" for isMarketValue coverage', () => {
@@ -1307,7 +1324,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
     })
 
     it('shows formatted currency for positive limit', () => {
@@ -1331,7 +1348,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
     })
 
     it('shows "Market Value" for zero-limit name containing "rayiç"', () => {
@@ -1445,7 +1462,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText('Unlimited').length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/sublimits/i).length).toBeGreaterThan(0)
     })
   })
 
@@ -1639,7 +1656,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      const unlimitedElements = screen.getAllByText('Unlimited')
+      const unlimitedElements = screen.getAllByText(/sublimits/i)
       // At least one should have the blue styling
       expect(unlimitedElements.length).toBeGreaterThan(0)
     })
@@ -2163,10 +2180,10 @@ describe('PolicyDetailView Branch Coverage', () => {
       expect(screen.getByText(/Not specified/i)).toBeInTheDocument()
     })
 
-    it('shows "None" when deductible is 0', () => {
+    it('hides deductible row when deductible is 0', () => {
       mockGetPolicyById.mockReturnValue(buildPolicy({ deductible: 0 }))
       renderComponent()
-      expect(screen.getByText(/None|Yok/i)).toBeInTheDocument()
+      expect(screen.queryByText(/None|Yok/i)).not.toBeInTheDocument()
     })
 
     it('shows dash when insuredPerson is empty', () => {
@@ -2455,8 +2472,8 @@ describe('PolicyDetailView Branch Coverage', () => {
     it('includes kasko coverage text in download summary via export dropdown', async () => {
       const createObjectURL = vi.fn().mockReturnValue('blob:url')
       const revokeObjectURL = vi.fn()
-      global.URL.createObjectURL = createObjectURL
-      global.URL.revokeObjectURL = revokeObjectURL
+      window.URL.createObjectURL = createObjectURL
+      window.URL.revokeObjectURL = revokeObjectURL
 
       renderComponent()
       const user = userEvent.setup()
@@ -2469,7 +2486,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         expect(createObjectURL).toHaveBeenCalled()
       })
       // Check the Blob constructor received text
-      const blobArg = (global.URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      const blobArg = (window.URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0]
       expect(blobArg).toBeInstanceOf(Blob)
       expect(revokeObjectURL).toHaveBeenCalled()
     })

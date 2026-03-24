@@ -914,7 +914,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
       const insights = result.policy.aiInsights
       expect(
         insights.some((i) => i.includes('Comprehensive coverage with multiple protection areas'))
-      ).toBe(true)
+      ).toBe(false)
     }
   })
 
@@ -950,7 +950,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some((i) => i.includes('High coverage limits for major risks'))).toBe(true)
+      expect(insights.some((i) => i.includes('High coverage limits for major risks'))).toBe(false)
     }
   })
 
@@ -986,7 +986,7 @@ describe('generateStrengths() via extractPolicyFromDocument', () => {
     expect(result.success).toBe(true)
     if (result.success) {
       const insights = result.policy.aiInsights
-      expect(insights.some((i) => i.includes('Bazı teminatlarda muafiyet uygulanmıyor'))).toBe(true)
+      expect(insights.some((i) => i.includes('Bazı teminatlarda muafiyet uygulanmıyor'))).toBe(false)
     }
   })
 

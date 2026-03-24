@@ -4,18 +4,60 @@
  */
 
 import { AnalyzedPolicy } from '@/types/policy'
-import { formatCurrency, formatDate } from './utils'
-import { applySafeWording } from '@/lib/analysis/display-interpreter'
-import {
-  formatPremiumForReview,
-  formatMonthlyPremiumForReview,
-  formatInsuredForReview,
-  formatDeductibleForReview,
-  formatCoverageTotalForReview,
-  formatCoverageItemLimitForReview,
-  getLocalizedCoverageName,
-  getLocalizedInsight,
-} from '@/lib/reviewer/policy-reviewer-summary'
+
+import { buildPolicyReviewerSummary } from '@/lib/reviewer/policy-reviewer-summary'
+
+/**
+ * Export policies to CSV format
+ */
+export function exportToText(policy: AnalyzedPolicy, locale: string = 'tr'): string {
+  const summary = buildPolicyReviewerSummary(policy, { locale })
+  const isTr = locale === 'tr'
+
+  const coverageLabel = isTr ? 'Teminat' : 'Coverage'
+  const deductibleLabel = isTr ? 'Muafiyet' : 'Deductible'
+  const coveragesTitle = isTr ? 'Teminatlar' : 'Coverages'
+  const exclusionsTitle = isTr ? 'İstisnalar' : 'Exclusions'
+  const condDeductTitle = isTr
+    ? 'Koşullu Muafiyetler / Özel Şartlar'
+    : 'Conditional Deductibles / Special Conditions'
+  const insightsTitle = isTr ? 'AI Görüşleri' : 'AI Insights'
+
+  const sections = [
+    `${isTr ? 'Poliçe' : 'Policy'}: ${summary.policyNumber}`,
+    `${isTr ? 'Şirket' : 'Provider'}: ${summary.providerShort || summary.provider}`,
+    `${isTr ? 'Tür' : 'Type'}: ${summary.typeTr}`,
+    `${isTr ? 'Sigortalı' : 'Insured'}: ${summary.insured}`,
+    `${coverageLabel}: ${summary.coverageTotal}`,
+    `${isTr ? 'Prim' : 'Premium'}: ${summary.premium}`,
+    `${deductibleLabel}: ${summary.deductible}`,
+    `${isTr ? 'Tarih' : 'Period'}: ${summary.period}`,
+    '',
+    `=== ${coveragesTitle} ===`,
+    ...summary.coverages.map((c) => `• ${c.name}: ${c.limit}`),
+    '',
+    `=== ${exclusionsTitle} ===`,
+    ...summary.exclusions.map((e) => `• ${e}`),
+  ]
+
+  if (summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0) {
+    sections.push(
+      '',
+      `=== ${condDeductTitle} ===`,
+      ...summary.conditionalDeductibles.map((d) => `• ${d}`)
+    )
+  }
+
+  if (summary.insights && summary.insights.length > 0) {
+    sections.push(
+      '',
+      `=== ${insightsTitle} ===`,
+      ...summary.insights.map((insight) => `• ${insight}`)
+    )
+  }
+
+  return sections.join('\n')
+}
 
 /**
  * Export policies to CSV format
@@ -41,23 +83,25 @@ export function exportToCSV(policies: AnalyzedPolicy[], filename = 'policies'): 
   ]
 
   // Convert policies to CSV rows
-  const rows = policies.map((policy) => [
-    policy.policyNumber,
-    policy.provider,
-    policy.type,
-    policy.typeTr,
-    policy.status,
-    formatCoverageTotalForReview(policy, 'en'),
-    formatPremiumForReview(policy, 'en'),
-    formatMonthlyPremiumForReview(policy, 'en'),
-    formatDeductibleForReview(policy, 'en'),
-    policy.startDate,
-    policy.expiryDate,
-    formatInsuredForReview(policy, 'en'),
-    policy.location || '',
-    (policy.aiConfidence * 100).toFixed(0) + '%',
-    policy.uploadDate,
-  ])
+  const rows = policies.map((policy) => {
+    const summary = buildPolicyReviewerSummary(policy, { locale: 'en' })
+    return [
+      summary.policyNumber,
+      summary.provider,
+      summary.type,
+      summary.typeTr,
+      summary.status,
+      summary.coverageTotal,
+      summary.premium,
+      summary.monthlyPremium,
+      summary.deductible,
+      summary.startDate,
+      summary.expiryDate,
+      summary.insured,
+      summary.location,
+      policy.createdAt ? new Date(policy.createdAt).toLocaleDateString('en-GB') : '-',
+    ]
+  })
 
   // Escape CSV values
   const escapeCSV = (value: string): string => {
@@ -74,7 +118,7 @@ export function exportToCSV(policies: AnalyzedPolicy[], filename = 'policies'): 
   ].join('\n')
 
   // Add BOM for Excel UTF-8 compatibility
-  const bom = '\uFEFF'
+  const bom = '\ufeff'
   const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
 
   // Download file
@@ -92,23 +136,29 @@ export async function exportToExcel(
   try {
     const XLSX = await import('xlsx')
 
-    const rows = policies.map((policy) => ({
-      'Policy Number': policy.policyNumber,
-      Provider: policy.provider,
-      Type: policy.type,
-      'Type (TR)': policy.typeTr,
-      Status: policy.status,
-      Coverage: policy.coverage,
-      Premium: policy.premium,
-      'Monthly Premium': policy.monthlyPremium,
-      Deductible: policy.deductible,
-      'Start Date': policy.startDate,
-      'Expiry Date': policy.expiryDate,
-      'Insured Person': policy.insuredPerson || '',
-      Location: policy.location || '',
-      'AI Confidence': `${(policy.aiConfidence * 100).toFixed(0)}%`,
-      'Upload Date': policy.uploadDate,
-    }))
+    const rows = policies.map((policy) => {
+      const summary = buildPolicyReviewerSummary(policy, { locale: 'en' })
+      return {
+        'Policy Number': summary.policyNumber,
+        Provider: summary.provider,
+        Type: summary.type,
+        'Type (TR)': summary.typeTr,
+        Status: summary.status,
+        Coverage: summary.coverageTotal,
+        Premium: summary.premium,
+        'Monthly Premium': summary.monthlyPremium,
+        Deductible: summary.deductible,
+        'Start Date': summary.startDate,
+        'Expiry Date': summary.expiryDate,
+        'Insured Person': summary.insured,
+        Location: summary.location,
+        'AI Confidence':
+          summary.aiConfidence !== null ? `${(summary.aiConfidence * 100).toFixed(0)}%` : '-',
+        'Upload Date': policy.createdAt
+          ? new Date(policy.createdAt).toLocaleDateString('en-GB')
+          : '-',
+      }
+    })
 
     const ws = XLSX.utils.json_to_sheet(rows)
     // Set column widths for readability
@@ -151,23 +201,27 @@ export async function exportSinglePolicyToExcel(
   try {
     const XLSX = await import('xlsx')
     const isTr = locale === 'tr'
+    const summary = buildPolicyReviewerSummary(policy, { locale })
 
     const wb = XLSX.utils.book_new()
 
     // Sheet 1: Policy Info
     const infoData = [
       [isTr ? 'Alan' : 'Field', isTr ? 'Değer' : 'Value'],
-      [isTr ? 'Poliçe No' : 'Policy Number', policy.policyNumber],
-      [isTr ? 'Şirket' : 'Provider', policy.provider],
-      [isTr ? 'Tür' : 'Type', policy.typeTr],
-      [isTr ? 'Durum' : 'Status', policy.status],
-      [isTr ? 'Sigortalı' : 'Insured Person', formatInsuredForReview(policy, locale)],
-      [isTr ? 'Teminat' : 'Coverage', formatCoverageTotalForReview(policy, locale)],
-      [isTr ? 'Prim' : 'Premium', formatPremiumForReview(policy, locale)],
-      [isTr ? 'Muafiyet' : 'Deductible', formatDeductibleForReview(policy, locale)],
-      [isTr ? 'Başlangıç' : 'Start Date', formatDate(policy.startDate, locale)],
-      [isTr ? 'Bitiş' : 'Expiry Date', formatDate(policy.expiryDate, locale)],
-      [isTr ? 'AI Güven' : 'AI Confidence', `${(policy.aiConfidence * 100).toFixed(0)}%`],
+      [isTr ? 'Poliçe No' : 'Policy Number', summary.policyNumber],
+      [isTr ? 'Şirket' : 'Provider', summary.provider],
+      [isTr ? 'Tür' : 'Type', summary.typeTr],
+      [isTr ? 'Durum' : 'Status', summary.status],
+      [isTr ? 'Sigortalı' : 'Insured Person', summary.insured],
+      [isTr ? 'Teminat' : 'Coverage', summary.coverageTotal],
+      [isTr ? 'Prim' : 'Premium', summary.premium],
+      [isTr ? 'Muafiyet' : 'Deductible', summary.deductible],
+      [isTr ? 'Başlangıç' : 'Start Date', summary.startDate],
+      [isTr ? 'Bitiş' : 'Expiry Date', summary.expiryDate],
+      [
+        isTr ? 'AI Güven' : 'AI Confidence',
+        summary.aiConfidence !== null ? `${(summary.aiConfidence * 100).toFixed(0)}%` : '-',
+      ],
     ]
     const wsInfo = XLSX.utils.aoa_to_sheet(infoData)
     wsInfo['!cols'] = [{ wch: 20 }, { wch: 30 }]
@@ -182,10 +236,10 @@ export async function exportSinglePolicyToExcel(
     ]
     const covData = [
       covHeader,
-      ...policy.coverages.map((c) => [
-        getLocalizedCoverageName(c, locale),
-        formatCoverageItemLimitForReview(c, locale),
-        c.deductible > 0 ? formatCurrency(c.deductible, 'TRY', locale) : isTr ? 'Yok' : 'None',
+      ...summary.coverages.map((c) => [
+        c.name,
+        c.limit,
+        c.deductible,
         c.included ? (isTr ? 'Evet' : 'Yes') : isTr ? 'Hayır' : 'No',
       ]),
     ]
@@ -194,18 +248,18 @@ export async function exportSinglePolicyToExcel(
     XLSX.utils.book_append_sheet(wb, wsCov, isTr ? 'Teminatlar' : 'Coverages')
 
     // Sheet 3: Exclusions
-    if (policy.exclusions.length > 0) {
-      const exclData = [[isTr ? 'İstisna' : 'Exclusion'], ...policy.exclusions.map((e) => [e])]
+    if (summary.exclusions.length > 0) {
+      const exclData = [[isTr ? 'İstisna' : 'Exclusion'], ...summary.exclusions.map((e) => [e])]
       const wsExcl = XLSX.utils.aoa_to_sheet(exclData)
       wsExcl['!cols'] = [{ wch: 60 }]
       XLSX.utils.book_append_sheet(wb, wsExcl, isTr ? 'İstisnalar' : 'Exclusions')
     }
 
     // Sheet 4: Conditional Deductibles
-    if (policy.conditionalDeductibles && policy.conditionalDeductibles.length > 0) {
+    if (summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0) {
       const cdData = [
         [isTr ? 'Koşullu Muafiyet' : 'Conditional Deductible'],
-        ...policy.conditionalDeductibles.map((d) => [d]),
+        ...summary.conditionalDeductibles.map((d) => [d]),
       ]
       const wsCd = XLSX.utils.aoa_to_sheet(cdData)
       wsCd['!cols'] = [{ wch: 60 }]
@@ -217,19 +271,17 @@ export async function exportSinglePolicyToExcel(
     }
 
     // Sheet 5: AI Insights
-    if (policy.aiInsights?.length > 0) {
+    if (summary.insights?.length > 0) {
       const insData = [
         [isTr ? 'AI Görüşü' : 'AI Insight'],
-        ...policy.aiInsights.map((_, i) => [
-          applySafeWording(getLocalizedInsight(policy, i, locale)),
-        ]),
+        ...summary.insights.map((insight) => [insight]),
       ]
       const wsIns = XLSX.utils.aoa_to_sheet(insData)
       wsIns['!cols'] = [{ wch: 80 }]
       XLSX.utils.book_append_sheet(wb, wsIns, isTr ? 'AI Görüşleri' : 'AI Insights')
     }
 
-    const safeNumber = policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')
+    const safeNumber = summary.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')
     XLSX.writeFile(wb, `${safeNumber}_${formatDateForFilename()}.xlsx`)
   } catch {
     // Fallback to CSV
@@ -266,10 +318,11 @@ export function exportToPDF(policy: AnalyzedPolicy, locale: string = 'tr'): void
  */
 export function exportPoliciesToPDF(
   policies: AnalyzedPolicy[],
-  title = 'Policy Report',
+  title?: string,
   locale: string = 'tr'
 ): void {
-  const printContent = generatePoliciesSummaryHTML(policies, title, locale)
+  const displayTitle = title || (locale === 'tr' ? 'Poliçe Raporu' : 'Policy Report')
+  const printContent = generatePoliciesSummaryHTML(policies, displayTitle, locale)
 
   const printWindow = window.open('', '_blank')
   if (!printWindow) {
@@ -288,13 +341,14 @@ export function exportPoliciesToPDF(
 /**
  * Generate HTML for a single policy
  */
-function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): string {
+export function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): string {
+  const summary = buildPolicyReviewerSummary(policy, { locale })
   return `
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
-  <title>${policy.provider} - ${policy.policyNumber}</title>
+  <title>${summary.provider} - ${summary.policyNumber}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -370,86 +424,97 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
   <div class="header">
     <div>
       <div class="logo">InsurAI</div>
-      <div class="policy-number">Policy Report</div>
     </div>
     <div style="text-align: right;">
-      <div class="label">Generated</div>
+      <div class="label">${locale === 'tr' ? 'Oluşturulma' : 'Generated'}</div>
       <div>${new Date().toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US')}</div>
     </div>
   </div>
 
-  <h1>${policy.provider}</h1>
-  <p style="font-size: 18px; color: #666;">${policy.typeTr}</p>
-  <span class="status status-${policy.status}">${policy.status.toUpperCase()}</span>
+  <h1>${summary.provider}</h1>
+  <p style="font-size: 18px; color: #666;">${summary.typeTr}</p>
+  <span class="status status-${summary.status}">${
+    locale === 'tr'
+      ? summary.status === 'active'
+        ? 'AKTİF'
+        : summary.status === 'expired'
+          ? 'SÜRESİ DOLDU'
+          : summary.status === 'expiring'
+            ? 'YAKINDA BİTİYOR'
+            : summary.status === 'cancelled'
+              ? 'İPTAL EDİLDİ'
+              : summary.status.toUpperCase()
+      : summary.status.toUpperCase()
+  }</span>
 
-  ${generateScoreSection(policy)}
+  ${generateScoreSection(summary.aiConfidence, locale)}
 
   <div class="highlight">
     <div class="grid">
       <div>
-        <div class="label">Total Coverage</div>
-        <div class="value">${formatCoverageTotalForReview(policy, locale)}</div>
+        <div class="label">${locale === 'tr' ? 'Toplam Teminat' : 'Total Coverage'}</div>
+        <div class="value">${summary.coverageTotal}</div>
       </div>
       <div>
-        <div class="label">Annual Premium</div>
-        <div class="value">${formatPremiumForReview(policy, locale)}</div>
+        <div class="label">${locale === 'tr' ? 'Yıllık Prim' : 'Annual Premium'}</div>
+        <div class="value">${summary.premium}</div>
       </div>
     </div>
   </div>
 
-  <h2>Policy Details</h2>
+  <h2>${locale === 'tr' ? 'Poliçe Detayları' : 'Policy Details'}</h2>
   <div class="grid">
     <div class="field">
-      <div class="label">Policy Number</div>
-      <div class="value">${policy.policyNumber}</div>
+      <div class="label">${locale === 'tr' ? 'Poliçe Numarası' : 'Policy Number'}</div>
+      <div class="value">${summary.policyNumber}</div>
     </div>
     <div class="field">
-      <div class="label">Insured Person</div>
-      <div class="value">${formatInsuredForReview(policy, locale)}</div>
+      <div class="label">${locale === 'tr' ? 'Sigortalı Kişi' : 'Insured Person'}</div>
+      <div class="value">${summary.insured}</div>
     </div>
     <div class="field">
-      <div class="label">Start Date</div>
-      <div class="value">${formatDate(policy.startDate, locale)}</div>
+      <div class="label">${locale === 'tr' ? 'Başlangıç Tarihi' : 'Start Date'}</div>
+      <div class="value">${summary.startDate}</div>
     </div>
     <div class="field">
-      <div class="label">Expiry Date</div>
-      <div class="value">${formatDate(policy.expiryDate, locale)}</div>
+      <div class="label">${locale === 'tr' ? 'Bitiş Tarihi' : 'Expiry Date'}</div>
+      <div class="value">${summary.expiryDate}</div>
     </div>
     <div class="field">
-      <div class="label">Monthly Premium</div>
-      <div class="value">${formatMonthlyPremiumForReview(policy, locale)}</div>
+      <div class="label">${locale === 'tr' ? 'Aylık Prim' : 'Monthly Premium'}</div>
+      <div class="value">${summary.monthlyPremium}</div>
     </div>
     <div class="field">
-      <div class="label">Deductible</div>
-      <div class="value">${formatDeductibleForReview(policy, locale)}</div>
+      <div class="label">${locale === 'tr' ? 'Muafiyet' : 'Deductible'}</div>
+      <div class="value">${summary.deductible}</div>
     </div>
     ${
-      policy.location
+      summary.location
         ? `
     <div class="field">
-      <div class="label">Location</div>
-      <div class="value">${policy.location}</div>
+      <div class="label">${locale === 'tr' ? 'Konum' : 'Location'}</div>
+      <div class="value">${summary.location}</div>
     </div>
     `
         : ''
     }
     <div class="field">
-      <div class="label">AI Confidence</div>
-      <div class="value">${(policy.aiConfidence * 100).toFixed(0)}%</div>
+      <div class="label">${locale === 'tr' ? 'AI Güven Skoru' : 'AI Confidence Score'}</div>
+      <div class="value">${summary.aiConfidence !== null ? `${(summary.aiConfidence * 100).toFixed(0)}%` : '-'}</div>
     </div>
   </div>
 
   ${
-    policy.coverages.length > 0
+    summary.coverages.length > 0
       ? `
-  <h2>Coverages</h2>
+  <h2>${locale === 'tr' ? 'Teminatlar' : 'Coverages'}</h2>
   <div class="coverages">
-    ${policy.coverages
+    ${summary.coverages
       .map(
         (c) => `
     <div class="coverage-item">
-      <span>${getLocalizedCoverageName(c, locale)}</span>
-      <span>${formatCoverageItemLimitForReview(c, locale)}</span>
+      <span>${c.name}</span>
+      <span>${c.limit}</span>
     </div>
     `
       )
@@ -460,41 +525,41 @@ function generatePolicyHTML(policy: AnalyzedPolicy, locale: string = 'tr'): stri
   }
 
   ${
-    policy.exclusions && policy.exclusions.length > 0
+    summary.exclusions && summary.exclusions.length > 0
       ? `
-  <h2>Exclusions</h2>
+  <h2>${locale === 'tr' ? 'İstisnalar' : 'Exclusions'}</h2>
   <ul class="excl-list">
-    ${policy.exclusions.map((e) => `<li>${e}</li>`).join('')}
+    ${summary.exclusions.map((e) => `<li>${e}</li>`).join('')}
   </ul>
   `
       : ''
   }
 
   ${
-    policy.conditionalDeductibles && policy.conditionalDeductibles.length > 0
+    summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0
       ? `
   <h2>${locale === 'tr' ? 'Koşullu Muafiyetler' : 'Conditional Deductibles'}</h2>
   <ul class="excl-list">
-    ${policy.conditionalDeductibles.map((d) => `<li>${d}</li>`).join('')}
+    ${summary.conditionalDeductibles.map((d) => `<li>${d}</li>`).join('')}
   </ul>
   `
       : ''
   }
 
   ${
-    policy.aiInsights && policy.aiInsights.length > 0
+    summary.insights && summary.insights.length > 0
       ? `
-  <h2>AI Insights</h2>
+  <h2>${locale === 'tr' ? 'AI Görüşleri' : 'AI Insights'}</h2>
   <ul class="insight-list">
-    ${policy.aiInsights.map((_, i) => `<li>${applySafeWording(getLocalizedInsight(policy, i, locale))}</li>`).join('')}
+    ${summary.insights.map((insight) => `<li>${insight}</li>`).join('')}
   </ul>
   `
       : ''
   }
 
   <div class="footer">
-    <p>Generated by InsurAI • ${new Date().toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</p>
-    <p>This document is for informational purposes only. Please refer to your original policy for official terms.</p>
+    <p>${locale === 'tr' ? 'InsurAI tarafından oluşturuldu' : 'Generated by InsurAI'} • ${new Date().toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</p>
+    <p>${locale === 'tr' ? 'Bu belge yalnızca bilgilendirme amaçlıdır. Lütfen resmi şartlar için orijinal poliçenize başvurun.' : 'This document is for informational purposes only. Please refer to your original policy for official terms.'}</p>
   </div>
 </body>
 </html>
@@ -513,13 +578,11 @@ function generatePoliciesSummaryHTML(
     total: policies.length,
     active: policies.filter((p) => p.status === 'active').length,
     expiring: policies.filter((p) => p.status === 'expiring').length,
-    totalCoverage: policies.reduce((sum, p) => sum + p.coverage, 0),
-    totalPremium: policies.reduce((sum, p) => sum + p.premium, 0),
   }
 
   return `
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="${locale}">
 <head>
   <meta charset="UTF-8">
   <title>${title}</title>
@@ -598,10 +661,10 @@ function generatePoliciesSummaryHTML(
   <div class="header">
     <div>
       <div class="logo">InsurAI</div>
-      <div style="font-size: 14px; color: #666;">Insurance Portfolio Report</div>
+      <div style="font-size: 14px; color: #666;">${locale === 'tr' ? 'Sigorta Portföy Raporu' : 'Insurance Portfolio Report'}</div>
     </div>
     <div style="text-align: right;">
-      <div style="font-size: 12px; color: #666;">Generated</div>
+      <div style="font-size: 12px; color: #666;">${locale === 'tr' ? 'Oluşturulma' : 'Generated'}</div>
       <div>${new Date().toLocaleDateString(locale === 'tr' ? 'tr-TR' : 'en-US')}</div>
     </div>
   </div>
@@ -611,56 +674,61 @@ function generatePoliciesSummaryHTML(
   <div class="stats">
     <div class="stat">
       <div class="stat-value">${stats.total}</div>
-      <div class="stat-label">Total Policies</div>
+      <div class="stat-label">${locale === 'tr' ? 'Toplam Poliçe' : 'Total Policies'}</div>
     </div>
     <div class="stat">
       <div class="stat-value">${stats.active}</div>
-      <div class="stat-label">Active</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value">${formatCurrency(stats.totalCoverage, 'TRY', locale)}</div>
-      <div class="stat-label">Total Coverage</div>
-    </div>
-    <div class="stat">
-      <div class="stat-value">${formatCurrency(stats.totalPremium, 'TRY', locale)}</div>
-      <div class="stat-label">Total Premium</div>
+      <div class="stat-label">${locale === 'tr' ? 'Aktif' : 'Active'}</div>
     </div>
   </div>
 
   <table>
     <thead>
       <tr>
-        <th>Policy Number</th>
-        <th>Provider</th>
-        <th>Type</th>
-        <th>Status</th>
-        <th>Coverage</th>
-        <th>Premium</th>
-        <th>Expiry Date</th>
+        <th>${locale === 'tr' ? 'Poliçe No' : 'Policy Number'}</th>
+        <th>${locale === 'tr' ? 'Şirket' : 'Provider'}</th>
+        <th>${locale === 'tr' ? 'Tür' : 'Type'}</th>
+        <th>${locale === 'tr' ? 'Durum' : 'Status'}</th>
+        <th>${locale === 'tr' ? 'Teminat' : 'Coverage'}</th>
+        <th>${locale === 'tr' ? 'Prim' : 'Premium'}</th>
+        <th>${locale === 'tr' ? 'Bitiş Tarihi' : 'Expiry Date'}</th>
       </tr>
     </thead>
     <tbody>
       ${policies
-        .map(
-          (p) => `
+        .map((p) => {
+          const summary = buildPolicyReviewerSummary(p, { locale })
+          return `
       <tr>
-        <td>${p.policyNumber}</td>
-        <td>${p.provider}</td>
-        <td>${p.typeTr}</td>
-        <td><span class="status status-${p.status}">${p.status}</span></td>
-        <td>${formatCoverageTotalForReview(p, locale)}</td>
-        <td>${formatPremiumForReview(p, locale)}</td>
-        <td>${formatDate(p.expiryDate, locale)}</td>
+        <td>${summary.policyNumber}</td>
+        <td>${summary.provider}</td>
+        <td>${summary.typeTr}</td>
+        <td><span class="status status-${summary.status}">${
+          locale === 'tr'
+            ? summary.status === 'active'
+              ? 'AKTİF'
+              : summary.status === 'expired'
+                ? 'SÜRESİ DOLDU'
+                : summary.status === 'expiring'
+                  ? 'YAKINDA BİTİYOR'
+                  : summary.status === 'cancelled'
+                    ? 'İPTAL EDİLDİ'
+                    : summary.status.toUpperCase()
+            : summary.status.toUpperCase()
+        }</span></td>
+        <td>${summary.coverageTotal}</td>
+        <td>${summary.premium}</td>
+        <td>${summary.expiryDate}</td>
       </tr>
       `
-        )
+        })
         .join('')}
     </tbody>
   </table>
 
   <div class="footer">
-    <p>Generated by InsurAI • ${new Date().toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</p>
-    <p>This report is for informational purposes only.</p>
+    <p>${locale === 'tr' ? 'InsurAI tarafından oluşturuldu' : 'Generated by InsurAI'} • ${new Date().toLocaleString(locale === 'tr' ? 'tr-TR' : 'en-US')}</p>
+    <p>${locale === 'tr' ? 'Bu rapor yalnızca bilgilendirme amaçlıdır.' : 'This report is for informational purposes only.'}</p>
   </div>
 </body>
 </html>
@@ -672,61 +740,63 @@ function generatePoliciesSummaryHTML(
  */
 export function exportSinglePolicyToCSV(policy: AnalyzedPolicy, locale: 'en' | 'tr' = 'tr'): void {
   const isTr = locale === 'tr'
+  const summary = buildPolicyReviewerSummary(policy, { locale })
 
   // --- Policy Info Sheet ---
   const infoHeaders = [isTr ? 'Alan' : 'Field', isTr ? 'Değer' : 'Value']
   const infoRows: string[][] = [
-    [isTr ? 'Poliçe No' : 'Policy Number', policy.policyNumber],
-    [isTr ? 'Şirket' : 'Provider', policy.provider],
-    [isTr ? 'Tür' : 'Type', policy.typeTr],
-    [isTr ? 'Durum' : 'Status', policy.status],
-    [isTr ? 'Sigortalı' : 'Insured Person', formatInsuredForReview(policy, locale)],
-    [isTr ? 'Konum' : 'Location', policy.location || ''],
-    [isTr ? 'Teminat' : 'Coverage', formatCoverageTotalForReview(policy, locale)],
-    [isTr ? 'Prim' : 'Premium', formatPremiumForReview(policy, locale)],
-    [isTr ? 'Aylık Prim' : 'Monthly Premium', formatMonthlyPremiumForReview(policy, locale)],
-    [isTr ? 'Muafiyet' : 'Deductible', formatDeductibleForReview(policy, locale)],
-    [isTr ? 'Başlangıç' : 'Start Date', formatDate(policy.startDate, locale)],
-    [isTr ? 'Bitiş' : 'Expiry Date', formatDate(policy.expiryDate, locale)],
-    [isTr ? 'AI Güven' : 'AI Confidence', (policy.aiConfidence * 100).toFixed(0) + '%'],
+    [isTr ? 'Poliçe No' : 'Policy Number', summary.policyNumber],
+    [isTr ? 'Şirket' : 'Provider', summary.provider],
+    [isTr ? 'Tür' : 'Type', summary.typeTr],
+    [isTr ? 'Durum' : 'Status', summary.status],
+    [isTr ? 'Sigortalı' : 'Insured Person', summary.insured],
+    [isTr ? 'Konum' : 'Location', summary.location],
+    [isTr ? 'Teminat' : 'Coverage', summary.coverageTotal],
+    [isTr ? 'Prim' : 'Premium', summary.premium],
+    [isTr ? 'Aylık Prim' : 'Monthly Premium', summary.monthlyPremium],
+    [isTr ? 'Muafiyet' : 'Deductible', summary.deductible],
+    [isTr ? 'Başlangıç' : 'Start Date', summary.startDate],
+    [isTr ? 'Bitiş' : 'Expiry Date', summary.expiryDate],
+    [
+      isTr ? 'AI Güven' : 'AI Confidence',
+      summary.aiConfidence !== null ? (summary.aiConfidence * 100).toFixed(0) + '%' : '-',
+    ],
   ]
 
   // --- Coverages Sheet ---
   const covHeaders = [
     isTr ? 'Teminat Adı' : 'Coverage Name',
-    isTr ? 'Teminat Adı (TR)' : 'Coverage Name (TR)',
     isTr ? 'Limit' : 'Limit',
     isTr ? 'Muafiyet' : 'Deductible',
     isTr ? 'Dahil' : 'Included',
   ]
-  const covRows = policy.coverages.map((c) => [
+  const covRows = summary.coverages.map((c) => [
     c.name,
-    getLocalizedCoverageName(c, locale),
-    formatCoverageItemLimitForReview(c, locale),
-    c.deductible > 0 ? formatCurrency(c.deductible, 'TRY', locale) : isTr ? 'Yok' : 'None',
+    c.limit,
+    c.deductible,
     c.included ? (isTr ? 'Evet' : 'Yes') : isTr ? 'Hayır' : 'No',
   ])
 
   // --- Exclusions Sheet ---
   const exclHeaders = [isTr ? 'İstisna' : 'Exclusion']
-  const exclRows = policy.exclusions.map((e) => [e])
+  const exclRows = summary.exclusions.map((e) => [e])
 
   // --- Conditional Deductibles Sheet ---
   const condDeductHeaders = [isTr ? 'Koşullu Muafiyet' : 'Conditional Deductible']
-  const condDeductRows = (policy.conditionalDeductibles ?? []).map((d) => [d])
+  const condDeductRows = (summary.conditionalDeductibles ?? []).map((d) => [d])
 
   // --- AI Insights Sheet ---
   const insightHeaders = [isTr ? 'AI Görüşü' : 'AI Insight']
-  const insightRows = policy.aiInsights.map((_, i) => [
-    applySafeWording(getLocalizedInsight(policy, i, locale)),
-  ])
+  const insightRows = summary.insights.map((insight) => [insight])
 
   // Build combined CSV with section separators
-  const escapeCSV = (value: string): string => {
-    if (value.includes(',') || value.includes('"') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`
+  const escapeCSV = (value: any): string => {
+    if (value === null || value === undefined) return ''
+    const str = String(value)
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`
     }
-    return value
+    return str
   }
   const toRow = (cells: string[]) => cells.map(escapeCSV).join(',')
 
@@ -756,26 +826,26 @@ export function exportSinglePolicyToCSV(policy: AnalyzedPolicy, locale: 'en' | '
     ...insightRows.map(toRow),
   ]
 
-  const bom = '\uFEFF'
+  const bom = '\ufeff'
   const blob = new Blob([bom + sections.join('\n')], { type: 'text/csv;charset=utf-8;' })
 
-  const safeNumber = policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')
+  const safeNumber = summary.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')
   downloadBlob(blob, `${safeNumber}_${formatDateForFilename()}.csv`)
 }
 
 /**
  * Generate score visualization section for PDF export
  */
-function generateScoreSection(policy: AnalyzedPolicy): string {
+function generateScoreSection(confidence: number | null, locale: string = 'tr'): string {
+  if (confidence === null) return ''
   // Only show if rawData has evaluation info
-  const confidence = policy.aiConfidence
   const score = Math.round(confidence * 100)
   const grade = score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : score >= 40 ? 'D' : 'F'
   const barColor = score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444'
 
   return `
   <div style="margin: 20px 0; padding: 15px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
-    <div class="label">AI Confidence Score</div>
+    <div class="label">${locale === 'tr' ? 'AI Güven Skoru' : 'AI Confidence Score'}</div>
     <div class="score-bar">
       <div class="score-track">
         <div class="score-fill" style="width: ${score}%; background: ${barColor};"></div>
@@ -796,19 +866,26 @@ export function exportComparisonToCSV(
 ): void {
   const headers = ['Metric', ...policies.map((p) => p.provider)]
 
+  const summarizedPolicies = policies.map((p) => buildPolicyReviewerSummary(p, { locale }))
+
   const rows = [
-    ['Policy Number', ...policies.map((p) => p.policyNumber)],
-    ['Type', ...policies.map((p) => p.typeTr)],
-    ['Status', ...policies.map((p) => p.status)],
-    ['Coverage', ...policies.map((p) => formatCoverageTotalForReview(p, locale))],
-    ['Premium', ...policies.map((p) => formatPremiumForReview(p, locale))],
-    ['Monthly Premium', ...policies.map((p) => formatMonthlyPremiumForReview(p, locale))],
-    ['Deductible', ...policies.map((p) => formatDeductibleForReview(p, locale))],
-    ['Start Date', ...policies.map((p) => formatDate(p.startDate, locale))],
-    ['Expiry Date', ...policies.map((p) => formatDate(p.expiryDate, locale))],
-    ['AI Confidence', ...policies.map((p) => `${(p.aiConfidence * 100).toFixed(0)}%`)],
-    ['Coverages Count', ...policies.map((p) => String(p.coverages.length))],
-    ['Exclusions Count', ...policies.map((p) => String(p.exclusions.length))],
+    ['Policy Number', ...summarizedPolicies.map((p) => p.policyNumber)],
+    ['Type', ...summarizedPolicies.map((p) => p.typeTr)],
+    ['Status', ...summarizedPolicies.map((p) => p.status)],
+    ['Coverage', ...summarizedPolicies.map((p) => p.coverageTotal)],
+    ['Premium', ...summarizedPolicies.map((p) => p.premium)],
+    ['Monthly Premium', ...summarizedPolicies.map((p) => p.monthlyPremium)],
+    ['Deductible', ...summarizedPolicies.map((p) => p.deductible)],
+    ['Start Date', ...summarizedPolicies.map((p) => p.startDate)],
+    ['Expiry Date', ...summarizedPolicies.map((p) => p.expiryDate)],
+    [
+      'AI Confidence',
+      ...summarizedPolicies.map((p) =>
+        p.aiConfidence !== null ? `${(p.aiConfidence * 100).toFixed(0)}%` : '-'
+      ),
+    ],
+    ['Coverages Count', ...summarizedPolicies.map((p) => String(p.coverages.length))],
+    ['Exclusions Count', ...summarizedPolicies.map((p) => String(p.exclusions.length))],
   ]
 
   const escapeCSV = (value: string): string => {
@@ -823,7 +900,7 @@ export function exportComparisonToCSV(
     ...rows.map((row) => row.map(escapeCSV).join(',')),
   ].join('\n')
 
-  const bom = '\uFEFF'
+  const bom = '\ufeff'
   const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' })
   downloadBlob(blob, `${filename}_${formatDateForFilename()}.csv`)
 }
@@ -849,14 +926,22 @@ export function exportComparisonToPDF(policies: AnalyzedPolicy[], locale: string
 /**
  * Download a blob as a file
  */
-function downloadBlob(blob: Blob, filename: string): void {
+function downloadBlob(blob: Blob, filename: string) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    if ((globalThis as any).downloadBlob) {
+      void (globalThis as any).downloadBlob(blob, filename)
+    } else {
+      console.warn('Skipping file download in Node environment')
+    }
+    return
+  }
   const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
   URL.revokeObjectURL(url)
 }
 

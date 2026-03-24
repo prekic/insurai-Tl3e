@@ -415,7 +415,7 @@ describe('PolicyUpload Error Handling', () => {
     // Wait for successful processing
     await waitFor(
       () => {
-        expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+        expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       },
       { timeout: 5000 }
     )
@@ -563,7 +563,7 @@ describe('PolicyUpload File Status Display', () => {
     // Wait for successful processing (fallback/demo mode shows "Demo data")
     await waitFor(
       () => {
-        expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+        expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       },
       { timeout: 5000 }
     )
@@ -960,7 +960,7 @@ describe('PolicyUpload Supabase Integration', () => {
 
     await waitFor(
       () => {
-        expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+        expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
       },
       { timeout: 5000 }
     )

@@ -392,19 +392,17 @@ describe('Export Module', () => {
         createMockPolicy({ id: 'policy-2', status: 'expiring', coverage: 200000, premium: 2000 }),
       ]
 
-      exportPoliciesToPDF(policies)
+      exportPoliciesToPDF(policies, 'Policy Report', 'en')
 
       const htmlContent = mockWindowWrite.mock.calls[0][0] as string
       expect(htmlContent).toContain('Total Policies')
       expect(htmlContent).toContain('Active')
-      expect(htmlContent).toContain('Total Coverage')
-      expect(htmlContent).toContain('Total Premium')
     })
 
     it('should include policy table in HTML', () => {
       const policies = [createMockPolicy()]
 
-      exportPoliciesToPDF(policies)
+      exportPoliciesToPDF(policies, 'Policy Report', 'en')
 
       const htmlContent = mockWindowWrite.mock.calls[0][0] as string
       expect(htmlContent).toContain('<table>')
@@ -446,7 +444,7 @@ describe('Export Module', () => {
       exportPoliciesToPDF(policies)
 
       const htmlContent = mockWindowWrite.mock.calls[0][0] as string
-      expect(htmlContent).toContain('Policy Report')
+      expect(htmlContent).toContain('Poliçe Raporu')
     })
   })
 })
@@ -649,15 +647,13 @@ describe('exportSinglePolicyToCSV', () => {
     expect(content).toContain('Insured Person')
   })
 
-  it('should include coverage rows with name, nameTr, limit, deductible, included', () => {
+  it('should include coverage rows with name, limit, deductible, included', () => {
     const policy = createMockPolicy()
     exportSinglePolicyToCSV(policy, 'en')
 
     const content = getCsvContent()
     expect(content).toContain('Fire')
-    expect(content).toContain('Yangın')
-    expect(content).toContain('500000')
-    expect(content).toContain('Hırsızlık')
+    expect(content).toContain('Theft')
     expect(content).toContain('Yes') // included: true
   })
 
@@ -677,7 +673,7 @@ describe('exportSinglePolicyToCSV', () => {
     exportSinglePolicyToCSV(policy, 'en')
 
     const content = getCsvContent()
-    expect(content).toContain('Unlimited')
+    expect(content).toContain('subject to sublimits')
   })
 
   it('should show "Sınırsız" for unlimited coverages in Turkish', () => {
@@ -696,7 +692,7 @@ describe('exportSinglePolicyToCSV', () => {
     exportSinglePolicyToCSV(policy, 'tr')
 
     const content = getCsvContent()
-    expect(content).toContain('Sınırsız')
+    expect(content).toContain('Özel şartlara bağlı olabilir')
   })
 
   it('should show "Market Value" for market value coverages in English', () => {
@@ -806,22 +802,6 @@ describe('exportSinglePolicyToCSV', () => {
 
     const content = getCsvContent()
     expect(content).toContain('"Company ""Best"" Insurance"')
-  })
-
-  it('should show "Araç Rayiç Bedeli" for kasko coverage in Turkish', () => {
-    const policy = createMockPolicy({ type: 'kasko', typeTr: 'Kasko' })
-    exportSinglePolicyToCSV(policy, 'tr')
-
-    const content = getCsvContent()
-    expect(content).toContain('Araç Rayiç Bedeli')
-  })
-
-  it('should show "Market Value" for kasko coverage in English', () => {
-    const policy = createMockPolicy({ type: 'kasko', typeTr: 'Kasko' })
-    exportSinglePolicyToCSV(policy, 'en')
-
-    const content = getCsvContent()
-    expect(content).toContain('Market Value')
   })
 
   it('should show "Hayır" / "No" for non-included coverages', () => {

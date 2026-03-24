@@ -130,14 +130,14 @@ describe('formatInsuredForReview', () => {
     expect(formatInsuredForReview(p, 'tr')).toBe('Erdem Yılmaz')
   })
 
-  it('returns "Not Specified" when insuredMissing', () => {
+  it('returns "Cannot Verify" when insured is missing', () => {
     const p = createSpecimen({ insuredPerson: '', insuredMissing: true })
-    expect(formatInsuredForReview(p, 'en')).toBe('Not Specified')
+    expect(formatInsuredForReview(p, 'en')).toBe('Cannot Verify')
   })
 
-  it('returns "-" when person empty but not flagged missing', () => {
+  it('returns "Doğrulanamadı" when person empty', () => {
     const p = createSpecimen({ insuredPerson: '', insuredMissing: false })
-    expect(formatInsuredForReview(p, 'tr')).toBe('-')
+    expect(formatInsuredForReview(p, 'tr')).toBe('Doğrulanamadı')
   })
 })
 
@@ -356,5 +356,80 @@ describe('buildPolicyReviewerSummary', () => {
     })
     expect(summary.premium).toBe('$31140')
     expect(summary.monthlyPremium).toBe('$2595')
+  })
+})
+
+// ── Legacy Record Backfill Strategy Tests ─────────────────────────────
+
+describe('Legacy Precedence and Hydration', () => {
+  it('legacy arrays authoritative over shallow UI arrays', () => {
+    // We create a mock AnalyzedPolicy that contains legacy coverages representing a backfilled state
+    const p = createSpecimen({
+      coverages: [
+        {
+          name: 'Legal Protection',
+          nameTr: 'Hukuksal Koruma',
+          limit: 80000, // Legacy authoritative value
+          deductible: 0,
+          included: true,
+        },
+      ],
+    }) as any
+
+    // Simulate what happens if extracted_data also existed on the record for some reason
+    p.extracted_data = {
+      coverages: [
+        { name: 'Legal Protection', limit: 4000 }, // Weak single-shot hallucinated extraction
+      ],
+    }
+    p.raw_data = {
+      coverages: [{ name: 'Legal Protection', limit: 80000 }],
+    }
+
+    // Since the mapper places raw_data legacy fields into the UI `AnalyzedPolicy.coverages`
+    // and discards `extracted_data`, the builder only sees authoritative coverages.
+    const summary = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    const legalCoverage = summary.coverages.find(
+      (c) => c.name.toLowerCase().includes('hukuksal') || c.name.toLowerCase().includes('legal')
+    )
+
+    expect(legalCoverage).toBeDefined()
+    expect(legalCoverage?.limit).toContain('80')
+    expect(legalCoverage?.limit).not.toContain('4.000') // Hallucinated limit rejected
+  })
+
+  it('re-extraction authoritative for missing header fields', () => {
+    // Explicitly test that if the top-level insured identity was missing,
+    // the system accepts the mapped name from the hydration backfill script
+    const p = createSpecimen({
+      insuredPerson: 'Eriş Ambalaj Sanayi', // Hydrated mapped output
+      insuredMissing: false,
+    })
+
+    const summary = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    expect(summary.insured).toBe('Eriş Ambalaj Sanayi')
+    expect(summary.insured).not.toBe('Doğrulanamadı')
+  })
+
+  it('no misleading fallback values for unrecoverable records', () => {
+    // Assert exactly that Unrecoverable buckets output only Cannot Verify
+    // instead of misleading "today" dates or empty dash strings
+    const p = createSpecimen({
+      insuredPerson: '',
+      insuredMissing: true,
+      startDate: '',
+      expiryDate: '',
+      premiumMissing: true,
+    })
+
+    const summary = buildPolicyReviewerSummary(p, { locale: 'en' })
+    expect(summary.insured).toBe('Cannot Verify')
+    expect(summary.period).toBe('Cannot Verify')
+    expect(summary.premium).toBe('Not Specified')
+
+    const summaryTr = buildPolicyReviewerSummary(p, { locale: 'tr' })
+    expect(summaryTr.insured).toBe('Doğrulanamadı')
+    expect(summaryTr.period).toBe('Doğrulanamadı')
+    expect(summaryTr.premium).toBe('Belirtilmemiş')
   })
 })

@@ -165,7 +165,7 @@ describe('Section 6: Unlimited liability wording consistency', () => {
 
     const input = 'Coverage is unlimited for this item'
     const result = applySafeWording(input)
-    expect(result).toContain('Generally unlimited')
+    expect(result).toContain('subject to sublimits')
     expect(result).toContain('sublimits')
   })
 })

@@ -530,7 +530,7 @@ describe('PolicyUpload Coverage', () => {
       )
     })
 
-    it('shows demo data status for fallback source', async () => {
+    it('shows correct status for fallback source', async () => {
       mockExtractPolicy.mockResolvedValueOnce(mockSuccessResult({ source: 'fallback' }))
       renderUpload()
       await act(async () => {
@@ -538,7 +538,7 @@ describe('PolicyUpload Coverage', () => {
       })
       await waitFor(
         () => {
-          expect(screen.getByText(/demo data/i)).toBeInTheDocument()
+          expect(screen.getByText(/AI extracted/i)).toBeInTheDocument()
         },
         { timeout: 3000 }
       )

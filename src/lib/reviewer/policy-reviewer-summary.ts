@@ -16,10 +16,19 @@
 
 import type { AnalyzedPolicy, Coverage } from '@/types/policy'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { shouldShowUnlimited, shouldShowIncluded } from '@/lib/knowledge/kasko-knowledge'
 import { applySafeWording } from '@/lib/analysis/display-interpreter'
 import { COVERAGE_NAMES_EN_TO_TR, lookupCoverageNameTr } from '@/lib/i18n/coverage-names'
 import { getShortCompanyName } from '@/lib/insurance-display'
+import {
+  detectCoverageCategory,
+  groupCoverageSubLimits,
+  shouldShowIncluded,
+  shouldShowUnlimited,
+  sortByImportance,
+  type GroupedCoverage,
+  analyzeExclusionsComprehensive,
+  type ExclusionAnalysisResult,
+} from '@/lib/knowledge/kasko-knowledge'
 
 // ── Structured output types ─────────────────────────────────────────
 
@@ -52,18 +61,22 @@ export interface ReviewerSummary {
   status: string
 
   coverages: ReviewerCoverageItem[]
+  groupedCoverages: Record<string, GroupedCoverage[]>
   exclusions: string[]
+  groupedExclusions: ExclusionAnalysisResult
   conditionalDeductibles: string[]
   hasConditionalDeductibles: boolean
 
   /** Safe-worded, locale-resolved AI insights */
   insights: string[]
+  /** Original untranslated insights for evidence mapping */
+  rawInsights: string[]
 
   /** Reviewer flags */
   deductibleUncertain: boolean
   premiumMissing: boolean
   insuredMissing: boolean
-  aiConfidence: number
+  aiConfidence: number | null
 }
 
 export interface ReviewerSummaryOptions {
@@ -114,6 +127,9 @@ export function formatMonthlyPremiumForReview(
   if (policy.premiumMissing || !policy.premium || policy.premium <= 0) {
     return isTr ? 'Belirtilmemiş' : 'Not Specified'
   }
+  if (!policy.monthlyPremium || Number.isNaN(policy.monthlyPremium)) {
+    return isTr ? 'Hesaplanamadı' : 'Cannot Calculate'
+  }
   return formatAmount
     ? formatAmount(policy.monthlyPremium)
     : formatCurrency(policy.monthlyPremium, 'TRY', locale)
@@ -125,7 +141,17 @@ export function formatMonthlyPremiumForReview(
 export function formatInsuredForReview(policy: AnalyzedPolicy, locale: string): string {
   if (policy.insuredPerson) return policy.insuredPerson
   const isTr = locale === 'tr'
-  return policy.insuredMissing ? (isTr ? 'Belirtilmemiş' : 'Not Specified') : '-'
+  // If we reach here, the insured person is missing in the data
+  return isTr ? 'Doğrulanamadı' : 'Cannot Verify'
+}
+
+/**
+ * Format missing-safe dates for reviewer presentation
+ */
+export function formatDateForReview(date: string | undefined | null, locale: string): string {
+  const isTr = locale === 'tr'
+  if (!date) return isTr ? 'Doğrulanamadı' : 'Cannot Verify'
+  return formatDate(date, locale)
 }
 
 /**
@@ -371,6 +397,104 @@ export function buildPolicyReviewerSummary(
     applySafeWording(getLocalizedInsight(policy, i, locale, insightTranslations))
   )
 
+  // Format Coverages for groupedCoverages
+  const formattedCoveragesForGrouping = policy.coverages.map((c) => {
+    const { nameTr: _origNameTr, ...rest } = c
+    return {
+      ...rest,
+      nameEn: c.name || '',
+      nameTr:
+        locale === 'tr'
+          ? lookupCoverageNameTr(c.name || '') || c.nameTr || ''
+          : c.name || c.nameTr || '',
+      // Just use formatted limit logic from current export
+      limitFormatted:
+        c.limit > 0
+          ? formatAmount
+            ? formatAmount(c.limit)
+            : formatCurrency(c.limit, 'TRY', locale)
+          : c.isUnlimited || shouldShowUnlimited(c.name || '', c.limit)
+            ? locale === 'tr'
+              ? 'Limitsiz'
+              : 'Unlimited'
+            : c.isMarketValue
+              ? locale === 'tr'
+                ? 'Rayiç Bedel'
+                : 'Market Value'
+              : shouldShowIncluded(c.name || '', c.limit)
+                ? locale === 'tr'
+                  ? 'Dahil'
+                  : 'Included'
+                : locale === 'tr'
+                  ? 'Belirtilmemiş'
+                  : 'Not specified',
+    }
+  })
+
+  const groups: Record<string, any[]> = {
+    main: [],
+    liability: [],
+    personal_accident: [],
+    supplementary: [],
+    assistance: [],
+    legal: [],
+    other: [],
+  }
+
+  const filteredCoverages = formattedCoveragesForGrouping.filter((coverage) => {
+    // Always keep coverages with limits, unlimited flag, or market value flag
+    if (coverage.limit > 0) return true
+    if (coverage.isUnlimited) return true
+    if (coverage.isMarketValue) return true
+
+    // Keep service coverages
+    const nameLower = (coverage.name || '').toLowerCase()
+    if (shouldShowUnlimited(nameLower, 0) || shouldShowIncluded(nameLower, 0)) {
+      return true
+    }
+
+    // Filter out zero-limit entries that look like policy category headers
+    const categoryPatterns = [
+      'zorunlu mali sorumluluk',
+      'trafik sigortası',
+      'kasko sigortası',
+      'konut sigortası',
+    ]
+    return !categoryPatterns.some((pattern) => nameLower.includes(pattern))
+  })
+
+  // Format and group
+  for (const coverage of filteredCoverages) {
+    const origCov = {
+      ...coverage,
+      name:
+        locale === 'tr'
+          ? lookupCoverageNameTr(coverage.name || '') || coverage.nameTr || ''
+          : coverage.name || coverage.nameTr || '',
+    }
+    const category = origCov.category || detectCoverageCategory(coverage.name || '')
+    if (groups[category]) {
+      groups[category].push(origCov)
+    } else {
+      groups.other.push(origCov)
+    }
+  }
+
+  const groupedWithSubLimits: Record<string, GroupedCoverage[]> = {}
+  for (const [category, _coverages] of Object.entries(groups)) {
+    const grouped = groupCoverageSubLimits(_coverages)
+    groupedWithSubLimits[category] = sortByImportance(grouped)
+  }
+
+  const isCommercial =
+    (policy.type as string) === 'commercial_property' ||
+    (policy.type as string) === 'commercial_auto'
+  const groupedExclusions = analyzeExclusionsComprehensive(
+    policy.exclusions,
+    policy.exclusionsEn || [],
+    isCommercial
+  )
+
   return {
     policyNumber: policy.policyNumber,
     provider: policy.provider,
@@ -382,22 +506,33 @@ export function buildPolicyReviewerSummary(
     monthlyPremium: formatMonthlyPremiumForReview(policy, locale, formatAmount),
     deductible: formatDeductibleForReview(policy, locale, formatAmount),
     coverageTotal: formatCoverageTotalForReview(policy, locale, formatAmount),
-    period: `${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
-    startDate: formatDate(policy.startDate, locale),
-    expiryDate: formatDate(policy.expiryDate, locale),
+    period:
+      !policy.startDate || !policy.expiryDate
+        ? locale === 'tr'
+          ? 'Doğrulanamadı'
+          : 'Cannot Verify'
+        : `${formatDateForReview(policy.startDate, locale)} - ${formatDateForReview(policy.expiryDate, locale)}`,
+    startDate: formatDateForReview(policy.startDate, locale),
+    expiryDate: formatDateForReview(policy.expiryDate, locale),
     location: policy.location || '',
     status: policy.status,
 
     coverages,
+    groupedCoverages: groupedWithSubLimits,
     exclusions: policy.exclusions,
+    groupedExclusions,
     conditionalDeductibles: hasConditionalDeductibles ? policy.conditionalDeductibles! : [],
     hasConditionalDeductibles,
 
     insights,
+    rawInsights: policy.aiInsights || [],
 
-    deductibleUncertain: !!policy.deductibleUncertain,
-    premiumMissing: !!policy.premiumMissing,
-    insuredMissing: !!policy.insuredMissing,
-    aiConfidence: policy.aiConfidence,
+    deductibleUncertain: policy.deductibleUncertain || false,
+    premiumMissing: policy.premiumMissing || !policy.premium || policy.premium <= 0,
+    insuredMissing: policy.insuredMissing || !policy.insuredPerson,
+    aiConfidence:
+      typeof policy.aiConfidence === 'number' && !Number.isNaN(policy.aiConfidence)
+        ? policy.aiConfidence
+        : null,
   }
 }

@@ -391,11 +391,11 @@ describe('Cross-path alignment: KASKO specimen', () => {
       expect(source).not.toContain('policy as any')
     })
 
-    it('export.ts imports applySafeWording', async () => {
+    it('export.ts does not need to import applySafeWording', async () => {
       const { readFileSync } = await import('fs')
       const { resolve } = await import('path')
       const source = readFileSync(resolve(__dirname, '../export.ts'), 'utf-8')
-      expect(source).toContain(
+      expect(source).not.toContain(
         "import { applySafeWording } from '@/lib/analysis/display-interpreter'"
       )
     })

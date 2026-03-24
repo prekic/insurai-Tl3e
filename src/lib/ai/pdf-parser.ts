@@ -108,13 +108,16 @@ async function findWorkingWorkerUrl(version: string): Promise<string | null> {
 }
 
 /**
- * Create a promise that rejects after a timeout
+ * Create a promise that rejects after a timeout and provides a clear mechanism
  */
-function createTimeout<T>(ms: number, operation: string): Promise<T> {
+function createTimeout<T>(ms: number, operation: string, controller?: { clear?: () => void }): Promise<T> {
   return new Promise((_, reject) => {
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       reject(new Error(`${operation} timed out after ${ms}ms`))
     }, ms)
+    if (controller) {
+      controller.clear = () => clearTimeout(timeoutId)
+    }
   })
 }
 
@@ -277,11 +280,12 @@ export async function extractTextFromPDF(
       useSystemFonts: true,
     })
 
+    const timeoutCtrl: { clear?: () => void } = {}
     try {
       // Race between PDF loading and timeout
       pdfDocument = await Promise.race([
         loadingTask.promise,
-        createTimeout<never>(PDF_LOAD_TIMEOUT_MS, 'PDF loading'),
+        createTimeout<never>(PDF_LOAD_TIMEOUT_MS, 'PDF loading', timeoutCtrl),
       ])
     } catch (loadError) {
       // Cancel the loading task if it's still running
@@ -306,6 +310,8 @@ export async function extractTextFromPDF(
 
       // Re-throw to be handled by outer catch
       throw loadError
+    } finally {
+      if (timeoutCtrl.clear) timeoutCtrl.clear()
     }
 
     // Check for empty PDF

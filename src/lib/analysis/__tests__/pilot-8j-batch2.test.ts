@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import {
   evaluateKaskoPilotGate,
   createPilotQARecord,
-  logPilotQARecord,
   evaluatePilotAdmission,
   type PilotQARecord
 } from '../kasko-pilot-gate'
@@ -58,7 +57,7 @@ describe('Phase 8J: KASKO Pilot Batch 2 (Documents 6-20)', () => {
   beforeAll(async () => {
     // Process all 15 documents
     for (const doc of docs) {
-      const { isPilotActive } = evaluateKaskoPilotGate('kasko', 'internal-user', { kasko_ai_extraction_pilot: true }, ['kasko_pilot_reviewers']) 
+      evaluateKaskoPilotGate('kasko', 'internal-user', { kasko_ai_extraction_pilot: true }, ['kasko_pilot_reviewers']) 
       
       const meta = {
         id: doc.id,
@@ -135,7 +134,6 @@ describe('Phase 8J: KASKO Pilot Batch 2 (Documents 6-20)', () => {
   describe('Batch 2 Summary Metrics', () => {
     it('generates Phase 8J summary metrics output', () => {
         const eligibleResults = results.filter((r) => r.qaRecord.countedInPilotMetrics)
-        const ineligibleResults = results.filter((r) => !r.qaRecord.countedInPilotMetrics)
         
         const phraseLeaks = results.filter(r => !r.qaRecord.phraseClean).length
         const rejected = results.filter(r => r.qaRecord.reviewerOutcome === 'rejected').length

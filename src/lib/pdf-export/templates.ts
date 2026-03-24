@@ -12,36 +12,16 @@ import type {
   GapAnalysisReportData,
   PortfolioReportData,
 } from '@/types/pdf-report'
-import type { Coverage } from '@/types/policy'
-import { formatCurrency, formatDate } from '@/lib/utils'
-import { shouldShowUnlimited, shouldShowIncluded } from '@/lib/knowledge/kasko-knowledge'
+import { formatCurrency } from '@/lib/utils'
 import {
   generateBaseStyles,
   generateHeaderHTML,
   generateFooterHTML,
   generateWatermarkHTML,
 } from './branding'
+import { buildPolicyReviewerSummary } from '@/lib/reviewer/policy-reviewer-summary'
 
-/**
- * Format a coverage item limit for PDF export.
- * Canonical logic aligned with PolicyDetailView.formatCoverageLimit().
- */
-function fmtCovLimitPDF(c: Coverage, locale: string): string {
-  const isTr = locale === 'tr'
-  if (c.isUnlimited) return isTr ? 'Sınırsız' : 'Unlimited'
-  if (c.isMarketValue) return isTr ? 'Rayiç Değer' : 'Market Value'
-  if (shouldShowUnlimited(c.name, c.limit)) return isTr ? 'Sınırsız' : 'Unlimited'
-  if (shouldShowIncluded(c.name, c.limit)) return isTr ? 'Dahil' : 'Included'
-  if (c.limit === 0) {
-    const nameLower = c.name.toLowerCase()
-    if (nameLower.includes('sınırsız') || nameLower.includes('unlimited'))
-      return isTr ? 'Sınırsız' : 'Unlimited'
-    if (nameLower.includes('rayiç') || nameLower.includes('market value'))
-      return isTr ? 'Rayiç Değer' : 'Market Value'
-    return isTr ? 'Dahil' : 'Included'
-  }
-  return formatCurrency(c.limit, 'TRY', locale)
-}
+// fmtCovLimitPDF removed since we use string limits from ReviewerSummary
 
 // =============================================================================
 // Template Helpers
@@ -157,8 +137,10 @@ export function generatePolicyDetailHTML(
   const locale = isTr ? 'tr' : 'en'
   const sections = options.sections || {}
 
+  const summary = buildPolicyReviewerSummary(policy, { locale })
+
   const title = options.title || (isTr ? 'Poliçe Detay Raporu' : 'Policy Detail Report')
-  const subtitle = options.subtitle || `${policy.provider} - ${policy.policyNumber}`
+  const subtitle = options.subtitle || `${summary.provider} - ${summary.policyNumber}`
 
   return `
 <!DOCTYPE html>
@@ -196,14 +178,14 @@ export function generatePolicyDetailHTML(
   <!-- Policy Details -->
   <h2>${isTr ? 'Poliçe Bilgileri' : 'Policy Details'}</h2>
   <div class="grid-2">
-    ${fieldHTML(isTr ? 'Poliçe Numarası' : 'Policy Number', policy.policyNumber)}
-    ${fieldHTML(isTr ? 'Sigorta Şirketi' : 'Provider', policy.provider)}
-    ${fieldHTML(isTr ? 'Poliçe Türü' : 'Policy Type', isTr ? policy.typeTr : policy.type)}
-    ${fieldHTML(isTr ? 'Durum' : 'Status', getStatusBadge(policy.status))}
-    ${fieldHTML(isTr ? 'Başlangıç Tarihi' : 'Start Date', formatDate(policy.startDate, locale), false, locale)}
-    ${fieldHTML(isTr ? 'Bitiş Tarihi' : 'Expiry Date', formatDate(policy.expiryDate, locale), false, locale)}
-    ${policy.insuredPerson ? fieldHTML(isTr ? 'Sigortalı' : 'Insured Person', policy.insuredPerson) : ''}
-    ${policy.location ? fieldHTML(isTr ? 'Konum' : 'Location', policy.location) : ''}
+    ${fieldHTML(isTr ? 'Poliçe Numarası' : 'Policy Number', summary.policyNumber)}
+    ${fieldHTML(isTr ? 'Sigorta Şirketi' : 'Provider', summary.provider)}
+    ${fieldHTML(isTr ? 'Poliçe Türü' : 'Policy Type', isTr ? summary.typeTr : summary.type)}
+    ${fieldHTML(isTr ? 'Durum' : 'Status', getStatusBadge(summary.status))}
+    ${fieldHTML(isTr ? 'Başlangıç Tarihi' : 'Start Date', summary.startDate)}
+    ${fieldHTML(isTr ? 'Bitiş Tarihi' : 'Expiry Date', summary.expiryDate)}
+    ${summary.insured ? fieldHTML(isTr ? 'Sigortalı' : 'Insured Person', summary.insured) : ''}
+    ${summary.location ? fieldHTML(isTr ? 'Konum' : 'Location', summary.location) : ''}
   </div>
   `
       : ''
@@ -231,7 +213,7 @@ export function generatePolicyDetailHTML(
   }
 
   ${
-    sections.showCoverages !== false && policy.coverages.length > 0
+    sections.showCoverages !== false && summary.coverages.length > 0
       ? `
   <!-- Coverages -->
   <h2>${isTr ? 'Teminatlar' : 'Coverages'}</h2>
@@ -245,13 +227,13 @@ export function generatePolicyDetailHTML(
       </tr>
     </thead>
     <tbody>
-      ${policy.coverages
+      ${summary.coverages
         .map(
           (c) => `
         <tr>
-          <td>${isTr ? c.nameTr : c.name}</td>
-          <td style="text-align: right;">${fmtCovLimitPDF(c, locale)}</td>
-          <td style="text-align: right;">${formatCurrency(c.deductible, 'TRY', locale)}</td>
+          <td>${c.name}</td>
+          <td style="text-align: right;">${c.limit}</td>
+          <td style="text-align: right;">${c.deductible}</td>
           <td style="text-align: center;">${c.included ? '✓' : '—'}</td>
         </tr>
       `
@@ -287,25 +269,37 @@ export function generatePolicyDetailHTML(
   }
 
   ${
-    sections.showExclusions !== false && policy.exclusions.length > 0
+    sections.showExclusions !== false && summary.exclusions.length > 0
       ? `
   <!-- Exclusions -->
   <h2>${isTr ? 'İstisnalar' : 'Exclusions'}</h2>
   <ul>
-    ${policy.exclusions.map((e) => `<li>${e}</li>`).join('')}
+    ${summary.exclusions.map((e) => `<li>${e}</li>`).join('')}
   </ul>
   `
       : ''
   }
 
   ${
-    sections.showAiInsights !== false && policy.aiInsights && policy.aiInsights.length > 0
+    summary.hasConditionalDeductibles && summary.conditionalDeductibles.length > 0
+      ? `
+  <!-- Conditional Deductibles / Special Conditions -->
+  <h2>${isTr ? 'Koşullu Muafiyetler / Özel Şartlar' : 'Conditional Deductibles / Special Conditions'}</h2>
+  <ul>
+    ${summary.conditionalDeductibles.map((e) => `<li>${e}</li>`).join('')}
+  </ul>
+  `
+      : ''
+  }
+
+  ${
+    sections.showAiInsights !== false && summary.insights && summary.insights.length > 0
       ? `
   <!-- AI Insights -->
   <h2>${isTr ? 'AI Önerileri' : 'AI Insights'}</h2>
   <div class="card">
     <ul>
-      ${policy.aiInsights.map((i) => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}
+      ${summary.insights.map((i) => `<li style="margin-bottom: 8px;">${i}</li>`).join('')}
     </ul>
   </div>
   `
@@ -615,19 +609,20 @@ export function generatePortfolioHTML(
     </thead>
     <tbody>
       ${policies
-        .map(
-          (p) => `
+        .map((p) => {
+          const s = buildPolicyReviewerSummary(p, { locale })
+          return `
         <tr>
-          <td>${p.policyNumber}</td>
-          <td>${p.provider}</td>
-          <td>${isTr ? p.typeTr : p.type}</td>
-          <td style="text-align: center;">${getStatusBadge(p.status)}</td>
-          <td style="text-align: right;">${formatCurrency(p.coverage, 'TRY', locale)}</td>
-          <td style="text-align: right;">${formatCurrency(p.premium, 'TRY', locale)}</td>
-          <td>${formatDate(p.expiryDate, locale)}</td>
+          <td>${s.policyNumber}</td>
+          <td>${s.provider}</td>
+          <td>${isTr ? s.typeTr : s.type}</td>
+          <td style="text-align: center;">${getStatusBadge(s.status)}</td>
+          <td style="text-align: right;">${s.coverageTotal}</td>
+          <td style="text-align: right;">${s.premium}</td>
+          <td>${s.expiryDate}</td>
         </tr>
       `
-        )
+        })
         .join('')}
     </tbody>
   </table>
@@ -725,19 +720,20 @@ export function generatePolicySummaryHTML(
     </thead>
     <tbody>
       ${policies
-        .map(
-          (p) => `
+        .map((p) => {
+          const s = buildPolicyReviewerSummary(p, { locale })
+          return `
         <tr>
-          <td>${p.policyNumber}</td>
-          <td>${p.provider}</td>
-          <td>${isTr ? p.typeTr : p.type}</td>
-          <td style="text-align: center;">${getStatusBadge(p.status)}</td>
-          <td style="text-align: right;">${formatCurrency(p.coverage, 'TRY', locale)}</td>
-          <td style="text-align: right;">${formatCurrency(p.premium, 'TRY', locale)}</td>
-          <td>${formatDate(p.expiryDate, locale)}</td>
+          <td>${s.policyNumber}</td>
+          <td>${s.provider}</td>
+          <td>${isTr ? s.typeTr : s.type}</td>
+          <td style="text-align: center;">${getStatusBadge(s.status)}</td>
+          <td style="text-align: right;">${s.coverageTotal}</td>
+          <td style="text-align: right;">${s.premium}</td>
+          <td>${s.expiryDate}</td>
         </tr>
       `
-        )
+        })
         .join('')}
     </tbody>
   </table>

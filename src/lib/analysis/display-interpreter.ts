@@ -78,7 +78,7 @@ export function applySafeWording(text: string): string {
   let safe = text
   const replacements: [RegExp, string][] = [
     [/\bno deductible\b/gi, 'Deductible treatment depends on the specific scenario'],
-    [/\bunlimited\b/gi, 'Generally unlimited, subject to sublimits and specific carve-outs'],
+    [/\bunlimited\b/gi, 'Coverage subject to sublimits and specific carve-outs'],
     [/\bfully covered\b/gi, 'Policy wording indicates coverage, subject to conditions'],
     [/\btam kapsamlı\b/gi, 'Poliçe kapsamı koşullara bağlıdır'],
     [/\bguaranteed\b/gi, 'Policy wording indicates this protection, subject to conditions'],
@@ -273,7 +273,7 @@ function buildCoverageCards(
     let limitStr: string | undefined
     if (cov.isUnlimited) {
       // Use safe wording — consistent with unlimited reconciliation
-      limitStr = 'Generally unlimited, subject to sublimits and specific carve-outs'
+      limitStr = 'Coverage subject to sublimits and specific carve-outs'
       conditionMarkers.push('limit_conditional')
     } else if (cov.limit) {
       limitStr = `${cov.limit.toLocaleString('tr-TR')} TRY`
@@ -779,7 +779,7 @@ function missCard(
 }
 
 function limStr(c: { limit?: number | null; isUnlimited?: boolean }): string | undefined {
-  if (c.isUnlimited) return 'Generally unlimited, subject to sublimits and specific carve-outs'
+  if (c.isUnlimited) return 'Coverage subject to sublimits and specific carve-outs'
   if (c.limit) return `${c.limit.toLocaleString('tr-TR')} TRY`
   return undefined
 }

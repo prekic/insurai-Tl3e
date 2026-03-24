@@ -39,19 +39,20 @@ import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import type { Coverage, CoverageCategory } from '@/types/policy'
 import {
   KASKO_COVERAGE_CATEGORIES,
-  detectCoverageCategory,
   shouldShowUnlimited,
   shouldShowIncluded,
-  groupCoverageSubLimits,
-  sortByImportance,
-  analyzeExclusionsComprehensive,
   type GroupedCoverage,
   type AnalyzedExclusion,
+  type ExclusionAnalysisResult,
 } from '@/lib/knowledge/kasko-knowledge'
 import { getShortCompanyName } from '@/lib/insurance-display'
 import { useI18n } from '@/lib/i18n'
 import { usePdfExport } from '@/hooks/usePdfExport'
-import { exportSinglePolicyToCSV, exportSinglePolicyToExcel } from '@/lib/export'
+import {
+  exportSinglePolicyToCSV,
+  exportSinglePolicyToExcel,
+  exportToText,
+} from '@/lib/export'
 import {
   evaluateAndRankPolicies,
   mapAnalyzedToActuarialInput,
@@ -61,6 +62,7 @@ import { PolicyActuarialHistoryChart } from './actuarial/PolicyActuarialHistoryC
 import { applySafeWording } from '@/lib/analysis/display-interpreter'
 import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
 import { useDisplaySafeSummary } from '@/hooks/useDisplaySafeSummary'
+import { buildPolicyReviewerSummary } from '@/lib/reviewer/policy-reviewer-summary'
 
 /**
  * Format coverage limit with display-safe wording governance.
@@ -256,78 +258,7 @@ function getLocalizedCoverageName(
   return coverage.nameTr || coverage.name
 }
 
-/**
- * Translate AI insight text using the i18n insight translations map.
- * Legacy fallback for policies extracted before aiInsightsTr was added.
- */
-function translateInsightLegacy(
-  insight: string,
-  locale: string,
-  insightTranslations: Record<string, string>
-): string {
-  if (locale === 'en') return insight
 
-  // Extract emoji prefix if present (✓ ⚠ 💡 ❌ etc.)
-  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌]\s*)/u)
-  const prefix = prefixMatch ? prefixMatch[1] : ''
-  const text = prefix ? insight.slice(prefix.length).trim() : insight
-
-  // Known exact translations from i18n system
-  if (insightTranslations[text] && insightTranslations[text] !== text) {
-    return prefix ? `${prefix}${insightTranslations[text]}` : insightTranslations[text]
-  }
-
-  // Pattern matches for dynamic content using i18n templates
-  if (text.startsWith('Missing common coverage:')) {
-    const name = text.replace('Missing common coverage:', '').trim()
-    const template = insightTranslations['missingCoverage'] || 'Missing common coverage: {name}'
-    const translated = template.replace('{name}', name)
-    return prefix ? `${prefix}${translated}` : translated
-  }
-
-  if (text.startsWith('Invalid TC Kimlik') || text.startsWith('Invalid VKN')) {
-    const value = text.split(':').slice(1).join(':').trim()
-    const template = insightTranslations['invalidTcKimlik'] || 'Invalid TC Kimlik / VKN: {value}'
-    const translated = template.replace('{value}', value)
-    return prefix ? `${prefix}${translated}` : translated
-  }
-
-  const yoyMatch = text.match(/^Market premiums increased (\d+)% YoY - lock in rates early$/)
-  if (yoyMatch) {
-    const template =
-      insightTranslations['marketPremiumsYoY'] ||
-      'Market premiums increased {percent}% YoY - lock in rates early'
-    const translated = template.replace('{percent}', yoyMatch[1])
-    return prefix ? `${prefix}${translated}` : translated
-  }
-
-  return insight
-}
-
-/**
- * Get the localized insight string for the given index.
- * Uses pre-translated aiInsightsTr when available (new extractions),
- * falls back to display-time translation for legacy policies.
- */
-function getLocalizedInsight(
-  policy: { aiInsights: string[]; aiInsightsTr?: string[]; aiInsightsEn?: string[] },
-  index: number,
-  locale: string,
-  insightTranslations: Record<string, string>
-): string {
-  if (locale === 'en') {
-    if (policy.aiInsightsEn && policy.aiInsightsEn[index]) {
-      return policy.aiInsightsEn[index]
-    }
-    return policy.aiInsights[index]
-  }
-  // Use pre-translated TR insights if available
-  if (policy.aiInsightsTr && policy.aiInsightsTr[index]) {
-    return policy.aiInsightsTr[index]
-  }
-  // Legacy fallback for policies without aiInsightsTr
-  return translateInsightLegacy(policy.aiInsights[index], locale, insightTranslations)
-}
 
 /**
  * Collapsible coverage category for mobile-friendly display
@@ -505,69 +436,16 @@ function CollapsibleCoverageCategory({
  * Groups and displays coverages in organized sections
  */
 function CoveragesByCategory({
-  coverages,
+  groupedCoverages,
   policyType,
   locale,
 }: {
-  coverages: Coverage[]
+  groupedCoverages: Record<string, GroupedCoverage[]>
   policyType: string
   locale: string
 }) {
   const { t } = useI18n()
   const { formatConverted: formatAmount } = useDisplayCurrency()
-  // Filter and prepare coverages
-  const filteredCoverages = coverages.filter((coverage) => {
-    // Always keep coverages with limits, unlimited flag, or market value flag
-    if (coverage.limit > 0) return true
-    if (coverage.isUnlimited) return true
-    if (coverage.isMarketValue) return true
-
-    // Keep service coverages
-    const nameLower = (coverage.name || '').toLowerCase()
-    if (shouldShowUnlimited(nameLower, 0) || shouldShowIncluded(nameLower, 0)) {
-      return true
-    }
-
-    // Filter out zero-limit entries that look like policy category headers
-    const categoryPatterns = [
-      'zorunlu mali sorumluluk',
-      'trafik sigortası',
-      'kasko sigortası',
-      'konut sigortası',
-    ]
-    return !categoryPatterns.some((pattern) => nameLower.includes(pattern))
-  })
-
-  // Group coverages by category, then apply sub-limit grouping
-  const groupedCoverages = useMemo(() => {
-    const groups: Record<string, Coverage[]> = {
-      main: [],
-      liability: [],
-      personal_accident: [],
-      supplementary: [],
-      assistance: [],
-      legal: [],
-      other: [],
-    }
-
-    for (const coverage of filteredCoverages) {
-      const category = coverage.category || detectCoverageCategory(coverage.name)
-      if (groups[category]) {
-        groups[category].push(coverage)
-      } else {
-        groups.other.push(coverage)
-      }
-    }
-
-    // Apply sub-limit grouping to each category, then sort by importance
-    const groupedWithSubLimits: Record<string, GroupedCoverage[]> = {}
-    for (const [category, coverages] of Object.entries(groups)) {
-      const grouped = groupCoverageSubLimits(coverages)
-      groupedWithSubLimits[category] = sortByImportance(grouped)
-    }
-
-    return groupedWithSubLimits
-  }, [filteredCoverages])
 
   // Category order for display
   const categoryOrder: CoverageCategory[] = [
@@ -634,18 +512,14 @@ function CoveragesByCategory({
  * Analyzes exclusions, provides explanations, and highlights items needing clarification
  */
 function ExclusionsSection({
-  exclusions,
-  exclusionsEn,
+  analysis,
   policyType: _policyType, // Reserved for future policy-type-specific logic
-  isCommercial = false,
   locale,
   evidenceData,
   quoteTranslations,
 }: {
-  exclusions: string[]
-  exclusionsEn?: string[] | null
+  analysis: ExclusionAnalysisResult
   policyType: string
-  isCommercial?: boolean
   locale: string
   evidenceData?: Record<string, string>
   quoteTranslations?: Record<string, string>
@@ -654,12 +528,6 @@ function ExclusionsSection({
 
   const { t } = useI18n()
   const { formatConverted: formatAmount } = useDisplayCurrency()
-
-  // Analyze exclusions comprehensively
-  const analysis = useMemo(
-    () => analyzeExclusionsComprehensive(exclusions, exclusionsEn || [], isCommercial),
-    [exclusions, exclusionsEn, isCommercial]
-  )
 
   const getSeverityStyles = (severity: AnalyzedExclusion['severity']) => {
     switch (severity) {
@@ -1053,6 +921,12 @@ export function PolicyDetailView() {
   const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
   const isPilotResult = displaySummary?.isPilotResult ?? false
 
+  // The canonical summary for all reviewer rendering paths in this view
+  const reviewerSummary = useMemo(() => {
+    if (!policy) return null
+    return buildPolicyReviewerSummary(policy, { locale })
+  }, [policy, locale])
+
   // Close export menu on outside click
   useEffect(() => {
     if (!exportMenuOpen) return
@@ -1118,111 +992,22 @@ export function PolicyDetailView() {
   }, [policy, locale, t.exportMenu.excelSuccess])
 
   const handleExportText = useCallback(() => {
-    if (!policy) return
+    if (!policy || !reviewerSummary) return
     setExportMenuOpen(false)
 
-    // Format a coverage item limit using the same canonical logic as the UI
-    // (formatCoverageLimit function at line 70). This ensures text export
-    // never diverges from the reviewer UI for market-value, included, or
-    // unlimited coverages.
-    const fmtCovLimit = (c: Coverage): string => {
-      return formatCoverageLimit(c, locale, t, formatConverted)
-    }
-
-    // Canonical insured: same fallback as UI (line 1461)
-    const insuredText = policy.insuredPerson
-      ? policy.insuredPerson
-      : policy.insuredMissing
-        ? locale === 'tr'
-          ? 'Belirtilmemiş'
-          : 'Not specified'
-        : '-'
-
-    // Canonical premium: same double-check as UI (lines 1422-1426)
-    const premiumText =
-      policy.premiumMissing || !policy.premium || policy.premium <= 0
-        ? t.policy.notSpecified
-        : formatConverted(policy.premium)
-
-    // Canonical deductible: two-layer display when conditional deductibles exist
-    const hasConditionalDeductibles =
-      policy.conditionalDeductibles && policy.conditionalDeductibles.length > 0
-    const deductibleText =
-      policy.deductibleUncertain || (policy.type === 'kasko' && policy.deductible === 0)
-        ? hasConditionalDeductibles
-          ? locale === 'tr'
-            ? 'Genel muafiyet yapısı net değil; koşullu muafiyetler tespit edildi'
-            : 'General deductible structure unclear; conditional deductibles detected'
-          : locale === 'tr'
-            ? 'Koşullu / inceleme gerekli'
-            : 'Conditional / requires review'
-        : policy.deductible > 0
-          ? formatConverted(policy.deductible)
-          : locale === 'tr'
-            ? 'Yok'
-            : 'None'
-
-    // Build section labels
-    const isTr = locale === 'tr'
-    const coverageLabel = isTr ? 'Teminat' : t.policy.coverageLabel
-    const deductibleLabel = isTr ? 'Muafiyet' : t.policy.deductibleLabel
-    const coveragesTitle = isTr ? 'Teminatlar' : t.policy.coveragesTitleExport
-    const exclusionsTitle = isTr ? 'İstisnalar' : t.policy.exclusionsTitleExport
-    const condDeductTitle = isTr
-      ? 'Koşullu Muafiyetler / Özel Şartlar'
-      : 'Conditional Deductibles / Special Conditions'
-    const insightsTitle = isTr ? 'AI Görüşleri' : t.policy.aiInsightsTitleExport
-
-    const sections = [
-      `${t.policy.policy}: ${policy.policyNumber}`,
-      `${t.policy.provider}: ${getShortCompanyName(policy.provider)}`,
-      `${t.policy.type}: ${policy.typeTr}`,
-      `${t.policy.insured}: ${insuredText}`,
-      `${coverageLabel}: ${policy.type === 'kasko' ? t.policy.vehicleMarketValue : formatConverted(policy.coverage)}`,
-      `${t.policy.premiumLabel} ${premiumText}`,
-      `${deductibleLabel}: ${deductibleText}`,
-      `${t.policy.period}: ${formatDate(policy.startDate, locale)} - ${formatDate(policy.expiryDate, locale)}`,
-      '',
-      `=== ${coveragesTitle} ===`,
-      ...policy.coverages.map(
-        (c) => `• ${getLocalizedCoverageName(c, locale, t.coverageNames)}: ${fmtCovLimit(c)}`
-      ),
-      '',
-      `=== ${exclusionsTitle} ===`,
-      ...policy.exclusions.map((e) => `• ${e}`),
-    ]
-
-    // Add conditional deductibles section if present
-    if (hasConditionalDeductibles) {
-      sections.push(
-        '',
-        `=== ${condDeductTitle} ===`,
-        ...policy.conditionalDeductibles!.map((d) => `• ${d}`)
-      )
-    }
-
-    sections.push(
-      '',
-      `=== ${insightsTitle} ===`,
-      ...policy.aiInsights.map(
-        (_, i) =>
-          `• ${applySafeWording(getLocalizedInsight(policy, i, locale, t.insightTranslations))}`
-      )
-    )
-
-    const summary = sections.join('\n')
+    const summary = exportToText(policy, locale)
 
     const blob = new Blob([summary], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${policy.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
+    link.download = `${reviewerSummary.policyNumber.replace(/[^a-zA-Z0-9]/g, '_')}_summary.txt`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success(t.exportMenu.textSuccess)
-  }, [policy, locale, t, formatConverted])
+  }, [reviewerSummary, locale, t])
 
   // Show loading state while fetching policy
   if (isLoadingPolicy) {
@@ -1697,16 +1482,9 @@ export function PolicyDetailView() {
                     // Track original indices so evidence lookup and TR/EN parallel arrays stay correct.
                     const seenLocalized = new Set<string>()
                     const dedupedEntries: { originalIndex: number; localizedText: string }[] = []
-                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
-                      const rawLocalized = getLocalizedInsight(
-                        policy,
-                        idx,
-                        locale,
-                        t.insightTranslations
-                      )
-                      const normalized = applySafeWording(
-                        rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
-                      )
+                    for (let idx = 0; idx < reviewerSummary!.insights.length; idx++) {
+                      const rawLocalized = reviewerSummary!.insights[idx]
+                      const normalized = rawLocalized.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
                         .toLowerCase()
                         .replace(/\s+/g, ' ')
                       if (!seenLocalized.has(normalized)) {
@@ -1715,12 +1493,10 @@ export function PolicyDetailView() {
                       }
                     }
                     const visible = insightsExpanded ? dedupedEntries : dedupedEntries.slice(0, 3)
-                    return visible.map(({ originalIndex, localizedText }, renderIdx) => {
-                      const displayText = applySafeWording(
-                        localizedText.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
-                      )
+                    return visible.map(({ originalIndex, localizedText }, i) => {
+                      const displayText = localizedText.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
 
-                      const originalInsight = policy.aiInsights[originalIndex]
+                      const originalInsight = reviewerSummary!.rawInsights[originalIndex]
                       const originalInsightKey = originalInsight.trim().toLowerCase()
                       const hasEvidence =
                         policy.evidenceData?.insights &&
@@ -1728,7 +1504,7 @@ export function PolicyDetailView() {
 
                       return (
                         <div
-                          key={renderIdx}
+                          key={i}
                           className="flex flex-col gap-1 p-2 sm:p-3 bg-white/60 rounded-lg text-xs sm:text-sm text-gray-700"
                         >
                           <div className="flex items-start gap-2">
@@ -1760,9 +1536,9 @@ export function PolicyDetailView() {
                     // Compute deduped count using localized text (same logic as render dedup)
                     const seenBtnL = new Set<string>()
                     let dedupedCount = 0
-                    for (let idx = 0; idx < policy.aiInsights.length; idx++) {
-                      const raw = getLocalizedInsight(policy, idx, locale, t.insightTranslations)
-                      const n = applySafeWording(raw.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim())
+                    for (let idx = 0; idx < reviewerSummary!.insights.length; idx++) {
+                      const raw = reviewerSummary!.insights[idx]
+                      const n = raw.replace(/^[✓✔☑⚠💡❌]\s*/gu, '').trim()
                         .toLowerCase()
                         .replace(/\s+/g, ' ')
                       if (!seenBtnL.has(n)) {
@@ -1923,7 +1699,7 @@ export function PolicyDetailView() {
                     <Shield className="text-blue-600" size={20} />
                     {t.policy.coverageDetails}
                     <Badge variant="outline" className="text-xs ml-1">
-                      {policy.coverages.length}
+                      {reviewerSummary!.coverages.length}
                     </Badge>
                   </CardTitle>
                   <ChevronDown
@@ -1935,8 +1711,8 @@ export function PolicyDetailView() {
               {coveragesExpanded && (
                 <CardContent>
                   <CoveragesByCategory
-                    coverages={policy.coverages}
-                    policyType={policy.type}
+                    groupedCoverages={reviewerSummary!.groupedCoverages}
+                    policyType={reviewerSummary!.type}
                     locale={locale}
                   />
                 </CardContent>
@@ -1959,7 +1735,7 @@ export function PolicyDetailView() {
                     <AlertTriangle className="text-amber-500" size={20} />
                     {t.policy.exclusionsAndQuestions}
                     <Badge variant="outline" className="text-xs ml-1">
-                      {policy.exclusions.length}
+                      {reviewerSummary!.exclusions.length}
                     </Badge>
                   </CardTitle>
                   <ChevronDown
@@ -1971,10 +1747,8 @@ export function PolicyDetailView() {
               {exclusionsExpanded ? (
                 <CardContent className="pt-0">
                   <ExclusionsSection
-                    exclusions={policy.exclusions}
-                    exclusionsEn={policy.exclusionsEn}
+                    analysis={reviewerSummary!.groupedExclusions}
                     policyType={policy.type}
-                    isCommercial={policy.vehicleInfo?.usage === 'Ticari'}
                     locale={locale}
                     evidenceData={policy.evidenceData?.exclusions}
                     quoteTranslations={policy.evidenceData?.quoteTranslations?.exclusions}
@@ -2130,8 +1904,8 @@ export function PolicyDetailView() {
                       {Math.round(policy.aiConfidence * 100)}%
                     </span>
                   </div>
-                  {policy.aiInsights.map((_insight, i) => {
-                    const originalInsight = policy.aiInsights[i]
+                  {reviewerSummary!.insights.map((insightText, i) => {
+                    const originalInsight = reviewerSummary!.rawInsights[i]
                     const originalInsightKey = originalInsight.trim().toLowerCase()
                     const hasEvidence =
                       policy.evidenceData?.insights &&
@@ -2139,9 +1913,7 @@ export function PolicyDetailView() {
                     return (
                       <div key={i} className="p-3 bg-white/60 rounded-lg text-sm text-gray-700">
                         <TruncatableText
-                          text={applySafeWording(
-                            getLocalizedInsight(policy, i, locale, t.insightTranslations)
-                          )}
+                          text={insightText}
                           maxLength={150}
                           showFullTextTranslation={t.policy.showFullText}
                           showLessTranslation={t.common.showLess}

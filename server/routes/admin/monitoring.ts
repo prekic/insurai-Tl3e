@@ -653,7 +653,7 @@ router.get(
       // Import and evaluate rollback triggers
       // Note: This is a shared module — we import it dynamically to avoid bundling client code in server
       const { getRollbackTriggerStatus } = await import(
-        '../../src/lib/analysis/kasko-pilot-gate.js' as string
+        '../../../src/lib/analysis/kasko-pilot-gate.js' as string
       )
       const rollbackStatus = getRollbackTriggerStatus(metricsRecords)
 

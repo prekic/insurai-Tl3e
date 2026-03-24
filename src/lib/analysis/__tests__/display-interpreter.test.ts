@@ -127,7 +127,7 @@ describe('generateDisplaySafeSummary', () => {
     expect(kaskoCov).toBeDefined()
     // Must NOT say "unlimited"
     expect(kaskoCov!.limit!.toLowerCase()).not.toContain('unlimited')
-    expect(kaskoCov!.limit).toContain('generally available')
+    expect(kaskoCov!.limit).toContain('subject to sublimits')
     expect(kaskoCov!.conditionMarkers).toContain('limit_conditional')
   })
 

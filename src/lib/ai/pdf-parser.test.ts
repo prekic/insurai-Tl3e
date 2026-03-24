@@ -295,7 +295,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'policy.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -318,7 +318,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'multi.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -344,7 +344,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'policy.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -365,7 +365,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -386,7 +386,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'no-metadata.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -402,7 +402,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
 
     expect(mockGetDocument).toHaveBeenCalledWith(expect.objectContaining({ useSystemFonts: true }))
@@ -427,7 +427,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'whitespace.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -459,7 +459,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'mixed-items.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -477,7 +477,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'turkish-policy.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -499,7 +499,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'multi.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -514,7 +514,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
 
     expect(doc.destroy).toHaveBeenCalledTimes(1)
@@ -530,7 +530,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     // Should still succeed despite destroy error
@@ -557,7 +557,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'partial.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -583,7 +583,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'empty.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -602,7 +602,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'scanned.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -628,7 +628,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -653,7 +653,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -671,7 +671,7 @@ describe('extractTextFromPDF', () => {
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     errorSpy.mockRestore()
 
@@ -688,7 +688,7 @@ describe('extractTextFromPDF', () => {
 
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     errorSpy.mockRestore()
 
@@ -703,7 +703,7 @@ describe('extractTextFromPDF', () => {
     const file = createMockFile({ name: 'empty.pdf', emptyBuffer: true })
 
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -763,7 +763,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'protected.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -778,7 +778,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'corrupt.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -793,7 +793,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'fake.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -807,7 +807,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -822,7 +822,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -837,7 +837,7 @@ describe('extractTextFromPDF', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -853,7 +853,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -868,7 +868,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'broken.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -886,7 +886,7 @@ describe('extractTextFromPDF', () => {
 
     const file = createMockFile({ name: 'error.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -916,7 +916,7 @@ describe('extractTextFromPDFWithRetry', () => {
 
     const file = createMockFile({ name: 'ok.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -933,7 +933,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'empty.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -950,7 +950,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'locked.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -967,7 +967,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'corrupt.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -995,7 +995,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'flaky.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -1020,7 +1020,7 @@ describe('extractTextFromPDFWithRetry', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDFWithRetry(file, 3)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     // Capture calls BEFORE restoring (mockRestore clears mock data)
     const capturedWarnCalls = [...warnSpy.mock.calls]
@@ -1328,12 +1328,12 @@ describe('PDF.js Lazy Loading', () => {
     const file2 = createMockFile({ name: 'test2.pdf' })
 
     const r1 = extractTextFromPDF(file1)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await r1
 
     setupMockDocument(doc)
     const r2 = extractTextFromPDF(file2)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await r2
 
     expect(mockGetDocument).toHaveBeenCalledTimes(2)
@@ -1370,7 +1370,7 @@ describe('isWorkerError classification (tested via extractTextFromPDF)', () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const file = createMockFile({ name: 'test.pdf' })
       const resultPromise = extractTextFromPDF(file)
-      await vi.runAllTimersAsync()
+      await vi.advanceTimersByTimeAsync(35000)
       const result = await resultPromise
       warnSpy.mockRestore()
 
@@ -1389,7 +1389,7 @@ describe('isWorkerError classification (tested via extractTextFromPDF)', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -1429,7 +1429,7 @@ describe('isTransientError classification (tested via extractTextFromPDF)', () =
 
       const file = createMockFile({ name: 'test.pdf' })
       const resultPromise = extractTextFromPDF(file)
-      await vi.runAllTimersAsync()
+      await vi.advanceTimersByTimeAsync(35000)
       const result = await resultPromise
 
       expect(result.success).toBe(false)
@@ -1547,7 +1547,7 @@ describe('createTimeout (tested via extractTextFromPDF timeout path)', () => {
 
     const file = createMockFile({ name: 'fast.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(true)
@@ -1573,7 +1573,7 @@ describe('error priority in extractTextFromPDF catch block', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -1589,7 +1589,7 @@ describe('error priority in extractTextFromPDF catch block', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -1603,7 +1603,7 @@ describe('error priority in extractTextFromPDF catch block', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -1617,7 +1617,7 @@ describe('error priority in extractTextFromPDF catch block', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     expect(result.success).toBe(false)
@@ -1646,7 +1646,7 @@ describe('Worker URL testing (testWorkerUrl)', () => {
     setupMockDocument(doc)
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     await resultPromise
     warnSpy.mockRestore()
 
@@ -1661,7 +1661,7 @@ describe('Worker URL testing (testWorkerUrl)', () => {
     setupMockDocument(doc)
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
     warnSpy.mockRestore()
 
@@ -1688,7 +1688,7 @@ describe('worker failure count behavior', () => {
 
     const file = createMockFile({ name: 'test.pdf' })
     const resultPromise = extractTextFromPDF(file)
-    await vi.runAllTimersAsync()
+    await vi.advanceTimersByTimeAsync(35000)
     const result = await resultPromise
 
     // workerFailureCount = Math.max(0, workerFailureCount - 1) was called
