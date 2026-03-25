@@ -868,24 +868,6 @@ router.post(
           .json({ success: false, error: 'AI returned invalid JSON', code: 'INVALID_JSON' })
       }
 
-      // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT ===
-      const serverConfidence = (parsedData as Record<string, unknown>)?.confidence as
-        | Record<string, unknown>
-        | undefined
-      log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
-        requestId,
-        provider: 'openai',
-        hasConfidence: !!serverConfidence,
-        confidenceObject: serverConfidence
-          ? JSON.stringify(serverConfidence)
-          : 'NOT_RETURNED_BY_AI',
-        allFieldsPresent: serverConfidence
-          ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
-              (k) => k in serverConfidence
-            )
-          : false,
-      })
-
       log.info('Extraction successful', {
         requestId,
         inputTokens,
@@ -1567,24 +1549,6 @@ router.post(
 
           markPhase('anthropic_ms', anthropicStart)
 
-          // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT (Anthropic) ===
-          const serverConfidenceAnt = (parsedData as Record<string, unknown>)?.confidence as
-            | Record<string, unknown>
-            | undefined
-          log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
-            requestId,
-            provider: 'anthropic',
-            hasConfidence: !!serverConfidenceAnt,
-            confidenceObject: serverConfidenceAnt
-              ? JSON.stringify(serverConfidenceAnt)
-              : 'NOT_RETURNED_BY_AI',
-            allFieldsPresent: serverConfidenceAnt
-              ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
-                  (k) => k in serverConfidenceAnt
-                )
-              : false,
-          })
-
           log.info('Anthropic extraction successful', {
             requestId,
             anthropicMs: Date.now() - anthropicStart,
@@ -1915,25 +1879,6 @@ router.post(
         }
 
         markPhase('openai_ms', openaiStart)
-
-        // === SERVER-SIDE CONFIDENCE DIAGNOSTIC CHECKPOINT (OpenAI fallback/unified) ===
-        const serverConfidenceOAI = (parsedOpenAIData as Record<string, unknown>)?.confidence as
-          | Record<string, unknown>
-          | undefined
-        log.info('[ConfidenceDiag] Server-side AI raw confidence output', {
-          requestId,
-          provider: 'openai',
-          path: 'unified_endpoint',
-          hasConfidence: !!serverConfidenceOAI,
-          confidenceObject: serverConfidenceOAI
-            ? JSON.stringify(serverConfidenceOAI)
-            : 'NOT_RETURNED_BY_AI',
-          allFieldsPresent: serverConfidenceOAI
-            ? ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'].every(
-                (k) => k in serverConfidenceOAI
-              )
-            : false,
-        })
 
         const isFallback = !!anthropicClient
         const storedFallbackReason = (req as Request & { _fallbackReason?: string })._fallbackReason

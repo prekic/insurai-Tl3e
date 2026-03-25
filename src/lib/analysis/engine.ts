@@ -37,26 +37,58 @@ export function generateAnalysisBundle(
 ): AnalysisBundle {
   const generatedAt = new Date().toISOString()
 
-  // 0. Branch-specific post-extraction normalization (Phase 6B)
-  // Classifies coverages, extracts structured markers, tags branch-specific fields
-  normalizeBranchExtraction(data)
+  // Defensive: ensure inputs are usable
+  if (!data) {
+    return {
+      policyId: policyId || 'unknown',
+      validatorResult: validation || { isValid: false, flags: [] },
+      scoreBundle: { overall: 0, components: {} },
+      insightBundle: { strengths: [], warnings: [], recommendations: [] },
+      benchmarkBundle: { comparisons: [], hasBenchmarkData: false },
+      analysisVersion: ANALYSIS_MODEL_VERSION,
+      generatedAt,
+    } as unknown as AnalysisBundle
+  }
 
-  // 1. Benchmarks first (Workstream C) — needed by scoring to gate competitivenessScore
-  const benchmarkBundle = generateBenchmarkBundle(data)
+  try {
+    // 0. Branch-specific post-extraction normalization (Phase 6B)
+    normalizeBranchExtraction(data)
 
-  // 2. Scoring (Workstream A) — receives benchmark bundle for competitiveness gating
-  const scoreBundle = generateScoreBundle(data, validation, benchmarkBundle)
+    // 1. Benchmarks first (Workstream C) — needed by scoring to gate competitivenessScore
+    const benchmarkBundle = generateBenchmarkBundle(data)
 
-  // 3. Insights (Workstream B & suppression rules)
-  const insightBundle = generateInsightBundle(data)
+    // 2. Scoring (Workstream A) — receives benchmark bundle for competitiveness gating
+    const scoreBundle = generateScoreBundle(data, validation, benchmarkBundle)
 
-  return {
-    policyId,
-    validatorResult: validation,
-    scoreBundle,
-    insightBundle,
-    benchmarkBundle,
-    analysisVersion: ANALYSIS_MODEL_VERSION,
-    generatedAt,
+    // 3. Insights (Workstream B & suppression rules)
+    const insightBundle = generateInsightBundle(data)
+
+    return {
+      policyId,
+      validatorResult: validation,
+      scoreBundle,
+      insightBundle,
+      benchmarkBundle,
+      analysisVersion: ANALYSIS_MODEL_VERSION,
+      generatedAt,
+    }
+  } catch (err) {
+    console.warn(
+      '[AnalysisEngine] Pipeline failed, returning safe defaults:',
+      err instanceof Error ? err.message : String(err)
+    )
+    return {
+      policyId: policyId || 'unknown',
+      validatorResult: validation || { isValid: false, flags: [] },
+      scoreBundle: { overall: 0, components: {} },
+      insightBundle: {
+        strengths: [],
+        warnings: ['Analysis pipeline encountered an error'],
+        recommendations: [],
+      },
+      benchmarkBundle: { comparisons: [], hasBenchmarkData: false },
+      analysisVersion: ANALYSIS_MODEL_VERSION,
+      generatedAt,
+    } as unknown as AnalysisBundle
   }
 }

@@ -24,6 +24,11 @@ function isOnCooldown(alertKey: string, cooldownMs: number): boolean {
 }
 
 function markAlertFired(alertKey: string): void {
+  // Cap map at 50 entries to prevent unbounded growth
+  if (lastAlertFired.size >= 50) {
+    const oldestKey = [...lastAlertFired.entries()].sort(([, a], [, b]) => a - b)[0]?.[0]
+    if (oldestKey) lastAlertFired.delete(oldestKey)
+  }
   lastAlertFired.set(alertKey, Date.now())
 }
 

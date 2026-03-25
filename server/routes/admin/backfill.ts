@@ -50,6 +50,16 @@ const router = Router()
 const log = logger.child('backfill')
 
 // ---------------------------------------------------------------------------
+// Validation
+// ---------------------------------------------------------------------------
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isValidUUID(value: string): boolean {
+  return UUID_REGEX.test(value)
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -417,6 +427,19 @@ router.post(
       const limit = parseLimit(body.limit ?? req.query.limit)
       const offset = parseOffset(body.offset ?? req.query.offset)
       const filterIds: string[] | undefined = Array.isArray(body.ids) ? body.ids : undefined
+      if (filterIds) {
+        const invalidIds = filterIds.filter(
+          (id: unknown) => typeof id !== 'string' || !isValidUUID(id)
+        )
+        if (invalidIds.length > 0) {
+          return res
+            .status(400)
+            .json({
+              success: false,
+              error: `Invalid UUID(s) in ids array: ${invalidIds.join(', ')}`,
+            })
+        }
+      }
 
       const { client: supabase } = getSupabaseWithError()
       if (!supabase) {
@@ -579,6 +602,12 @@ router.get(
         .filter(Boolean)
       if (ids.length === 0 || ids.length > 50) {
         return res.status(400).json({ success: false, error: 'Provide 1-50 comma-separated IDs' })
+      }
+      const invalidIds = ids.filter((id) => !isValidUUID(id))
+      if (invalidIds.length > 0) {
+        return res
+          .status(400)
+          .json({ success: false, error: `Invalid UUID(s): ${invalidIds.join(', ')}` })
       }
 
       const { client: supabase } = getSupabaseWithError()

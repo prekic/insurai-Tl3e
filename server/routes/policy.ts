@@ -9,12 +9,19 @@ const log = logger.child('Policy')
 
 const router = Router()
 
-// Configure multer for PDF uploads (memory storage, 50MB limit)
+// Configure multer for PDF uploads (memory storage, 15MB limit — client validates at 10MB, server allows 50% headroom)
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB max
+    fileSize: 15 * 1024 * 1024, // 15MB max (client cap is 10MB)
     files: 1,
+  },
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype !== 'application/pdf') {
+      cb(new Error('Only PDF files are allowed'))
+      return
+    }
+    cb(null, true)
   },
 })
 
@@ -41,10 +48,21 @@ router.post(
         return
       }
 
-      const extractionResult =
-        typeof extractionResultRaw === 'string'
-          ? JSON.parse(extractionResultRaw)
-          : extractionResultRaw
+      let extractionResult: unknown
+      try {
+        extractionResult =
+          typeof extractionResultRaw === 'string'
+            ? JSON.parse(extractionResultRaw)
+            : extractionResultRaw
+      } catch {
+        res.status(400).json({ success: false, error: 'Invalid JSON in extractionResult' })
+        return
+      }
+
+      if (!extractionResult || typeof extractionResult !== 'object') {
+        res.status(400).json({ success: false, error: 'extractionResult must be a JSON object' })
+        return
+      }
 
       const { client: supabase, error: supabaseError } = getSupabaseWithError()
       if (!supabase) {

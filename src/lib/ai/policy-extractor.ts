@@ -197,10 +197,6 @@ function recalculateOverallConfidence(
   weights = DEFAULT_CONFIDENCE_WEIGHTS
 ): number {
   if (!confidence) {
-    console.warn(
-      '[ConfidenceDiag] recalculateOverallConfidence: confidence object is null/undefined — returning fallback:',
-      fallback
-    )
     return fallback
   }
 
@@ -212,17 +208,6 @@ function recalculateOverallConfidence(
 
   // If any per-field scores are missing, use the AI-reported overall
   if (pn == null || pr == null || dt == null || pm == null || cv == null) {
-    const missing = [
-      pn == null ? 'policyNumber' : null,
-      pr == null ? 'provider' : null,
-      dt == null ? 'dates' : null,
-      pm == null ? 'premium' : null,
-      cv == null ? 'coverages' : null,
-    ].filter(Boolean)
-    console.warn(
-      `[ConfidenceDiag] recalculateOverallConfidence: Missing per-field scores [${missing.join(', ')}] — using AI-reported overall as fallback:`,
-      fallback
-    )
     return fallback
   }
 
@@ -232,17 +217,6 @@ function recalculateOverallConfidence(
     dt * weights.dates +
     pm * weights.premium +
     cv * weights.coverages
-
-  console.warn('[ConfidenceDiag] recalculateOverallConfidence breakdown:', {
-    fields: { policyNumber: pn, provider: pr, dates: dt, premium: pm, coverages: cv },
-    weights,
-    calculated: Math.round(calculated * 1000) / 1000,
-    aiReportedOverall: confidence.overall,
-    delta:
-      confidence.overall != null
-        ? Math.round((calculated - confidence.overall) * 1000) / 1000
-        : 'N/A',
-  })
 
   return calculated
 }
@@ -669,18 +643,6 @@ export async function extractPolicyFromDocument(
       if (processingResult.success) {
         processedText = processingResult.processedText
         cleanRoomResult = processingResult.cleanRoomOutput
-
-        // Debug info - text processing stats
-        if (import.meta.env.DEV) {
-          const validation = cleanRoomResult?.validationReport
-          console.warn(
-            `[DEBUG] Clean-room processing: ` +
-              `${processingResult.cleanupStats.totalCharactersRemoved} chars normalized, ` +
-              `${cleanRoomResult?.piiVault?.length || 0} PII items detected, ` +
-              `${validation?.issues?.length || 0} validation issues, ` +
-              `${Math.round(processingResult.confidence * 100)}% confidence`
-          )
-        }
       }
     } catch (error) {
       // Clean-room processing failed, fall back to legacy
@@ -700,18 +662,6 @@ export async function extractPolicyFromDocument(
 
       if (processingResult.success) {
         processedText = processingResult.processedText
-        // Debug info - text processing stats
-        if (import.meta.env.DEV) {
-          const stats = processingResult.cleanupStats
-          console.warn(
-            `[DEBUG] Text processing: ${processingResult.corrections.length} corrections, ` +
-              `${stats.garbageBlocksRemoved} garbage blocks removed, ` +
-              `${stats.spacedCharsFixed} spaced chars fixed, ` +
-              `${stats.urlsCleaned} URLs cleaned, ` +
-              `${stats.totalCharactersRemoved} chars removed, ` +
-              `${Math.round(processingResult.confidence * 100)}% confidence`
-          )
-        }
       }
     } catch (error) {
       // Text processing is optional, continue with raw text
@@ -849,7 +799,6 @@ export async function extractPolicyFromDocument(
     // Weights are loaded from DB config; falls back to hardcoded defaults.
     const rawOverall = extractedData.confidence?.overall ?? 0.7
     let confidenceWeights = DEFAULT_CONFIDENCE_WEIGHTS
-    let weightsSource = 'hardcoded_defaults'
     try {
       const aiCfg = await getAIConfig()
       confidenceWeights = {
@@ -859,36 +808,8 @@ export async function extractPolicyFromDocument(
         premium: aiCfg.confidenceWeightPremium,
         coverages: aiCfg.confidenceWeightCoverages,
       }
-      weightsSource = 'admin_db_config'
     } catch {
       // DB unavailable — use hardcoded defaults
-      weightsSource = 'hardcoded_defaults (DB unavailable)'
-    }
-
-    // === CONFIDENCE DIAGNOSTIC CHECKPOINT ===
-    console.warn('[ConfidenceDiag] ====== CONFIDENCE PIPELINE CHECKPOINT ======')
-    console.warn('[ConfidenceDiag] Provider used:', provider)
-    console.warn(
-      '[ConfidenceDiag] Extraction mode:',
-      isProxyConfigured() ? 'proxy' : useMultiProvider ? 'consensus' : 'direct'
-    )
-    console.warn('[ConfidenceDiag] Weights source:', weightsSource)
-    console.warn(
-      '[ConfidenceDiag] AI-returned confidence object:',
-      JSON.stringify(extractedData.confidence)
-    )
-    console.warn('[ConfidenceDiag] AI-reported overall (or default 0.7 if missing):', rawOverall)
-    const allFieldsDefault =
-      extractedData.confidence &&
-      extractedData.confidence.policyNumber === 0.7 &&
-      extractedData.confidence.provider === 0.7 &&
-      extractedData.confidence.dates === 0.7 &&
-      extractedData.confidence.premium === 0.7 &&
-      extractedData.confidence.coverages === 0.7
-    if (allFieldsDefault) {
-      console.warn(
-        '[ConfidenceDiag] ⚠️ WARNING: All per-field scores are exactly 0.7 — this likely means the AI did NOT return real confidence scores and the adapter defaulted them'
-      )
     }
 
     const confidenceOverall = recalculateOverallConfidence(
@@ -899,25 +820,6 @@ export async function extractPolicyFromDocument(
     if (extractedData.confidence) {
       extractedData.confidence.overall = confidenceOverall
     }
-    console.warn(
-      '[ConfidenceDiag] Final recalculated overall:',
-      Math.round(confidenceOverall * 100) + '%',
-      '| AI reported:',
-      Math.round(rawOverall * 100) + '%',
-      '| Tier:',
-      confidenceOverall >= AI_CONFIG.warningConfidence
-        ? 'FULL_CONFIDENCE'
-        : confidenceOverall >= AI_CONFIG.minConfidence
-          ? 'LOW_CONFIDENCE_WARNING'
-          : 'HARD_REJECT'
-    )
-    console.warn(
-      '[ConfidenceDiag] Thresholds: minConfidence=' +
-        AI_CONFIG.minConfidence +
-        ', warningConfidence=' +
-        AI_CONFIG.warningConfidence
-    )
-    console.warn('[ConfidenceDiag] ============================================')
     logger?.setExtractionConfidence(confidenceOverall * 100)
     logger?.completeStage({
       output: {

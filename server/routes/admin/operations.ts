@@ -61,7 +61,9 @@ router.get('/health', async (_req: Request, res: Response) => {
           name: 'Google Vision',
           status: process.env.GOOGLE_CLOUD_API_KEY ? 'healthy' : 'degraded',
           lastChecked: new Date().toISOString(),
-          details: process.env.GOOGLE_CLOUD_API_KEY ? 'API key configured' : 'API key not configured',
+          details: process.env.GOOGLE_CLOUD_API_KEY
+            ? 'API key configured'
+            : 'API key not configured',
         },
       ],
     }
@@ -80,11 +82,12 @@ router.get('/metrics', authenticateAdmin, async (_req: AuthenticatedRequest, res
     const usedMemory = totalMemory - freeMemory
 
     // Calculate CPU usage
-    const cpuUsage = cpus.reduce((acc, cpu) => {
-      const total = Object.values(cpu.times).reduce((a, b) => a + b, 0)
-      const idle = cpu.times.idle
-      return acc + ((total - idle) / total) * 100
-    }, 0) / cpus.length
+    const cpuUsage =
+      cpus.reduce((acc, cpu) => {
+        const total = Object.values(cpu.times).reduce((a, b) => a + b, 0)
+        const idle = cpu.times.idle
+        return acc + ((total - idle) / total) * 100
+      }, 0) / cpus.length
 
     const memInfo = process.memoryUsage()
 
@@ -186,21 +189,27 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
       requests = requests.filter((r) => r.timestamp <= (endDate as string))
     }
 
-    const byProvider: Record<string, {
-      requests: number
-      tokens: { input: number; output: number; total: number }
-      cost: number
-      errors: number
-      totalResponseTime: number
-    }> = {}
+    const byProvider: Record<
+      string,
+      {
+        requests: number
+        tokens: { input: number; output: number; total: number }
+        cost: number
+        errors: number
+        totalResponseTime: number
+      }
+    > = {}
 
-    const byOperation: Record<string, {
-      requests: number
-      successes: number
-      totalResponseTime: number
-      totalTokens: number
-      totalCost: number
-    }> = {}
+    const byOperation: Record<
+      string,
+      {
+        requests: number
+        successes: number
+        totalResponseTime: number
+        totalTokens: number
+        totalCost: number
+      }
+    > = {}
 
     for (const request of requests) {
       // By provider
@@ -261,9 +270,7 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
             requests: stats.requests,
             tokens: stats.tokens,
             cost: stats.cost,
-            averageResponseTime: stats.requests > 0
-              ? stats.totalResponseTime / stats.requests
-              : 0,
+            averageResponseTime: stats.requests > 0 ? stats.totalResponseTime / stats.requests : 0,
             errorCount: stats.errors,
             errorRate: stats.requests > 0 ? stats.errors / stats.requests : 0,
           },
@@ -274,15 +281,9 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
           operation,
           {
             requests: stats.requests,
-            successRate: stats.requests > 0
-              ? stats.successes / stats.requests
-              : 0,
-            averageResponseTime: stats.requests > 0
-              ? stats.totalResponseTime / stats.requests
-              : 0,
-            averageTokens: stats.requests > 0
-              ? stats.totalTokens / stats.requests
-              : 0,
+            successRate: stats.requests > 0 ? stats.successes / stats.requests : 0,
+            averageResponseTime: stats.requests > 0 ? stats.totalResponseTime / stats.requests : 0,
+            averageTokens: stats.requests > 0 ? stats.totalTokens / stats.requests : 0,
             totalCost: stats.totalCost,
           },
         ])
@@ -299,36 +300,40 @@ router.get('/ai/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Resp
 // POLICY OPERATIONS
 // ============================================================================
 
-router.get('/policies/operations', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { type, userId, status, startDate, endDate, limit = 100 } = req.query
+router.get(
+  '/policies/operations',
+  authenticateAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { type, userId, status, startDate, endDate, limit = 100 } = req.query
 
-    let results = [...policyOperations]
+      let results = [...policyOperations]
 
-    if (type) {
-      results = results.filter((o) => o.type === type)
-    }
-    if (userId) {
-      results = results.filter((o) => o.userId === userId)
-    }
-    if (status) {
-      results = results.filter((o) => o.status === status)
-    }
-    if (startDate) {
-      results = results.filter((o) => o.timestamp >= (startDate as string))
-    }
-    if (endDate) {
-      results = results.filter((o) => o.timestamp <= (endDate as string))
-    }
+      if (type) {
+        results = results.filter((o) => o.type === type)
+      }
+      if (userId) {
+        results = results.filter((o) => o.userId === userId)
+      }
+      if (status) {
+        results = results.filter((o) => o.status === status)
+      }
+      if (startDate) {
+        results = results.filter((o) => o.timestamp >= (startDate as string))
+      }
+      if (endDate) {
+        results = results.filter((o) => o.timestamp <= (endDate as string))
+      }
 
-    results.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-    results = results.slice(0, Number(limit))
+      results.sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      results = results.slice(0, Number(limit))
 
-    res.json({ success: true, data: results, total: policyOperations.length })
-  } catch (_error) {
-    res.status(500).json({ success: false, error: 'Failed to get policy operations' })
+      res.json({ success: true, data: results, total: policyOperations.length })
+    } catch (_error) {
+      res.status(500).json({ success: false, error: 'Failed to get policy operations' })
+    }
   }
-})
+)
 
 router.get('/policies/stats', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -415,42 +420,74 @@ router.get('/security/logs', authenticateAdmin, (req: AuthenticatedRequest, res:
   }
 })
 
-router.post('/security/logs/:id/resolve', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const log = securityLogs.find((l) => l.id === req.params.id)
+router.post(
+  '/security/logs/:id/resolve',
+  authenticateAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const log = securityLogs.find((l) => l.id === req.params.id)
 
-  if (!log) {
-    res.status(404).json({ success: false, error: 'Log not found' })
-    return
+    if (!log) {
+      res.status(404).json({ success: false, error: 'Log not found' })
+      return
+    }
+
+    log.resolved = true
+
+    res.json({ success: true, data: log })
   }
-
-  log.resolved = true
-
-  res.json({ success: true, data: log })
-})
+)
 
 // ============================================================================
 // RATE LIMITING
 // ============================================================================
 
-router.get('/security/rate-limits', authenticateAdmin, (_req: AuthenticatedRequest, res: Response) => {
-  const rateLimits = {
-    endpoints: [
-      { endpoint: '/api/ai/chat', windowMs: 3600000, maxRequests: 60, currentUsage: 0, blockedRequests: 0 },
-      { endpoint: '/api/ai/extract/*', windowMs: 3600000, maxRequests: 20, currentUsage: 0, blockedRequests: 0 },
-      { endpoint: '/api/ai/ocr', windowMs: 3600000, maxRequests: 30, currentUsage: 0, blockedRequests: 0 },
-      { endpoint: '/api/health', windowMs: 60000, maxRequests: 60, currentUsage: 0, blockedRequests: 0 },
-    ],
-    blockedIPs: Array.from(blockedIPs.entries()).map(([ip, data]) => ({
-      ip,
-      ...data,
-      requestCount: 0,
-      isManual: false,
-    })),
-    recentViolations: [],
-  }
+router.get(
+  '/security/rate-limits',
+  authenticateAdmin,
+  (_req: AuthenticatedRequest, res: Response) => {
+    const rateLimits = {
+      endpoints: [
+        {
+          endpoint: '/api/ai/chat',
+          windowMs: 3600000,
+          maxRequests: 60,
+          currentUsage: 0,
+          blockedRequests: 0,
+        },
+        {
+          endpoint: '/api/ai/extract/*',
+          windowMs: 3600000,
+          maxRequests: 20,
+          currentUsage: 0,
+          blockedRequests: 0,
+        },
+        {
+          endpoint: '/api/ai/ocr',
+          windowMs: 3600000,
+          maxRequests: 30,
+          currentUsage: 0,
+          blockedRequests: 0,
+        },
+        {
+          endpoint: '/api/health',
+          windowMs: 60000,
+          maxRequests: 60,
+          currentUsage: 0,
+          blockedRequests: 0,
+        },
+      ],
+      blockedIPs: Array.from(blockedIPs.entries()).map(([ip, data]) => ({
+        ip,
+        ...data,
+        requestCount: 0,
+        isManual: false,
+      })),
+      recentViolations: [],
+    }
 
-  res.json({ success: true, data: rateLimits })
-})
+    res.json({ success: true, data: rateLimits })
+  }
+)
 
 router.post('/security/block-ip', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { ip, reason, expiresIn } = req.body
@@ -460,25 +497,57 @@ router.post('/security/block-ip', authenticateAdmin, (req: AuthenticatedRequest,
     return
   }
 
+  // Validate IP format (IPv4 or IPv6)
+  const ipv4Regex = /^(\d{1,3}\.){3}\d{1,3}$/
+  const ipv6Regex = /^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/
+  if (!ipv4Regex.test(ip) && !ipv6Regex.test(ip)) {
+    res.status(400).json({ success: false, error: 'Invalid IP address format' })
+    return
+  }
+
+  // Validate expiresIn if provided (must be positive number, max 30 days)
+  const MAX_BLOCK_DURATION_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+  let expiresAt: string | undefined
+  if (expiresIn !== undefined) {
+    const expMs = Number(expiresIn)
+    if (isNaN(expMs) || expMs <= 0 || expMs > MAX_BLOCK_DURATION_MS) {
+      res
+        .status(400)
+        .json({ success: false, error: 'expiresIn must be a positive number (ms), max 30 days' })
+      return
+    }
+    expiresAt = new Date(Date.now() + expMs).toISOString()
+  }
+
+  // Cap blockedIPs to prevent unbounded growth
+  if (blockedIPs.size >= 10000) {
+    const firstKey = blockedIPs.keys().next().value
+    if (firstKey) blockedIPs.delete(firstKey)
+  }
+
   blockedIPs.set(ip, {
-    reason,
+    reason: String(reason).slice(0, 500),
     blockedAt: new Date().toISOString(),
-    expiresAt: expiresIn ? new Date(Date.now() + expiresIn).toISOString() : undefined,
+    expiresAt,
   })
 
   res.json({ success: true, message: `IP ${ip} blocked` })
 })
 
-router.delete('/security/block-ip/:ip', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
-  const ip = qstr(req.params.ip)
+router.delete(
+  '/security/block-ip/:ip',
+  authenticateAdmin,
+  (req: AuthenticatedRequest, res: Response) => {
+    const ip = qstr(req.params.ip)
 
-  if (blockedIPs.has(ip)) {
-    blockedIPs.delete(ip)
-    res.json({ success: true, message: `IP ${ip} unblocked` })
-  } else {
-    res.status(404).json({ success: false, error: 'IP not found in blocklist' })
+    if (blockedIPs.has(ip)) {
+      blockedIPs.delete(ip)
+      res.json({ success: true, message: `IP ${ip} unblocked` })
+    } else {
+      res.status(404).json({ success: false, error: 'IP not found in blocklist' })
+    }
   }
-})
+)
 
 // ============================================================================
 // AUDIT LOGS
@@ -525,14 +594,30 @@ router.get('/audit/logs', authenticateAdmin, (req: AuthenticatedRequest, res: Re
 const appConfigs = new Map<string, { value: unknown; type: string; description: string }>()
 
 // Initialize default configs
-appConfigs.set('ai.default_provider', { value: 'openai', type: 'string', description: 'Default AI provider' })
+appConfigs.set('ai.default_provider', {
+  value: 'openai',
+  type: 'string',
+  description: 'Default AI provider',
+})
 appConfigs.set('ai.chat_model', { value: 'gpt-4o-mini', type: 'string', description: 'Chat model' })
-appConfigs.set('ai.extraction_model', { value: 'gpt-4o', type: 'string', description: 'Extraction model' })
+appConfigs.set('ai.extraction_model', {
+  value: 'gpt-4o',
+  type: 'string',
+  description: 'Extraction model',
+})
 appConfigs.set('ai.temperature', { value: 0.3, type: 'number', description: 'AI temperature' })
 appConfigs.set('features.enable_chat', { value: true, type: 'boolean', description: 'Enable chat' })
 appConfigs.set('features.enable_ocr', { value: true, type: 'boolean', description: 'Enable OCR' })
-appConfigs.set('features.enable_gap_analysis', { value: true, type: 'boolean', description: 'Enable gap analysis' })
-appConfigs.set('system.maintenance_mode', { value: false, type: 'boolean', description: 'Maintenance mode' })
+appConfigs.set('features.enable_gap_analysis', {
+  value: true,
+  type: 'boolean',
+  description: 'Enable gap analysis',
+})
+appConfigs.set('system.maintenance_mode', {
+  value: false,
+  type: 'boolean',
+  description: 'Maintenance mode',
+})
 
 router.get('/config', authenticateAdmin, (req: AuthenticatedRequest, res: Response) => {
   const { category } = req.query
@@ -563,49 +648,58 @@ router.get('/config', authenticateAdmin, (req: AuthenticatedRequest, res: Respon
   res.json({ success: true, data: configs })
 })
 
-router.put('/config/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const id = qstr(req.params.id)
-  const { value } = req.body
+router.put(
+  '/config/:id',
+  authenticateAdmin,
+  requireRole('admin', 'super_admin'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const id = qstr(req.params.id)
+    const { value } = req.body
 
-  const config = appConfigs.get(id)
-  if (!config) {
-    res.status(404).json({ success: false, error: 'Config not found' })
-    return
+    const config = appConfigs.get(id)
+    if (!config) {
+      res.status(404).json({ success: false, error: 'Config not found' })
+      return
+    }
+
+    const oldValue = config.value
+    config.value = value
+    appConfigs.set(id, config)
+
+    // Log audit with proper admin info
+    auditLogs.push({
+      id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
+      timestamp: new Date().toISOString(),
+      actorId: req.adminUser?.id || 'unknown',
+      actorEmail: req.adminUser?.email || 'unknown',
+      action: 'update',
+      resourceType: 'config',
+      resourceId: id,
+      changes: [{ field: 'value', oldValue, newValue: value }],
+      ipAddress: getClientIp(req),
+    })
+    if (auditLogs.length > MAX_ENTRIES) auditLogs.shift()
+
+    // Also log to database
+    logAdminAction(req, 'update', 'config', id, { value: oldValue }, { value })
+
+    res.json({ success: true, data: { id, ...config } })
   }
-
-  const oldValue = config.value
-  config.value = value
-  appConfigs.set(id, config)
-
-  // Log audit with proper admin info
-  auditLogs.push({
-    id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
-    timestamp: new Date().toISOString(),
-    actorId: req.adminUser?.id || 'unknown',
-    actorEmail: req.adminUser?.email || 'unknown',
-    action: 'update',
-    resourceType: 'config',
-    resourceId: id,
-    changes: [{ field: 'value', oldValue, newValue: value }],
-    ipAddress: getClientIp(req),
-  })
-
-  // Also log to database
-  logAdminAction(req, 'update', 'config', id, { value: oldValue }, { value })
-
-  res.json({ success: true, data: { id, ...config } })
-})
+)
 
 // ============================================================================
 // FEATURE FLAGS
 // ============================================================================
 
-const featureFlags = new Map<string, {
-  name: string
-  description: string
-  enabled: boolean
-  enabledPercentage?: number
-}>()
+const featureFlags = new Map<
+  string,
+  {
+    name: string
+    description: string
+    enabled: boolean
+    enabledPercentage?: number
+  }
+>()
 
 // Initialize defaults
 featureFlags.set('new_extraction_pipeline', {
@@ -637,65 +731,82 @@ router.get('/feature-flags', authenticateAdmin, (_req: AuthenticatedRequest, res
   res.json({ success: true, data: flags })
 })
 
-router.put('/feature-flags/:id', authenticateAdmin, requireRole('admin', 'super_admin'), (req: AuthenticatedRequest, res: Response) => {
-  const id = qstr(req.params.id)
-  const updates = req.body
+router.put(
+  '/feature-flags/:id',
+  authenticateAdmin,
+  requireRole('admin', 'super_admin'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const id = qstr(req.params.id)
+    const updates = req.body
 
-  const flag = featureFlags.get(id)
-  if (!flag) {
-    res.status(404).json({ success: false, error: 'Feature flag not found' })
-    return
+    const flag = featureFlags.get(id)
+    if (!flag) {
+      res.status(404).json({ success: false, error: 'Feature flag not found' })
+      return
+    }
+
+    const previousState = { ...flag }
+    // Only allow known fields to prevent mass assignment
+    if (updates.name !== undefined) flag.name = String(updates.name)
+    if (updates.description !== undefined) flag.description = String(updates.description)
+    if (updates.enabled !== undefined) flag.enabled = Boolean(updates.enabled)
+    if (updates.enabledPercentage !== undefined)
+      flag.enabledPercentage = Number(updates.enabledPercentage)
+    featureFlags.set(id, flag)
+
+    const action =
+      updates.enabled !== undefined ? (updates.enabled ? 'enable' : 'disable') : 'update'
+
+    auditLogs.push({
+      id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
+      timestamp: new Date().toISOString(),
+      actorId: req.adminUser?.id || 'unknown',
+      actorEmail: req.adminUser?.email || 'unknown',
+      action,
+      resourceType: 'feature_flag',
+      resourceId: id,
+      ipAddress: getClientIp(req),
+    })
+    if (auditLogs.length > MAX_ENTRIES) auditLogs.shift()
+
+    // Log to database
+    logAdminAction(req, action, 'feature_flag', id, previousState, flag)
+
+    res.json({ success: true, data: { id, ...flag } })
   }
-
-  const previousState = { ...flag }
-  Object.assign(flag, updates)
-  featureFlags.set(id, flag)
-
-  const action = updates.enabled !== undefined ? (updates.enabled ? 'enable' : 'disable') : 'update'
-
-  auditLogs.push({
-    id: `audit-${Date.now()}-${++requestCounters.auditLogId}`,
-    timestamp: new Date().toISOString(),
-    actorId: req.adminUser?.id || 'unknown',
-    actorEmail: req.adminUser?.email || 'unknown',
-    action,
-    resourceType: 'feature_flag',
-    resourceId: id,
-    ipAddress: getClientIp(req),
-  })
-
-  // Log to database
-  logAdminAction(req, action, 'feature_flag', id, previousState, flag)
-
-  res.json({ success: true, data: { id, ...flag } })
-})
+)
 
 // ============================================================================
 // DATA EXPORT
 // ============================================================================
 
-router.get('/export', authenticateAdmin, requireRole('admin', 'super_admin'), async (req: AuthenticatedRequest, res: Response) => {
-  const exportData = {
-    aiRequests: aiRequests.slice(-1000),
-    policyOperations: policyOperations.slice(-1000),
-    securityLogs: securityLogs.slice(-1000),
-    auditLogs: auditLogs.slice(-1000),
-    exportedAt: new Date().toISOString(),
-    exportedBy: req.adminUser?.email,
+router.get(
+  '/export',
+  authenticateAdmin,
+  requireRole('admin', 'super_admin'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    const exportData = {
+      aiRequests: aiRequests.slice(-1000),
+      policyOperations: policyOperations.slice(-1000),
+      securityLogs: securityLogs.slice(-1000),
+      auditLogs: auditLogs.slice(-1000),
+      exportedAt: new Date().toISOString(),
+      exportedBy: req.adminUser?.email,
+    }
+
+    // Log export action
+    await logAdminAction(req, 'export', 'admin_data', undefined, undefined, {
+      recordCounts: {
+        aiRequests: exportData.aiRequests.length,
+        policyOperations: exportData.policyOperations.length,
+        securityLogs: exportData.securityLogs.length,
+        auditLogs: exportData.auditLogs.length,
+      },
+    })
+
+    res.json({ success: true, data: exportData })
   }
-
-  // Log export action
-  await logAdminAction(req, 'export', 'admin_data', undefined, undefined, {
-    recordCounts: {
-      aiRequests: exportData.aiRequests.length,
-      policyOperations: exportData.policyOperations.length,
-      securityLogs: exportData.securityLogs.length,
-      auditLogs: exportData.auditLogs.length,
-    },
-  })
-
-  res.json({ success: true, data: exportData })
-})
+)
 
 // ============================================================================
 // LOG INGESTION (for frontend to report operations)
