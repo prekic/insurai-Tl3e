@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils'
 import { useI18n } from '@/lib/i18n'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
 import { usePolicies } from '@/lib/policy-context'
+import { usePilotGateOptions } from '@/hooks/usePilotGateOptions'
+import { evaluateKaskoPilotGate } from '@/lib/analysis/kasko-pilot-gate'
 import { usePolicyComparison } from '@/hooks/usePolicyComparison'
 import { PolicyCard } from './PolicyCard'
 import {
@@ -44,6 +46,20 @@ export function ComparePolicies() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { t, locale, isRTL } = useI18n()
   const { policies, isLoading } = usePolicies()
+  const pilotOptions = usePilotGateOptions()
+
+  const isPolicyDraft = useCallback(
+    (policy: { type: string; id: string }) => {
+      const gate = evaluateKaskoPilotGate(
+        policy.type || 'unknown',
+        pilotOptions.userId,
+        pilotOptions.featureFlags || {},
+        pilotOptions.userSegments || []
+      )
+      return gate.isDraft
+    },
+    [pilotOptions]
+  )
 
   // Get selected IDs from URL
   const urlIds = useMemo(() => {
@@ -304,6 +320,11 @@ export function ComparePolicies() {
                     {policy.logo}
                   </span>
                   <span className="font-medium text-gray-900">{policy.provider}</span>
+                  {isPolicyDraft(policy) && (
+                    <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-300 rounded px-1 py-0.5">
+                      TASLAK
+                    </span>
+                  )}
                   <button
                     onClick={() => removePolicy(policy.id)}
                     className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"

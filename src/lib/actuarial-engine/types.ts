@@ -427,6 +427,9 @@ export interface PolicyEvaluationResult {
   /** Contract quality score (0–100). */
   contractQualityScore: number
 
+  /** True when contract quality score is based on defaults (missing indemnity data). */
+  contractQualityIsEstimated?: boolean
+
   /** TOPSIS ranking (Layer D) — only present for multi-policy comparisons. */
   ranking?: {
     topsisCloseness: number

@@ -289,6 +289,8 @@ export interface AnalyzedPolicy extends Policy {
    * Separated from exclusions during extraction — rendered in their own section.
    */
   conditionalDeductibles?: string[]
+  /** Highest percentage-based deductible extracted (e.g., 35 for "35% tenzili muafiyet"). */
+  deductiblePercent?: number
 }
 
 export const POLICY_TYPES: Record<PolicyType, { label: string; labelTr: string; icon: string }> = {

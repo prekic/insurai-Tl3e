@@ -1928,6 +1928,9 @@ async function convertToAnalyzedPolicy(
     const classified = classifyExclusions(basePolicy.exclusions)
     basePolicy.exclusions = classified.trueExclusions
     basePolicy.conditionalDeductibles = classified.conditionalDeductibles
+    if (classified.maxDeductiblePercent > 0) {
+      basePolicy.deductiblePercent = classified.maxDeductiblePercent
+    }
     // Rebuild English arrays if they exist
     if (basePolicy.exclusionsEn && basePolicy.exclusionsEn.length > 0) {
       const trueIndices = classified.trueExclusionIndices
@@ -2473,6 +2476,8 @@ function classifyExclusions(exclusions: string[]): {
   trueExclusions: string[]
   conditionalDeductibles: string[]
   trueExclusionIndices: Set<number>
+  /** Highest percentage-based deductible found (e.g., 35 for "35% tenzili muafiyet") */
+  maxDeductiblePercent: number
 } {
   const conditionalPatterns = [
     /muafiyet/i, // "muafiyet" = deductible
@@ -2489,11 +2494,20 @@ function classifyExclusions(exclusions: string[]): {
   const trueExclusions: string[] = []
   const conditionalDeductibles: string[] = []
   const trueExclusionIndices = new Set<number>()
+  let maxDeductiblePercent = 0
 
   for (let i = 0; i < exclusions.length; i++) {
     const text = exclusions[i]
     const isConditional = conditionalPatterns.some((p) => p.test(text))
     if (isConditional) {
+      // Extract percentage value if present (e.g., "35%" or "%35")
+      const pctMatch = text.match(/(\d{1,3})\s*%/) || text.match(/%\s*(\d{1,3})/)
+      if (pctMatch) {
+        const pct = parseInt(pctMatch[1], 10)
+        if (pct > 0 && pct <= 100 && pct > maxDeductiblePercent) {
+          maxDeductiblePercent = pct
+        }
+      }
       // Apply evidence-softened wording
       conditionalDeductibles.push(softenConditionalDeductible(text))
     } else {
@@ -2502,7 +2516,7 @@ function classifyExclusions(exclusions: string[]): {
     }
   }
 
-  return { trueExclusions, conditionalDeductibles, trueExclusionIndices }
+  return { trueExclusions, conditionalDeductibles, trueExclusionIndices, maxDeductiblePercent }
 }
 
 /**

@@ -3,11 +3,12 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Execute Phase 8L**: KASKO pilot is LIVE with 22 QA records and zero safety violations. Evaluate live safety + quality metrics from `kasko_pilot_qa_records` to determine broader rollout readiness.
-2. **Fix Processing Log PATCH 404**: `PATCH /api/ai/processing-log/:id` returns 404 after initial CREATE succeeds. Investigate route/table mismatch — the initial POST works but subsequent PATCH updates fail. Non-blocking but creates noisy console errors.
-3. **Fix QA Record `display_mode`**: All 22 records have `display_mode: 'unknown'` instead of expected `'full'` or `'restricted'`. The pilot gate code path isn't setting this field. Low priority.
-4. **Fix `user_preferences` 406 Error**: `GET /rest/v1/user_preferences?...category=eq.email` returns 406. Likely missing `Accept` header or schema mismatch. Pre-existing.
-5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Deploy Safety Patch to Production**: Branch `claude/load-project-context-nqrry` has 7 safety fixes + 79 tests. Sandbox `git push` doesn't trigger Railway webhook — use `mcp__github__push_files` or Railway manual deploy.
+2. **Upload Diverse KASKO PDFs**: Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target graduation: April 5, 2026.
+3. **Fix Processing Log PATCH 404**: `PATCH /api/ai/processing-log/:id` returns 404 after initial CREATE succeeds. Investigate route/table mismatch — the initial POST works but subsequent PATCH updates fail. Non-blocking but creates noisy console errors.
+4. **Fix QA Record `display_mode`**: All 22 records have `display_mode: 'unknown'` instead of expected `'full'` or `'restricted'`. The pilot gate code path isn't setting this field. Low priority.
+5. **Fix `user_preferences` 406 Error**: `GET /rest/v1/user_preferences?...category=eq.email` returns 406. Likely missing `Accept` header or schema mismatch. Pre-existing.
+6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
@@ -56,6 +57,14 @@
 21. **Admin Sub-Route Test Mock Path**: Tests for admin sub-routers (`segments.ts`, `backfill.ts`, etc.) must mock `'../routes/admin/shared.js'` — NOT `'../../middleware/admin-auth.js'`. The sub-routers import auth functions via the `shared.js` re-export barrel. Mocking the original middleware path does NOT intercept the import chain, causing 401 errors in tests. Pattern: `vi.mock('../routes/admin/shared.js', () => ({ requireSuperAdmin: () => [(_req, _res, next) => next()], ... }))`.
 
 22. **Railway Sandbox Proxy Push Does Not Trigger Webhooks**: `git push` via Claude Code sandbox goes through a `127.0.0.1` local proxy. This successfully pushes commits to GitHub but does NOT trigger Railway's GitHub webhook for auto-deploy. To trigger Railway, use `mcp__github__create_or_update_file` or `mcp__github__push_files` which creates a real GitHub commit event.
+
+23. **Benchmark Confidence Gating (Added Mar 27, 2026)**: All market premium comparisons in `evaluator.ts` are now gated by `assessBenchmarkConfidence()` which checks 5 context factors (vehicle class, model year, geography, insurer, coverage level). When 0 factors are present, the Market Comparison UI card is **hidden entirely** and the premium score returns neutral 70. When 1-2 factors are present, the comparison is shown with a prominent "low-confidence" warning listing missing factors. The `BenchmarkConfidence` type is in `src/lib/policy-evaluation/types.ts`. Follow this pattern when adding any new user-facing conclusion that depends on extraction context.
+
+24. **Draft Export/Share Gating (Added Mar 27, 2026)**: Draft policies (`displaySummary?.isDraft === true`) are now gated from export (PDF/CSV/Excel/Text), sharing, and comparison. The `draftExportBlocked()` callback in `PolicyDetailView.tsx` shows a bilingual toast warning and returns early. `SharedResult.tsx` shows a TASLAK/DRAFT banner. `ComparePolicies.tsx` shows a TASLAK badge on draft policies. When adding new output paths (new export format, new share mechanism), always check `isDraft` first.
+
+25. **Contract Quality `contractQualityIsEstimated` Flag (Added Mar 27, 2026)**: When `ActuarialPolicyInput.indemnityMechanics` is missing/undefined, `engine.ts` sets `contractQualityIsEstimated: true` on the result and defaults score to 50. The UI shows "~50 (estimated)" in amber instead of a confident "50 / 100". Both the sync and async (worker) paths in `engine.ts` must set this flag — there are two separate result assembly blocks.
+
+26. **`evaluatePremium()` Signature Changed (Mar 27, 2026)**: The function now accepts an optional 3rd parameter `confidence?: BenchmarkConfidence`. Tests that mock or spy on this function may need to account for the additional parameter. The confidence assessment is done in `evaluatePolicy()` before calling `evaluatePremium()`.
 
 ---
 

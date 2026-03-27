@@ -110,6 +110,7 @@ export function runFullEvaluation(
   const layerC_ms = performance.now() - layerCStart
 
   // Compute supporting scores for TOPSIS
+  const contractQualityIsEstimated = !policy.indemnityMechanics
   const contractQualityScore = policy.indemnityMechanics
     ? computeContractQualityScore(
         policy.indemnityMechanics.partsStandard.value,
@@ -117,7 +118,7 @@ export function runFullEvaluation(
         policy.indemnityMechanics.rayicMethod.value,
         policy.indemnityMechanics.rayicMethodIsConcrete.value
       )
-    : 50 // Default for unknown
+    : 50 // Default for unknown — flagged via contractQualityIsEstimated
 
   // Per-scenario scores (0-100, based on coverage quality for each scenario)
   const scenarioScores: Record<string, number> = {}
@@ -155,6 +156,7 @@ export function runFullEvaluation(
     scenarioScores,
     expectedOutOfPocket: eoopResult,
     contractQualityScore,
+    contractQualityIsEstimated,
     layerTimings: { layerA_ms, layerB_ms, layerC_ms, total_ms },
     configSnapshot: {
       ruleset: compliance.rulesetVersion,
@@ -521,6 +523,7 @@ export async function runFullEvaluationAsync(
 
   // ── Layer D & Post-Processing ──────────────────────────────────────
   // (Same as synchronous version but leveraging eoopResult)
+  const contractQualityIsEstimated = !policy.indemnityMechanics
   const contractQualityScore = policy.indemnityMechanics
     ? computeContractQualityScore(
         policy.indemnityMechanics.partsStandard.value,
@@ -562,6 +565,7 @@ export async function runFullEvaluationAsync(
     scenarioScores,
     expectedOutOfPocket: eoopResult,
     contractQualityScore,
+    contractQualityIsEstimated,
     layerTimings: { layerA_ms, layerB_ms, layerC_ms, total_ms },
     configSnapshot: {
       ruleset: compliance.rulesetVersion,

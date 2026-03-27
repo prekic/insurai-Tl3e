@@ -15,6 +15,36 @@ import type { PolicyEvaluationResult } from '@/lib/actuarial-engine/types'
 export type EvaluationGrade = 'A' | 'B' | 'C' | 'D' | 'F'
 export type EvaluationStatus = 'excellent' | 'good' | 'fair' | 'poor' | 'critical'
 
+/**
+ * Benchmark comparison confidence.
+ *
+ * Premium comparisons depend on context factors (vehicle class, geography,
+ * no-claim level, driver profile, etc.). When these are missing, the
+ * comparison confidence drops and the UI must reflect that.
+ *
+ * - 'high':       3+ context factors present — show full comparison
+ * - 'low':        1-2 context factors present — show with prominent caveat
+ * - 'suppressed': 0 factors OR benchmark data stale — hide comparison entirely
+ */
+export type BenchmarkConfidenceLevel = 'high' | 'low' | 'suppressed'
+
+export interface BenchmarkContextFactor {
+  factor: string
+  factorTr: string
+  present: boolean
+  value?: string
+}
+
+export interface BenchmarkConfidence {
+  level: BenchmarkConfidenceLevel
+  factors: BenchmarkContextFactor[]
+  presentCount: number
+  totalCount: number
+  /** If suppressed, the reason why */
+  suppressionReason?: string
+  suppressionReasonTr?: string
+}
+
 export interface ScoreBreakdown {
   category: string
   categoryTR: string
@@ -54,6 +84,13 @@ export interface PolicyEvaluation {
     isAboveAverageValue: boolean
     competitivePosition: 'leader' | 'competitive' | 'average' | 'below_average' | 'lagging'
   }
+
+  // Benchmark confidence — tracks which context factors are present/missing
+  benchmarkConfidence?: BenchmarkConfidence
+
+  // Benchmark provenance — empty string means verified, non-empty is a caveat
+  benchmarkDisclaimer?: string
+  benchmarkDisclaimerTr?: string
 
   // Regulatory compliance
   compliance: {

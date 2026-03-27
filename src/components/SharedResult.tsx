@@ -17,6 +17,7 @@ import {
   ArrowRight,
   Shield,
   Lock,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from './ui/button'
 import {
@@ -153,6 +154,29 @@ export function SharedResult() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {/* Draft Warning Banner */}
+        {displaySummary?.isDraft && (
+          <div
+            className="bg-amber-50 border-2 border-amber-400 rounded-xl p-4 mb-6"
+            role="alert"
+            aria-live="polite"
+            data-testid="shared-draft-banner"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <p className="font-semibold text-amber-800">
+                  TASLAK / DRAFT
+                </p>
+                <p className="text-sm text-amber-700 mt-0.5">
+                  {displaySummary.pilotReviewBanner ||
+                    'Bu sonuçlar yapay zeka tarafından oluşturulmuştur ve insan onayı olmadan kesinleşmiş değildir. / These results are AI-generated and not finalized without human approval.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Shared Banner */}
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">

@@ -40,6 +40,93 @@ import {
 } from './benchmark-service'
 
 // =============================================================================
+// BENCHMARK CONFIDENCE ASSESSMENT
+// =============================================================================
+
+import type { BenchmarkConfidence, BenchmarkConfidenceLevel, BenchmarkContextFactor } from './types'
+
+/**
+ * Assess how much confidence we should place in a benchmark comparison.
+ *
+ * Premium comparisons are only meaningful when the comparison cohort matches
+ * the actual policy. Without key context factors, the "market average" could
+ * be for a completely different risk profile.
+ *
+ * Context factors checked:
+ *   1. Vehicle class / type (economy vs luxury vs commercial)
+ *   2. Vehicle model year (affects depreciation and premium)
+ *   3. Geography / region (Istanbul 1.2x vs rural 0.85x)
+ *   4. Insurer (provider-specific pricing tiers)
+ *   5. Policy coverage level (market value / sum insured)
+ *
+ * Thresholds:
+ *   - 3+ factors present → 'high' confidence → full comparison shown
+ *   - 1-2 factors present → 'low' confidence → comparison with prominent caveat
+ *   - 0 factors present  → 'suppressed' → hide comparison entirely
+ */
+function assessBenchmarkConfidence(policy: Policy): BenchmarkConfidence {
+  const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
+
+  const factors: BenchmarkContextFactor[] = [
+    {
+      factor: 'Vehicle class',
+      factorTr: 'Araç sınıfı',
+      present: !!(analyzedPolicy.vehicleInfo?.vehicleClass || analyzedPolicy.vehicleInfo?.usage),
+      value: analyzedPolicy.vehicleInfo?.vehicleClass || analyzedPolicy.vehicleInfo?.usage,
+    },
+    {
+      factor: 'Model year',
+      factorTr: 'Model yılı',
+      present: !!analyzedPolicy.vehicleInfo?.year,
+      value: analyzedPolicy.vehicleInfo?.year?.toString(),
+    },
+    {
+      factor: 'Geography',
+      factorTr: 'Bölge',
+      present: !!(analyzedPolicy.location && analyzedPolicy.location.length > 2),
+      value: analyzedPolicy.location || undefined,
+    },
+    {
+      factor: 'Insurer',
+      factorTr: 'Sigorta şirketi',
+      present: !!(
+        policy.provider &&
+        policy.provider !== 'Unknown' &&
+        policy.provider !== 'Bilinmiyor'
+      ),
+      value: policy.provider || undefined,
+    },
+    {
+      factor: 'Coverage level',
+      factorTr: 'Teminat tutarı',
+      present: policy.coverage > 0,
+      value: policy.coverage > 0 ? `${policy.coverage.toLocaleString('tr-TR')} TL` : undefined,
+    },
+  ]
+
+  const presentCount = factors.filter((f) => f.present).length
+  const totalCount = factors.length
+
+  let level: BenchmarkConfidenceLevel
+  let suppressionReason: string | undefined
+  let suppressionReasonTr: string | undefined
+
+  if (presentCount >= 3) {
+    level = 'high'
+  } else if (presentCount >= 1) {
+    level = 'low'
+  } else {
+    level = 'suppressed'
+    suppressionReason =
+      'Insufficient context for meaningful market comparison — vehicle, location, and coverage data missing'
+    suppressionReasonTr =
+      'Anlamlı piyasa karşılaştırması için yeterli bağlam yok — araç, konum ve teminat bilgileri eksik'
+  }
+
+  return { level, factors, presentCount, totalCount, suppressionReason, suppressionReasonTr }
+}
+
+// =============================================================================
 // POLICY TYPE TO BRANCH CODE MAPPING
 // =============================================================================
 
@@ -105,8 +192,11 @@ export function evaluatePolicy(
   const branchCode = POLICY_TYPE_TO_BRANCH[policy.type]
   const branchStats = getBranchStatistics(branchCode)
 
+  // Assess benchmark confidence before scoring
+  const benchmarkConfidence = assessBenchmarkConfidence(policy)
+
   // Evaluate each category
-  const premiumScore = evaluatePremium(policy, fullConfig)
+  const premiumScore = evaluatePremium(policy, fullConfig, benchmarkConfidence)
   const coverageScore = evaluateCoverage(policy, fullConfig)
   const deductibleScore = evaluateDeductible(policy, fullConfig)
   const complianceResult = evaluateCompliance(policy, fullConfig)
@@ -186,6 +276,14 @@ export function evaluatePolicy(
 
     recommendations,
     summary,
+
+    benchmarkConfidence,
+
+    // Benchmark provenance disclaimer — all current benchmarks are indicative estimates
+    benchmarkDisclaimer:
+      'Market averages are estimates based on indicative data. Actual premiums vary by vehicle, driver profile, and region.',
+    benchmarkDisclaimerTr:
+      'Piyasa ortalamaları gösterge niteliğinde tahminlere dayanmaktadır. Gerçek primler araca, sürücü profiline ve bölgeye göre değişir.',
   }
 }
 
@@ -193,7 +291,11 @@ export function evaluatePolicy(
 // PREMIUM EVALUATION
 // =============================================================================
 
-function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdown {
+function evaluatePremium(
+  policy: Policy,
+  config: EvaluationConfig,
+  confidence?: BenchmarkConfidence
+): ScoreBreakdown {
   const insuranceType = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
   const benchmark = getPremiumBenchmarkWithFallback(insuranceType)
   const issues: string[] = []
@@ -216,9 +318,35 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
     }
   }
 
+  // If benchmark confidence is suppressed, return neutral score — comparison is meaningless
+  if (confidence?.level === 'suppressed') {
+    const missingNames = confidence.factors
+      .filter((f) => !f.present)
+      .map((f) => f.factor)
+      .join(', ')
+    const missingNamesTr = confidence.factors
+      .filter((f) => !f.present)
+      .map((f) => f.factorTr)
+      .join(', ')
+    return {
+      category: 'Premium',
+      categoryTR: 'Prim',
+      score: 70, // Neutral — no comparison possible
+      weight: config.weights.premium,
+      details: `Premium of ${policy.premium.toLocaleString('tr-TR')} TL — comparison suppressed (missing: ${missingNames})`,
+      detailsTR: `${policy.premium.toLocaleString('tr-TR')} TL prim — karşılaştırma yapılamıyor (eksik: ${missingNamesTr})`,
+      issues: ['Market comparison suppressed due to insufficient context data'],
+      issuesTR: ['Yetersiz bağlam verisi nedeniyle piyasa karşılaştırması yapılamıyor'],
+    }
+  }
+
   let score = 70 // Default score
-  let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market average`
-  let detailsTR = `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa ortalaması ile karşılaştırıldı`
+  let details = `Premium of ${policy.premium.toLocaleString('tr-TR')} TL compared to market estimate`
+  let detailsTR = `${policy.premium.toLocaleString('tr-TR')} TL prim, piyasa tahmini ile karşılaştırıldı`
+
+  // Benchmark provenance check: current benchmarks are indicative estimates,
+  // not verified against audited market data. Cap scores to prevent false confidence.
+  const BENCHMARK_SCORE_CAP = 75 // Max score when benchmark lacks verified provenance
 
   if (benchmark) {
     // Check if this benchmark uses value-based comparison (% of insured value)
@@ -226,16 +354,20 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
     if (isValueBasedBenchmark(benchmark) && policy.coverage > 0) {
       // Use value-based evaluation
       const valueEval = evaluateValueBasedPremium(policy.premium, policy.coverage, benchmark)
-      score = valueEval.score
+      score = Math.min(valueEval.score, BENCHMARK_SCORE_CAP)
       details = valueEval.details
       detailsTR = valueEval.detailsTR
 
       if (valueEval.position === 'high') {
-        issues.push('Premium rate is above market average for this value')
-        issuesTR.push('Prim oranı bu değer için piyasa ortalamasının üzerinde')
+        issues.push('Premium rate is above market estimate for this value (indicative benchmark)')
+        issuesTR.push('Prim oranı bu değer için piyasa tahmininin üzerinde (gösterge niteliğinde)')
       } else if (valueEval.position === 'very_high') {
-        issues.push('Premium rate significantly exceeds typical market range')
-        issuesTR.push('Prim oranı tipik piyasa aralığını önemli ölçüde aşıyor')
+        issues.push(
+          'Premium rate significantly exceeds typical market range (indicative benchmark)'
+        )
+        issuesTR.push(
+          'Prim oranı tipik piyasa aralığını önemli ölçüde aşıyor (gösterge niteliğinde)'
+        )
       }
     } else {
       // Direct premium comparison
@@ -247,16 +379,18 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
         issues.push('Premium is below market minimum - verify coverage is adequate')
         issuesTR.push('Prim piyasa minimumunun altında - teminatın yeterli olduğunu doğrulayın')
       } else if (policy.premium <= avgPremium) {
-        // Great - at or below average
-        score = 90 + Math.round(((avgPremium - policy.premium) / avgPremium) * 10)
-        score = Math.min(100, score)
+        // At or below average — cap at BENCHMARK_SCORE_CAP since benchmark is indicative
+        score = Math.min(
+          90 + Math.round(((avgPremium - policy.premium) / avgPremium) * 10),
+          BENCHMARK_SCORE_CAP
+        )
       } else if (policy.premium <= maxPremium) {
         // Above average but within range
         const aboveAvgRatio = (policy.premium - avgPremium) / (maxPremium - avgPremium)
         score = 90 - Math.round(aboveAvgRatio * 30)
         if (aboveAvgRatio > 0.5) {
-          issues.push('Premium is significantly above market average')
-          issuesTR.push('Prim piyasa ortalamasının önemli ölçüde üzerinde')
+          issues.push('Premium is significantly above market estimate')
+          issuesTR.push('Prim piyasa tahmininin önemli ölçüde üzerinde')
         }
       } else {
         // Above maximum
@@ -281,6 +415,20 @@ function evaluatePremium(policy: Policy, config: EvaluationConfig): ScoreBreakdo
       issues.push('Premium to coverage ratio is high')
       issuesTR.push('Prim/teminat oranı yüksek')
     }
+  }
+
+  // Qualify details when confidence is low
+  if (confidence?.level === 'low') {
+    const missingNames = confidence.factors
+      .filter((f) => !f.present)
+      .map((f) => f.factor)
+      .join(', ')
+    const missingNamesTr = confidence.factors
+      .filter((f) => !f.present)
+      .map((f) => f.factorTr)
+      .join(', ')
+    details += ` (low confidence — missing: ${missingNames})`
+    detailsTR += ` (düşük güven — eksik: ${missingNamesTr})`
   }
 
   return {
