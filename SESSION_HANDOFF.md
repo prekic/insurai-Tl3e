@@ -1,106 +1,91 @@
-# Session Handoff — March 25, 2026
+# Session Handoff — March 27, 2026
 
 ## Branch
 
-`claude/load-project-context-HpU30`
+`claude/load-project-context-nqrry`
 
 ## What Was Done This Session
 
-### 1. Railway Build Fix (Critical)
-- 3 TypeScript errors blocking Railway deployment resolved:
-  - `useDisplaySafeSummary.ts:58` — cast `policy` to `unknown` for `evidence` access
-  - `relationship-resolver.ts:26` — cast `relationshipType` to `RelationshipType`
-  - `policy-extractor.ts:1338` — cast `clauseGraph` param for `description` null compat
-- Root cause: Railway was building from cached snapshot; fix pushed to correct deploy branch and triggered via GitHub API
+### 1. Migrations Applied to Production Supabase
+- **Migration 040** (`040_kasko_pilot_flag_and_segment.sql`): Applied successfully. Creates `user_segments` table, `kasko_pilot_qa_records` table (34 columns), and seeds `kasko_ai_extraction_pilot` feature flag. Note: RLS policy "Service role manages segments" already existed from a previous partial run — resolved with `DROP POLICY IF EXISTS` + `CREATE POLICY`.
+- **Migration 041** (`041_supabase_linter_security_fixes.sql`): Applied successfully. Recreates cron monitoring views as `SECURITY INVOKER`, enables RLS on 15+ admin/system tables, creates `service_role`-only policies.
 
-### 2. Security Hardening (6 fixes)
-- **Memory leak fix**: `auditLogs` array had no `MAX_ENTRIES` cap — grew unbounded in `operations.ts` and `prompts.ts` (3 push sites fixed)
-- **Mass assignment prevention**: `Object.assign(flag, updates)` in feature flag PUT endpoint replaced with explicit field allowlist (`name`, `description`, `enabled`, `enabledPercentage`)
-- **Input validation**: UUID format regex + segment name allowlist on all 4 segments CRUD endpoints; UUID validation on backfill verify and POST ids
-- **IP block hardening**: IP format regex (IPv4/IPv6), `expiresIn` duration bounds (max 30 days), reason string truncation (500 chars), `blockedIPs` Map capped at 10K
-- **Policy save hardening**: `JSON.parse` guarded with try-catch, `extractionResult` validated as JSON object, multer upload limit reduced from 50MB to 15MB (client cap is 10MB), PDF-only file filter added
-- **Actuarial auth bypass**: All 7 actuarial admin endpoints had ZERO authentication — added `requireSuperAdmin()` to all of them
+### 2. KASKO Pilot Activated
+- Feature flag `kasko_ai_extraction_pilot` enabled (`enabled=true`, `rollout_percentage=100`)
+- `prekic@gmail.com` (UUID: `5c887095-61bd-488b-933f-f41786a3d527`) assigned to `kasko_pilot_reviewers` segment (was already assigned from Mar 18)
+- `testadmin@insur.ai` (UUID: `c470bf79-db83-497f-a1de-da05e80e54e5`) assigned to `kasko_pilot_reviewers` segment (new, Mar 27)
 
-### 3. Defensive Error Handling
-- `engine.ts`: Null guard on `data` input + try-catch around entire analysis pipeline, returns safe defaults instead of crashing
-- `useDisplaySafeSummary.ts`: Wrapped entire `useMemo` callback in try-catch, returns `null` on failure instead of propagating error to UI
-- `extraction-alert-service.ts`: LRU eviction cap (50 entries) on `lastAlertFired` Map
+### 3. Live Artifacts Collected
+Uploaded real KASKO PDF (`eriş ambalaj 34 rz 9511 kasko pol.pdf`, 16 pages) as `prekic@gmail.com`.
 
-### 4. Debug Log Cleanup
-- Removed 13 `[ConfidenceDiag]` diagnostic `console.warn` from `policy-extractor.ts`
-- Removed 3 `[ConfidenceDiag]` diagnostic `log.info` from `server/routes/ai.ts`
-- Removed 2 `[DEBUG]` console.warn blocks from `policy-extractor.ts`
-- Removed 1 `[DEBUG EXACT TEST]` console.log from `server/routes/settings.ts`
+**Extraction Results:**
+- Provider: Anthropic (via unified proxy)
+- OCR: Document AI (split 16 pages into 2 chunks: 1-10 + 11-16, 60,571 chars)
+- Extraction time: ~53s total (Document AI: 29s + Anthropic: 53s server)
+- Confidence: 0.9625 (policyNumber: 1.0, provider: 1.0, dates: 1.0, premium: 1.0, coverages: 0.85)
 
-### 5. New Tests (95 tests across 4 files)
-- `useDisplaySafeSummary.test.ts` — 8 tests (null/undefined policy, pilot metadata, memoization)
-- `usePilotGateOptions.test.ts` — 7 tests (flag loading, graceful degradation, loading state)
-- `admin-segments.test.ts` — 12 tests (all 4 CRUD endpoints, UUID/segment validation, duplicate handling)
-- `admin-backfill.test.ts` — 56 tests (dry-run, write, verify endpoints, classification logic, UUID validation, safety gates)
-- `admin-segments.test.ts` — 12 tests (UUID and segment name allowlist, duplicate 409)
+**Extracted Policy:**
+- Policy #1680600025, Anadolu Sigorta, Kasko
+- Insured: ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ
+- Coverage: Vehicle Market Value, 9 coverages extracted
+- Premium: TRY 31,140
+- Period: 12/28/2025 → 12/28/2026
+- Score: 80/100 (Grade B - Good)
 
-## Commits on Branch (This Session)
+**Pilot Gate Confirmation:**
+- Admission: `pilot_eligible_clean` — "Document meets all criteria for clean admission"
+- DRAFT banner visible: `⚠️ TASLAK — İnsan İncelemesi Gerekli / DRAFT — Requires Human Review`
+- QA record persisted: `[PilotQA] QA record persisted for document: 3be474f1-45fc-4625-89f1-40a7fd2a9064`
 
-| # | SHA | Message |
-|---|-----|---------|
-| 1 | `b7a5b02` | fix: resolve 3 TypeScript build errors blocking Railway deployment |
-| 2 | `ec3fde3` | chore: trigger Railway deploy — TS build fixes on deploy branch |
-| 3 | `1dca28f` | fix: harden server input validation and cap memory leak |
-| 4 | `2dd93a8` | fix: prevent mass assignment in feature flag update endpoint |
-| 5 | `b417e18` | fix: harden policy save and IP block endpoints |
-| 6 | `53dae40` | test: add tests for pilot hooks and segments admin route |
-| 7 | `1163f79` | fix: remove debug console.log from settings route |
-| 8 | `a53b0f0` | chore: remove ConfidenceDiag and DEBUG diagnostic logs |
-| 9 | `b0f07d3` | fix: cap alert cooldown map at 50 entries |
-| 10 | `5301c30` | fix: add defensive error handling to analysis engine and display hook |
-| 11 | `9384402` | test: add 56 tests for admin backfill pilot route |
-| 12 | `ed0c335` | fix(security): add authentication to all 7 actuarial admin endpoints |
+**QA Record Evidence (from `kasko_pilot_qa_records`):**
 
-## Audit Findings Summary
+| Field | Value |
+|-------|-------|
+| admission_status | `pilot_eligible_clean` |
+| extraction_success | `true` |
+| confidence_score | `0.9625` |
+| phrase_clean | `true` |
+| coverage_count_extracted | `9` |
+| display_mode | `unknown` (see issues below) |
 
-Five parallel audit agents ran against the entire codebase:
+**Rollback Safety Thresholds (22 total records):**
 
-### Security Audit (Server)
-- **CRITICAL (fixed)**: 7 actuarial endpoints had zero authentication → fixed with `requireSuperAdmin()`
-- **FALSE POSITIVES**: `webhooks.ts` and `drift.ts` have auth at mount level (`server/index.ts:336,339`)
-- **ACCEPTABLE**: Logging endpoints (`/log/ai-request`, `/log/policy-operation`, `/log/security`) are intentionally unauthenticated (frontend-called) but rate-limited via global `generalLimiter`
-- **LOW**: `x-user-id` header auth in notifications is weak but acceptable (subscription ownership checked in DB)
+| Threshold | Count | Limit |
+|-----------|-------|-------|
+| zero_coverage | **0** | >20% triggers rollback |
+| major_correction | **0** | >50% triggers rollback |
+| phrase_leak | **0** | Any triggers rollback |
+| deductible_miss | **0** | 3+ consecutive triggers rollback |
 
-### Frontend Quality Audit
-- **CRITICAL (false positive)**: `renderCount` in `usePolicyComparison.ts` is an intentional infinite-loop safety guard (CLAUDE.md Gotcha #2)
-- **HIGH (acceptable)**: `JSON.stringify` in dependency arrays is a known deep-comparison pattern
-- **MEDIUM**: `AIInsightsPanel.tsx` has hardcoded bilingual `TASLAK/DRAFT` banner text (intentional per Known Issue #176)
+**Verdict: ALL CLEAR — zero safety violations across 22 QA records.**
 
-### Bundle & Performance Audit
-- **All ring buffers properly capped** (extraction metrics, AI requests, policy operations, security logs)
-- **Config service cache already cleans expired entries** (line 78: `cache.delete(cacheKey)`)
-- **Alert cooldown map fixed** (was unbounded → now capped at 50 with LRU eviction)
-- **Compression, caching, graceful shutdown all production-grade**
+## Non-Critical Issues Observed
 
-### Test Coverage Gap Analysis
-- Critical gaps in `useDisplaySafeSummary` and `usePilotGateOptions` → **fixed** (27 new tests)
-- `admin-segments.ts` route → **fixed** (12 new tests)
-- `admin-backfill.ts` route → **fixed** (56 new tests)
+1. **Processing log PATCH 404** — `PATCH /api/ai/processing-log/:id` returns 404 repeatedly after initial CREATE succeeds. The `document_processing_logs` table likely has a primary key mismatch with what the client sends. Non-blocking — pilot QA records persist via separate path.
 
-### Analysis Pipeline Audit
-- `engine.ts` null guard + try-catch → **fixed**
-- `useDisplaySafeSummary` try-catch → **fixed**
-- Other findings (review-thresholds regex patterns, validator default case) are low severity
+2. **`user_preferences` 406 error** — `GET /rest/v1/user_preferences?...category=eq.email` returns 406. Likely missing `Accept` header or schema mismatch. Pre-existing, non-pilot.
+
+3. **Missing PWA icons** — `vite.svg` and `icons/icon-144x144.png` return 404. Cosmetic only.
+
+4. **`display_mode` always "unknown"** — All 22 QA records have `display_mode: 'unknown'` instead of expected `'full'` or `'restricted'`. The pilot gate code path isn't populating this field from `review-thresholds.ts`. Low priority fix.
+
+5. **Duplicate GoTrueClient warning** — "Multiple GoTrueClient instances detected in the same browser context." Occurs during pilot QA persistence which creates a new Supabase client. Non-blocking.
 
 ## Status
 
-### Ready
-- All 12 commits clean (TypeScript ✓, ESLint ✓, pre-commit hooks ✓)
-- Railway build should succeed with TS fix in place
-- 95 new tests all passing
-- 7 actuarial endpoints now secured
-- Memory leaks capped
-- Debug logs removed for production
+### Complete
+- Migrations 040 + 041 applied to production
+- KASKO pilot activated (flag + 2 reviewers)
+- Live extraction successful with all pilot features working
+- QA records persisting correctly
+- DRAFT banner displaying
+- Rollback thresholds all zero — pilot is healthy
 
-### Blocked On
-- **Railway deploy verification** — confirm the build succeeds with the TS fixes
-- **Migrations 040 + 041** — still need manual application to production Supabase (from previous session)
-- **KASKO pilot activation** — 3 manual SQL steps per `docs/KASKO_PILOT_OPERATIONAL_AUDIT_2026_03_16.md`
+### Ready for Next Session
+- **Phase 8L evaluation** — 22 QA records with real data exist; evaluate live safety + quality metrics
+- **Processing log 404 fix** — investigate `PATCH /api/ai/processing-log/:id` route mismatch
+- **QA `display_mode` fix** — wire display mode from review-thresholds into QA record persistence
+- **`user_preferences` 406** — investigate Accept header / schema issue
 
 ## Non-Negotiable Rules (carry forward)
 
@@ -111,51 +96,12 @@ Five parallel audit agents ran against the entire codebase:
 5. Never add `VITE_` prefix to API keys
 6. `auditLogs` array MUST have `MAX_ENTRIES` cap after every `.push()` call
 7. All admin endpoints under `/api/admin/` that aren't auth-related MUST have `authenticateAdmin` or `requireSuperAdmin()` middleware
-8. Segment names must be in `VALID_SEGMENT_NAMES` allowlist — don't pass raw user input to Supabase queries
-
-## Next Steps (Priority Order)
-
-1. **Verify Railway deploy** — confirm build passes, health check responds
-2. **Apply migrations 040 + 041** to production Supabase (idempotent, safe to re-run)
-3. **Activate KASKO pilot** (3 SQL steps — see operational audit doc)
-4. **Run backfill pilot** — follow `docs/BACKFILL_PILOT_RUNBOOK.md`
-5. **Consider xlsx replacement** — `xlsx` has 8 high-severity CVEs (prototype pollution, ReDoS) with no fix. Only used for output (safe), but consider replacing with `exceljs` for a clean security posture
-6. **Address remaining audit findings** — review-thresholds regex boundary conditions, validator default case for unknown branch types
-
-## DB Column Reference (authoritative)
-
-| Column | Type | Source |
-|--------|------|--------|
-| `insured_person` | TEXT NOT NULL | supabase/migrations/001_initial_schema.sql |
-| `start_date` | DATE NOT NULL | supabase/migrations/001_initial_schema.sql |
-| `expiry_date` | DATE NOT NULL | supabase/migrations/001_initial_schema.sql |
-
-There is NO column named `insured` or `end_date` in the policies table.
-
-## Files Changed (17 files, +2,997/−1,245 lines)
-
-| File | Change |
-|------|--------|
-| `server/__tests__/admin-backfill.test.ts` | **NEW** 56 tests |
-| `server/__tests__/admin-segments.test.ts` | **NEW** 12 tests |
-| `server/routes/admin/actuarial.ts` | Auth added to all 7 endpoints |
-| `server/routes/admin/backfill.ts` | UUID validation |
-| `server/routes/admin/operations.ts` | auditLogs cap, IP validation, mass assignment fix |
-| `server/routes/admin/prompts.ts` | auditLogs cap, MAX_ENTRIES import |
-| `server/routes/admin/segments.ts` | UUID + segment name validation |
-| `server/routes/ai.ts` | ConfidenceDiag logs removed |
-| `server/routes/policy.ts` | JSON.parse guard, upload limits, PDF filter |
-| `server/routes/settings.ts` | Debug log removed |
-| `server/services/extraction-alert-service.ts` | LRU cap on cooldown map |
-| `src/hooks/useDisplaySafeSummary.test.ts` | **NEW** 8 tests |
-| `src/hooks/useDisplaySafeSummary.ts` | try-catch wrapper |
-| `src/hooks/usePilotGateOptions.test.ts` | **NEW** 7 tests |
-| `src/lib/ai/policy-extractor.ts` | 15 diagnostic logs removed |
-| `src/lib/ai/relationship-resolver.ts` | Cast `relationshipType` to `RelationshipType` (TS build fix) |
-| `src/lib/analysis/engine.ts` | Null guard + try-catch |
+8. Segment names must be in `VALID_SEGMENT_NAMES` allowlist
 
 ## Session-Specific Gotchas
 
-1. **Railway Sandbox Proxy Push**: `git push` via Claude Code sandbox goes through `127.0.0.1` local proxy. This successfully pushes to GitHub but does NOT trigger Railway's GitHub webhook. To trigger Railway auto-deploy, use `mcp__github__create_or_update_file` or `mcp__github__push_files` which creates a real GitHub commit event that fires the webhook.
+1. **Railway Sandbox Proxy Push**: `git push` via Claude Code sandbox goes through `127.0.0.1` local proxy. This successfully pushes to GitHub but does NOT trigger Railway's GitHub webhook. To trigger Railway auto-deploy, use `mcp__github__push_files` which creates a real GitHub commit event.
 
-2. **Admin Sub-Route Test Mock Path**: Tests for admin sub-routers (e.g., `segments.ts`, `backfill.ts`) must mock `'../routes/admin/shared.js'` — NOT `'../../middleware/admin-auth.js'`. The sub-routers import auth functions via the `shared.js` re-export barrel. Mocking the original middleware path does NOT intercept the import chain, causing 401 errors in tests.
+2. **Migration 040 RLS Policy Conflict**: If migration 040 was partially applied before, the RLS policy "Service role manages segments" already exists. Fix: `DROP POLICY IF EXISTS "Service role manages segments" ON public.user_segments;` before CREATE POLICY.
+
+3. **Admin Sub-Route Test Mock Path**: Tests for admin sub-routers must mock `'../routes/admin/shared.js'` — NOT `'../../middleware/admin-auth.js'`.
