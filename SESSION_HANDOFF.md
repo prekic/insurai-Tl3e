@@ -1,10 +1,21 @@
 # Session Handoff — March 28, 2026
 
-## Current State
+## Current State (Updated March 28, 2026 — Deploy Session)
 
-**Branch `claude/project-handoff-docs-0XYw6` has 8 commits ahead of `main` (at `f7b6683`).** All commits are feature/fix work ready for PR and merge. No uncommitted changes.
+**Branch `claude/project-handoff-docs-0XYw6` has been MERGED to `main` via PRs #309 and #310.** Latest main commit: `5f0568f`.
 
-### Commits on This Branch (newest first)
+### Status of Prior Session Priorities
+
+| # | Priority | Status |
+|---|----------|--------|
+| 1 | Merge handoff branch to main | **DONE** — PRs #309/#310 merged |
+| 2 | Deploy to production | **DONE** — Triggered via `mcp__github__push_files` commit to main |
+| 3 | Apply migrations 042 + 043 | **PENDING** — SQL provided below, user must run in Supabase SQL Editor |
+| 4 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ different providers |
+| 5 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data; thresholds now config-driven |
+| 6 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
+
+### Merged Commits (now on main, newest first)
 
 | Commit | Type | Description |
 |--------|------|-------------|
@@ -104,15 +115,38 @@
 4. **Benchmark premium ranges outdated** — `dataDate` updated to 2026-03-28 but actual premium ranges still from Dec 2024 research. Needs external market research to update ranges in `MARKET_BENCHMARKS`.
 5. **EOOP can't model % deductibles in Monte Carlo** — warning added; full fix needs per-coverage DeductibleSpec mapping in adapter.
 
+## Migrations to Apply (Copy-Paste into Supabase SQL Editor)
+
+### Migration 042 — isDraft Column
+
+```sql
+-- Migration 042: Add is_draft column to policies table
+ALTER TABLE public.policies ADD COLUMN IF NOT EXISTS is_draft BOOLEAN DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_policies_user_is_draft ON public.policies (user_id, is_draft);
+```
+
+**Verify**: `SELECT column_name, data_type, column_default FROM information_schema.columns WHERE table_name = 'policies' AND column_name = 'is_draft';`
+
+### Migration 043 — Benchmark Threshold Configs
+
+```sql
+-- Migration 043: Seed benchmark aging/stale threshold configs
+INSERT INTO public.app_settings (category, key, value, description, validation_schema)
+VALUES
+  ('evaluation', 'benchmark_aging_days', '180', 'Days after dataDate before benchmark is considered aging (181-365 default range)', '{"type":"number","minimum":30,"maximum":730}'),
+  ('evaluation', 'benchmark_stale_days', '365', 'Days after dataDate before benchmark is considered stale (>365 default)', '{"type":"number","minimum":60,"maximum":1460}')
+ON CONFLICT (category, key) DO NOTHING;
+```
+
+**Verify**: `SELECT * FROM app_settings WHERE category = 'evaluation' AND key IN ('benchmark_aging_days', 'benchmark_stale_days');`
+
 ## Next Steps (Priority Order)
 
-1. **Merge This Branch to Main** — Create PR for `claude/project-handoff-docs-0XYw6` → `main`. All 7 commits are clean.
-2. **Deploy to Production** — Railway needs a deploy trigger. Sandbox `git push` doesn't trigger webhook — use `mcp__github__push_files` or Railway manual deploy.
-3. **Apply Migrations to Production Supabase** — Two new migrations need manual application via SQL Editor:
-   - `042_add_is_draft_to_policies.sql` — adds `is_draft` column to `policies` table
-   - `043_seed_benchmark_threshold_configs.sql` — seeds `benchmarkAgingDays`/`benchmarkStaleDays` in `app_settings`
+1. ~~**Merge This Branch to Main**~~ — **DONE** via PRs #309/#310.
+2. ~~**Deploy to Production**~~ — **DONE** via `mcp__github__push_files` deploy trigger commit.
+3. **Apply Migrations to Production Supabase** — Run the SQL above in Supabase Dashboard → SQL Editor. Both are idempotent (`IF NOT EXISTS` / `ON CONFLICT DO NOTHING`).
 4. **Upload Diverse KASKO PDFs** — Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target: April 5, 2026.
-5. **Calibrate Grade Thresholds** — A=90, B=80 etc. are arbitrary. Need real outcome data. Thresholds are now config-driven via admin Settings UI.
+5. **Calibrate Grade Thresholds** — A=90, B=80 etc. are arbitrary. Need real outcome data. Thresholds are now config-driven via admin Settings UI (Settings → Evaluation).
 6. **Update Benchmark Premium Ranges** — Current premium ranges from Dec 2024 research. Needs external market research to update actual values in `MARKET_BENCHMARKS`.
 
 ## Non-Negotiable Rules (Carry Forward)
