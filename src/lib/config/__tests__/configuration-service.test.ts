@@ -21,9 +21,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 // ── Hoisted mocks ──────────────────────────────────────────────────────────
 // We use vi.hoisted so mock variables are available inside vi.mock factories.
-const { mockFrom, mockSelect, mockSingle, mockOrder, mockEq, mockUpsert } =
+const { mockFrom, mockSelect, mockSingle, mockMaybeSingle, mockOrder, mockEq, mockUpsert } =
   vi.hoisted(() => {
     const mockSingle = vi.fn()
+    const mockMaybeSingle = vi.fn()
     const mockOrder = vi.fn()
     const mockUpsert = vi.fn()
 
@@ -32,7 +33,7 @@ const { mockFrom, mockSelect, mockSingle, mockOrder, mockEq, mockUpsert } =
     const mockSelect = vi.fn()
     const mockFrom = vi.fn()
 
-    return { mockFrom, mockSelect, mockSingle, mockOrder, mockEq, mockUpsert }
+    return { mockFrom, mockSelect, mockSingle, mockMaybeSingle, mockOrder, mockEq, mockUpsert }
   })
 
 // Mock Supabase — we control every chained call
@@ -78,7 +79,31 @@ import { configPerformanceMonitor } from '../config-performance-monitor'
  */
 function setupSingleQuery(result: { data: unknown; error: unknown }) {
   mockSingle.mockResolvedValueOnce(result)
-  mockEq.mockReturnValue({ eq: mockEq, single: mockSingle, order: mockOrder })
+  mockEq.mockReturnValue({
+    eq: mockEq,
+    single: mockSingle,
+    maybeSingle: mockMaybeSingle,
+    order: mockOrder,
+  })
+  mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
+  mockFrom.mockReturnValue({
+    select: mockSelect,
+    upsert: mockUpsert,
+  })
+}
+
+/**
+ * Set up the Supabase mock chain for a query that ends with .maybeSingle()
+ * e.g. supabase.from('user_preferences').select('*').eq('user_id','x').maybeSingle()
+ */
+function setupMaybeSingleQuery(result: { data: unknown; error: unknown }) {
+  mockMaybeSingle.mockResolvedValueOnce(result)
+  mockEq.mockReturnValue({
+    eq: mockEq,
+    single: mockSingle,
+    maybeSingle: mockMaybeSingle,
+    order: mockOrder,
+  })
   mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
   mockFrom.mockReturnValue({
     select: mockSelect,
@@ -92,7 +117,12 @@ function setupSingleQuery(result: { data: unknown; error: unknown }) {
  */
 function setupOrderQuery(result: { data: unknown; error: unknown }) {
   mockOrder.mockResolvedValueOnce(result)
-  mockEq.mockReturnValue({ eq: mockEq, single: mockSingle, order: mockOrder })
+  mockEq.mockReturnValue({
+    eq: mockEq,
+    single: mockSingle,
+    maybeSingle: mockMaybeSingle,
+    order: mockOrder,
+  })
   mockSelect.mockReturnValue({ eq: mockEq, order: mockOrder })
   mockFrom.mockReturnValue({
     select: mockSelect,
@@ -539,11 +569,11 @@ describe('ConfigurationService', () => {
 
     it('should override OCR thresholds from DB', async () => {
       setupCategoryQuery([
-        { key: 'skip_ocr_threshold', value: 0.90 },
+        { key: 'skip_ocr_threshold', value: 0.9 },
         { key: 'timeout_seconds', value: 60 },
       ])
       const config = await service.getOCRConfig()
-      expect(config.skipOcrThreshold).toBe(0.90)
+      expect(config.skipOcrThreshold).toBe(0.9)
       expect(config.timeoutSeconds).toBe(60)
       expect(config.charsPerPageThreshold).toBe(DEFAULT_OCR_CONFIG.charsPerPageThreshold)
     })
@@ -564,9 +594,7 @@ describe('ConfigurationService', () => {
       setupCategoryQuery([{ key: 'default_threshold', value: 0.9 }])
       const config = await service.getFuzzyMatchingConfig()
       expect(config.defaultThreshold).toBe(0.9)
-      expect(config.policyNumberThreshold).toBe(
-        DEFAULT_FUZZY_MATCHING_CONFIG.policyNumberThreshold
-      )
+      expect(config.policyNumberThreshold).toBe(DEFAULT_FUZZY_MATCHING_CONFIG.policyNumberThreshold)
     })
   })
 
@@ -1376,13 +1404,13 @@ describe('ConfigurationService', () => {
 
     it('should return preferences when found', async () => {
       const prefs = { default_items_per_page: 25, max_ai_insights_preview: 5 }
-      setupSingleQuery({ data: { preferences: prefs }, error: null })
+      setupMaybeSingleQuery({ data: { preferences: prefs }, error: null })
       const result = await service.getUserPreferences('user-1', 'ui')
       expect(result).toEqual(prefs)
     })
 
     it('should return null when not found', async () => {
-      setupSingleQuery({ data: null, error: { code: 'PGRST116' } })
+      setupMaybeSingleQuery({ data: null, error: { code: 'PGRST116' } })
       const result = await service.getUserPreferences('user-1', 'ui')
       expect(result).toBeNull()
     })
@@ -1439,7 +1467,7 @@ describe('ConfigurationService', () => {
       // getUIConfig returns default (DB empty)
       setupCategoryQuery([])
       // getUserPreferences returns user overrides
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { default_items_per_page: 25 } },
         error: null,
       })
@@ -1451,7 +1479,7 @@ describe('ConfigurationService', () => {
 
     it('should return admin config when user has no preferences', async () => {
       setupCategoryQuery([{ key: 'max_file_size_mb', value: 20 }])
-      setupSingleQuery({ data: null, error: null })
+      setupMaybeSingleQuery({ data: null, error: null })
 
       const config = await service.getUIConfigForUser('user-1')
       expect(config.maxFileSizeMb).toBe(20)
@@ -1466,7 +1494,7 @@ describe('ConfigurationService', () => {
 
     it('should merge email user preferences over admin config', async () => {
       setupCategoryQuery([])
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { default_digest_enabled: true } },
         error: null,
       })
@@ -1478,7 +1506,7 @@ describe('ConfigurationService', () => {
 
     it('should return admin config when user has null prefs', async () => {
       setupCategoryQuery([{ key: 'urgency_threshold_days', value: 14 }])
-      setupSingleQuery({ data: null, error: null })
+      setupMaybeSingleQuery({ data: null, error: null })
 
       const config = await service.getEmailConfigForUser('user-2')
       expect(config.urgencyThresholdDays).toBe(14)
@@ -1504,58 +1532,38 @@ describe('ConfigurationService', () => {
 
     it('should return user preference for overridable category when set', async () => {
       // getUserPreferences returns user prefs
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { default_items_per_page: 30 } },
         error: null,
       })
-      const result = await service.getForUser(
-        'ui',
-        'default_items_per_page',
-        10,
-        'user-1'
-      )
+      const result = await service.getForUser('ui', 'default_items_per_page', 10, 'user-1')
       expect(result).toBe(30)
     })
 
     it('should fall back to admin setting when user has no pref for the key', async () => {
       // getUserPreferences returns prefs without our key
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { some_other_key: 'val' } },
         error: null,
       })
       // Fall back to admin get
       setupSingleQuery({ data: { value: 25 }, error: null })
-      const result = await service.getForUser(
-        'ui',
-        'default_items_per_page',
-        10,
-        'user-1'
-      )
+      const result = await service.getForUser('ui', 'default_items_per_page', 10, 'user-1')
       expect(result).toBe(25)
     })
 
     it('should fall back to admin setting when getUserPreferences returns null', async () => {
       // getUserPreferences returns null
-      setupSingleQuery({ data: null, error: null })
+      setupMaybeSingleQuery({ data: null, error: null })
       // Admin setting
       setupSingleQuery({ data: { value: 5000 }, error: null })
-      const result = await service.getForUser(
-        'email',
-        'urgency_threshold_days',
-        7,
-        'user-1'
-      )
+      const result = await service.getForUser('email', 'urgency_threshold_days', 7, 'user-1')
       expect(result).toBe(5000)
     })
 
     it('should handle non-overridable categories with userId — delegates to get()', async () => {
       setupSingleQuery({ data: { value: 0.2 }, error: null })
-      const result = await service.getForUser(
-        'ocr',
-        'skip_ocr_threshold',
-        0.85,
-        'user-1'
-      )
+      const result = await service.getForUser('ocr', 'skip_ocr_threshold', 0.85, 'user-1')
       expect(result).toBe(0.2)
     })
   })
@@ -1635,7 +1643,7 @@ describe('ConfigurationService', () => {
 
     it('getUIConfigForUser() should merge user prefs', async () => {
       setupCategoryQuery([])
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { default_items_per_page: 50 } },
         error: null,
       })
@@ -1646,7 +1654,7 @@ describe('ConfigurationService', () => {
 
     it('getEmailConfigForUser() should merge user prefs', async () => {
       setupCategoryQuery([])
-      setupSingleQuery({
+      setupMaybeSingleQuery({
         data: { preferences: { default_marketing_enabled: false } },
         error: null,
       })

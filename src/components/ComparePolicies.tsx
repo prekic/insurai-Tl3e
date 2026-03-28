@@ -373,7 +373,7 @@ export function ComparePolicies() {
             <QuickStatsCard comparison={comparison} t={t} />
 
             {/* Score Comparison Chart */}
-            <ScoreComparisonChart comparison={comparison} t={t} />
+            <ScoreComparisonChart comparison={comparison} locale={locale} t={t} />
 
             {/* Winners Summary */}
             <section className="bg-white rounded-2xl border border-gray-200 p-6">
@@ -736,6 +736,7 @@ function QuickStatsCard({ comparison, t }: QuickStatsCardProps) {
 
 interface ScoreComparisonChartProps {
   comparison: PolicyComparisonType
+  locale: string
   t: {
     comparison: {
       scoreChart: string
@@ -750,7 +751,7 @@ interface ScoreComparisonChartProps {
   }
 }
 
-function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
+function ScoreComparisonChart({ comparison, locale, t }: ScoreComparisonChartProps) {
   const categories = ['premium', 'coverage', 'deductible', 'compliance', 'value'] as const
   const categoryLabels: Record<string, string> = {
     premium: t.comparison.premium,
