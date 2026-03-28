@@ -87,9 +87,15 @@ export default tseslint.config(
     },
   },
 
-  // Scripts directory - CLI tools need console.log and more lenient rules
+  // Scripts directory - CLI tools need console.log, Node globals, and more lenient rules
   {
-    files: ['scripts/**/*.{ts,js}'],
+    files: ['scripts/**/*.{ts,js,mjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2020,
+      },
+    },
     rules: {
       'no-console': 'off',
       '@typescript-eslint/no-explicit-any': 'off',

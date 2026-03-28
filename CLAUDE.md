@@ -3,13 +3,14 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. ~~**Merge Handoff Branch to Main**~~: **DONE** — PRs #309/#310 merged. Branch `claude/project-handoff-docs-0XYw6` is now on main.
-2. ~~**Deploy to Production**~~: **DONE** — Deploy triggered via `mcp__github__push_files` commit to main (March 28, 2026).
-3. **Apply Migrations to Production Supabase**: `042_add_is_draft_to_policies.sql` (isDraft persistence) and `043_seed_benchmark_threshold_configs.sql` (admin-configurable freshness thresholds). SQL provided in SESSION_HANDOFF.md — run in Supabase SQL Editor.
-4. **Upload Diverse KASKO PDFs**: Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target graduation: April 5, 2026.
-5. **Calibrate Grade Thresholds**: A=90, B=80 etc. are arbitrary — need real outcome data. Thresholds are now config-driven via admin Settings UI.
-6. **Update Benchmark Data**: `dataDate` updated to 2026-03-28 but premium ranges still from Dec 2024. Needs external market research to update actual premium ranges in `MARKET_BENCHMARKS`.
-7. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. ~~**Merge Handoff Branch to Main**~~: **DONE** — PRs #309/#310 merged.
+2. ~~**Deploy to Production**~~: **DONE** — Deploy triggered via commit to main (March 28, 2026).
+3. ~~**Trim CLAUDE.md**~~: **DONE** — PR #311 merged. 404KB → 151KB. Archive at `docs/KNOWN_ISSUES_ARCHIVE.md`.
+4. **Apply Migrations to Production Supabase** *(manual)*: `042_add_is_draft_to_policies.sql` and `043_seed_benchmark_threshold_configs.sql`. SQL in SESSION_HANDOFF.md — run in Supabase SQL Editor.
+5. **Upload Diverse KASKO PDFs** *(blocked — needs real files)*: Phase 8L graduation needs 5+ unique documents from different providers. Target: April 5, 2026.
+6. **Calibrate Grade Thresholds** *(blocked — needs outcome data)*: A=90, B=80 etc. are arbitrary. Thresholds are config-driven via admin Settings UI.
+7. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
+8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
