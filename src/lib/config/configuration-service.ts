@@ -139,6 +139,8 @@ const EVALUATION_KEY_MAP: Record<string, keyof EvaluationConfig> = {
   use_regional_benchmarks: 'useRegionalBenchmarks',
   worker_enabled: 'workerEnabled',
   worker_iterations: 'workerIterations',
+  benchmark_aging_days: 'benchmarkAgingDays',
+  benchmark_stale_days: 'benchmarkStaleDays',
 }
 
 const RATE_LIMITS_KEY_MAP: Record<string, keyof RateLimitsConfig> = {

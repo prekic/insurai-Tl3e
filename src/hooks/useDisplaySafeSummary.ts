@@ -104,7 +104,7 @@ export function useDisplaySafeSummary(
         summary.pilotFlagName = 'kasko_ai_extraction_pilot'
         summary.pilotReviewerSegment = 'kasko_pilot_reviewers'
         summary.pilotReviewBanner = pilotGate.reviewBannerText
-        summary.isDraft = pilotGate.isDraft
+        summary.isDraft = policy.isDraft ?? pilotGate.isDraft
       }
 
       return summary

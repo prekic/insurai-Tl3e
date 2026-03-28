@@ -75,7 +75,7 @@ vi.mock('./data', () => ({
       area: 20177,
       density: 130,
       urbanRatio: 0.71,
-      coordinates: { lat: 36.88, lng: 30.70 },
+      coordinates: { lat: 36.88, lng: 30.7 },
     },
   },
   REGIONAL_RISK_PROFILES: {
@@ -157,17 +157,43 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 25000000000,
       marketPenetration: 0.42,
       insurancePerCapita: 7250,
-      claimsData: { totalClaims: 2800000, claimsPaid: 125000000000, avgClaimAmount: 44643, claimsRatio: 0.68, avgSettlementDays: 18 },
+      claimsData: {
+        totalClaims: 2800000,
+        claimsPaid: 125000000000,
+        avgClaimAmount: 44643,
+        claimsRatio: 0.68,
+        avgSettlementDays: 18,
+      },
       growth: { yoyPremiumGrowth: 0.45, yoyPolicyGrowth: 0.12, yoyClaimsGrowth: 0.38 },
       policyDistribution: {
-        kasko: { count: 1500000, avgPremium: 20000, premiumVolume: 30000000000, marketShare: 0.256 },
-        traffic: { count: 2000000, avgPremium: 4500, premiumVolume: 9000000000, marketShare: 0.384 },
+        kasko: {
+          count: 1500000,
+          avgPremium: 20000,
+          premiumVolume: 30000000000,
+          marketShare: 0.256,
+        },
+        traffic: {
+          count: 2000000,
+          avgPremium: 4500,
+          premiumVolume: 9000000000,
+          marketShare: 0.384,
+        },
         home: { count: 500000, avgPremium: 6000, premiumVolume: 3000000000, marketShare: 0.144 },
-        health: { count: 300000, avgPremium: 37000, premiumVolume: 11100000000, marketShare: 0.096 },
+        health: {
+          count: 300000,
+          avgPremium: 37000,
+          premiumVolume: 11100000000,
+          marketShare: 0.096,
+        },
         life: { count: 200000, avgPremium: 11000, premiumVolume: 2200000000, marketShare: 0.064 },
-        dask: { count: 400000, avgPremium: 1000, premiumVolume: 400000000, marketShare: 0.200 },
-        business: { count: 100000, avgPremium: 65000, premiumVolume: 6500000000, marketShare: 0.036 },
-        nakliyat: { count: 50000, avgPremium: 15000, premiumVolume: 750000000, marketShare: 0.030 },
+        dask: { count: 400000, avgPremium: 1000, premiumVolume: 400000000, marketShare: 0.2 },
+        business: {
+          count: 100000,
+          avgPremium: 65000,
+          premiumVolume: 6500000000,
+          marketShare: 0.036,
+        },
+        nakliyat: { count: 50000, avgPremium: 15000, premiumVolume: 750000000, marketShare: 0.03 },
       },
       dataDate: '2024-12-01',
       source: 'TSB/SEDDK',
@@ -178,16 +204,27 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 8000000000,
       marketPenetration: 0.38,
       insurancePerCapita: 5800,
-      claimsData: { totalClaims: 850000, claimsPaid: 32000000000, avgClaimAmount: 37647, claimsRatio: 0.62, avgSettlementDays: 15 },
-      growth: { yoyPremiumGrowth: 0.42, yoyPolicyGrowth: 0.10, yoyClaimsGrowth: 0.35 },
+      claimsData: {
+        totalClaims: 850000,
+        claimsPaid: 32000000000,
+        avgClaimAmount: 37647,
+        claimsRatio: 0.62,
+        avgSettlementDays: 15,
+      },
+      growth: { yoyPremiumGrowth: 0.42, yoyPolicyGrowth: 0.1, yoyClaimsGrowth: 0.35 },
       policyDistribution: {
         kasko: { count: 600000, avgPremium: 17000, premiumVolume: 10200000000, marketShare: 0.262 },
         traffic: { count: 800000, avgPremium: 4200, premiumVolume: 3360000000, marketShare: 0.381 },
         home: { count: 200000, avgPremium: 5800, premiumVolume: 1160000000, marketShare: 0.155 },
-        health: { count: 150000, avgPremium: 32000, premiumVolume: 4800000000, marketShare: 0.090 },
+        health: { count: 150000, avgPremium: 32000, premiumVolume: 4800000000, marketShare: 0.09 },
         life: { count: 100000, avgPremium: 10000, premiumVolume: 1000000000, marketShare: 0.067 },
         dask: { count: 120000, avgPremium: 880, premiumVolume: 105600000, marketShare: 0.202 },
-        business: { count: 30000, avgPremium: 35000, premiumVolume: 1050000000, marketShare: 0.043 },
+        business: {
+          count: 30000,
+          avgPremium: 35000,
+          premiumVolume: 1050000000,
+          marketShare: 0.043,
+        },
         nakliyat: { count: 20000, avgPremium: 12000, premiumVolume: 240000000, marketShare: 0.035 },
       },
       dataDate: '2024-12-01',
@@ -199,10 +236,16 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 6000000000,
       marketPenetration: 0.35,
       insurancePerCapita: 4800,
-      claimsData: { totalClaims: 780000, claimsPaid: 28000000000, avgClaimAmount: 35897, claimsRatio: 0.62, avgSettlementDays: 16 },
-      growth: { yoyPremiumGrowth: 0.40, yoyPolicyGrowth: 0.08, yoyClaimsGrowth: 0.32 },
+      claimsData: {
+        totalClaims: 780000,
+        claimsPaid: 28000000000,
+        avgClaimAmount: 35897,
+        claimsRatio: 0.62,
+        avgSettlementDays: 16,
+      },
+      growth: { yoyPremiumGrowth: 0.4, yoyPolicyGrowth: 0.08, yoyClaimsGrowth: 0.32 },
       policyDistribution: {
-        kasko: { count: 450000, avgPremium: 17000, premiumVolume: 7650000000, marketShare: 0.250 },
+        kasko: { count: 450000, avgPremium: 17000, premiumVolume: 7650000000, marketShare: 0.25 },
         traffic: { count: 600000, avgPremium: 4100, premiumVolume: 2460000000, marketShare: 0.395 },
         home: { count: 150000, avgPremium: 5500, premiumVolume: 825000000, marketShare: 0.153 },
         health: { count: 100000, avgPremium: 32000, premiumVolume: 3200000000, marketShare: 0.084 },
@@ -220,16 +263,27 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 7000000000,
       marketPenetration: 0.32,
       insurancePerCapita: 4200,
-      claimsData: { totalClaims: 820000, claimsPaid: 26000000000, avgClaimAmount: 31707, claimsRatio: 0.54, avgSettlementDays: 14 },
-      growth: { yoyPremiumGrowth: 0.38, yoyPolicyGrowth: 0.09, yoyClaimsGrowth: 0.30 },
+      claimsData: {
+        totalClaims: 820000,
+        claimsPaid: 26000000000,
+        avgClaimAmount: 31707,
+        claimsRatio: 0.54,
+        avgSettlementDays: 14,
+      },
+      growth: { yoyPremiumGrowth: 0.38, yoyPolicyGrowth: 0.09, yoyClaimsGrowth: 0.3 },
       policyDistribution: {
         kasko: { count: 500000, avgPremium: 14000, premiumVolume: 7000000000, marketShare: 0.233 },
-        traffic: { count: 700000, avgPremium: 3700, premiumVolume: 2590000000, marketShare: 0.400 },
+        traffic: { count: 700000, avgPremium: 3700, premiumVolume: 2590000000, marketShare: 0.4 },
         home: { count: 180000, avgPremium: 5000, premiumVolume: 900000000, marketShare: 0.156 },
         health: { count: 120000, avgPremium: 30000, premiumVolume: 3600000000, marketShare: 0.093 },
         life: { count: 90000, avgPremium: 9000, premiumVolume: 810000000, marketShare: 0.071 },
-        dask: { count: 150000, avgPremium: 700, premiumVolume: 105000000, marketShare: 0.200 },
-        business: { count: 60000, avgPremium: 26000, premiumVolume: 1560000000, marketShare: 0.047 },
+        dask: { count: 150000, avgPremium: 700, premiumVolume: 105000000, marketShare: 0.2 },
+        business: {
+          count: 60000,
+          avgPremium: 26000,
+          premiumVolume: 1560000000,
+          marketShare: 0.047,
+        },
         nakliyat: { count: 10000, avgPremium: 11000, premiumVolume: 110000000, marketShare: 0.034 },
       },
       dataDate: '2024-12-01',
@@ -241,7 +295,13 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 3000000000,
       marketPenetration: 0.28,
       insurancePerCapita: 3200,
-      claimsData: { totalClaims: 380000, claimsPaid: 9500000000, avgClaimAmount: 25000, claimsRatio: 0.53, avgSettlementDays: 20 },
+      claimsData: {
+        totalClaims: 380000,
+        claimsPaid: 9500000000,
+        avgClaimAmount: 25000,
+        claimsRatio: 0.53,
+        avgSettlementDays: 20,
+      },
       growth: { yoyPremiumGrowth: 0.35, yoyPolicyGrowth: 0.06, yoyClaimsGrowth: 0.28 },
       policyDistribution: {
         kasko: { count: 200000, avgPremium: 13000, premiumVolume: 2600000000, marketShare: 0.218 },
@@ -262,7 +322,13 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 1500000000,
       marketPenetration: 0.22,
       insurancePerCapita: 2100,
-      claimsData: { totalClaims: 180000, claimsPaid: 4200000000, avgClaimAmount: 23333, claimsRatio: 0.49, avgSettlementDays: 25 },
+      claimsData: {
+        totalClaims: 180000,
+        claimsPaid: 4200000000,
+        avgClaimAmount: 23333,
+        claimsRatio: 0.49,
+        avgSettlementDays: 25,
+      },
       growth: { yoyPremiumGrowth: 0.32, yoyPolicyGrowth: 0.05, yoyClaimsGrowth: 0.25 },
       policyDistribution: {
         kasko: { count: 100000, avgPremium: 12000, premiumVolume: 1200000000, marketShare: 0.183 },
@@ -272,7 +338,7 @@ vi.mock('./data', () => ({
         life: { count: 20000, avgPremium: 6800, premiumVolume: 136000000, marketShare: 0.058 },
         dask: { count: 25000, avgPremium: 1100, premiumVolume: 27500000, marketShare: 0.233 },
         business: { count: 5000, avgPremium: 15000, premiumVolume: 75000000, marketShare: 0.035 },
-        nakliyat: { count: 4000, avgPremium: 9000, premiumVolume: 36000000, marketShare: 0.030 },
+        nakliyat: { count: 4000, avgPremium: 9000, premiumVolume: 36000000, marketShare: 0.03 },
       },
       dataDate: '2024-12-01',
       source: 'TSB/SEDDK',
@@ -283,7 +349,13 @@ vi.mock('./data', () => ({
       totalPremiumVolume: 2000000000,
       marketPenetration: 0.24,
       insurancePerCapita: 2400,
-      claimsData: { totalClaims: 280000, claimsPaid: 6800000000, avgClaimAmount: 24286, claimsRatio: 0.49, avgSettlementDays: 22 },
+      claimsData: {
+        totalClaims: 280000,
+        claimsPaid: 6800000000,
+        avgClaimAmount: 24286,
+        claimsRatio: 0.49,
+        avgSettlementDays: 22,
+      },
       growth: { yoyPremiumGrowth: 0.34, yoyPolicyGrowth: 0.07, yoyClaimsGrowth: 0.26 },
       policyDistribution: {
         kasko: { count: 130000, avgPremium: 12500, premiumVolume: 1625000000, marketShare: 0.211 },
@@ -300,11 +372,31 @@ vi.mock('./data', () => ({
     },
   },
   getRegionalPremiumBenchmarks: vi.fn((policyType: PolicyType) => {
-    const regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
-    const benchmarks: Record<string, { region: string; policyType: PolicyType; vsNational: { ranking: number; totalRegions: number } }> = {}
+    const regions: TurkishRegion[] = [
+      'marmara',
+      'ege',
+      'akdeniz',
+      'ic_anadolu',
+      'karadeniz',
+      'dogu_anadolu',
+      'guneydogu',
+    ]
+    const benchmarks: Record<
+      string,
+      {
+        region: string
+        policyType: PolicyType
+        vsNational: { ranking: number; totalRegions: number }
+      }
+    > = {}
     const avgPremiums: Record<string, number> = {
-      marmara: 20000, ege: 17000, akdeniz: 17000, ic_anadolu: 14000,
-      karadeniz: 13000, dogu_anadolu: 12000, guneydogu: 12500,
+      marmara: 20000,
+      ege: 17000,
+      akdeniz: 17000,
+      ic_anadolu: 14000,
+      karadeniz: 13000,
+      dogu_anadolu: 12000,
+      guneydogu: 12500,
     }
     // Sort by premium to determine ranking
     const sorted = [...regions].sort((a, b) => (avgPremiums[a] || 0) - (avgPremiums[b] || 0))
@@ -333,28 +425,121 @@ vi.mock('./data', () => ({
     return scores[region]
   }),
   getProvincesByRegion: vi.fn((region: TurkishRegion) => {
-    const regionProvinces: Record<TurkishRegion, Array<{ code: string; name: string; nameTr: string; region: TurkishRegion; population: number; area: number; density: number; urbanRatio: number; coordinates: { lat: number; lng: number } }>> = {
+    const regionProvinces: Record<
+      TurkishRegion,
+      Array<{
+        code: string
+        name: string
+        nameTr: string
+        region: TurkishRegion
+        population: number
+        area: number
+        density: number
+        urbanRatio: number
+        coordinates: { lat: number; lng: number }
+      }>
+    > = {
       marmara: [
-        { code: '34', name: 'Istanbul', nameTr: 'İstanbul', region: 'marmara', population: 15500000, area: 5461, density: 2913, urbanRatio: 0.99, coordinates: { lat: 41.01, lng: 28.98 } },
-        { code: '16', name: 'Bursa', nameTr: 'Bursa', region: 'marmara', population: 3100000, area: 10813, density: 291, urbanRatio: 0.91, coordinates: { lat: 40.18, lng: 29.06 } },
+        {
+          code: '34',
+          name: 'Istanbul',
+          nameTr: 'İstanbul',
+          region: 'marmara',
+          population: 15500000,
+          area: 5461,
+          density: 2913,
+          urbanRatio: 0.99,
+          coordinates: { lat: 41.01, lng: 28.98 },
+        },
+        {
+          code: '16',
+          name: 'Bursa',
+          nameTr: 'Bursa',
+          region: 'marmara',
+          population: 3100000,
+          area: 10813,
+          density: 291,
+          urbanRatio: 0.91,
+          coordinates: { lat: 40.18, lng: 29.06 },
+        },
       ],
       ege: [
-        { code: '35', name: 'Izmir', nameTr: 'İzmir', region: 'ege', population: 4400000, area: 11973, density: 370, urbanRatio: 0.92, coordinates: { lat: 38.42, lng: 27.14 } },
+        {
+          code: '35',
+          name: 'Izmir',
+          nameTr: 'İzmir',
+          region: 'ege',
+          population: 4400000,
+          area: 11973,
+          density: 370,
+          urbanRatio: 0.92,
+          coordinates: { lat: 38.42, lng: 27.14 },
+        },
       ],
       akdeniz: [
-        { code: '07', name: 'Antalya', nameTr: 'Antalya', region: 'akdeniz', population: 2600000, area: 20177, density: 130, urbanRatio: 0.71, coordinates: { lat: 36.88, lng: 30.70 } },
+        {
+          code: '07',
+          name: 'Antalya',
+          nameTr: 'Antalya',
+          region: 'akdeniz',
+          population: 2600000,
+          area: 20177,
+          density: 130,
+          urbanRatio: 0.71,
+          coordinates: { lat: 36.88, lng: 30.7 },
+        },
       ],
       ic_anadolu: [
-        { code: '06', name: 'Ankara', nameTr: 'Ankara', region: 'ic_anadolu', population: 5500000, area: 25632, density: 224, urbanRatio: 0.97, coordinates: { lat: 39.93, lng: 32.86 } },
+        {
+          code: '06',
+          name: 'Ankara',
+          nameTr: 'Ankara',
+          region: 'ic_anadolu',
+          population: 5500000,
+          area: 25632,
+          density: 224,
+          urbanRatio: 0.97,
+          coordinates: { lat: 39.93, lng: 32.86 },
+        },
       ],
       karadeniz: [
-        { code: '55', name: 'Samsun', nameTr: 'Samsun', region: 'karadeniz', population: 1300000, area: 9352, density: 146, urbanRatio: 0.68, coordinates: { lat: 41.29, lng: 36.33 } },
+        {
+          code: '55',
+          name: 'Samsun',
+          nameTr: 'Samsun',
+          region: 'karadeniz',
+          population: 1300000,
+          area: 9352,
+          density: 146,
+          urbanRatio: 0.68,
+          coordinates: { lat: 41.29, lng: 36.33 },
+        },
       ],
       dogu_anadolu: [
-        { code: '25', name: 'Erzurum', nameTr: 'Erzurum', region: 'dogu_anadolu', population: 750000, area: 25066, density: 30, urbanRatio: 0.64, coordinates: { lat: 39.90, lng: 41.27 } },
+        {
+          code: '25',
+          name: 'Erzurum',
+          nameTr: 'Erzurum',
+          region: 'dogu_anadolu',
+          population: 750000,
+          area: 25066,
+          density: 30,
+          urbanRatio: 0.64,
+          coordinates: { lat: 39.9, lng: 41.27 },
+        },
       ],
       guneydogu: [
-        { code: '27', name: 'Gaziantep', nameTr: 'Gaziantep', region: 'guneydogu', population: 2150000, area: 6887, density: 313, urbanRatio: 0.90, coordinates: { lat: 37.07, lng: 37.38 } },
+        {
+          code: '27',
+          name: 'Gaziantep',
+          nameTr: 'Gaziantep',
+          region: 'guneydogu',
+          population: 2150000,
+          area: 6887,
+          density: 313,
+          urbanRatio: 0.9,
+          coordinates: { lat: 37.07, lng: 37.38 },
+        },
       ],
     }
     return regionProvinces[region] || []
@@ -442,7 +627,7 @@ describe('compareRegions — branch coverage', () => {
     it('should generate advantage insight when target premium is lower', () => {
       // marmara kasko: 20000, ic_anadolu kasko: 14000 => diff = -6000 < 0
       const comparison = compareRegions('marmara', 'ic_anadolu', 'kasko')
-      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      const premiumInsight = comparison.insights.find((i) => i.category === 'premium')
       expect(premiumInsight).toBeDefined()
       expect(premiumInsight!.type).toBe('advantage')
       expect(premiumInsight!.message).toContain('lower premiums')
@@ -452,7 +637,7 @@ describe('compareRegions — branch coverage', () => {
     it('should generate disadvantage insight when target premium is higher', () => {
       // ic_anadolu kasko: 14000, marmara kasko: 20000 => diff = +6000 > 0
       const comparison = compareRegions('ic_anadolu', 'marmara', 'kasko')
-      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      const premiumInsight = comparison.insights.find((i) => i.category === 'premium')
       expect(premiumInsight).toBeDefined()
       expect(premiumInsight!.type).toBe('disadvantage')
       expect(premiumInsight!.message).toContain('higher premiums')
@@ -461,7 +646,7 @@ describe('compareRegions — branch coverage', () => {
     it('should not generate premium insight when premiums are equal', () => {
       // ege and akdeniz both have kasko avgPremium = 17000
       const comparison = compareRegions('ege', 'akdeniz', 'kasko')
-      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      const premiumInsight = comparison.insights.find((i) => i.category === 'premium')
       // diff = 17000 - 17000 = 0, neither < 0 nor > 0, so no premium insight
       expect(premiumInsight).toBeUndefined()
     })
@@ -469,7 +654,7 @@ describe('compareRegions — branch coverage', () => {
     it('should mark high impact when premium diff > 15% of source', () => {
       // marmara kasko: 20000, ic_anadolu: 14000 => diff = -6000 => |-6000/20000| = 30% > 15%
       const comparison = compareRegions('marmara', 'ic_anadolu', 'kasko')
-      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      const premiumInsight = comparison.insights.find((i) => i.category === 'premium')
       expect(premiumInsight!.impact).toBe('high')
     })
 
@@ -477,7 +662,7 @@ describe('compareRegions — branch coverage', () => {
       // ege kasko: 17000, marmara: 20000 => diff = 3000 => |3000/17000| ~= 17.6% > 15% => high
       // Need smaller diff. karadeniz: 13000, ic_anadolu: 14000 => diff = 1000 => |1000/13000| ~= 7.7% <= 15%
       const comparison = compareRegions('karadeniz', 'ic_anadolu', 'kasko')
-      const premiumInsight = comparison.insights.find(i => i.category === 'premium')
+      const premiumInsight = comparison.insights.find((i) => i.category === 'premium')
       expect(premiumInsight).toBeDefined()
       // diff = 1000, positive => disadvantage
       expect(premiumInsight!.type).toBe('disadvantage')
@@ -494,7 +679,7 @@ describe('compareRegions — branch coverage', () => {
     it('should generate advantage insight when target risk > 10 lower', () => {
       // marmara risk: 85, ic_anadolu risk: 45 => target < source - 10 (45 < 75)
       const comparison = compareRegions('marmara', 'ic_anadolu', 'kasko')
-      const riskInsight = comparison.insights.find(i => i.category === 'risk')
+      const riskInsight = comparison.insights.find((i) => i.category === 'risk')
       expect(riskInsight).toBeDefined()
       expect(riskInsight!.type).toBe('advantage')
       expect(riskInsight!.message).toContain('Lower overall risk')
@@ -503,7 +688,7 @@ describe('compareRegions — branch coverage', () => {
     it('should generate disadvantage insight when target risk > 10 higher', () => {
       // ic_anadolu risk: 45, marmara risk: 85 => target > source + 10 (85 > 55)
       const comparison = compareRegions('ic_anadolu', 'marmara', 'kasko')
-      const riskInsight = comparison.insights.find(i => i.category === 'risk')
+      const riskInsight = comparison.insights.find((i) => i.category === 'risk')
       expect(riskInsight).toBeDefined()
       expect(riskInsight!.type).toBe('disadvantage')
       expect(riskInsight!.message).toContain('Higher risk profile')
@@ -512,7 +697,7 @@ describe('compareRegions — branch coverage', () => {
     it('should not generate risk insight when risk difference <= 10', () => {
       // ege risk: 60, akdeniz risk: 62 => diff = 2 <= 10
       const comparison = compareRegions('ege', 'akdeniz', 'kasko')
-      const riskInsight = comparison.insights.find(i => i.category === 'risk')
+      const riskInsight = comparison.insights.find((i) => i.category === 'risk')
       expect(riskInsight).toBeUndefined()
     })
   })
@@ -525,7 +710,7 @@ describe('compareRegions — branch coverage', () => {
     it('should generate neutral market insight when target penetration > source + 0.05', () => {
       // ic_anadolu penetration: 0.32, marmara: 0.42 => 0.42 > 0.32 + 0.05 = 0.37
       const comparison = compareRegions('ic_anadolu', 'marmara', 'kasko')
-      const marketInsight = comparison.insights.find(i => i.category === 'market')
+      const marketInsight = comparison.insights.find((i) => i.category === 'market')
       expect(marketInsight).toBeDefined()
       expect(marketInsight!.type).toBe('neutral')
       expect(marketInsight!.impact).toBe('low')
@@ -534,7 +719,7 @@ describe('compareRegions — branch coverage', () => {
     it('should not generate market insight when penetration difference <= 0.05', () => {
       // marmara penetration: 0.42, ege: 0.38 => 0.38 - 0.42 = -0.04 NOT > 0.05
       const comparison = compareRegions('marmara', 'ege', 'kasko')
-      const marketInsight = comparison.insights.find(i => i.category === 'market')
+      const marketInsight = comparison.insights.find((i) => i.category === 'market')
       expect(marketInsight).toBeUndefined()
     })
   })
@@ -584,20 +769,29 @@ describe('compareAllRegions — branch coverage', () => {
   it('should return 6 comparisons (excluding source)', () => {
     const comparisons = compareAllRegions('marmara', 'kasko')
     expect(comparisons.length).toBe(6)
-    expect(comparisons.every(c => c.sourceRegion === 'marmara')).toBe(true)
-    expect(comparisons.some(c => c.targetRegion === 'marmara')).toBe(false)
+    expect(comparisons.every((c) => c.sourceRegion === 'marmara')).toBe(true)
+    expect(comparisons.some((c) => c.targetRegion === 'marmara')).toBe(false)
   })
 
   it('should be sorted by premium difference ascending', () => {
     const comparisons = compareAllRegions('marmara', 'kasko')
     for (let i = 0; i < comparisons.length - 1; i++) {
-      expect(comparisons[i].premiumDifference.amount)
-        .toBeLessThanOrEqual(comparisons[i + 1].premiumDifference.amount)
+      expect(comparisons[i].premiumDifference.amount).toBeLessThanOrEqual(
+        comparisons[i + 1].premiumDifference.amount
+      )
     }
   })
 
   it('should work for every source region', () => {
-    const regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
+    const regions: TurkishRegion[] = [
+      'marmara',
+      'ege',
+      'akdeniz',
+      'ic_anadolu',
+      'karadeniz',
+      'dogu_anadolu',
+      'guneydogu',
+    ]
     for (const region of regions) {
       const comparisons = compareAllRegions(region, 'traffic')
       expect(comparisons.length).toBe(6)
@@ -687,7 +881,7 @@ describe('analyzeLocation — branch coverage', () => {
   describe('recommendations', () => {
     it('should include DASK recommendation for earthquake zone <= 2 (marmara zone 1)', () => {
       const analysis = analyzeLocation('Istanbul')
-      const dask = analysis.recommendations.find(r => r.title.includes('DASK'))
+      const dask = analysis.recommendations.find((r) => r.title.includes('DASK'))
       expect(dask).toBeDefined()
       expect(dask!.priority).toBe('high')
       expect(dask!.type).toBe('coverage')
@@ -696,7 +890,7 @@ describe('analyzeLocation — branch coverage', () => {
 
     it('should include flood recommendation for high flood risk (akdeniz)', () => {
       const analysis = analyzeLocation('Antalya')
-      const flood = analysis.recommendations.find(r => r.title.includes('Flood'))
+      const flood = analysis.recommendations.find((r) => r.title.includes('Flood'))
       expect(flood).toBeDefined()
       expect(flood!.priority).toBe('high')
       expect(flood!.estimatedImpact!.premiumChange).toBe(15)
@@ -705,7 +899,7 @@ describe('analyzeLocation — branch coverage', () => {
 
     it('should include security recommendation for high crime (marmara overallLevel: high)', () => {
       const analysis = analyzeLocation('Istanbul')
-      const security = analysis.recommendations.find(r => r.title.includes('Security'))
+      const security = analysis.recommendations.find((r) => r.title.includes('Security'))
       expect(security).toBeDefined()
       expect(security!.type).toBe('risk_mitigation')
       expect(security!.priority).toBe('medium')
@@ -713,45 +907,45 @@ describe('analyzeLocation — branch coverage', () => {
 
     it('should include traffic recommendation for very_high congestion (marmara)', () => {
       const analysis = analyzeLocation('Istanbul')
-      const traffic = analysis.recommendations.find(r => r.title.includes('Auto'))
+      const traffic = analysis.recommendations.find((r) => r.title.includes('Auto'))
       expect(traffic).toBeDefined()
       expect(traffic!.priority).toBe('medium')
     })
 
     it('should include health recommendation for high healthcare access difficulty (dogu_anadolu)', () => {
       const analysis = analyzeLocation('Erzurum')
-      const health = analysis.recommendations.find(r => r.title.includes('Health'))
+      const health = analysis.recommendations.find((r) => r.title.includes('Health'))
       expect(health).toBeDefined()
       expect(health!.priority).toBe('medium')
     })
 
     it('should include health recommendation for guneydogu (high healthcareAccess)', () => {
       const analysis = analyzeLocation('Gaziantep')
-      const health = analysis.recommendations.find(r => r.title.includes('Health'))
+      const health = analysis.recommendations.find((r) => r.title.includes('Health'))
       expect(health).toBeDefined()
     })
 
     it('should NOT include traffic recommendation for low congestion (karadeniz)', () => {
       const analysis = analyzeLocation('Samsun')
-      const traffic = analysis.recommendations.find(r => r.title.includes('Comprehensive Auto'))
+      const traffic = analysis.recommendations.find((r) => r.title.includes('Comprehensive Auto'))
       expect(traffic).toBeUndefined()
     })
 
     it('should NOT include flood recommendation for low flood (ic_anadolu)', () => {
       const analysis = analyzeLocation('Ankara')
-      const flood = analysis.recommendations.find(r => r.title.includes('Flood'))
+      const flood = analysis.recommendations.find((r) => r.title.includes('Flood'))
       expect(flood).toBeUndefined()
     })
 
     it('should NOT include crime recommendation for low crime (ic_anadolu)', () => {
       const analysis = analyzeLocation('Ankara')
-      const security = analysis.recommendations.find(r => r.title.includes('Security'))
+      const security = analysis.recommendations.find((r) => r.title.includes('Security'))
       expect(security).toBeUndefined()
     })
 
     it('should NOT include DASK recommendation for zone 3 (ic_anadolu)', () => {
       const analysis = analyzeLocation('Ankara')
-      const dask = analysis.recommendations.find(r => r.title.includes('DASK'))
+      const dask = analysis.recommendations.find((r) => r.title.includes('DASK'))
       expect(dask).toBeUndefined()
     })
   })
@@ -812,8 +1006,9 @@ describe('compareNearbyProvinces — branch coverage', () => {
 
     const result = compareNearbyProvinces(istanbul, 'kasko')
     for (let i = 1; i < result.nearbyProvinces.length; i++) {
-      expect(result.nearbyProvinces[i].distance)
-        .toBeGreaterThanOrEqual(result.nearbyProvinces[i - 1].distance)
+      expect(result.nearbyProvinces[i].distance).toBeGreaterThanOrEqual(
+        result.nearbyProvinces[i - 1].distance
+      )
     }
   })
 
@@ -856,13 +1051,18 @@ describe('compareNearbyProvinces — branch coverage', () => {
 
     const result = compareNearbyProvinces(istanbul, 'kasko')
     // Check if any nearby province with lower premium has advantage
-    const withAdvantages = result.nearbyProvinces.filter(n => n.advantages.length > 0)
+    const withAdvantages = result.nearbyProvinces.filter((n) => n.advantages.length > 0)
     // Nearby Ankara (if within 300km) should have lower premiums advantage
     // Istanbul to Ankara is ~350km, so may not be nearby
     // Istanbul to Bursa is ~100km (same region, same premium) - no advantage
     // This depends on distance calculation - but we verify the structure
     for (const n of withAdvantages) {
-      expect(n.advantages.some(a => a.includes('lower premiums') || a.includes('Lower risk') || a.includes('competitive'))).toBe(true)
+      expect(
+        n.advantages.some(
+          (a) =>
+            a.includes('lower premiums') || a.includes('Lower risk') || a.includes('competitive')
+        )
+      ).toBe(true)
     }
   })
 
@@ -952,7 +1152,10 @@ describe('compareNearbyProvinces — branch coverage', () => {
     // No nearby region has higher penetration => no market advantage for nearby
     for (const nearby of result.nearbyProvinces) {
       // If nearby region has lower penetration, no market advantage
-      expect(nearby.advantages.includes('More competitive market') || !nearby.advantages.includes('More competitive market')).toBe(true)
+      expect(
+        nearby.advantages.includes('More competitive market') ||
+          !nearby.advantages.includes('More competitive market')
+      ).toBe(true)
     }
   })
 
@@ -1034,7 +1237,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
 
     const result = compareNearbyProvinces(bursa, 'kasko')
     // Find Izmir in nearby provinces (ege region, ~220km away)
-    const izmir = result.nearbyProvinces.find(n => n.province.code === '35')
+    const izmir = result.nearbyProvinces.find((n) => n.province.code === '35')
     expect(izmir).toBeDefined()
     if (izmir) {
       // 1 - 17000/20000 = 0.15 => 15% lower premiums
@@ -1059,7 +1262,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(bursa, 'kasko')
-    const izmir = result.nearbyProvinces.find(n => n.province.code === '35')
+    const izmir = result.nearbyProvinces.find((n) => n.province.code === '35')
     expect(izmir).toBeDefined()
     if (izmir) {
       expect(izmir.advantages).toContain('Lower risk profile')
@@ -1084,7 +1287,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
 
     const result = compareNearbyProvinces(izmir, 'kasko')
     // Find Bursa in nearby (marmara region, ~220km away)
-    const bursa = result.nearbyProvinces.find(n => n.province.code === '16')
+    const bursa = result.nearbyProvinces.find((n) => n.province.code === '16')
     expect(bursa).toBeDefined()
     if (bursa) {
       // 20000/17000 - 1 = 0.176 => 18% higher premiums (Math.round)
@@ -1109,7 +1312,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(izmir, 'kasko')
-    const bursa = result.nearbyProvinces.find(n => n.province.code === '16')
+    const bursa = result.nearbyProvinces.find((n) => n.province.code === '16')
     expect(bursa).toBeDefined()
     if (bursa) {
       expect(bursa.disadvantages).toContain('Higher risk profile')
@@ -1133,7 +1336,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(izmir, 'kasko')
-    const bursa = result.nearbyProvinces.find(n => n.province.code === '16')
+    const bursa = result.nearbyProvinces.find((n) => n.province.code === '16')
     expect(bursa).toBeDefined()
     if (bursa) {
       expect(bursa.advantages).toContain('More competitive market')
@@ -1157,7 +1360,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(bursa, 'kasko')
-    const izmir = result.nearbyProvinces.find(n => n.province.code === '35')
+    const izmir = result.nearbyProvinces.find((n) => n.province.code === '35')
     expect(izmir).toBeDefined()
     if (izmir) {
       expect(izmir.advantages).not.toContain('More competitive market')
@@ -1182,7 +1385,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(izmir, 'kasko')
-    const bursa = result.nearbyProvinces.find(n => n.province.code === '16')
+    const bursa = result.nearbyProvinces.find((n) => n.province.code === '16')
     expect(bursa).toBeDefined()
     if (bursa) {
       // Should have both disadvantages and one advantage
@@ -1212,7 +1415,7 @@ describe('compareNearbyProvinces — branch coverage', () => {
     }
 
     const result = compareNearbyProvinces(bursa, 'kasko')
-    const izmir = result.nearbyProvinces.find(n => n.province.code === '35')
+    const izmir = result.nearbyProvinces.find((n) => n.province.code === '35')
     expect(izmir).toBeDefined()
     if (izmir) {
       // Should have both advantages, no disadvantages
@@ -1242,7 +1445,8 @@ describe('getNationalStatistics — branch coverage', () => {
 
   it('should aggregate total premium volume', () => {
     const stats = getNationalStatistics()
-    const expectedVolume = 25000000000 + 8000000000 + 6000000000 + 7000000000 + 3000000000 + 1500000000 + 2000000000
+    const expectedVolume =
+      25000000000 + 8000000000 + 6000000000 + 7000000000 + 3000000000 + 1500000000 + 2000000000
     expect(stats.totalPremiumVolume).toBe(expectedVolume)
   })
 
@@ -1299,7 +1503,7 @@ describe('getNationalStatistics — branch coverage', () => {
 
   it('should include metadata', () => {
     const stats = getNationalStatistics()
-    expect(stats.dataDate).toBe('2024-12-01')
+    expect(stats.dataDate).toBe('2026-03-28')
     expect(stats.source).toBe('TSB/SEDDK')
   })
 
@@ -1313,11 +1517,24 @@ describe('getNationalStatistics — branch coverage', () => {
 
   it('should keep avgPremium at 0 when policyCount sums to 0 (line 443 else branch)', () => {
     // Temporarily set all regions' "life" count and premiumVolume to 0
-    const regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
+    const regions: TurkishRegion[] = [
+      'marmara',
+      'ege',
+      'akdeniz',
+      'ic_anadolu',
+      'karadeniz',
+      'dogu_anadolu',
+      'guneydogu',
+    ]
     const originals: { count: number; premiumVolume: number }[] = []
 
     for (const region of regions) {
-      const dist = (REGIONAL_INSURANCE_STATS as Record<string, { policyDistribution: Record<string, { count: number; premiumVolume: number }> }>)[region].policyDistribution.life
+      const dist = (
+        REGIONAL_INSURANCE_STATS as Record<
+          string,
+          { policyDistribution: Record<string, { count: number; premiumVolume: number }> }
+        >
+      )[region].policyDistribution.life
       originals.push({ count: dist.count, premiumVolume: dist.premiumVolume })
       dist.count = 0
       dist.premiumVolume = 0
@@ -1331,7 +1548,12 @@ describe('getNationalStatistics — branch coverage', () => {
     } finally {
       // Restore original values so other tests are not affected
       for (let i = 0; i < regions.length; i++) {
-        const dist = (REGIONAL_INSURANCE_STATS as Record<string, { policyDistribution: Record<string, { count: number; premiumVolume: number }> }>)[regions[i]].policyDistribution.life
+        const dist = (
+          REGIONAL_INSURANCE_STATS as Record<
+            string,
+            { policyDistribution: Record<string, { count: number; premiumVolume: number }> }
+          >
+        )[regions[i]].policyDistribution.life
         dist.count = originals[i].count
         dist.premiumVolume = originals[i].premiumVolume
       }
@@ -1421,7 +1643,7 @@ describe('getRegionalRankings — branch coverage', () => {
     it('should calculate value as penetration / (avgPremium / 10000)', () => {
       const rankings = getRegionalRankings('kasko', 'value')
       // marmara: 0.42 / (20000 / 10000) = 0.42 / 2 = 0.21
-      const marmaraRanking = rankings.rankings.find(r => r.region === 'marmara')
+      const marmaraRanking = rankings.rankings.find((r) => r.region === 'marmara')
       expect(marmaraRanking).toBeDefined()
       expect(marmaraRanking!.value).toBeCloseTo(0.21, 1)
     })

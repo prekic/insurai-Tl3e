@@ -335,7 +335,7 @@ export function getPremiumBenchmarkWithFallback(
     return {
       ...hardcoded,
       comparisonMethod: 'direct_premium',
-      dataDate: '2024-12-01',
+      dataDate: '2026-03-28',
     }
   }
 

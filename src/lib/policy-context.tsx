@@ -145,6 +145,7 @@ function policyRowToAnalyzedPolicy(row: PolicyRow): AnalyzedPolicy {
     canonicalText: row.canonical_text || undefined,
     spanMaps: (row.span_maps as AnalyzedPolicy['spanMaps']) || undefined,
     clauseGraph: (row.clause_graph as AnalyzedPolicy['clauseGraph']) || undefined,
+    isDraft: row.is_draft ?? false,
     isUniversalSchema: row.is_universal_schema || false,
     validationErrors: row.validation_errors || undefined,
     validationWarnings: row.validation_warnings || undefined,
@@ -204,6 +205,7 @@ function analyzedPolicyToInsert(policy: AnalyzedPolicy, userId: string): PolicyI
     evidence_span_version: policy.evidenceSpanVersion || 1,
     clause_graph_version: policy.clauseGraphVersion || 1,
     extraction_schema_version: policy.extractionSchemaVersion,
+    is_draft: policy.isDraft ?? false,
   }
 }
 
@@ -243,6 +245,7 @@ function analyzedPolicyToUpdate(updates: Partial<AnalyzedPolicy>): PolicyUpdate 
     result.clause_graph_version = updates.clauseGraphVersion
   if (updates.extractionSchemaVersion !== undefined)
     result.extraction_schema_version = updates.extractionSchemaVersion
+  if (updates.isDraft !== undefined) result.is_draft = updates.isDraft
 
   // Handle raw_data updates
   const hasRawDataUpdates =

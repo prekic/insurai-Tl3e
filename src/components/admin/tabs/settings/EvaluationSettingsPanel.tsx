@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { SettingsSkeleton } from '@/components/ui/loading'
 import { validateGradeThresholds, type ValidationResult } from '@/lib/admin/settings-validation'
-import { Save, Scale, Trophy, Target, AlertCircle, Info, BarChart3, Cpu } from 'lucide-react'
+import { Save, Scale, Trophy, Target, AlertCircle, Info, BarChart3, Cpu, Clock } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import type { SettingValue } from '../SettingsTab'
@@ -55,6 +55,8 @@ export function EvaluationSettingsPanel({
   const [tempGrades, setTempGrades] = useState<Record<string, number>>({})
   const [editingPerformance, setEditingPerformance] = useState(false)
   const [tempPerformance, setTempPerformance] = useState<Record<string, unknown>>({})
+  const [editingBenchmark, setEditingBenchmark] = useState(false)
+  const [tempBenchmark, setTempBenchmark] = useState<Record<string, number>>({})
   const [editReason, setEditReason] = useState('')
   const [metrics, setMetrics] = useState<{ avgLayerCMs: number | null; sampleSize: number } | null>(
     null
@@ -105,6 +107,15 @@ export function EvaluationSettingsPanel({
         ? workerEnabled.value === 'true' || workerEnabled.value === true
         : true,
       worker_iterations: workerIterations ? Number(workerIterations.value) : 10000,
+    }
+  }, [settings])
+
+  const currentBenchmark = useMemo(() => {
+    const agingSetting = settings.find((s) => s.key === 'benchmark_aging_days')
+    const staleSetting = settings.find((s) => s.key === 'benchmark_stale_days')
+    return {
+      benchmark_aging_days: agingSetting ? Number(agingSetting.value) : 180,
+      benchmark_stale_days: staleSetting ? Number(staleSetting.value) : 365,
     }
   }, [settings])
 
@@ -182,6 +193,44 @@ export function EvaluationSettingsPanel({
       }
     }
     setEditingGrades(false)
+  }
+
+  const benchmarkValidation = useMemo(() => {
+    if (!editingBenchmark) return null
+    const aging = tempBenchmark.benchmark_aging_days ?? 180
+    const stale = tempBenchmark.benchmark_stale_days ?? 365
+    if (aging >= stale) {
+      return { valid: false, message: 'Aging threshold must be less than stale threshold' }
+    }
+    if (aging < 30 || stale < 60) {
+      return { valid: false, message: 'Aging minimum is 30 days, stale minimum is 60 days' }
+    }
+    return { valid: true, message: '' }
+  }, [editingBenchmark, tempBenchmark])
+
+  const startEditingBenchmark = () => {
+    setTempBenchmark({ ...currentBenchmark })
+    setEditingBenchmark(true)
+    setEditReason('')
+  }
+
+  const saveBenchmark = async () => {
+    const changedEntries = Object.entries(tempBenchmark).filter(
+      ([key, value]) => value !== currentBenchmark[key as keyof typeof currentBenchmark]
+    )
+    const reason = editReason || 'Updated via benchmark freshness panel'
+
+    if (changedEntries.length > 0 && onBatchUpdate) {
+      await onBatchUpdate(
+        changedEntries.map(([key, value]) => ({ key, value })),
+        reason
+      )
+    } else {
+      for (const [key, value] of changedEntries) {
+        await onUpdate(key, value, reason)
+      }
+    }
+    setEditingBenchmark(false)
   }
 
   const getWeightColor = (key: string) => {
@@ -643,6 +692,128 @@ export function EvaluationSettingsPanel({
         </CardContent>
       </Card>
 
+      {/* Benchmark Freshness Thresholds */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-500" />
+                Benchmark Freshness Thresholds
+              </CardTitle>
+              <CardDescription>
+                Control when market benchmark data is flagged as aging or stale
+              </CardDescription>
+            </div>
+            {!editingBenchmark && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startEditingBenchmark}
+                disabled={isSaving}
+              >
+                Edit
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-gray-500 bg-gray-50 p-3 rounded-lg">
+              <Info className="h-4 w-4 flex-shrink-0" />
+              <span>
+                Benchmarks with dataDate older than the aging threshold show a warning. Beyond the
+                stale threshold, confidence is downgraded and language is hedged.
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Aging Threshold (days)</label>
+                <div className="text-xs text-gray-500 mb-2">
+                  Data older than this is flagged as aging (default: 180)
+                </div>
+                {editingBenchmark ? (
+                  <Input
+                    type="number"
+                    min={30}
+                    max={730}
+                    value={tempBenchmark.benchmark_aging_days ?? 180}
+                    onChange={(e) =>
+                      setTempBenchmark((prev) => ({
+                        ...prev,
+                        benchmark_aging_days: Number(e.target.value),
+                      }))
+                    }
+                  />
+                ) : (
+                  <span className="font-mono bg-gray-100 px-3 py-2 rounded text-sm inline-block">
+                    {currentBenchmark.benchmark_aging_days} days
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Stale Threshold (days)</label>
+                <div className="text-xs text-gray-500 mb-2">
+                  Data older than this downgrades confidence (default: 365)
+                </div>
+                {editingBenchmark ? (
+                  <Input
+                    type="number"
+                    min={60}
+                    max={1460}
+                    value={tempBenchmark.benchmark_stale_days ?? 365}
+                    onChange={(e) =>
+                      setTempBenchmark((prev) => ({
+                        ...prev,
+                        benchmark_stale_days: Number(e.target.value),
+                      }))
+                    }
+                  />
+                ) : (
+                  <span className="font-mono bg-gray-100 px-3 py-2 rounded text-sm inline-block">
+                    {currentBenchmark.benchmark_stale_days} days
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {editingBenchmark && benchmarkValidation && !benchmarkValidation.valid && (
+              <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                {benchmarkValidation.message}
+              </div>
+            )}
+
+            {editingBenchmark && (
+              <div className="space-y-3 pt-2">
+                <Input
+                  placeholder="Reason for change (optional)"
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={saveBenchmark}
+                    disabled={
+                      isSaving || (benchmarkValidation !== null && !benchmarkValidation.valid)
+                    }
+                    size="sm"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Save Thresholds
+                  </Button>
+                  <Button variant="outline" onClick={() => setEditingBenchmark(false)} size="sm">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Other Evaluation Settings */}
       <Card>
         <CardHeader>
@@ -660,7 +831,9 @@ export function EvaluationSettingsPanel({
                   !WEIGHT_KEYS.includes(s.key) &&
                   !GRADE_KEYS.includes(s.key) &&
                   s.key !== 'worker_enabled' &&
-                  s.key !== 'worker_iterations'
+                  s.key !== 'worker_iterations' &&
+                  s.key !== 'benchmark_aging_days' &&
+                  s.key !== 'benchmark_stale_days'
               )
               .map((setting) => (
                 <div

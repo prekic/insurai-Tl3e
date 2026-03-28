@@ -56,7 +56,9 @@ export function compareRegions(
     primaryRiskDifference = `Earthquake zone ${sourceRiskProfile.earthquake.zone} vs ${targetRiskProfile.earthquake.zone}`
   } else if (Math.abs(sourceRiskProfile.crime.theftRate - targetRiskProfile.crime.theftRate) > 50) {
     primaryRiskDifference = 'Crime rate difference'
-  } else if (Math.abs(sourceRiskProfile.flood.annualFrequency - targetRiskProfile.flood.annualFrequency) > 10) {
+  } else if (
+    Math.abs(sourceRiskProfile.flood.annualFrequency - targetRiskProfile.flood.annualFrequency) > 10
+  ) {
     primaryRiskDifference = 'Flood risk difference'
   }
 
@@ -145,12 +147,18 @@ export function compareAllRegions(
   policyType: PolicyType
 ): RegionalComparison[] {
   const allRegions: TurkishRegion[] = [
-    'marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu'
+    'marmara',
+    'ege',
+    'akdeniz',
+    'ic_anadolu',
+    'karadeniz',
+    'dogu_anadolu',
+    'guneydogu',
   ]
 
   return allRegions
-    .filter(r => r !== sourceRegion)
-    .map(targetRegion => compareRegions(sourceRegion, targetRegion, policyType))
+    .filter((r) => r !== sourceRegion)
+    .map((targetRegion) => compareRegions(sourceRegion, targetRegion, policyType))
     .sort((a, b) => a.premiumDifference.amount - b.premiumDifference.amount)
 }
 
@@ -173,8 +181,10 @@ export function analyzeLocation(address: string): LocationAnalysis {
   const addressLower = address.toLowerCase()
 
   for (const province of provinces) {
-    if (addressLower.includes(province.name.toLowerCase()) ||
-        addressLower.includes(province.nameTr.toLowerCase())) {
+    if (
+      addressLower.includes(province.name.toLowerCase()) ||
+      addressLower.includes(province.nameTr.toLowerCase())
+    ) {
       matchedProvince = province
       break
     }
@@ -182,28 +192,48 @@ export function analyzeLocation(address: string): LocationAnalysis {
 
   // Calculate confidence
   let confidence = 0.5
-  if (matchedProvince && (
-    addressLower.includes(matchedProvince.name.toLowerCase()) ||
-    addressLower.includes(matchedProvince.nameTr.toLowerCase())
-  )) {
+  if (
+    matchedProvince &&
+    (addressLower.includes(matchedProvince.name.toLowerCase()) ||
+      addressLower.includes(matchedProvince.nameTr.toLowerCase()))
+  ) {
     confidence = 0.9
   } else if (address.length > 20) {
     confidence = 0.7
   }
 
   // Get all regional risk scores for ranking
-  const allRegions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
+  const allRegions: TurkishRegion[] = [
+    'marmara',
+    'ege',
+    'akdeniz',
+    'ic_anadolu',
+    'karadeniz',
+    'dogu_anadolu',
+    'guneydogu',
+  ]
   const riskRankings = allRegions
-    .map(r => ({ region: r, score: calculateRegionalRiskScore(r) }))
+    .map((r) => ({ region: r, score: calculateRegionalRiskScore(r) }))
     .sort((a, b) => b.score - a.score)
-  const riskRanking = riskRankings.findIndex(r => r.region === region) + 1
+  const riskRanking = riskRankings.findIndex((r) => r.region === region) + 1
 
   // Generate recommendations
   const recommendations = generateLocationRecommendations(region, riskProfile, riskScore)
 
   // Get premium benchmarks for all policy types
-  const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
-  const premiumBenchmarks: Record<PolicyType, ReturnType<typeof getRegionalPremiumBenchmarks>[TurkishRegion]> = {} as Record<PolicyType, ReturnType<typeof getRegionalPremiumBenchmarks>[TurkishRegion]>
+  const policyTypes: PolicyType[] = [
+    'kasko',
+    'traffic',
+    'home',
+    'health',
+    'life',
+    'dask',
+    'business',
+  ]
+  const premiumBenchmarks: Record<
+    PolicyType,
+    ReturnType<typeof getRegionalPremiumBenchmarks>[TurkishRegion]
+  > = {} as Record<PolicyType, ReturnType<typeof getRegionalPremiumBenchmarks>[TurkishRegion]>
 
   for (const policyType of policyTypes) {
     premiumBenchmarks[policyType] = getRegionalPremiumBenchmarks(policyType)[region]
@@ -227,7 +257,7 @@ export function analyzeLocation(address: string): LocationAnalysis {
  */
 function generateLocationRecommendations(
   _region: TurkishRegion,
-  riskProfile: typeof REGIONAL_RISK_PROFILES[TurkishRegion],
+  riskProfile: (typeof REGIONAL_RISK_PROFILES)[TurkishRegion],
   _riskScore: number
 ): LocationRecommendation[] {
   const recommendations: LocationRecommendation[] = []
@@ -254,8 +284,10 @@ function generateLocationRecommendations(
       priority: 'high',
       title: 'Flood Coverage Recommended',
       titleTr: 'Sel Teminatı Önerilir',
-      description: 'High flood risk in your area. Consider adding flood coverage to your home insurance.',
-      descriptionTr: 'Bölgenizde sel riski yüksek. Konut sigortanıza sel teminatı eklemeyi düşünün.',
+      description:
+        'High flood risk in your area. Consider adding flood coverage to your home insurance.',
+      descriptionTr:
+        'Bölgenizde sel riski yüksek. Konut sigortanıza sel teminatı eklemeyi düşünün.',
       estimatedImpact: {
         premiumChange: 15,
         riskReduction: 25,
@@ -280,7 +312,10 @@ function generateLocationRecommendations(
   }
 
   // Traffic risk recommendations
-  if (riskProfile.traffic.congestionLevel === 'high' || riskProfile.traffic.congestionLevel === 'very_high') {
+  if (
+    riskProfile.traffic.congestionLevel === 'high' ||
+    riskProfile.traffic.congestionLevel === 'very_high'
+  ) {
     recommendations.push({
       type: 'coverage',
       priority: 'medium',
@@ -292,14 +327,19 @@ function generateLocationRecommendations(
   }
 
   // Healthcare access recommendations
-  if (riskProfile.health.healthcareAccess === 'high' || riskProfile.health.healthcareAccess === 'very_high') {
+  if (
+    riskProfile.health.healthcareAccess === 'high' ||
+    riskProfile.health.healthcareAccess === 'very_high'
+  ) {
     recommendations.push({
       type: 'coverage',
       priority: 'medium',
       title: 'Enhanced Health Coverage',
       titleTr: 'Gelişmiş Sağlık Teminatı',
-      description: 'Limited healthcare access. Consider comprehensive health insurance with air ambulance.',
-      descriptionTr: 'Sınırlı sağlık erişimi. Hava ambulansı dahil kapsamlı sağlık sigortası düşünün.',
+      description:
+        'Limited healthcare access. Consider comprehensive health insurance with air ambulance.',
+      descriptionTr:
+        'Sınırlı sağlık erişimi. Hava ambulansı dahil kapsamlı sağlık sigortası düşünün.',
     })
   }
 
@@ -324,8 +364,8 @@ export function compareNearbyProvinces(
 
   // Calculate distances and filter nearby
   const nearbyWithDistances = allProvinces
-    .filter(p => p.code !== province.code)
-    .map(p => ({
+    .filter((p) => p.code !== province.code)
+    .map((p) => ({
       province: p,
       distance: calculateDistance(
         province.coordinates.lat,
@@ -334,7 +374,7 @@ export function compareNearbyProvinces(
         p.coordinates.lng
       ),
     }))
-    .filter(p => p.distance <= 300) // Within 300km
+    .filter((p) => p.distance <= 300) // Within 300km
     .sort((a, b) => a.distance - b.distance)
     .slice(0, 5) // Top 5 nearest
 
@@ -345,7 +385,15 @@ export function compareNearbyProvinces(
 
     // Calculate premium differences for all policy types
     const premiumDifference: Record<PolicyType, number> = {} as Record<PolicyType, number>
-    const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
+    const policyTypes: PolicyType[] = [
+      'kasko',
+      'traffic',
+      'home',
+      'health',
+      'life',
+      'dask',
+      'business',
+    ]
 
     for (const pt of policyTypes) {
       const srcPrem = sourceStats.policyDistribution[pt].avgPremium
@@ -368,7 +416,9 @@ export function compareNearbyProvinces(
     }
 
     if (nearbyPremium > sourcePremium * 1.1) {
-      disadvantages.push(`${Math.round((nearbyPremium / sourcePremium - 1) * 100)}% higher premiums`)
+      disadvantages.push(
+        `${Math.round((nearbyPremium / sourcePremium - 1) * 100)}% higher premiums`
+      )
     }
     if (nearbyRisk > sourceRisk + 10) {
       disadvantages.push('Higher risk profile')
@@ -398,7 +448,15 @@ export function compareNearbyProvinces(
  * Get national aggregate statistics
  */
 export function getNationalStatistics(): NationalStatistics {
-  const regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
+  const regions: TurkishRegion[] = [
+    'marmara',
+    'ege',
+    'akdeniz',
+    'ic_anadolu',
+    'karadeniz',
+    'dogu_anadolu',
+    'guneydogu',
+  ]
 
   let totalPolicies = 0
   let totalPremiumVolume = 0
@@ -407,7 +465,15 @@ export function getNationalStatistics(): NationalStatistics {
   const byPolicyType: NationalStatistics['byPolicyType'] = {} as NationalStatistics['byPolicyType']
 
   // Initialize policy type aggregates
-  const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
+  const policyTypes: PolicyType[] = [
+    'kasko',
+    'traffic',
+    'home',
+    'health',
+    'life',
+    'dask',
+    'business',
+  ]
   for (const pt of policyTypes) {
     byPolicyType[pt] = { policyCount: 0, premiumVolume: 0, avgPremium: 0, growth: 0 }
   }
@@ -463,7 +529,7 @@ export function getNationalStatistics(): NationalStatistics {
       projectedGrowth: 0.35,
       marketConcentration: 0.18, // HHI estimate
     },
-    dataDate: '2024-12-01',
+    dataDate: '2026-03-28',
     source: 'TSB/SEDDK',
   }
 }
@@ -475,10 +541,18 @@ export function getRegionalRankings(
   policyType: PolicyType,
   metric: 'premium' | 'claims' | 'penetration' | 'risk' | 'value'
 ): RegionalRanking {
-  const regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu']
+  const regions: TurkishRegion[] = [
+    'marmara',
+    'ege',
+    'akdeniz',
+    'ic_anadolu',
+    'karadeniz',
+    'dogu_anadolu',
+    'guneydogu',
+  ]
 
   // Calculate values and national average
-  const values = regions.map(region => {
+  const values = regions.map((region) => {
     const stats = REGIONAL_INSURANCE_STATS[region]
     let value: number
 
@@ -513,7 +587,7 @@ export function getRegionalRankings(
 
   // Sort (ascending for premium/claims/risk, descending for penetration/value)
   const ascending = ['premium', 'claims', 'risk'].includes(metric)
-  values.sort((a, b) => ascending ? a.value - b.value : b.value - a.value)
+  values.sort((a, b) => (ascending ? a.value - b.value : b.value - a.value))
 
   const rankings = values.map((item, index) => ({
     rank: index + 1,
@@ -529,7 +603,9 @@ export function getRegionalRankings(
 
   if (metric === 'premium') {
     insights.push(`${getRegionNameTr(best.region)} has the lowest ${policyType} premiums`)
-    insights.push(`${getRegionNameTr(worst.region)} has ${Math.abs(worst.vsAverage)}% above average premiums`)
+    insights.push(
+      `${getRegionNameTr(worst.region)} has ${Math.abs(worst.vsAverage)}% above average premiums`
+    )
   } else if (metric === 'risk') {
     insights.push(`${getRegionNameTr(best.region)} is the safest region`)
     insights.push(`${getRegionNameTr(worst.region)} has highest risk exposure`)
@@ -556,8 +632,7 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   const dLng = toRad(lng2 - lng1)
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
-    Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   return R * c
 }

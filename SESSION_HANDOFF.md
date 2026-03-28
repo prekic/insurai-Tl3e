@@ -1,146 +1,81 @@
 # Session Handoff — March 28, 2026
 
-## Branch
+## Current State
 
-`claude/load-project-context-RcmfR`
+**All code work is merged to `main` (at `f7b6683`).** Branch `claude/project-handoff-docs-0XYw6` has 1 documentation-only commit ahead (`d18cb1b`) — updates to CLAUDE.md and SESSION_HANDOFF.md. This commit should be merged to main.
 
-## What Was Done This Session (8 commits)
+## What Was Done in Recent Sessions (Merged PRs #296-#306)
 
-### 1. Three Bug Fixes (commit `8398d2a`)
+### Safety Governance & Explainability (PRs #303, #304, #306)
 
-| Bug | Root Cause | Fix | Tests |
-|-----|-----------|-----|-------|
-| Processing Log PATCH 404 | `.single()` returns PGRST116 on 0 rows + POST/PATCH race condition | Server: `.maybeSingle()` + null check; Client: 1-retry with 500ms delay on 404 | 15 |
-| QA Record display_mode "unknown" | `createPilotQARecord()` defaults to `'unknown'`, never evaluated | Added `evaluateSimpleDisplayMode()` to kasko-pilot-gate.ts, wired into policy-extractor.ts | 13 |
-| user_preferences 406 | `.single()` returns 406 when no preference row exists for new users | `.single()` → `.maybeSingle()` in configuration-service.ts | 0 (one-line) |
+| Feature | Description | Key Files |
+|---------|-------------|-----------|
+| Benchmark Confidence Gating | 5-factor context assessment (vehicle class, model year, geography, insurer, coverage level). Suppresses or warns when data is insufficient. | `evaluator.ts`, `types.ts` |
+| Benchmark Freshness | 3-state system (current ≤180d, aging 181-365d, stale >365d). Stale data downgrades confidence one step, hedges language. | `evaluator.ts`, `benchmark-service.ts`, `PolicyDetailView.tsx` |
+| EOOP Precision | Flags percentage/conditional deductibles that can't be fully modeled. Shows `~` prefix, amber color, limitation panel. | `adapter.ts`, `engine.ts`, `types.ts` |
+| TOPSIS Weight Transparency | Collapsible panel showing 6 criteria with weights, direction badges, and "model-based ranking, not objective truth" disclaimer. | `ComparePolicies.tsx` |
+| Grade Threshold Disclosure | "Top Score Drivers" summary + model disclosure below grade badge. GradeBadge hover with calibration notice. | `PolicyDetailView.tsx`, `GradeBadge.tsx` |
+| Draft Export/Share Gating | Blocks PDF/CSV/Excel/Text export and sharing for draft policies. Shows TASLAK/DRAFT banner. | `PolicyDetailView.tsx`, `SharedResult.tsx`, `ComparePolicies.tsx` |
+| Language Softening | "Recommended choice" → "Top-ranked by model", "above/below average" → "above/below market estimate" | `translations-en.ts`, `translations-tr.ts` |
 
-### 2. Benchmark Freshness Governance (commit `98a0868`)
+### Bug Fixes (PR #304)
 
-3-state freshness system preventing definitive market conclusions from stale data:
-- `current` (≤180 days): full comparison, normal language
-- `aging` (181-365 days): comparison shown with data date warning
-- `stale` (>365 days): confidence downgraded one step, definitive language → hedged "historical" wording
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| Processing Log PATCH 404 | `.single()` returns PGRST116 on 0 rows + race condition | `.maybeSingle()` + client retry on 404 |
+| QA Record display_mode "unknown" | Never evaluated | Added `evaluateSimpleDisplayMode()` |
+| user_preferences 406 | `.single()` on non-existent row | `.maybeSingle()` in configuration-service.ts |
 
-Key files: `evaluator.ts` (`computeBenchmarkFreshness`, modified `assessBenchmarkConfidence`), `benchmark-service.ts` (`dataDate` on `LegacyPremiumRange`), `PolicyDetailView.tsx` (freshness badge), `types.ts` (`BenchmarkFreshness` type + config keys)
+### Security Hardening (PR #300)
 
-### 3. EOOP Precision Governance (commit `62298e1`)
+- Actuarial admin routes now require auth
+- Memory leak caps on all in-memory arrays/maps
+- Mass assignment protection on admin endpoints
+- Input validation with Zod on backfill/segments routes
+- Debug log cleanup (98 lines removed from policy-extractor.ts)
+- 95 new tests (admin-backfill, admin-segments, usePilotGateOptions, useDisplaySafeSummary)
 
-Flags percentage/conditional deductibles that can't be fully modeled in Monte Carlo:
-- `eoopPrecision: 'full' | 'partial' | 'suppressed'` on `EOOPResult` and `PolicyEvaluationResult`
-- Adapter flags `_hasPercentageDeductible`, `_deductiblePercent`, `_hasConditionalDeductibles`
-- UI: `~` prefix, "(base estimate)" label, limitation warning with scenario examples
+### Documentation (PR #306)
 
-### 4. TOPSIS Weight Transparency (commit `01d4344`)
+- SESSION_HANDOFF.md with full commit table and file manifest
+- CLAUDE.md gotchas #23-35 documenting all new patterns
+- SESSION_OUTPUT.txt for copy-paste reference
 
-Collapsible panel in ComparePolicies showing all 6 TOPSIS criteria with weights, direction badges, bilingual labels, and "model-based ranking, not objective truth" disclaimer.
+## Test Count
 
-### 5. Grade Threshold Disclosure (commit `551f626`)
+~16,088+ tests across 340+ files, 0 failures, 0 lint errors.
 
-- Top Score Drivers summary (strongest + weakest category) below grade badge
-- Model disclosure: "This rating is based on current internal model thresholds..."
-- GradeBadge hover title with calibration notice
+## New Gotchas Introduced (Documented in CLAUDE.md #23-35)
 
-### 6. User-Facing Language Softening (commit `e670393`)
-
-- "Recommended choice" → "Top-ranked by model"
-- "Actuarial TOPSIS Score" → "Model-Based Ranking"
-- "above/below average" → "above/below market estimate"
-
-### 7. Production Safety Audit — Verified Complete
-
-All 79 safety regression tests pass (B1-B6 blockers from previous session). Prompts 2-6 all already implemented.
-
-### 8. Beta-Release Readiness Audit — SAFE FOR CONTROLLED RELEASE
-
-Every user-facing conclusion is qualified with "model-based" / "estimate" / "indicative" language, gated by confidence level, or labeled as draft. No output presents itself as authoritative external truth.
-
-## Commits
-
-| # | SHA | Message |
-|---|-----|---------|
-| 1 | `8398d2a` | fix: resolve 3 non-critical bugs — processing log 404, QA display_mode, user_preferences 406 |
-| 2 | `b308e34` | docs: update session handoff and next-session instructions |
-| 3 | `98a0868` | feat(safety): benchmark freshness governance — suppress stale conclusions |
-| 4 | `041dbc0` | docs: add session output summary for copy-paste reference |
-| 5 | `62298e1` | feat(safety): EOOP precision governance — flag percentage deductible limitations |
-| 6 | `01d4344` | feat(explainability): TOPSIS weight transparency panel in comparison view |
-| 7 | `551f626` | feat(explainability): grade threshold disclosure and calibration readiness |
-| 8 | `e670393` | fix(safety): soften 3 user-facing texts that overstated certainty |
-
-## Files Changed (30 files, +2,427 / -199 lines)
-
-| File | Change |
-|------|--------|
-| `server/services/processing-log-service.ts` | `.single()` → `.maybeSingle()` + null check |
-| `src/lib/processing-log-api.ts` | 1-retry with 500ms delay on 404 |
-| `src/lib/config/configuration-service.ts` | `.single()` → `.maybeSingle()` in getUserPreferences |
-| `src/lib/config/types.ts` | `benchmarkAgingDays`, `benchmarkStaleDays` |
-| `src/lib/analysis/kasko-pilot-gate.ts` | `evaluateSimpleDisplayMode()` |
-| `src/lib/ai/policy-extractor.ts` | Wire display mode into QA record |
-| `src/lib/policy-evaluation/types.ts` | `BenchmarkFreshness`, freshness fields, config keys |
-| `src/lib/policy-evaluation/evaluator.ts` | `computeBenchmarkFreshness()`, freshness in confidence, language gating, dynamic disclaimers |
-| `src/lib/policy-evaluation/benchmark-service.ts` | `dataDate` on `LegacyPremiumRange` |
-| `src/lib/actuarial-engine/types.ts` | `eoopPrecision`, `eoopLimitations` |
-| `src/lib/actuarial-engine/adapter.ts` | Deductible precision flags |
-| `src/lib/actuarial-engine/engine.ts` | `computeEoopPrecision()` |
-| `src/components/PolicyDetailView.tsx` | Freshness badge, EOOP precision warnings, top drivers, model disclosure |
-| `src/components/ComparePolicies.tsx` | TOPSIS weight panel, softened header |
-| `src/components/evaluation/GradeBadge.tsx` | Calibration title attribute |
-| `src/lib/i18n/translations-en.ts` | Softened 3 translation strings |
-| `src/lib/i18n/translations-tr.ts` | Softened 3 translation strings |
-| + 7 new test files | 128 new tests |
-| `src/lib/policy-evaluation/__tests__/benchmark-confidence.test.ts` | Added `dataDate` to mock (+1 line) |
-| `src/lib/policy-evaluation/__tests__/evaluator-benchmark-honesty.test.ts` | Added `CURRENT_DATA_DATE` + `dataDate` to mocks (+21 lines) |
-| `src/lib/policy-evaluation/evaluator-branches.test.ts` | Added `CURRENT_DATA_DATE` + `dataDate` to all benchmark mocks (+26 lines) |
-
-**Note**: 6 files appear in `git diff main...HEAD` that were NOT changed in this session — they came from the merged PR `7d47976` (previous session's safety blockers): `src/components/SharedResult.tsx`, `src/types/policy.ts`, `src/components/__tests__/draft-gating.test.tsx`, `src/lib/actuarial-engine/__tests__/contract-quality-estimated.test.ts`, `src/lib/ai/__tests__/deductible-percentage-extraction.test.ts`, `src/lib/analysis/__tests__/assistance-label-accuracy.test.ts`. These are correctly excluded from this session's changelog.
-
-## New Test Files (128 tests)
-
-| File | Tests |
-|------|-------|
-| `server/__tests__/processing-log-update.test.ts` | 7 |
-| `src/lib/__tests__/processing-log-api-retry.test.ts` | 8 |
-| `src/lib/analysis/__tests__/evaluate-simple-display-mode.test.ts` | 13 |
-| `src/lib/policy-evaluation/__tests__/benchmark-freshness.test.ts` | 19 |
-| `src/lib/actuarial-engine/__tests__/eoop-precision.test.ts` | 11 |
-| `src/lib/actuarial-engine/__tests__/topsis-transparency.test.ts` | 16 |
-| `src/lib/policy-evaluation/__tests__/threshold-disclosure.test.ts` | 26 |
-| + existing test updates | 28 |
-
-## New Patterns Introduced
-
-### Benchmark Freshness
-- `computeBenchmarkFreshness(dataDate, agingDays, staleDays)` → `{ freshness, dataAgeDays }`
-- Stale data downgrades confidence by one step (high→low, low→suppressed)
-- Config-driven: `benchmarkAgingDays` (default 180), `benchmarkStaleDays` (default 365)
-- **Test gotcha**: Benchmark mocks MUST include `dataDate` or they're treated as stale
-
-### EOOP Precision
-- Adapter flags `_hasPercentageDeductible` / `_hasConditionalDeductibles` from AnalyzedPolicy
-- Engine `computeEoopPrecision()` reads flags → sets `eoopPrecision` + `eoopLimitations`
-- UI: `~` prefix, amber, "(base estimate)" label, limitation panel
-
-### Language Governance
-- All user-facing market conclusions must use "estimate" or "model-based" qualifiers
-- Never "recommended" or "best" without "by model" / "model-based" prefix
-- Never "above/below average" — use "above/below market estimate"
+- **#23**: Benchmark Confidence Gating — all market comparisons gated by 5-factor assessment
+- **#24**: Draft Export/Share Gating — check `isDraft` on all output paths
+- **#25**: Contract Quality `contractQualityIsEstimated` flag — both sync/async paths must set it
+- **#26**: `evaluatePremium()` now accepts optional 3rd param `confidence`
+- **#27**: Benchmark Freshness — stale data downgrades confidence, test mocks MUST include `dataDate`
+- **#28**: EOOP Precision — adapter flags percentage/conditional deductibles
+- **#29**: TOPSIS Weight Transparency — panel uses `DEFAULT_TOPSIS_CRITERIA` export
+- **#30**: Grade Threshold Disclosure — config-driven via `getGradeFromScore(score, thresholds?)`
+- **#31**: Language Softening — never use unqualified "best" or "recommended"
+- **#32**: `.single()` → `.maybeSingle()` pattern for potentially empty Supabase queries
+- **#33**: Processing Log PATCH race condition — client retries once on 404
+- **#34**: `evaluateSimpleDisplayMode()` — lightweight mode eval for pilot QA
+- **#35**: Benchmark mock `dataDate` requirement — omitting it causes stale downgrade
 
 ## Non-Critical Issues (Carry Forward)
 
-1. **Missing PWA icons** — `vite.svg`, `icon-144x144.png` return 404. Cosmetic.
+1. **Missing PWA icons** — `vite.svg`, `icon-144x144.png` return 404. Cosmetic only.
 2. **Duplicate GoTrueClient warning** — during pilot QA persistence. Non-blocking.
-3. **`isDraft` not persisted to DB** — computed dynamically from feature flag. Needs schema migration.
+3. **`isDraft` not persisted to DB** — computed dynamically from feature flag. Needs `is_draft` column migration.
 4. **Benchmark data stale (2024-12-01)** — freshness governance now flags this; needs external market research to update.
 5. **EOOP can't model % deductibles in Monte Carlo** — warning added; full fix needs per-coverage DeductibleSpec mapping in adapter.
 
 ## Next Steps (Priority Order)
 
-1. **Deploy to production** — create PR, merge, Railway deploy
-2. **Upload diverse KASKO PDFs** — Phase 8L graduation needs 5+ unique documents
-3. **Persist `isDraft` to DB** — add `is_draft` column via migration
-4. **Calibrate grade thresholds** — need real outcome data (A=90, B=80 are arbitrary)
-5. **Update benchmark data** — current data is Dec 2024, freshness governance flags it as stale
+1. **Deploy to Production** — All merged to `main`. Railway needs a deploy trigger (sandbox `git push` doesn't trigger webhook — use `mcp__github__push_files` or Railway manual deploy).
+2. **Upload Diverse KASKO PDFs** — Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target: April 5, 2026.
+3. **Persist `isDraft` to DB** — Add `is_draft` column to `policies` table via migration so draft status survives feature flag changes.
+4. **Calibrate Grade Thresholds** — A=90, B=80 etc. are arbitrary. Need real outcome data. Thresholds are now config-driven (`benchmarkAgingDays`, `benchmarkStaleDays` in `EvaluationConfig`; grade thresholds via admin Settings UI).
+5. **Update Benchmark Data** — Current data is Dec 2024, benchmark freshness governance flags it as stale (>365 days). Needs external market research to update `dataDate` and premium ranges in `MARKET_BENCHMARKS`.
 
 ## Non-Negotiable Rules (Carry Forward)
 
@@ -154,3 +89,14 @@ Every user-facing conclusion is qualified with "model-based" / "estimate" / "ind
 8. Benchmark test mocks MUST include `dataDate` — omitting it causes stale downgrade
 9. User-facing comparison language must use "estimate" / "model-based" qualifiers
 10. `auditLogs` array MUST have `MAX_ENTRIES` cap after every `.push()` call
+
+## Environment Variables Required
+
+All existing env vars documented in CLAUDE.md remain required. No new env vars were introduced in recent sessions.
+
+Key vars for production:
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — required for admin panel and service-role operations
+- `ADMIN_JWT_SECRET` — required for admin login
+- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — AI extraction
+- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — push notifications
+- `EXCHANGERATE_API_KEY` — optional, for higher rate limits on FX API

@@ -23,7 +23,13 @@ import {
 } from './data'
 
 const ALL_REGIONS: TurkishRegion[] = [
-  'marmara', 'ege', 'akdeniz', 'ic_anadolu', 'karadeniz', 'dogu_anadolu', 'guneydogu',
+  'marmara',
+  'ege',
+  'akdeniz',
+  'ic_anadolu',
+  'karadeniz',
+  'dogu_anadolu',
+  'guneydogu',
 ]
 
 // =============================================================================
@@ -101,7 +107,7 @@ describe('calculateRegionalRiskScore — branch coverage', () => {
   })
 
   it('should produce at least 4 distinct scores among 7 regions (some cap at 100)', () => {
-    const scores = ALL_REGIONS.map(r => calculateRegionalRiskScore(r))
+    const scores = ALL_REGIONS.map((r) => calculateRegionalRiskScore(r))
     // Several regions (marmara, ege, akdeniz, dogu_anadolu) hit the 100 cap
     // So unique scores are {100, 72, 99, 87} = 4 distinct values
     const uniqueScores = new Set(scores)
@@ -116,7 +122,15 @@ describe('calculateRegionalRiskScore — branch coverage', () => {
 describe('getRegionalPremiumBenchmarks — branch coverage', () => {
   describe('premium percentile ordering', () => {
     it('should satisfy min < p10 < p25 < median < average < p75 < p90 < max for every region/type', () => {
-      const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
+      const policyTypes: PolicyType[] = [
+        'kasko',
+        'traffic',
+        'home',
+        'health',
+        'life',
+        'dask',
+        'business',
+      ]
 
       for (const pt of policyTypes) {
         const benchmarks = getRegionalPremiumBenchmarks(pt)
@@ -137,11 +151,19 @@ describe('getRegionalPremiumBenchmarks — branch coverage', () => {
 
   describe('vsNational rankings', () => {
     it('should assign unique rankings 1-7 for every policy type', () => {
-      const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
+      const policyTypes: PolicyType[] = [
+        'kasko',
+        'traffic',
+        'home',
+        'health',
+        'life',
+        'dask',
+        'business',
+      ]
 
       for (const pt of policyTypes) {
         const benchmarks = getRegionalPremiumBenchmarks(pt)
-        const rankings = ALL_REGIONS.map(r => benchmarks[r].vsNational.ranking)
+        const rankings = ALL_REGIONS.map((r) => benchmarks[r].vsNational.ranking)
         rankings.sort((a, b) => a - b)
         expect(rankings).toEqual([1, 2, 3, 4, 5, 6, 7])
       }
@@ -172,7 +194,13 @@ describe('getRegionalPremiumBenchmarks — branch coverage', () => {
 
       // Zone 1: marmara, ege (actually zone 1 for ege), dogu_anadolu
       // Zone 2: akdeniz, guneydogu
-      const zone1or2Regions: TurkishRegion[] = ['marmara', 'ege', 'akdeniz', 'dogu_anadolu', 'guneydogu']
+      const zone1or2Regions: TurkishRegion[] = [
+        'marmara',
+        'ege',
+        'akdeniz',
+        'dogu_anadolu',
+        'guneydogu',
+      ]
       for (const region of zone1or2Regions) {
         expect(benchmarks[region].factors.riskAdjustment).toBe(1.2)
       }
@@ -303,14 +331,14 @@ describe('getRankedRegions — branch coverage', () => {
     it('should use insurancePerCapita when policyType is undefined', () => {
       const ranked = getRankedRegions('premium')
       // marmara has highest insurancePerCapita (7250)
-      const marmaraItem = ranked.find(r => r.region === 'marmara')
+      const marmaraItem = ranked.find((r) => r.region === 'marmara')
       expect(marmaraItem).toBeDefined()
       expect(marmaraItem!.value).toBe(REGIONAL_INSURANCE_STATS.marmara.insurancePerCapita)
     })
 
     it('should use policyDistribution avgPremium when policyType is provided', () => {
       const ranked = getRankedRegions('premium', 'kasko')
-      const marmaraItem = ranked.find(r => r.region === 'marmara')
+      const marmaraItem = ranked.find((r) => r.region === 'marmara')
       expect(marmaraItem).toBeDefined()
       expect(marmaraItem!.value).toBe(
         REGIONAL_INSURANCE_STATS.marmara.policyDistribution.kasko.avgPremium
@@ -388,14 +416,22 @@ describe('getRankedRegions — branch coverage', () => {
     it('should assign sequential ranks 1 through 7', () => {
       for (const metric of ['premium', 'risk', 'penetration', 'claims'] as const) {
         const ranked = getRankedRegions(metric)
-        const ranks = ranked.map(r => r.rank)
+        const ranks = ranked.map((r) => r.rank)
         expect(ranks).toEqual([1, 2, 3, 4, 5, 6, 7])
       }
     })
   })
 
   describe('premium with different policy types', () => {
-    const policyTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business']
+    const policyTypes: PolicyType[] = [
+      'kasko',
+      'traffic',
+      'home',
+      'health',
+      'life',
+      'dask',
+      'business',
+    ]
 
     for (const pt of policyTypes) {
       it(`should return valid rankings for premium with policyType=${pt}`, () => {
@@ -453,7 +489,7 @@ describe('getProvincesByRegion — branch coverage', () => {
 
   it('should include known provinces in their regions', () => {
     const marmara = getProvincesByRegion('marmara')
-    const istanbulCodes = marmara.map(p => p.code)
+    const istanbulCodes = marmara.map((p) => p.code)
     expect(istanbulCodes).toContain('34') // Istanbul
     expect(istanbulCodes).toContain('16') // Bursa
     expect(istanbulCodes).toContain('41') // Kocaeli
@@ -463,7 +499,7 @@ describe('getProvincesByRegion — branch coverage', () => {
     const akdeniz = getProvincesByRegion('akdeniz')
     // Adana ('01'), Antalya ('07'), Mersin ('33')
     expect(akdeniz.length).toBeGreaterThanOrEqual(3)
-    const codes = akdeniz.map(p => p.code)
+    const codes = akdeniz.map((p) => p.code)
     expect(codes).toContain('01')
     expect(codes).toContain('07')
     expect(codes).toContain('33')
@@ -473,7 +509,7 @@ describe('getProvincesByRegion — branch coverage', () => {
     const icAnadolu = getProvincesByRegion('ic_anadolu')
     // Ankara ('06'), Kayseri ('38'), Konya ('42')
     expect(icAnadolu.length).toBeGreaterThanOrEqual(3)
-    const codes = icAnadolu.map(p => p.code)
+    const codes = icAnadolu.map((p) => p.code)
     expect(codes).toContain('06')
     expect(codes).toContain('38')
     expect(codes).toContain('42')
@@ -481,7 +517,7 @@ describe('getProvincesByRegion — branch coverage', () => {
 
   it('should return provinces for guneydogu with correct Turkish names', () => {
     const guneydogu = getProvincesByRegion('guneydogu')
-    const names = guneydogu.map(p => p.nameTr)
+    const names = guneydogu.map((p) => p.nameTr)
     expect(names).toContain('Diyarbakır')
     expect(names).toContain('Gaziantep')
     expect(names).toContain('Şanlıurfa')
@@ -534,7 +570,7 @@ describe('getRegionalInsuranceStats — every region', () => {
   it('should have dataDate and source for all regions', () => {
     for (const region of ALL_REGIONS) {
       const stats = getRegionalInsuranceStats(region)
-      expect(stats.dataDate).toBe('2024-12-01')
+      expect(stats.dataDate).toBe('2026-03-28')
       expect(stats.source).toBe('TSB/SEDDK')
     }
   })
@@ -625,7 +661,16 @@ describe('REGIONAL_RISK_PROFILES data integrity', () => {
 
 describe('REGIONAL_INSURANCE_STATS data integrity', () => {
   it('should have all 8 policy types in every region distribution', () => {
-    const requiredTypes: PolicyType[] = ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat']
+    const requiredTypes: PolicyType[] = [
+      'kasko',
+      'traffic',
+      'home',
+      'health',
+      'life',
+      'dask',
+      'business',
+      'nakliyat',
+    ]
     for (const region of ALL_REGIONS) {
       const stats = REGIONAL_INSURANCE_STATS[region]
       for (const pt of requiredTypes) {
