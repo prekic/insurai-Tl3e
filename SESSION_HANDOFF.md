@@ -1,119 +1,54 @@
-# Session Handoff — March 28, 2026
+# Session Handoff — March 28, 2026 (Updated: Post-Trim Session)
 
-## Current State (Updated March 28, 2026 — Deploy Session)
+## Current State
 
-**Branch `claude/project-handoff-docs-0XYw6` has been MERGED to `main` via PRs #309 and #310.** Latest main commit: `5f0568f`.
+**Main branch is up to date.** Latest commits on main: `efbdba6` (PR #312), `bdb2365` (PR #311).
 
-### Status of Prior Session Priorities
+### Status of All Priorities
 
 | # | Priority | Status |
 |---|----------|--------|
 | 1 | Merge handoff branch to main | **DONE** — PRs #309/#310 merged |
-| 2 | Deploy to production | **DONE** — Triggered via `mcp__github__push_files` commit to main |
-| 3 | Apply migrations 042 + 043 | **PENDING** — SQL provided below, user must run in Supabase SQL Editor |
-| 4 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ different providers |
-| 5 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data; thresholds now config-driven |
-| 6 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
+| 2 | Deploy to production | **DONE** — Triggered via MCP commit to main |
+| 3 | Trim CLAUDE.md | **DONE** — PR #311 merged. 404KB → 151KB |
+| 4 | Fix ESLint errors | **DONE** — PR #312 merged. 18 errors → 0 |
+| 5 | Apply migrations 042 + 043 | **PENDING** — User must run in Supabase SQL Editor |
+| 6 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ providers |
+| 7 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data |
+| 8 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
 
-### Merged Commits (now on main, newest first)
+## What Was Done This Session
 
-| Commit | Type | Description |
-|--------|------|-------------|
-| `0983ebf` | docs | Update CLAUDE.md gotchas #36-40 and SESSION_HANDOFF.md for final handoff |
-| `d68fe4d` | feat | PWA icon assets (11 PNGs + screenshots) and 54-test ComparePolicies suite |
-| `4df18e7` | fix | Resolve 12 test failures (configuration-service.test.ts `.maybeSingle()` mock) and 7 TypeScript errors (ComparePolicies.tsx `ScoreComparisonChart` missing `locale` prop) — pre-existing on main |
-| `f179666` | chore | Update benchmark `dataDate` to 2026-03-28 (prevents stale downgrade) |
-| `aad8176` | feat | Make benchmark aging/stale thresholds admin-configurable via `EvaluationConfig` |
-| `0c378bf` | feat | Persist `isDraft` to DB — migration 042 adds `is_draft` column to `policies` table |
-| `67b6d55` | fix | Correct SESSION_HANDOFF.md branch state description |
-| `d18cb1b` | chore | Project handoff — update CLAUDE.md and SESSION_HANDOFF.md for Mar 28 state |
+### 1. CLAUDE.md Trim (PR #311 — commit `bdb2365`)
+- Archived all 178 historical Known Issue entries to `docs/KNOWN_ISSUES_ARCHIVE.md` (197KB)
+- Replaced Known Issues section (2656 lines, 194KB) with 15-entry key active patterns table
+- Trimmed Common Gotchas section (676 lines, 61KB) to 100 essential lines
+- Result: CLAUDE.md 5931 → 2722 lines, 404KB → 151KB
+- File is now pushable via MCP `push_files` in a single commit
 
-## What Was Done in This Session
+### 2. ESLint Config Fix (PR #312 — commit `efbdba6`)
+- `scripts/generate-pwa-icons.mjs` had 18 `no-undef` errors (`Buffer`, `console`)
+- Root cause: ESLint scripts config matched `*.{ts,js}` but not `*.mjs`, and lacked Node globals
+- Fix: Added `.mjs` to glob pattern and `globals.node` to languageOptions in `eslint.config.js`
+- Result: 0 ESLint errors, 0 warnings across entire codebase
 
-### 1. `isDraft` Database Persistence (commit `0c378bf`)
-- Added `is_draft BOOLEAN DEFAULT false` column to `policies` table via `supabase/migrations/042_add_is_draft_to_policies.sql`
-- `convertToAnalyzedPolicy()` now sets `isDraft` from `displaySummary?.isDraft`
-- Draft status now survives page refreshes and feature flag changes
+### 3. CLAUDE.md Next Session Instructions Updated
+- Marked trim task as done (item #3)
+- Added blocked/manual status labels to remaining items
 
-### 2. Admin-Configurable Benchmark Thresholds (commit `aad8176`)
-- `benchmarkAgingDays` (default 180) and `benchmarkStaleDays` (default 365) added to `EvaluationConfig`
-- Seeded via `supabase/migrations/043_seed_benchmark_threshold_configs.sql`
-- Admin UI: Settings → Evaluation panel
-- `assessBenchmarkConfidence()` reads thresholds from config instead of hardcoded values
+## All Modified Files (This Session)
 
-### 3. Benchmark dataDate Update (commit `f179666`)
-- Updated `MARKET_BENCHMARKS[].dataDate` from `2024-12-01` to `2026-03-28`
-- Prevents all benchmarks from being flagged as "stale" by freshness governance
+| File | Change |
+|------|--------|
+| `CLAUDE.md` | Trimmed from 404KB → 151KB; updated Next Session Instructions |
+| `docs/KNOWN_ISSUES_ARCHIVE.md` | **NEW** — 178 historical Known Issue entries (197KB) |
+| `eslint.config.js` | Added `.mjs` glob + Node globals to scripts config |
 
-### 4. Pre-Existing Test & TypeScript Fixes (commit `4df18e7`)
-- **12 test failures**: `configuration-service.test.ts` — `getUserPreferences` mock chain missing `maybeSingle()`. Added `mockMaybeSingle` and `setupMaybeSingleQuery()` helper.
-- **7 TypeScript errors**: `ComparePolicies.tsx` — `ScoreComparisonChart` used `locale` but didn't receive it as a prop. Added `locale: string` to props interface and passed it at call site.
+## Quality State
 
-### 5. PWA Icon Assets (commit `d68fe4d`)
-- Created all 11 icon PNGs referenced by `manifest.json` (72-512px + upload, dashboard, badge)
-- Created 2 screenshot placeholders (dashboard 1280x720, mobile 390x844)
-- Added `public/vite.svg` placeholder
-- Added `scripts/generate-pwa-icons.mjs` for future icon regeneration
-- **Resolves non-critical issue #1** from prior handoff (missing PWA icons returning 404)
-
-### 6. ComparePolicies Test Suite (commit `d68fe4d`)
-- 54 tests covering all major features: loading/empty states, URL param handling, policy selection/deselection, Clear All, remove, preview badges, error states, Quick Stats, Score Chart, category winners, metrics, coverage matrix, key differences, tradeoffs, AI recommendation, winner highlight, GradeBadge, improvement suggestions, TOPSIS ranking, TOPSIS transparency panel, collapsible sections, export dropdown (PDF/CSV with toast), draft TASLAK badge, significance labels, hidden sections, missing winner, coverage matrix fallback
-- Key mock pattern documented in CLAUDE.md gotcha #36
-
-## Test Count
-
-~16,142+ tests across 340+ files, 0 failures, 0 lint errors.
-
-## New Gotchas Introduced (Documented in CLAUDE.md #36-40)
-
-- **#36**: Module-level mock variable pattern for draft detection (`let mockIsDraft` captured in `vi.mock` closure)
-- **#37**: `getAllByText` for ambiguous text in comparison/dashboard component tests
-- **#38**: Policy selector hidden when URL params present — click "Select Policies" first
-- **#39**: `isDraft` DB column — migration 042 must be applied for persistence
-- **#40**: Benchmark aging/stale thresholds admin-configurable — migration 043 seeds defaults
-
-## All Modified Files (32 files on branch)
-
-### Documentation
-- `CLAUDE.md` — gotchas #36-40, next session instructions, metadata
-- `SESSION_HANDOFF.md` — full rewrite for Mar 28 handoff
-
-### isDraft DB Persistence (commit `0c378bf`)
-- `supabase/migrations/042_add_is_draft_to_policies.sql` — migration
-- `src/types/policy.ts` — `isDraft?: boolean` on `AnalyzedPolicy`
-- `src/lib/supabase/types.ts` — `is_draft: boolean` on PolicyRow/Insert/Update
-- `src/lib/policy-context.tsx` — mapping in `policyRowToAnalyzedPolicy`, `analyzedPolicyToInsert`, `analyzedPolicyToUpdate`
-- `src/hooks/useDisplaySafeSummary.ts` — DB-first fallback: `policy.isDraft ?? pilotGate.isDraft`
-
-### Admin-Configurable Benchmark Thresholds (commit `aad8176`)
-- `supabase/migrations/043_seed_benchmark_threshold_configs.sql` — seeds defaults
-- `src/lib/config/configuration-service.ts` — `EVALUATION_KEY_MAP` additions
-- `src/components/admin/tabs/settings/EvaluationSettingsPanel.tsx` — benchmark freshness UI
-
-### Benchmark dataDate Update (commit `f179666`)
-- `src/data/market-data/benchmarks.ts` — dataDate → 2026-03-28
-- `src/lib/policy-evaluation/benchmark-service.ts` — fallback dataDate updated
-- `src/lib/regional-benchmark/data.ts` + `data.test.ts` — dataDate + formatting
-- `src/lib/regional-benchmark/comparison.ts` + `comparison.test.ts` — type fix + formatting
-
-### Test & TypeScript Fixes (commit `4df18e7`)
-- `src/lib/config/__tests__/configuration-service.test.ts` — `mockMaybeSingle` + `setupMaybeSingleQuery()`
-- `src/components/ComparePolicies.tsx` — `locale` prop on `ScoreComparisonChart`
-
-### PWA Assets & ComparePolicies Tests (commit `d68fe4d`)
-- `public/icons/*.png` (11 files) — icon assets 72-512px + upload, dashboard, badge
-- `public/screenshots/*.png` (2 files) — dashboard + mobile placeholders
-- `public/vite.svg` — placeholder
-- `scripts/generate-pwa-icons.mjs` — icon regeneration script
-- `src/components/ComparePolicies.test.tsx` — 54-test suite (new)
-
-## Non-Critical Issues (Carry Forward)
-
-1. ~~**Missing PWA icons**~~ — **RESOLVED** in commit `d68fe4d`. All icons now present.
-2. **Duplicate GoTrueClient warning** — during pilot QA persistence. Non-blocking.
-3. ~~**`isDraft` not persisted to DB**~~ — **RESOLVED** in commit `0c378bf`. Migration 042 adds column.
-4. **Benchmark premium ranges outdated** — `dataDate` updated to 2026-03-28 but actual premium ranges still from Dec 2024 research. Needs external market research to update ranges in `MARKET_BENCHMARKS`.
-5. **EOOP can't model % deductibles in Monte Carlo** — warning added; full fix needs per-coverage DeductibleSpec mapping in adapter.
+- **TypeScript**: 0 errors (`npx tsc --noEmit` clean)
+- **ESLint**: 0 errors, 0 warnings (`npx eslint . --max-warnings 0` clean)
+- **Tests**: ~16,142+ across 340+ files, 0 failures (not re-run this session — no code changes)
 
 ## Migrations to Apply (Copy-Paste into Supabase SQL Editor)
 
@@ -142,12 +77,16 @@ ON CONFLICT (category, key) DO NOTHING;
 
 ## Next Steps (Priority Order)
 
-1. ~~**Merge This Branch to Main**~~ — **DONE** via PRs #309/#310.
-2. ~~**Deploy to Production**~~ — **DONE** via `mcp__github__push_files` deploy trigger commit.
-3. **Apply Migrations to Production Supabase** — Run the SQL above in Supabase Dashboard → SQL Editor. Both are idempotent (`IF NOT EXISTS` / `ON CONFLICT DO NOTHING`).
-4. **Upload Diverse KASKO PDFs** — Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target: April 5, 2026.
-5. **Calibrate Grade Thresholds** — A=90, B=80 etc. are arbitrary. Need real outcome data. Thresholds are now config-driven via admin Settings UI (Settings → Evaluation).
-6. **Update Benchmark Premium Ranges** — Current premium ranges from Dec 2024 research. Needs external market research to update actual values in `MARKET_BENCHMARKS`.
+1. **Apply Migrations 042 + 043** *(manual)* — Run SQL above in Supabase Dashboard → SQL Editor. Both idempotent.
+2. **Upload Diverse KASKO PDFs** *(blocked)* — Phase 8L graduation needs 5+ unique documents from different providers. Target: April 5, 2026.
+3. **Calibrate Grade Thresholds** *(blocked)* — A=90, B=80 etc. are arbitrary. Need real outcome data. Admin UI: Settings → Evaluation.
+4. **Update Benchmark Premium Ranges** *(blocked)* — Premium ranges from Dec 2024. Needs external market research for `MARKET_BENCHMARKS`.
+
+## Non-Critical Issues (Carry Forward)
+
+1. **Duplicate GoTrueClient warning** — during pilot QA persistence. Non-blocking.
+2. **Benchmark premium ranges outdated** — `dataDate` updated to 2026-03-28 but actual premium ranges still from Dec 2024 research.
+3. **EOOP can't model % deductibles in Monte Carlo** — warning added; full fix needs per-coverage DeductibleSpec mapping in adapter.
 
 ## Non-Negotiable Rules (Carry Forward)
 
@@ -164,11 +103,11 @@ ON CONFLICT (category, key) DO NOTHING;
 
 ## Environment Variables Required
 
-All existing env vars documented in CLAUDE.md remain required. No new env vars were introduced in this session.
+No new env vars introduced. All existing vars documented in CLAUDE.md remain required.
 
 Key vars for production:
-- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — required for admin panel and service-role operations
-- `ADMIN_JWT_SECRET` — required for admin login
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — admin panel and service-role operations
+- `ADMIN_JWT_SECRET` — admin login
 - `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — AI extraction
 - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — push notifications
-- `EXCHANGERATE_API_KEY` — optional, for higher rate limits on FX API
+- `EXCHANGERATE_API_KEY` — optional, higher rate limits on FX API
