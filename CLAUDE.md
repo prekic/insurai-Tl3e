@@ -463,6 +463,7 @@ insurai/
 | `.env` | Environment configuration (not committed) |
 | `.env.example` | Environment template |
 | `vite.config.ts` | Vite config with proxy settings (recently updated for `/api/admin/fx-monitoring`) |
+| `eslint.config.js` | **UPDATED** ESLint flat config — scripts dir includes `.mjs` glob + Node globals |
 | `lighthouserc.js` | Lighthouse CI configuration |
 | `playwright.config.ts` | E2E test configuration |
 
@@ -2473,6 +2474,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 
 **Railway Deployment:**
 - Sandbox `git push` does NOT trigger Railway webhook — use `mcp__github__push_files`
+- `mcp__github__push_files` requires file content as parameter — files >~100KB can't be loaded into context. Workaround: commit locally, push branch, create PR via `mcp__github__create_pull_request`, merge via `mcp__github__merge_pull_request`
 - `nixpacks.toml` with `providers = ["node"]` prevents Caddy/Chromium auto-detection
 - `nixpacks.toml` and `railway.json` must stay in sync — nixpacks takes precedence
 - API proxy auto-detects in production via `window.location.origin` (no `VITE_API_PROXY_URL` needed)
@@ -2720,4 +2722,4 @@ npm run build:analyze
 **Lighthouse**: Performance 99, Accessibility 100, Best Practices 93, SEO 100
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
-**Last Updated**: March 20, 2026 (Reviewer-mode Phase 2 — benchmark provenance gate, conditional deductible classification, evidence-softening, canonical summary builder, export path unification)
+**Last Updated**: March 28, 2026 (CLAUDE.md trimmed 404KB→151KB, ESLint .mjs fix, isDraft DB persistence, admin benchmark thresholds, PWA icons, ComparePolicies tests)
