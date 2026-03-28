@@ -279,6 +279,16 @@ export interface EOOPResult {
   config: MonteCarloConfig
   /** Contract quality penalty applied (0.0–1.0, where 1.0 = no penalty). */
   contractQualityFactor: number
+  /**
+   * EOOP precision indicator.
+   * - 'full':       all deductible inputs are absolute/well-modeled
+   * - 'partial':    percentage or conditional deductibles detected but not fully modeled —
+   *                 EOOP is a base estimate that may understate actual OOP
+   * - 'suppressed': deductible structure too complex/unknown to produce meaningful EOOP
+   */
+  eoopPrecision?: 'full' | 'partial' | 'suppressed'
+  /** Human-readable limitations explaining why precision is not 'full'. */
+  eoopLimitations?: string[]
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -429,6 +439,12 @@ export interface PolicyEvaluationResult {
 
   /** True when contract quality score is based on defaults (missing indemnity data). */
   contractQualityIsEstimated?: boolean
+
+  /** EOOP precision level — 'full', 'partial', or 'suppressed'. */
+  eoopPrecision?: 'full' | 'partial' | 'suppressed'
+
+  /** Human-readable limitations explaining reduced EOOP precision. */
+  eoopLimitations?: string[]
 
   /** TOPSIS ranking (Layer D) — only present for multi-policy comparisons. */
   ranking?: {

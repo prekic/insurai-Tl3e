@@ -1093,7 +1093,7 @@ export class ConfigurationService {
         .select('preferences')
         .eq('user_id', userId)
         .eq('category', category)
-        .single()
+        .maybeSingle()
 
       if (error || !data) {
         return null

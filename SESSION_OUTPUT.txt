@@ -1,0 +1,369 @@
+# Complete Session Output — March 28, 2026
+# Branch: claude/load-project-context-RcmfR
+# 8 commits, 30 files changed, +2,427 / -199 lines
+
+================================================================================
+COMMIT 1: 8398d2a — fix: resolve 3 non-critical bugs
+================================================================================
+
+BUG 1: Processing Log PATCH 404
+- Root cause: server/services/processing-log-service.ts used .single() which
+  returns PGRST116 error on 0 rows (race condition — POST CREATE hadn't
+  committed before PATCH arrived)
+- Server fix: .single() → .maybeSingle() + separate null data check with
+  log.warn diagnostic including documentId
+- Client fix: src/lib/processing-log-api.ts — added retry loop (1 retry,
+  500ms delay) on 404 status code only; non-404 errors not retried
+- Files: server/services/processing-log-service.ts,
+         src/lib/processing-log-api.ts
+- Tests: server/__tests__/processing-log-update.test.ts (7 tests)
+         src/lib/__tests__/processing-log-api-retry.test.ts (8 tests)
+
+BUG 2: QA Record display_mode Always "unknown"
+- Root cause: src/lib/ai/policy-extractor.ts created QA records via
+  createPilotQARecord() but never called evaluateDisplayMode(). Default
+  in kasko-pilot-gate.ts:351 was displayMode: 'unknown'
+- Fix: Added evaluateSimpleDisplayMode() to kasko-pilot-gate.ts — lightweight
+  evaluator using confidence score, policyNumber, provider, coverages:
+    confidence < 0.3 → 'human_review_required'
+    confidence < 0.6 → 'restricted'
+    missing policyNumber → 'restricted'
+    missing provider → 'restricted'
+    no coverages → 'restricted'
+    otherwise → 'full'
+- Wired into policy-extractor.ts QA record creation (7 lines added)
+- Files: src/lib/analysis/kasko-pilot-gate.ts (48 lines added),
+         src/lib/ai/policy-extractor.ts (10 lines added)
+- Tests: src/lib/analysis/__tests__/evaluate-simple-display-mode.test.ts
+         (13 tests)
+
+BUG 3: user_preferences 406 Error
+- Root cause: src/lib/config/configuration-service.ts:1096 used .single()
+  which returns HTTP 406 (PGRST116) when 0 rows match. New users have no
+  preference rows for category='email'
+- Fix: One-line change — .single() → .maybeSingle()
+- File: src/lib/config/configuration-service.ts
+
+================================================================================
+COMMIT 2: b308e34 — docs: update session handoff
+================================================================================
+
+- Updated SESSION_HANDOFF.md with resolved bugs and new priorities
+- Updated CLAUDE.md Next Session Instructions (removed resolved items)
+
+================================================================================
+COMMIT 3: 98a0868 — feat(safety): benchmark freshness governance
+================================================================================
+
+Problem: All benchmark data hardcoded with dataDate: '2024-12-01' (~16 months
+stale). Evaluator generated "above market average" conclusions without
+checking data age.
+
+Solution: 3-state freshness system preventing definitive conclusions from
+outdated data.
+
+States:
+  current  (≤180 days)  — full comparison, normal language
+  aging    (181-365 days) — comparison shown with data date amber warning
+  stale    (>365 days)  — confidence downgraded one step, definitive language
+                          replaced with hedged/historical wording
+
+Type changes (src/lib/policy-evaluation/types.ts):
+  - Added BenchmarkFreshness type: 'current' | 'aging' | 'stale'
+  - Extended BenchmarkConfidence with freshness?, dataAsOf?, dataAgeDays?
+  - Added benchmarkAgingDays?, benchmarkStaleDays? to EvaluationConfig
+    (defaults: 180, 365)
+
+Config changes (src/lib/config/types.ts):
+  - Added benchmarkAgingDays: 180, benchmarkStaleDays: 365 to
+    EvaluationConfig and DEFAULT_EVALUATION_CONFIG
+
+Core logic (src/lib/policy-evaluation/evaluator.ts):
+  - Added computeBenchmarkFreshness(dataDate, agingDays, staleDays)
+  - Modified assessBenchmarkConfidence() — now accepts dataDate and
+    evalConfig, computes freshness, downgrades confidence when stale
+    (high→low, low→suppressed)
+  - Modified evaluatePolicy() — gets dataDate from benchmark, passes to
+    assessBenchmarkConfidence()
+  - Modified evaluatePremium() — gates issue strings by freshness:
+    Stale: "above market estimate" → "above historical market estimate
+           (data from 2024-12-01) — updated validation recommended"
+    Stale: "exceeds typical market range" → "exceeds historical market
+           range (data from 2024-12-01) — updated validation recommended"
+    Current/aging: normal language unchanged
+  - Modified disclaimer generation:
+    Stale: "Benchmark data is from {date} ({N} days old). This is a
+           historical reference only — updated market validation recommended."
+    Aging: "Market data from {date}. Actual premiums vary by vehicle,
+           driver profile, and region."
+    Current: "Market averages are estimates based on indicative data.
+             Actual premiums vary by vehicle, driver profile, and region."
+
+Benchmark service (src/lib/policy-evaluation/benchmark-service.ts):
+  - Added dataDate?: string to LegacyPremiumRange interface
+  - Populated dataDate in DB path (${match.year}-01-01) and hardcoded
+    fallback path ('2024-12-01')
+
+UI (src/components/PolicyDetailView.tsx):
+  - Freshness badge in Market Comparison card (desktop + mobile):
+    Stale: Red dot + red bg, "Benchmark data is {N} days old (from {date}).
+           Historical reference only."
+    Aging: Amber dot + amber bg, "Market data from {date}"
+    Current: No badge shown
+  - Bilingual (TR/EN) for all freshness messages
+
+Existing test updates:
+  - benchmark-confidence.test.ts: Added dataDate to mock
+  - evaluator-branches.test.ts: Added CURRENT_DATA_DATE constant, added
+    dataDate to all benchmark mock objects
+  - evaluator-benchmark-honesty.test.ts: Added CURRENT_DATA_DATE and
+    dataDate to benchmark mocks
+
+New tests: src/lib/policy-evaluation/__tests__/benchmark-freshness.test.ts
+  19 tests: freshness computation (current/aging/stale), missing/invalid
+  dataDate → stale, confidence downgrade, language gating, disclaimer
+  variations, boundary cases (exactly 180/365/366 days)
+
+Total evaluator tests: 120/120 pass
+
+================================================================================
+COMMIT 4: 041dbc0 — docs: add session output summary
+================================================================================
+
+Created SESSION_OUTPUT.txt (initial version, now superseded by this file)
+
+================================================================================
+COMMIT 5: 62298e1 — feat(safety): EOOP precision governance
+================================================================================
+
+Problem: Monte Carlo EOOP simulation uses absolute deductibles only.
+Percentage-based deductibles (e.g., 35% tenzili muafiyet) are detected
+during extraction but the adapter maps them as absolute Money amounts,
+not { kind: 'pct', percent: N }. EOOP looks precise when it shouldn't be.
+
+Schema additions (src/lib/actuarial-engine/types.ts):
+  On EOOPResult:
+    eoopPrecision?: 'full' | 'partial' | 'suppressed'
+    eoopLimitations?: string[]
+  On PolicyEvaluationResult:
+    eoopPrecision?: 'full' | 'partial' | 'suppressed'
+    eoopLimitations?: string[]
+
+Adapter (src/lib/actuarial-engine/adapter.ts):
+  - Extended return type with metadata flags:
+    _hasPercentageDeductible?: boolean
+    _deductiblePercent?: number
+    _hasConditionalDeductibles?: boolean
+    _conditionalDeductibleCount?: number
+  - Populated from AnalyzedPolicy.deductiblePercent and
+    AnalyzedPolicy.conditionalDeductibles
+
+Engine (src/lib/actuarial-engine/engine.ts):
+  - Added computeEoopPrecision(policy) function:
+    If _hasPercentageDeductible: adds limitation with specific %
+    If _hasConditionalDeductibles: adds limitation with count
+    0 limitations → 'full', any limitations → 'partial'
+  - Spreads eoopPrecision + eoopLimitations into evaluation result
+
+UI (src/components/PolicyDetailView.tsx):
+  - Partial EOOP: ~ prefix, amber color, "(base estimate)" label
+  - Warning panel when eoopPrecision === 'partial':
+    EN: "Actual out-of-pocket exposure may be materially higher:"
+    TR: "Gerçek cepten harcama önemli ölçüde daha yüksek olabilir:"
+    + bulleted limitation list
+  - Scenario example when deductiblePercent present:
+    EN: "Example: on a 100,000 TL claim, 35% deductible = 35,000 TL
+         additional out-of-pocket"
+    TR: "Örnek: 100.000 TL hasarda %35 muafiyet = 35.000 TL ek cepten
+         maliyet"
+
+Tests: src/lib/actuarial-engine/__tests__/eoop-precision.test.ts
+  11 tests: adapter flags, engine precision states (full/partial),
+  specific percentages (10%/20%/35%), both flags combined, EOOP still
+  computed when partial, blocked policies
+
+Total actuarial tests: 87/87 pass (11 new + 76 existing)
+
+================================================================================
+COMMIT 6: 01d4344 — feat(explainability): TOPSIS weight transparency
+================================================================================
+
+Problem: TOPSIS ranking weights (6 criteria summing to 100%) not visible
+to users. Users can't understand what drives the multi-criteria ranking.
+
+UI (src/components/ComparePolicies.tsx):
+  - Collapsible "Ranking Criteria & Weights" panel below TOPSIS score bars
+  - Uses <details> element for expand/collapse
+  - Each criterion shows:
+    * Bilingual label (EN/TR from DEFAULT_TOPSIS_CRITERIA)
+    * Weight bar (visual) + percentage (e.g., "30%")
+    * Direction badge: "lower better" (cost) or "higher better" (benefit)
+      in both EN and TR
+  - Disclaimer text:
+    EN: "Weights are configuration-driven. This is a model-based ranking,
+         not an objective truth."
+    TR: "Ağırlıklar yapılandırma tarafından belirlenir. Bu model tabanlı
+         bir sıralamadır, objektif bir gerçek değildir."
+
+Criteria surfaced (6, summing to 100%):
+  Expected Out-of-Pocket: 30% (cost — lower better)
+  Annual Premium: 20% (cost — lower better)
+  Coverage Breadth: 20% (benefit — higher better)
+  Compliance Score: 10% (benefit — higher better)
+  Contract Quality: 10% (benefit — higher better)
+  Deductible Exposure: 10% (cost — lower better)
+
+Tests: src/lib/actuarial-engine/__tests__/topsis-transparency.test.ts
+  16 tests: criteria count, weight sum = 1.0, non-empty labels (EN + TR),
+  valid direction, unique codes, expected codes, EOOP highest weight,
+  cost/benefit correctness, normalizedScores present, weightedScores =
+  weight × normalized, ranking correctness, closeness bounds, single
+  policy edge case
+
+No changes to underlying TOPSIS math.
+
+================================================================================
+COMMIT 7: 551f626 — feat(explainability): grade threshold disclosure
+================================================================================
+
+Problem: Grades (A/B/C/D/F) presented without "model-based" caveat. Grade
+thresholds (A≥90, B≥80, etc.) are arbitrary — not calibrated against real
+market outcomes. No indication to users that these can change.
+
+UI (src/components/PolicyDetailView.tsx — both mobile and desktop):
+  - Top Score Drivers below grade badge:
+    EN: "Strongest: Coverage (85)" / "Weakest: Premium (52)"
+    TR: "En güçlü: Teminat (85)" / "En zayıf: Prim (52)"
+    Shows highest-contributing and lowest-scoring categories. Weakest only
+    shown when score < 70 and different from strongest.
+  - Model Disclosure text (data-testid="grade-model-disclosure"):
+    EN: "This rating is based on current internal model thresholds and may
+         be recalibrated as benchmark coverage improves."
+    TR: "Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve
+         karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir."
+
+GradeBadge component (src/components/evaluation/GradeBadge.tsx):
+  - Added title attribute (hover tooltip):
+    "Model-based grade — thresholds are configurable and subject to
+     recalibration"
+
+Config readiness (already existed, now tested):
+  - getGradeFromScore(score, thresholds?) accepts optional config
+  - getStatusFromScore(score, thresholds?) accepts optional config
+  - Admin can change A/B/C/D cutoffs via Settings UI without code changes
+  - DB keys: grade_a_threshold, grade_b_threshold, etc. in app_settings
+
+Tests: src/lib/policy-evaluation/__tests__/threshold-disclosure.test.ts
+  26 tests: default threshold verification (all A-F boundaries, all
+  excellent-critical boundaries), config override (lenient, strict, partial),
+  unchanged scoring under defaults (documented values match), full 0-100
+  sweep (valid grade for every score), monotonic ordering (higher score never
+  produces worse grade), custom threshold injection (function signature)
+
+Total evaluator tests: 100/100 pass (26 new + 74 existing)
+
+================================================================================
+COMMIT 8: e670393 — fix(safety): soften 3 texts that overstated certainty
+================================================================================
+
+Beta-release audit found 3 places with definitive language:
+
+1. "Recommended choice" → "Top-ranked by model"
+   TR: "Önerilen seçim" → "Model sıralamasına göre en iyi"
+   File: src/lib/i18n/translations-en.ts, translations-tr.ts
+
+2. "Actuarial TOPSIS Score" → "Model-Based Ranking"
+   TR: "Model Tabanlı Sıralama"
+   File: src/components/ComparePolicies.tsx
+
+3. "above/below average" → "above/below market estimate"
+   TR: "ortalamanın üstünde/altında" → "piyasa tahmininin üstünde/altında"
+   File: src/lib/i18n/translations-en.ts, translations-tr.ts
+
+================================================================================
+PRODUCTION SAFETY AUDIT — VERIFIED COMPLETE
+================================================================================
+
+Ran all safety regression test files. All 79 tests pass:
+  benchmark-confidence.test.ts        18 PASS
+  evaluator-benchmark-honesty.test.ts  9 PASS
+  contract-quality-estimated.test.ts   7 PASS
+  deductible-percentage-extraction    17 PASS
+  draft-gating.test.tsx               21 PASS
+  assistance-label-accuracy.test.ts    7 PASS
+
+All 6 production safety blockers (B1-B6) from previous session confirmed
+fixed. Prompts 2-6 audit all already implemented:
+  Prompt 2 (Benchmark): assessBenchmarkConfidence() + premium cap + 3 levels
+  Prompt 3 (Deductible): classifyExclusions() + deductiblePercent
+  Prompt 4 (Score): contractQualityIsEstimated flag
+  Prompt 5 (Draft): draftExportBlocked() + TASLAK banners
+  Prompt 6 (Explainability): BenchmarkConfidence type + bilingual disclaimers
+
+================================================================================
+BETA-RELEASE READINESS — SAFE FOR CONTROLLED RELEASE
+================================================================================
+
+Every user-facing conclusion is either:
+  - Qualified with "model-based" / "estimate" / "indicative" language
+  - Gated by confidence level (suppressed when data insufficient)
+  - Marked as "base estimate" when precision is limited
+  - Labeled as draft when not finalized
+
+No output presents itself as authoritative external truth.
+
+Remaining acceptable limitations for beta:
+  - Benchmark data from Dec 2024 (~16mo old) — flagged as stale
+  - EOOP doesn't simulate % deductibles — flagged as partial
+  - Grade thresholds not market-calibrated — disclosed as model-based
+  - TOPSIS weights are static defaults — disclosed as config-driven
+
+================================================================================
+ALL FILES CHANGED (30 files, +2,427 / -199 lines)
+================================================================================
+
+server/services/processing-log-service.ts          +9  -2
+server/__tests__/processing-log-update.test.ts     +187 NEW
+src/components/ComparePolicies.tsx                 +69  -4
+src/components/PolicyDetailView.tsx                +258 -17
+src/components/evaluation/GradeBadge.tsx           +1
+src/lib/__tests__/processing-log-api-retry.test.ts +171 NEW
+src/lib/actuarial-engine/__tests__/eoop-precision.test.ts      +239 NEW
+src/lib/actuarial-engine/__tests__/topsis-transparency.test.ts +244 NEW
+src/lib/actuarial-engine/adapter.ts                +15  -2
+src/lib/actuarial-engine/engine.ts                 +38
+src/lib/actuarial-engine/types.ts                  +16
+src/lib/ai/policy-extractor.ts                     +10
+src/lib/analysis/__tests__/evaluate-simple-display-mode.test.ts +146 NEW
+src/lib/analysis/kasko-pilot-gate.ts               +48
+src/lib/config/configuration-service.ts            +1   -1
+src/lib/config/types.ts                            +5
+src/lib/i18n/translations-en.ts                    +3   -3
+src/lib/i18n/translations-tr.ts                    +3   -3
+src/lib/policy-evaluation/__tests__/benchmark-confidence.test.ts  +1
+src/lib/policy-evaluation/__tests__/benchmark-freshness.test.ts   +244 NEW
+src/lib/policy-evaluation/__tests__/evaluator-benchmark-honesty.test.ts +21
+src/lib/policy-evaluation/__tests__/threshold-disclosure.test.ts  +206 NEW
+src/lib/policy-evaluation/benchmark-service.ts     +6   -32
+src/lib/policy-evaluation/evaluator-branches.test.ts +26
+src/lib/policy-evaluation/evaluator.ts             +149 -12
+src/lib/policy-evaluation/types.ts                 +20
+src/lib/processing-log-api.ts                      +42  -17
+CLAUDE.md                                          +4   -4
+SESSION_HANDOFF.md                                 +63  -114
+SESSION_OUTPUT.txt                                 +207 NEW
+
+================================================================================
+ALL NEW TEST FILES (7 files, 128 new tests)
+================================================================================
+
+server/__tests__/processing-log-update.test.ts               7 tests
+src/lib/__tests__/processing-log-api-retry.test.ts           8 tests
+src/lib/analysis/__tests__/evaluate-simple-display-mode.test.ts  13 tests
+src/lib/policy-evaluation/__tests__/benchmark-freshness.test.ts  19 tests
+src/lib/actuarial-engine/__tests__/eoop-precision.test.ts    11 tests
+src/lib/actuarial-engine/__tests__/topsis-transparency.test.ts   16 tests
+src/lib/policy-evaluation/__tests__/threshold-disclosure.test.ts 26 tests
++ existing test updates across 3 files                       28 updates
+
+TOTAL SESSION TESTS: 128 new + existing updates = all passing

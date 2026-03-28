@@ -54,6 +54,7 @@ import { resolveClauseRelationships } from './relationship-resolver'
 import {
   evaluatePilotAdmission,
   createPilotQARecord,
+  evaluateSimpleDisplayMode,
   type PilotAdmissionGateResult,
   type PilotQARecord,
 } from '@/lib/analysis/kasko-pilot-gate'
@@ -1321,6 +1322,15 @@ export async function extractPolicyFromDocument(
           qaRecord.countedInPilotMetrics = pilotAdmission.countedInPilotMetrics
           qaRecord.coverageCountExtracted = policy.coverages?.length || 0
           qaRecord.confidenceScore = confidenceOverall
+
+          // Evaluate display mode based on extraction quality
+          const displayModeResult = evaluateSimpleDisplayMode(confidenceOverall, {
+            policyNumber: enhancedExtractedData?.policyNumber,
+            provider: enhancedExtractedData?.provider,
+            coverages: enhancedExtractedData?.coverages,
+          })
+          qaRecord.displayMode = displayModeResult.mode
+          qaRecord.triggersFired = displayModeResult.triggers
 
           // Fire-and-forget: persist QA record to Supabase
           persistPilotQARecord(qaRecord).catch((err) =>

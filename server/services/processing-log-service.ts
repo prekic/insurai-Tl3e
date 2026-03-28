@@ -144,10 +144,15 @@ export async function updateProcessingLog(
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('document_id', documentId)
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
-    log.error('Failed to update log', { error: String(error) })
+    log.error('Failed to update processing log', { documentId, error: String(error) })
+    return null
+  }
+
+  if (!data) {
+    log.warn('Processing log not found for update', { documentId })
     return null
   }
 

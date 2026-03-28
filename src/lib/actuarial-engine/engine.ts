@@ -39,6 +39,43 @@ import {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Determine EOOP precision based on adapter metadata flags.
+ * Percentage and conditional deductibles cannot be fully modeled in Monte Carlo
+ * because they depend on loss magnitude, which varies per scenario.
+ */
+function computeEoopPrecision(policy: ActuarialPolicyInput): {
+  eoopPrecision: 'full' | 'partial' | 'suppressed'
+  eoopLimitations: string[]
+} {
+  const meta = policy as ActuarialPolicyInput & {
+    _hasPercentageDeductible?: boolean
+    _deductiblePercent?: number
+    _hasConditionalDeductibles?: boolean
+    _conditionalDeductibleCount?: number
+  }
+
+  const limitations: string[] = []
+
+  if (meta._hasPercentageDeductible && meta._deductiblePercent) {
+    limitations.push(
+      `${meta._deductiblePercent}% proportional deductible detected — actual out-of-pocket varies with loss amount and is likely higher than shown`
+    )
+  }
+
+  if (meta._hasConditionalDeductibles) {
+    limitations.push(
+      `${meta._conditionalDeductibleCount} conditional deductible condition(s) detected — exposure depends on claim circumstances (e.g., service network, repair type)`
+    )
+  }
+
+  if (limitations.length === 0) {
+    return { eoopPrecision: 'full', eoopLimitations: [] }
+  }
+
+  return { eoopPrecision: 'partial', eoopLimitations: limitations }
+}
+
+/**
  * Runs the full 4-layer actuarial evaluation on a single policy.
  *
  * @param policy - The actuarial policy input
@@ -157,6 +194,7 @@ export function runFullEvaluation(
     expectedOutOfPocket: eoopResult,
     contractQualityScore,
     contractQualityIsEstimated,
+    ...computeEoopPrecision(policy),
     layerTimings: { layerA_ms, layerB_ms, layerC_ms, total_ms },
     configSnapshot: {
       ruleset: compliance.rulesetVersion,

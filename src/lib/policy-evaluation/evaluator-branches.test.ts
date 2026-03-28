@@ -67,6 +67,9 @@ const mockGetBenchmark = vi.mocked(getPremiumBenchmarkWithFallback)
 const mockIsValueBased = vi.mocked(isValueBasedBenchmark)
 const mockEvalValueBased = vi.mocked(evaluateValueBasedPremium)
 
+// Current date for benchmark freshness — prevents stale downgrade in context-factor tests
+const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]
+
 function makePolicy(overrides: Partial<Policy> = {}): Policy {
   return {
     id: 'test-1',
@@ -155,6 +158,7 @@ describe('evaluatePolicy', () => {
         valueMinRate: 0.01,
         valueAvgRate: 0.02,
         valueMaxRate: 0.04,
+        dataDate: CURRENT_DATA_DATE,
       }
       mockGetBenchmark.mockReturnValue(
         benchmark as ReturnType<typeof getPremiumBenchmarkWithFallback>
@@ -182,6 +186,7 @@ describe('evaluatePolicy', () => {
         valueMinRate: 0.01,
         valueAvgRate: 0.02,
         valueMaxRate: 0.04,
+        dataDate: CURRENT_DATA_DATE,
       }
       mockGetBenchmark.mockReturnValue(
         benchmark as ReturnType<typeof getPremiumBenchmarkWithFallback>
@@ -210,6 +215,7 @@ describe('evaluatePolicy', () => {
         valueMinRate: 0.01,
         valueAvgRate: 0.02,
         valueMaxRate: 0.04,
+        dataDate: CURRENT_DATA_DATE,
       }
       mockGetBenchmark.mockReturnValue(
         benchmark as ReturnType<typeof getPremiumBenchmarkWithFallback>
@@ -234,6 +240,7 @@ describe('evaluatePolicy', () => {
         minPremium: 3000,
         avgPremium: 5000,
         maxPremium: 10000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -249,6 +256,7 @@ describe('evaluatePolicy', () => {
         minPremium: 3000,
         avgPremium: 5000,
         maxPremium: 10000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -263,6 +271,7 @@ describe('evaluatePolicy', () => {
         minPremium: 3000,
         avgPremium: 5000,
         maxPremium: 10000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -278,6 +287,7 @@ describe('evaluatePolicy', () => {
         minPremium: 3000,
         avgPremium: 5000,
         maxPremium: 10000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -287,6 +297,18 @@ describe('evaluatePolicy', () => {
     })
 
     it('penalizes high premium-to-coverage ratio', () => {
+      // Need a current-dated benchmark so confidence isn't suppressed
+      // (suppression causes early return before the ratio check)
+      mockGetBenchmark.mockReturnValue({
+        insuranceType: 'kasko',
+        minPremium: 3000,
+        avgPremium: 8000,
+        maxPremium: 60000,
+        currency: 'TRY' as const,
+        year: 2026,
+        source: 'TSB',
+        dataDate: CURRENT_DATA_DATE,
+      })
       const result = evaluatePolicy(makePolicy({ premium: 50000, coverage: 100000 }))
       // premiumToCoverageRatio = 0.5 is very high
       expect(result.scoreBreakdown.premium.issues).toContain('Premium to coverage ratio is high')
@@ -863,6 +885,7 @@ describe('evaluatePolicy', () => {
         minPremium: 3000,
         avgPremium: 8000,
         maxPremium: 15000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -898,6 +921,7 @@ describe('evaluatePolicy', () => {
         minPremium: 8000,
         avgPremium: 12000,
         maxPremium: 20000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -918,6 +942,7 @@ describe('evaluatePolicy', () => {
         minPremium: 1000,
         avgPremium: 3000,
         maxPremium: 5000,
+        dataDate: CURRENT_DATA_DATE,
       } as ReturnType<typeof getPremiumBenchmarkWithFallback>)
       mockIsValueBased.mockReturnValue(false)
 
@@ -941,6 +966,7 @@ describe('evaluatePolicy', () => {
         valueMinRate: 0.01,
         valueAvgRate: 0.02,
         valueMaxRate: 0.04,
+        dataDate: CURRENT_DATA_DATE,
       }
       mockGetBenchmark.mockReturnValue(
         benchmark as ReturnType<typeof getPremiumBenchmarkWithFallback>

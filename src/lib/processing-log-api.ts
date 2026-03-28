@@ -49,30 +49,51 @@ export async function updateProcessingLog(
   documentId: string,
   updates: Partial<DocumentProcessingLog>
 ): Promise<DocumentProcessingLog | null> {
-  try {
-    const response = await fetch(`${API_BASE}/api/ai/processing-log/${documentId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(updates),
-    })
+  const maxRetries = 1
+  const retryDelayMs = 500
 
-    if (!response.ok) {
-      console.error('[ProcessingLogAPI] Update HTTP error:', response.status, response.statusText, {
-        documentId,
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(`${API_BASE}/api/ai/processing-log/${documentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
       })
+
+      // Retry once on 404 — the CREATE may not have committed yet
+      if (response.status === 404 && attempt < maxRetries) {
+        console.warn(
+          `[ProcessingLogAPI] Update 404 for ${documentId}, retrying in ${retryDelayMs}ms...`
+        )
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs))
+        continue
+      }
+
+      if (!response.ok) {
+        console.error(
+          '[ProcessingLogAPI] Update HTTP error:',
+          response.status,
+          response.statusText,
+          {
+            documentId,
+          }
+        )
+        return null
+      }
+
+      const data = await response.json()
+      if (data.success) {
+        return data.data
+      }
+      console.error('[ProcessingLogAPI] Update failed:', data.error, { documentId })
+      return null
+    } catch (error) {
+      console.error('[ProcessingLogAPI] Update error:', error, { documentId })
       return null
     }
-
-    const data = await response.json()
-    if (data.success) {
-      return data.data
-    }
-    console.error('[ProcessingLogAPI] Update failed:', data.error, { documentId })
-    return null
-  } catch (error) {
-    console.error('[ProcessingLogAPI] Update error:', error, { documentId })
-    return null
   }
+
+  return null
 }
 
 /**

@@ -3,11 +3,11 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Deploy Safety Patch to Production**: Branch `claude/load-project-context-nqrry` has 7 safety fixes + 79 tests. Sandbox `git push` doesn't trigger Railway webhook — use `mcp__github__push_files` or Railway manual deploy.
+1. **Deploy to Production**: Branch `claude/load-project-context-RcmfR` has 3 bug fixes + safety patch. Sandbox `git push` doesn't trigger Railway webhook — use `mcp__github__push_files` or Railway manual deploy.
 2. **Upload Diverse KASKO PDFs**: Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target graduation: April 5, 2026.
-3. **Fix Processing Log PATCH 404**: `PATCH /api/ai/processing-log/:id` returns 404 after initial CREATE succeeds. Investigate route/table mismatch — the initial POST works but subsequent PATCH updates fail. Non-blocking but creates noisy console errors.
-4. **Fix QA Record `display_mode`**: All 22 records have `display_mode: 'unknown'` instead of expected `'full'` or `'restricted'`. The pilot gate code path isn't setting this field. Low priority.
-5. **Fix `user_preferences` 406 Error**: `GET /rest/v1/user_preferences?...category=eq.email` returns 406. Likely missing `Accept` header or schema mismatch. Pre-existing.
+3. **Persist `isDraft` to DB**: Add `is_draft` column to policies table so draft status survives feature flag changes.
+4. **Calibrate Grade Thresholds**: A=90, B=80 etc. are arbitrary — need real outcome data for calibration.
+5. **Add TOPSIS Weight Visibility**: Users can't see what weights drive multi-criteria ranking.
 6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---

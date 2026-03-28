@@ -28,6 +28,14 @@ export type EvaluationStatus = 'excellent' | 'good' | 'fair' | 'poor' | 'critica
  */
 export type BenchmarkConfidenceLevel = 'high' | 'low' | 'suppressed'
 
+/**
+ * Benchmark data freshness state.
+ * - 'current':  within agingDays threshold — full comparison
+ * - 'aging':    between agingDays and staleDays — comparison with date warning
+ * - 'stale':    beyond staleDays — suppress definitive language, downgrade confidence
+ */
+export type BenchmarkFreshness = 'current' | 'aging' | 'stale'
+
 export interface BenchmarkContextFactor {
   factor: string
   factorTr: string
@@ -43,6 +51,12 @@ export interface BenchmarkConfidence {
   /** If suppressed, the reason why */
   suppressionReason?: string
   suppressionReasonTr?: string
+  /** Benchmark data freshness assessment */
+  freshness?: BenchmarkFreshness
+  /** ISO date the benchmark data was last updated */
+  dataAsOf?: string
+  /** Number of days since the benchmark data was last updated */
+  dataAgeDays?: number
 }
 
 export interface ScoreBreakdown {
@@ -278,6 +292,10 @@ export interface EvaluationConfig {
   // Actuarial Engine settings
   workerEnabled?: boolean
   workerIterations?: number
+
+  // Benchmark freshness thresholds (days)
+  benchmarkAgingDays?: number
+  benchmarkStaleDays?: number
 }
 
 export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
@@ -293,6 +311,8 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
   useRegionalBenchmarks: true,
   workerEnabled: true,
   workerIterations: 10000,
+  benchmarkAgingDays: 180,
+  benchmarkStaleDays: 365,
 }
 
 /**

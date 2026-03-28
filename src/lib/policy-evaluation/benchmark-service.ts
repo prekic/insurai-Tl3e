@@ -6,7 +6,7 @@
  * comparison and value-based (% of insured value) comparison.
  */
 
-const getSupabase = () => import('@/lib/supabase/client').then(m => m.supabase)
+const getSupabase = () => import('@/lib/supabase/client').then((m) => m.supabase)
 
 // =============================================================================
 // TYPES
@@ -22,7 +22,7 @@ export interface PremiumBenchmark {
   avgPremium: number
   maxPremium: number
   comparisonMethod: 'direct_premium' | 'value_based'
-  valueMinRate: number | null  // For value_based: e.g., 0.015 = 1.5%
+  valueMinRate: number | null // For value_based: e.g., 0.015 = 1.5%
   valueAvgRate: number | null
   valueMaxRate: number | null
   currency: string
@@ -48,6 +48,8 @@ export interface LegacyPremiumRange {
   valueMinRate?: number
   valueAvgRate?: number
   valueMaxRate?: number
+  // Benchmark data date (ISO-8601) for freshness governance
+  dataDate?: string
 }
 
 // =============================================================================
@@ -62,7 +64,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
  * Check if cache is valid
  */
 function isCacheValid(): boolean {
-  return benchmarkCache.length > 0 && (Date.now() - cacheTimestamp) < CACHE_TTL_MS
+  return benchmarkCache.length > 0 && Date.now() - cacheTimestamp < CACHE_TTL_MS
 }
 
 /**
@@ -83,7 +85,7 @@ export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
     }
 
     // Transform database rows to our interface
-    benchmarkCache = (data || []).map(row => ({
+    benchmarkCache = (data || []).map((row) => ({
       id: row.id,
       insuranceType: row.insurance_type,
       insuranceTypeTR: row.insurance_type_tr,
@@ -129,7 +131,7 @@ export function getAllBenchmarks(): PremiumBenchmark[] {
  * Get benchmarks by insurance type (synchronous)
  */
 export function getBenchmarksByType(insuranceType: string): PremiumBenchmark[] {
-  return benchmarkCache.filter(b => b.insuranceType === insuranceType)
+  return benchmarkCache.filter((b) => b.insuranceType === insuranceType)
 }
 
 // =============================================================================
@@ -154,7 +156,7 @@ export function getPremiumBenchmark(
   }
 
   // Find matching benchmark
-  const benchmark = benchmarkCache.find(b => {
+  const benchmark = benchmarkCache.find((b) => {
     if (b.insuranceType !== insuranceType) return false
     if (subType && b.subType && b.subType !== subType) return false
     // If no subType specified, prefer the first match (or general one)
@@ -164,7 +166,7 @@ export function getPremiumBenchmark(
 
   // If no exact match found, try to find a general one for the insurance type
   const fallback = !benchmark
-    ? benchmarkCache.find(b => b.insuranceType === insuranceType && !b.subType)
+    ? benchmarkCache.find((b) => b.insuranceType === insuranceType && !b.subType)
     : undefined
 
   const match = benchmark || fallback
@@ -177,8 +179,12 @@ export function getPremiumBenchmark(
   return {
     insuranceType: match.insuranceType,
     // Map subType to legacy fields
-    vehicleClass: ['zmss', 'kasko'].includes(match.insuranceType) ? match.subType || undefined : undefined,
-    propertyType: ['dask', 'home', 'business'].includes(match.insuranceType) ? match.subType || undefined : undefined,
+    vehicleClass: ['zmss', 'kasko'].includes(match.insuranceType)
+      ? match.subType || undefined
+      : undefined,
+    propertyType: ['dask', 'home', 'business'].includes(match.insuranceType)
+      ? match.subType || undefined
+      : undefined,
     minPremium: match.minPremium,
     avgPremium: match.avgPremium,
     maxPremium: match.maxPremium,
@@ -190,6 +196,7 @@ export function getPremiumBenchmark(
     valueMinRate: match.valueMinRate || undefined,
     valueAvgRate: match.valueAvgRate || undefined,
     valueMaxRate: match.valueMaxRate || undefined,
+    dataDate: `${match.year}-01-01`,
   }
 }
 
@@ -198,11 +205,15 @@ export function getPremiumBenchmark(
  */
 export function getAllBenchmarksForType(insuranceType: string): LegacyPremiumRange[] {
   return benchmarkCache
-    .filter(b => b.insuranceType === insuranceType)
-    .map(match => ({
+    .filter((b) => b.insuranceType === insuranceType)
+    .map((match) => ({
       insuranceType: match.insuranceType,
-      vehicleClass: ['zmss', 'kasko'].includes(match.insuranceType) ? match.subType || undefined : undefined,
-      propertyType: ['dask', 'home', 'business'].includes(match.insuranceType) ? match.subType || undefined : undefined,
+      vehicleClass: ['zmss', 'kasko'].includes(match.insuranceType)
+        ? match.subType || undefined
+        : undefined,
+      propertyType: ['dask', 'home', 'business'].includes(match.insuranceType)
+        ? match.subType || undefined
+        : undefined,
       minPremium: match.minPremium,
       avgPremium: match.avgPremium,
       maxPremium: match.maxPremium,
@@ -324,6 +335,7 @@ export function getPremiumBenchmarkWithFallback(
     return {
       ...hardcoded,
       comparisonMethod: 'direct_premium',
+      dataDate: '2024-12-01',
     }
   }
 

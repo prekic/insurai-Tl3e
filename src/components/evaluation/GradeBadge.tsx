@@ -37,6 +37,7 @@ export function GradeBadge({ grade, size = 'md', showLabel = false, className }:
       )}
       role="status"
       aria-label={`Grade ${grade}`}
+      title="Model-based grade — thresholds are configurable and subject to recalibration"
     >
       {showLabel ? `Grade ${grade}` : grade}
     </span>

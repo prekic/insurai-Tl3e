@@ -168,6 +168,9 @@ export interface EvaluationConfig {
   // Worker Settings
   workerEnabled: boolean
   workerIterations: number
+  // Benchmark Freshness Thresholds (days)
+  benchmarkAgingDays: number
+  benchmarkStaleDays: number
 }
 
 export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
@@ -189,6 +192,8 @@ export const DEFAULT_EVALUATION_CONFIG: EvaluationConfig = {
   useRegionalBenchmarks: true,
   workerEnabled: true,
   workerIterations: 10000,
+  benchmarkAgingDays: 180,
+  benchmarkStaleDays: 365,
 }
 
 // =============================================================================

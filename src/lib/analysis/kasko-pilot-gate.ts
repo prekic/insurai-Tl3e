@@ -376,6 +376,54 @@ export function createPilotQARecord(
 }
 
 /**
+ * Lightweight display mode evaluator for pilot QA records.
+ * Uses data available at extraction time (confidence, extracted data fields)
+ * without requiring the full ValidationResult / AnalysisBundle types.
+ *
+ * Returns display mode and trigger rules for the QA record.
+ */
+export function evaluateSimpleDisplayMode(
+  confidenceScore: number,
+  extractedData: {
+    policyNumber?: string | null
+    provider?: string | null
+    coverages?: unknown[]
+  }
+): { mode: 'full' | 'restricted' | 'human_review_required'; triggers: string[] } {
+  const triggers: string[] = []
+
+  // Very low confidence → human review required
+  if (confidenceScore < 0.3) {
+    triggers.push('LOW_CONFIDENCE_HUMAN_REVIEW')
+    return { mode: 'human_review_required', triggers }
+  }
+
+  // Low confidence → restricted
+  if (confidenceScore < 0.6) {
+    triggers.push('LOW_CONFIDENCE_RESTRICTED')
+  }
+
+  // Missing critical fields → restricted
+  if (!extractedData.policyNumber) {
+    triggers.push('MISSING_POLICY_NUMBER')
+  }
+  if (!extractedData.provider) {
+    triggers.push('MISSING_PROVIDER')
+  }
+
+  // No coverages extracted → restricted
+  if (!extractedData.coverages || extractedData.coverages.length === 0) {
+    triggers.push('NO_COVERAGES_EXTRACTED')
+  }
+
+  if (triggers.length > 0) {
+    return { mode: 'restricted', triggers }
+  }
+
+  return { mode: 'full', triggers: [] }
+}
+
+/**
  * Serialize and log a QA record. In production this would go to Supabase;
  * during pilot it appends to a local JSONL file.
  */

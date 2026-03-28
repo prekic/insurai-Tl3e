@@ -43,7 +43,12 @@ import {
 // BENCHMARK CONFIDENCE ASSESSMENT
 // =============================================================================
 
-import type { BenchmarkConfidence, BenchmarkConfidenceLevel, BenchmarkContextFactor } from './types'
+import type {
+  BenchmarkConfidence,
+  BenchmarkConfidenceLevel,
+  BenchmarkContextFactor,
+  BenchmarkFreshness,
+} from './types'
 
 /**
  * Assess how much confidence we should place in a benchmark comparison.
@@ -64,8 +69,40 @@ import type { BenchmarkConfidence, BenchmarkConfidenceLevel, BenchmarkContextFac
  *   - 1-2 factors present → 'low' confidence → comparison with prominent caveat
  *   - 0 factors present  → 'suppressed' → hide comparison entirely
  */
-function assessBenchmarkConfidence(policy: Policy): BenchmarkConfidence {
+/**
+ * Compute benchmark data freshness from dataDate and config thresholds.
+ */
+function computeBenchmarkFreshness(
+  dataDate: string | undefined,
+  agingDays: number,
+  staleDays: number
+): { freshness: BenchmarkFreshness; dataAgeDays: number } {
+  if (!dataDate) {
+    return { freshness: 'stale', dataAgeDays: Infinity }
+  }
+  const dataTimestamp = new Date(dataDate).getTime()
+  if (isNaN(dataTimestamp)) {
+    return { freshness: 'stale', dataAgeDays: Infinity }
+  }
+  const dataAgeDays = Math.floor((Date.now() - dataTimestamp) / 86_400_000)
+  let freshness: BenchmarkFreshness
+  if (dataAgeDays <= agingDays) {
+    freshness = 'current'
+  } else if (dataAgeDays <= staleDays) {
+    freshness = 'aging'
+  } else {
+    freshness = 'stale'
+  }
+  return { freshness, dataAgeDays }
+}
+
+function assessBenchmarkConfidence(
+  policy: Policy,
+  dataDate?: string,
+  evalConfig?: EvaluationConfig
+): BenchmarkConfidence {
   const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
+  const config = evalConfig || DEFAULT_EVALUATION_CONFIG
 
   const factors: BenchmarkContextFactor[] = [
     {
@@ -107,6 +144,14 @@ function assessBenchmarkConfidence(policy: Policy): BenchmarkConfidence {
   const presentCount = factors.filter((f) => f.present).length
   const totalCount = factors.length
 
+  // Compute freshness from dataDate
+  const { freshness, dataAgeDays } = computeBenchmarkFreshness(
+    dataDate,
+    config.benchmarkAgingDays ?? 180,
+    config.benchmarkStaleDays ?? 365
+  )
+
+  // Determine confidence level from context factors
   let level: BenchmarkConfidenceLevel
   let suppressionReason: string | undefined
   let suppressionReasonTr: string | undefined
@@ -123,7 +168,28 @@ function assessBenchmarkConfidence(policy: Policy): BenchmarkConfidence {
       'Anlamlı piyasa karşılaştırması için yeterli bağlam yok — araç, konum ve teminat bilgileri eksik'
   }
 
-  return { level, factors, presentCount, totalCount, suppressionReason, suppressionReasonTr }
+  // Stale data downgrades confidence by one step
+  if (freshness === 'stale' && level !== 'suppressed') {
+    if (level === 'high') {
+      level = 'low'
+    } else if (level === 'low') {
+      level = 'suppressed'
+      suppressionReason = `Benchmark data is over ${config.benchmarkStaleDays ?? 365} days old (from ${dataDate}) — comparison suppressed`
+      suppressionReasonTr = `Karşılaştırma verileri ${config.benchmarkStaleDays ?? 365} günden eski (${dataDate} tarihli) — karşılaştırma yapılamıyor`
+    }
+  }
+
+  return {
+    level,
+    factors,
+    presentCount,
+    totalCount,
+    suppressionReason,
+    suppressionReasonTr,
+    freshness,
+    dataAsOf: dataDate,
+    dataAgeDays: isFinite(dataAgeDays) ? dataAgeDays : undefined,
+  }
 }
 
 // =============================================================================
@@ -192,8 +258,16 @@ export function evaluatePolicy(
   const branchCode = POLICY_TYPE_TO_BRANCH[policy.type]
   const branchStats = getBranchStatistics(branchCode)
 
-  // Assess benchmark confidence before scoring
-  const benchmarkConfidence = assessBenchmarkConfidence(policy)
+  // Get benchmark dataDate for freshness assessment
+  const insuranceTypeForDate = POLICY_TYPE_TO_INSURANCE_TYPE[policy.type]
+  const benchmarkForDate = getPremiumBenchmarkWithFallback(insuranceTypeForDate)
+
+  // Assess benchmark confidence (context factors + data freshness)
+  const benchmarkConfidence = assessBenchmarkConfidence(
+    policy,
+    benchmarkForDate?.dataDate,
+    fullConfig
+  )
 
   // Evaluate each category
   const premiumScore = evaluatePremium(policy, fullConfig, benchmarkConfidence)
@@ -279,11 +353,19 @@ export function evaluatePolicy(
 
     benchmarkConfidence,
 
-    // Benchmark provenance disclaimer — all current benchmarks are indicative estimates
+    // Benchmark provenance disclaimer — varies by freshness
     benchmarkDisclaimer:
-      'Market averages are estimates based on indicative data. Actual premiums vary by vehicle, driver profile, and region.',
+      benchmarkConfidence.freshness === 'stale'
+        ? `Benchmark data is from ${benchmarkConfidence.dataAsOf || 'unknown date'} (${benchmarkConfidence.dataAgeDays ?? '?'} days old). This is a historical reference only — updated market validation recommended.`
+        : benchmarkConfidence.freshness === 'aging'
+          ? `Market data from ${benchmarkConfidence.dataAsOf || 'unknown date'}. Actual premiums vary by vehicle, driver profile, and region.`
+          : 'Market averages are estimates based on indicative data. Actual premiums vary by vehicle, driver profile, and region.',
     benchmarkDisclaimerTr:
-      'Piyasa ortalamaları gösterge niteliğinde tahminlere dayanmaktadır. Gerçek primler araca, sürücü profiline ve bölgeye göre değişir.',
+      benchmarkConfidence.freshness === 'stale'
+        ? `Karşılaştırma verileri ${benchmarkConfidence.dataAsOf || 'bilinmeyen tarih'} tarihli (${benchmarkConfidence.dataAgeDays ?? '?'} gün eski). Bu yalnızca tarihsel referanstır — güncel piyasa doğrulaması önerilir.`
+        : benchmarkConfidence.freshness === 'aging'
+          ? `Piyasa verileri ${benchmarkConfidence.dataAsOf || 'bilinmeyen tarih'} tarihli. Gerçek primler araca, sürücü profiline ve bölgeye göre değişir.`
+          : 'Piyasa ortalamaları gösterge niteliğinde tahminlere dayanmaktadır. Gerçek primler araca, sürücü profiline ve bölgeye göre değişir.',
   }
 }
 
@@ -358,20 +440,39 @@ function evaluatePremium(
       details = valueEval.details
       detailsTR = valueEval.detailsTR
 
+      const isStale = confidence?.freshness === 'stale'
+      const dateRef = confidence?.dataAsOf ? ` (data from ${confidence.dataAsOf})` : ''
+      const dateRefTr = confidence?.dataAsOf ? ` (${confidence.dataAsOf} tarihli veri)` : ''
+
       if (valueEval.position === 'high') {
-        issues.push('Premium rate is above market estimate for this value (indicative benchmark)')
-        issuesTR.push('Prim oranı bu değer için piyasa tahmininin üzerinde (gösterge niteliğinde)')
-      } else if (valueEval.position === 'very_high') {
         issues.push(
-          'Premium rate significantly exceeds typical market range (indicative benchmark)'
+          isStale
+            ? `Premium rate above historical market estimate${dateRef} — updated validation recommended`
+            : 'Premium rate is above market estimate for this value (indicative benchmark)'
         )
         issuesTR.push(
-          'Prim oranı tipik piyasa aralığını önemli ölçüde aşıyor (gösterge niteliğinde)'
+          isStale
+            ? `Prim oranı tarihsel piyasa tahmininin üzerinde${dateRefTr} — güncel doğrulama önerilir`
+            : 'Prim oranı bu değer için piyasa tahmininin üzerinde (gösterge niteliğinde)'
+        )
+      } else if (valueEval.position === 'very_high') {
+        issues.push(
+          isStale
+            ? `Premium rate significantly exceeds historical market range${dateRef} — updated validation recommended`
+            : 'Premium rate significantly exceeds typical market range (indicative benchmark)'
+        )
+        issuesTR.push(
+          isStale
+            ? `Prim oranı tarihsel piyasa aralığını önemli ölçüde aşıyor${dateRefTr} — güncel doğrulama önerilir`
+            : 'Prim oranı tipik piyasa aralığını önemli ölçüde aşıyor (gösterge niteliğinde)'
         )
       }
     } else {
       // Direct premium comparison
       const { minPremium, avgPremium, maxPremium } = benchmark
+      const isStaleD = confidence?.freshness === 'stale'
+      const dateRefD = confidence?.dataAsOf ? ` (data from ${confidence.dataAsOf})` : ''
+      const dateRefDTr = confidence?.dataAsOf ? ` (${confidence.dataAsOf} tarihli veri)` : ''
 
       if (policy.premium < minPremium) {
         // Suspiciously low - might be missing coverage
@@ -389,14 +490,30 @@ function evaluatePremium(
         const aboveAvgRatio = (policy.premium - avgPremium) / (maxPremium - avgPremium)
         score = 90 - Math.round(aboveAvgRatio * 30)
         if (aboveAvgRatio > 0.5) {
-          issues.push('Premium is significantly above market estimate')
-          issuesTR.push('Prim piyasa tahmininin önemli ölçüde üzerinde')
+          issues.push(
+            isStaleD
+              ? `Premium above historical market estimate${dateRefD} — updated validation recommended`
+              : 'Premium is significantly above market estimate'
+          )
+          issuesTR.push(
+            isStaleD
+              ? `Prim tarihsel piyasa tahmininin üzerinde${dateRefDTr} — güncel doğrulama önerilir`
+              : 'Prim piyasa tahmininin önemli ölçüde üzerinde'
+          )
         }
       } else {
         // Above maximum
         score = 40
-        issues.push('Premium exceeds typical market range')
-        issuesTR.push('Prim tipik piyasa aralığını aşıyor')
+        issues.push(
+          isStaleD
+            ? `Premium exceeds historical market range${dateRefD} — updated validation recommended`
+            : 'Premium exceeds typical market range'
+        )
+        issuesTR.push(
+          isStaleD
+            ? `Prim tarihsel piyasa aralığını aşıyor${dateRefDTr} — güncel doğrulama önerilir`
+            : 'Prim tipik piyasa aralığını aşıyor'
+        )
       }
     }
   }

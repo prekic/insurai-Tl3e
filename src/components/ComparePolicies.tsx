@@ -35,7 +35,7 @@ import {
 import { exportComparisonToCSV, exportComparisonToPDF } from '@/lib/export'
 import type { AnalyzedPolicy } from '@/types/policy'
 import type { PolicyComparison as PolicyComparisonType } from '@/lib/policy-evaluation/types'
-import { emitEvaluation } from '@/lib/actuarial-engine'
+import { emitEvaluation, DEFAULT_TOPSIS_CRITERIA } from '@/lib/actuarial-engine'
 
 /**
  * ComparePolicies page for side-by-side policy comparison.
@@ -876,8 +876,12 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
         {/* Overall Actuarial (TOPSIS) */}
         <div className="pt-3 border-t border-gray-200">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-sm font-bold text-blue-900">Actuarial TOPSIS Score</span>
-            <span className="text-xs text-gray-500 text-right">Beta Engine</span>
+            <span className="text-sm font-bold text-blue-900">
+              {locale === 'tr' ? 'Model Tabanlı Sıralama' : 'Model-Based Ranking'}
+            </span>
+            <span className="text-xs text-gray-500 text-right">
+              {locale === 'tr' ? 'Beta Motor' : 'Beta Engine'}
+            </span>
           </div>
           <div className="space-y-1.5">
             {comparison.policies.map((p, i) => {
@@ -914,6 +918,65 @@ function ScoreComparisonChart({ comparison, t }: ScoreComparisonChartProps) {
               )
             })}
           </div>
+        </div>
+
+        {/* TOPSIS Weight Transparency Panel */}
+        <div className="pt-3 border-t border-gray-200">
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900">
+              <span>
+                {locale === 'tr'
+                  ? 'Sıralama Kriterleri ve Ağırlıkları'
+                  : 'Ranking Criteria & Weights'}
+              </span>
+              <ChevronDown className="w-4 h-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="mt-2 space-y-2">
+              {DEFAULT_TOPSIS_CRITERIA.map((criterion) => (
+                <div key={criterion.code} className="flex items-center gap-2 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-medium text-gray-800">
+                        {locale === 'tr' ? criterion.labelTr : criterion.label}
+                      </span>
+                      <span
+                        className={cn(
+                          'px-1 py-0.5 rounded text-[10px] font-medium',
+                          criterion.direction === 'cost'
+                            ? 'bg-red-50 text-red-600'
+                            : 'bg-green-50 text-green-600'
+                        )}
+                      >
+                        {criterion.direction === 'cost'
+                          ? locale === 'tr'
+                            ? 'düşük iyi'
+                            : 'lower better'
+                          : locale === 'tr'
+                            ? 'yüksek iyi'
+                            : 'higher better'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full"
+                        style={{ width: `${criterion.weight * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-gray-600 font-mono w-8 text-right">
+                      {Math.round(criterion.weight * 100)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+              <p className="text-[10px] text-gray-400 italic mt-2 leading-tight">
+                {locale === 'tr'
+                  ? 'Ağırlıklar yapılandırma tarafından belirlenir. Bu model tabanlı bir sıralamadır, objektif bir gerçek değildir.'
+                  : 'Weights are configuration-driven. This is a model-based ranking, not an objective truth.'}
+              </p>
+            </div>
+          </details>
         </div>
       </div>
     </section>

@@ -117,6 +117,7 @@ beforeEach(() => {
     currency: 'TRY' as const,
     year: 2024,
     source: 'TSB/SEDDK',
+    dataDate: new Date().toISOString().split('T')[0], // current date to avoid stale downgrade
   })
 })
 

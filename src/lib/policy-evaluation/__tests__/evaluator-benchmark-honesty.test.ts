@@ -61,6 +61,9 @@ const mockGetBenchmark = vi.mocked(getPremiumBenchmarkWithFallback)
 const mockIsValueBased = vi.mocked(isValueBasedBenchmark)
 const mockEvalValueBased = vi.mocked(evaluateValueBasedPremium)
 
+// Current date for benchmark freshness — prevents stale downgrade in context-factor tests
+const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]
+
 function makePolicy(overrides: Partial<Policy> = {}): Policy {
   return {
     id: 'bench-test-1',
@@ -104,6 +107,7 @@ describe('B1 — Benchmark Honesty', () => {
         currency: 'TRY' as const,
         year: 2026,
         source: 'Indicative estimate',
+        dataDate: CURRENT_DATA_DATE,
       })
 
       // Premium far below avg would normally score 90+
@@ -122,6 +126,7 @@ describe('B1 — Benchmark Honesty', () => {
         currency: 'TRY' as const,
         year: 2026,
         source: 'Indicative estimate',
+        dataDate: CURRENT_DATA_DATE,
       })
 
       // Premium at avg would normally score ~90
@@ -143,6 +148,7 @@ describe('B1 — Benchmark Honesty', () => {
         valueMinRate: 0.015,
         valueAvgRate: 0.03,
         valueMaxRate: 0.06,
+        dataDate: CURRENT_DATA_DATE,
       })
       mockIsValueBased.mockReturnValue(true)
       mockEvalValueBased.mockReturnValue({
@@ -178,6 +184,18 @@ describe('B1 — Benchmark Honesty', () => {
     })
 
     it('disclaimer mentions estimates or indicative nature', () => {
+      // Provide current-date benchmark so disclaimer uses standard (not stale) wording
+      mockGetBenchmark.mockReturnValue({
+        insuranceType: 'kasko',
+        minPremium: 3000,
+        avgPremium: 8000,
+        maxPremium: 15000,
+        currency: 'TRY' as const,
+        year: 2026,
+        source: 'TSB',
+        dataDate: CURRENT_DATA_DATE,
+      })
+
       const result = evaluatePolicy(makePolicy())
 
       // The English disclaimer should mention "estimate" to signal indicative data
@@ -195,6 +213,7 @@ describe('B1 — Benchmark Honesty', () => {
         currency: 'TRY' as const,
         year: 2026,
         source: 'Indicative',
+        dataDate: CURRENT_DATA_DATE,
       })
 
       const result = evaluatePolicy(makePolicy({ premium: 8000, coverage: 500000 }))
@@ -212,6 +231,7 @@ describe('B1 — Benchmark Honesty', () => {
         currency: 'TRY' as const,
         year: 2026,
         source: 'Indicative',
+        dataDate: CURRENT_DATA_DATE,
       })
 
       const result = evaluatePolicy(makePolicy({ premium: 8000, coverage: 500000 }))
@@ -230,6 +250,7 @@ describe('B1 — Benchmark Honesty', () => {
         currency: 'TRY' as const,
         year: 2026,
         source: 'Indicative estimate',
+        dataDate: CURRENT_DATA_DATE,
       })
 
       // Premium at 4000 is well below avg of 15000 — uncapped would be ~93

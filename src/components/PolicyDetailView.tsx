@@ -1417,6 +1417,81 @@ export function PolicyDetailView() {
                     </div>
                   </div>
 
+                  {/* Top Score Drivers — concise "why this grade" */}
+                  {(() => {
+                    const breakdown = evaluation.scoreBreakdown
+                    const categories = [
+                      {
+                        key: 'premium',
+                        score: breakdown.premium.score,
+                        weight: breakdown.premium.weight,
+                        label: locale === 'tr' ? 'Prim' : 'Premium',
+                      },
+                      {
+                        key: 'coverage',
+                        score: breakdown.coverage.score,
+                        weight: breakdown.coverage.weight,
+                        label: locale === 'tr' ? 'Teminat' : 'Coverage',
+                      },
+                      {
+                        key: 'deductible',
+                        score: breakdown.deductible.score,
+                        weight: breakdown.deductible.weight,
+                        label: locale === 'tr' ? 'Muafiyet' : 'Deductible',
+                      },
+                      {
+                        key: 'compliance',
+                        score: breakdown.compliance.score,
+                        weight: breakdown.compliance.weight,
+                        label: locale === 'tr' ? 'Uyum' : 'Compliance',
+                      },
+                      {
+                        key: 'value',
+                        score: breakdown.value.score,
+                        weight: breakdown.value.weight,
+                        label: locale === 'tr' ? 'Değer' : 'Value',
+                      },
+                    ].filter((c) => c.score >= 0)
+                    const sorted = [...categories].sort(
+                      (a, b) => b.score * b.weight - a.score * a.weight
+                    )
+                    const topDriver = sorted[0]
+                    const topPenalty = [...categories].sort((a, b) => a.score - b.score)[0]
+                    const showPenalty =
+                      topPenalty && topPenalty.score < 70 && topPenalty.key !== topDriver?.key
+
+                    return (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] sm:text-xs text-gray-500 mt-1">
+                        {topDriver && (
+                          <span>
+                            {locale === 'tr' ? 'En güçlü' : 'Strongest'}:{' '}
+                            <span className="font-medium text-emerald-700">
+                              {topDriver.label} ({topDriver.score})
+                            </span>
+                          </span>
+                        )}
+                        {showPenalty && (
+                          <span>
+                            {locale === 'tr' ? 'En zayıf' : 'Weakest'}:{' '}
+                            <span className="font-medium text-amber-700">
+                              {topPenalty.label} ({topPenalty.score})
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Model disclosure */}
+                  <p
+                    className="text-[10px] text-gray-400 italic leading-tight"
+                    data-testid="grade-model-disclosure"
+                  >
+                    {locale === 'tr'
+                      ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
+                      : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
+                  </p>
+
                   {/* Score Breakdown - Expandable */}
                   <div className="pt-2 border-t">
                     <button
@@ -1623,6 +1698,34 @@ export function PolicyDetailView() {
                   </CardHeader>
                   <CardContent className="p-3 sm:p-6">
                     <div className="space-y-3">
+                      {/* Freshness badge — mobile */}
+                      {evaluation?.benchmarkConfidence?.freshness &&
+                        evaluation.benchmarkConfidence.freshness !== 'current' && (
+                          <div
+                            className={`flex items-center gap-1.5 px-2 py-1.5 rounded text-[10px] ${
+                              evaluation.benchmarkConfidence.freshness === 'stale'
+                                ? 'bg-red-50 border border-red-200 text-red-700'
+                                : 'bg-amber-50 border border-amber-200 text-amber-700'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                                evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? 'bg-red-500'
+                                  : 'bg-amber-500'
+                              }`}
+                            />
+                            <span>
+                              {locale === 'tr'
+                                ? evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? `Veriler ${evaluation.benchmarkConfidence.dataAgeDays ?? '?'} gün eski. Tarihsel referans.`
+                                  : `Veri: ${evaluation.benchmarkConfidence.dataAsOf || '?'}`
+                                : evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? `Data is ${evaluation.benchmarkConfidence.dataAgeDays ?? '?'} days old. Historical reference only.`
+                                  : `Data: ${evaluation.benchmarkConfidence.dataAsOf || '?'}`}
+                            </span>
+                          </div>
+                        )}
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs text-gray-500">{t.policy.yourPremium}</span>
@@ -1888,6 +1991,79 @@ export function PolicyDetailView() {
                     </div>
                   </div>
 
+                  {/* Top Score Drivers — desktop */}
+                  {(() => {
+                    const bd = evaluation.scoreBreakdown
+                    const cats = [
+                      {
+                        key: 'premium',
+                        score: bd.premium.score,
+                        weight: bd.premium.weight,
+                        label: locale === 'tr' ? 'Prim' : 'Premium',
+                      },
+                      {
+                        key: 'coverage',
+                        score: bd.coverage.score,
+                        weight: bd.coverage.weight,
+                        label: locale === 'tr' ? 'Teminat' : 'Coverage',
+                      },
+                      {
+                        key: 'deductible',
+                        score: bd.deductible.score,
+                        weight: bd.deductible.weight,
+                        label: locale === 'tr' ? 'Muafiyet' : 'Deductible',
+                      },
+                      {
+                        key: 'compliance',
+                        score: bd.compliance.score,
+                        weight: bd.compliance.weight,
+                        label: locale === 'tr' ? 'Uyum' : 'Compliance',
+                      },
+                      {
+                        key: 'value',
+                        score: bd.value.score,
+                        weight: bd.value.weight,
+                        label: locale === 'tr' ? 'Değer' : 'Value',
+                      },
+                    ].filter((c) => c.score >= 0)
+                    const sorted = [...cats].sort((a, b) => b.score * b.weight - a.score * a.weight)
+                    const topDriver = sorted[0]
+                    const topPenalty = [...cats].sort((a, b) => a.score - b.score)[0]
+                    const showPenalty =
+                      topPenalty && topPenalty.score < 70 && topPenalty.key !== topDriver?.key
+
+                    return (
+                      <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mt-1">
+                        {topDriver && (
+                          <span>
+                            {locale === 'tr' ? 'En güçlü' : 'Strongest'}:{' '}
+                            <span className="font-medium text-emerald-700">
+                              {topDriver.label} ({topDriver.score})
+                            </span>
+                          </span>
+                        )}
+                        {showPenalty && (
+                          <span>
+                            {locale === 'tr' ? 'En zayıf' : 'Weakest'}:{' '}
+                            <span className="font-medium text-amber-700">
+                              {topPenalty.label} ({topPenalty.score})
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Model disclosure — desktop */}
+                  <p
+                    className="text-[10px] text-gray-400 italic leading-tight"
+                    data-testid="grade-model-disclosure"
+                  >
+                    {locale === 'tr'
+                      ? 'Bu derecelendirme mevcut iç model eşiklerine dayanmaktadır ve karşılaştırma kapsamı geliştikçe yeniden kalibre edilebilir.'
+                      : 'This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves.'}
+                  </p>
+
                   {/* Score Breakdown */}
                   <div className="pt-2 border-t">
                     <p className="text-sm font-medium text-gray-700 mb-2">
@@ -2012,6 +2188,34 @@ export function PolicyDetailView() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
+                      {/* Freshness badge */}
+                      {evaluation?.benchmarkConfidence?.freshness &&
+                        evaluation.benchmarkConfidence.freshness !== 'current' && (
+                          <div
+                            className={`flex items-center gap-2 px-3 py-2 rounded text-xs ${
+                              evaluation.benchmarkConfidence.freshness === 'stale'
+                                ? 'bg-red-50 border border-red-200 text-red-700'
+                                : 'bg-amber-50 border border-amber-200 text-amber-700'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${
+                                evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? 'bg-red-500'
+                                  : 'bg-amber-500'
+                              }`}
+                            />
+                            <span>
+                              {locale === 'tr'
+                                ? evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? `Karşılaştırma verileri ${evaluation.benchmarkConfidence.dataAgeDays ?? '?'} gün eski (${evaluation.benchmarkConfidence.dataAsOf || '?'}). Yalnızca tarihsel referans.`
+                                  : `Piyasa verileri ${evaluation.benchmarkConfidence.dataAsOf || '?'} tarihli`
+                                : evaluation.benchmarkConfidence.freshness === 'stale'
+                                  ? `Benchmark data is ${evaluation.benchmarkConfidence.dataAgeDays ?? '?'} days old (from ${evaluation.benchmarkConfidence.dataAsOf || '?'}). Historical reference only.`
+                                  : `Market data from ${evaluation.benchmarkConfidence.dataAsOf || '?'}`}
+                            </span>
+                          </div>
+                        )}
                       <div>
                         <div className="flex items-center justify-between mb-1">
                           <span className="text-xs sm:text-sm text-gray-500">
@@ -2158,10 +2362,21 @@ export function PolicyDetailView() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">
                       {t.policy.expectedOutOfPocket}
                     </p>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString()}{' '}
-                      {actuarialResult.expectedOutOfPocket.expectedCost.currency}
-                    </p>
+                    {/* EOOP value — annotated when precision is partial */}
+                    <div className="flex items-end gap-2">
+                      <p
+                        className={`text-2xl font-bold ${actuarialResult.eoopPrecision === 'partial' ? 'text-amber-700' : 'text-gray-900'}`}
+                      >
+                        {actuarialResult.eoopPrecision === 'partial' ? '~' : ''}
+                        {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString()}{' '}
+                        {actuarialResult.expectedOutOfPocket.expectedCost.currency}
+                      </p>
+                      {actuarialResult.eoopPrecision === 'partial' && (
+                        <span className="text-[10px] text-amber-600 font-medium mb-1.5">
+                          ({locale === 'tr' ? 'taban tahmin' : 'base estimate'})
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-gray-600 mt-2">
                       {t.policy.premiumLabel}{' '}
                       <span className="font-medium">
@@ -2176,16 +2391,31 @@ export function PolicyDetailView() {
                         {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.currency}
                       </span>
                     </p>
-                    {policy.deductiblePercent && policy.deductiblePercent > 0 && (
-                      <p className="text-xs text-amber-600 mt-2 flex items-start gap-1">
-                        <AlertTriangle className="flex-shrink-0 mt-0.5" size={12} />
-                        <span>
-                          {locale === 'tr'
-                            ? `EOOP hesaplaması %${policy.deductiblePercent} oransal muafiyeti tam olarak modelleyemeyebilir — gerçek cepten harcama daha yüksek olabilir`
-                            : `EOOP may understate costs — ${policy.deductiblePercent}% proportional deductible detected but not fully modeled`}
-                        </span>
-                      </p>
-                    )}
+                    {/* EOOP precision warnings — driven by eoopPrecision + eoopLimitations */}
+                    {actuarialResult.eoopPrecision === 'partial' &&
+                      actuarialResult.eoopLimitations &&
+                      actuarialResult.eoopLimitations.length > 0 && (
+                        <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700">
+                          <p className="font-medium mb-1 flex items-center gap-1">
+                            <AlertTriangle className="flex-shrink-0" size={12} />
+                            {locale === 'tr'
+                              ? 'Gerçek cepten harcama gösterilenden önemli ölçüde yüksek olabilir:'
+                              : 'Actual out-of-pocket exposure may be materially higher:'}
+                          </p>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            {actuarialResult.eoopLimitations.map((limitation, i) => (
+                              <li key={i}>{limitation}</li>
+                            ))}
+                          </ul>
+                          {policy.deductiblePercent && policy.deductiblePercent > 0 && (
+                            <p className="mt-1.5 text-[10px] text-amber-600 italic">
+                              {locale === 'tr'
+                                ? `Örnek: 100.000 TL hasarda %${policy.deductiblePercent} muafiyet = ${((100000 * policy.deductiblePercent) / 100).toLocaleString('tr-TR')} TL ek cepten maliyet`
+                                : `Example: on a 100,000 TL claim, ${policy.deductiblePercent}% deductible = ${((100000 * policy.deductiblePercent) / 100).toLocaleString()} TL additional out-of-pocket`}
+                            </p>
+                          )}
+                        </div>
+                      )}
                   </div>
 
                   <div className="bg-white rounded-lg p-4 border border-blue-50">
