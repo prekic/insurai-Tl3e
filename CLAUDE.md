@@ -3,12 +3,11 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **Deploy to Production**: Branch `claude/load-project-context-RcmfR` has 3 bug fixes + safety patch. Sandbox `git push` doesn't trigger Railway webhook — use `mcp__github__push_files` or Railway manual deploy.
+1. **Deploy to Production**: Branch `claude/load-project-context-RcmfR` has 8 commits (bug fixes + safety governance + explainability). Sandbox `git push` doesn't trigger Railway webhook — use `mcp__github__push_files` or Railway manual deploy.
 2. **Upload Diverse KASKO PDFs**: Phase 8L graduation needs 5+ unique documents from different providers (currently all 22 QA records are from the same Anadolu Sigorta PDF). Target graduation: April 5, 2026.
 3. **Persist `isDraft` to DB**: Add `is_draft` column to policies table so draft status survives feature flag changes.
-4. **Calibrate Grade Thresholds**: A=90, B=80 etc. are arbitrary — need real outcome data for calibration.
-5. **Add TOPSIS Weight Visibility**: Users can't see what weights drive multi-criteria ranking.
-6. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+4. **Calibrate Grade Thresholds**: A=90, B=80 etc. are arbitrary — need real outcome data. Thresholds are now config-driven (`benchmarkAgingDays`, `benchmarkStaleDays` in `EvaluationConfig`; grade thresholds via admin Settings UI).
+5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
@@ -65,6 +64,24 @@
 25. **Contract Quality `contractQualityIsEstimated` Flag (Added Mar 27, 2026)**: When `ActuarialPolicyInput.indemnityMechanics` is missing/undefined, `engine.ts` sets `contractQualityIsEstimated: true` on the result and defaults score to 50. The UI shows "~50 (estimated)" in amber instead of a confident "50 / 100". Both the sync and async (worker) paths in `engine.ts` must set this flag — there are two separate result assembly blocks.
 
 26. **`evaluatePremium()` Signature Changed (Mar 27, 2026)**: The function now accepts an optional 3rd parameter `confidence?: BenchmarkConfidence`. Tests that mock or spy on this function may need to account for the additional parameter. The confidence assessment is done in `evaluatePolicy()` before calling `evaluatePremium()`.
+
+27. **Benchmark Freshness Governance (Added Mar 28, 2026)**: `assessBenchmarkConfidence()` in `evaluator.ts` now computes data freshness from `benchmark.dataDate`. Three states: `current` (≤180 days), `aging` (181-365), `stale` (>365). Stale data **downgrades confidence by one step** (high→low, low→suppressed) and replaces definitive issue strings with hedged "historical" language. Thresholds are config-driven via `benchmarkAgingDays` and `benchmarkStaleDays` on `EvaluationConfig`. When writing tests that mock `getPremiumBenchmarkWithFallback()`, always include `dataDate: new Date().toISOString().split('T')[0]` or the mock will be treated as stale.
+
+28. **EOOP Precision Governance (Added Mar 28, 2026)**: `eoopPrecision` field on `EOOPResult` and `PolicyEvaluationResult` indicates whether the EOOP estimate is `'full'`, `'partial'`, or `'suppressed'`. The adapter (`adapter.ts`) flags `_hasPercentageDeductible` and `_hasConditionalDeductibles` from `AnalyzedPolicy` extraction fields. The engine's `computeEoopPrecision()` reads these flags. When partial, the UI shows `~` prefix, amber color, and a limitation warning panel with scenario examples.
+
+29. **TOPSIS Weight Transparency (Added Mar 28, 2026)**: `ComparePolicies.tsx` has a collapsible "Ranking Criteria & Weights" panel showing all 6 TOPSIS criteria with bilingual labels, weight bars, and direction badges. The disclaimer reads "This is a model-based ranking, not an objective truth." `DEFAULT_TOPSIS_CRITERIA` is already exported from `@/lib/actuarial-engine`.
+
+30. **Grade Threshold Disclosure (Added Mar 28, 2026)**: `PolicyDetailView.tsx` shows a "Top Score Drivers" summary (strongest + weakest category) and a model disclosure: "This rating is based on current internal model thresholds and may be recalibrated as benchmark coverage improves." `GradeBadge.tsx` has a `title` hover attribute with calibration notice. Grades are config-driven via `getGradeFromScore(score, thresholds?)`.
+
+31. **User-Facing Language Softening (Added Mar 28, 2026)**: Three translations were softened: `"Recommended choice"` → `"Top-ranked by model"`, `"Actuarial TOPSIS Score"` → `"Model-Based Ranking"`, `"above/below average"` → `"above/below market estimate"`. When adding new user-facing comparison language, always use "estimate" or "model-based" qualifiers, never unqualified "best" or "recommended".
+
+32. **Supabase `.single()` → `.maybeSingle()` Pattern (Added Mar 28, 2026)**: Supabase's `.single()` returns HTTP 406 (PGRST116) when 0 rows match a query. Use `.maybeSingle()` instead for any query where the row might not exist (e.g., user preferences for new users, processing log updates during race conditions). `.maybeSingle()` returns `{ data: null, error: null }` on 0 rows instead of an error. Fixed in `configuration-service.ts` (`getUserPreferences`) and `processing-log-service.ts` (`updateProcessingLog`). When adding new Supabase queries that might return 0 rows, always use `.maybeSingle()`.
+
+33. **Processing Log PATCH Race Condition (Added Mar 28, 2026)**: The client-side `updateProcessingLog()` in `src/lib/processing-log-api.ts` retries once after 500ms on HTTP 404 to handle the race condition where the POST CREATE hasn't committed before the first PATCH arrives. This is intentional — do not remove the retry logic. The server-side `updateProcessingLog()` uses `.maybeSingle()` and returns `null` (not an error) when the row doesn't exist yet.
+
+34. **`evaluateSimpleDisplayMode()` for Pilot QA Records (Added Mar 28, 2026)**: The lightweight display mode evaluator in `kasko-pilot-gate.ts` uses confidence score + field presence to determine `'full'` / `'restricted'` / `'human_review_required'` without requiring the full `ValidationResult` / `AnalysisBundle` types. It is wired into `policy-extractor.ts` at the QA record creation point (line ~1324). If adding new display mode rules, update this function — it is separate from the full `evaluateDisplayMode()` in `review-thresholds.ts`.
+
+35. **Benchmark Mock `dataDate` Requirement (Added Mar 28, 2026)**: All test mocks for `getPremiumBenchmarkWithFallback()` MUST include `dataDate: CURRENT_DATA_DATE` (or a recent ISO date string). Without it, `computeBenchmarkFreshness()` treats the data as stale, causing confidence downgrades and hedged language in issue strings. This broke 17 existing tests when benchmark freshness was introduced (commit `98a0868`). Pattern: add `const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]` near test file top.
 
 ---
 
