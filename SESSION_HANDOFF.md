@@ -1,54 +1,39 @@
-# Session Handoff — March 28, 2026 (Updated: Post-Trim Session)
+# Session Handoff — March 30, 2026 (Trustworthiness Sprint Finalization)
 
 ## Current State
 
-**Main branch is up to date.** Latest commits on main: `efbdba6` (PR #312), `bdb2365` (PR #311).
+**Main branch is up to date.** Uncommitted changes exist for UI test hardening in `src/components/__tests__/TrustworthinessUI.test.tsx`.
 
 ### Status of All Priorities
 
 | # | Priority | Status |
 |---|----------|--------|
-| 1 | Merge handoff branch to main | **DONE** — PRs #309/#310 merged |
-| 2 | Deploy to production | **DONE** — Triggered via MCP commit to main |
-| 3 | Trim CLAUDE.md | **DONE** — PR #311 merged. 404KB → 151KB |
-| 4 | Fix ESLint errors | **DONE** — PR #312 merged. 18 errors → 0 |
-| 5 | Apply migrations 042 + 043 | **PENDING** — User must run in Supabase SQL Editor |
-| 6 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ providers |
-| 7 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data |
-| 8 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
+| 1 | Trustworthiness UI Hardening Tests | **DONE** — Regression tests finalized for provisional gating |
+| 2 | Apply migrations 042 + 043 | **PENDING** — User must run in Supabase SQL Editor |
+| 3 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ providers |
+| 4 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data |
+| 5 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
 
 ## What Was Done This Session
 
-### 1. CLAUDE.md Trim (PR #311 — commit `bdb2365`)
-- Archived all 178 historical Known Issue entries to `docs/KNOWN_ISSUES_ARCHIVE.md` (197KB)
-- Replaced Known Issues section (2656 lines, 194KB) with 15-entry key active patterns table
-- Trimmed Common Gotchas section (676 lines, 61KB) to 100 essential lines
-- Result: CLAUDE.md 5931 → 2722 lines, 404KB → 151KB
-- File is now pushable via MCP `push_files` in a single commit
-
-### 2. ESLint Config Fix (PR #312 — commit `efbdba6`)
-- `scripts/generate-pwa-icons.mjs` had 18 `no-undef` errors (`Buffer`, `console`)
-- Root cause: ESLint scripts config matched `*.{ts,js}` but not `*.mjs`, and lacked Node globals
-- Fix: Added `.mjs` to glob pattern and `globals.node` to languageOptions in `eslint.config.js`
-- Result: 0 ESLint errors, 0 warnings across entire codebase
-
-### 3. CLAUDE.md Next Session Instructions Updated
-- Marked trim task as done (item #3)
-- Added blocked/manual status labels to remaining items
+### 1. Trustworthiness UI Hardening
+- Finalized UI regression test suite for the "Trustworthiness Hardening" sprint.
+- Updated 3 tests in `TrustworthinessUI.test.tsx` to correctly mock the specific properties that trigger `isProvisional` status: `aiConfidence < 0.85`, `benchmarkStatus === 'untrusted'`, and `benchmark === undefined`.
+- Verified that the "UNVERIFIED AI OUTPUT" banner is rendered and export/share actions are blocked for provisional results.
 
 ## All Modified Files (This Session)
 
 | File | Change |
 |------|--------|
-| `CLAUDE.md` | Trimmed from 404KB → 151KB; updated Next Session Instructions |
-| `docs/KNOWN_ISSUES_ARCHIVE.md` | **NEW** — 178 historical Known Issue entries (197KB) |
-| `eslint.config.js` | Added `.mjs` glob + Node globals to scripts config |
+| `src/components/__tests__/TrustworthinessUI.test.tsx` | Updated 3 UI regression tests to mock specific provisional status properties |
+| `CLAUDE.md` | Added Gotcha 41 regarding Provisional Status UI Mocking, updated Last Updated date |
+| `SESSION_HANDOFF.md` | Updated status and session info for Trustworthiness Hardening |
 
 ## Quality State
 
-- **TypeScript**: 0 errors (`npx tsc --noEmit` clean)
-- **ESLint**: 0 errors, 0 warnings (`npx eslint . --max-warnings 0` clean)
-- **Tests**: ~16,142+ across 340+ files, 0 failures (not re-run this session — no code changes)
+- **TypeScript**: 0 errors expected (`npx tsc --noEmit` should be clean)
+- **ESLint**: 0 errors, 0 warnings expected
+- **Tests**: Re-run of `TrustworthinessUI.test.tsx` passes successfully.
 
 ## Migrations to Apply (Copy-Paste into Supabase SQL Editor)
 
@@ -77,10 +62,11 @@ ON CONFLICT (category, key) DO NOTHING;
 
 ## Next Steps (Priority Order)
 
-1. **Apply Migrations 042 + 043** *(manual)* — Run SQL above in Supabase Dashboard → SQL Editor. Both idempotent.
-2. **Upload Diverse KASKO PDFs** *(blocked)* — Phase 8L graduation needs 5+ unique documents from different providers. Target: April 5, 2026.
-3. **Calibrate Grade Thresholds** *(blocked)* — A=90, B=80 etc. are arbitrary. Need real outcome data. Admin UI: Settings → Evaluation.
-4. **Update Benchmark Premium Ranges** *(blocked)* — Premium ranges from Dec 2024. Needs external market research for `MARKET_BENCHMARKS`.
+1. **Commit and Merge** — Commit the changes to `TrustworthinessUI.test.tsx` and merge.
+2. **Apply Migrations 042 + 043** *(manual)* — Run SQL above in Supabase Dashboard → SQL Editor. Both idempotent.
+3. **Upload Diverse KASKO PDFs** *(blocked)* — Phase 8L graduation needs 5+ unique documents from different providers.
+4. **Calibrate Grade Thresholds** *(blocked)* — A=90, B=80 etc. are arbitrary. Need real outcome data. Admin UI: Settings → Evaluation.
+5. **Update Benchmark Premium Ranges** *(blocked)* — Premium ranges from Dec 2024. Needs external market research for `MARKET_BENCHMARKS`.
 
 ## Non-Critical Issues (Carry Forward)
 
