@@ -6,6 +6,7 @@ import {
   Download,
   Share2,
   Shield,
+  ShieldAlert,
   AlertTriangle,
   Check,
   X,
@@ -916,6 +917,9 @@ export function PolicyDetailView() {
   const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
   const isPilotResult = displaySummary?.isPilotResult ?? false
   const isDraft = displaySummary?.isDraft ?? false
+  const isVerificationPending = isPilotResult && displaySummary?.pilotReviewStatus === 'pending_review'
+  // Also include evaluation.isProvisional (which checks benchmarkStatus and AI confidence internally)
+  const isUnverified = isDraft || isVerificationPending || lowConfidence || (evaluation?.isProvisional ?? false)
 
   // The canonical summary for all reviewer rendering paths in this view
   const reviewerSummary = useMemo(() => {
@@ -963,17 +967,17 @@ export function PolicyDetailView() {
 
   // Export handlers
   const draftExportBlocked = useCallback(() => {
-    if (isDraft) {
+    if (isUnverified) {
       setExportMenuOpen(false)
       toast.warning(
         locale === 'tr'
-          ? 'TASLAK — Dışa aktarma inceleme tamamlanana kadar devre dışı'
-          : 'DRAFT — Export disabled until review is complete'
+          ? 'DOĞRULANMAMIŞ — Dışa aktarma inceleme tamamlanana kadar devre dışı'
+          : 'UNVERIFIED — Export disabled until review is complete'
       )
       return true
     }
     return false
-  }, [isDraft, locale])
+  }, [isUnverified, locale])
 
   const handleExportPdf = useCallback(async () => {
     if (!policy || draftExportBlocked()) return
@@ -1048,6 +1052,20 @@ export function PolicyDetailView() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden">
+      {/* Draft Result Banner (Persistent, Red) - Priority 2 */}
+      {isUnverified && (
+        <div className="bg-red-600 text-white py-2 sm:py-3 px-4 sticky top-0 z-[60] font-bold text-center shadow-md">
+          <div className="max-w-6xl mx-auto flex items-center justify-center gap-2">
+            <AlertTriangle size={20} className="flex-shrink-0 animate-pulse" />
+            <span className="text-sm sm:text-base tracking-wider uppercase">
+              {locale === 'tr'
+                ? 'DOĞRULANMAMIŞ YAPAY ZEKA ÇIKTISI — KESİN KARARLAR İÇİN KULLANMAYIN'
+                : 'UNVERIFIED AI OUTPUT — DO NOT USE FOR FINAL DECISIONS'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Mobile-first header - ultra compact */}
       {/* Trial result banner */}
       {isTrialResult && (
@@ -1128,11 +1146,11 @@ export function PolicyDetailView() {
             <div className="flex gap-0.5 sm:gap-1 flex-shrink-0">
               <button
                 onClick={async () => {
-                  if (isDraft) {
+                  if (isUnverified) {
                     toast.warning(
                       locale === 'tr'
-                        ? 'TASLAK — Paylaşım inceleme tamamlanana kadar devre dışı'
-                        : 'DRAFT — Sharing disabled until review is complete'
+                        ? 'DOĞRULANMAMIŞ — Paylaşım inceleme tamamlanana kadar devre dışı'
+                        : 'UNVERIFIED — Sharing disabled until review is complete'
                     )
                     return
                   }
@@ -1154,27 +1172,40 @@ export function PolicyDetailView() {
                     }
                   }
                 }}
-                className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isDraft ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${isUnverified ? 'opacity-50 cursor-not-allowed' : ''}`}
                 aria-label={t.common.share}
-                aria-disabled={isDraft}
+                aria-disabled={isUnverified}
               >
                 <Share2 size={18} className="text-gray-600" />
               </button>
               {/* Export dropdown */}
               <div className="relative" ref={exportMenuRef}>
-                <button
-                  onClick={() => setExportMenuOpen((prev) => !prev)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  aria-label={t.exportMenu.exportAs}
-                  aria-expanded={exportMenuOpen}
-                  aria-haspopup="true"
+                <div 
+                  className={isUnverified ? "cursor-not-allowed group relative inline-block" : ""}
+                  title={isUnverified ? (locale === 'tr' ? 'Dışa aktarma doğrulanmamış poliçeler için devre dışı' : 'Export disabled for unverified policies') : undefined}
                 >
-                  {isPdfGenerating ? (
-                    <Loader2 size={18} className="text-gray-600 animate-spin" />
-                  ) : (
-                    <Download size={18} className="text-gray-600" />
-                  )}
-                </button>
+                  <button
+                    onClick={(e) => {
+                      if (isUnverified) {
+                        e.preventDefault()
+                        draftExportBlocked()
+                        return
+                      }
+                      setExportMenuOpen((prev) => !prev)
+                    }}
+                    className={`p-2 rounded-lg transition-colors ${isUnverified ? 'opacity-50' : 'hover:bg-gray-100'}`}
+                    aria-label={t.exportMenu.exportAs}
+                    aria-expanded={exportMenuOpen}
+                    aria-haspopup="true"
+                    disabled={isUnverified}
+                  >
+                    {isPdfGenerating && !isUnverified ? (
+                      <Loader2 size={18} className="text-gray-600 animate-spin" />
+                    ) : (
+                      <Download size={18} className="text-gray-600" />
+                    )}
+                  </button>
+                </div>
                 {exportMenuOpen && (
                   <div className="absolute right-0 top-full mt-1 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
                     <button
@@ -1381,10 +1412,114 @@ export function PolicyDetailView() {
               </CardContent>
             </Card>
 
+            {/* Critical Financial Warnings */}
+            {evaluation?.compliance?.issues?.some(
+              (i) => i.severity === 'critical' || i.severity === 'high'
+            ) && (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <AlertTriangle className="text-red-600" size={20} />
+                  {locale === 'tr' ? 'Kritik Finansal Riskler' : 'Critical Financial Risks'}
+                </h3>
+                {evaluation.compliance.issues
+                  .filter((i) => i.severity === 'critical' || i.severity === 'high')
+                  .map((issue, idx) => (
+                    <div
+                      key={idx}
+                      className="border-l-4 border-red-500 bg-red-50 p-4 rounded-r-lg shadow-sm"
+                    >
+                      <div className="flex gap-3">
+                        <AlertTriangle className="text-red-500 flex-shrink-0 mt-0.5" size={18} />
+                        <div>
+                          <p className="text-sm font-semibold text-red-900 mb-1">
+                            {locale === 'tr' ? issue.descriptionTR : issue.description}
+                          </p>
+                          <p className="text-xs text-red-700">
+                            {locale === 'tr'
+                              ? 'Bu durum poliçenin koruma kapasitesini ciddi şekilde zayıflatır.'
+                              : 'This significantly weakens the policy protection capability.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+
+            {/* Plain-Language Scenario Explainability Layer */}
+            {evaluation?.scenarioCards && evaluation.scenarioCards.length > 0 && (
+              <div className="space-y-4 pt-2">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                  <ShieldAlert className="text-blue-600" size={20} />
+                  {locale === 'tr' ? 'Senaryo Risk Analizi' : 'Scenario Risk Analysis'}
+                </h3>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {evaluation.scenarioCards.map((scenario) => (
+                    <div
+                      key={scenario.id}
+                      className="border rounded-lg p-4 bg-white shadow-sm flex flex-col h-full"
+                    >
+                      <div className="flex items-start justify-between mb-2 gap-2">
+                        <h4 className="font-semibold text-sm text-gray-900 line-clamp-2">
+                          {locale === 'tr' ? scenario.titleTR : scenario.title}
+                        </h4>
+                        <div
+                          className={`flex-shrink-0 w-3 h-3 rounded-full mt-1 ${
+                            scenario.financialStatus === 'covered'
+                              ? 'bg-green-500'
+                              : scenario.financialStatus === 'partially_covered'
+                                ? 'bg-amber-500'
+                                : 'bg-red-500'
+                          }`}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-600 mb-3 flex-grow">
+                        {locale === 'tr' ? scenario.descriptionTR : scenario.description}
+                      </p>
+
+                      <div className="space-y-2 text-[11px] leading-relaxed mb-3 border-t border-gray-100 pt-3">
+                        {((locale === 'tr' ? scenario.insurerPaysTR : scenario.insurerPays) || scenario.insurerPays) && (
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">{locale === 'tr' ? 'Sigortacı Öder:' : 'Insurer Pays:'}</span>
+                            <span className="font-medium text-green-700 max-w-[60%] text-right">{locale === 'tr' ? (scenario.insurerPaysTR || scenario.insurerPays) : scenario.insurerPays}</span>
+                          </div>
+                        )}
+                        {((locale === 'tr' ? scenario.userPaysTR : scenario.userPays) || scenario.userPays) && (
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">{locale === 'tr' ? 'Kullanıcı Öder:' : 'User Pays:'}</span>
+                            <span className="font-medium text-amber-700 max-w-[60%] text-right">{locale === 'tr' ? (scenario.userPaysTR || scenario.userPays) : scenario.userPays}</span>
+                          </div>
+                        )}
+                        {((locale === 'tr' ? scenario.triggerTR : scenario.trigger) || scenario.trigger) && (
+                           <div className="flex justify-between border-b border-gray-50 pb-1">
+                             <span className="text-gray-500">{locale === 'tr' ? 'Örnek Olay:' : 'Trigger:'}</span>
+                             <span className="font-medium text-gray-800 max-w-[60%] text-right">{locale === 'tr' ? (scenario.triggerTR || scenario.trigger) : scenario.trigger}</span>
+                           </div>
+                        )}
+                        {((locale === 'tr' ? scenario.whyItMattersTR : scenario.whyItMatters) || scenario.whyItMatters) && (
+                          <div className="pt-1 mt-2 bg-blue-50/50 p-2 border border-blue-100/50 rounded text-blue-800 italic font-medium">
+                            {locale === 'tr' ? (scenario.whyItMattersTR || scenario.whyItMatters) : scenario.whyItMatters}
+                          </div>
+                        )}
+                      </div>
+
+                      {(scenario.riskAmount || scenario.riskAmountTR) && (
+                        <div className="mt-auto bg-gray-50 rounded p-2 text-xs font-medium text-gray-800 border-l-2 border-gray-300">
+                          {locale === 'tr'
+                            ? scenario.riskAmountTR || scenario.riskAmount
+                            : scenario.riskAmount}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Policy Evaluation - Mobile only (high priority) */}
             {evaluation && !isEvaluationLoading && (
               <Card className="lg:hidden">
-                {isDraft && (
+                {isUnverified && (
                   <div className="px-3 pt-2 sm:px-6 sm:pt-3">
                     <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
                       <AlertTriangle size={12} className="flex-shrink-0" />
@@ -1412,7 +1547,7 @@ export function PolicyDetailView() {
                       <div className="text-xs sm:text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-1.5 sm:gap-2">
-                      <GradeBadge grade={evaluation.grade} size="md" />
+                      <GradeBadge grade={evaluation.grade} isProvisional={evaluation.isProvisional} size="md" />
                       <StatusIndicator status={evaluation.status} showLabel size="sm" />
                     </div>
                   </div>
@@ -1986,7 +2121,7 @@ export function PolicyDetailView() {
                       <div className="text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <GradeBadge grade={evaluation.grade} size="md" />
+                      <GradeBadge grade={evaluation.grade} isProvisional={evaluation.isProvisional} size="md" />
                       <StatusIndicator status={evaluation.status} showLabel size="sm" />
                     </div>
                   </div>
@@ -2346,7 +2481,7 @@ export function PolicyDetailView() {
                   <BarChart3 className="text-blue-600 w-5 h-5" />
                   <h3 className="font-semibold text-gray-900">Beta Actuarial Engine (EOOP)</h3>
                 </div>
-                {isDraft && (
+                {isUnverified && (
                   <div className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-1.5 mb-3">
                     <AlertTriangle size={12} className="flex-shrink-0" />
                     <span>

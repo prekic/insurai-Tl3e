@@ -3,6 +3,7 @@ import type { EvaluationGrade } from '@/lib/policy-evaluation/types'
 
 interface GradeBadgeProps {
   grade: EvaluationGrade
+  isProvisional?: boolean
   size?: 'sm' | 'md' | 'lg'
   showLabel?: boolean
   className?: string
@@ -16,6 +17,8 @@ const GRADE_STYLES: Record<EvaluationGrade, string> = {
   F: 'bg-red-100 text-red-800 border-red-200',
 }
 
+const PROVISIONAL_STYLE = 'bg-gray-100 text-gray-400 border-gray-200 border-dashed hover:text-gray-600 transition-colors cursor-help'
+
 const SIZE_STYLES = {
   sm: 'text-xs px-1.5 py-0.5 min-w-[20px]',
   md: 'text-sm px-2 py-0.5 min-w-[24px]',
@@ -24,22 +27,23 @@ const SIZE_STYLES = {
 
 /**
  * Grade badge component displaying A-F evaluation grades
- * with appropriate color coding.
+ * with appropriate color coding or provisional state.
  */
-export function GradeBadge({ grade, size = 'md', showLabel = false, className }: GradeBadgeProps) {
+export function GradeBadge({ grade, isProvisional = false, size = 'md', showLabel = false, className }: GradeBadgeProps) {
+  const content = showLabel ? `Grade ${grade}` : grade
   return (
     <span
       className={cn(
         'inline-flex items-center justify-center font-bold rounded border',
-        GRADE_STYLES[grade],
+        isProvisional ? PROVISIONAL_STYLE : GRADE_STYLES[grade],
         SIZE_STYLES[size],
         className
       )}
       role="status"
-      aria-label={`Grade ${grade}`}
-      title="Model-based grade — thresholds are configurable and subject to recalibration"
+      aria-label={isProvisional ? `Provisional Grade ${grade}` : `Grade ${grade}`}
+      title={isProvisional ? "Provisional Grade — model confidence is low, verification pending, or benchmark is untrusted" : "Model-based grade — thresholds are configurable and subject to recalibration"}
     >
-      {showLabel ? `Grade ${grade}` : grade}
+      {isProvisional && !showLabel ? `${grade}?` : content}
     </span>
   )
 }
