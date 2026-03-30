@@ -1323,6 +1323,16 @@ export async function extractPolicyFromDocument(
           qaRecord.coverageCountExtracted = policy.coverages?.length || 0
           qaRecord.confidenceScore = confidenceOverall
 
+          // Populate QA fields from extraction results (WS-1 fix)
+          qaRecord.specialConditionCount = policy.specialConditions?.length || 0
+          qaRecord.hasRayicDeger = policy.coverages?.some((c) => c.isMarketValue) || false
+          qaRecord.hasConditionalDeductible = Boolean(
+            (policy.conditionalDeductibles && policy.conditionalDeductibles.length > 0) ||
+            policy.deductibleUncertain
+          )
+          qaRecord.sourceQuoteCount = Object.keys(policy.evidenceData || {}).length
+          qaRecord.zeroCoverage = (policy.coverages?.length || 0) === 0
+
           // Evaluate display mode based on extraction quality
           const displayModeResult = evaluateSimpleDisplayMode(confidenceOverall, {
             policyNumber: enhancedExtractedData?.policyNumber,

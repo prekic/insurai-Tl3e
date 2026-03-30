@@ -138,6 +138,8 @@ function validateBranchSpecificRules(
       return validateBusiness(data)
     case 'nakliyat':
       return validateNakliyat(data)
+    case 'kasko':
+      return validateKasko(data)
     default:
       return []
   }
@@ -475,6 +477,181 @@ function validateNakliyat(data: Partial<ExtractedPolicyData>): SafetyFlag[] {
       message: 'Cargo policy lacks packaging adequacy condition. Common exclusion risk.',
       field: 'specialConditions',
     })
+  }
+
+  return flags
+}
+
+// --- KASKO ---
+function validateKasko(data: Partial<ExtractedPolicyData>): SafetyFlag[] {
+  const flags: SafetyFlag[] = []
+  const coverages = data.coverages || []
+  const conditions = data.specialConditions || []
+
+  // 1. Vehicle value basis — warn if neither market value nor fixed-sum main coverage
+  const hasMarketValue = coverages.some((c) => c.isMarketValue === true)
+  const hasMainWithLimit = coverages.some(
+    (c) => c.category === 'main' && c.limit !== null && c.limit > 0
+  )
+  if (!hasMarketValue && !hasMainWithLimit) {
+    flags.push({
+      level: 'Warning',
+      message:
+        'Kasko policy lacks clear vehicle value basis. Neither market value nor fixed-sum main coverage detected.',
+      field: 'coverages.valueBasis',
+    })
+  }
+
+  // 2. Parts standard — search conditions and coverage descriptions for parts terminology
+  const partsTerms = ['orijinal', 'original', 'eşdeğer', 'equivalent', 'muadil', 'oem']
+  const hasPartsInConditions = conditions.some((c) =>
+    partsTerms.some((term) => c.toLowerCase().includes(term))
+  )
+  const hasPartsInDescriptions = coverages.some(
+    (c) => c.description && partsTerms.some((term) => c.description!.toLowerCase().includes(term))
+  )
+  if (!hasPartsInConditions && !hasPartsInDescriptions) {
+    flags.push({
+      level: 'Warning',
+      message:
+        'Kasko policy lacks parts standard specification (orijinal/eşdeğer/muadil/OEM). Repair cost basis unclear.',
+      field: 'specialConditions.partsStandard',
+    })
+  }
+
+  // 3. Deductible structure — warn if all coverages lack deductibles and no condition mentions them
+  const hasAnyDeductible = coverages.some((c) => c.deductible !== null && c.deductible > 0)
+  const deductibleTerms = ['muafiyet', 'tenzil', 'deductible']
+  const hasDeductibleMention = conditions.some((c) =>
+    deductibleTerms.some((term) => c.toLowerCase().includes(term))
+  )
+  if (!hasAnyDeductible && !hasDeductibleMention) {
+    flags.push({
+      level: 'Warning',
+      message:
+        'Kasko policy has no deductible on any coverage and no deductible terms in conditions. Deductible structure unclear.',
+      field: 'coverages.deductible',
+    })
+  }
+
+  // 4. Minimum expected coverages — collision, theft, fire
+  const hasCollision = coverages.some((c) => {
+    const n = c.name?.toLowerCase() || ''
+    const t = c.nameTr?.toLowerCase() || ''
+    return (
+      n.includes('collision') ||
+      n.includes('çarpma') ||
+      n.includes('çarpışma') ||
+      n.includes('carpma') ||
+      n.includes('carpisma') ||
+      t.includes('çarpma') ||
+      t.includes('çarpışma') ||
+      t.includes('carpma') ||
+      t.includes('carpisma')
+    )
+  })
+  const hasTheft = coverages.some((c) => {
+    const n = c.name?.toLowerCase() || ''
+    const t = c.nameTr?.toLowerCase() || ''
+    return (
+      n.includes('theft') ||
+      n.includes('hırsızlık') ||
+      n.includes('hirsizlik') ||
+      t.includes('hırsızlık') ||
+      t.includes('hirsizlik') ||
+      t.includes('theft')
+    )
+  })
+  const hasFire = coverages.some((c) => {
+    const n = c.name?.toLowerCase() || ''
+    const t = c.nameTr?.toLowerCase() || ''
+    return (
+      n.includes('fire') ||
+      n.includes('yangın') ||
+      n.includes('yangin') ||
+      t.includes('yangın') ||
+      t.includes('yangin') ||
+      t.includes('fire')
+    )
+  })
+  if (!hasCollision) {
+    flags.push({
+      level: 'Warning',
+      message: 'Kasko policy is missing collision coverage (çarpma/çarpışma).',
+      field: 'coverages.collision',
+    })
+  }
+  if (!hasTheft) {
+    flags.push({
+      level: 'Warning',
+      message: 'Kasko policy is missing theft coverage (hırsızlık).',
+      field: 'coverages.theft',
+    })
+  }
+  if (!hasFire) {
+    flags.push({
+      level: 'Warning',
+      message: 'Kasko policy is missing fire coverage (yangın).',
+      field: 'coverages.fire',
+    })
+  }
+
+  // 5. "Tam Kasko" consistency — if labeled as full/comprehensive, check for flood and earthquake
+  const isTamKasko =
+    coverages.some((c) => {
+      const n = c.name?.toLowerCase() || ''
+      const t = c.nameTr?.toLowerCase() || ''
+      return (
+        n.includes('tam kasko') ||
+        n.includes('full kasko') ||
+        n.includes('genişletilmiş') ||
+        t.includes('tam kasko') ||
+        t.includes('full kasko') ||
+        t.includes('genişletilmiş')
+      )
+    }) || conditions.some((c) => c.toLowerCase().includes('tam kasko'))
+
+  if (isTamKasko) {
+    const hasFlood = coverages.some((c) => {
+      const n = c.name?.toLowerCase() || ''
+      const t = c.nameTr?.toLowerCase() || ''
+      return (
+        n.includes('flood') ||
+        n.includes('sel') ||
+        n.includes('su baskını') ||
+        n.includes('su baskini') ||
+        t.includes('sel') ||
+        t.includes('su baskını') ||
+        t.includes('su baskini') ||
+        t.includes('flood')
+      )
+    })
+    const hasEarthquake = coverages.some((c) => {
+      const n = c.name?.toLowerCase() || ''
+      const t = c.nameTr?.toLowerCase() || ''
+      return (
+        n.includes('earthquake') ||
+        n.includes('deprem') ||
+        t.includes('deprem') ||
+        t.includes('earthquake')
+      )
+    })
+    if (!hasFlood) {
+      flags.push({
+        level: 'Warning',
+        message:
+          'Policy labeled "Tam Kasko" but lacks flood coverage (sel/su baskını). Scope may be narrower than expected.',
+        field: 'coverages.flood',
+      })
+    }
+    if (!hasEarthquake) {
+      flags.push({
+        level: 'Warning',
+        message:
+          'Policy labeled "Tam Kasko" but lacks earthquake coverage (deprem). Scope may be narrower than expected.',
+        field: 'coverages.earthquake',
+      })
+    }
   }
 
   return flags
