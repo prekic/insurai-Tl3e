@@ -80,6 +80,7 @@ export interface PolicyEvaluation {
   // Overall scores
   overallScore: number // 0-100
   grade: EvaluationGrade
+  isProvisional?: boolean
   status: EvaluationStatus
 
   // Category scores
@@ -97,6 +98,7 @@ export interface PolicyEvaluation {
     coveragePercentile: number
     isAboveAverageValue: boolean
     competitivePosition: 'leader' | 'competitive' | 'average' | 'below_average' | 'lagging'
+    untrusted?: boolean
   }
 
   // Benchmark confidence — tracks which context factors are present/missing
@@ -126,6 +128,9 @@ export interface PolicyEvaluation {
     immediateActions: string[]
     immediateActionsTR: string[]
   }
+
+  // Plain language scenario cards for explainability layer
+  scenarioCards?: ScenarioCard[]
 }
 
 export interface ComplianceIssue {
@@ -136,6 +141,25 @@ export interface ComplianceIssue {
   regulation?: string
   requiredValue?: number
   actualValue?: number
+}
+
+export interface ScenarioCard {
+  id: string
+  title: string
+  titleTR: string
+  description: string
+  descriptionTR: string
+  financialStatus: 'covered' | 'partially_covered' | 'risk' // Red/Yellow/Green indicator
+  riskAmount?: string
+  riskAmountTR?: string
+  insurerPays?: string
+  insurerPaysTR?: string
+  userPays?: string
+  userPaysTR?: string
+  trigger?: string
+  triggerTR?: string
+  whyItMatters?: string
+  whyItMattersTR?: string
 }
 
 export interface Recommendation {

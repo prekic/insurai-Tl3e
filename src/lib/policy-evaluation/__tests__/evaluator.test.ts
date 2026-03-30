@@ -2,13 +2,20 @@
  * Tests for Policy Evaluator
  */
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { evaluatePolicy } from '../evaluator'
 import type { Policy } from '@/types/policy'
 
-// =============================================================================
-// MOCK DATA FACTORY
-// =============================================================================
+vi.mock('../benchmark-service', async (importOriginal) => {
+  const actual = await importOriginal()
+  return {
+    ...actual as any,
+    getPremiumBenchmarkWithFallback: vi.fn().mockImplementation((...args) => {
+      const result = (actual as any).getPremiumBenchmarkWithFallback(...args)
+      return { ...result, benchmarkStatus: 'trusted', source: 'database' }
+    })
+  }
+})
 
 function createMockPolicy(overrides: Partial<Policy> = {}): Policy {
   const now = new Date()

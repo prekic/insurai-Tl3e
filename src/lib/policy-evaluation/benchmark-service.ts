@@ -30,6 +30,9 @@ export interface PremiumBenchmark {
   source: string | null
   sourceTR: string | null
   isActive: boolean
+  benchmarkStatus?: 'trusted' | 'untrusted' | 'missing' | 'stale'
+  matchedVehicleAttributes?: string[]
+  freshnessDays?: number
 }
 
 // Legacy interface for compatibility with existing evaluator
@@ -50,6 +53,9 @@ export interface LegacyPremiumRange {
   valueMaxRate?: number
   // Benchmark data date (ISO-8601) for freshness governance
   dataDate?: string
+  benchmarkStatus?: 'trusted' | 'untrusted' | 'missing' | 'stale'
+  matchedVehicleAttributes?: string[]
+  freshnessDays?: number
 }
 
 // =============================================================================
@@ -103,6 +109,7 @@ export async function refreshBenchmarks(): Promise<PremiumBenchmark[]> {
       source: row.source,
       sourceTR: row.source_tr,
       isActive: row.is_active,
+      benchmarkStatus: 'trusted',
     }))
 
     cacheTimestamp = Date.now()
@@ -197,6 +204,7 @@ export function getPremiumBenchmark(
     valueAvgRate: match.valueAvgRate || undefined,
     valueMaxRate: match.valueMaxRate || undefined,
     dataDate: `${match.year}-01-01`,
+    benchmarkStatus: match.benchmarkStatus || 'trusted',
   }
 }
 
@@ -224,6 +232,7 @@ export function getAllBenchmarksForType(insuranceType: string): LegacyPremiumRan
       valueMinRate: match.valueMinRate || undefined,
       valueAvgRate: match.valueAvgRate || undefined,
       valueMaxRate: match.valueMaxRate || undefined,
+      benchmarkStatus: match.benchmarkStatus || 'trusted',
     }))
 }
 
@@ -336,6 +345,8 @@ export function getPremiumBenchmarkWithFallback(
       ...hardcoded,
       comparisonMethod: 'direct_premium',
       dataDate: '2026-03-28',
+      benchmarkStatus: 'untrusted',
+      source: 'fallback',
     }
   }
 
