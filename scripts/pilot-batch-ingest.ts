@@ -208,8 +208,8 @@ async function runDownstreamPipeline(extractedData: any) {
   const analysis = generateAnalysisBundle('BATCH', normalized, validation)
   const displayResult = evaluateDisplayMode(normalized, validation, analysis)
 
-  const summaryText = JSON.stringify(normalized).toLowerCase()
-  const foundPhrases = PROHIBITED_PHRASES.filter((p) => summaryText.includes(p.toLowerCase()))
+  const { checkProhibitedPhrases } = await import('../src/lib/analysis/batch-ingest-helpers')
+  const foundPhrases = checkProhibitedPhrases(normalized, PROHIBITED_PHRASES)
 
   return {
     normalized,

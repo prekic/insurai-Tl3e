@@ -1,39 +1,42 @@
-# Session Handoff — March 30, 2026 (Trustworthiness Sprint Finalization)
+# Session Handoff — March 30, 2026 (Batch Ingestion Diagnostics)
 
 ## Current State
 
-**Main branch is up to date.** Uncommitted changes exist for UI test hardening in `src/components/__tests__/TrustworthinessUI.test.tsx`.
+**Main branch is up to date.** Uncommitted changes exist for fixing false-positive phrase leak detections in the `pilot-batch-ingest.ts` script.
 
 ### Status of All Priorities
 
 | # | Priority | Status |
 |---|----------|--------|
-| 1 | Trustworthiness UI Hardening Tests | **DONE** — Regression tests finalized for provisional gating |
+| 1 | Pilot Batch Phrase Diagnostics | **DONE** — False positives from JSON structural keys fixed |
 | 2 | Apply migrations 042 + 043 | **PENDING** — User must run in Supabase SQL Editor |
-| 3 | Upload diverse KASKO PDFs | **BLOCKED** — Requires real PDF files from 5+ providers |
-| 4 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data |
+| 3 | Process Real KASKO PDFs | **PENDING** — Need to run `pilot-batch-ingest.ts` without `--dry-run` on real PDFs |
+| 4 | Calibrate grade thresholds | **BLOCKED** — Requires real outcome data from pilot |
 | 5 | Update benchmark premium ranges | **BLOCKED** — Requires external market research |
 
 ## What Was Done This Session
 
-### 1. Trustworthiness UI Hardening
-- Finalized UI regression test suite for the "Trustworthiness Hardening" sprint.
-- Updated 3 tests in `TrustworthinessUI.test.tsx` to correctly mock the specific properties that trigger `isProvisional` status: `aiConfidence < 0.85`, `benchmarkStatus === 'untrusted'`, and `benchmark === undefined`.
-- Verified that the "UNVERIFIED AI OUTPUT" banner is rendered and export/share actions are blocked for provisional results.
+### 1. Batch Ingestion False-Positive Fix
+- Diagnosed why 5/5 valid synthetic policies were failing the "phrase leak" detection during the `pilot-batch-ingest.ts` dry run.
+- **Root Cause:** The script was using `JSON.stringify(normalized).includes(...)`, which caused structural JSON keys like `"isUnlimited": true` to flag as prohibited wording leaks.
+- **Fix:** Implemented `checkProhibitedPhrases` in `batch-ingest-helpers.ts` to strictly scan only human-facing text fields (`name`, `description`, `conditions`, `exclusions`) rather than the entire serialized object.
+- **Verification:** Added an isolated test suite `batch-ingest-helpers.test.ts` to prove JSON keys are ignored while content matches are caught. Successful 5/5 extraction dry-run completed.
 
 ## All Modified Files (This Session)
 
 | File | Change |
 |------|--------|
-| `src/components/__tests__/TrustworthinessUI.test.tsx` | Updated 3 UI regression tests to mock specific provisional status properties |
-| `CLAUDE.md` | Added Gotcha 41 regarding Provisional Status UI Mocking, updated Last Updated date |
-| `SESSION_HANDOFF.md` | Updated status and session info for Trustworthiness Hardening |
+| `scripts/pilot-batch-ingest.ts` | Refactored detection to use `checkProhibitedPhrases` |
+| `src/lib/analysis/batch-ingest-helpers.ts` | Added `checkProhibitedPhrases` targeted text scanner |
+| `src/lib/analysis/__tests__/batch-ingest-helpers.test.ts` | Added isolated test suite for phrase checking logic |
+| `CLAUDE.md` | Added Gotcha #42 (Phrase Detection Targeting on JSON), updated Last Updated |
+| `SESSION_HANDOFF.md` | Updated status and session info for Pilot Batch Diagnostics |
 
 ## Quality State
 
 - **TypeScript**: 0 errors expected (`npx tsc --noEmit` should be clean)
 - **ESLint**: 0 errors, 0 warnings expected
-- **Tests**: Re-run of `TrustworthinessUI.test.tsx` passes successfully.
+- **Tests**: Re-run of isolated `batch-ingest-helpers.test.ts` passes successfully.
 
 ## Migrations to Apply (Copy-Paste into Supabase SQL Editor)
 
@@ -62,9 +65,9 @@ ON CONFLICT (category, key) DO NOTHING;
 
 ## Next Steps (Priority Order)
 
-1. **Commit and Merge** — Commit the changes to `TrustworthinessUI.test.tsx` and merge.
+1. **Commit and Merge** — Commit the batch-ingest fixes and merge.
 2. **Apply Migrations 042 + 043** *(manual)* — Run SQL above in Supabase Dashboard → SQL Editor. Both idempotent.
-3. **Upload Diverse KASKO PDFs** *(blocked)* — Phase 8L graduation needs 5+ unique documents from different providers.
+3. **Process Real KASKO PDFs** — Place real-world KASKO PDFs in `/workspaces/insurai/policies`, then execute `npx tsx scripts/pilot-batch-ingest.ts --dir=./policies` to process them.
 4. **Calibrate Grade Thresholds** *(blocked)* — A=90, B=80 etc. are arbitrary. Need real outcome data. Admin UI: Settings → Evaluation.
 5. **Update Benchmark Premium Ranges** *(blocked)* — Premium ranges from Dec 2024. Needs external market research for `MARKET_BENCHMARKS`.
 

@@ -21,9 +21,14 @@ import 'dotenv/config'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
+import { createClient } from '@supabase/supabase-js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
+
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 // ============================================================================
 // STEP 1: PDF TEXT EXTRACTION (using pdfjs-dist directly)
@@ -351,6 +356,16 @@ async function main() {
       path: path.resolve(__dirname, '../e2e/fixtures/test-policy.pdf'),
       sourceType: 'test-fixture',
     },
+    {
+      id: 'KASKO-PDF-004',
+      path: path.resolve(__dirname, '../test-data/synthetic-kasko-4.pdf'),
+      sourceType: 'synthetic-pdf',
+    },
+    {
+      id: 'KASKO-PDF-005',
+      path: path.resolve(__dirname, '../test-data/synthetic-kasko-5.pdf'),
+      sourceType: 'synthetic-pdf',
+    },
   ]
 
   const results: ExtractionResult[] = []
@@ -471,6 +486,42 @@ async function main() {
       )
       console.log(`  Triggers: ${result.triggerNames?.join(', ') || 'none'}`)
       console.log(`  Source quotes: ${result.sourceQuoteCount}`)
+
+      if (supabase) {
+        try {
+          const { evaluatePilotAdmission } = await import('../src/lib/analysis/kasko-pilot-gate')
+          const admission = evaluatePilotAdmission(extracted, {
+            textCharCount: textResult.text?.length || 0,
+          })
+
+          await supabase.from('kasko_pilot_qa_records').insert({
+            document_id: Date.now().toString(),
+            filename: path.basename(pdf.path),
+            branch: 'kasko',
+            review_date: new Date().toISOString(),
+            reviewer_user_id: 'automated-test',
+            extraction_success: true,
+            extraction_model: llmResult.model || 'auto',
+            text_char_count: textResult.text?.length || 0,
+            page_count: result.pageCount,
+            admission_status: admission.status,
+            admission_reason: admission.reason,
+            counted_in_pilot_metrics: admission.countedInPilotMetrics,
+            coverage_count_extracted: result.coverageCount,
+            special_condition_count: result.specialConditionCount,
+            has_rayic_deger: result.hasRayicDeger,
+            has_conditional_deductible: result.hasConditionalDeductible,
+            source_quote_count: result.sourceQuoteCount,
+            display_mode: result.displayMode,
+            triggers_fired: result.triggerNames,
+            phrase_clean: result.phraseClean,
+            found_prohibited_phrases: result.foundPhrases,
+          })
+          console.log(`  💾 QA record persisted to Supabase`)
+        } catch (e: any) {
+          console.log(`  ⚠️ Failed to save QA record: ${e.message}`)
+        }
+      }
     } catch (err: any) {
       console.log(`  ❌ Downstream pipeline error: ${err.message}`)
     }

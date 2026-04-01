@@ -1,0 +1,33 @@
+[dotenv@17.2.4] injecting env (18) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+--- BASIC COLUMNS ---
+id: bd2e2b33-7822-47c1-87aa-5d27d6f90609
+provider: ANADOLU ANONIM TÜRK SIGORTA ŞIRKETI
+type: kasko
+insured: undefined
+
+--- EXTRACTED DATA ---
+undefined
+
+--- COVERAGES ---
+undefined
+
+--- EXCLUSIONS ---
+undefined
+
+--- RAW DATA / OCR ---
+{
+  "coverages": "object",
+  "riskScore": "object",
+  "aiInsights": "object",
+  "exclusions": "object",
+  "gapActions": "object",
+  "gapAnalysis": "object",
+  "riskActions": "object",
+  "aiConfidence": "number",
+  "evidenceData": "object",
+  "extractedText": "string length 60571",
+  "insuranceLine": "string length 18",
+  "processedText": "string length 60119",
+  "marketComparison": "object",
+  "specialConditions": "object"
+}

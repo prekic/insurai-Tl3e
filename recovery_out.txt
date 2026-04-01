@@ -1,0 +1,107 @@
+[dotenv@17.2.4] injecting env (18) from .env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
+Fetching policy 1680600025...
+Found OCR text length: 60119. Starting re-extraction...
+Extraction complete! Data: {
+  "policyType": "kasko",
+  "policyNumber": "1680600025",
+  "policyholder": {
+    "name": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+    "address": "ATATÜRK MAH. MUSTAFA KEMAL CAD. No: 25/1A, İSTANBUL, ATAŞEHİR, ATAŞEHİR BELEDİYESİ, MUSTAFA KEMAL CAD., NO: 25/1A",
+    "customerNumber": "42817659",
+    "phone": "532 *** **73",
+    "email": "o**n@erisambalaj.com"
+  },
+  "insured": {
+    "name": "ERİŞ AMBALAJ SANAYİ VE TİCARET LİMİTED ŞİRKETİ",
+    "vehicle": {
+      "plate": "34 RZ9511",
+      "brand": "VOLKSWAGEN",
+      "model": "TIGUAN 1.4 TSI ACT BMT 150 DSG HIGHLINE",
+      "year": "2016",
+      "chassisNumber": "WVGZZZ5NZHW862628",
+      "engineNumber": "CZE307964",
+      "type": "OTOMOBİL (9 KOLTUĞA KADAR)",
+      "usage": "HUSUSİ OTOMOBİL",
+      "registrationDate": "2017-01-01"
+    }
+  },
+  "coverage": {
+    "main": {
+      "name": "Comprehensive Coverage",
+      "nameTr": "Genişletilmiş KASKO",
+      "limit": {
+        "amount": null,
+        "isUnlimited": true
+      }
+    },
+    "supplementary": [
+      {
+        "name": "Personal Accident",
+        "nameTr": "Ferdi Kaza",
+        "limit": {
+          "amount": 10000,
+          "isMarketValue": false
+        }
+      },
+      {
+        "name": "Theft",
+        "nameTr": "Hırsızlık",
+        "limit": {
+          "amount": 5000,
+          "isMarketValue": false
+        }
+      },
+      {
+        "name": "Legal Protection",
+        "nameTr": "Hukuksal Koruma",
+        "limit": {
+          "amount": 4000,
+          "isMarketValue": false
+        }
+      },
+      {
+        "name": "Liability",
+        "nameTr": "Artan Mali Sorumluluk",
+        "limit": {
+          "amount": 5000000,
+          "isMarketValue": false,
+          "isUnlimited": true
+        }
+      }
+    ],
+    "assistance": {
+      "name": "Roadside Assistance",
+      "nameTr": "Yol Yardım",
+      "limit": {
+        "amount": 80000,
+        "isMarketValue": false
+      }
+    }
+  },
+  "premium": {
+    "amount": 31140,
+    "currency": "TRY",
+    "paymentPlan": "Peşin",
+    "paymentDate": "2025-12-28"
+  },
+  "deductible": null,
+  "startDate": "2025-12-28",
+  "endDate": "2026-12-28",
+  "isAmendment": false,
+  "amendmentInfo": {
+    "amendmentNumber": null,
+    "amendmentDate": null,
+    "basePolicyNumber": null,
+    "amendmentReason": null,
+    "premiumDifference": null
+  },
+  "evidence": {
+    "insights": [],
+    "exclusions": []
+  },
+  "clauseGraph": {
+    "edges": []
+  },
+  "confidence": 1
+}
+Successfully updated DB record with re-extracted data.
