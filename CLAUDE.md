@@ -3,14 +3,13 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. ~~**Merge Handoff Branch to Main**~~: **DONE** — PRs #309/#310 merged.
-2. ~~**Deploy to Production**~~: **DONE** — Deploy triggered via commit to main (March 28, 2026).
-3. ~~**Trim CLAUDE.md**~~: **DONE** — PR #311 merged. 404KB → 151KB. Archive at `docs/KNOWN_ISSUES_ARCHIVE.md`.
-4. **Apply Migrations to Production Supabase** *(manual)*: `042_add_is_draft_to_policies.sql` and `043_seed_benchmark_threshold_configs.sql`. SQL in SESSION_HANDOFF.md — run in Supabase SQL Editor.
-5. ~~**Process Real KASKO PDFs**~~: **DONE** — Real-world KASKO PDFs uploaded to `/policies` and processed successfully; coverage reconciliation applied.
-6. **Calibrate Grade Thresholds** *(pending)*: A=90, B=80 etc. are currently arbitrary. Now that we have real pilot outcome data and real PDFs, these thresholds must be calibrated via the admin Settings UI.
-7. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
-8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+1. **Merge Handoff Branch to Main**: Merge branch `insuraigemini202604012015` via PR to trigger `release-please`.
+2. **Apply Migrations to Production Supabase** *(manual)*: Ensure previously added migrations are run on the remote DB using the Supabase SQL Editor.
+3. **Pilot Batch Ingestion**: Bulk upload the remaining `upload/real-kasko-pdf/` files into the web UI application.
+4. **Execute Evaluation Backfill**: Run `npx tsx scripts/backfill-evaluation-scores.ts --apply` to generate database scores for all ingested policies.
+5. **Calibrate Grade Thresholds**: Run `scripts/calibrate-grade-thresholds.ts` once 50+ scored policies exist to adjust the A/B/C/D grade cutoffs.
+6. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
+7. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 
@@ -101,6 +100,10 @@
 42. **Phrase Detection Targeting on JSON (Added Mar 30, 2026)**: Never use `JSON.stringify(object).toLowerCase().includes('phrase')` for content moderation or prohibited phrase detection on serialized policy objects. This leads to false positives where structural JSON keys (like `"isUnlimited": true`) trigger a violation for "unlimited". Always target only human-facing text fields explicitly using `checkProhibitedPhrases` (in `batch-ingest-helpers.ts`) which isolates `name`, `description`, `conditions`, and `exclusions`.
 
 43. **Legacy Tabular Data Precedence (Added Apr 1, 2026)**: When dealing with legacy policy data backfills, the older multi-stage pipeline was structurally superior for tables (`coverages`) and domain rules. Legacy data (`raw_data.coverages`) **remains permanently authoritative**. Re-extraction payloads (like GPT-4o-mini single-shot extractions) are strictly utilized to hydrate missing identity and headers (`insuredPerson`, `startDate`, `expiryDate`) and any hallucinated `coverage` array shifts inside those payloads must be explicitly ignored to preserve data accuracy.
+
+44. **Evaluation Engine Unpersisted Scores (Added Apr 1, 2026)**: The core actuarial engine (`evaluatePolicy()`) is stateless and does not persist its output to the `policies` table during standard operations (e.g. initial upload). To enable system-wide threshold calibration based on analytical grades, you MUST run the `scripts/backfill-evaluation-scores.ts` utility. This utility resurrects the database row into a structured `Policy` object, feeds it through the evaluator, and writes the `overallScore` back to `raw_data.evaluation`.
+
+45. **Node Shell Execution of Evaluation Engine (`VITE_SUPABASE_URL` Exception) (Added Apr 1, 2026)**: When executing `evaluatePolicy()` inside native Node scripts (like `npx tsx scripts/backfill-evaluation-scores.ts`), be aware that the evaluator asynchronously triggers `refreshBenchmarks()`. Exploring deep imports leads to `src/lib/supabase/config.ts`, which utilizes client-side Vite (`import.meta.env.VITE_SUPABASE_URL`). This throws a `TypeError: Cannot read properties of undefined` stack trace to the CLI console. **This crash is non-fatal**: it is explicitly caught by the service, causing it to bypass dynamic cloud fetching and successfully fallback to static local json endpoints allowing evaluation to conclude correctly unmodified. Do not attempt to fix this trace by loading `import.meta` in Node.
 
 ---
 
