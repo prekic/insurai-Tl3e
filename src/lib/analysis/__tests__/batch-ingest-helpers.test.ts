@@ -2,7 +2,12 @@
  * WS-5 — Batch Ingestion Pure Helper Tests
  */
 import { describe, it, expect } from 'vitest'
-import { discoverPDFs, summarizeBatch, type BatchResultEntry } from '../batch-ingest-helpers'
+import {
+  discoverPDFs,
+  summarizeBatch,
+  checkProhibitedPhrases,
+  type BatchResultEntry,
+} from '../batch-ingest-helpers'
 
 // ============================================================================
 // discoverPDFs
@@ -149,5 +154,47 @@ describe('summarizeBatch', () => {
     expect(summary.totalFiles).toBe(0)
     expect(summary.averageCoverages).toBe(0)
     expect(summary.phraseLeaks).toBe(0)
+  })
+})
+
+// ============================================================================
+// checkProhibitedPhrases
+// ============================================================================
+
+describe('checkProhibitedPhrases', () => {
+  const PROHIBITED = ['unlimited', 'fully covered', 'muafiyetsiz']
+
+  it('ignores json structural keys and booleans', () => {
+    // an extraction with isUnlimited: true should not fail
+    const data = {
+      isUnlimited: true,
+      hasFullyCoveredDetail: false,
+      coverages: [{ name: 'Standard Auto', description: 'Regular coverage' }],
+    }
+    const leaks = checkProhibitedPhrases(data, PROHIBITED)
+    expect(leaks).toHaveLength(0)
+  })
+
+  it('detects prohibited phrases in coverage names and descriptions', () => {
+    const data = {
+      coverages: [{ name: 'Unlimited Liability', description: 'You are fully covered.' }],
+    }
+    const leaks = checkProhibitedPhrases(data, PROHIBITED)
+    expect(leaks).toEqual(['unlimited', 'fully covered'])
+  })
+
+  it('detects prohibited phrases in special conditions and exclusions', () => {
+    const data = {
+      coverages: [],
+      specialConditions: ['This is muafiyetsiz'],
+      exclusions: ['Does not apply if unlimited limits exceeded'],
+    }
+    const leaks = checkProhibitedPhrases(data, PROHIBITED)
+    expect(leaks).toEqual(['unlimited', 'muafiyetsiz'])
+  })
+
+  it('returns empty array if nothing is passed', () => {
+    expect(checkProhibitedPhrases(null, PROHIBITED)).toEqual([])
+    expect(checkProhibitedPhrases({}, PROHIBITED)).toEqual([])
   })
 })
