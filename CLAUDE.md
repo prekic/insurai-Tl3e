@@ -7,8 +7,8 @@
 2. ~~**Deploy to Production**~~: **DONE** — Deploy triggered via commit to main (March 28, 2026).
 3. ~~**Trim CLAUDE.md**~~: **DONE** — PR #311 merged. 404KB → 151KB. Archive at `docs/KNOWN_ISSUES_ARCHIVE.md`.
 4. **Apply Migrations to Production Supabase** *(manual)*: `042_add_is_draft_to_policies.sql` and `043_seed_benchmark_threshold_configs.sql`. SQL in SESSION_HANDOFF.md — run in Supabase SQL Editor.
-5. **Process Real KASKO PDFs**: Upload the real-world KASKO PDFs into the `/workspaces/insurai/policies` directory and execute the full pilot batch ingestion pipeline (`scripts/pilot-batch-ingest.ts` without `--dry-run`).
-6. **Calibrate Grade Thresholds** *(blocked — needs outcome data)*: A=90, B=80 etc. are arbitrary. Thresholds are config-driven via admin Settings UI. Must be calibrated using the results of the real pilot.
+5. ~~**Process Real KASKO PDFs**~~: **DONE** — Real-world KASKO PDFs uploaded to `/policies` and processed successfully; coverage reconciliation applied.
+6. **Calibrate Grade Thresholds** *(pending)*: A=90, B=80 etc. are currently arbitrary. Now that we have real pilot outcome data and real PDFs, these thresholds must be calibrated via the admin Settings UI.
 7. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
 8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
@@ -99,6 +99,8 @@
 41. **Provisional Status UI Mocking (Added Mar 30, 2026)**: When testing components that block export/share functionality based on provisional results (e.g., `TrustworthinessUI`), you must explicitly provide the triggering condition (like `aiConfidence: 0.80`, `benchmarkStatus: 'untrusted'`, or `benchmark: undefined`) inside the mocked `evaluation` object returned by `vi.spyOn(usePolicyEvaluationHook, 'usePolicyEvaluation')`. Setting `isProvisional: true` alone is not always enough if the component logic expects the specific underlying reason variable.
 
 42. **Phrase Detection Targeting on JSON (Added Mar 30, 2026)**: Never use `JSON.stringify(object).toLowerCase().includes('phrase')` for content moderation or prohibited phrase detection on serialized policy objects. This leads to false positives where structural JSON keys (like `"isUnlimited": true`) trigger a violation for "unlimited". Always target only human-facing text fields explicitly using `checkProhibitedPhrases` (in `batch-ingest-helpers.ts`) which isolates `name`, `description`, `conditions`, and `exclusions`.
+
+43. **Legacy Tabular Data Precedence (Added Apr 1, 2026)**: When dealing with legacy policy data backfills, the older multi-stage pipeline was structurally superior for tables (`coverages`) and domain rules. Legacy data (`raw_data.coverages`) **remains permanently authoritative**. Re-extraction payloads (like GPT-4o-mini single-shot extractions) are strictly utilized to hydrate missing identity and headers (`insuredPerson`, `startDate`, `expiryDate`) and any hallucinated `coverage` array shifts inside those payloads must be explicitly ignored to preserve data accuracy.
 
 ---
 
