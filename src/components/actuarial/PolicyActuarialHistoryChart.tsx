@@ -12,7 +12,7 @@ import {
 } from 'recharts'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { adminFetch } from '@/lib/admin/api'
+import { supabase } from '@/lib/supabase/client'
 import { useTranslation } from '@/lib/i18n/i18n-context'
 
 interface HistoricalResult {
@@ -39,22 +39,23 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
       try {
         setIsLoading(true)
         setError(null)
-        // We use the admin endpoint, typically this would be a user-facing endpoint but we're reusing it here
-        const res = await adminFetch(
-          `/api/admin/actuarial/evaluation-results?policyId=${policyId}&limit=20`
-        )
-        if (!res.ok) {
-          throw new Error('Failed to fetch history')
-        }
-        const json = await res.json()
-        if (json.success && json.data) {
-          // Sort chronologically (oldest to newest) for chart
-          const sorted = [...json.data].sort(
-            (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        // We use the primary Supabase client to fetch directly
+        const { data: results, error: fetchError } = await supabase
+          .from('policy_evaluations')
+          .select(
+            'id, created_at, topsis_closeness, topsis_grade, monte_carlo_lower_bound, monte_carlo_upper_bound'
           )
-          setData(sorted)
+          .eq('policy_id', policyId)
+          .order('created_at', { ascending: true })
+          .limit(20)
+
+        if (fetchError) {
+          throw new Error('Failed to fetch history: ' + fetchError.message)
+        }
+        if (results) {
+          setData(results as HistoricalResult[])
         } else {
-          throw new Error(json.error || 'Invalid response')
+          throw new Error('Invalid response')
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error')
