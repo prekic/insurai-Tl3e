@@ -8,7 +8,7 @@ export type PolicyType =
   | 'business'
   | 'nakliyat'
 
-export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
+export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending' | 'draft'
 
 /** Coverage category for organization */
 export type CoverageCategory =

@@ -37,7 +37,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { PolicyDocuments } from './PolicyDocuments'
 import { formatDate } from '@/lib/utils'
 import { useDisplayCurrency } from '@/hooks/useDisplayCurrency'
-import type { Coverage, CoverageCategory } from '@/types/policy'
+import type { Coverage, CoverageCategory, PolicyStatus } from '@/types/policy'
 import {
   KASKO_COVERAGE_CATEGORIES,
   shouldShowUnlimited,
@@ -854,6 +854,42 @@ function EvidenceQuote({ quote, quoteTr }: { quote: string; quoteTr?: string }) 
   )
 }
 
+function getStatusVariant(
+  status: PolicyStatus
+): 'default' | 'success' | 'warning' | 'destructive' | 'secondary' | 'outline' {
+  switch (status) {
+    case 'active':
+      return 'success'
+    case 'expiring':
+      return 'warning'
+    case 'expired':
+      return 'destructive'
+    case 'pending':
+      return 'secondary'
+    case 'draft':
+      return 'outline'
+    default:
+      return 'default'
+  }
+}
+
+function getStatusLabel(status: PolicyStatus, t: TranslationDictionary): string {
+  switch (status) {
+    case 'active':
+      return t.policy.activeStatus
+    case 'expiring':
+      return t.policy.expiringSoonStatus
+    case 'expired':
+      return t.policy.expiredStatus
+    case 'pending':
+      return t.policy.pendingStatus
+    case 'draft':
+      return t.policy.draftStatus
+    default:
+      return status
+  }
+}
+
 export function PolicyDetailView() {
   const navigate = useNavigate()
   const location = useLocation()
@@ -917,9 +953,11 @@ export function PolicyDetailView() {
   const displaySummary = useDisplaySafeSummary(policy, pilotOptions)
   const isPilotResult = displaySummary?.isPilotResult ?? false
   const isDraft = displaySummary?.isDraft ?? false
-  const isVerificationPending = isPilotResult && displaySummary?.pilotReviewStatus === 'pending_review'
+  const isVerificationPending =
+    isPilotResult && displaySummary?.pilotReviewStatus === 'pending_review'
   // Also include evaluation.isProvisional (which checks benchmarkStatus and AI confidence internally)
-  const isUnverified = isDraft || isVerificationPending || lowConfidence || (evaluation?.isProvisional ?? false)
+  const isUnverified =
+    isDraft || isVerificationPending || lowConfidence || (evaluation?.isProvisional ?? false)
 
   // The canonical summary for all reviewer rendering paths in this view
   const reviewerSummary = useMemo(() => {
@@ -1180,9 +1218,15 @@ export function PolicyDetailView() {
               </button>
               {/* Export dropdown */}
               <div className="relative" ref={exportMenuRef}>
-                <div 
-                  className={isUnverified ? "cursor-not-allowed group relative inline-block" : ""}
-                  title={isUnverified ? (locale === 'tr' ? 'Dışa aktarma doğrulanmamış poliçeler için devre dışı' : 'Export disabled for unverified policies') : undefined}
+                <div
+                  className={isUnverified ? 'cursor-not-allowed group relative inline-block' : ''}
+                  title={
+                    isUnverified
+                      ? locale === 'tr'
+                        ? 'Dışa aktarma doğrulanmamış poliçeler için devre dışı'
+                        : 'Export disabled for unverified policies'
+                      : undefined
+                  }
                 >
                   <button
                     onClick={(e) => {
@@ -1288,12 +1332,10 @@ export function PolicyDetailView() {
                     <span className="truncate">{t.policy.policySummary}</span>
                   </span>
                   <Badge
-                    variant={policy.status === 'active' ? 'success' : 'warning'}
+                    variant={getStatusVariant(policy.status)}
                     className="text-xs flex-shrink-0"
                   >
-                    {policy.status === 'active'
-                      ? t.policy.activeStatus
-                      : t.policy.expiringSoonStatus}
+                    {getStatusLabel(policy.status, t)}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -1478,27 +1520,51 @@ export function PolicyDetailView() {
                       </p>
 
                       <div className="space-y-2 text-[11px] leading-relaxed mb-3 border-t border-gray-100 pt-3">
-                        {((locale === 'tr' ? scenario.insurerPaysTR : scenario.insurerPays) || scenario.insurerPays) && (
+                        {((locale === 'tr' ? scenario.insurerPaysTR : scenario.insurerPays) ||
+                          scenario.insurerPays) && (
                           <div className="flex justify-between border-b border-gray-50 pb-1">
-                            <span className="text-gray-500">{locale === 'tr' ? 'Sigortacı Öder:' : 'Insurer Pays:'}</span>
-                            <span className="font-medium text-green-700 max-w-[60%] text-right">{locale === 'tr' ? (scenario.insurerPaysTR || scenario.insurerPays) : scenario.insurerPays}</span>
+                            <span className="text-gray-500">
+                              {locale === 'tr' ? 'Sigortacı Öder:' : 'Insurer Pays:'}
+                            </span>
+                            <span className="font-medium text-green-700 max-w-[60%] text-right">
+                              {locale === 'tr'
+                                ? scenario.insurerPaysTR || scenario.insurerPays
+                                : scenario.insurerPays}
+                            </span>
                           </div>
                         )}
-                        {((locale === 'tr' ? scenario.userPaysTR : scenario.userPays) || scenario.userPays) && (
+                        {((locale === 'tr' ? scenario.userPaysTR : scenario.userPays) ||
+                          scenario.userPays) && (
                           <div className="flex justify-between border-b border-gray-50 pb-1">
-                            <span className="text-gray-500">{locale === 'tr' ? 'Kullanıcı Öder:' : 'User Pays:'}</span>
-                            <span className="font-medium text-amber-700 max-w-[60%] text-right">{locale === 'tr' ? (scenario.userPaysTR || scenario.userPays) : scenario.userPays}</span>
+                            <span className="text-gray-500">
+                              {locale === 'tr' ? 'Kullanıcı Öder:' : 'User Pays:'}
+                            </span>
+                            <span className="font-medium text-amber-700 max-w-[60%] text-right">
+                              {locale === 'tr'
+                                ? scenario.userPaysTR || scenario.userPays
+                                : scenario.userPays}
+                            </span>
                           </div>
                         )}
-                        {((locale === 'tr' ? scenario.triggerTR : scenario.trigger) || scenario.trigger) && (
-                           <div className="flex justify-between border-b border-gray-50 pb-1">
-                             <span className="text-gray-500">{locale === 'tr' ? 'Örnek Olay:' : 'Trigger:'}</span>
-                             <span className="font-medium text-gray-800 max-w-[60%] text-right">{locale === 'tr' ? (scenario.triggerTR || scenario.trigger) : scenario.trigger}</span>
-                           </div>
+                        {((locale === 'tr' ? scenario.triggerTR : scenario.trigger) ||
+                          scenario.trigger) && (
+                          <div className="flex justify-between border-b border-gray-50 pb-1">
+                            <span className="text-gray-500">
+                              {locale === 'tr' ? 'Örnek Olay:' : 'Trigger:'}
+                            </span>
+                            <span className="font-medium text-gray-800 max-w-[60%] text-right">
+                              {locale === 'tr'
+                                ? scenario.triggerTR || scenario.trigger
+                                : scenario.trigger}
+                            </span>
+                          </div>
                         )}
-                        {((locale === 'tr' ? scenario.whyItMattersTR : scenario.whyItMatters) || scenario.whyItMatters) && (
+                        {((locale === 'tr' ? scenario.whyItMattersTR : scenario.whyItMatters) ||
+                          scenario.whyItMatters) && (
                           <div className="pt-1 mt-2 bg-blue-50/50 p-2 border border-blue-100/50 rounded text-blue-800 italic font-medium">
-                            {locale === 'tr' ? (scenario.whyItMattersTR || scenario.whyItMatters) : scenario.whyItMatters}
+                            {locale === 'tr'
+                              ? scenario.whyItMattersTR || scenario.whyItMatters
+                              : scenario.whyItMatters}
                           </div>
                         )}
                       </div>
@@ -1542,12 +1608,22 @@ export function PolicyDetailView() {
                   <div className="flex items-center justify-between p-2.5 sm:p-3 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg">
                     <div className="flex items-center gap-2 sm:gap-3">
                       <div className="text-2xl sm:text-3xl font-bold text-gray-900">
-                        {evaluation.overallScore}
+                        {isUnverified ? '-' : evaluation.overallScore}
                       </div>
                       <div className="text-xs sm:text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-1.5 sm:gap-2">
-                      <GradeBadge grade={evaluation.grade} isProvisional={evaluation.isProvisional} size="md" />
+                      {isUnverified ? (
+                        <Badge variant="outline" className="text-gray-500 border-gray-300">
+                          {t.policy.draftStatus}
+                        </Badge>
+                      ) : (
+                        <GradeBadge
+                          grade={evaluation.grade}
+                          isProvisional={evaluation.isProvisional}
+                          size="md"
+                        />
+                      )}
                       <StatusIndicator status={evaluation.status} showLabel size="sm" />
                     </div>
                   </div>
@@ -1861,56 +1937,70 @@ export function PolicyDetailView() {
                             </span>
                           </div>
                         )}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-500">{t.policy.yourPremium}</span>
-                          <span className="text-xs text-gray-500">{t.policy.marketAvg}</span>
+                      {evaluation?.benchmarkConfidence?.level === 'low' ? (
+                        <div className="py-2 text-xs text-gray-500 italic text-center">
+                          {locale === 'tr'
+                            ? 'Eksik veriler nedeniyle piyasa karşılaştırması kullanılamıyor'
+                            : 'Market comparison unavailable due to missing inputs'}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-sm text-gray-900">
-                            {formatConverted(policy.premium)}
-                          </span>
-                          <span className="font-semibold text-sm text-gray-600">
-                            {formatConverted(policy.marketComparison.averagePremium)}
-                          </span>
-                        </div>
-                        {policy.premium < policy.marketComparison.averagePremium && (
-                          <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
-                            <TrendingDown size={12} />
-                            <span>
-                              {Math.round(
-                                (1 - policy.premium / policy.marketComparison.averagePremium) * 100
-                              )}
-                              % {t.policy.belowAverage}
-                            </span>
+                      ) : (
+                        <>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-gray-500">{t.policy.yourPremium}</span>
+                              <span className="text-xs text-gray-500">{t.policy.marketAvg}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-sm text-gray-900">
+                                {formatConverted(policy.premium)}
+                              </span>
+                              <span className="font-semibold text-sm text-gray-600">
+                                {formatConverted(policy.marketComparison.averagePremium)}
+                              </span>
+                            </div>
+                            {policy.premium < policy.marketComparison.averagePremium && (
+                              <div className="flex items-center gap-1 mt-1 text-green-600 text-xs">
+                                <TrendingDown size={12} />
+                                <span>
+                                  {Math.round(
+                                    (1 - policy.premium / policy.marketComparison.averagePremium) *
+                                      100
+                                  )}
+                                  % {t.policy.belowAverage}
+                                </span>
+                              </div>
+                            )}
+                            {policy.premium > policy.marketComparison.averagePremium && (
+                              <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs">
+                                <TrendingUp size={12} />
+                                <span>
+                                  {Math.round(
+                                    (policy.premium / policy.marketComparison.averagePremium - 1) *
+                                      100
+                                  )}
+                                  % {t.policy.aboveAverage}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {policy.premium > policy.marketComparison.averagePremium && (
-                          <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs">
-                            <TrendingUp size={12} />
-                            <span>
-                              {Math.round(
-                                (policy.premium / policy.marketComparison.averagePremium - 1) * 100
-                              )}
-                              % {t.policy.aboveAverage}
-                            </span>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs text-gray-500 mb-1">
+                              {t.policy.marketPercentile}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-600"
+                                  style={{ width: `${policy.marketComparison.percentile}%` }}
+                                />
+                              </div>
+                              <span className="font-semibold text-gray-900 text-xs">
+                                {policy.marketComparison.percentile}%
+                              </span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-gray-500 mb-1">{t.policy.marketPercentile}</p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-600"
-                              style={{ width: `${policy.marketComparison.percentile}%` }}
-                            />
-                          </div>
-                          <span className="font-semibold text-gray-900 text-xs">
-                            {policy.marketComparison.percentile}%
-                          </span>
-                        </div>
-                      </div>
+                        </>
+                      )}
                       {/* Missing context factors warning */}
                       {evaluation?.benchmarkConfidence?.level === 'low' && (
                         <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-[10px] text-amber-700 leading-tight">
@@ -2080,13 +2170,8 @@ export function PolicyDetailView() {
             <Card>
               <CardContent className="pt-6">
                 <div className="text-center">
-                  <Badge
-                    variant={policy.status === 'active' ? 'success' : 'warning'}
-                    className="mb-4"
-                  >
-                    {policy.status === 'active'
-                      ? t.policy.activeStatus
-                      : t.policy.expiringSoonStatus}
+                  <Badge variant={getStatusVariant(policy.status)} className="mb-4">
+                    {getStatusLabel(policy.status, t)}
                   </Badge>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
@@ -2116,12 +2201,22 @@ export function PolicyDetailView() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="text-3xl font-bold text-gray-900">
-                        {evaluation.overallScore}
+                        {isUnverified ? '-' : evaluation.overallScore}
                       </div>
                       <div className="text-sm text-gray-500">/100</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <GradeBadge grade={evaluation.grade} isProvisional={evaluation.isProvisional} size="md" />
+                      {isUnverified ? (
+                        <Badge variant="outline" className="text-gray-500 border-gray-300">
+                          {t.policy.draftStatus}
+                        </Badge>
+                      ) : (
+                        <GradeBadge
+                          grade={evaluation.grade}
+                          isProvisional={evaluation.isProvisional}
+                          size="md"
+                        />
+                      )}
                       <StatusIndicator status={evaluation.status} showLabel size="sm" />
                     </div>
                   </div>
@@ -2351,62 +2446,74 @@ export function PolicyDetailView() {
                             </span>
                           </div>
                         )}
-                      <div>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs sm:text-sm text-gray-500">
-                            {t.policy.yourPremium}
-                          </span>
-                          <span className="text-xs sm:text-sm text-gray-500">
-                            {t.policy.marketAvg}
-                          </span>
+                      {evaluation?.benchmarkConfidence?.level === 'low' ? (
+                        <div className="py-4 text-sm text-gray-500 italic text-center">
+                          {locale === 'tr'
+                            ? 'Eksik veriler nedeniyle piyasa karşılaştırması kullanılamıyor'
+                            : 'Market comparison unavailable due to missing inputs'}
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-900">
-                            {formatConverted(policy.premium)}
-                          </span>
-                          <span className="font-semibold text-gray-600">
-                            {formatConverted(policy.marketComparison.averagePremium)}
-                          </span>
-                        </div>
-                        {policy.premium < policy.marketComparison.averagePremium && (
-                          <div className="flex items-center gap-1 mt-1 text-green-600 text-xs sm:text-sm">
-                            <TrendingDown size={14} />
-                            <span>
-                              {Math.round(
-                                (1 - policy.premium / policy.marketComparison.averagePremium) * 100
-                              )}
-                              % {t.policy.belowAverage}
-                            </span>
+                      ) : (
+                        <>
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs sm:text-sm text-gray-500">
+                                {t.policy.yourPremium}
+                              </span>
+                              <span className="text-xs sm:text-sm text-gray-500">
+                                {t.policy.marketAvg}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold text-gray-900">
+                                {formatConverted(policy.premium)}
+                              </span>
+                              <span className="font-semibold text-gray-600">
+                                {formatConverted(policy.marketComparison.averagePremium)}
+                              </span>
+                            </div>
+                            {policy.premium < policy.marketComparison.averagePremium && (
+                              <div className="flex items-center gap-1 mt-1 text-green-600 text-xs sm:text-sm">
+                                <TrendingDown size={14} />
+                                <span>
+                                  {Math.round(
+                                    (1 - policy.premium / policy.marketComparison.averagePremium) *
+                                      100
+                                  )}
+                                  % {t.policy.belowAverage}
+                                </span>
+                              </div>
+                            )}
+                            {policy.premium > policy.marketComparison.averagePremium && (
+                              <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs sm:text-sm">
+                                <TrendingUp size={14} />
+                                <span>
+                                  {Math.round(
+                                    (policy.premium / policy.marketComparison.averagePremium - 1) *
+                                      100
+                                  )}
+                                  % {t.policy.aboveAverage}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {policy.premium > policy.marketComparison.averagePremium && (
-                          <div className="flex items-center gap-1 mt-1 text-amber-600 text-xs sm:text-sm">
-                            <TrendingUp size={14} />
-                            <span>
-                              {Math.round(
-                                (policy.premium / policy.marketComparison.averagePremium - 1) * 100
-                              )}
-                              % {t.policy.aboveAverage}
-                            </span>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs sm:text-sm text-gray-500 mb-1">
+                              {t.policy.marketPercentile}
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-blue-600"
+                                  style={{ width: `${policy.marketComparison.percentile}%` }}
+                                />
+                              </div>
+                              <span className="font-semibold text-gray-900 text-sm">
+                                {policy.marketComparison.percentile}%
+                              </span>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                      <div className="pt-2 border-t">
-                        <p className="text-xs sm:text-sm text-gray-500 mb-1">
-                          {t.policy.marketPercentile}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-blue-600"
-                              style={{ width: `${policy.marketComparison.percentile}%` }}
-                            />
-                          </div>
-                          <span className="font-semibold text-gray-900 text-sm">
-                            {policy.marketComparison.percentile}%
-                          </span>
-                        </div>
-                      </div>
+                        </>
+                      )}
                       {/* Missing context factors warning */}
                       {evaluation?.benchmarkConfidence?.level === 'low' && (
                         <div className="mt-3 p-2.5 bg-amber-50 border border-amber-200 rounded text-xs text-amber-700 leading-tight">
@@ -2498,34 +2605,42 @@ export function PolicyDetailView() {
                       {t.policy.expectedOutOfPocket}
                     </p>
                     {/* EOOP value — annotated when precision is partial */}
-                    <div className="flex items-end gap-2">
-                      <p
-                        className={`text-2xl font-bold ${actuarialResult.eoopPrecision === 'partial' ? 'text-amber-700' : 'text-gray-900'}`}
-                      >
-                        {actuarialResult.eoopPrecision === 'partial' ? '~' : ''}
-                        {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString()}{' '}
-                        {actuarialResult.expectedOutOfPocket.expectedCost.currency}
-                      </p>
-                      {actuarialResult.eoopPrecision === 'partial' && (
-                        <span className="text-[10px] text-amber-600 font-medium mb-1.5">
-                          ({locale === 'tr' ? 'taban tahmin' : 'base estimate'})
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-2">
-                      {t.policy.premiumLabel}{' '}
-                      <span className="font-medium">
-                        {actuarialResult.expectedOutOfPocket.premium.amount.toLocaleString()}{' '}
-                        {actuarialResult.expectedOutOfPocket.premium.currency}
-                      </span>
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {t.policy.expectedUncoveredLoss}{' '}
-                      <span className="font-medium text-amber-600">
-                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.amount.toLocaleString()}{' '}
-                        {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.currency}
-                      </span>
-                    </p>
+                    {actuarialResult.contractQualityScore === 0 ? (
+                      <div className="flex items-end gap-2 mt-1">
+                        <p className="text-xl font-bold text-gray-400">N/A</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-end gap-2">
+                          <p
+                            className={`text-2xl font-bold ${actuarialResult.eoopPrecision === 'partial' ? 'text-amber-700' : 'text-gray-900'}`}
+                          >
+                            {actuarialResult.eoopPrecision === 'partial' ? '~' : ''}
+                            {actuarialResult.expectedOutOfPocket.expectedCost.amount.toLocaleString()}{' '}
+                            {actuarialResult.expectedOutOfPocket.expectedCost.currency}
+                          </p>
+                          {actuarialResult.eoopPrecision === 'partial' && (
+                            <span className="text-[10px] text-amber-600 font-medium mb-1.5">
+                              ({locale === 'tr' ? 'taban tahmin' : 'base estimate'})
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mt-2">
+                          {t.policy.premiumLabel}{' '}
+                          <span className="font-medium">
+                            {actuarialResult.expectedOutOfPocket.premium.amount.toLocaleString()}{' '}
+                            {actuarialResult.expectedOutOfPocket.premium.currency}
+                          </span>
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {t.policy.expectedUncoveredLoss}{' '}
+                          <span className="font-medium text-amber-600">
+                            {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.amount.toLocaleString()}{' '}
+                            {actuarialResult.expectedOutOfPocket.expectedUncoveredLoss.currency}
+                          </span>
+                        </p>
+                      </>
+                    )}
                     {/* EOOP precision warnings — driven by eoopPrecision + eoopLimitations */}
                     {actuarialResult.eoopPrecision === 'partial' &&
                       actuarialResult.eoopLimitations &&

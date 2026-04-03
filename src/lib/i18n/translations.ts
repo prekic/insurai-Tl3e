@@ -443,6 +443,9 @@ export interface TranslationDictionary {
     exclusionsDesc: string
     exclusionsTitleExport: string
     expiringSoonStatus: string
+    expiredStatus: string
+    pendingStatus: string
+    draftStatus: string
     freeTrialResult: string
     goBack: string
     goToDashboard: string

@@ -26,7 +26,7 @@ export type PolicyType =
   | 'nakliyat'
 
 /** Policy status values */
-export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending'
+export type PolicyStatus = 'active' | 'expiring' | 'expired' | 'pending' | 'draft'
 
 /** Types of changes tracked in policy version history */
 export type VersionChangeType = 'created' | 'updated' | 'extracted' | 'manual_edit'
@@ -644,7 +644,10 @@ export function isPolicyType(value: unknown): value is PolicyType {
 
 /** Check if a value is a valid PolicyStatus */
 export function isPolicyStatus(value: unknown): value is PolicyStatus {
-  return typeof value === 'string' && ['active', 'expiring', 'expired', 'pending'].includes(value)
+  return (
+    typeof value === 'string' &&
+    ['active', 'expiring', 'expired', 'pending', 'draft'].includes(value)
+  )
 }
 
 /** Check if a value is a valid VersionChangeType */
