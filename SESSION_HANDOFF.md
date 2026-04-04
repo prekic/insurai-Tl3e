@@ -28,19 +28,17 @@
 - Applied conditional CSS opacity (`opacity-60`) to the `ScoreBreakdown` component inside `PolicyDetailView.tsx`.
 - This ensures unverified/draft policies do not present fully bright, concrete numerical sub-scores, further guarding against misleading precision.
 
-### 3. TypeScript & Linter Hardening
-- Fixed 7 outstanding compilation errors in translations files and `PolicyDetailView.tsx`.
-- The codebase builds cleanly (`npx tsc --noEmit`).
+### 3. Evaluation History Component Fix
+- Identified that `PolicyActuarialHistoryChart.tsx` was querying a non-existent `public.policy_evaluations` table.
+- Pointed the fetch query to the correct evaluation source, permanently bypassing the cache error.
 
 ## All Modified Files (This Session)
 
 | File | Change |
 |------|--------|
 | `src/lib/policy-evaluation/evaluator.ts` | **UPDATED** — Grounded AI insight generation wording. |
-| `src/components/PolicyDetailView.tsx` | **UPDATED** — Visual opacity reduction logic; TS fixes. |
-| `src/lib/i18n/translations.ts` | **UPDATED** — Cleaned duplicate activeStatus keys. |
-| `src/lib/i18n/translations-skeleton.ts` | **UPDATED** — Sync translations. |
-| `src/types/policy.ts` (and `supabase/types.ts`) | **UPDATED** — Added `'draft'` to `PolicyStatus` union type. |
+| `src/components/PolicyDetailView.tsx` | **UPDATED** — Visual opacity reduction logic for draft unverified scores. |
+| `src/components/actuarial/PolicyActuarialHistoryChart.tsx` | **UPDATED** — Redirected history fetch query to correct schema layer. |
 | `CLAUDE.md` | **UPDATED** — Documented Gotcha 46 on AI phrasing guidelines; Updated core doc state. |
 | `SESSION_HANDOFF.md` | **UPDATED** — Synchronized UI hardening polish status. |
 
