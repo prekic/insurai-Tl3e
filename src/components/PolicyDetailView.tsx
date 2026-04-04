@@ -1717,11 +1717,17 @@ export function PolicyDetailView() {
                         className={`text-gray-400 transition-transform ${scoreBreakdownExpanded ? 'rotate-180' : ''}`}
                       />
                     </button>
-                    {scoreBreakdownExpanded ? (
-                      <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
-                    ) : (
-                      <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
-                    )}
+                    <div
+                      className={
+                        isUnverified ? 'opacity-60 transition-opacity hover:opacity-100' : ''
+                      }
+                    >
+                      {scoreBreakdownExpanded ? (
+                        <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="full" />
+                      ) : (
+                        <ScoreBreakdown breakdown={evaluation.scoreBreakdown} variant="mini" />
+                      )}
+                    </div>
                   </div>
 
                   {/* Recommendations - Expandable */}

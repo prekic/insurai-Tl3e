@@ -289,12 +289,13 @@ export function evaluatePolicy(
   )
 
   // Priority 4: Score Safety Capping
-  const hasCriticalComplianceIssues =
-    complianceResult.complianceIssues.some((i) => i.severity === 'critical')
+  const hasCriticalComplianceIssues = complianceResult.complianceIssues.some(
+    (i) => i.severity === 'critical'
+  )
   // Safest implementation: apply the same 60 max cap to ALL untrusted benchmark states, including fallback and missing.
   const hasUntrustedBenchmark =
     !benchmarkForDate || benchmarkForDate?.benchmarkStatus === 'untrusted'
-  
+
   if (hasCriticalComplianceIssues || hasUntrustedBenchmark) {
     overallScore = Math.min(overallScore, 60)
   }
@@ -335,7 +336,12 @@ export function evaluatePolicy(
 
     overallScore,
     grade: getGradeFromScore(overallScore, gradeThresholds),
-    isProvisional: Boolean((policy as any).isDraft || ((policy as any).aiConfidence && (policy as any).aiConfidence < 0.85) || !benchmarkForDate || benchmarkForDate.benchmarkStatus === 'untrusted'),
+    isProvisional: Boolean(
+      (policy as any).isDraft ||
+      ((policy as any).aiConfidence && (policy as any).aiConfidence < 0.85) ||
+      !benchmarkForDate ||
+      benchmarkForDate.benchmarkStatus === 'untrusted'
+    ),
     status: getStatusFromScore(overallScore, statusThresholds),
 
     scoreBreakdown: {
@@ -1007,37 +1013,41 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
 
   // Check for Conditional Deductibles
   const analyzedPolicy = policy as import('@/types/policy').AnalyzedPolicy
-  const hasConditionalDeductibles = analyzedPolicy.conditionalDeductibles && analyzedPolicy.conditionalDeductibles.length > 0
-  
+  const hasConditionalDeductibles =
+    analyzedPolicy.conditionalDeductibles && analyzedPolicy.conditionalDeductibles.length > 0
+
   // Check for IMM Sublimits (Limited IMM) - Kasko typically
-  const hasImmSublimits = policy.coverages.some(c => 
-    c.included && 
-    (c.name.toLowerCase().includes('mali mesuliyet') || c.name.toLowerCase().includes('mali sorumluluk') || c.name.toLowerCase().includes('imm')) &&
-    !c.isUnlimited && 
-    c.limit > 0 &&
-    c.limit < 100000000 // Sublimit threshold
+  const hasImmSublimits = policy.coverages.some(
+    (c) =>
+      c.included &&
+      (c.name.toLowerCase().includes('mali mesuliyet') ||
+        c.name.toLowerCase().includes('mali sorumluluk') ||
+        c.name.toLowerCase().includes('imm')) &&
+      !c.isUnlimited &&
+      c.limit > 0 &&
+      c.limit < 100000000 // Sublimit threshold
   )
 
   if (hasConditionalDeductibles || hasImmSublimits) {
     if (hasConditionalDeductibles) {
       score -= 15
       issues.push({
-         type: 'regulatory',
-         severity: 'high',
-         description: 'Policy contains conditional deductibles requiring review',
-         descriptionTR: 'Poliçe inceleme gerektiren koşullu muafiyetler içeriyor',
+        type: 'regulatory',
+        severity: 'high',
+        description: 'Policy contains conditional deductibles requiring review',
+        descriptionTR: 'Poliçe inceleme gerektiren koşullu muafiyetler içeriyor',
       })
       textIssues.push('Contains conditional deductibles')
       textIssuesTR.push('Koşullu muafiyet içeriyor')
     }
-    
+
     if (hasImmSublimits) {
       score -= 10
       issues.push({
-         type: 'regulatory',
-         severity: 'medium',
-         description: 'Policy contains IMM sublimits instead of unlimited coverage',
-         descriptionTR: 'Poliçe sınırsız yerine İMM alt limitleri içeriyor',
+        type: 'regulatory',
+        severity: 'medium',
+        description: 'Policy contains IMM sublimits instead of unlimited coverage',
+        descriptionTR: 'Poliçe sınırsız yerine İMM alt limitleri içeriyor',
       })
       textIssues.push('Contains IMM sublimits')
       textIssuesTR.push('İMM alt limitleri içeriyor')
@@ -1045,20 +1055,28 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
   }
 
   // Check for Sanctions clause
-  const hasSanctions = 
-    policy.exclusions.some(e => e.toLowerCase().includes('yaptırım') || e.toLowerCase().includes('sanction')) ||
-    (policy as any).specialConditions?.some((c: any) => typeof c === 'string' && (c.toLowerCase().includes('yaptırım') || c.toLowerCase().includes('sanction')));
+  const hasSanctions =
+    policy.exclusions.some(
+      (e) => e.toLowerCase().includes('yaptırım') || e.toLowerCase().includes('sanction')
+    ) ||
+    (policy as any).specialConditions?.some(
+      (c: any) =>
+        typeof c === 'string' &&
+        (c.toLowerCase().includes('yaptırım') || c.toLowerCase().includes('sanction'))
+    )
 
   if (hasSanctions) {
-      score -= 20
-      issues.push({
-         type: 'regulatory',
-         severity: 'critical',
-         description: 'Policy contains international sanctions clause (Yaptırım Klozu) which may entirely void coverage',
-         descriptionTR: 'Poliçe, teminatı tamamen geçersiz kılabilecek uluslararası yaptırımlar klozu (Sanctions Clause) içeriyor',
-      })
-      textIssues.push('Contains sanctions clause')
-      textIssuesTR.push('Yaptırım klozu içeriyor')
+    score -= 20
+    issues.push({
+      type: 'regulatory',
+      severity: 'critical',
+      description:
+        'Policy contains international sanctions clause (Yaptırım Klozu) which may entirely void coverage',
+      descriptionTR:
+        'Poliçe, teminatı tamamen geçersiz kılabilecek uluslararası yaptırımlar klozu (Sanctions Clause) içeriyor',
+    })
+    textIssues.push('Contains sanctions clause')
+    textIssuesTR.push('Yaptırım klozu içeriyor')
   }
 
   // Ensure minimum score
@@ -1508,41 +1526,47 @@ function generateSummary(
 
 function generateScenarioCards(
   policy: Policy,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   _complianceResult: ComplianceResult
 ): import('./types').ScenarioCard[] {
   const cards: import('./types').ScenarioCard[] = []
-  
+
   // 1. IMM (Limits of liability) Scenario for vehicles
-  const immCoverage = policy.coverages.find(c =>
-    (c.name.toLowerCase().includes('mali mesuliyet') || c.name.toLowerCase().includes('imm')) && c.included
+  const immCoverage = policy.coverages.find(
+    (c) =>
+      (c.name.toLowerCase().includes('mali mesuliyet') || c.name.toLowerCase().includes('imm')) &&
+      c.included
   )
-  
+
   if (immCoverage) {
     if (immCoverage.isUnlimited) {
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
         titleTR: 'Kusurlu Büyük Kazada',
-        description: 'If you cause an accident involving multiple luxury vehicles, your policy covers all third-party damages without limit, protecting you from personal bankruptcy.',
-        descriptionTR: 'Birden fazla lüks aracın karıştığı bir kazaya sebep olursanız, poliçeniz sınırlar olmadan tüm üçüncü taraf hasarlarını karşılar ve sizi kişisel iflas riskinden korur.',
+        description:
+          'If you cause an accident involving multiple luxury vehicles, your policy covers all third-party damages without limit, protecting you from major unexpected costs.',
+        descriptionTR:
+          'Birden fazla lüks aracın karıştığı bir kazaya sebep olursanız, poliçeniz sınırlar olmadan tüm üçüncü taraf hasarlarını karşılar ve sizi beklenmedik büyük masraflardan korur.',
         financialStatus: 'covered',
         insurerPays: 'Unlimited',
         insurerPaysTR: 'Sınırsız',
         userPays: '0 TL',
         userPaysTR: '0 TL',
         trigger: 'Causing a major accident with third-party claims exceeding mandatory limits.',
-        triggerTR: 'Zorunlu limitleri aşan üçüncü şahıs hasarlarına yol açan büyük bir kazada kusurlu olma.',
+        triggerTR:
+          'Zorunlu limitleri aşan üçüncü şahıs hasarlarına yol açan büyük bir kazada kusurlu olma.',
         whyItMatters: 'IMM protects you from lawsuits when your compulsory insurance runs out.',
-        whyItMattersTR: 'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
+        whyItMattersTR:
+          'İMM, zorunlu trafik sigortası limitiniz tükendiğinde sizi davalardan korur.',
       })
     } else {
       cards.push({
         id: 'imm-scenario',
         title: 'At-Fault Major Accident',
         titleTR: 'Kusurlu Büyük Kazada',
-        description: `Your policy caps liability at ${immCoverage.limit.toLocaleString('tr-TR')} TL. Damages exceeding this limit must be paid out-of-pocket, creating severe financial risk.`,
-        descriptionTR: `Poliçeniz mali sorumluluğu ${immCoverage.limit.toLocaleString('tr-TR')} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortasi olsa bile cebinizden ödenmelidir, ciddi finansal risk yaratır.`,
+        description: `Your policy caps liability at ${immCoverage.limit.toLocaleString('tr-TR')} TL. Damages exceeding this limit must be paid out-of-pocket, creating significant financial exposure.`,
+        descriptionTR: `Poliçeniz mali sorumluluğu ${immCoverage.limit.toLocaleString('tr-TR')} TL ile sınırlar. Bu limiti aşan hasarlar trafik sigortası olsa bile cebinizden ödenmelidir, bu da yüksek mali yükümlülük yaratabilir.`,
         financialStatus: 'risk',
         riskAmount: `Over ${immCoverage.limit.toLocaleString('tr-TR')} TL`,
         riskAmountTR: `${immCoverage.limit.toLocaleString('tr-TR')} TL Üzeri`,
@@ -1552,8 +1576,10 @@ function generateScenarioCards(
         userPaysTR: 'bilinmiyor (cepten)',
         trigger: 'Third-party damages exceeding the policy IMM limits.',
         triggerTR: 'Poliçe İMM limitlerini aşan üçüncü taraf hasarları.',
-        whyItMatters: 'Without unlimited coverage, your personal assets are at risk in catastrophic accidents.',
-        whyItMattersTR: 'Sınırsız teminat olmadan, feci kazalarda kişisel varlıklarınız risk altındadır.',
+        whyItMatters:
+          'Without unlimited coverage, your personal assets are at risk in catastrophic accidents.',
+        whyItMattersTR:
+          'Sınırsız teminat olmadan, feci kazalarda kişisel varlıklarınız risk altındadır.',
       })
     }
   } else if (policy.type === 'kasko' || policy.type === 'traffic') {
@@ -1561,8 +1587,10 @@ function generateScenarioCards(
       id: 'imm-scenario',
       title: 'At-Fault Major Accident',
       titleTR: 'Kusurlu Büyük Kazada',
-      description: 'Your policy lacks Voluntary Liability Coverage (IMM). You are entirely responsible for damages exceeding the state minimum limit, risking personal ruin.',
-      descriptionTR: 'Poliçenizde İhtiyari Mali Mesuliyet (İMM) teminatı yok. Devletin zorunlu limitini aşan tüm hasarlardan bizzat sorumlusunuz.',
+      description:
+        'Your policy lacks Voluntary Liability Coverage (IMM). You are entirely responsible for damages exceeding the state minimum limit, exposing you to significant out-of-pocket costs.',
+      descriptionTR:
+        'Poliçenizde İhtiyari Mali Mesuliyet (İMM) teminatı yok. Devletin zorunlu limitini aşan tüm hasarlardan bizzat sorumlusunuz, bu da sizi ciddi masraflara açık hale getirir.',
       financialStatus: 'risk',
       insurerPays: '0 TL',
       insurerPaysTR: '0 TL',
@@ -1570,25 +1598,29 @@ function generateScenarioCards(
       userPaysTR: 'bilinmiyor (cepten)',
       trigger: 'Third-party claim beyond statutory traffic insurance bounds.',
       triggerTR: 'Zorunlu trafik sigortası sınırlarını aşan üçüncü taraf talepleri.',
-      whyItMatters: 'You are completely exposed to third-party lawsuits and financial ruin.',
-      whyItMattersTR: 'Üçüncü şahıs davalarına ve finansal yıkıma tamamen açıksınız.',
+      whyItMatters:
+        'You are completely exposed to third-party lawsuits and substantial financial liability.',
+      whyItMattersTR: 'Üçüncü şahıs davalarına ve yüksek mali yükümlülüklere tamamen açıksınız.',
     })
   }
 
   // 2. Network Repair Scenario (Kasko specific)
-  const hasNetworkRestriction = policy.exclusions.some(e => 
-    e.toLowerCase().includes('servis') && 
-    (e.toLowerCase().includes('anlaşmalı') || e.toLowerCase().includes('yetkili'))
+  const hasNetworkRestriction = policy.exclusions.some(
+    (e) =>
+      e.toLowerCase().includes('servis') &&
+      (e.toLowerCase().includes('anlaşmalı') || e.toLowerCase().includes('yetkili'))
   )
-  
+
   if (policy.type === 'kasko') {
     if (hasNetworkRestriction) {
       cards.push({
         id: 'repair-scenario',
         title: 'Repair at Unauthorized Service',
         titleTR: 'Yetkisiz Kurumda Onarım',
-        description: 'You are restricted to the insurer\'s contracted repair network. Taking your vehicle to your preferred unauthorized shop may result in high out-of-pocket costs up to 50% or denial.',
-        descriptionTR: 'Sigorta şirketinin anlaşmalı servis ağına tabisiniz. Aracınızı kendi tercih ettiğiniz yetkisiz servise götürmek, faturanın yarısının ödenmemesine veya hasarın reddine yol açabilir.',
+        description:
+          "You are restricted to the insurer's contracted repair network. Taking your vehicle to your preferred unauthorized shop may result in high out-of-pocket costs up to 50% or denial.",
+        descriptionTR:
+          'Sigorta şirketinin anlaşmalı servis ağına tabisiniz. Aracınızı kendi tercih ettiğiniz yetkisiz servise götürmek, faturanın yarısının ödenmemesine veya hasarın reddine yol açabilir.',
         financialStatus: 'partially_covered',
         insurerPays: 'unknown (often 50% max)',
         insurerPaysTR: 'bilinmiyor (genellikle maks %50)',
@@ -1604,8 +1636,10 @@ function generateScenarioCards(
         id: 'repair-scenario',
         title: 'Repair at Your Choice of Shop',
         titleTR: 'Kendi Seçtiğiniz Serviste Onarım',
-        description: 'Your policy allows repairs at any authorized or preferred shop without heavy network penalties.',
-        descriptionTR: 'Poliçeniz, ağır ağ kısıtlaması kesintileri olmadan, istediğiniz yetkili veya özel serviste onarıma izin verir.',
+        description:
+          'Your policy allows repairs at any authorized or preferred shop without heavy network penalties.',
+        descriptionTR:
+          'Poliçeniz, ağır ağ kısıtlaması kesintileri olmadan, istediğiniz yetkili veya özel serviste onarıma izin verir.',
         financialStatus: 'covered',
         insurerPays: 'Full invoice amount (subject to usual deductibles)',
         insurerPaysTR: 'Tam fatura tutarı (olağan muafiyetlere tabi)',
@@ -1618,29 +1652,35 @@ function generateScenarioCards(
       })
     }
   }
-  
+
   // 3. Total Loss Scenario
-  const newValueClause = policy.coverages.find(c => c.name.toLowerCase().includes('yeni değer') && c.included)
+  const newValueClause = policy.coverages.find(
+    (c) => c.name.toLowerCase().includes('yeni değer') && c.included
+  )
   if (policy.type === 'kasko') {
     cards.push({
-        id: 'total-loss-scenario',
-        title: 'Total Loss Vehicle Replacement',
-        titleTR: 'Tam Hasar (Pert) Durumu',
-        description: newValueClause 
-          ? 'In a total loss, your policy promises a payout referencing the new vehicle replacement value, shielding you from normal depreciation.'
-          : 'In a total loss, the payout will be strictly constrained to the current market value (Rayiç Bedel) minus any conditionally applied deductibles.',
-        descriptionTR: newValueClause
-          ? 'Poliçenizde "Yenileme Bedeli" klozu mevcuttur. Pert durumunda poliçeniz normal değer kaybından korur.'
-          : 'Poliçeniz standart pert ödemesi içerir. Güncel rayiç bedel üzerinden, poliçedeki koşullu muafiyet kesintileri düşülerek ödeme yapılır.',
-        financialStatus: newValueClause ? 'covered' : 'partially_covered',
-        insurerPays: newValueClause ? 'New vehicle replacement cost' : 'Current Market Value (Rayiç)',
-        insurerPaysTR: newValueClause ? 'Yeni araç ikame bedeli' : 'Güncel Piyasa Değeri (Rayiç)',
-        userPays: newValueClause ? '0 TL' : 'Depreciation difference',
-        userPaysTR: newValueClause ? '0 TL' : 'Değer kaybı farkı',
-        trigger: 'Vehicle is deemed a total loss (pert).',
-        triggerTR: 'Aracın tam hasarlı (pert) sayılması.',
-        whyItMatters: newValueClause ? 'Protects against depreciation.' : 'You may not receive enough to buy the same car again.',
-        whyItMattersTR: newValueClause ? 'Değer kaybına karşı korur.' : 'Aynı aracı tekrar alabilmek için yeterli ödeme almayabilirsiniz.',
+      id: 'total-loss-scenario',
+      title: 'Total Loss Vehicle Replacement',
+      titleTR: 'Tam Hasar (Pert) Durumu',
+      description: newValueClause
+        ? 'In a total loss, your policy promises a payout referencing the new vehicle replacement value, shielding you from normal depreciation.'
+        : 'In a total loss, the payout will be strictly constrained to the current market value (Rayiç Bedel) minus any conditionally applied deductibles.',
+      descriptionTR: newValueClause
+        ? 'Poliçenizde "Yenileme Bedeli" klozu mevcuttur. Pert durumunda poliçeniz normal değer kaybından korur.'
+        : 'Poliçeniz standart pert ödemesi içerir. Güncel rayiç bedel üzerinden, poliçedeki koşullu muafiyet kesintileri düşülerek ödeme yapılır.',
+      financialStatus: newValueClause ? 'covered' : 'partially_covered',
+      insurerPays: newValueClause ? 'New vehicle replacement cost' : 'Current Market Value (Rayiç)',
+      insurerPaysTR: newValueClause ? 'Yeni araç ikame bedeli' : 'Güncel Piyasa Değeri (Rayiç)',
+      userPays: newValueClause ? '0 TL' : 'Depreciation difference',
+      userPaysTR: newValueClause ? '0 TL' : 'Değer kaybı farkı',
+      trigger: 'Vehicle is deemed a total loss (pert).',
+      triggerTR: 'Aracın tam hasarlı (pert) sayılması.',
+      whyItMatters: newValueClause
+        ? 'Protects against depreciation.'
+        : 'You may not receive enough to buy the same car again.',
+      whyItMattersTR: newValueClause
+        ? 'Değer kaybına karşı korur.'
+        : 'Aynı aracı tekrar alabilmek için yeterli ödeme almayabilirsiniz.',
     })
   }
 
@@ -1650,19 +1690,26 @@ function generateScenarioCards(
       id: 'general-deductible',
       title: 'General Claim Incident',
       titleTR: 'Genel Hasar Durumu',
-      description: policy.deductible > 0 
-        ? `You will pay the first ${policy.deductible.toLocaleString('tr-TR')} TL out of pocket for any claimed loss.` 
-        : 'You have no fixed deductible. The insurer will cover verified claims directly, subject to limits.',
-      descriptionTR: policy.deductible > 0
-        ? `Herhangi bir hasar talebinde ilk ${policy.deductible.toLocaleString('tr-TR')} TL'yi cepten ödeyeceksiniz.`
-        : 'Sabit bir muafiyetiniz yok. Sigortacı onaylanan hasarları doğrudan teminat limitleri dahilinde öder.',
+      description:
+        policy.deductible > 0
+          ? `You will pay the first ${policy.deductible.toLocaleString('tr-TR')} TL out of pocket for any claimed loss.`
+          : 'You have no fixed deductible. The insurer will cover verified claims directly, subject to limits.',
+      descriptionTR:
+        policy.deductible > 0
+          ? `Herhangi bir hasar talebinde ilk ${policy.deductible.toLocaleString('tr-TR')} TL'yi cepten ödeyeceksiniz.`
+          : 'Sabit bir muafiyetiniz yok. Sigortacı onaylanan hasarları doğrudan teminat limitleri dahilinde öder.',
       financialStatus: policy.deductible > 0 ? 'partially_covered' : 'covered',
-      riskAmount: policy.deductible > 0 ? `Up to ${policy.deductible.toLocaleString('tr-TR')} TL` : undefined,
-      riskAmountTR: policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL'ye kadar` : undefined,
+      riskAmount:
+        policy.deductible > 0 ? `Up to ${policy.deductible.toLocaleString('tr-TR')} TL` : undefined,
+      riskAmountTR:
+        policy.deductible > 0
+          ? `${policy.deductible.toLocaleString('tr-TR')} TL'ye kadar`
+          : undefined,
       insurerPays: policy.deductible > 0 ? 'Claim minus deductible' : 'Full verified claim',
       insurerPaysTR: policy.deductible > 0 ? 'Hasar eksi muafiyet' : 'Doğrulanmış hasarın tamamı',
       userPays: policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
-      userPaysTR: policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
+      userPaysTR:
+        policy.deductible > 0 ? `${policy.deductible.toLocaleString('tr-TR')} TL` : '0 TL',
       trigger: 'Any eligible claim occurs.',
       triggerTR: 'Uygun bir hasar talebinin oluşması.',
       whyItMatters: 'Shows your guaranteed out-of-pocket minimum for any claim.',
