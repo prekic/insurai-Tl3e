@@ -7,10 +7,27 @@
 
   "classification": {
     "detection_terms": {
-      "tr": ["sağlık sigortası", "sağlık poliçesi", "tamamlayıcı sağlık", "tss", "özel sağlık", "tedavi giderleri"],
-      "en": ["health insurance", "medical insurance", "healthcare", "medical expenses", "hospital cover"],
+      "tr": [
+        "sağlık sigortası",
+        "sağlık poliçesi",
+        "tamamlayıcı sağlık",
+        "tss",
+        "özel sağlık",
+        "tedavi giderleri"
+      ],
+      "en": [
+        "health insurance",
+        "medical insurance",
+        "healthcare",
+        "medical expenses",
+        "hospital cover"
+      ],
       "de": ["krankenversicherung", "gesundheitsversicherung", "krankenkasse"],
       "fr": ["assurance maladie", "assurance santé", "mutuelle santé"]
+    },
+    "exclude_if_contains": {
+      "tr": ["seyahat", "vize", "yurtdışı seyahat"],
+      "en": ["travel", "visa", "overbooking", "flight"]
     },
     "confidence_threshold": 0.6
   },
@@ -109,8 +126,8 @@
   },
 
   "quality_thresholds": {
-    "min_required_fields_rate": 0.70,
-    "min_quality_score": 0.30,
+    "min_required_fields_rate": 0.7,
+    "min_quality_score": 0.3,
     "ocr_trigger_confidence": 0.65
   }
 }

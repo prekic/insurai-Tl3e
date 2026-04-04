@@ -1601,16 +1601,38 @@ async function convertToAnalyzedPolicy(
   // Handle both camelCase (endDate) and snake_case (end_date) from AI
   const rawEndDate = data.endDate ?? (rawData.end_date as string | undefined)
   let status: 'active' | 'expiring' | 'expired' | 'pending' = 'active'
-  const expiryDateStr =
-    rawEndDate ?? new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  if (rawEndDate) {
-    const endDate = new Date(rawEndDate)
-    const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+  let expiryDateStr = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split('T')[0]
 
-    if (daysUntilExpiry < 0) {
-      status = 'expired'
-    } else if (daysUntilExpiry <= 30) {
-      status = 'expiring'
+  if (rawEndDate) {
+    let endDate = new Date(rawEndDate)
+    if (isNaN(endDate.getTime())) {
+      const parts = rawEndDate.split(/[./-]/)
+      if (parts.length === 3) {
+        if (parts[2].length === 4) {
+          endDate = new Date(
+            `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
+          )
+        } else if (parts[0].length === 4) {
+          endDate = new Date(
+            `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
+          )
+        }
+      }
+    }
+
+    if (!isNaN(endDate.getTime())) {
+      expiryDateStr = endDate.toISOString().split('T')[0]
+      const daysUntilExpiry = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+
+      if (daysUntilExpiry < 0) {
+        status = 'expired'
+      } else if (daysUntilExpiry <= 30) {
+        status = 'expiring'
+      }
+    } else {
+      expiryDateStr = rawEndDate // fallback to raw string if totally unparseable
     }
   }
 
@@ -1749,7 +1771,25 @@ async function convertToAnalyzedPolicy(
     premium: premiumValue,
     monthlyPremium: premiumValue / 12,
     deductible: coverages[0]?.deductible ?? 0,
-    startDate: data.startDate ?? (rawData.start_date as string) ?? now.toISOString().split('T')[0],
+    startDate: (() => {
+      const rawStartDate = data.startDate ?? (rawData.start_date as string)
+      if (!rawStartDate) return now.toISOString().split('T')[0]
+      let sd = new Date(rawStartDate)
+      if (isNaN(sd.getTime())) {
+        const parts = rawStartDate.split(/[./-]/)
+        if (parts.length === 3) {
+          if (parts[2].length === 4)
+            sd = new Date(
+              `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
+            )
+          else if (parts[0].length === 4)
+            sd = new Date(
+              `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
+            )
+        }
+      }
+      return !isNaN(sd.getTime()) ? sd.toISOString().split('T')[0] : rawStartDate
+    })(),
     expiryDate: expiryDateStr,
     status,
     uploadDate: now.toISOString().split('T')[0],
