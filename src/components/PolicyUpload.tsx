@@ -3,9 +3,11 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   Upload,
   FileText,
+  File,
   Check,
   X,
   Eye,
+  Plus,
   Sparkles,
   AlertTriangle,
   RefreshCw,
@@ -17,6 +19,7 @@ import {
   Stethoscope,
   CheckCircle2,
   XCircle,
+  Image as ImageIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
@@ -1138,18 +1141,18 @@ export function PolicyUpload() {
           </div>
         )}
 
-        {/* Status Badges */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        {/* Status Indicators */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mb-4">
           {health.status === 'checking' && (
-            <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-4 py-2">
-              <Server size={16} className="animate-pulse" />
-              <span>{t.upload.checkingBackend}</span>
-            </div>
+            <span className="flex items-center gap-1">
+              <Server size={12} className="animate-pulse" />
+              {t.upload.checkingBackend}
+            </span>
           )}
           {backendReady && (
-            <div className="flex items-center gap-2 text-sm text-purple-700 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2">
-              <Cpu size={16} />
-              <span>
+            <>
+              <span className="flex items-center gap-1 text-purple-600">
+                <Cpu size={12} />
                 {t.upload.aiExtractionEnabled}
                 {health.providers.openai && health.providers.anthropic
                   ? ' (OpenAI + Claude)'
@@ -1159,80 +1162,109 @@ export function PolicyUpload() {
                       ? ' (Claude)'
                       : ''}
               </span>
-            </div>
+              <span className="text-gray-300" aria-hidden="true">
+                ·
+              </span>
+            </>
           )}
           {!backendReady && health.status !== 'checking' && !isAIConfigured() && (
-            <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-4 py-2">
-              <Zap size={16} />
-              <span>{t.upload.demoModeStatus}</span>
-            </div>
+            <span className="flex items-center gap-1 text-amber-600">
+              <Zap size={12} />
+              {t.upload.demoModeStatus}
+            </span>
           )}
           {useSupabase && (
-            <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2">
-              <Cloud size={16} />
-              <span>{t.upload.cloudStorageEnabled}</span>
-            </div>
+            <span className="flex items-center gap-1 text-green-600">
+              <Cloud size={12} />
+              {t.upload.cloudStorageEnabled}
+            </span>
           )}
         </div>
 
-        {/* Upload Area */}
-        <div
-          onDragOver={(e) => {
-            e.preventDefault()
-            setIsDragging(true)
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={handleDrop}
-          className={`relative border-2 border-dashed rounded-2xl p-12 text-center transition-all mb-8 ${
-            isDragging
-              ? 'border-blue-500 bg-blue-50'
-              : 'border-gray-300 bg-white hover:border-gray-400'
-          }`}
-        >
-          <label className="cursor-pointer flex flex-col items-center gap-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-              <Upload className="text-white" size={40} />
-            </div>
-            <div>
-              <p className="text-xl font-semibold text-gray-900">{t.upload.dropHere}</p>
-              <p className="text-gray-500 mt-1">{t.upload.orClickBrowse}</p>
-            </div>
-            <div className="text-sm text-gray-400 space-y-1">
-              <p>
-                {t.upload.supportedFormats}: {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}
-              </p>
-              <p>
-                {t.upload.maxSize}: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file
-              </p>
-            </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
-              multiple
-              onChange={handleFileSelect}
-              className="hidden"
-            />
-          </label>
-        </div>
-
-        {/* Sample Policies Option */}
-        <div className="bg-gradient-to-r from-slate-50 to-blue-50 border border-slate-200 rounded-2xl p-6 mb-8">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center">
-                <Sparkles className="text-white" size={24} />
+        {/* Upload Area — collapses to compact bar when files are present */}
+        {files.length === 0 ? (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`relative border rounded-2xl p-10 text-center transition-all mb-6 ${
+              isDragging
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-200 bg-gray-50/50 hover:border-gray-300 hover:bg-blue-50/30'
+            }`}
+          >
+            <label className="cursor-pointer flex flex-col items-center gap-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <Upload className="text-white" size={28} />
               </div>
               <div>
-                <h3 className="font-semibold text-gray-900">{t.upload.useSamples}</h3>
-                <p className="text-sm text-gray-600">{t.upload.useSamplesDescription}</p>
+                <p className="text-xl font-semibold text-gray-900">{t.upload.dropHere}</p>
+                <p className="text-blue-500 hover:text-blue-700 underline underline-offset-2 mt-1 text-sm">
+                  {t.upload.browseFiles}
+                </p>
               </div>
-            </div>
-            <Button onClick={useSamplePolicies} variant="outline">
-              Use Samples
-            </Button>
+              <div className="text-sm text-gray-400 space-y-1">
+                <p>
+                  {t.upload.supportedFormats}: {FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(', ')}
+                </p>
+                <p>
+                  {t.upload.maxSize}: {FILE_CONSTRAINTS.MAX_SIZE_MB}MB per file
+                </p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </label>
           </div>
-        </div>
+        ) : (
+          <div
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            className={`border border-dashed rounded-xl p-3 text-center transition-all mb-4 ${
+              isDragging
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+            }`}
+          >
+            <label className="cursor-pointer flex items-center justify-center gap-2 text-sm text-gray-500 hover:text-blue-600">
+              <Plus size={16} />
+              <span>{t.upload.addMoreFiles}</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={FILE_CONSTRAINTS.ALLOWED_EXTENSIONS.join(',')}
+                multiple
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </label>
+          </div>
+        )}
+
+        {/* Sample Policies — subtle text link, hidden when files are present */}
+        {files.length === 0 && (
+          <p className="text-center text-sm text-gray-400 mb-6">
+            {t.upload.orTrySamples}{' '}
+            <button
+              onClick={useSamplePolicies}
+              className="text-blue-500 hover:text-blue-700 underline underline-offset-2 transition-colors"
+            >
+              {t.upload.useSamplesLink}
+            </button>
+          </p>
+        )}
 
         {/* Error Summary */}
         {errorCount > 0 && (
@@ -1267,10 +1299,11 @@ export function PolicyUpload() {
             <div className="p-4 border-b border-gray-100 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-gray-900">
-                  {t.upload.uploadedFiles} ({completedCount}/{files.length} {t.upload.analyzed})
+                  {t.upload.uploadedFiles} ({completedCount}/{files.length})
                 </h3>
                 {processingCount > 0 && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-purple-600 flex items-center gap-1">
+                    <Sparkles size={12} className="animate-pulse" />
                     {processingCount} {t.upload.processingFiles}
                   </p>
                 )}
@@ -1296,8 +1329,12 @@ export function PolicyUpload() {
                   >
                     {uploadedFile.status === 'error' ? (
                       <AlertTriangle className="text-red-600" size={24} />
+                    ) : uploadedFile.file.type === 'application/pdf' ? (
+                      <FileText className="text-red-500" size={24} />
+                    ) : uploadedFile.file.type.startsWith('image/') ? (
+                      <ImageIcon className="text-blue-500" size={24} />
                     ) : (
-                      <FileText className="text-gray-600" size={24} />
+                      <File className="text-gray-500" size={24} />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1317,10 +1354,15 @@ export function PolicyUpload() {
                         </>
                       )}
                       {uploadedFile.status === 'analyzing' && (
-                        <span className="text-purple-600 flex items-center gap-1">
-                          <Sparkles size={14} className="animate-pulse" />
-                          {t.upload.aiAnalyzingStatus}
-                        </span>
+                        <div className="flex flex-col gap-1.5 w-full">
+                          <span className="text-purple-600 flex items-center gap-1 text-sm">
+                            <Sparkles size={14} className="animate-pulse" />
+                            {t.upload.aiAnalyzingStatus}
+                          </span>
+                          <div className="w-full h-1.5 bg-purple-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-purple-400 rounded-full shimmer-bar" />
+                          </div>
+                        </div>
                       )}
                       {uploadedFile.status === 'complete' && uploadedFile.awaitingResolution && (
                         <span className="text-amber-600 flex items-center gap-1">
@@ -1406,9 +1448,9 @@ export function PolicyUpload() {
                       )}
                     <button
                       onClick={() => removeFile(uploadedFile.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      aria-label="Remove file"
-                      title="Remove"
+                      className="p-2.5 -m-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      aria-label={t.upload.removeFile}
+                      title={t.upload.removeFile}
                     >
                       <X size={18} />
                     </button>

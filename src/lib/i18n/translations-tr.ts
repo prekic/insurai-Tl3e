@@ -513,6 +513,10 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     removeFile: 'Dosyayı kaldır',
     useSamples: 'Örnek Poliçelerle Dene',
     useSamplesDescription: "InsurAI'ın Türk sigorta poliçelerini nasıl analiz ettiğini görün",
+    useSamplesLink: 'örnek poliçeler',
+    orTrySamples: 'Veya deneyin:',
+    addMoreFiles: 'Daha fazla dosya ekle',
+    browseFiles: 'Dosyalara göz atın',
     uploadPolicy: 'Poliçe Yükle',
     // Toast mesajları
     filesAccepted: 'dosya kabul edildi',
