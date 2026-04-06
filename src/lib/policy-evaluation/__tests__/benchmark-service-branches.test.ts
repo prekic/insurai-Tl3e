@@ -41,12 +41,15 @@ import {
   isValueBasedBenchmark,
   getPremiumBenchmarkWithFallback,
 } from '../benchmark-service'
+import * as benchmarkServiceModule from '../benchmark-service'
 
 // =============================================================================
 // MOCK DATA FACTORIES
 // =============================================================================
 
-function createMockDbRow(overrides: Partial<Record<string, unknown>> = {}): Record<string, unknown> {
+function createMockDbRow(
+  overrides: Partial<Record<string, unknown>> = {}
+): Record<string, unknown> {
   return {
     id: 'bench-1',
     insurance_type: 'kasko',
@@ -112,7 +115,7 @@ describe('Benchmark Service - Branch Coverage', () => {
       const result = getPremiumBenchmark('nonexistent')
       expect(result).toBeUndefined()
       // Wait for the background refresh to complete so it doesn't pollute the next test
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
     })
 
     it('should use cached data without refresh when cache is populated and fresh', async () => {
@@ -325,7 +328,7 @@ describe('Benchmark Service - Branch Coverage', () => {
 
       const kasko = getBenchmarksByType('kasko')
       expect(kasko).toHaveLength(2)
-      expect(kasko.every(b => b.insuranceType === 'kasko')).toBe(true)
+      expect(kasko.every((b) => b.insuranceType === 'kasko')).toBe(true)
     })
 
     it('should return empty array for unknown type', async () => {
@@ -347,17 +350,17 @@ describe('Benchmark Service - Branch Coverage', () => {
     beforeEach(async () => {
       mockSupabaseResponse.mockResolvedValue({
         data: [
-          createMockBenchmarkRow('kasko', null),           // General kasko
-          createMockBenchmarkRow('kasko', 'automobile'),   // Kasko automobile subtype
-          createMockBenchmarkRow('kasko', 'suv'),          // Kasko SUV subtype
-          createMockBenchmarkRow('zmss', null),            // General traffic
-          createMockBenchmarkRow('zmss', 'automobile'),    // Traffic automobile
-          createMockBenchmarkRow('dask', null),            // DASK general
-          createMockBenchmarkRow('dask', 'apartment'),     // DASK apartment
-          createMockBenchmarkRow('health', null),          // Health general
-          createMockBenchmarkRow('home', null),            // Home general
-          createMockBenchmarkRow('home', 'villa'),         // Home villa
-          createMockBenchmarkRow('business', null),        // Business general
+          createMockBenchmarkRow('kasko', null), // General kasko
+          createMockBenchmarkRow('kasko', 'automobile'), // Kasko automobile subtype
+          createMockBenchmarkRow('kasko', 'suv'), // Kasko SUV subtype
+          createMockBenchmarkRow('zmss', null), // General traffic
+          createMockBenchmarkRow('zmss', 'automobile'), // Traffic automobile
+          createMockBenchmarkRow('dask', null), // DASK general
+          createMockBenchmarkRow('dask', 'apartment'), // DASK apartment
+          createMockBenchmarkRow('health', null), // Health general
+          createMockBenchmarkRow('home', null), // Home general
+          createMockBenchmarkRow('home', 'villa'), // Home villa
+          createMockBenchmarkRow('business', null), // Business general
         ],
         error: null,
       })
@@ -489,7 +492,13 @@ describe('Benchmark Service - Branch Coverage', () => {
 
     it('should include value rate fields when present', async () => {
       mockSupabaseResponse.mockResolvedValue({
-        data: [createMockBenchmarkRow('kasko_vb', null, 'value_based', { min: 0.01, avg: 0.025, max: 0.05 })],
+        data: [
+          createMockBenchmarkRow('kasko_vb', null, 'value_based', {
+            min: 0.01,
+            avg: 0.025,
+            max: 0.05,
+          }),
+        ],
         error: null,
       })
       await refreshBenchmarks()
@@ -534,7 +543,7 @@ describe('Benchmark Service - Branch Coverage', () => {
     it('should return all benchmarks for a given type', () => {
       const result = getAllBenchmarksForType('kasko')
       expect(result).toHaveLength(3)
-      expect(result.every(b => b.insuranceType === 'kasko')).toBe(true)
+      expect(result.every((b) => b.insuranceType === 'kasko')).toBe(true)
     })
 
     it('should return empty array for non-existent type', () => {
@@ -544,7 +553,7 @@ describe('Benchmark Service - Branch Coverage', () => {
 
     it('should map vehicleClass for zmss/kasko types', () => {
       const kaskoResults = getAllBenchmarksForType('kasko')
-      const autoResult = kaskoResults.find(b => b.vehicleClass === 'automobile')
+      const autoResult = kaskoResults.find((b) => b.vehicleClass === 'automobile')
       expect(autoResult).toBeDefined()
       expect(autoResult?.propertyType).toBeUndefined()
     })
@@ -584,7 +593,13 @@ describe('Benchmark Service - Branch Coverage', () => {
 
     it('should include comparisonMethod and value rates in output', async () => {
       mockSupabaseResponse.mockResolvedValue({
-        data: [createMockBenchmarkRow('custom', null, 'value_based', { min: 0.01, avg: 0.02, max: 0.03 })],
+        data: [
+          createMockBenchmarkRow('custom', null, 'value_based', {
+            min: 0.01,
+            avg: 0.02,
+            max: 0.03,
+          }),
+        ],
         error: null,
       })
       await refreshBenchmarks()
@@ -694,9 +709,9 @@ describe('Benchmark Service - Branch Coverage', () => {
       year: 2026,
       source: 'Test',
       comparisonMethod: 'value_based',
-      valueMinRate: 0.015,  // 1.5%
-      valueAvgRate: 0.025,  // 2.5%
-      valueMaxRate: 0.04,   // 4%
+      valueMinRate: 0.015, // 1.5%
+      valueAvgRate: 0.025, // 2.5%
+      valueMaxRate: 0.04, // 4%
     }
 
     describe('Fallback when value rates not available', () => {
@@ -897,12 +912,14 @@ describe('Benchmark Service - Branch Coverage', () => {
   describe('getPremiumBenchmarkWithFallback', () => {
     it('should return DB benchmark when available', async () => {
       mockSupabaseResponse.mockResolvedValue({
-        data: [createMockDbRow({
-          insurance_type: 'kasko',
-          min_premium: 7777,
-          avg_premium: 12222,
-          max_premium: 18888,
-        })],
+        data: [
+          createMockDbRow({
+            insurance_type: 'kasko',
+            min_premium: 7777,
+            avg_premium: 12222,
+            max_premium: 18888,
+          }),
+        ],
         error: null,
       })
       await refreshBenchmarks()
@@ -944,12 +961,14 @@ describe('Benchmark Service - Branch Coverage', () => {
 
     it('should prefer DB data over hardcoded data', async () => {
       mockSupabaseResponse.mockResolvedValue({
-        data: [createMockDbRow({
-          insurance_type: 'zmss',
-          min_premium: 9999,
-          avg_premium: 19999,
-          max_premium: 29999,
-        })],
+        data: [
+          createMockDbRow({
+            insurance_type: 'zmss',
+            min_premium: 9999,
+            avg_premium: 19999,
+            max_premium: 29999,
+          }),
+        ],
         error: null,
       })
       await refreshBenchmarks()
@@ -1051,7 +1070,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
       const policy = createPolicy({
         coverage: 500000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 500000, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 500000,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
           { name: 'Theft', nameTr: 'Hırsızlık', limit: 500000, deductible: 0, included: true },
         ],
       })
@@ -1074,7 +1100,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
     it('should award bonus for unlimited liability', () => {
       const policy = createPolicy({
         coverages: [
-          { name: 'Artan Mali Sorumluluk', nameTr: 'Artan Mali Sorumluluk', limit: 0, deductible: 0, included: true, isUnlimited: true },
+          {
+            name: 'Artan Mali Sorumluluk',
+            nameTr: 'Artan Mali Sorumluluk',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isUnlimited: true,
+          },
           { name: 'Collision', nameTr: 'Çarpışma', limit: 200000, deductible: 0, included: true },
         ],
       })
@@ -1088,7 +1121,13 @@ describe('Evaluator - Additional Branch Coverage', () => {
       const policy = createPolicy({
         coverages: [
           { name: 'Collision', nameTr: 'Çarpışma', limit: 200000, deductible: 0, included: true },
-          { name: 'Increased Liability', nameTr: 'Artan Mali Sorumluluk', limit: 100000, deductible: 0, included: true },
+          {
+            name: 'Increased Liability',
+            nameTr: 'Artan Mali Sorumluluk',
+            limit: 100000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Ferdi Kaza', nameTr: 'Ferdi Kaza', limit: 50000, deductible: 0, included: true },
         ],
       })
@@ -1101,7 +1140,13 @@ describe('Evaluator - Additional Branch Coverage', () => {
       const policy = createPolicy({
         coverages: [
           { name: 'Collision', nameTr: 'Çarpışma', limit: 200000, deductible: 0, included: true },
-          { name: 'Increased Liability', nameTr: 'Artan Mali Sorumluluk', limit: 100000, deductible: 0, included: true },
+          {
+            name: 'Increased Liability',
+            nameTr: 'Artan Mali Sorumluluk',
+            limit: 100000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Ferdi Kaza', nameTr: 'Ferdi Kaza', limit: 50000, deductible: 0, included: true },
           { name: 'İkame Araç', nameTr: 'İkame Araç', limit: 0, deductible: 0, included: true },
         ],
@@ -1115,9 +1160,21 @@ describe('Evaluator - Additional Branch Coverage', () => {
       const policy = createPolicy({
         coverages: [
           { name: 'Collision', nameTr: 'Çarpışma', limit: 200000, deductible: 0, included: true },
-          { name: 'Increased Liability', nameTr: 'Artan Mali Sorumluluk', limit: 100000, deductible: 0, included: true },
+          {
+            name: 'Increased Liability',
+            nameTr: 'Artan Mali Sorumluluk',
+            limit: 100000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Ferdi Kaza', nameTr: 'Ferdi Kaza', limit: 50000, deductible: 0, included: true },
-          { name: 'Hukuki Koruma', nameTr: 'Hukuki Koruma', limit: 20000, deductible: 0, included: true },
+          {
+            name: 'Hukuki Koruma',
+            nameTr: 'Hukuki Koruma',
+            limit: 20000,
+            deductible: 0,
+            included: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1137,7 +1194,13 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverage: 1000000,
         premium: 10000, // Ratio = 100
         coverages: [
-          { name: 'Hospitalization', nameTr: 'Yatarak Tedavi', limit: 500000, deductible: 0, included: true },
+          {
+            name: 'Hospitalization',
+            nameTr: 'Yatarak Tedavi',
+            limit: 500000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Surgery', nameTr: 'Ameliyat', limit: 500000, deductible: 0, included: true },
         ],
       })
@@ -1152,13 +1215,21 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverage: 50000,
         premium: 10000, // Ratio = 5
         coverages: [
-          { name: 'Hospitalization', nameTr: 'Yatarak Tedavi', limit: 50000, deductible: 5000, included: true },
+          {
+            name: 'Hospitalization',
+            nameTr: 'Yatarak Tedavi',
+            limit: 50000,
+            deductible: 5000,
+            included: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.toLowerCase().includes('low relative to premium')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) =>
+          i.toLowerCase().includes('low relative to premium')
+        )
+      ).toBe(true)
     })
 
     it('should penalize non-kasko with fewer than 3 coverages', () => {
@@ -1172,9 +1243,11 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.toLowerCase().includes('limited number')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) =>
+          i.toLowerCase().includes('limited number')
+        )
+      ).toBe(true)
     })
 
     it('should penalize non-kasko with many low-limit coverages', () => {
@@ -1186,14 +1259,20 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverages: [
           { name: 'Fire', nameTr: 'Yangın', limit: 10000, deductible: 0, included: true },
           { name: 'Theft', nameTr: 'Hırsızlık', limit: 20000, deductible: 0, included: true },
-          { name: 'Water Damage', nameTr: 'Su Hasarı', limit: 15000, deductible: 0, included: true },
+          {
+            name: 'Water Damage',
+            nameTr: 'Su Hasarı',
+            limit: 15000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Glass', nameTr: 'Cam', limit: 5000, deductible: 0, included: true },
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.toLowerCase().includes('low limits')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) => i.toLowerCase().includes('low limits'))
+      ).toBe(true)
     })
   })
 
@@ -1239,7 +1318,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
         deductible: 3000,
         premium: 10000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1252,7 +1338,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
         deductible: 7000,
         premium: 10000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1265,7 +1358,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
         deductible: 15000,
         premium: 10000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1279,7 +1379,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
         deductible: 35000,
         premium: 10000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1293,7 +1400,14 @@ describe('Evaluator - Additional Branch Coverage', () => {
         deductible: 60000,
         premium: 10000,
         coverages: [
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1379,9 +1493,22 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverages: [
           { name: 'Yol Yardım', nameTr: 'Yol Yardım', limit: 0, deductible: 0, included: true },
           { name: 'İkame Araç', nameTr: 'İkame Araç', limit: 0, deductible: 0, included: true },
-          { name: 'Hukuki Koruma', nameTr: 'Hukuki Koruma', limit: 0, deductible: 0, included: true },
+          {
+            name: 'Hukuki Koruma',
+            nameTr: 'Hukuki Koruma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Cam', nameTr: 'Cam', limit: 10000, deductible: 0, included: true },
-          { name: 'Collision', nameTr: 'Çarpışma', limit: 0, deductible: 0, included: true, isMarketValue: true },
+          {
+            name: 'Collision',
+            nameTr: 'Çarpışma',
+            limit: 0,
+            deductible: 0,
+            included: true,
+            isMarketValue: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
@@ -1395,7 +1522,13 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverage: 2000000,
         premium: 10000, // 200x ratio
         coverages: [
-          { name: 'Hospitalization', nameTr: 'Yatarak', limit: 2000000, deductible: 0, included: true },
+          {
+            name: 'Hospitalization',
+            nameTr: 'Yatarak',
+            limit: 2000000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Surgery', nameTr: 'Ameliyat', limit: 1000000, deductible: 0, included: true },
         ],
       })
@@ -1411,14 +1544,22 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverage: 50000,
         premium: 10000, // 5x ratio
         coverages: [
-          { name: 'Hospitalization', nameTr: 'Yatarak', limit: 50000, deductible: 5000, included: true },
+          {
+            name: 'Hospitalization',
+            nameTr: 'Yatarak',
+            limit: 50000,
+            deductible: 5000,
+            included: true,
+          },
         ],
         exclusions: Array.from({ length: 12 }, (_, i) => `Exclusion ${i}`),
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.value.issues.some(i =>
-        i.toLowerCase().includes('low coverage-to-premium')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.value.issues.some((i) =>
+          i.toLowerCase().includes('low coverage-to-premium')
+        )
+      ).toBe(true)
     })
   })
 
@@ -1426,22 +1567,62 @@ describe('Evaluator - Additional Branch Coverage', () => {
   // Premium evaluation - direct comparison branches
   // =========================================================================
   describe('Premium direct comparison branches', () => {
+    const CURRENT_DATA_DATE = new Date().toISOString().split('T')[0]
+
+    beforeEach(() => {
+      // Override benchmark to return trusted status with fresh dataDate
+      // so the evaluator exercises the direct premium comparison path
+      vi.spyOn(benchmarkServiceModule, 'getPremiumBenchmarkWithFallback').mockReturnValue({
+        insuranceType: 'zmss',
+        minPremium: 800,
+        avgPremium: 2500,
+        maxPremium: 6000,
+        currency: 'TRY',
+        year: 2026,
+        source: 'test',
+        comparisonMethod: 'direct_premium',
+        dataDate: CURRENT_DATA_DATE,
+        benchmarkStatus: 'trusted',
+      })
+    })
+
+    afterEach(() => {
+      vi.restoreAllMocks()
+    })
+
     it('should handle premium below market minimum', () => {
       // For traffic insurance, use direct premium comparison
+      // Provide 3+ context factors to avoid confidence suppression
       const policy = createPolicy({
         type: 'traffic',
         typeTr: 'Trafik',
         coverage: 1500000,
-        premium: 100, // Suspiciously low
+        premium: 100, // Suspiciously low — below minPremium (800)
+        location: 'Istanbul',
+        vehicleInfo: { vehicleClass: 'sedan', year: 2024 },
         coverages: [
-          { name: 'Bodily Injury', nameTr: 'Bedensel', limit: 1000000, deductible: 0, included: true },
-          { name: 'Material Damage', nameTr: 'Maddi', limit: 500000, deductible: 0, included: true },
+          {
+            name: 'Bodily Injury',
+            nameTr: 'Bedensel',
+            limit: 1000000,
+            deductible: 0,
+            included: true,
+          },
+          {
+            name: 'Material Damage',
+            nameTr: 'Maddi',
+            limit: 500000,
+            deductible: 0,
+            included: true,
+          },
         ],
-      })
+      } as Partial<Policy>)
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.premium.issues.some(i =>
-        i.toLowerCase().includes('below market minimum')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.premium.issues.some((i) =>
+          i.toLowerCase().includes('below market minimum')
+        )
+      ).toBe(true)
     })
 
     it('should handle premium above market maximum', () => {
@@ -1449,16 +1630,32 @@ describe('Evaluator - Additional Branch Coverage', () => {
         type: 'traffic',
         typeTr: 'Trafik',
         coverage: 1500000,
-        premium: 999999, // Way above max
+        premium: 999999, // Way above maxPremium (6000)
+        location: 'Istanbul',
+        vehicleInfo: { vehicleClass: 'sedan', year: 2024 },
         coverages: [
-          { name: 'Bodily Injury', nameTr: 'Bedensel', limit: 1000000, deductible: 0, included: true },
-          { name: 'Material Damage', nameTr: 'Maddi', limit: 500000, deductible: 0, included: true },
+          {
+            name: 'Bodily Injury',
+            nameTr: 'Bedensel',
+            limit: 1000000,
+            deductible: 0,
+            included: true,
+          },
+          {
+            name: 'Material Damage',
+            nameTr: 'Maddi',
+            limit: 500000,
+            deductible: 0,
+            included: true,
+          },
         ],
-      })
+      } as Partial<Policy>)
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.premium.issues.some(i =>
-        i.toLowerCase().includes('exceeds typical market range')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.premium.issues.some((i) =>
+          i.toLowerCase().includes('exceeds typical market range')
+        )
+      ).toBe(true)
     })
   })
 
@@ -1473,8 +1670,20 @@ describe('Evaluator - Additional Branch Coverage', () => {
         coverage: 500000,
         premium: 8000,
         coverages: [
-          { name: 'Cargo Damage', nameTr: 'Emtia Hasarı', limit: 300000, deductible: 5000, included: true },
-          { name: 'Loading/Unloading', nameTr: 'Yükleme/Boşaltma', limit: 100000, deductible: 2000, included: true },
+          {
+            name: 'Cargo Damage',
+            nameTr: 'Emtia Hasarı',
+            limit: 300000,
+            deductible: 5000,
+            included: true,
+          },
+          {
+            name: 'Loading/Unloading',
+            nameTr: 'Yükleme/Boşaltma',
+            limit: 100000,
+            deductible: 2000,
+            included: true,
+          },
           { name: 'Theft', nameTr: 'Hırsızlık', limit: 100000, deductible: 1000, included: true },
         ],
       })
@@ -1541,7 +1750,7 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      const complianceRecs = result.recommendations.filter(r => r.type === 'compliance')
+      const complianceRecs = result.recommendations.filter((r) => r.type === 'compliance')
       expect(complianceRecs.length).toBeGreaterThan(0)
     })
 
@@ -1554,17 +1763,41 @@ describe('Evaluator - Additional Branch Coverage', () => {
           { name: 'Collision', nameTr: 'Çarpışma', limit: 300000, deductible: 500, included: true },
           { name: 'Theft', nameTr: 'Hırsızlık', limit: 300000, deductible: 500, included: true },
           { name: 'Fire', nameTr: 'Yangın', limit: 300000, deductible: 0, included: true },
-          { name: 'Natural Disasters', nameTr: 'Doğal Afetler', limit: 200000, deductible: 1000, included: true },
+          {
+            name: 'Natural Disasters',
+            nameTr: 'Doğal Afetler',
+            limit: 200000,
+            deductible: 1000,
+            included: true,
+          },
           { name: 'Glass', nameTr: 'Cam', limit: 20000, deductible: 0, included: true },
-          { name: 'Roadside Assistance', nameTr: 'Yol Yardım', limit: 5000, deductible: 0, included: true },
-          { name: 'Legal Protection', nameTr: 'Hukuki Koruma', limit: 50000, deductible: 0, included: true },
-          { name: 'Increased Liability', nameTr: 'Artan Mali Sorumluluk', limit: 100000, deductible: 0, included: true },
+          {
+            name: 'Roadside Assistance',
+            nameTr: 'Yol Yardım',
+            limit: 5000,
+            deductible: 0,
+            included: true,
+          },
+          {
+            name: 'Legal Protection',
+            nameTr: 'Hukuki Koruma',
+            limit: 50000,
+            deductible: 0,
+            included: true,
+          },
+          {
+            name: 'Increased Liability',
+            nameTr: 'Artan Mali Sorumluluk',
+            limit: 100000,
+            deductible: 0,
+            included: true,
+          },
           { name: 'Ferdi Kaza', nameTr: 'Ferdi Kaza', limit: 50000, deductible: 0, included: true },
         ],
         exclusions: [],
       })
       const result = evaluatePolicy(policy)
-      const positiveRec = result.recommendations.find(r => r.title === 'Policy Well-Structured')
+      const positiveRec = result.recommendations.find((r) => r.title === 'Policy Well-Structured')
       // If the policy scores well in all areas, it should get a positive recommendation
       if (result.scoreBreakdown.premium.score >= 70 && result.scoreBreakdown.coverage.score >= 70) {
         expect(positiveRec).toBeDefined()
@@ -1584,7 +1817,7 @@ describe('Evaluator - Additional Branch Coverage', () => {
         })),
       })
       const result = evaluatePolicy(policy)
-      const premiumRec = result.recommendations.find(r => r.type === 'review_premium')
+      const premiumRec = result.recommendations.find((r) => r.type === 'review_premium')
       // Should be undefined because isComprehensivePolicy is true
       expect(premiumRec).toBeUndefined()
     })
@@ -1600,8 +1833,12 @@ describe('Evaluator - Additional Branch Coverage', () => {
       })
       const result = evaluatePolicy(policy)
       // Zero deductible should result in "Strong deductible" strength
-      expect(result.summary.strengths.some(s => s.toLowerCase().includes('deductible'))).toBe(true)
-      expect(result.summary.strengthsTR.some(s => s.toLowerCase().includes('muafiyet'))).toBe(true)
+      expect(result.summary.strengths.some((s) => s.toLowerCase().includes('deductible'))).toBe(
+        true
+      )
+      expect(result.summary.strengthsTR.some((s) => s.toLowerCase().includes('muafiyet'))).toBe(
+        true
+      )
     })
 
     it('should include weaknesses for categories with score < 60', () => {
@@ -1637,12 +1874,18 @@ describe('Evaluator - Additional Branch Coverage', () => {
         startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         expiryDate: new Date(now.getTime() + 335 * 24 * 60 * 60 * 1000).toISOString(),
         coverages: [
-          { name: 'Earthquake', nameTr: 'Deprem', limit: 10000000, deductible: 200000, included: true },
+          {
+            name: 'Earthquake',
+            nameTr: 'Deprem',
+            limit: 10000000,
+            deductible: 200000,
+            included: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
-      const regulatoryIssue = result.compliance.issues.find(i =>
-        i.type === 'regulatory' && i.description.includes('DASK maximum')
+      const regulatoryIssue = result.compliance.issues.find(
+        (i) => i.type === 'regulatory' && i.description.includes('DASK maximum')
       )
       expect(regulatoryIssue).toBeDefined()
     })
@@ -1658,12 +1901,18 @@ describe('Evaluator - Additional Branch Coverage', () => {
         startDate: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString(),
         expiryDate: new Date(now.getTime() + 335 * 24 * 60 * 60 * 1000).toISOString(),
         coverages: [
-          { name: 'Earthquake', nameTr: 'Deprem', limit: 500000, deductible: 50000, included: true },
+          {
+            name: 'Earthquake',
+            nameTr: 'Deprem',
+            limit: 500000,
+            deductible: 50000,
+            included: true,
+          },
         ],
       })
       const result = evaluatePolicy(policy)
-      const deductibleIssue = result.compliance.issues.find(i =>
-        i.type === 'regulatory' && i.description.includes('DASK deductible')
+      const deductibleIssue = result.compliance.issues.find(
+        (i) => i.type === 'regulatory' && i.description.includes('DASK deductible')
       )
       expect(deductibleIssue).toBeDefined()
     })
@@ -1684,9 +1933,9 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.includes('Missing essential')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) => i.includes('Missing essential'))
+      ).toBe(true)
     })
 
     it('should flag missing essential coverages for business policy', () => {
@@ -1700,9 +1949,9 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.includes('Missing essential')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) => i.includes('Missing essential'))
+      ).toBe(true)
     })
 
     it('should flag missing essential coverages for nakliyat policy', () => {
@@ -1716,9 +1965,9 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      expect(result.scoreBreakdown.coverage.issues.some(i =>
-        i.includes('Missing essential')
-      )).toBe(true)
+      expect(
+        result.scoreBreakdown.coverage.issues.some((i) => i.includes('Missing essential'))
+      ).toBe(true)
     })
 
     it('should show recommended (not essential) coverage for kasko', () => {
@@ -1732,7 +1981,7 @@ describe('Evaluator - Additional Branch Coverage', () => {
         ],
       })
       const result = evaluatePolicy(policy)
-      const recIssues = result.scoreBreakdown.coverage.issues.filter(i =>
+      const recIssues = result.scoreBreakdown.coverage.issues.filter((i) =>
         i.includes('Recommended coverage')
       )
       // Should have "Recommended" not "Missing essential" for kasko
