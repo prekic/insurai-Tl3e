@@ -3,18 +3,18 @@ on:
     branches:
       - main
 
+name: release-please
+
 permissions:
   contents: write
   pull-requests: write
 
-name: release-please
-
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - uses: googleapis/release-please-action@v4
         with:
-          # This specifies that we want to manage a node project
-          # which will automatically bump the version in package.json
           release-type: node
