@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Upload, FileText, Sparkles, Clock, XCircle, Shield, AlertTriangle } from 'lucide-react'
+import { Upload, Sparkles, Clock, XCircle, Shield, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from './ui/button'
 import { validateFiles, getErrorMessage, FILE_CONSTRAINTS } from '@/lib/errors'
@@ -9,6 +9,8 @@ import { extractPolicyFromDocument, isAIConfigured, preloadPdfJs } from '@/lib/a
 import { getProxyUrl } from '@/lib/ai/proxy-utils'
 import { createProcessingLogger } from '@/lib/processing-logger'
 import { createProcessingLog, updateProcessingLog } from '@/lib/processing-log-api'
+import { AnalysisProgressCard } from './analysis/AnalysisProgressCard'
+import type { DocumentProcessingLog } from '@/types/processing-log'
 import { useBackendHealth } from '@/hooks/useBackendHealth'
 import { useAuth } from '@/lib/supabase/auth-context'
 import { useTranslation } from '@/lib/i18n/i18n-context'
@@ -57,6 +59,11 @@ export function TryAnalysis() {
       isMounted.current = false
       if (timeoutIdRef.current) clearTimeout(timeoutIdRef.current)
       if (intervalIdRef.current) clearInterval(intervalIdRef.current)
+      // Detach the live-progress listener if still attached
+      if (unsubscribeStageRef.current) {
+        unsubscribeStageRef.current()
+        unsubscribeStageRef.current = null
+      }
       // NOTE: We intentionally do NOT abort the extraction on unmount.
       // If the user navigates away during extraction, the fetch continues
       // in the background. When it completes, saveTrialResult() persists
@@ -67,11 +74,20 @@ export function TryAnalysis() {
   }, [])
 
   const [state, setState] = useState<AnalysisState>('idle')
-  const [progress, setProgress] = useState(0)
-  const [progressMessage, setProgressMessage] = useState('')
+  // Legacy progress/message state — still set by extraction flow for telemetry
+  // but not rendered in UI (replaced by AnalysisProgressCard which derives
+  // truthful progress from the live processingLog stage events).
+  const [, setProgress] = useState(0)
+  const [, setProgressMessage] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  // Live processing log snapshot for the new pipeline visualization (drives AnalysisProgressCard)
+  const [processingLog, setProcessingLog] = useState<DocumentProcessingLog | null>(null)
+  // Captured at analysis start for the live elapsed-time chip
+  const startTimeRef = useRef<number>(0)
+  // Holds the latest unsubscribe so we can detach on completion / unmount
+  const unsubscribeStageRef = useRef<(() => void) | null>(null)
 
   // Track page view on mount
   useEffect(() => {
@@ -154,6 +170,9 @@ export function TryAnalysis() {
       setProgress(10)
       setProgressMessage(t.tryAnalysis.preparingDocument)
       setError(null)
+      // Capture start time for the live elapsed-time chip
+      startTimeRef.current = Date.now()
+      setProcessingLog(null)
 
       // Create processing logger for admin dashboard tracking
       const logger = createProcessingLogger({
@@ -162,6 +181,14 @@ export function TryAnalysis() {
         mime_type: file.type,
         user_id: user?.id,
       })
+
+      // Subscribe to live stage transitions so AnalysisProgressCard can render
+      // a truthful, multi-stage pipeline visualization. Capture unsubscribe in
+      // a ref so we can detach on completion / unmount and avoid leaks.
+      const unsubscribe = logger.onStageChange((latest) => {
+        if (isMounted.current) setProcessingLog(latest)
+      })
+      unsubscribeStageRef.current = unsubscribe
 
       // Set up persistence callback (same pattern as PolicyUpload)
       let logCreatePromise: Promise<boolean> | null = null
@@ -372,6 +399,11 @@ export function TryAnalysis() {
 
         // Mark processing as complete
         logger.complete()
+        // Detach live-progress listener — extraction is finished
+        if (unsubscribeStageRef.current) {
+          unsubscribeStageRef.current()
+          unsubscribeStageRef.current = null
+        }
 
         trackTrialAnalysisCompleted(policy.type, policy.aiConfidence, policy.coverages?.length || 0)
 
@@ -407,6 +439,11 @@ export function TryAnalysis() {
         })
       } catch (err) {
         if (progressInterval) clearInterval(progressInterval)
+        // Detach live-progress listener on error too
+        if (unsubscribeStageRef.current) {
+          unsubscribeStageRef.current()
+          unsubscribeStageRef.current = null
+        }
 
         extractionInFlightRef.current = false
 
@@ -674,43 +711,13 @@ export function TryAnalysis() {
               </Button>
             </div>
           ) : state === 'uploading' || state === 'analyzing' ? (
-            <div className="p-8">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <FileText className="text-blue-600" size={24} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-gray-900 truncate">{selectedFile?.name}</p>
-                  <p className="text-sm text-gray-500">{progressMessage}</p>
-                </div>
-              </div>
-
-              {/* Progress bar */}
-              <div className="relative h-3 bg-gray-100 rounded-full overflow-hidden mb-2">
-                <div
-                  className="absolute inset-y-0 left-0 bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-300 rounded-full"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-              <p className="text-sm text-gray-500 text-center">
-                {Math.round(progress)}
-                {t.tryAnalysis.percentComplete}
-              </p>
-
-              {/* Analyzing animation */}
-              {state === 'analyzing' && (
-                <div className="mt-6 flex justify-center">
-                  <div className="flex items-center gap-3 px-4 py-2 bg-indigo-50 rounded-full">
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" />
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.1s]" />
-                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:0.2s]" />
-                    <span className="text-sm text-indigo-700 ml-2">
-                      {t.tryAnalysis.aiAnalyzing}
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
+            <AnalysisProgressCard
+              fileName={selectedFile?.name || ''}
+              fileSizeBytes={selectedFile?.size}
+              log={processingLog}
+              state={state}
+              startTimeMs={startTimeRef.current}
+            />
           ) : (
             <div
               className={`p-8 transition-colors ${isDragging ? 'bg-blue-50' : 'bg-white'}`}

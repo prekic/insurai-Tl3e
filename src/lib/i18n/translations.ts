@@ -1084,6 +1084,18 @@ export interface TranslationDictionary {
     tryAgain: string
     percentComplete: string
     aiAnalyzing: string
+    preparingToAnalyze: string
+    elapsed: string
+    detectedPages: string
+    detectedProvider: string
+    detectedLanguage: string
+    tips: {
+      tip1: string
+      tip2: string
+      tip3: string
+      tip4: string
+      tip5: string
+    }
     dropFileHere: string
     uploadYourPolicy: string
     dragDropOrClick: string

@@ -28,6 +28,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('@/lib/i18n/i18n-context', () => ({
   useTranslation: () => ({ t: EN_TRANSLATIONS, locale: 'en', isLoading: false }),
+  useI18n: () => ({ locale: 'en', setLocale: vi.fn() }),
 }))
 
 let mockUser: Record<string, unknown> | null = null

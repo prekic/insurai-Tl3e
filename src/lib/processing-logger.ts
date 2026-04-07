@@ -72,7 +72,8 @@ export class ProcessingLogger {
   private currentStage: ProcessingStage | null = null
   private stageStartTime: number | null = null
   private persistCallback?: (log: DocumentProcessingLog) => Promise<void>
-
+  // Stage transition listeners — UI components subscribe to live progress updates
+  private stageListeners: Set<(log: DocumentProcessingLog) => void> = new Set()
   constructor(options: CreateLogOptions, documentId?: string) {
     this.documentId = documentId || crypto.randomUUID()
 
@@ -116,6 +117,36 @@ export class ProcessingLogger {
   }
 
   /**
+   * Subscribe to stage transitions. Listener is invoked synchronously after
+   * any startStage/completeStage/failStage/skipStage mutation, with the latest
+   * log snapshot. Returns an unsubscribe function.
+   *
+   * Listener errors are caught individually so a buggy subscriber cannot break
+   * the extraction pipeline or other listeners.
+   */
+  onStageChange(listener: (log: DocumentProcessingLog) => void): () => void {
+    this.stageListeners.add(listener)
+    return () => {
+      this.stageListeners.delete(listener)
+    }
+  }
+
+  /**
+   * Notify all subscribers with a fresh snapshot of the current log state.
+   */
+  private emitStageChange(): void {
+    if (this.stageListeners.size === 0) return
+    const snapshot = this.getLog()
+    for (const listener of this.stageListeners) {
+      try {
+        listener(snapshot)
+      } catch (err) {
+        console.error('[ProcessingLogger] stage listener threw', err)
+      }
+    }
+  }
+
+  /**
    * Start a new processing stage
    */
   startStage(stage: ProcessingStage, input?: Record<string, unknown>): void {
@@ -144,6 +175,8 @@ export class ProcessingLogger {
 
     // Persist async
     this.persist()
+    // Notify UI subscribers
+    this.emitStageChange()
   }
 
   /**
@@ -183,6 +216,8 @@ export class ProcessingLogger {
 
     // Persist async
     this.persist()
+    // Notify UI subscribers
+    this.emitStageChange()
   }
 
   /**
@@ -222,6 +257,8 @@ export class ProcessingLogger {
 
     // Persist async
     this.persist()
+    // Notify UI subscribers
+    this.emitStageChange()
   }
 
   /**
@@ -252,6 +289,8 @@ export class ProcessingLogger {
 
     // Persist async
     this.persist()
+    // Notify UI subscribers
+    this.emitStageChange()
   }
 
   /**
@@ -260,6 +299,8 @@ export class ProcessingLogger {
   setPageCount(count: number): void {
     this.log.page_count = count
     this.log.updated_at = new Date().toISOString()
+    // Surface early-win chip in UI
+    this.emitStageChange()
   }
 
   /**
@@ -269,6 +310,7 @@ export class ProcessingLogger {
     this.log.ocr_used = true
     this.log.ocr_engine = engine
     this.log.updated_at = new Date().toISOString()
+    this.emitStageChange()
   }
 
   /**
@@ -277,6 +319,8 @@ export class ProcessingLogger {
   setAIProvider(provider: string): void {
     this.log.ai_provider = provider
     this.log.updated_at = new Date().toISOString()
+    // Surface early-win chip in UI
+    this.emitStageChange()
   }
 
   /**

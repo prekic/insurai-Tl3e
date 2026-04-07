@@ -46,10 +46,7 @@ describe('ProcessingLogger', () => {
     })
 
     it('should use provided document ID', () => {
-      const logger = createProcessingLogger(
-        { filename: 'test.pdf' },
-        'custom-doc-id'
-      )
+      const logger = createProcessingLogger({ filename: 'test.pdf' }, 'custom-doc-id')
       expect(logger.getDocumentId()).toBe('custom-doc-id')
     })
   })
@@ -357,7 +354,7 @@ describe('ProcessingLogger', () => {
       logger.startStage('pdf_extraction')
 
       // Wait for async persist
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       expect(persistCallback).toHaveBeenCalled()
     })
 
@@ -370,7 +367,7 @@ describe('ProcessingLogger', () => {
       logger.failWithDetails(new Error('Test error'))
 
       // Wait for async persist
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       expect(persistCallback).toHaveBeenCalledTimes(2) // Once for start, once for fail
     })
 
@@ -383,7 +380,7 @@ describe('ProcessingLogger', () => {
       logger.startStage('pdf_extraction')
 
       // Wait for async persist
-      await new Promise(resolve => setTimeout(resolve, 10))
+      await new Promise((resolve) => setTimeout(resolve, 10))
       expect(consoleError).toHaveBeenCalled()
 
       consoleError.mockRestore()
@@ -430,6 +427,107 @@ describe('ProcessingLogger', () => {
       // Modifying the returned object should not affect the logger
       json.filename = 'modified.pdf'
       expect(logger.getLog().filename).toBe('test.pdf')
+    })
+  })
+
+  // ========================================================================
+  // onStageChange — live UI subscription API
+  // ========================================================================
+  describe('onStageChange', () => {
+    it('fires listener after startStage', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const listener = vi.fn()
+      logger.onStageChange(listener)
+      logger.startStage('upload')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].stages).toHaveLength(1)
+      expect(listener.mock.calls[0][0].stages[0].stage).toBe('upload')
+    })
+
+    it('fires listener after completeStage', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      logger.startStage('upload')
+      const listener = vi.fn()
+      logger.onStageChange(listener)
+      logger.completeStage()
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].stages[0].status).toBe('completed')
+    })
+
+    it('fires listener after failStage', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      logger.startStage('upload')
+      const listener = vi.fn()
+      logger.onStageChange(listener)
+      logger.failStage('boom')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].stages[0].status).toBe('failed')
+    })
+
+    it('fires listener after skipStage', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const listener = vi.fn()
+      logger.onStageChange(listener)
+      logger.skipStage('ocr_processing', 'not needed')
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].stages[0].status).toBe('skipped')
+    })
+
+    it('fires listener after setPageCount and setAIProvider (early wins)', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const listener = vi.fn()
+      logger.onStageChange(listener)
+      logger.setPageCount(12)
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].page_count).toBe(12)
+      logger.setAIProvider('openai')
+      expect(listener).toHaveBeenCalledTimes(2)
+      expect(listener.mock.calls[1][0].ai_provider).toBe('openai')
+    })
+
+    it('returns an unsubscribe function that detaches the listener', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const listener = vi.fn()
+      const unsubscribe = logger.onStageChange(listener)
+      logger.startStage('upload')
+      expect(listener).toHaveBeenCalledTimes(1)
+      unsubscribe()
+      logger.completeStage()
+      expect(listener).toHaveBeenCalledTimes(1) // not called after unsubscribe
+    })
+
+    it('isolates listener errors from each other and from the pipeline', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const goodListener = vi.fn()
+      const badListener = vi.fn(() => {
+        throw new Error('listener boom')
+      })
+      logger.onStageChange(badListener)
+      logger.onStageChange(goodListener)
+
+      // Should not throw — error is caught and logged
+      expect(() => logger.startStage('upload')).not.toThrow()
+
+      // Both listeners were invoked
+      expect(badListener).toHaveBeenCalledTimes(1)
+      expect(goodListener).toHaveBeenCalledTimes(1)
+
+      // Pipeline continues to function
+      expect(logger.getLog().stages).toHaveLength(1)
+    })
+
+    it('supports multiple listeners simultaneously', () => {
+      const logger = createProcessingLogger({ filename: 'test.pdf' })
+      const a = vi.fn()
+      const b = vi.fn()
+      logger.onStageChange(a)
+      logger.onStageChange(b)
+      logger.startStage('upload')
+      expect(a).toHaveBeenCalledTimes(1)
+      expect(b).toHaveBeenCalledTimes(1)
+      // Both receive the same snapshot data
+      expect(a.mock.calls[0][0].stages[0].stage).toBe('upload')
+      expect(b.mock.calls[0][0].stages[0].stage).toBe('upload')
     })
   })
 })
