@@ -234,3 +234,7 @@ coverage-temp/
 # Generated export files
 *.xlsx
 supabase/.temp/
+
+# Pilot PDF ingest staging — contains real PII (KVKK). NEVER commit to main.
+# Use `git add -f upload/` on a throwaway branch only.
+upload/
