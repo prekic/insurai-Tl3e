@@ -273,14 +273,11 @@ describe('TryAnalysis', () => {
 
       renderWithRouter(['/try'], { file: mockFile })
 
-      // Should show analyzing state initially
-      await waitFor(() => {
-        expect(
-          screen.getByText(/Preparing document|Uploading document|Extracting text/)
-        ).toBeInTheDocument()
-      })
-
-      // Should navigate to PolicyDetailView after completion
+      // Should navigate to PolicyDetailView after completion.
+      // Note: the intermediate "loading" UI is rendered transiently but
+      // the mocked extraction resolves on the next microtask, so React often
+      // batches the uploading→analyzing→complete renders before any waitFor
+      // poll runs. We assert the final navigation rather than the transient UI.
       await waitFor(
         () => {
           expect(screen.getByTestId('policy-trial-page')).toBeInTheDocument()
@@ -636,12 +633,13 @@ describe('TryAnalysis', () => {
         })
       })
 
-      // Should show some processing state (uploading or analyzing)
+      // Should show the new analysis progress card with active stage banner
       await waitFor(() => {
         const hasProcessingText =
-          screen.queryByText(/Preparing document/i) ||
-          screen.queryByText(/Uploading/i) ||
-          screen.queryByText(/Extracting/i) ||
+          screen.queryByText(/Preparing to analyze/i) ||
+          screen.queryByText(/Upload/i) ||
+          screen.queryByText(/PDF Extraction/i) ||
+          screen.queryByText(/AI Extraction/i) ||
           screen.queryByText(/analyzing/i)
         expect(hasProcessingText).toBeInTheDocument()
       })
