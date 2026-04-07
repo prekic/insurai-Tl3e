@@ -17,6 +17,7 @@ import {
   type Table,
 } from './document-ocr'
 import { extractFormFieldMap, findFormField, TURKISH_FORM_FIELD_PATTERNS } from './ocr'
+import { parseTurkishCurrency, extractVehicleInfoFromText } from './turkish-utils'
 import { parseTablesForCoverages, mergeCoveragesWithTableData } from './table-parser'
 import { extractWithConsensus, type ConsensusResult } from './providers/consensus'
 import { extractWithOpenAI } from './providers/openai'
@@ -1693,6 +1694,42 @@ async function convertToAnalyzedPolicy(
     console.warn('[convertToAnalyzedPolicy] Extracted premium from object:', premiumValue)
   }
 
+  // Turkish premium magnitude sanity check — fix 100× / 1000× errors caused by
+  // AI mis-parsing Turkish thousands/decimal separators (e.g., "1.659,72 TL"
+  // becoming 165972 instead of 1659.72). Look for "Brüt Prim" / "Net Prim"
+  // strings in the raw text and re-parse with the locale-aware utility.
+  if (premiumValue > 0 && rawText) {
+    try {
+      // Match "Brüt Prim ... 1.659,72 TL" or "Net Prim ... 1.580,67"
+      const premiumPatterns = [
+        /(?:brüt\s*prim|brut\s*prim)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+        /(?:toplam\s*prim|ödenecek\s*prim)[\s:.]*([\d.,]+)\s*(?:TL|TRY|₺)?/i,
+      ]
+      for (const pat of premiumPatterns) {
+        const m = rawText.match(pat)
+        if (m && m[1]) {
+          const reparsed = parseTurkishCurrency(m[1])
+          if (reparsed && reparsed > 0) {
+            // If our extracted premium differs from re-parsed by ≥50× and
+            // the re-parsed value is plausible (< 500K TL for kasko), trust it
+            const ratio = premiumValue / reparsed
+            const isLikelyMisparsed =
+              (ratio >= 50 || ratio <= 0.02) && reparsed < 500000 && reparsed > 50
+            if (isLikelyMisparsed) {
+              console.warn(
+                `[convertToAnalyzedPolicy] Premium magnitude correction: ${premiumValue} → ${reparsed} (raw: "${m[0]}")`
+              )
+              premiumValue = reparsed
+              break
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[convertToAnalyzedPolicy] Premium re-parse failed:', err)
+    }
+  }
+
   // Handle policyNumber - AI might return camelCase or snake_case
   const policyNumber = data.policyNumber ?? (rawData.policy_number as string) ?? `POL-${Date.now()}`
 
@@ -1801,6 +1838,13 @@ async function convertToAnalyzedPolicy(
       : normalizeTurkishLegalEntityName(insuredPerson ?? ''),
     location: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
     insuredAddress: data.insuredAddress ?? (rawData.insured_address as string) ?? undefined,
+    // Extract vehicle metadata from raw text for kasko/traffic policies.
+    // The standard ExtractedPolicyData schema does not request vehicle fields,
+    // so we recover them from the document text via regex patterns.
+    vehicleInfo:
+      (policyType === 'kasko' || policyType === 'traffic') && rawText
+        ? extractVehicleInfoFromText(rawText)
+        : undefined,
     coverages,
     exclusions: data.exclusions,
     exclusionsEn: ensureExclusionsEn(data.exclusions, data.exclusionsEn),
@@ -1999,14 +2043,36 @@ async function convertToAnalyzedPolicy(
   }
 
   // ── Two-layer deductible reporting ─────────────────────────────────
-  // If conditional deductibles were detected, upgrade the header text
+  // Once classifyExclusions has run, we know whether explicit conditional
+  // deductibles were detected. If so, deductible status is NOT uncertain —
+  // it is "explicit but conditional", which the UI handles with richer text.
+  // Clear the uncertainty flag and remove any "doğrulanamadı" extraction
+  // warning to avoid contradicting the deductible section users will see.
   if (
     basePolicy.conditionalDeductibles &&
     basePolicy.conditionalDeductibles.length > 0 &&
     basePolicy.deductibleUncertain
   ) {
-    // The deductible display logic reads deductibleUncertain — keep it true
-    // but the display function will now use the richer text when conditionals exist
+    basePolicy.deductibleUncertain = false
+    if (basePolicy.extractionWarnings && basePolicy.extractionWarnings.length > 0) {
+      basePolicy.extractionWarnings = basePolicy.extractionWarnings.filter(
+        (w) => !/muafiyet.*do[ğg]rulanamad/i.test(w)
+      )
+      if (basePolicy.extractionWarnings.length === 0) {
+        basePolicy.extractionWarnings = undefined
+      }
+    }
+    // Also strip the warning insight from aiInsights so it doesn't render
+    if (basePolicy.aiInsights && basePolicy.aiInsights.length > 0) {
+      basePolicy.aiInsights = basePolicy.aiInsights.filter(
+        (i) => !/muafiyet.*do[ğg]rulanamad/i.test(i)
+      )
+    }
+    if (basePolicy.aiInsightsEn && basePolicy.aiInsightsEn.length > 0) {
+      basePolicy.aiInsightsEn = basePolicy.aiInsightsEn.filter(
+        (i) => !/deductible.*not\s*confirmed|deductible.*could\s*not/i.test(i)
+      )
+    }
   }
 
   // ── Mini repair confidence downgrade ───────────────────────────────

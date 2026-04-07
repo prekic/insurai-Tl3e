@@ -347,6 +347,101 @@ export function parseTurkishPlate(plateStr: string): {
 }
 
 // =============================================================================
+// VEHICLE METADATA EXTRACTION
+// =============================================================================
+
+/**
+ * Extract vehicle metadata (make, model, year, plate, chassis) from raw
+ * Turkish kasko policy text. Uses regex patterns matching common section
+ * labels: "Marka", "Tip", "Model Yılı", "Plaka", "Şasi No".
+ *
+ * Returns undefined if no fields could be extracted.
+ */
+export function extractVehicleInfoFromText(rawText: string):
+  | {
+      make?: string
+      model?: string
+      year?: number
+      plate?: string
+      chassisNo?: string
+    }
+  | undefined {
+  if (!rawText || typeof rawText !== 'string') return undefined
+
+  const result: {
+    make?: string
+    model?: string
+    year?: number
+    plate?: string
+    chassisNo?: string
+  } = {}
+
+  // Plate — already-existing PLATE_PATTERN
+  const plateMatch = rawText.match(/\b(\d{2})\s*([A-Z]{1,3})\s*(\d{1,4})\b/)
+  if (plateMatch) {
+    const cityNum = parseInt(plateMatch[1], 10)
+    if (cityNum >= 1 && cityNum <= 81) {
+      result.plate = `${plateMatch[1]} ${plateMatch[2]} ${plateMatch[3]}`
+    }
+  }
+
+  // Make — "Marka" or "Marka/Tip" followed by uppercase brand
+  // e.g. "Marka : PEUGEOT", "Marka/Tip : PEUGEOT 308 COMFORT"
+  const makeMatch = rawText.match(
+    /Marka(?:\s*\/\s*Tip)?\s*[:.]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-zçğıöşü\d\s.\-/]{1,80})/i
+  )
+  if (makeMatch) {
+    const raw = makeMatch[1].trim()
+    // Take the first word as make (e.g., "PEUGEOT" from "PEUGEOT 308 COMFORT")
+    const parts = raw.split(/\s+/)
+    if (parts[0] && parts[0].length >= 2 && parts[0].length <= 25) {
+      result.make = parts[0]
+      // Take the rest as model if reasonable length
+      if (parts.length > 1) {
+        const modelStr = parts
+          .slice(1)
+          .join(' ')
+          .replace(/[\n\r,.;:].*/, '')
+          .trim()
+        if (modelStr.length >= 1 && modelStr.length <= 60) {
+          result.model = modelStr
+        }
+      }
+    }
+  }
+
+  // Standalone Tip / Model field — "Tip : 308 COMFORT 1.6"
+  if (!result.model) {
+    const tipMatch = rawText.match(
+      /(?:^|\n)\s*Tip\s*[:.]?\s*([A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜa-zçğıöşü\d\s.\-/]{1,60})/i
+    )
+    if (tipMatch) {
+      const cleaned = tipMatch[1].replace(/[\n\r,.;:].*/, '').trim()
+      if (cleaned.length >= 2 && cleaned.length <= 60) {
+        result.model = cleaned
+      }
+    }
+  }
+
+  // Model year — "Model Yılı : 2010" (handle dotless İ + various separators)
+  const yearMatch = rawText.match(/Model\s*Y[ıi]l[ıi]?\s*[:.]?\s*(\d{4})/i)
+  if (yearMatch) {
+    const yr = parseInt(yearMatch[1], 10)
+    if (yr >= 1950 && yr <= new Date().getFullYear() + 1) {
+      result.year = yr
+    }
+  }
+
+  // Chassis — "Şasi No : VF34..." or "Sasi No"
+  const chassisMatch = rawText.match(/[ŞS]asi\s*(?:No)?\s*[:.]?\s*([A-Z0-9]{6,20})/i)
+  if (chassisMatch) {
+    result.chassisNo = chassisMatch[1].toUpperCase()
+  }
+
+  return Object.keys(result).length > 0 ? result : undefined
+}
+
+// =============================================================================
 // TC KIMLIK (NATIONAL ID) VALIDATION
 // =============================================================================
 
@@ -409,15 +504,7 @@ export function extractPremiumFromText(text: string): {
   currency: string
 } | null {
   // Look for premium-related keywords near amounts
-  const premiumKeywords = [
-    'prim',
-    'premium',
-    'toplam',
-    'tutar',
-    'ödeme',
-    'net prim',
-    'brüt prim',
-  ]
+  const premiumKeywords = ['prim', 'premium', 'toplam', 'tutar', 'ödeme', 'net prim', 'brüt prim']
 
   const lines = text.split('\n')
 
@@ -467,12 +554,7 @@ export function detectPolicyTypeFromText(
       weight: 0,
     },
     traffic: {
-      patterns: [
-        'trafik sigortasi',
-        'zorunlu mali sorumluluk',
-        'mtpl',
-        'traffic insurance',
-      ],
+      patterns: ['trafik sigortasi', 'zorunlu mali sorumluluk', 'mtpl', 'traffic insurance'],
       weight: 0,
     },
     home: {
@@ -544,9 +626,7 @@ const PROVINCE_CODES: Record<string, string> = {
 /**
  * Extract province from address
  */
-export function extractProvinceFromAddress(
-  address: string
-): { code: string; name: string } | null {
+export function extractProvinceFromAddress(address: string): { code: string; name: string } | null {
   if (!address) return null
 
   const upperAddress = address.toUpperCase()
