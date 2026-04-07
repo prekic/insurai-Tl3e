@@ -414,6 +414,8 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     marketPercentile: 'Market Percentile',
     aiInsightsTitle: 'AI Insights',
     confidenceLabel: 'Confidence:',
+    insufficientData: 'Insufficient data',
+    coveredScenariosTitle: "What's Covered",
     yourPremium: 'Your Premium',
     marketAvg: 'Market Avg',
     activeStatus: 'Active',

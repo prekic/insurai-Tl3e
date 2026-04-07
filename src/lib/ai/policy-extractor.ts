@@ -2088,20 +2088,35 @@ async function convertToAnalyzedPolicy(
   // Evidence-based insights (Turkish) and generated insights (English) can
   // express the same idea. Dedup BEFORE translation so parallel arrays
   // (aiInsights, aiInsightsTr, aiInsightsEn) stay index-aligned.
+  //
+  // Cross-language dedup: an insight expressed in EN and an equivalent in TR
+  // would survive plain string dedup. We canonicalize each insight by trying
+  // BOTH translation directions (translateInsightToTr and translateInsightToEn)
+  // and using the lexicographically smallest variant as the dedup key, so any
+  // pair of {EN,TR} variants of the same insight collapse to one entry.
   {
     const seen = new Set<string>()
     const keepIndices: number[] = []
-    for (let idx = 0; idx < basePolicy.aiInsights.length; idx++) {
-      // Normalize: strip emoji prefix, lowercase, collapse whitespace
-      const raw = basePolicy.aiInsights[idx]
-      const normalized = raw
+    const stripAndNormalize = (s: string) =>
+      s
         // eslint-disable-next-line no-misleading-character-class
         .replace(/^[✓✔☑⚠💡❌🔍\uFE0F]\s*/gu, '')
         .trim()
         .toLowerCase()
         .replace(/\s+/g, ' ')
-      if (!seen.has(normalized)) {
-        seen.add(normalized)
+
+    for (let idx = 0; idx < basePolicy.aiInsights.length; idx++) {
+      const raw = basePolicy.aiInsights[idx]
+      const baseNorm = stripAndNormalize(raw)
+      // Cross-language canonicalization via translation map (best-effort)
+      const trVariant = stripAndNormalize(translateInsightToTr(raw))
+      const enVariant = stripAndNormalize(translateInsightToEn(raw))
+      // Pick the lexicographically smallest non-empty variant as the canonical key
+      const canonical =
+        [baseNorm, trVariant, enVariant].filter((s) => s.length > 0).sort()[0] || baseNorm
+
+      if (!seen.has(canonical)) {
+        seen.add(canonical)
         keepIndices.push(idx)
       }
     }
@@ -2207,7 +2222,8 @@ function createEmptyExtractedData(): ExtractedPolicyData {
  * Mirrors the display-time translateInsight() logic in PolicyDetailView
  * but runs once at extraction so the result is persisted.
  */
-function translateInsightToTr(insight: string): string {
+// Exported for unit tests verifying cross-language deduplication
+export function translateInsightToTr(insight: string): string {
   const trMap = TR_TRANSLATIONS.insightTranslations
 
   // Extract emoji prefix if present (✓ ⚠ 💡 ❌ 🔍 etc.)
@@ -2248,6 +2264,30 @@ function translateInsightToTr(insight: string): string {
   }
 
   // No translation found — return original
+  return insight
+}
+
+/**
+ * Reverse-translate a Turkish insight to its English equivalent if known.
+ * Iterates the EN→TR translation map looking for a matching TR value, and
+ * returns the EN key. Used for cross-language deduplication so an insight
+ * present in both languages collapses to a single entry.
+ *
+ * If no match is found (e.g., new dynamic insight), returns the input unchanged.
+ */
+// Exported for unit tests verifying cross-language deduplication
+export function translateInsightToEn(insight: string): string {
+  const trMap = TR_TRANSLATIONS.insightTranslations
+  // eslint-disable-next-line no-misleading-character-class
+  const prefixMatch = insight.match(/^([✓✔☑⚠💡❌🔍\uFE0F]\s*)/u)
+  const prefix = prefixMatch ? prefixMatch[1] : ''
+  const text = prefix ? insight.slice(prefix.length).trim() : insight
+
+  for (const [enKey, trValue] of Object.entries(trMap)) {
+    if (trValue === text) {
+      return prefix ? `${prefix}${enKey}` : enKey
+    }
+  }
   return insight
 }
 
