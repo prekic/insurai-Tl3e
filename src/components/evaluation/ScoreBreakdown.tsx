@@ -1,6 +1,9 @@
 import { cn } from '@/lib/utils'
-import { useI18n } from '@/lib/i18n'
-import type { PolicyEvaluation, ScoreBreakdown as ScoreBreakdownType } from '@/lib/policy-evaluation/types'
+import { useI18n, useTranslation } from '@/lib/i18n'
+import type {
+  PolicyEvaluation,
+  ScoreBreakdown as ScoreBreakdownType,
+} from '@/lib/policy-evaluation/types'
 
 interface ScoreBreakdownProps {
   breakdown: PolicyEvaluation['scoreBreakdown']
@@ -14,6 +17,7 @@ interface SingleScoreProps {
   weight?: number
   details?: string
   variant: 'mini' | 'full'
+  insufficientDataLabel?: string
 }
 
 function getScoreColor(score: number): string {
@@ -40,8 +44,31 @@ function getScoreBgColor(score: number): string {
   return 'bg-red-50'
 }
 
-function SingleScore({ score, label, weight, details, variant }: SingleScoreProps) {
+function SingleScore({
+  score,
+  label,
+  weight,
+  details,
+  variant,
+  insufficientDataLabel,
+}: SingleScoreProps) {
+  // Sentinel value: score < 0 means "insufficient data" and must NOT render as a number
+  // or use red styling. The evaluator uses -1 for cases like unverified deductibles.
+  const isInsufficient = score < 0
+  const tooltipText = isInsufficient ? insufficientDataLabel || details : details
+
   if (variant === 'mini') {
+    if (isInsufficient) {
+      return (
+        <span
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-gray-100 text-gray-500"
+          title={tooltipText}
+        >
+          <span>{label}</span>
+          <span className="font-bold">—</span>
+        </span>
+      )
+    }
     return (
       <span
         className={cn(
@@ -54,6 +81,24 @@ function SingleScore({ score, label, weight, details, variant }: SingleScoreProp
         <span>{label}</span>
         <span className="font-bold">{Math.round(score)}</span>
       </span>
+    )
+  }
+
+  if (isInsufficient) {
+    return (
+      <div className="space-y-1" title={tooltipText}>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-gray-700 font-medium">
+            {label}
+            {weight && <span className="text-gray-400 ml-1">({weight}%)</span>}
+          </span>
+          <span className="font-bold text-gray-400">—</span>
+        </div>
+        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full w-full bg-gray-200" />
+        </div>
+        {details && <p className="text-xs text-gray-500 mt-0.5">{details}</p>}
+      </div>
     )
   }
 
@@ -87,8 +132,13 @@ function SingleScore({ score, label, weight, details, variant }: SingleScoreProp
  */
 export function ScoreBreakdown({ breakdown, variant = 'full', className }: ScoreBreakdownProps) {
   const { locale } = useI18n()
+  const { t } = useTranslation()
+  const insufficientDataLabel = t.policy.insufficientData
 
-  const categories: Array<{ key: keyof PolicyEvaluation['scoreBreakdown']; data: ScoreBreakdownType }> = [
+  const categories: Array<{
+    key: keyof PolicyEvaluation['scoreBreakdown']
+    data: ScoreBreakdownType
+  }> = [
     { key: 'premium', data: breakdown.premium },
     { key: 'coverage', data: breakdown.coverage },
     { key: 'deductible', data: breakdown.deductible },
@@ -109,6 +159,7 @@ export function ScoreBreakdown({ breakdown, variant = 'full', className }: Score
             label={locale === 'tr' ? data.categoryTR : data.category}
             variant="mini"
             details={locale === 'tr' ? data.detailsTR : data.details}
+            insufficientDataLabel={insufficientDataLabel}
           />
         ))}
       </div>
@@ -125,6 +176,7 @@ export function ScoreBreakdown({ breakdown, variant = 'full', className }: Score
           weight={data.weight}
           details={locale === 'tr' ? data.detailsTR : data.details}
           variant="full"
+          insufficientDataLabel={insufficientDataLabel}
         />
       ))}
     </div>
@@ -141,7 +193,12 @@ interface OverallScoreProps {
   className?: string
 }
 
-export function OverallScore({ score, size = 'md', showLabel = true, className }: OverallScoreProps) {
+export function OverallScore({
+  score,
+  size = 'md',
+  showLabel = true,
+  className,
+}: OverallScoreProps) {
   const { locale } = useI18n()
 
   const sizeStyles = {
@@ -175,7 +232,9 @@ export function OverallScore({ score, size = 'md', showLabel = true, className }
           />
         </svg>
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className={cn('font-bold', style.text, getScoreTextColor(score))}>{Math.round(score)}</span>
+          <span className={cn('font-bold', style.text, getScoreTextColor(score))}>
+            {Math.round(score)}
+          </span>
         </div>
       </div>
       {showLabel && (

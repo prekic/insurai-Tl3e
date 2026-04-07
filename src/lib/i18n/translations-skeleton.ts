@@ -372,6 +372,8 @@ export const SKELETON_TRANSLATIONS: TranslationDictionary = {
     marketPercentile: '',
     aiInsightsTitle: '',
     confidenceLabel: '',
+    insufficientData: '',
+    coveredScenariosTitle: '',
     yourPremium: '',
     marketAvg: '',
     activeStatus: '',

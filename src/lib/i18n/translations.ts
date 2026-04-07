@@ -424,6 +424,8 @@ export interface TranslationDictionary {
     marketPercentile: string
     aiInsightsTitle: string
     confidenceLabel: string
+    insufficientData: string
+    coveredScenariosTitle: string
     yourPremium: string
     marketAvg: string
     activeStatus: string

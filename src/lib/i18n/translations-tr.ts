@@ -419,6 +419,8 @@ export const TR_TRANSLATIONS: TranslationDictionary = {
     marketPercentile: 'Piyasa Yüzdeliği',
     aiInsightsTitle: 'Yapay Zeka Görüşleri',
     confidenceLabel: 'Güven:',
+    insufficientData: 'Yetersiz veri',
+    coveredScenariosTitle: 'Kapsanan Senaryolar',
     yourPremium: 'Priminiz',
     marketAvg: 'Piyasa Ort.',
     activeStatus: 'Aktif',
