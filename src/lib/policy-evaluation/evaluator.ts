@@ -1532,10 +1532,30 @@ function generateScenarioCards(
   const cards: import('./types').ScenarioCard[] = []
 
   // 1. IMM (Limits of liability) Scenario for vehicles
+  // Match against both English and Turkish coverage names. The AI may return
+  // the coverage as "Excess Liability", "Voluntary Liability Coverage",
+  // "İhtiyari Mali Mesuliyet", "İMM", etc. — check all common variants on
+  // BOTH name and nameTr to avoid scenario engine vs coverage extractor drift.
+  const IMM_NAME_PATTERNS = [
+    'mali mesuliyet',
+    'i̇mm',
+    ' imm',
+    'imm ',
+    'i̇htiyari',
+    'ihtiyari',
+    'voluntary liability',
+    'excess liability',
+    'third.party liability',
+    'üçüncü şahıs',
+    'ucuncu sahis',
+  ]
+  const matchesIMM = (text: string | undefined | null): boolean => {
+    if (!text) return false
+    const lower = text.toLowerCase()
+    return IMM_NAME_PATTERNS.some((pat) => lower.includes(pat))
+  }
   const immCoverage = policy.coverages.find(
-    (c) =>
-      (c.name.toLowerCase().includes('mali mesuliyet') || c.name.toLowerCase().includes('imm')) &&
-      c.included
+    (c) => (matchesIMM(c.name) || matchesIMM(c.nameTr)) && c.included
   )
 
   if (immCoverage) {
