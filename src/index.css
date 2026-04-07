@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -192,16 +192,36 @@ html {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.4);
   }
   50% {
     box-shadow: 0 0 20px 5px rgba(168, 85, 247, 0.2);
+  }
+}
+
+/* Shimmer progress bar for AI analyzing state */
+.shimmer-bar {
+  width: 60%;
+  animation: shimmer-slide 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(200%);
   }
 }
 
@@ -251,7 +271,9 @@ html {
 /* Custom focus ring for buttons and interactive elements */
 .focus-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--primary), 0 0 0 5px white;
+  box-shadow:
+    0 0 0 3px var(--primary),
+    0 0 0 5px white;
 }
 
 /* Screen reader only - visually hidden but accessible */
@@ -299,7 +321,7 @@ html {
   }
 
   button,
-  [role="button"] {
+  [role='button'] {
     border: 2px solid currentColor;
   }
 }
@@ -307,7 +329,7 @@ html {
 /* Ensure minimum touch target size (44x44px) for mobile accessibility */
 @media (pointer: coarse) {
   button,
-  [role="button"],
+  [role='button'],
   a,
   input,
   select,

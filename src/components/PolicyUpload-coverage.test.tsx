@@ -1259,7 +1259,7 @@ describe('PolicyUpload Coverage', () => {
     it('loads sample policies and navigates to dashboard', async () => {
       renderUpload()
       await act(async () => {
-        fireEvent.click(screen.getByText('Use Samples'))
+        fireEvent.click(screen.getByText(EN_TRANSLATIONS.upload.useSamplesLink))
       })
       expect(mockAddPolicies).toHaveBeenCalled()
       expect(mockNavigate).toHaveBeenCalledWith('/dashboard')
@@ -1352,7 +1352,7 @@ describe('PolicyUpload Coverage', () => {
       renderUpload()
       const dropZone = screen
         .getByText(EN_TRANSLATIONS.upload.dropHere)
-        .closest('[class*="border-dashed"]')!
+        .closest('[class*="rounded-2xl"]')!
       fireEvent.dragOver(dropZone, { dataTransfer: { files: [] } })
       expect(dropZone.className).toContain('border-blue-500')
     })
@@ -1361,7 +1361,7 @@ describe('PolicyUpload Coverage', () => {
       renderUpload()
       const dropZone = screen
         .getByText(EN_TRANSLATIONS.upload.dropHere)
-        .closest('[class*="border-dashed"]')!
+        .closest('[class*="rounded-2xl"]')!
       fireEvent.dragOver(dropZone, { dataTransfer: { files: [] } })
       fireEvent.dragLeave(dropZone)
       expect(dropZone.className).not.toContain('border-blue-500')
@@ -1371,7 +1371,7 @@ describe('PolicyUpload Coverage', () => {
       renderUpload()
       const dropZone = screen
         .getByText(EN_TRANSLATIONS.upload.dropHere)
-        .closest('[class*="border-dashed"]')!
+        .closest('[class*="rounded-2xl"]')!
       const file = new File(['%PDF'], 'dropped.pdf', { type: 'application/pdf' })
       fireEvent.drop(dropZone, { dataTransfer: { files: [file] } })
       await waitFor(() => {

@@ -507,6 +507,10 @@ export const EN_TRANSLATIONS: TranslationDictionary = {
     removeFile: 'Remove file',
     useSamples: 'Try with Sample Policies',
     useSamplesDescription: 'See how InsurAI analyzes Turkish insurance policies',
+    useSamplesLink: 'sample policies',
+    orTrySamples: 'Or try with',
+    addMoreFiles: 'Add more files',
+    browseFiles: 'Browse files',
     uploadPolicy: 'Upload Policy',
     // Toast messages
     filesAccepted: 'file(s) accepted',

@@ -517,6 +517,10 @@ export interface TranslationDictionary {
     removeFile: string
     useSamples: string
     useSamplesDescription: string
+    useSamplesLink: string
+    orTrySamples: string
+    addMoreFiles: string
+    browseFiles: string
     uploadPolicy: string
     // Toast messages
     filesAccepted: string
