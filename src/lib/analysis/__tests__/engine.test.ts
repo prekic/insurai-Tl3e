@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { generateAnalysisBundle } from '../engine'
+import { evaluateDisplayMode } from '../review-thresholds'
 import { ExtractedPolicyData } from '@/lib/ai/extraction-schema'
 import { ValidationResult } from '@/lib/ai/validator'
 
@@ -139,5 +140,106 @@ describe('generateAnalysisBundle (integration)', () => {
     expect(bundle.scoreBundle.scores.extractionQualityScore).toBeDefined()
     expect(bundle.scoreBundle.scores.policyStructureScore).toBeDefined()
     expect(bundle.scoreBundle.scores.consumerSafetyScore).toBeDefined()
+  })
+
+  // ============================================================================
+  // Safe-default path coverage (Issue #333)
+  // ============================================================================
+
+  describe('safe-default path (Issue #333)', () => {
+    it('returns a complete AnalysisBundle when called with null data', () => {
+      const mockValidation: ValidationResult = { isValid: false, flags: [] }
+      // Cast through unknown to test the runtime null guard
+      const bundle = generateAnalysisBundle(
+        'test-null-1',
+        null as unknown as ExtractedPolicyData,
+        mockValidation
+      )
+
+      // Bundle has the expected top-level shape (not the old broken stub)
+      expect(bundle.policyId).toBe('test-null-1')
+      expect(bundle.analysisVersion).toBe('safe-default')
+      expect(bundle.validatorResult).toEqual(mockValidation)
+
+      // ScoreBundle has internalOverallScore (not the old `overall: 0` field)
+      expect(bundle.scoreBundle.internalOverallScore.internalOnly).toBe(true)
+      expect(bundle.scoreBundle.internalOverallScore.value).toBe(0)
+      expect(bundle.scoreBundle.internalOverallScore.derivationRule).toBe('SAFE_DEFAULT')
+
+      // ScoreBundle.scores has all 5 score families
+      expect(bundle.scoreBundle.scores.extractionQualityScore).toBeDefined()
+      expect(bundle.scoreBundle.scores.policyStructureScore).toBeDefined()
+      expect(bundle.scoreBundle.scores.consumerSafetyScore).toBeDefined()
+      expect(bundle.scoreBundle.scores.competitivenessScore).toBeDefined()
+      expect(bundle.scoreBundle.scores.riskAttentionScore).toBeDefined()
+
+      // Each score is a fully-formed ScoreDetail with suppressed: true
+      const ext = bundle.scoreBundle.scores.extractionQualityScore
+      expect(ext.scoreValue).toBe(0)
+      expect(ext.scoreScale).toBe(100)
+      expect(ext.scoreVersion).toBe('safe-default')
+      expect(ext.suppressed).toBe(true)
+      expect(ext.suppressionReason).toBe('null_extraction_data')
+      expect(ext.warnings).toContain('null_extraction_data')
+
+      // InsightBundle and BenchmarkBundle have proper bundleVersion fields
+      expect(bundle.insightBundle.insights).toEqual([])
+      expect(bundle.insightBundle.bundleVersion).toBe('safe-default')
+      expect(bundle.benchmarkBundle.references).toEqual({})
+      expect(bundle.benchmarkBundle.comparisons).toEqual([])
+      expect(bundle.benchmarkBundle.bundleVersion).toBe('safe-default')
+    })
+
+    it('safe-default bundle passes through evaluateDisplayMode without crashing', () => {
+      const mockValidation: ValidationResult = { isValid: false, flags: [] }
+      const bundle = generateAnalysisBundle(
+        'test-null-2',
+        null as unknown as ExtractedPolicyData,
+        mockValidation
+      )
+
+      // The crash in Issue #333 was: evaluateDisplayMode reads
+      // analysis.scoreBundle.scores.extractionQualityScore without optional chain
+      // and threw on the old `{ overall: 0, components: {} }` stub. With the
+      // complete safe default, this call must succeed.
+      const minimalData = {} as ExtractedPolicyData
+      let result: ReturnType<typeof evaluateDisplayMode>
+      expect(() => {
+        result = evaluateDisplayMode(minimalData, mockValidation, bundle)
+      }).not.toThrow()
+      expect(result!).toBeDefined()
+      expect(result!.mode).toBeDefined()
+      // With all scores at 0 (well below HUMAN_REVIEW_THRESHOLD = 30),
+      // the strict evaluator should route to human_review_required
+      expect(result!.mode).toBe('human_review_required')
+    })
+
+    it('returns safe-default with error reason when an internal helper throws', async () => {
+      // Mock the scoring module to throw, forcing the catch block in
+      // generateAnalysisBundle to fire
+      vi.resetModules()
+      vi.doMock('../scoring', () => ({
+        generateScoreBundle: () => {
+          throw new Error('synthetic test failure')
+        },
+      }))
+      const { generateAnalysisBundle: freshBundle } = await import('../engine')
+
+      const mockData: ExtractedPolicyData = {
+        policyType: 'kasko',
+        coverages: [],
+      } as ExtractedPolicyData
+      const mockValidation: ValidationResult = { isValid: true, flags: [] }
+      const bundle = freshBundle('test-error-1', mockData, mockValidation)
+
+      // Bundle is the safe default with the synthetic error message captured
+      expect(bundle.analysisVersion).toBe('safe-default')
+      expect(bundle.scoreBundle.scores.extractionQualityScore.suppressed).toBe(true)
+      expect(bundle.scoreBundle.scores.extractionQualityScore.suppressionReason).toContain(
+        'synthetic test failure'
+      )
+      vi.doUnmock('../scoring')
+      vi.resetModules()
+    })
   })
 })
