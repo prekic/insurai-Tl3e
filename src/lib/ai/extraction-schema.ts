@@ -31,6 +31,17 @@ export interface ExtractedPolicyData {
   exclusions: string[]
   exclusionsEn?: string[] | null
 
+  // Structured conditional deductibles (NEW)
+  // Turkish KASKO policies routinely apply percentage-based or scenario-triggered
+  // deductibles (muafiyet / tenzili muafiyet). This optional field surfaces them
+  // directly from the LLM with verbatim evidence. When present, it takes precedence
+  // over post-hoc classification via classifyExclusions() in policy-extractor.ts.
+  conditionalDeductibles?: Array<{
+    trigger: string // e.g., "driver under 26", "license < 3 years", "non-contracted service"
+    rate: string // e.g., "%35", "20%", "5000 TL"
+    evidence: string // verbatim quote from policy text
+  }> | null
+
   // Amendment/Zeyilname detection (NEW)
   // Turkish insurance amendments have specific markers that distinguish them from original policies
   amendmentInfo: {
@@ -198,7 +209,19 @@ export const EXTRACTION_JSON_SCHEMA = {
                 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
           },
-          required: ['name', 'nameTr', 'isUnlimited', 'isMarketValue'],
+          // STRICT MODE: ALL properties must be in required (Issue #331).
+          // limit, deductible, description, category are nullable types so the
+          // LLM can return null when it can't determine a value.
+          required: [
+            'name',
+            'nameTr',
+            'limit',
+            'deductible',
+            'description',
+            'isUnlimited',
+            'isMarketValue',
+            'category',
+          ],
           additionalProperties: false,
         },
         description:
@@ -219,6 +242,33 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: { type: 'string' },
         description:
           'REQUIRED: English translation of each exclusion at the same array index. For Turkish policies, ALWAYS provide this array with the same length as "exclusions". Example: exclusions=["Deprem hariçtir"] → exclusionsEn=["Earthquake is excluded"].',
+      },
+      conditionalDeductibles: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            trigger: {
+              type: 'string',
+              description:
+                'What triggers the deductible (e.g. "driver under 26", "license < 3 years", "non-contracted service", "partial loss", "total loss")',
+            },
+            rate: {
+              type: 'string',
+              description:
+                'The deductible amount or percentage as written in the policy (e.g. "%35", "20%", "5000 TL")',
+            },
+            evidence: {
+              type: 'string',
+              description:
+                'Verbatim direct quote from the policy text proving this deductible exists. DO NOT paraphrase.',
+            },
+          },
+          required: ['trigger', 'rate', 'evidence'],
+          additionalProperties: false,
+        },
+        description:
+          'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible: age-based, license-based, non-contracted service, repair-conditional, partial/total loss. Each entry MUST include a verbatim evidence quote. Return null or empty array ONLY if none are present in the document.',
       },
       amendmentInfo: {
         type: 'object',
@@ -369,7 +419,9 @@ export const EXTRACTION_JSON_SCHEMA = {
                     'Set to true if this relationship is unclear or ambiguous and needs review',
                 },
               },
-              required: ['sourceId', 'targetId', 'relationshipType', 'isCandidate'],
+              // STRICT MODE: ALL properties must be in required (Issue #331).
+              // description is a nullable type so the LLM can return null.
+              required: ['sourceId', 'targetId', 'relationshipType', 'description', 'isCandidate'],
               additionalProperties: false,
             },
           },
@@ -394,6 +446,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         description: 'Confidence scores for extracted fields',
       },
     },
+    // STRICT MODE: ALL top-level properties must be in required (Issue #331).
+    // exclusionsEn and conditionalDeductibles are nullable types, so the LLM
+    // can return null and still satisfy the requirement. Removing them from
+    // required would require also removing them from properties, which would
+    // break extraction quality for Turkish KASKO docs that need them.
     required: [
       'policyNumber',
       'provider',
@@ -408,6 +465,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       'coverages',
       'specialConditions',
       'exclusions',
+      'exclusionsEn',
+      'conditionalDeductibles',
       'amendmentInfo',
       'evidence',
       'clauseGraph',
@@ -550,5 +609,29 @@ Your task is to extract structured information from insurance policy documents.
     - 'targetId': What it affects (can be null if ambiguous).
     - 'relationshipType': Must be one of coverage_inclusion, conditional_restriction, deductible_trigger, sublimit, carve_out, endorsement_override, service_benefit_linkage.
     - 'isCandidate': Set to true ONLY if you are unsure of the relationship or if it is ambiguous.
+
+11. **CRITICAL - Structured Conditional Deductibles**:
+    Turkish KASKO policies routinely apply scenario-triggered or percentage-based deductibles beyond the simple flat 'deductible' on individual coverages. You MUST enumerate every one of them in the dedicated 'conditionalDeductibles' array — NOT in 'exclusions'.
+
+    **What counts as a conditional deductible (goes in conditionalDeductibles):**
+    - Age-based: "Sürücü yaşı 25'ten küçük ise %20 tenzili muafiyet uygulanır"
+    - License-tenure-based: "Ehliyetin 3 yıldan az olması durumunda %30 muafiyet"
+    - Non-contracted service: "Anlaşmalı olmayan servislerde %15 tenzili muafiyet"
+    - Repair-conditional: "Onarım muafiyeti %5"
+    - Partial-loss deductible: "Kısmi hasarlarda %2 muafiyet"
+    - Total-loss deductible: "Pert halinde %10 tenzil"
+    - Any "tenzili muafiyet" or "muafiyet" with an explicit trigger condition
+
+    **What does NOT go in conditionalDeductibles (use 'exclusions' instead):**
+    - "Savaş hali hariçtir" — non-coverage exclusion, goes in exclusions
+    - "Deprem teminat dışıdır" — non-coverage exclusion (if truly excluded, not just deductible-adjusted)
+    - Any clause that removes coverage entirely rather than applying a deductible
+
+    **Format requirements for each entry:**
+    - 'trigger': A short natural-language description of the condition (e.g., "driver under 26", "license tenure < 3 years", "non-contracted service")
+    - 'rate': The deductible as written in the source (e.g., "%35", "20%", "5000 TL")
+    - 'evidence': A verbatim direct quote from the policy text. DO NOT paraphrase. Copy exactly.
+
+    If NO conditional deductibles are present, return an empty array or null. Do NOT fabricate.
 
 Be thorough but accurate. It's better to return null than to guess incorrectly.`

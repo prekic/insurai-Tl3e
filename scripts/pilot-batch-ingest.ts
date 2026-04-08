@@ -93,7 +93,12 @@ async function extractTextFromPdfFile(
   }
 }
 
-function buildSectionAwareText(fullText: string, maxChars: number = 32000): string {
+// Default budget chosen so typical KASKO policies (10-25 pages, up to ~80K chars)
+// fit without truncation. gpt-4o-mini context window is 128K tokens (~384K chars),
+// so 96K chars leaves comfortable headroom for prompt + response. The head/tail
+// collapse remains as a safety net for hypothetical 100+ page edge cases. See
+// assessment Finding #2.
+function buildSectionAwareText(fullText: string, maxChars: number = 96000): string {
   if (fullText.length <= maxChars) return fullText
   const HEAD_RATIO = 0.625
   const headSize = Math.floor(maxChars * HEAD_RATIO)
@@ -104,6 +109,162 @@ function buildSectionAwareText(fullText: string, maxChars: number = 32000): stri
 }
 
 // ---------------------------------------------------------------------------
+// Inlined helpers
+// ---------------------------------------------------------------------------
+// These are local copies of production utilities (policy-extractor.ts) that
+// cannot be imported directly because policy-extractor.ts pulls in Vite-env-
+// dependent code (`import.meta.env`) which crashes under standalone `npx tsx`.
+// See CLAUDE.md gotchas #16 and #45. Keep in sync with the production source
+// referenced below if you modify either side.
+
+// Mirrors src/lib/ai/policy-extractor.ts:173-179
+const DEFAULT_CONFIDENCE_WEIGHTS = {
+  policyNumber: 0.2,
+  provider: 0.15,
+  dates: 0.2,
+  premium: 0.2,
+  coverages: 0.25,
+}
+
+// Mirrors src/lib/ai/policy-extractor.ts:186-224
+function recalculateOverallConfidence(
+  confidence:
+    | {
+        overall?: number
+        policyNumber?: number
+        provider?: number
+        dates?: number
+        premium?: number
+        coverages?: number
+      }
+    | undefined
+    | null,
+  fallback: number,
+  weights = DEFAULT_CONFIDENCE_WEIGHTS
+): number {
+  if (!confidence) return fallback
+  const pn = confidence.policyNumber
+  const pr = confidence.provider
+  const dt = confidence.dates
+  const pm = confidence.premium
+  const cv = confidence.coverages
+  // If any per-field score is missing, fall back to the model-reported overall
+  if (pn == null || pr == null || dt == null || pm == null || cv == null) {
+    return typeof confidence.overall === 'number' ? confidence.overall : fallback
+  }
+  return (
+    pn * weights.policyNumber +
+    pr * weights.provider +
+    dt * weights.dates +
+    pm * weights.premium +
+    cv * weights.coverages
+  )
+}
+
+// Mirrors src/lib/ai/policy-extractor.ts:2648-2658 (classifyExclusions patterns).
+// Used to detect conditional deductibles in any text source — coverages,
+// exclusions, specialConditions, or the explicit conditionalDeductibles array.
+const CONDITIONAL_DEDUCTIBLE_PATTERNS: RegExp[] = [
+  /muafiyet/i,
+  /tenzil/i,
+  /%\s*\d+/i,
+  /\d+\s*%/i,
+  /anlaşmalı olmayan.*servis/i,
+  /anlaşmasız.*servis/i,
+  /onarım.*muafiyet/i,
+  /pert.*muafiyet/i,
+  /pert.*tenzil/i,
+]
+
+/**
+ * Clamp LLM-reported confidence to the deterministic extraction quality score.
+ * Used to resolve Finding #1 Round-2: gpt-4o-mini self-rates confidence at 0.99-1.00
+ * even for extractions the validator flags with multiple warnings/errors. The
+ * extractionQualityScore (0-100) from scoring.ts:63-102 is the ground-truth signal
+ * (formula: confidence*100 - 30*errors - 10*warnings, clamped). Taking the minimum
+ * ensures persisted confidence can never exceed what the validator is willing to
+ * vouch for.
+ *
+ * If quality score is undefined (e.g., analysis bundle failed to build), pass the
+ * raw confidence through unchanged — the clamp must never introduce new failures.
+ */
+function demoteConfidenceForQuality(
+  rawConfidence: number,
+  extractionQualityScore: number | undefined
+): number {
+  if (typeof extractionQualityScore !== 'number' || !Number.isFinite(extractionQualityScore)) {
+    return rawConfidence
+  }
+  const qualityNormalized = Math.max(0, Math.min(100, extractionQualityScore)) / 100
+  return Math.min(rawConfidence, qualityNormalized)
+}
+
+function detectConditionalDeductibles(extractedData: any): boolean {
+  const sources: string[] = []
+  // Explicit conditionalDeductibles array (preferred)
+  if (Array.isArray(extractedData.conditionalDeductibles)) {
+    for (const cd of extractedData.conditionalDeductibles) {
+      if (cd && typeof cd === 'object') {
+        sources.push(`${cd.trigger || ''} ${cd.rate || ''} ${cd.evidence || ''}`)
+      } else if (typeof cd === 'string') {
+        sources.push(cd)
+      }
+    }
+  }
+  if (Array.isArray(extractedData.specialConditions)) {
+    for (const sc of extractedData.specialConditions) {
+      if (typeof sc === 'string') sources.push(sc)
+    }
+  }
+  if (Array.isArray(extractedData.exclusions)) {
+    for (const ex of extractedData.exclusions) {
+      if (typeof ex === 'string') sources.push(ex)
+    }
+  }
+  if (Array.isArray(extractedData.coverages)) {
+    for (const cov of extractedData.coverages) {
+      if (cov?.description && typeof cov.description === 'string') sources.push(cov.description)
+    }
+  }
+  return sources.some((text) => CONDITIONAL_DEDUCTIBLE_PATTERNS.some((p) => p.test(text)))
+}
+
+function countSourceQuotes(extractedData: any): number {
+  // Production extraction schema places verbatim quotes under
+  // `evidence.insights[].quote` and `evidence.exclusions[].quote`. The new
+  // structured `conditionalDeductibles[].evidence` field (added in the
+  // production schema enhancement commit) also carries quotes. We sum all
+  // three sources. The round-1 per-coverage `sourceQuote` / parallel
+  // `exclusionEvidence` fields are NOT in the production schema and will
+  // be absent after the refactor — that's expected.
+  let count = 0
+  const insights = extractedData?.evidence?.insights
+  if (Array.isArray(insights)) {
+    for (const ins of insights) {
+      if (ins?.quote && typeof ins.quote === 'string' && ins.quote.trim()) {
+        count++
+      }
+    }
+  }
+  const evExclusions = extractedData?.evidence?.exclusions
+  if (Array.isArray(evExclusions)) {
+    for (const ex of evExclusions) {
+      if (ex?.quote && typeof ex.quote === 'string' && ex.quote.trim()) {
+        count++
+      }
+    }
+  }
+  if (Array.isArray(extractedData.conditionalDeductibles)) {
+    for (const cd of extractedData.conditionalDeductibles) {
+      if (cd?.evidence && typeof cd.evidence === 'string' && cd.evidence.trim()) {
+        count++
+      }
+    }
+  }
+  return count
+}
+
+// ---------------------------------------------------------------------------
 // LLM extraction (mirrors kasko-real-pdf-extraction.ts)
 // ---------------------------------------------------------------------------
 
@@ -111,35 +272,25 @@ async function extractWithLLM(
   documentText: string,
   provider: 'openai' | 'anthropic'
 ): Promise<{ success: boolean; data?: any; model?: string; error?: string }> {
-  const systemPrompt = `You are a Turkish insurance policy (KASKO) extraction expert.
-Extract structured data from the following policy document text.
-Return ONLY valid JSON with these fields:
-{
-  "policyNumber": "string or null",
-  "provider": "string",
-  "branch": "kasko",
-  "policyType": "kasko",
-  "startDate": "YYYY-MM-DD or null",
-  "endDate": "YYYY-MM-DD or null",
-  "premium": number or null,
-  "currency": "TRY",
-  "insuredName": "string or null",
-  "coverages": [{
-    "name": "string",
-    "nameTr": "string",
-    "description": "string",
-    "limit": number or null,
-    "deductible": number or null,
-    "isMarketValue": boolean,
-    "isUnlimited": boolean,
-    "included": true,
-    "category": "main"|"liability"|"supplementary"|"assistance"|"legal"|"other"
-  }],
-  "exclusions": ["string"],
-  "specialConditions": ["string"],
-  "confidence": { "overall": number between 0 and 1 }
-}
-Focus on: conditional deductibles, muafiyet/tenzili muafiyet, age/license restrictions.`
+  // Import production extraction prompt + JSON schema. The PROMPT comes
+  // from the client extraction-schema.ts (the only place EXTRACTION_SYSTEM_PROMPT
+  // is exported). The SCHEMA comes from the server extraction-schema.ts because
+  // (a) it's explicitly strict-mode compliant ("ALL properties must be in required"
+  // per the file header) and (b) the client schema has a latent bug where
+  // coverages.items.required is missing fields, causing OpenAI's strict mode
+  // to reject it. Both files are Vite-env-free and safe to import from a
+  // standalone tsx script.
+  const { EXTRACTION_SYSTEM_PROMPT } = await import('../src/lib/ai/extraction-schema')
+  const { EXTRACTION_JSON_SCHEMA } = await import('../server/schemas/extraction-schema')
+  const systemPrompt = EXTRACTION_SYSTEM_PROMPT
+
+  // We use OpenAI's strict json_schema response mode (not json_object) so
+  // gpt-4o-mini is forced to return ALL required fields including provider.
+  // Without strict schema enforcement, gpt-4o-mini under-extracts when given
+  // the production prompt — it drops provider/insuredName fields, which
+  // breaks the downstream analysis pipeline (some helpers .toLowerCase()
+  // these fields without null checks).
+  const userMessage = documentText
 
   try {
     if (provider === 'openai') {
@@ -149,10 +300,13 @@ Focus on: conditional deductibles, muafiyet/tenzili muafiyet, age/license restri
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: documentText },
+          { role: 'user', content: userMessage },
         ],
         temperature: 0.1,
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: EXTRACTION_JSON_SCHEMA as any,
+        },
         max_tokens: 4096,
       })
       const content = resp.choices[0]?.message?.content
@@ -162,10 +316,15 @@ Focus on: conditional deductibles, muafiyet/tenzili muafiyet, age/license restri
       const { default: Anthropic } = await import('@anthropic-ai/sdk')
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const resp = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-latest',
+        // Pinned to a current model. Both 'claude-3-5-haiku-latest' (alias)
+        // and 'claude-3-5-haiku-20241022' (dated) are now retired (post-EOL
+        // April 2026). claude-haiku-4-5-20251001 is the current cheap haiku
+        // per CLAUDE.md. Production extraction uses DB-managed config; we
+        // hardcode here to avoid the alias breakage.
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 4096,
         system: systemPrompt,
-        messages: [{ role: 'user', content: documentText }],
+        messages: [{ role: 'user', content: userMessage }],
       })
       const text = resp.content
         .filter((b: any) => b.type === 'text')
@@ -173,7 +332,7 @@ Focus on: conditional deductibles, muafiyet/tenzili muafiyet, age/license restri
         .join('')
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) return { success: false, error: 'No JSON in response' }
-      return { success: true, data: JSON.parse(jsonMatch[0]), model: 'claude-3-5-haiku' }
+      return { success: true, data: JSON.parse(jsonMatch[0]), model: 'claude-haiku-4-5-20251001' }
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Unknown error' }
@@ -214,6 +373,7 @@ async function runDownstreamPipeline(extractedData: any) {
   return {
     normalized,
     validation,
+    analysis,
     displayResult,
     phraseClean: foundPhrases.length === 0,
     foundPhrases,
@@ -244,18 +404,30 @@ async function evaluatePilotAdmissionForBatch(extractedData: any, textLength: nu
   qaRecord.countedInPilotMetrics = admission.countedInPilotMetrics
   qaRecord.coverageCountExtracted = extractedData.coverages?.length || 0
   qaRecord.specialConditionCount = extractedData.specialConditions?.length || 0
-  qaRecord.confidenceScore = extractedData.confidence?.overall || 0
+
+  // Confidence: prefer per-field weighted recalculation; fall back to model overall.
+  // See assessment Finding #1 and CLAUDE.md gotcha — production uses the same
+  // weighted formula via DEFAULT_CONFIDENCE_WEIGHTS.
+  qaRecord.confidenceScore = recalculateOverallConfidence(
+    extractedData.confidence,
+    typeof extractedData.confidence?.overall === 'number' ? extractedData.confidence.overall : 0
+  )
 
   // WS-1 fields
   qaRecord.hasRayicDeger = extractedData.coverages?.some((c: any) => c.isMarketValue) || false
-  qaRecord.hasConditionalDeductible = (extractedData.specialConditions || []).some(
-    (sc: string) => sc.toLowerCase().includes('muafiyet') || sc.toLowerCase().includes('tenzil')
-  )
-  qaRecord.sourceQuoteCount = 0 // Evidence not available in simplified pipeline
+  // Conditional deductible detection now scans all sources (conditionalDeductibles
+  // array, specialConditions, exclusions, coverage descriptions) using production's
+  // regex pattern set. See assessment Finding #3.
+  qaRecord.hasConditionalDeductible = detectConditionalDeductibles(extractedData)
+  // Evidence quote count: sums sourceQuotes from coverages, evidence from
+  // conditionalDeductibles, and exclusionEvidence entries. See Finding #7.
+  qaRecord.sourceQuoteCount = countSourceQuotes(extractedData)
   qaRecord.zeroCoverage = (extractedData.coverages?.length || 0) === 0
 
-  // Display mode
-  const dm = evaluateSimpleDisplayMode(extractedData.confidence?.overall || 0, {
+  // Display mode (lightweight QA-time evaluator). NOTE: this verdict is later
+  // overwritten in pilot-batch-ingest main loop with the strict
+  // evaluateDisplayMode() result from runDownstreamPipeline(). See Finding #6.
+  const dm = evaluateSimpleDisplayMode(qaRecord.confidenceScore, {
     policyNumber: extractedData.policyNumber,
     provider: extractedData.provider,
     coverages: extractedData.coverages,
@@ -407,7 +579,9 @@ async function main() {
 
     if (!llmResult.success && !forcedProvider) {
       const fallback = primary === 'openai' ? 'anthropic' : 'openai'
-      console.log(`  ${primary} failed, trying ${fallback}...`)
+      console.log(
+        `  ${primary} failed (${llmResult.error || 'unknown error'}), trying ${fallback}...`
+      )
       llmResult = await extractWithLLM(llmText, fallback as 'openai' | 'anthropic')
     }
 
@@ -448,6 +622,23 @@ async function main() {
       if (qaRecord) {
         qaRecord.phraseClean = downstream.phraseClean
         qaRecord.foundProhibitedPhrases = downstream.foundPhrases
+        // Sync display mode + triggers from the strict (full ValidationResult-based)
+        // evaluator. Without this, the QA record persists the lightweight
+        // evaluateSimpleDisplayMode() verdict which can disagree with what reviewers
+        // see in CLI output. See assessment Finding #6.
+        qaRecord.displayMode = downstream.displayResult.mode
+        qaRecord.triggersFired = downstream.displayResult.triggers.map((t: any) => t.triggerRule)
+        // Demote confidence to at most the deterministic extraction quality score.
+        // gpt-4o-mini self-rates at 0.99-1.00 regardless of validator defects; this
+        // clamp ensures pilot metrics reflect real quality, not LLM self-flattery.
+        // See assessment Finding #1 Round-2.
+        const rawConfidence = qaRecord.confidenceScore
+        const qualityScore =
+          downstream.analysis?.scoreBundle?.scores?.extractionQualityScore?.scoreValue
+        qaRecord.confidenceScore = demoteConfidenceForQuality(rawConfidence, qualityScore)
+        console.log(
+          `  Confidence: LLM ${rawConfidence.toFixed(2)} → quality-clamped ${qaRecord.confidenceScore.toFixed(2)} (quality score: ${qualityScore ?? 'n/a'})`
+        )
       }
     } catch (err: any) {
       console.log(`  Pipeline error: ${err.message}`)
