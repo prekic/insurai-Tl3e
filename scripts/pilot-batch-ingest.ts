@@ -230,10 +230,26 @@ function detectConditionalDeductibles(extractedData: any): boolean {
 }
 
 function countSourceQuotes(extractedData: any): number {
+  // Production extraction schema places verbatim quotes under
+  // `evidence.insights[].quote` and `evidence.exclusions[].quote`. The new
+  // structured `conditionalDeductibles[].evidence` field (added in the
+  // production schema enhancement commit) also carries quotes. We sum all
+  // three sources. The round-1 per-coverage `sourceQuote` / parallel
+  // `exclusionEvidence` fields are NOT in the production schema and will
+  // be absent after the refactor — that's expected.
   let count = 0
-  if (Array.isArray(extractedData.coverages)) {
-    for (const cov of extractedData.coverages) {
-      if (cov?.sourceQuote && typeof cov.sourceQuote === 'string' && cov.sourceQuote.trim()) {
+  const insights = extractedData?.evidence?.insights
+  if (Array.isArray(insights)) {
+    for (const ins of insights) {
+      if (ins?.quote && typeof ins.quote === 'string' && ins.quote.trim()) {
+        count++
+      }
+    }
+  }
+  const evExclusions = extractedData?.evidence?.exclusions
+  if (Array.isArray(evExclusions)) {
+    for (const ex of evExclusions) {
+      if (ex?.quote && typeof ex.quote === 'string' && ex.quote.trim()) {
         count++
       }
     }
@@ -243,11 +259,6 @@ function countSourceQuotes(extractedData: any): number {
       if (cd?.evidence && typeof cd.evidence === 'string' && cd.evidence.trim()) {
         count++
       }
-    }
-  }
-  if (Array.isArray(extractedData.exclusionEvidence)) {
-    for (const ev of extractedData.exclusionEvidence) {
-      if (typeof ev === 'string' && ev.trim()) count++
     }
   }
   return count
@@ -261,67 +272,13 @@ async function extractWithLLM(
   documentText: string,
   provider: 'openai' | 'anthropic'
 ): Promise<{ success: boolean; data?: any; model?: string; error?: string }> {
-  const systemPrompt = `You are a Turkish insurance policy (KASKO) extraction expert.
-Extract structured data from the following policy document text.
-Return ONLY valid JSON with these fields:
-{
-  "policyNumber": "string or null",
-  "provider": "string",
-  "branch": "kasko",
-  "policyType": "kasko",
-  "startDate": "YYYY-MM-DD or null",
-  "endDate": "YYYY-MM-DD or null",
-  "premium": number or null,
-  "currency": "TRY",
-  "insuredName": "string or null",
-  "coverages": [{
-    "name": "string",
-    "nameTr": "string",
-    "description": "string",
-    "limit": number or null,
-    "deductible": number or null,
-    "isMarketValue": boolean,
-    "isUnlimited": boolean,
-    "included": true,
-    "category": "main"|"liability"|"supplementary"|"assistance"|"legal"|"other",
-    "sourceQuote": "string — 1-2 line direct quote from the policy text proving this coverage exists; copy verbatim, do not paraphrase"
-  }],
-  "exclusions": ["string"],
-  "exclusionEvidence": ["string — for each exclusion above (same index), a direct quote from policy text"],
-  "specialConditions": ["string"],
-  "conditionalDeductibles": [{
-    "trigger": "string — what triggers the deductible (e.g. 'driver under 26', 'license < 3 years', 'non-contracted service', 'partial loss')",
-    "rate": "string — the deductible amount or percentage as written (e.g. '%35', '20%', '5000 TL')",
-    "evidence": "string — direct quote from policy text proving this deductible exists"
-  }],
-  "confidence": {
-    "policyNumber": <number 0-1>,
-    "provider": <number 0-1>,
-    "dates": <number 0-1>,
-    "premium": <number 0-1>,
-    "coverages": <number 0-1>,
-    "overall": <number 0-1 — your holistic estimate; the script will recompute a weighted overall too>
-  }
-}
-
-CONFIDENCE RUBRIC — apply per field:
-- 0.95-1.0: Field is explicitly stated in source text, unambiguous, formatted normally
-- 0.75-0.9: Field is present but slightly ambiguous, abbreviated, or unusually formatted
-- 0.5-0.75: Field is partially readable or inferred from context (not directly stated)
-- 0.3-0.5: Field is uncertain or only weakly suggested
-- 0.0-0.3: Field is missing, contradictory, or unreadable
-DO NOT default every field to 0.95. Only use 0.95+ when the field is genuinely
-explicit and verifiable from a single sentence in the source. If you had to guess,
-infer, or read across multiple sections, use 0.6-0.8.
-
-EXTRACTION FOCUS:
-- All conditional deductibles MUST be enumerated in the conditionalDeductibles array
-  with explicit trigger/rate/evidence. Examples: muafiyet, tenzili muafiyet,
-  age-based deductibles ("25 yaş altı sürücü"), license-tenure deductibles
-  ("ehliyetin 3 yıldan az olması"), non-contracted service penalties
-  ("anlaşmalı olmayan servis"), partial loss deductibles, total loss deductibles.
-- Every coverage and conditional deductible MUST have a verbatim source quote.
-- exclusionEvidence array indices MUST correspond to exclusions array indices.`
+  // Import production extraction prompt directly. extraction-schema.ts is
+  // Vite-env-free (only imports a type from src/types/policy.ts), so it's
+  // safe to pull into a standalone tsx script. Do NOT import from
+  // src/lib/ai/providers/openai.ts or src/lib/ai/config.ts — those touch
+  // `import.meta.env` and crash under `npx tsx`.
+  const { EXTRACTION_SYSTEM_PROMPT } = await import('../src/lib/ai/extraction-schema')
+  const systemPrompt = EXTRACTION_SYSTEM_PROMPT
 
   try {
     if (provider === 'openai') {
