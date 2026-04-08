@@ -128,6 +128,12 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: { type: 'string' },
         description: 'What is NOT covered',
       },
+      exclusionsEn: {
+        type: ['array', 'null'],
+        items: { type: 'string' },
+        description:
+          'REQUIRED: English translation of each exclusion at the same array index. For Turkish policies, ALWAYS provide this array with the same length as "exclusions". Example: exclusions=["Deprem hariçtir"] → exclusionsEn=["Earthquake is excluded"].',
+      },
       conditionalDeductibles: {
         type: ['array', 'null'],
         items: {
@@ -154,6 +160,120 @@ export const EXTRACTION_JSON_SCHEMA = {
         },
         description:
           'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible with verbatim evidence. Return null if none present.',
+      },
+      evidence: {
+        type: 'object',
+        properties: {
+          insights: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description:
+                    'The insight text (e.g., "✓ Mükemmel sağlık teminatı" or "💡 Yurt dışı teminatı eklemeyi düşünün")',
+                },
+                textEn: {
+                  type: 'string',
+                  description: 'The English translation of the insight text',
+                },
+                quote: {
+                  type: 'string',
+                  description:
+                    'The exact verbatim quote from the raw document that proves this insight. DO NOT paraphrase. Extract directly from the text.',
+                },
+                quoteTr: {
+                  type: ['string', 'null'],
+                  description:
+                    'If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null.',
+                },
+              },
+              required: ['text', 'textEn', 'quote', 'quoteTr'],
+              additionalProperties: false,
+            },
+            description: 'List of insights with corroborating quotes from the text',
+          },
+          exclusions: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                text: {
+                  type: 'string',
+                  description: 'The exclusion text',
+                },
+                textEn: {
+                  type: 'string',
+                  description: 'The English translation of the exclusion text',
+                },
+                quote: {
+                  type: 'string',
+                  description:
+                    'The exact verbatim quote from the raw document that proves this exclusion. DO NOT paraphrase.',
+                },
+                quoteTr: {
+                  type: ['string', 'null'],
+                  description:
+                    'If the original quote is NOT in Turkish, provide its Turkish translation here. If the original is already in Turkish, set to null.',
+                },
+              },
+              required: ['text', 'textEn', 'quote', 'quoteTr'],
+              additionalProperties: false,
+            },
+            description: 'List of exclusions with corroborating quotes from the text',
+          },
+        },
+        required: ['insights', 'exclusions'],
+        additionalProperties: false,
+        description:
+          'Verbatim evidence quotes from the source document for insights and exclusions',
+      },
+      clauseGraph: {
+        type: 'object',
+        properties: {
+          edges: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                sourceId: { type: 'string', description: 'Name of the source coverage or clause' },
+                targetId: {
+                  type: ['string', 'null'],
+                  description: 'Name of the target coverage or clause. Use null if ambiguous.',
+                },
+                relationshipType: {
+                  type: 'string',
+                  enum: [
+                    'coverage_inclusion',
+                    'conditional_restriction',
+                    'deductible_trigger',
+                    'sublimit',
+                    'carve_out',
+                    'endorsement_override',
+                    'service_benefit_linkage',
+                  ],
+                  description: 'Type of relationship',
+                },
+                description: {
+                  type: ['string', 'null'],
+                  description: 'Explanation of the relationship',
+                },
+                isCandidate: {
+                  type: 'boolean',
+                  description:
+                    'Set to true if this relationship is unclear or ambiguous and needs review',
+                },
+              },
+              required: ['sourceId', 'targetId', 'relationshipType', 'description', 'isCandidate'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['edges'],
+        additionalProperties: false,
+        description:
+          'A graph representing relationships and overrides between clauses and coverages',
       },
       amendmentInfo: {
         type: 'object',
@@ -249,7 +369,10 @@ export const EXTRACTION_JSON_SCHEMA = {
       'coverages',
       'specialConditions',
       'exclusions',
+      'exclusionsEn',
       'conditionalDeductibles',
+      'evidence',
+      'clauseGraph',
       'amendmentInfo',
       'confidence',
     ],
