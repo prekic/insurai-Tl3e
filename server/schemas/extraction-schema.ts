@@ -32,7 +32,10 @@ export const EXTRACTION_JSON_SCHEMA = {
       },
       policyType: {
         anyOf: [
-          { type: 'string', enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat'] },
+          {
+            type: 'string',
+            enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat'],
+          },
           { type: 'null' },
         ],
         description: 'Type of insurance policy',
@@ -91,7 +94,10 @@ export const EXTRACTION_JSON_SCHEMA = {
             },
             category: {
               anyOf: [
-                { type: 'string', enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other'] },
+                {
+                  type: 'string',
+                  enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other'],
+                },
                 { type: 'null' },
               ],
               description:
@@ -99,7 +105,15 @@ export const EXTRACTION_JSON_SCHEMA = {
             },
           },
           // STRICT MODE: ALL properties must be in required
-          required: ['name', 'limit', 'deductible', 'description', 'isUnlimited', 'isMarketValue', 'category'],
+          required: [
+            'name',
+            'limit',
+            'deductible',
+            'description',
+            'isUnlimited',
+            'isMarketValue',
+            'category',
+          ],
           additionalProperties: false,
         },
         description: 'List of coverage items found in the policy',
@@ -113,6 +127,33 @@ export const EXTRACTION_JSON_SCHEMA = {
         type: 'array',
         items: { type: 'string' },
         description: 'What is NOT covered',
+      },
+      conditionalDeductibles: {
+        type: ['array', 'null'],
+        items: {
+          type: 'object',
+          properties: {
+            trigger: {
+              type: 'string',
+              description:
+                'What triggers the deductible (e.g. "driver under 26", "license < 3 years", "non-contracted service", "partial loss")',
+            },
+            rate: {
+              type: 'string',
+              description:
+                'The deductible amount or percentage as written (e.g. "%35", "20%", "5000 TL")',
+            },
+            evidence: {
+              type: 'string',
+              description:
+                'Verbatim direct quote from the policy text proving this deductible exists. DO NOT paraphrase.',
+            },
+          },
+          required: ['trigger', 'rate', 'evidence'],
+          additionalProperties: false,
+        },
+        description:
+          'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible with verbatim evidence. Return null if none present.',
       },
       amendmentInfo: {
         type: 'object',
@@ -208,6 +249,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       'coverages',
       'specialConditions',
       'exclusions',
+      'conditionalDeductibles',
       'amendmentInfo',
       'confidence',
     ],

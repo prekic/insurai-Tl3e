@@ -2025,13 +2025,35 @@ async function convertToAnalyzedPolicy(
   }
 
   // ── Classify exclusions vs conditional deductibles ──────────────────
-  // AI extraction dumps everything into exclusions[]. Items that describe
-  // scenario-based deductibles (e.g. "%35 tenzili muafiyet") or repair
-  // conditions belong in a separate conditionalDeductibles section.
+  // AI extraction (legacy path) dumps everything into exclusions[]. Items
+  // that describe scenario-based deductibles (e.g. "%35 tenzili muafiyet")
+  // or repair conditions belong in a separate conditionalDeductibles
+  // section. classifyExclusions() splits them post-hoc via regex.
+  //
+  // Newer schema (Apr 2026+): the LLM may populate a structured
+  // `conditionalDeductibles` array directly. When non-empty, prefer the
+  // structured data (it carries explicit trigger/rate/evidence triplets
+  // that the regex path cannot reconstruct). We still run classifyExclusions
+  // to split the exclusions array, but we do not overwrite the structured
+  // conditionalDeductibles. Precedent: same conditional-merge pattern used
+  // for exclusionsEn above.
   {
     const classified = classifyExclusions(basePolicy.exclusions)
     basePolicy.exclusions = classified.trueExclusions
-    basePolicy.conditionalDeductibles = classified.conditionalDeductibles
+    const llmProvided = Array.isArray(data.conditionalDeductibles)
+      ? data.conditionalDeductibles.filter((d) => d && typeof d === 'object')
+      : []
+    if (llmProvided.length > 0) {
+      // Keep LLM-structured entries as-is (plus any regex-derived strings as
+      // additional context). Store as stringified "trigger — rate — evidence"
+      // to match AnalyzedPolicy.conditionalDeductibles shape (string[]).
+      const fromLlm = llmProvided.map((d) =>
+        `${d.trigger || ''} — ${d.rate || ''}${d.evidence ? ` (${d.evidence})` : ''}`.trim()
+      )
+      basePolicy.conditionalDeductibles = [...fromLlm, ...classified.conditionalDeductibles]
+    } else {
+      basePolicy.conditionalDeductibles = classified.conditionalDeductibles
+    }
     if (classified.maxDeductiblePercent > 0) {
       basePolicy.deductiblePercent = classified.maxDeductiblePercent
     }
