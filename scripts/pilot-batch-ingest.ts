@@ -176,6 +176,29 @@ const CONDITIONAL_DEDUCTIBLE_PATTERNS: RegExp[] = [
   /pert.*tenzil/i,
 ]
 
+/**
+ * Clamp LLM-reported confidence to the deterministic extraction quality score.
+ * Used to resolve Finding #1 Round-2: gpt-4o-mini self-rates confidence at 0.99-1.00
+ * even for extractions the validator flags with multiple warnings/errors. The
+ * extractionQualityScore (0-100) from scoring.ts:63-102 is the ground-truth signal
+ * (formula: confidence*100 - 30*errors - 10*warnings, clamped). Taking the minimum
+ * ensures persisted confidence can never exceed what the validator is willing to
+ * vouch for.
+ *
+ * If quality score is undefined (e.g., analysis bundle failed to build), pass the
+ * raw confidence through unchanged — the clamp must never introduce new failures.
+ */
+function demoteConfidenceForQuality(
+  rawConfidence: number,
+  extractionQualityScore: number | undefined
+): number {
+  if (typeof extractionQualityScore !== 'number' || !Number.isFinite(extractionQualityScore)) {
+    return rawConfidence
+  }
+  const qualityNormalized = Math.max(0, Math.min(100, extractionQualityScore)) / 100
+  return Math.min(rawConfidence, qualityNormalized)
+}
+
 function detectConditionalDeductibles(extractedData: any): boolean {
   const sources: string[] = []
   // Explicit conditionalDeductibles array (preferred)
@@ -373,6 +396,7 @@ async function runDownstreamPipeline(extractedData: any) {
   return {
     normalized,
     validation,
+    analysis,
     displayResult,
     phraseClean: foundPhrases.length === 0,
     foundPhrases,
@@ -625,6 +649,17 @@ async function main() {
         // see in CLI output. See assessment Finding #6.
         qaRecord.displayMode = downstream.displayResult.mode
         qaRecord.triggersFired = downstream.displayResult.triggers.map((t: any) => t.triggerRule)
+        // Demote confidence to at most the deterministic extraction quality score.
+        // gpt-4o-mini self-rates at 0.99-1.00 regardless of validator defects; this
+        // clamp ensures pilot metrics reflect real quality, not LLM self-flattery.
+        // See assessment Finding #1 Round-2.
+        const rawConfidence = qaRecord.confidenceScore
+        const qualityScore =
+          downstream.analysis?.scoreBundle?.scores?.extractionQualityScore?.scoreValue
+        qaRecord.confidenceScore = demoteConfidenceForQuality(rawConfidence, qualityScore)
+        console.log(
+          `  Confidence: LLM ${rawConfidence.toFixed(2)} → quality-clamped ${qaRecord.confidenceScore.toFixed(2)} (quality score: ${qualityScore ?? 'n/a'})`
+        )
       }
     } catch (err: any) {
       console.log(`  Pipeline error: ${err.message}`)
