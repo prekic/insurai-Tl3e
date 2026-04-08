@@ -209,7 +209,19 @@ export const EXTRACTION_JSON_SCHEMA = {
                 'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
           },
-          required: ['name', 'nameTr', 'isUnlimited', 'isMarketValue'],
+          // STRICT MODE: ALL properties must be in required (Issue #331).
+          // limit, deductible, description, category are nullable types so the
+          // LLM can return null when it can't determine a value.
+          required: [
+            'name',
+            'nameTr',
+            'limit',
+            'deductible',
+            'description',
+            'isUnlimited',
+            'isMarketValue',
+            'category',
+          ],
           additionalProperties: false,
         },
         description:
@@ -407,7 +419,9 @@ export const EXTRACTION_JSON_SCHEMA = {
                     'Set to true if this relationship is unclear or ambiguous and needs review',
                 },
               },
-              required: ['sourceId', 'targetId', 'relationshipType', 'isCandidate'],
+              // STRICT MODE: ALL properties must be in required (Issue #331).
+              // description is a nullable type so the LLM can return null.
+              required: ['sourceId', 'targetId', 'relationshipType', 'description', 'isCandidate'],
               additionalProperties: false,
             },
           },
@@ -432,6 +446,11 @@ export const EXTRACTION_JSON_SCHEMA = {
         description: 'Confidence scores for extracted fields',
       },
     },
+    // STRICT MODE: ALL top-level properties must be in required (Issue #331).
+    // exclusionsEn and conditionalDeductibles are nullable types, so the LLM
+    // can return null and still satisfy the requirement. Removing them from
+    // required would require also removing them from properties, which would
+    // break extraction quality for Turkish KASKO docs that need them.
     required: [
       'policyNumber',
       'provider',
@@ -446,6 +465,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       'coverages',
       'specialConditions',
       'exclusions',
+      'exclusionsEn',
+      'conditionalDeductibles',
       'amendmentInfo',
       'evidence',
       'clauseGraph',
