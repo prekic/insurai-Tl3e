@@ -272,13 +272,25 @@ async function extractWithLLM(
   documentText: string,
   provider: 'openai' | 'anthropic'
 ): Promise<{ success: boolean; data?: any; model?: string; error?: string }> {
-  // Import production extraction prompt directly. extraction-schema.ts is
-  // Vite-env-free (only imports a type from src/types/policy.ts), so it's
-  // safe to pull into a standalone tsx script. Do NOT import from
-  // src/lib/ai/providers/openai.ts or src/lib/ai/config.ts — those touch
-  // `import.meta.env` and crash under `npx tsx`.
+  // Import production extraction prompt + JSON schema. The PROMPT comes
+  // from the client extraction-schema.ts (the only place EXTRACTION_SYSTEM_PROMPT
+  // is exported). The SCHEMA comes from the server extraction-schema.ts because
+  // (a) it's explicitly strict-mode compliant ("ALL properties must be in required"
+  // per the file header) and (b) the client schema has a latent bug where
+  // coverages.items.required is missing fields, causing OpenAI's strict mode
+  // to reject it. Both files are Vite-env-free and safe to import from a
+  // standalone tsx script.
   const { EXTRACTION_SYSTEM_PROMPT } = await import('../src/lib/ai/extraction-schema')
+  const { EXTRACTION_JSON_SCHEMA } = await import('../server/schemas/extraction-schema')
   const systemPrompt = EXTRACTION_SYSTEM_PROMPT
+
+  // We use OpenAI's strict json_schema response mode (not json_object) so
+  // gpt-4o-mini is forced to return ALL required fields including provider.
+  // Without strict schema enforcement, gpt-4o-mini under-extracts when given
+  // the production prompt — it drops provider/insuredName fields, which
+  // breaks the downstream analysis pipeline (some helpers .toLowerCase()
+  // these fields without null checks).
+  const userMessage = documentText
 
   try {
     if (provider === 'openai') {
@@ -288,10 +300,13 @@ async function extractWithLLM(
         model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: documentText },
+          { role: 'user', content: userMessage },
         ],
         temperature: 0.1,
-        response_format: { type: 'json_object' },
+        response_format: {
+          type: 'json_schema',
+          json_schema: EXTRACTION_JSON_SCHEMA as any,
+        },
         max_tokens: 4096,
       })
       const content = resp.choices[0]?.message?.content
@@ -301,10 +316,15 @@ async function extractWithLLM(
       const { default: Anthropic } = await import('@anthropic-ai/sdk')
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
       const resp = await anthropic.messages.create({
-        model: 'claude-3-5-haiku-latest',
+        // Pinned to a current model. Both 'claude-3-5-haiku-latest' (alias)
+        // and 'claude-3-5-haiku-20241022' (dated) are now retired (post-EOL
+        // April 2026). claude-haiku-4-5-20251001 is the current cheap haiku
+        // per CLAUDE.md. Production extraction uses DB-managed config; we
+        // hardcode here to avoid the alias breakage.
+        model: 'claude-haiku-4-5-20251001',
         max_tokens: 4096,
         system: systemPrompt,
-        messages: [{ role: 'user', content: documentText }],
+        messages: [{ role: 'user', content: userMessage }],
       })
       const text = resp.content
         .filter((b: any) => b.type === 'text')
@@ -312,7 +332,7 @@ async function extractWithLLM(
         .join('')
       const jsonMatch = text.match(/\{[\s\S]*\}/)
       if (!jsonMatch) return { success: false, error: 'No JSON in response' }
-      return { success: true, data: JSON.parse(jsonMatch[0]), model: 'claude-3-5-haiku' }
+      return { success: true, data: JSON.parse(jsonMatch[0]), model: 'claude-haiku-4-5-20251001' }
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Unknown error' }
@@ -559,7 +579,9 @@ async function main() {
 
     if (!llmResult.success && !forcedProvider) {
       const fallback = primary === 'openai' ? 'anthropic' : 'openai'
-      console.log(`  ${primary} failed, trying ${fallback}...`)
+      console.log(
+        `  ${primary} failed (${llmResult.error || 'unknown error'}), trying ${fallback}...`
+      )
       llmResult = await extractWithLLM(llmText, fallback as 'openai' | 'anthropic')
     }
 
