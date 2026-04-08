@@ -93,7 +93,12 @@ async function extractTextFromPdfFile(
   }
 }
 
-function buildSectionAwareText(fullText: string, maxChars: number = 32000): string {
+// Default budget chosen so typical KASKO policies (10-25 pages, up to ~80K chars)
+// fit without truncation. gpt-4o-mini context window is 128K tokens (~384K chars),
+// so 96K chars leaves comfortable headroom for prompt + response. The head/tail
+// collapse remains as a safety net for hypothetical 100+ page edge cases. See
+// assessment Finding #2.
+function buildSectionAwareText(fullText: string, maxChars: number = 96000): string {
   if (fullText.length <= maxChars) return fullText
   const HEAD_RATIO = 0.625
   const headSize = Math.floor(maxChars * HEAD_RATIO)
@@ -101,6 +106,128 @@ function buildSectionAwareText(fullText: string, maxChars: number = 32000): stri
   const head = fullText.substring(0, headSize)
   const tail = fullText.substring(fullText.length - tailSize)
   return head + '\n\n[... document middle section omitted for length ...]\n\n' + tail
+}
+
+// ---------------------------------------------------------------------------
+// Inlined helpers
+// ---------------------------------------------------------------------------
+// These are local copies of production utilities (policy-extractor.ts) that
+// cannot be imported directly because policy-extractor.ts pulls in Vite-env-
+// dependent code (`import.meta.env`) which crashes under standalone `npx tsx`.
+// See CLAUDE.md gotchas #16 and #45. Keep in sync with the production source
+// referenced below if you modify either side.
+
+// Mirrors src/lib/ai/policy-extractor.ts:173-179
+const DEFAULT_CONFIDENCE_WEIGHTS = {
+  policyNumber: 0.2,
+  provider: 0.15,
+  dates: 0.2,
+  premium: 0.2,
+  coverages: 0.25,
+}
+
+// Mirrors src/lib/ai/policy-extractor.ts:186-224
+function recalculateOverallConfidence(
+  confidence:
+    | {
+        overall?: number
+        policyNumber?: number
+        provider?: number
+        dates?: number
+        premium?: number
+        coverages?: number
+      }
+    | undefined
+    | null,
+  fallback: number,
+  weights = DEFAULT_CONFIDENCE_WEIGHTS
+): number {
+  if (!confidence) return fallback
+  const pn = confidence.policyNumber
+  const pr = confidence.provider
+  const dt = confidence.dates
+  const pm = confidence.premium
+  const cv = confidence.coverages
+  // If any per-field score is missing, fall back to the model-reported overall
+  if (pn == null || pr == null || dt == null || pm == null || cv == null) {
+    return typeof confidence.overall === 'number' ? confidence.overall : fallback
+  }
+  return (
+    pn * weights.policyNumber +
+    pr * weights.provider +
+    dt * weights.dates +
+    pm * weights.premium +
+    cv * weights.coverages
+  )
+}
+
+// Mirrors src/lib/ai/policy-extractor.ts:2648-2658 (classifyExclusions patterns).
+// Used to detect conditional deductibles in any text source — coverages,
+// exclusions, specialConditions, or the explicit conditionalDeductibles array.
+const CONDITIONAL_DEDUCTIBLE_PATTERNS: RegExp[] = [
+  /muafiyet/i,
+  /tenzil/i,
+  /%\s*\d+/i,
+  /\d+\s*%/i,
+  /anlaşmalı olmayan.*servis/i,
+  /anlaşmasız.*servis/i,
+  /onarım.*muafiyet/i,
+  /pert.*muafiyet/i,
+  /pert.*tenzil/i,
+]
+
+function detectConditionalDeductibles(extractedData: any): boolean {
+  const sources: string[] = []
+  // Explicit conditionalDeductibles array (preferred)
+  if (Array.isArray(extractedData.conditionalDeductibles)) {
+    for (const cd of extractedData.conditionalDeductibles) {
+      if (cd && typeof cd === 'object') {
+        sources.push(`${cd.trigger || ''} ${cd.rate || ''} ${cd.evidence || ''}`)
+      } else if (typeof cd === 'string') {
+        sources.push(cd)
+      }
+    }
+  }
+  if (Array.isArray(extractedData.specialConditions)) {
+    for (const sc of extractedData.specialConditions) {
+      if (typeof sc === 'string') sources.push(sc)
+    }
+  }
+  if (Array.isArray(extractedData.exclusions)) {
+    for (const ex of extractedData.exclusions) {
+      if (typeof ex === 'string') sources.push(ex)
+    }
+  }
+  if (Array.isArray(extractedData.coverages)) {
+    for (const cov of extractedData.coverages) {
+      if (cov?.description && typeof cov.description === 'string') sources.push(cov.description)
+    }
+  }
+  return sources.some((text) => CONDITIONAL_DEDUCTIBLE_PATTERNS.some((p) => p.test(text)))
+}
+
+function countSourceQuotes(extractedData: any): number {
+  let count = 0
+  if (Array.isArray(extractedData.coverages)) {
+    for (const cov of extractedData.coverages) {
+      if (cov?.sourceQuote && typeof cov.sourceQuote === 'string' && cov.sourceQuote.trim()) {
+        count++
+      }
+    }
+  }
+  if (Array.isArray(extractedData.conditionalDeductibles)) {
+    for (const cd of extractedData.conditionalDeductibles) {
+      if (cd?.evidence && typeof cd.evidence === 'string' && cd.evidence.trim()) {
+        count++
+      }
+    }
+  }
+  if (Array.isArray(extractedData.exclusionEvidence)) {
+    for (const ev of extractedData.exclusionEvidence) {
+      if (typeof ev === 'string' && ev.trim()) count++
+    }
+  }
+  return count
 }
 
 // ---------------------------------------------------------------------------
@@ -133,13 +260,45 @@ Return ONLY valid JSON with these fields:
     "isMarketValue": boolean,
     "isUnlimited": boolean,
     "included": true,
-    "category": "main"|"liability"|"supplementary"|"assistance"|"legal"|"other"
+    "category": "main"|"liability"|"supplementary"|"assistance"|"legal"|"other",
+    "sourceQuote": "string — 1-2 line direct quote from the policy text proving this coverage exists; copy verbatim, do not paraphrase"
   }],
   "exclusions": ["string"],
+  "exclusionEvidence": ["string — for each exclusion above (same index), a direct quote from policy text"],
   "specialConditions": ["string"],
-  "confidence": { "overall": number between 0 and 1 }
+  "conditionalDeductibles": [{
+    "trigger": "string — what triggers the deductible (e.g. 'driver under 26', 'license < 3 years', 'non-contracted service', 'partial loss')",
+    "rate": "string — the deductible amount or percentage as written (e.g. '%35', '20%', '5000 TL')",
+    "evidence": "string — direct quote from policy text proving this deductible exists"
+  }],
+  "confidence": {
+    "policyNumber": <number 0-1>,
+    "provider": <number 0-1>,
+    "dates": <number 0-1>,
+    "premium": <number 0-1>,
+    "coverages": <number 0-1>,
+    "overall": <number 0-1 — your holistic estimate; the script will recompute a weighted overall too>
+  }
 }
-Focus on: conditional deductibles, muafiyet/tenzili muafiyet, age/license restrictions.`
+
+CONFIDENCE RUBRIC — apply per field:
+- 0.95-1.0: Field is explicitly stated in source text, unambiguous, formatted normally
+- 0.75-0.9: Field is present but slightly ambiguous, abbreviated, or unusually formatted
+- 0.5-0.75: Field is partially readable or inferred from context (not directly stated)
+- 0.3-0.5: Field is uncertain or only weakly suggested
+- 0.0-0.3: Field is missing, contradictory, or unreadable
+DO NOT default every field to 0.95. Only use 0.95+ when the field is genuinely
+explicit and verifiable from a single sentence in the source. If you had to guess,
+infer, or read across multiple sections, use 0.6-0.8.
+
+EXTRACTION FOCUS:
+- All conditional deductibles MUST be enumerated in the conditionalDeductibles array
+  with explicit trigger/rate/evidence. Examples: muafiyet, tenzili muafiyet,
+  age-based deductibles ("25 yaş altı sürücü"), license-tenure deductibles
+  ("ehliyetin 3 yıldan az olması"), non-contracted service penalties
+  ("anlaşmalı olmayan servis"), partial loss deductibles, total loss deductibles.
+- Every coverage and conditional deductible MUST have a verbatim source quote.
+- exclusionEvidence array indices MUST correspond to exclusions array indices.`
 
   try {
     if (provider === 'openai') {
@@ -244,18 +403,30 @@ async function evaluatePilotAdmissionForBatch(extractedData: any, textLength: nu
   qaRecord.countedInPilotMetrics = admission.countedInPilotMetrics
   qaRecord.coverageCountExtracted = extractedData.coverages?.length || 0
   qaRecord.specialConditionCount = extractedData.specialConditions?.length || 0
-  qaRecord.confidenceScore = extractedData.confidence?.overall || 0
+
+  // Confidence: prefer per-field weighted recalculation; fall back to model overall.
+  // See assessment Finding #1 and CLAUDE.md gotcha — production uses the same
+  // weighted formula via DEFAULT_CONFIDENCE_WEIGHTS.
+  qaRecord.confidenceScore = recalculateOverallConfidence(
+    extractedData.confidence,
+    typeof extractedData.confidence?.overall === 'number' ? extractedData.confidence.overall : 0
+  )
 
   // WS-1 fields
   qaRecord.hasRayicDeger = extractedData.coverages?.some((c: any) => c.isMarketValue) || false
-  qaRecord.hasConditionalDeductible = (extractedData.specialConditions || []).some(
-    (sc: string) => sc.toLowerCase().includes('muafiyet') || sc.toLowerCase().includes('tenzil')
-  )
-  qaRecord.sourceQuoteCount = 0 // Evidence not available in simplified pipeline
+  // Conditional deductible detection now scans all sources (conditionalDeductibles
+  // array, specialConditions, exclusions, coverage descriptions) using production's
+  // regex pattern set. See assessment Finding #3.
+  qaRecord.hasConditionalDeductible = detectConditionalDeductibles(extractedData)
+  // Evidence quote count: sums sourceQuotes from coverages, evidence from
+  // conditionalDeductibles, and exclusionEvidence entries. See Finding #7.
+  qaRecord.sourceQuoteCount = countSourceQuotes(extractedData)
   qaRecord.zeroCoverage = (extractedData.coverages?.length || 0) === 0
 
-  // Display mode
-  const dm = evaluateSimpleDisplayMode(extractedData.confidence?.overall || 0, {
+  // Display mode (lightweight QA-time evaluator). NOTE: this verdict is later
+  // overwritten in pilot-batch-ingest main loop with the strict
+  // evaluateDisplayMode() result from runDownstreamPipeline(). See Finding #6.
+  const dm = evaluateSimpleDisplayMode(qaRecord.confidenceScore, {
     policyNumber: extractedData.policyNumber,
     provider: extractedData.provider,
     coverages: extractedData.coverages,
@@ -448,6 +619,12 @@ async function main() {
       if (qaRecord) {
         qaRecord.phraseClean = downstream.phraseClean
         qaRecord.foundProhibitedPhrases = downstream.foundPhrases
+        // Sync display mode + triggers from the strict (full ValidationResult-based)
+        // evaluator. Without this, the QA record persists the lightweight
+        // evaluateSimpleDisplayMode() verdict which can disagree with what reviewers
+        // see in CLI output. See assessment Finding #6.
+        qaRecord.displayMode = downstream.displayResult.mode
+        qaRecord.triggersFired = downstream.displayResult.triggers.map((t: any) => t.triggerRule)
       }
     } catch (err: any) {
       console.log(`  Pipeline error: ${err.message}`)
