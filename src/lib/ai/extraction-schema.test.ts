@@ -5,6 +5,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { EXTRACTION_JSON_SCHEMA, EXTRACTION_SYSTEM_PROMPT } from './extraction-schema'
+import { validateStrictCompliance } from './strict-mode-validator'
 import type { ExtractedPolicyData, ExtractedCoverage } from './extraction-schema'
 
 // =============================================================================
@@ -461,5 +462,21 @@ describe('Schema Validity', () => {
     for (const field of required) {
       expect(properties).toContain(field)
     }
+  })
+})
+
+// =============================================================================
+// OpenAI Strict Mode Compliance (recursive validation)
+// =============================================================================
+
+describe('EXTRACTION_JSON_SCHEMA strict mode compliance', () => {
+  it('should have all nested objects with all properties in required', () => {
+    const errors = validateStrictCompliance(EXTRACTION_JSON_SCHEMA.schema)
+
+    if (errors.length > 0) {
+      console.error('Strict mode compliance errors:', errors)
+    }
+
+    expect(errors).toHaveLength(0)
   })
 })

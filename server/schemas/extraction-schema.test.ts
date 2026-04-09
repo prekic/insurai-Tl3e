@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { EXTRACTION_JSON_SCHEMA } from './extraction-schema'
+import { validateStrictCompliance } from './strict-mode-validator'
 
 describe('EXTRACTION_JSON_SCHEMA', () => {
   it('should have correct top-level structure', () => {
@@ -49,6 +50,10 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
       // name is required string (not nullable)
       expect(props.name.type).toBe('string')
 
+      // nameTr is nullable string (Turkish coverage name)
+      expect(props.nameTr.type).toContain('string')
+      expect(props.nameTr.type).toContain('null')
+
       // limit, deductible, description are nullable
       expect(props.limit.type).toContain('null')
       expect(props.deductible.type).toContain('null')
@@ -62,6 +67,11 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
       const category = props.category as { anyOf: Array<{ type: string; enum?: string[] }> }
       expect(category.anyOf).toBeDefined()
       expect(category.anyOf).toHaveLength(2)
+    })
+
+    it('should have nameTr field for Turkish coverage names', () => {
+      expect(coverageSchema.properties.nameTr).toBeDefined()
+      expect(coverageSchema.required).toContain('nameTr')
     })
   })
 
@@ -158,7 +168,8 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
     })
 
     it('should use anyOf pattern for nullable coverage category enum', () => {
-      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties.category as {
+      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties
+        .category as {
         anyOf: Array<{ type: string; enum?: string[] }>
       }
 
@@ -181,52 +192,15 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
     })
   })
 
+  describe('currency description correctness', () => {
+    it('should NOT instruct to default to TRY', () => {
+      const currencyDesc = EXTRACTION_JSON_SCHEMA.schema.properties.currency.description
+      expect(currencyDesc).not.toContain('Default to TRY')
+      expect(currencyDesc).toContain('DO NOT default')
+    })
+  })
+
   describe('OpenAI strict mode compliance', () => {
-    /**
-     * Helper to recursively check that all object schemas have
-     * all their properties in the required array
-     */
-    function validateStrictCompliance(
-      schema: Record<string, unknown>,
-      path: string = 'root'
-    ): string[] {
-      const errors: string[] = []
-
-      if (schema.type === 'object' && schema.properties) {
-        const properties = Object.keys(schema.properties as Record<string, unknown>)
-        const required = (schema.required as string[]) || []
-
-        // Check all properties are in required
-        for (const prop of properties) {
-          if (!required.includes(prop)) {
-            errors.push(`${path}.${prop} is not in required array`)
-          }
-        }
-
-        // Check additionalProperties is false
-        if (schema.additionalProperties !== false) {
-          errors.push(`${path} does not have additionalProperties: false`)
-        }
-
-        // Recurse into nested object properties
-        for (const [key, value] of Object.entries(schema.properties as Record<string, unknown>)) {
-          const propSchema = value as Record<string, unknown>
-          if (propSchema.type === 'object') {
-            errors.push(...validateStrictCompliance(propSchema, `${path}.${key}`))
-          }
-        }
-      }
-
-      if (schema.type === 'array' && schema.items) {
-        const itemSchema = schema.items as Record<string, unknown>
-        if (itemSchema.type === 'object') {
-          errors.push(...validateStrictCompliance(itemSchema, `${path}[]`))
-        }
-      }
-
-      return errors
-    }
-
     it('should have all nested objects with all properties in required', () => {
       const errors = validateStrictCompliance(EXTRACTION_JSON_SCHEMA.schema)
 
