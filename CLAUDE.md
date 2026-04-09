@@ -2674,6 +2674,19 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 - **Risk**: If someone tightens the RLS based on the misleading comment (e.g., restricts to `service_role`), both `persistPilotQARecord()` and `usePilotGateOptions` will silently fail — pilot QA records won't persist and the gate will always return inactive
 - To properly restrict: update RLS to allow `anon` SELECT on `user_segments` and `anon` INSERT on `kasko_pilot_qa_records`, then restrict other operations to `service_role`
 
+**Stale Local `main` Mismatches `origin/main` After Sandbox Merges (Added Apr 9, 2026):**
+- The Claude Code sandbox does **not** automatically fast-forward local `main` after a PR is merged on GitHub. This means `git diff main...HEAD --name-status` can return a phantom list of files that look "unmerged" but are already on `origin/main`.
+- **Concrete example from Apr 9 audit**: local `main` was at `4eb31494...` (pre-PR #334) while `origin/main` was at `62e95cd...` (post-PR #334). `git diff main...HEAD` returned **34 files**; `git diff origin/main...HEAD` returned **1 file**. An agent trusting the first command would have re-documented all 34 files as if they were new work.
+- **Always use `origin/main` as the truth source** when auditing branch scope: `git fetch origin main && git diff origin/main...HEAD --name-status`. Never trust local `main` without an explicit `git fetch` first.
+- **Detection commands**: `git rev-parse main && git rev-parse origin/main` — if SHAs differ, local main is stale.
+- This is also why `git log main..HEAD --oneline` can be misleading post-merge — same root cause.
+
+**Vitest Bundler Resolver Ignores `tsconfig.rootDir` (Added Apr 9, 2026):**
+- Vitest uses esbuild with bundler-style module resolution and **does not enforce** `tsconfig.rootDir` constraints. This means a server test file at `server/__tests__/foo.test.ts` can `import` from `../../src/lib/...` and pass at test time, even though `tsc -p server/tsconfig.json` would reject the same import with TS6059.
+- **Useful pattern**: cross-rootDir imports in test files can break the parity gap between client and server schemas (e.g., the planned `extraction-schema-parity.test.ts` in PR-B imports both `src/lib/ai/extraction-schema` and `server/schemas/extraction-schema`).
+- **Critical safety constraint**: only safe inside `server/__tests__/**` because `server/tsconfig.json` excludes that directory from the production build (`exclude: ["__tests__/**/*"]`). If anyone loosens that exclude, the cross-rootDir import will break the prod build with TS6059.
+- **Mitigation**: add an inline comment to any cross-rootDir test file warning future maintainers that the import only works because vitest ignores rootDir. Do NOT use this pattern in non-test files — it will fail under tsc.
+
 ---
 
 ## CI/CD
