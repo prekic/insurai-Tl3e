@@ -1,21 +1,23 @@
 /**
- * Server-side Extraction Schema
+ * Canonical Extraction JSON Schema — Single Source of Truth
  *
- * JSON Schema for OpenAI structured output with strict mode.
+ * This is the unified schema used by BOTH client (via Vite bundler) and
+ * server (via tsc with rootDir: ".."). Previously duplicated across:
+ *   - src/lib/ai/extraction-schema.ts (client copy — now re-exports)
+ *   - server/schemas/extraction-schema.ts (server copy — deleted)
  *
- * IMPORTANT: OpenAI strict mode requirements:
- * 1. ALL properties must be listed in 'required' at every level
- * 2. additionalProperties must be false at every level
- * 3. For nullable types, use type: ['string', 'null'] etc.
- * 4. For nullable enums, include null in the enum array AND in the type array
+ * OpenAI strict mode requirements enforced here:
+ *   1. ALL properties must be listed in 'required' at every level
+ *   2. additionalProperties must be false at every level
+ *   3. For nullable types, use type: ['string', 'null'] etc.
+ *   4. For nullable enums, include null in the enum array AND in the type array
+ *
+ * When adding new fields:
+ *   - Add to properties AND required (strict mode)
+ *   - Update the test count assertion in src/lib/ai/extraction-schema.test.ts
+ *   - Run: npx vitest run src/lib/ai/extraction-schema.test.ts
  */
 
-/**
- * JSON Schema for OpenAI structured output
- * Mirrors the client-side EXTRACTION_JSON_SCHEMA
- *
- * When strict: true, ALL properties at ALL levels must be in required.
- */
 export const EXTRACTION_JSON_SCHEMA = {
   name: 'policy_extraction',
   strict: true,
@@ -28,16 +30,11 @@ export const EXTRACTION_JSON_SCHEMA = {
       },
       provider: {
         type: ['string', 'null'],
-        description: 'Insurance company name (e.g., Allianz, Axa, Anadolu Sigorta)',
+        description: 'Insurance company name (e.g., Allianz, Axa, Mapfre)',
       },
       policyType: {
-        anyOf: [
-          {
-            type: 'string',
-            enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat'],
-          },
-          { type: 'null' },
-        ],
+        type: ['string', 'null'],
+        enum: ['kasko', 'traffic', 'home', 'health', 'life', 'dask', 'business', 'nakliyat', null],
         description: 'Type of insurance policy',
       },
       insuredName: {
@@ -58,7 +55,8 @@ export const EXTRACTION_JSON_SCHEMA = {
       },
       premium: {
         type: ['number', 'null'],
-        description: 'Total premium amount',
+        description:
+          'Total premium amount (Prim/Ödenecek Prim). DO NOT confuse with vehicle market value (Rayiç Bedel) which is usually in the millions.',
       },
       currency: {
         type: ['string', 'null'],
@@ -66,10 +64,8 @@ export const EXTRACTION_JSON_SCHEMA = {
           'Currency code - REQUIRED IF PRESENT. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Return null if no currency can be found. DO NOT default to TRY or any other currency. ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR) if found.',
       },
       paymentFrequency: {
-        anyOf: [
-          { type: 'string', enum: ['annual', 'semi-annual', 'quarterly', 'monthly'] },
-          { type: 'null' },
-        ],
+        type: ['string', 'null'],
+        enum: ['annual', 'semi-annual', 'quarterly', 'monthly', null],
         description: 'How often premium is paid',
       },
       coverages: {
@@ -77,7 +73,7 @@ export const EXTRACTION_JSON_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Coverage name/type' },
+            name: { type: 'string', description: 'Coverage name/type in English' },
             nameTr: {
               type: ['string', 'null'],
               description:
@@ -98,18 +94,15 @@ export const EXTRACTION_JSON_SCHEMA = {
               description: 'Set to true if limit shows "Rayiç Değer" (market value)',
             },
             category: {
-              anyOf: [
-                {
-                  type: 'string',
-                  enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other'],
-                },
-                { type: 'null' },
-              ],
+              type: ['string', 'null'],
+              enum: ['main', 'liability', 'supplementary', 'assistance', 'legal', 'other', null],
               description:
-                'Coverage category: main (Ana Teminat), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans), legal (Hukuki Koruma), other',
+                'Coverage category: main (Ana Teminat, vehicle/property value), liability (Mali Sorumluluk), supplementary (Ek Teminat), assistance (Asistans, İkame), legal (Hukuki Koruma), other',
             },
           },
-          // STRICT MODE: ALL properties must be in required
+          // STRICT MODE: ALL properties must be in required (Issue #331).
+          // limit, deductible, description, category are nullable types so the
+          // LLM can return null when it can't determine a value.
           required: [
             'name',
             'nameTr',
@@ -122,7 +115,8 @@ export const EXTRACTION_JSON_SCHEMA = {
           ],
           additionalProperties: false,
         },
-        description: 'List of coverage items found in the policy',
+        description:
+          'List of coverage items. IMPORTANT: Set isUnlimited=true for "Sınırsız", isMarketValue=true for "Rayiç Değer".',
       },
       specialConditions: {
         type: 'array',
@@ -148,12 +142,12 @@ export const EXTRACTION_JSON_SCHEMA = {
             trigger: {
               type: 'string',
               description:
-                'What triggers the deductible (e.g. "driver under 26", "license < 3 years", "non-contracted service", "partial loss")',
+                'What triggers the deductible (e.g. "driver under 26", "license < 3 years", "non-contracted service", "partial loss", "total loss")',
             },
             rate: {
               type: 'string',
               description:
-                'The deductible amount or percentage as written (e.g. "%35", "20%", "5000 TL")',
+                'The deductible amount or percentage as written in the policy (e.g. "%35", "20%", "5000 TL")',
             },
             evidence: {
               type: 'string',
@@ -165,7 +159,51 @@ export const EXTRACTION_JSON_SCHEMA = {
           additionalProperties: false,
         },
         description:
-          'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible with verbatim evidence. Return null if none present.',
+          'Structured conditional deductibles (muafiyet / tenzili muafiyet). List every scenario-triggered deductible: age-based, license-based, non-contracted service, repair-conditional, partial/total loss. Each entry MUST include a verbatim evidence quote. Return null or empty array ONLY if none are present in the document.',
+      },
+      amendmentInfo: {
+        type: 'object',
+        properties: {
+          isAmendment: {
+            type: 'boolean',
+            description:
+              'true if document is a Zeyilname/Amendment (contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ", "ENDORSEMENT", "DEĞİŞİKLİK NO")',
+          },
+          amendmentNumber: {
+            type: ['string', 'null'],
+            description:
+              'Amendment sequence number (e.g., "1/2024", "2/2024") from "NO: N/YYYY" or "Değişiklik No: N"',
+          },
+          amendmentDate: {
+            type: ['string', 'null'],
+            description: 'Effective date of amendment (Geçerlilik Tarihi) in YYYY-MM-DD format',
+          },
+          basePolicyNumber: {
+            type: ['string', 'null'],
+            description: 'Original policy number this amends (Ana Poliçe No)',
+          },
+          amendmentReason: {
+            type: ['string', 'null'],
+            description:
+              'Reason for amendment (e.g., "Sigortalı Talebi", "Prim Farkı", "Teminat Eklenmesi")',
+          },
+          premiumDifference: {
+            type: ['number', 'null'],
+            description:
+              'Premium change amount (Prim Farkı) - positive for increase, negative for refund',
+          },
+        },
+        required: [
+          'isAmendment',
+          'amendmentNumber',
+          'amendmentDate',
+          'basePolicyNumber',
+          'amendmentReason',
+          'premiumDifference',
+        ],
+        additionalProperties: false,
+        description:
+          'Amendment/Zeyilname detection - identifies if this is a policy change document',
       },
       evidence: {
         type: 'object',
@@ -182,7 +220,8 @@ export const EXTRACTION_JSON_SCHEMA = {
                 },
                 textEn: {
                   type: 'string',
-                  description: 'The English translation of the insight text',
+                  description:
+                    'The English translation of the insight text (e.g., "✓ Excellent health coverage" or "💡 Consider adding international coverage")',
                 },
                 quote: {
                   type: 'string',
@@ -207,16 +246,17 @@ export const EXTRACTION_JSON_SCHEMA = {
               properties: {
                 text: {
                   type: 'string',
-                  description: 'The exclusion text',
+                  description: 'The specific exclusion (e.g., "Deprem teminatı hariçtir")',
                 },
                 textEn: {
                   type: 'string',
-                  description: 'The English translation of the exclusion text',
+                  description:
+                    'The English translation of the exclusion text (e.g., "Earthquake coverage is excluded")',
                 },
                 quote: {
                   type: 'string',
                   description:
-                    'The exact verbatim quote from the raw document that proves this exclusion. DO NOT paraphrase.',
+                    'The exact verbatim quote from the raw document stating this exclusion. DO NOT paraphrase.',
                 },
                 quoteTr: {
                   type: ['string', 'null'],
@@ -232,8 +272,7 @@ export const EXTRACTION_JSON_SCHEMA = {
         },
         required: ['insights', 'exclusions'],
         additionalProperties: false,
-        description:
-          'Verbatim evidence quotes from the source document for insights and exclusions',
+        description: 'Verbatim evidence supporting the generated insights and exclusions',
       },
       clauseGraph: {
         type: 'object',
@@ -271,6 +310,8 @@ export const EXTRACTION_JSON_SCHEMA = {
                     'Set to true if this relationship is unclear or ambiguous and needs review',
                 },
               },
+              // STRICT MODE: ALL properties must be in required (Issue #331).
+              // description is a nullable type so the LLM can return null.
               required: ['sourceId', 'targetId', 'relationshipType', 'description', 'isCandidate'],
               additionalProperties: false,
             },
@@ -281,86 +322,26 @@ export const EXTRACTION_JSON_SCHEMA = {
         description:
           'A graph representing relationships and overrides between clauses and coverages',
       },
-      amendmentInfo: {
-        type: 'object',
-        properties: {
-          isAmendment: {
-            type: 'boolean',
-            description:
-              'true if document is a Zeyilname/Amendment (contains "ZEYİLNAME", "POLİÇE DEĞİŞİKLİĞİ")',
-          },
-          amendmentNumber: {
-            type: ['string', 'null'],
-            description: 'Amendment sequence number (e.g., "1/2024")',
-          },
-          amendmentDate: {
-            type: ['string', 'null'],
-            description: 'Effective date of amendment in YYYY-MM-DD format',
-          },
-          basePolicyNumber: {
-            type: ['string', 'null'],
-            description: 'Original policy number this amends',
-          },
-          amendmentReason: {
-            type: ['string', 'null'],
-            description: 'Reason for amendment',
-          },
-          premiumDifference: {
-            type: ['number', 'null'],
-            description: 'Premium change amount (can be negative)',
-          },
-        },
-        required: [
-          'isAmendment',
-          'amendmentNumber',
-          'amendmentDate',
-          'basePolicyNumber',
-          'amendmentReason',
-          'premiumDifference',
-        ],
-        additionalProperties: false,
-        description: 'Amendment/Zeyilname detection',
-      },
       confidence: {
         type: 'object',
         properties: {
-          overall: {
-            type: 'number',
-            description:
-              'Weighted average of per-field scores: policyNumber*0.20 + provider*0.15 + dates*0.20 + premium*0.20 + coverages*0.25. A clearly printed document with readable fields should score 0.85-0.95.',
-          },
-          policyNumber: {
-            type: 'number',
-            description:
-              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred, 0.1-0.4=guessed, 0.0=not found',
-          },
-          provider: {
-            type: 'number',
-            description:
-              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred, 0.1-0.4=guessed, 0.0=not found',
-          },
-          dates: {
-            type: 'number',
-            description:
-              '1.0=both dates found clearly, 0.8-0.9=dates found with minor ambiguity, 0.5-0.7=only one date or format unclear, 0.0=not found',
-          },
-          premium: {
-            type: 'number',
-            description:
-              '1.0=found explicitly, 0.8-0.9=found with minor ambiguity, 0.5-0.7=inferred from context, 0.1-0.4=guessed, 0.0=not found',
-          },
-          coverages: {
-            type: 'number',
-            description:
-              '1.0=all coverages clearly listed with limits, 0.8-0.9=most coverages found, 0.5-0.7=partial coverage list, 0.1-0.4=few coverages found, 0.0=none found',
-          },
+          overall: { type: 'number', description: '0-1 confidence in extraction quality' },
+          policyNumber: { type: 'number', description: '0-1 confidence' },
+          provider: { type: 'number', description: '0-1 confidence' },
+          dates: { type: 'number', description: '0-1 confidence' },
+          premium: { type: 'number', description: '0-1 confidence' },
+          coverages: { type: 'number', description: '0-1 confidence' },
         },
         required: ['overall', 'policyNumber', 'provider', 'dates', 'premium', 'coverages'],
         additionalProperties: false,
-        description:
-          'Confidence scores for extracted fields. Overall is a weighted average of per-field scores (default: policyNumber 20%, provider 15%, dates 20%, premium 20%, coverages 25%). A well-structured readable document should score 0.85-0.95 overall.',
+        description: 'Confidence scores for extracted fields',
       },
     },
+    // STRICT MODE: ALL top-level properties must be in required (Issue #331).
+    // exclusionsEn and conditionalDeductibles are nullable types, so the LLM
+    // can return null and still satisfy the requirement. Removing them from
+    // required would require also removing them from properties, which would
+    // break extraction quality for Turkish KASKO docs that need them.
     required: [
       'policyNumber',
       'provider',
@@ -377,9 +358,9 @@ export const EXTRACTION_JSON_SCHEMA = {
       'exclusions',
       'exclusionsEn',
       'conditionalDeductibles',
+      'amendmentInfo',
       'evidence',
       'clauseGraph',
-      'amendmentInfo',
       'confidence',
     ],
     additionalProperties: false,

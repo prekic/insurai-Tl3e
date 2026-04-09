@@ -135,7 +135,7 @@ vi.mock('../services/processing-log-service.js', () => ({
   getProcessingLog: (...args: unknown[]) => mockGetProcessingLog(...args),
 }))
 
-vi.mock('../schemas/extraction-schema.js', () => ({
+vi.mock('../../shared/extraction-schema.js', () => ({
   EXTRACTION_JSON_SCHEMA: {
     name: 'policy_extraction',
     strict: true,

@@ -5,9 +5,7 @@
  * - Every object's `properties` keys must ALL appear in `required[]`
  * - Every object must set `additionalProperties: false`
  *
- * This file is intentionally duplicated at `src/lib/ai/strict-mode-validator.ts`
- * because `server/tsconfig.json` (rootDir: ".") cannot import from `src/`.
- * Keep both copies in sync until schema unification lands.
+ * Canonical single source — imported by both client and server.
  */
 export function validateStrictCompliance(
   schema: Record<string, unknown>,

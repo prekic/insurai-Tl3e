@@ -180,7 +180,7 @@ app.use(
 
 // Serve static files in production (before CORS to avoid blocking)
 if (IS_PRODUCTION) {
-  const distPath = path.join(__dirname, '..', 'dist')
+  const distPath = path.join(__dirname, '..', '..', 'dist')
 
   // Hashed assets (/assets/*) — cache aggressively (1 year), filenames change on each build
   app.use(
@@ -363,7 +363,7 @@ app.use('/api', (_req, res) => {
 
 // Handle client-side routing in production - serve index.html for all other routes
 if (IS_PRODUCTION) {
-  const distPath = path.join(__dirname, '..', 'dist')
+  const distPath = path.join(__dirname, '..', '..', 'dist')
 
   // Return 404 for missing static assets instead of serving index.html
   // This prevents 'text/html is not a valid JavaScript MIME type' errors

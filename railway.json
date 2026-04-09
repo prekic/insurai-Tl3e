@@ -6,7 +6,7 @@
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
-    "startCommand": "NODE_ENV=production node dist-server/index.js",
+    "startCommand": "NODE_ENV=production node dist-server/server/index.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",

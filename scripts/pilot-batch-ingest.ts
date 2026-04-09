@@ -281,7 +281,7 @@ async function extractWithLLM(
   // to reject it. Both files are Vite-env-free and safe to import from a
   // standalone tsx script.
   const { EXTRACTION_SYSTEM_PROMPT } = await import('../src/lib/ai/extraction-schema')
-  const { EXTRACTION_JSON_SCHEMA } = await import('../server/schemas/extraction-schema')
+  const { EXTRACTION_JSON_SCHEMA } = await import('../shared/extraction-schema')
   const systemPrompt = EXTRACTION_SYSTEM_PROMPT
 
   // We use OpenAI's strict json_schema response mode (not json_object) so
