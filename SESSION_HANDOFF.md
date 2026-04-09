@@ -2,7 +2,7 @@
 
 > **Session type**: Implementation. Unified extraction schema into `shared/`, fixed 6 pre-existing test timeouts, added shared schema validation test.
 >
-> **What this session produced**: 4 commits on branch `claude/load-project-context-Yjmcl` — docs sync, schema unification (refactor), test fixes/validation, ADR-019. All affected tests pass. Ready for PR review.
+> **What this session produced**: 5 commits on branch `claude/load-project-context-Yjmcl` — docs sync, schema unification (refactor), test fixes/validation, ADR-019, QA audit fix. All affected tests pass. Ready for PR review.
 
 ## Current State
 
@@ -25,7 +25,8 @@
 | 1 | `4831924` | `docs: sync handoff for migration 042+043 production confirmation` | Docs only |
 | 2 | `07314d6` | `refactor(schema): unify extraction schema into shared/ single source of truth` | 18 files (2 new, 12 modified, 4 deleted) |
 | 3 | `79175d5` | `fix(test): add fetch stub for diagnose tests + shared schema validation` | Test fixes + new test file |
-| 4 | *(this commit)* | `docs(adr): document extraction schema unification decision (ADR-019)` | ADR + handoff sync |
+| 4 | `2bf1e3f` | `docs(adr): document extraction schema unification decision (ADR-019)` | ADR + handoff sync |
+| 5 | `e0a54fe` | `docs(qa): fix 7 stale references in CLAUDE.md after schema unification` | QA audit fix |
 
 ## What Was Implemented
 

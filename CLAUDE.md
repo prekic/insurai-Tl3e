@@ -5,10 +5,10 @@
 ## ⚠️ Next Session Instructions
 1. **🔴 SECURITY: Rotate leaked secrets from earlier in the Apr 8 session** — Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key. Most critical carry-forward; must be done before the next deploy.
 2. **Schema follow-ups** — all complete, merged via PR #337:
-   - ✅ **Strict-mode CI validator**: extracted `validateStrictCompliance()` into dual helpers (`server/schemas/strict-mode-validator.ts` + `src/lib/ai/strict-mode-validator.ts`) — PR-B commit `14f781d`
+   - ✅ **Strict-mode CI validator**: `validateStrictCompliance()` now lives in `shared/strict-mode-validator.ts` (originally extracted as dual helpers in PR-B `14f781d`, then unified)
    - ✅ **Currency description contradiction**: server now says "DO NOT default to TRY" matching client — PR-B commit `14f781d`
    - ✅ **Missing `nameTr` on server**: added to `coverages[]` properties + required — PR-B commit `14f781d`
-   - ✅ **Cross-file parity test**: `server/__tests__/extraction-schema-parity.test.ts` (10 tests) enforces structural alignment on every CI run
+   - ✅ **Cross-file parity test**: deleted (redundant after schema unification into `shared/`); replaced by `shared/__tests__/extraction-schema.test.ts` (12 tests)
    - ✅ **Schema unification**: extracted into `shared/extraction-schema.ts` — single source of truth, both client and server import from shared. Server `rootDir` changed to `..`, deployment paths updated to `dist-server/server/index.js`.
 3. **Database migrations** — all applied to production Supabase:
    - ✅ **Migration 042** (`is_draft` column on `policies` table + index) — applied Apr 9, 2026
@@ -254,8 +254,9 @@ insurai/
 | `src/lib/ai/validator.ts` | **NEW** (Phase 7) Cross-field consistency and rule validation checking |
 | `src/lib/ai/extraction-normalizer.ts` | **NEW** Deterministic document normalization before validation |
 | `src/lib/ai/relationship-resolver.ts` | **NEW** AI clause logic resolver |
-| `src/lib/ai/strict-mode-validator.ts` | **NEW** Reusable OpenAI strict-mode JSON schema validator (client copy) |
-| `server/schemas/strict-mode-validator.ts` | **NEW** Server copy of strict-mode validator (intentional duplication due to rootDir constraint) |
+| `src/lib/ai/strict-mode-validator.ts` | Re-exports `validateStrictCompliance()` from `shared/strict-mode-validator.ts` |
+| `shared/extraction-schema.ts` | **Canonical** single source of truth for `EXTRACTION_JSON_SCHEMA` (unified Apr 9) |
+| `shared/strict-mode-validator.ts` | **Canonical** `validateStrictCompliance()` for OpenAI strict-mode JSON schema validation |
 | `src/lib/analysis/engine.ts` | **NEW** Orchestrator replacing direct LLM component consumption |
 | `src/lib/analysis/benchmarks.ts`, `insights.ts`, `scoring.ts` | **NEW** Modularized logic for extraction analysis |
 | `src/lib/analysis/display-interpreter.ts` | **NEW** Generates safe summaries, sanitizes forbidden LLM strings (e.g. 'sınırsız') |
@@ -1642,7 +1643,7 @@ Server Tests:               server/__tests__/
 | `src/lib/actuarial-engine/__tests__/actuarial-events.test.ts` | 8 | Event bus: subscribe/unsubscribe, emit, error isolation |
 | `src/lib/actuarial-engine/__tests__/adapter-integration.test.ts` | 18 | Adapter→engine pipeline: kasko/traffic/DASK, TOPSIS, edge cases |
 | `server/__tests__/config-migration-validation.test.ts` | 49 | Migration 033 SQL↔TypeScript drift detection, new config getters (FX, Server, Webhooks, Cost, Monitoring, Retention) |
-| `server/__tests__/extraction-schema-parity.test.ts` | 10 | Cross-file structural parity (client ↔ server schema keys, required fields, currency description, strict-mode compliance) |
+| `shared/__tests__/extraction-schema.test.ts` | 12 | Shared schema validation (structure, strict-mode compliance, required fields, currency, nameTr, validator edge cases) |
 
 ### Running Tests
 ```bash
@@ -2394,7 +2395,7 @@ Railway hosts both frontend and backend as a single service. The Express server 
     "buildCommand": "npm run build && npm run build:server"
   },
   "deploy": {
-    "startCommand": "NODE_ENV=production node dist-server/index.js",
+    "startCommand": "NODE_ENV=production node dist-server/server/index.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
@@ -2417,7 +2418,7 @@ cmds = ["npm ci --include=dev"]
 cmds = ["npm run build && npm run build:server"]
 
 [start]
-cmd = "NODE_ENV=production node dist-server/index.js"
+cmd = "NODE_ENV=production node dist-server/server/index.js"
 ```
 
 **Environment Variables on Railway:**
@@ -2467,7 +2468,7 @@ VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX  # Optional: GA4 analytics
 1. Push to the deployment branch
 2. Railway auto-detects changes and rebuilds
 3. Nixpacks runs `npm run build && npm run build:server`
-4. Server starts with `node dist-server/index.js`
+4. Server starts with `node dist-server/server/index.js`
 
 **Supabase Configuration Required:**
 - Go to Supabase Dashboard → Authentication → URL Configuration
