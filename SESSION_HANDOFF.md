@@ -177,5 +177,35 @@ chore(docs): plan deferred schema parity + test cleanup follow-ups from PR #334
 - [x] `nameTr` deployment risk documented (smoke test before merge)
 - [x] Environment variable rotation urgency preserved
 - [x] Non-negotiable rules carried forward from Apr 8
-- [x] Branch state confirmed (0 commits ahead of origin/main)
+- [x] Branch state confirmed (0 commits ahead of `origin/main`)
 - [x] Recommended PR title provided
+- [x] **QA Audit pass complete (Apr 9)** — see "QA Audit Findings" section below
+
+## QA Audit Findings (Apr 9 self-check, post-handoff)
+
+The first pass of this handoff was audited for completeness. The audit uncovered **2 operational gotchas that had been summarized away** instead of documented explicitly. Both have now been added to `CLAUDE.md` (gotchas appended to the "Common Gotchas" section between the KASKO Pilot RLS gotcha and the `## CI/CD` section):
+
+1. **Stale local `main` mismatches `origin/main` after sandbox merges** — During the audit, `git diff main...HEAD --name-status` returned **34 files**, falsely suggesting the branch had 34 unmerged changes. The actual branch state (`git diff origin/main...HEAD --name-status`) is **1 file**: this `SESSION_HANDOFF.md` (plus the QA pass adding the gotchas to `CLAUDE.md`). Root cause: local `main` was at `4eb31494...` (pre-PR #334) while `origin/main` was at `62e95cd...` (post-PR #334). The Claude Code sandbox does not auto-fast-forward local `main` after a PR merge on GitHub. Future agents auditing branch scope must always `git fetch origin main` first and then diff against `origin/main`, never local `main`.
+
+2. **Vitest's bundler resolver ignores `tsconfig.rootDir`** — Discovered during the design of PR-B sub-task B.4 (the cross-file extraction-schema parity test). A test at `server/__tests__/extraction-schema-parity.test.ts` can `import` from `../../src/lib/ai/extraction-schema` and pass at test time, even though `tsc -p server/tsconfig.json` would reject the same import with TS6059. This is the only mechanism that makes the parity test possible without restructuring the build pipeline. The plan file documents this for the planned PR, but it is also a general property of the test infrastructure that affects any cross-rootDir test work.
+
+### QA Audit Validation Steps Taken
+
+1. `git diff main...HEAD --name-status` → 34 files (misleading, see gotcha #1 above)
+2. `git fetch origin main && git diff origin/main...HEAD --name-status` → 1 file (`SESSION_HANDOFF.md`) — **truth source**
+3. `git rev-parse main && git rev-parse origin/main && git rev-parse HEAD` → confirmed local `main` (`4eb31494...`) is stale, `origin/main` (`62e95cd...`) is current, HEAD (`1d0c56f...`) is exactly 1 commit ahead of `origin/main`
+4. `git log origin/main..HEAD --oneline` → exactly 1 commit (`1d0c56f chore(docs): plan deferred schema parity + test cleanup follow-ups`)
+5. `git show --stat 1d0c56f` → confirmed commit changes exactly 1 file (`SESSION_HANDOFF.md`, +137/−376)
+6. Re-read this file end-to-end to confirm all carry-forward items, scope decisions, and migration SQL are present
+7. Re-read the plan file at `/root/.claude/plans/prancy-crunching-crab.md` to confirm all 5 PR-B sub-tasks have file paths, line numbers, and verbatim code snippets
+8. Grepped this file for "stale", "local main", "fast-forward" → confirmed the staleness gotcha was missing before the QA pass added it
+9. Cross-referenced the cross-cutting risks listed in the plan file against the handoff's narrative — all 4 (cross-rootDir import, helper duplication, parity false positives, `nameTr` deployment) are captured in the plan; the handoff defers risk detail to the plan file by reference
+10. Verified no environment variables changed this session (no new vars in either the handoff or the plan file)
+11. Verified no Vitest mock / API routing / Railway gotchas were encountered during execution — the planning session never ran code or tests, so there are no runtime issues to capture. The vitest bundler-resolver gotcha (#2 above) was uncovered during the **design** of PR-B, not during execution.
+
+### What was NOT changed by the QA pass
+
+- The plan file `/root/.claude/plans/prancy-crunching-crab.md` already documented the cross-rootDir vitest pattern in PR-B sub-task B.4. The QA pass surfaced it from the plan-file scope into the global `CLAUDE.md` gotchas section so the next agent doesn't need to read the plan file to discover it.
+- No ADR was needed (planning session, no architectural shift).
+- No environment variables were added or changed.
+- The Apr 8 SESSION_HANDOFF content (PR #334 details, 34-file inventory, gotchas #47-51) is already preserved in git history at `2e84699` and is reachable by any agent who needs the context. Re-summarizing it here would duplicate already-merged information.
