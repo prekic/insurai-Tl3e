@@ -2,11 +2,11 @@
 
 > **Session type**: Implementation. Executed both deferred PRs designed in the prior planning session.
 >
-> **What this session produced**: 2 commits on branch `claude/load-project-context-7iIk0`, implementing PR-A (test fix) and PR-B (schema parity + validator extraction + parity test + docs). All isolated tests pass. Ready for PR review and merge.
+> **What this session produced**: 4 commits on branch `claude/load-project-context-7iIk0`, implementing PR-A (test fix), PR-B (schema parity + validator extraction + parity test + docs), and handoff documentation. All isolated tests pass. Ready for PR review and merge.
 
 ## Current State
 
-**Branch**: `claude/load-project-context-7iIk0` — clean, pushed, 3 commits ahead of `origin/main`.
+**Branch**: `claude/load-project-context-7iIk0` — clean, pushed, 5 commits ahead of `origin/main`.
 **Working tree**: clean (after this handoff commit).
 **Test state**: All modified test files pass in isolation:
 - `src/components/PolicyDetailView-branches.test.tsx` — 163/163 passed
@@ -20,7 +20,9 @@
 |---|-----|---------|-------|
 | 1 | `5710249` | `test(PolicyDetailView): align market comparison regex with softened i18n wording` | PR-A: 8 line edits in 1 file |
 | 2 | `14f781d` | `fix(schema): add missing nameTr to server coverages + fix currency description contradiction` | PR-B: 7 files (2 modified, 3 new, 2 docs) |
-| 3 | *(this commit)* | `docs: update SESSION_HANDOFF.md for PR-A + PR-B implementation` | Handoff update |
+| 3 | `bcd325c` | `docs: update SESSION_HANDOFF.md for PR-A + PR-B implementation` | Handoff update |
+| 4 | `1caa082` | `chore(docs): final handoff sync — update CLAUDE.md for PR-A/PR-B completion` | CLAUDE.md sync |
+| 5 | *(this commit)* | `docs(qa): QA audit correction — fix stale commit counts in SESSION_HANDOFF` | QA correction |
 
 ## Files Changed (vs origin/main)
 
@@ -134,4 +136,4 @@ No new app env vars introduced this session. All existing vars from CLAUDE.md re
 
 **This session**: 4 isolated test runs (all green), 0 full-suite runs, ESLint + Prettier via pre-commit hooks on both commits (clean). No regressions introduced.
 
-**Known test state**: 16,142+ tests (from PR #334). The 4 previously failing `PolicyDetailView-branches` "above/below average" tests are now fixed by PR-A.
+**Known test state**: 16,155+ tests (updated from 16,142+ after adding 13 new tests across schema + parity files). The 4 previously failing `PolicyDetailView-branches` "above/below average" tests are now fixed by PR-A.
