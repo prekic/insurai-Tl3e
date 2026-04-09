@@ -63,7 +63,7 @@ export const EXTRACTION_JSON_SCHEMA = {
       currency: {
         type: ['string', 'null'],
         description:
-          'Currency code - Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR. Default to TRY if not found.',
+          'Currency code - REQUIRED IF PRESENT. Look for: ₺/TL/TRY=TRY, $/USD=USD, €/EUR=EUR, £/GBP=GBP. Check symbols near premium and coverage amounts. Return null if no currency can be found. DO NOT default to TRY or any other currency. ALWAYS return the 3-letter ISO currency code (e.g., TRY, USD, EUR) if found.',
       },
       paymentFrequency: {
         anyOf: [
@@ -78,6 +78,11 @@ export const EXTRACTION_JSON_SCHEMA = {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'Coverage name/type' },
+            nameTr: {
+              type: ['string', 'null'],
+              description:
+                'Coverage name in Turkish. For Turkish policies, provide the original Turkish name (e.g., "Çarpma/Çarpışma", "Hırsızlık", "Yangın"). For English policies, set to null.',
+            },
             limit: {
               type: ['number', 'null'],
               description: 'Coverage limit amount. Use null for Sınırsız or Rayiç Değer.',
@@ -107,6 +112,7 @@ export const EXTRACTION_JSON_SCHEMA = {
           // STRICT MODE: ALL properties must be in required
           required: [
             'name',
+            'nameTr',
             'limit',
             'deductible',
             'description',
