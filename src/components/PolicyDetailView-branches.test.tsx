@@ -926,7 +926,7 @@ describe('PolicyDetailView Branch Coverage', () => {
   describe('Market Comparison', () => {
     it('shows "below average" when premium < averagePremium', () => {
       renderComponent() // premium 8500, avg 10000
-      expect(screen.getAllByText(/below average/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/below market estimate/).length).toBeGreaterThan(0)
     })
 
     it('shows "above average" when premium > averagePremium', () => {
@@ -937,7 +937,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/above average/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/above market estimate/).length).toBeGreaterThan(0)
     })
 
     it('shows neither when premium equals averagePremium', () => {
@@ -948,8 +948,8 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.queryByText(/below average/)).not.toBeInTheDocument()
-      expect(screen.queryByText(/above average/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/below market estimate/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/above market estimate/)).not.toBeInTheDocument()
     })
 
     it('does not render market comparison when marketComparison is undefined', () => {
@@ -2247,7 +2247,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/below average/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/below market estimate/).length).toBeGreaterThan(0)
     })
 
     it('shows "above average" when premium is higher than market average', () => {
@@ -2258,7 +2258,7 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.getAllByText(/above average/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/above market estimate/).length).toBeGreaterThan(0)
     })
 
     it('shows neither above/below when premium equals market average', () => {
@@ -2269,8 +2269,8 @@ describe('PolicyDetailView Branch Coverage', () => {
         })
       )
       renderComponent()
-      expect(screen.queryByText(/below average/)).not.toBeInTheDocument()
-      expect(screen.queryByText(/above average/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/below market estimate/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/above market estimate/)).not.toBeInTheDocument()
     })
 
     it('does not show market comparison when premium is 0', () => {
