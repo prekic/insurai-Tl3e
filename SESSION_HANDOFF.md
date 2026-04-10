@@ -1,108 +1,94 @@
-# Session Handoff — April 9, 2026 (Implementation Session — PR-A + PR-B Executed)
+# Session Handoff — April 9, 2026 (Schema Unification + Test Fixes)
 
-> **Session type**: Implementation. Executed both deferred PRs designed in the prior planning session.
+> **Session type**: Implementation. Unified extraction schema into `shared/`, fixed 6 pre-existing test timeouts, added shared schema validation test.
 >
-> **What this session produced**: 4 commits on branch `claude/load-project-context-7iIk0`, implementing PR-A (test fix), PR-B (schema parity + validator extraction + parity test + docs), and handoff documentation. All isolated tests pass. Ready for PR review and merge.
+> **What this session produced**: 5 commits on branch `claude/load-project-context-Yjmcl` — docs sync, schema unification (refactor), test fixes/validation, ADR-019, QA audit fix. All affected tests pass. Ready for PR review.
 
 ## Current State
 
-**Branch**: `claude/load-project-context-7iIk0` — clean, pushed, 5 commits ahead of `origin/main`.
-**Working tree**: clean (after this handoff commit).
+**Branch**: `claude/load-project-context-Yjmcl` — clean, pushed.
+**Working tree**: clean (after this commit).
 **Test state**: All modified test files pass in isolation:
-- `src/components/PolicyDetailView-branches.test.tsx` — 163/163 passed
-- `server/schemas/extraction-schema.test.ts` — 16/16 passed
 - `src/lib/ai/extraction-schema.test.ts` — 69/69 passed
-- `server/__tests__/extraction-schema-parity.test.ts` — 10/10 passed (new file)
+- `server/__tests__/extraction-schema.test.ts` — 16/16 passed (moved from server/schemas/)
+- `shared/__tests__/extraction-schema.test.ts` — 12/12 passed (new)
+- `server/__tests__/ai-routes-extended.test.ts` — 112/112 passed
+- `server/__tests__/ai-extraction-routes-branches.test.ts` — 33/33 passed
+- `server/__tests__/ai-chat-ocr-diagnose-logs.test.ts` — 14/14 passed
+- `server/__tests__/ai-ocr-coverage.test.ts` — 77/77 passed
+- `server/__tests__/routes-branches.test.ts` — 76/76 passed (6 pre-existing timeouts fixed)
 
 ## Commits on This Branch
 
 | # | SHA | Message | Scope |
 |---|-----|---------|-------|
-| 1 | `5710249` | `test(PolicyDetailView): align market comparison regex with softened i18n wording` | PR-A: 8 line edits in 1 file |
-| 2 | `14f781d` | `fix(schema): add missing nameTr to server coverages + fix currency description contradiction` | PR-B: 7 files (2 modified, 3 new, 2 docs) |
-| 3 | `bcd325c` | `docs: update SESSION_HANDOFF.md for PR-A + PR-B implementation` | Handoff update |
-| 4 | `1caa082` | `chore(docs): final handoff sync — update CLAUDE.md for PR-A/PR-B completion` | CLAUDE.md sync |
-| 5 | *(this commit)* | `docs(qa): QA audit correction — fix stale commit counts in SESSION_HANDOFF` | QA correction |
+| 1 | `4831924` | `docs: sync handoff for migration 042+043 production confirmation` | Docs only |
+| 2 | `07314d6` | `refactor(schema): unify extraction schema into shared/ single source of truth` | 18 files (2 new, 12 modified, 4 deleted) |
+| 3 | `79175d5` | `fix(test): add fetch stub for diagnose tests + shared schema validation` | Test fixes + new test file |
+| 4 | `2bf1e3f` | `docs(adr): document extraction schema unification decision (ADR-019)` | ADR + handoff sync |
+| 5 | `e0a54fe` | `docs(qa): fix 7 stale references in CLAUDE.md after schema unification` | QA audit fix |
 
-## Files Changed (vs origin/main)
+## What Was Implemented
 
-| File | Change | PR |
-|------|--------|----|
-| `src/components/PolicyDetailView-branches.test.tsx` | 8 regex replacements (`/below average/` → `/below market estimate/`, `/above average/` → `/above market estimate/`) | PR-A |
-| `server/schemas/extraction-schema.ts` | Added `nameTr` to coverages[].properties + required[]; fixed currency description ("DO NOT default") | PR-B |
-| `server/schemas/extraction-schema.test.ts` | +2 tests (nameTr field, currency description); extracted inline `validateStrictCompliance()` to import | PR-B |
-| `server/schemas/strict-mode-validator.ts` | **NEW** — extracted `validateStrictCompliance()` helper (~50 lines) | PR-B |
-| `src/lib/ai/strict-mode-validator.ts` | **NEW** — client-side mirror (intentional duplication due to rootDir constraint) | PR-B |
-| `src/lib/ai/extraction-schema.test.ts` | +1 strict-mode compliance describe block using client helper | PR-B |
-| `server/__tests__/extraction-schema-parity.test.ts` | **NEW** — 10 cross-file structural parity tests (keys, required, currency, strict-mode) | PR-B |
-| `CLAUDE.md` | Updated gotchas #48 (audit note) and #49 (parity test + extracted helper) | PR-B |
-| `SESSION_HANDOFF.md` | **REWRITTEN** — this file | Handoff |
+### Schema Unification (commit `07314d6`)
+
+Extracted `EXTRACTION_JSON_SCHEMA` and `validateStrictCompliance()` into `shared/` directory — single source of truth importable by both client and server.
+
+| Change | Details |
+|--------|---------|
+| `shared/extraction-schema.ts` | **NEW** — canonical schema (client format: `type: ['string', 'null']`) |
+| `shared/strict-mode-validator.ts` | **NEW** — canonical validator |
+| `server/tsconfig.json` | `rootDir: ".."`, include adds `../shared/**/*.ts` |
+| `server/index.ts` | `__dirname` paths: `'..'` → `'..', '..'` for dist/ (2 locations) |
+| `server/routes/ai.ts` | Import from `../../shared/extraction-schema.js` + __dirname fix |
+| `railway.json` | Start: `dist-server/server/index.js` |
+| `nixpacks.toml` | Start: `dist-server/server/index.js` |
+| `package.json` | `start:server` + `start:prod` updated |
+| `src/lib/ai/extraction-schema.ts` | ~350 lines → 3-line re-export from shared |
+| `src/lib/ai/strict-mode-validator.ts` | ~50 lines → 2-line re-export from shared |
+| `server/schemas/` | **DELETED** (extraction-schema.ts, strict-mode-validator.ts, test) |
+| `server/__tests__/extraction-schema-parity.test.ts` | **DELETED** (redundant with single source) |
+| 5 server test files | Mock paths: `../schemas/...` → `../../shared/...` |
+| `scripts/pilot-batch-ingest.ts` | Import updated |
+
+### Test Fixes (this commit)
+
+- **Fixed 6 pre-existing `/api/ai/diagnose` test timeouts** in `routes-branches.test.ts` — added `vi.stubGlobal('fetch', ...)` to the Diagnostic Error Classification describe block (per CLAUDE.md gotcha about diagnose tests requiring global fetch stub)
+- **Added `shared/__tests__/extraction-schema.test.ts`** — 12 tests validating the canonical schema (structure, required fields count, strict-mode compliance, currency description, coverage nameTr, validator edge cases)
 
 ## Status of All Carry-Forward Priorities
 
 | # | Priority | Status |
 |---|----------|--------|
-| 0 | **🔴 URGENT — Rotate leaked secrets from Apr 8 session** | **PENDING — user must do** (Supabase service role, ADMIN_JWT_SECRET, OpenAI/Anthropic keys, GCP SA, VAPID keypair, exchangerate-host key) |
-| 1 | Apply Migration 042 (`is_draft` column on `policies`) | **PENDING — manual SQL via Supabase Dashboard** |
-| 2 | Apply Migration 043 (benchmark aging/stale threshold configs) | **PENDING — manual SQL via Supabase Dashboard** |
-| 3 | Bulk ingest pilot KASKO PDFs (50+ for calibration) | **BLOCKED — no PDFs available; `upload/real-kasko-pdf/` does not exist; needs user PDF drops** |
-| 4 | Execute backfill: `npx tsx scripts/backfill-evaluation-scores.ts --apply` | **BLOCKED — depends on #3 + Supabase credentials** |
-| 5 | Calibrate grade thresholds: `scripts/calibrate-grade-thresholds.ts` | **BLOCKED — depends on #4, needs 50+ scored policies** |
-| 6 | Update benchmark premium ranges | **BLOCKED — needs market research** |
-| 7 | PR-A (test fix — 4 failing market comparison tests) | **DONE** — commit `5710249` |
-| 8 | PR-B (schema parity + validator + parity test + docs) | **DONE** — commit `14f781d` |
+| 0 | **🔴 URGENT — Rotate leaked secrets from Apr 8 session** | **PENDING — user must do** |
+| 1 | Apply Migration 042 | **✅ DONE** — applied to production (Apr 9) |
+| 2 | Apply Migration 043 | **✅ DONE** — applied to production (Apr 9) |
+| 3 | Bulk ingest pilot KASKO PDFs (50+ for calibration) | **BLOCKED — needs user PDF drops** |
+| 4 | Execute evaluation backfill | **BLOCKED — depends on #3 + Supabase credentials** |
+| 5 | Calibrate grade thresholds | **BLOCKED — depends on #4** |
+| 6 | Update benchmark premium ranges | **BLOCKED — needs TSB/SEDDK 2025 market research** |
+| 7 | Schema unification | **✅ DONE** — `shared/extraction-schema.ts` is single source of truth |
 
-## What Was Implemented
+## Architecture Change: Server Output Path
 
-### PR-A — Test Fix (commit `5710249`)
+**Before**: `dist-server/index.js` (server tsconfig rootDir: `.`)
+**After**: `dist-server/server/index.js` (server tsconfig rootDir: `..`)
 
-**Problem**: 4 tests in `PolicyDetailView-branches.test.tsx` "Market Comparison" blocks were asserting `/below average/` and `/above average/`, but the UI had been softened to "below market estimate" / "above market estimate" in commit `7b8ce28` (Apr 4, CLAUDE.md gotcha #31).
+This affects:
+- `railway.json` startCommand
+- `nixpacks.toml` start cmd
+- `package.json` start:server / start:prod
+- All `__dirname`-based paths in server code (now one dir deeper)
 
-**Fix**: 8 regex replacements on lines 929, 940, 951, 952, 2250, 2261, 2272, 2273. `it()` titles left untouched (they describe the business condition, not the rendered string).
-
-**Verification**: 163/163 tests pass.
-
-### PR-B — Schema Parity (commit `14f781d`)
-
-Per SESSION_HANDOFF scope decisions from the Apr 9 planning session:
-
-| Sub-task | What |
-|----------|------|
-| **B.1** | Added `nameTr: { type: ['string', 'null'] }` to server `coverages[]` properties + `required[]`. Replaced currency description from "Default to TRY if not found" to "DO NOT default to TRY or any other currency" matching client. |
-| **B.2** | +2 server tests: `nameTr` field presence assertion, currency description must NOT contain "Default to TRY" and MUST contain "DO NOT default". |
-| **B.3** | Extracted `validateStrictCompliance()` from inline in server test (lines 189-228) into `server/schemas/strict-mode-validator.ts` + `src/lib/ai/strict-mode-validator.ts`. Intentional duplication due to `server/tsconfig.json` rootDir constraint. Updated server test import. Added strict-mode compliance describe block to client test. |
-| **B.4** | Created `server/__tests__/extraction-schema-parity.test.ts` (10 tests) enforcing structural alignment: top-level keys, required fields, coverage item keys/required, confidence/amendment/evidence/clauseGraph keys, currency description correctness, and strict-mode compliance for both schemas. Uses cross-rootDir import (vitest allows; tsc would reject — safe because `__tests__/` excluded from server build). |
-| **B.5** | Added audit note to CLAUDE.md gotcha #48: zero other `as unknown as` instances found. Updated gotcha #49 to document extracted helper + parity test. |
-
-**Scope honored**: Only 2 functional fixes (`nameTr` + currency). 12 description rewordings deliberately skipped per user decision. Parity test compares keys, not description values.
-
-**Verification**: 16/16 server schema tests, 69/69 client schema tests, 10/10 parity tests.
-
-## Migrations Still to Apply (Carry Forward)
-
-```sql
--- Migration 042: Add is_draft column to policies table
-ALTER TABLE public.policies ADD COLUMN IF NOT EXISTS is_draft BOOLEAN DEFAULT false;
-CREATE INDEX IF NOT EXISTS idx_policies_user_is_draft ON public.policies (user_id, is_draft);
-
--- Migration 043: Seed benchmark aging/stale threshold configs
-INSERT INTO public.app_settings (category, key, value, description, "schema")
-VALUES
-  ('evaluation', 'benchmark_aging_days', '180', 'Days after dataDate before benchmark is considered aging (181-365 default range)', '{"type":"number","minimum":30,"maximum":730}'),
-  ('evaluation', 'benchmark_stale_days', '365', 'Days after dataDate before benchmark is considered stale (>365 default)', '{"type":"number","minimum":60,"maximum":1460}')
-ON CONFLICT (category, key) DO NOTHING;
-```
-
-Both idempotent. Apply via Supabase Dashboard → SQL Editor.
+When adding new `__dirname` paths in server code, remember that `__dirname` at runtime resolves to `dist-server/server/...` — use `path.join(__dirname, '..', '..', ...)` to reach the project root.
 
 ## Next Steps for the Next Agent (Priority Order)
 
 1. **🔴 URGENT — Rotate leaked secrets** (user action; cannot be done by agent)
-2. **Apply Migrations 042 + 043** (manual SQL — both idempotent)
-3. **Merge this PR** once reviewed
-4. **Bulk ingest pilot KASKO PDFs** — needs user to drop 50+ real PDFs
-5. **Run backfill** then **calibrate grade thresholds** — needs Supabase credentials in `.env`
-6. **Update benchmark premium ranges** (blocked on market research)
+2. **Bulk ingest pilot KASKO PDFs** — needs user to drop 50+ real PDFs
+3. **Run evaluation backfill** — `npx tsx scripts/backfill-evaluation-scores.ts --apply`
+4. **Calibrate grade thresholds** — `scripts/calibrate-grade-thresholds.ts`
+5. **Update benchmark premium ranges** — blocked on market research
 
 ## Non-Negotiable Rules (Carry Forward)
 
@@ -116,24 +102,18 @@ Both idempotent. Apply via Supabase Dashboard → SQL Editor.
 8. Benchmark test mocks MUST include `dataDate`
 9. User-facing comparison: "estimate" / "model-based" qualifiers
 10. `auditLogs` array MUST have `MAX_ENTRIES` cap after `.push()`
-11. Any change to either `extraction-schema.ts` MUST be mirrored manually — parity test at `server/__tests__/extraction-schema-parity.test.ts` will catch drift on CI
+11. Extraction schema changes go in `shared/extraction-schema.ts` only — single source of truth, no mirroring needed
 12. `ProcessingLogger.onStageChange()` listener errors are caught individually — do NOT add rethrow logic
 13. `translations-skeleton.ts` accepts new KEYS with empty-string VALUES — what's forbidden is non-empty content
+14. Server `__dirname` paths: `dist-server/server/` is the base — need 2 levels up to reach project root
 
 ## Environment Variables Required
 
-No new app env vars introduced this session. All existing vars from CLAUDE.md remain required:
-- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — admin panel and service-role operations
-- `ADMIN_JWT_SECRET` — admin login
-- `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` — AI extraction
-- `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` — push notifications
-- `EXCHANGERATE_API_KEY` — optional, FX rate higher tier
-- `GCP_SERVICE_ACCOUNT_BASE64` — Document AI OCR
+No new env vars introduced. All existing vars from CLAUDE.md remain required.
 
-**🔴 ALL KEYS LISTED ABOVE MUST BE ROTATED** — they were exposed earlier in the April 8 session.
+**🔴 ALL KEYS MUST BE ROTATED** — they were exposed earlier in the April 8 session.
 
 ## Quality State
 
-**This session**: 4 isolated test runs (all green), 0 full-suite runs, ESLint + Prettier via pre-commit hooks on both commits (clean). No regressions introduced.
-
-**Known test state**: 16,155+ tests (updated from 16,142+ after adding 13 new tests across schema + parity files). The 4 previously failing `PolicyDetailView-branches` "above/below average" tests are now fixed by PR-A.
+**This session**: 8 isolated test runs (all green), 0 full-suite runs, ESLint + Prettier via pre-commit hooks (clean). 6 pre-existing test timeouts fixed.
+**Known test state**: 16,155+ tests (+ 12 new shared tests), ~91.67% statements, ~85.91% branches coverage.

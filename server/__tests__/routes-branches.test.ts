@@ -135,7 +135,7 @@ vi.mock('../services/processing-log-service.js', () => ({
   getProcessingLog: (...args: unknown[]) => mockGetProcessingLog(...args),
 }))
 
-vi.mock('../schemas/extraction-schema.js', () => ({
+vi.mock('../../shared/extraction-schema.js', () => ({
   EXTRACTION_JSON_SCHEMA: {
     name: 'policy_extraction',
     strict: true,
@@ -1668,6 +1668,12 @@ describe('Diagnostic Error Classification Branches', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    // Stub global fetch — the /api/ai/diagnose endpoint calls fetch() directly
+    // for Google Vision API checks. Without this, real HTTP requests cause 10s timeouts.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify({ responses: [{}] }), { status: 200 }))
+    )
     process.env = {
       ...originalEnv,
       OPENAI_API_KEY: 'test-key',
@@ -1678,6 +1684,7 @@ describe('Diagnostic Error Classification Branches', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllGlobals()
     process.env = { ...originalEnv }
   })
 

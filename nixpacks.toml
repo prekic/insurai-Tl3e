@@ -24,4 +24,4 @@ cmds = ["npm ci --include=dev"]
 cmds = ["npm run build && npm run build:server"]
 
 [start]
-cmd = "NODE_ENV=production node dist-server/index.js"
+cmd = "NODE_ENV=production node dist-server/server/index.js"

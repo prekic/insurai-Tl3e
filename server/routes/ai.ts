@@ -49,7 +49,7 @@ import {
   getSenseCheckPrompt,
 } from '../services/prompt-service.js'
 import * as adminNotificationService from '../services/admin-notification-service.js'
-import { EXTRACTION_JSON_SCHEMA } from '../schemas/extraction-schema.js'
+import { EXTRACTION_JSON_SCHEMA } from '../../shared/extraction-schema.js'
 import { sendExtractionCompleteNotification } from '../services/notification-service.js'
 import { captureServerError } from '../lib/sentry.js'
 import { persistExtractionEvent } from '../services/extraction-metrics-service.js'
@@ -606,8 +606,8 @@ function getGCPCredentialsPath(): string | null {
   // Check common locations
   const possiblePaths = [
     path.join(process.cwd(), 'gcp-service-account.json'),
-    path.join(__dirname, '..', '..', 'gcp-service-account.json'),
     path.join(__dirname, '..', '..', '..', 'gcp-service-account.json'),
+    path.join(__dirname, '..', '..', '..', '..', 'gcp-service-account.json'),
   ]
 
   for (const p of possiblePaths) {

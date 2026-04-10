@@ -1,12 +1,13 @@
 /**
- * Tests for Extraction Schema
+ * Tests for the shared Extraction Schema
  *
  * Validates that the schema conforms to OpenAI's strict JSON schema requirements.
+ * Imports from shared/ — the canonical single source of truth.
  */
 
 import { describe, it, expect } from 'vitest'
-import { EXTRACTION_JSON_SCHEMA } from './extraction-schema'
-import { validateStrictCompliance } from './strict-mode-validator'
+import { EXTRACTION_JSON_SCHEMA } from '../../shared/extraction-schema'
+import { validateStrictCompliance } from '../../shared/strict-mode-validator'
 
 describe('EXTRACTION_JSON_SCHEMA', () => {
   it('should have correct top-level structure', () => {
@@ -63,10 +64,11 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
       expect(props.isUnlimited.type).toBe('boolean')
       expect(props.isMarketValue.type).toBe('boolean')
 
-      // category is nullable enum using anyOf pattern
-      const category = props.category as { anyOf: Array<{ type: string; enum?: string[] }> }
-      expect(category.anyOf).toBeDefined()
-      expect(category.anyOf).toHaveLength(2)
+      // category is nullable enum
+      expect(props.category.type).toContain('string')
+      expect(props.category.type).toContain('null')
+      expect(props.category.enum).toContain('main')
+      expect(props.category.enum).toContain(null)
     })
 
     it('should have nameTr field for Turkish coverage names', () => {
@@ -120,75 +122,44 @@ describe('EXTRACTION_JSON_SCHEMA', () => {
     })
   })
 
-  describe('nullable enums with anyOf pattern', () => {
-    it('should use anyOf pattern for nullable policyType enum', () => {
-      const policyType = EXTRACTION_JSON_SCHEMA.schema.properties.policyType as {
-        anyOf: Array<{ type: string; enum?: string[] }>
-      }
-
-      expect(policyType.anyOf).toBeDefined()
-      expect(policyType.anyOf).toHaveLength(2)
-
-      // First option: string enum
-      const stringOption = policyType.anyOf.find((opt) => opt.type === 'string')
-      expect(stringOption).toBeDefined()
-      expect(stringOption?.enum).toContain('kasko')
-      expect(stringOption?.enum).toContain('traffic')
-      expect(stringOption?.enum).toContain('home')
-      expect(stringOption?.enum).toContain('health')
-      expect(stringOption?.enum).toContain('life')
-      expect(stringOption?.enum).toContain('dask')
-      expect(stringOption?.enum).toContain('business')
-      expect(stringOption?.enum).toContain('nakliyat')
-
-      // Second option: null
-      const nullOption = policyType.anyOf.find((opt) => opt.type === 'null')
-      expect(nullOption).toBeDefined()
+  describe('nullable enums', () => {
+    it('should have policyType as nullable enum', () => {
+      const policyType = EXTRACTION_JSON_SCHEMA.schema.properties.policyType
+      expect(policyType.type).toContain('string')
+      expect(policyType.type).toContain('null')
+      expect(policyType.enum).toContain('kasko')
+      expect(policyType.enum).toContain('traffic')
+      expect(policyType.enum).toContain('home')
+      expect(policyType.enum).toContain('health')
+      expect(policyType.enum).toContain('life')
+      expect(policyType.enum).toContain('dask')
+      expect(policyType.enum).toContain('business')
+      expect(policyType.enum).toContain('nakliyat')
+      expect(policyType.enum).toContain(null)
     })
 
-    it('should use anyOf pattern for nullable paymentFrequency enum', () => {
-      const paymentFreq = EXTRACTION_JSON_SCHEMA.schema.properties.paymentFrequency as {
-        anyOf: Array<{ type: string; enum?: string[] }>
-      }
-
-      expect(paymentFreq.anyOf).toBeDefined()
-      expect(paymentFreq.anyOf).toHaveLength(2)
-
-      // First option: string enum
-      const stringOption = paymentFreq.anyOf.find((opt) => opt.type === 'string')
-      expect(stringOption).toBeDefined()
-      expect(stringOption?.enum).toContain('annual')
-      expect(stringOption?.enum).toContain('semi-annual')
-      expect(stringOption?.enum).toContain('quarterly')
-      expect(stringOption?.enum).toContain('monthly')
-
-      // Second option: null
-      const nullOption = paymentFreq.anyOf.find((opt) => opt.type === 'null')
-      expect(nullOption).toBeDefined()
+    it('should have paymentFrequency as nullable enum', () => {
+      const paymentFreq = EXTRACTION_JSON_SCHEMA.schema.properties.paymentFrequency
+      expect(paymentFreq.type).toContain('string')
+      expect(paymentFreq.type).toContain('null')
+      expect(paymentFreq.enum).toContain('annual')
+      expect(paymentFreq.enum).toContain('semi-annual')
+      expect(paymentFreq.enum).toContain('quarterly')
+      expect(paymentFreq.enum).toContain('monthly')
+      expect(paymentFreq.enum).toContain(null)
     })
 
-    it('should use anyOf pattern for nullable coverage category enum', () => {
-      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties
-        .category as {
-        anyOf: Array<{ type: string; enum?: string[] }>
-      }
-
-      expect(category.anyOf).toBeDefined()
-      expect(category.anyOf).toHaveLength(2)
-
-      // First option: string enum
-      const stringOption = category.anyOf.find((opt) => opt.type === 'string')
-      expect(stringOption).toBeDefined()
-      expect(stringOption?.enum).toContain('main')
-      expect(stringOption?.enum).toContain('liability')
-      expect(stringOption?.enum).toContain('supplementary')
-      expect(stringOption?.enum).toContain('assistance')
-      expect(stringOption?.enum).toContain('legal')
-      expect(stringOption?.enum).toContain('other')
-
-      // Second option: null
-      const nullOption = category.anyOf.find((opt) => opt.type === 'null')
-      expect(nullOption).toBeDefined()
+    it('should have coverage category as nullable enum', () => {
+      const category = EXTRACTION_JSON_SCHEMA.schema.properties.coverages.items.properties.category
+      expect(category.type).toContain('string')
+      expect(category.type).toContain('null')
+      expect(category.enum).toContain('main')
+      expect(category.enum).toContain('liability')
+      expect(category.enum).toContain('supplementary')
+      expect(category.enum).toContain('assistance')
+      expect(category.enum).toContain('legal')
+      expect(category.enum).toContain('other')
+      expect(category.enum).toContain(null)
     })
   })
 
