@@ -65,6 +65,46 @@ if (!fs.existsSync(pdfDir) || !fs.statSync(pdfDir).isDirectory()) {
 }
 
 // ---------------------------------------------------------------------------
+// Preflight: fail fast when --persist-policies is set but env/inputs are
+// missing. Runs ONLY outside dry-run mode — dry-run should always work for
+// verification without credentials. This saves real LLM tokens from being
+// spent on runs that would only fail at Supabase insert time.
+// ---------------------------------------------------------------------------
+
+if (persistPolicies && !isDryRun) {
+  const missing: string[] = []
+  if (!process.env.SUPABASE_URL && !process.env.VITE_SUPABASE_URL) {
+    missing.push('SUPABASE_URL (or VITE_SUPABASE_URL)')
+  }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    missing.push('SUPABASE_SERVICE_ROLE_KEY')
+  }
+  if (!reviewerUserId) {
+    missing.push('--reviewer-id=<uuid> or PILOT_REVIEWER_USER_ID env')
+  } else {
+    // Basic UUID v4-ish shape check — catches typos and accidental emails.
+    // Does NOT verify that the UUID exists in auth.users (that would need
+    // a live Supabase query; defer to the actual insert which will hard-fail
+    // on FK violation with a clear error message).
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRe.test(reviewerUserId)) {
+      console.error(
+        `Invalid --reviewer-id: "${reviewerUserId}" — expected a UUID (e.g. 12345678-1234-1234-1234-123456789abc)`
+      )
+      process.exit(1)
+    }
+  }
+  if (missing.length > 0) {
+    console.error('--persist-policies requires the following to be set:')
+    for (const m of missing) console.error(`  • ${m}`)
+    console.error(
+      '\nEither provide them (e.g. via .env) or drop --persist-policies to run in QA-only mode.'
+    )
+    process.exit(1)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // PDF text extraction (mirrors kasko-real-pdf-extraction.ts)
 // ---------------------------------------------------------------------------
 
