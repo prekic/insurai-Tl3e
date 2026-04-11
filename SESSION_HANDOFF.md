@@ -35,7 +35,7 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md` (prereqs
 | 1 | `e1174df` | `feat(pilot-batch): add Document AI OCR fallback + policies table writer` | 1 file, +292/−9 |
 | 2 | `3cd6445` | `feat(pilot-batch): preflight validation + handoff docs sync` | 3 files, +203/−89 |
 | 3 | `ea97912` | `feat(pilot-batch): runbook + extracted date parser + latent bug fix` | 6 files, +578/−32 |
-| 4 | (final commit — this handoff sync) | `chore(docs): session handoff + CLAUDE.md gotcha #52 + non-negotiable rules #11/#12` | 2 files |
+| 4 | `89dca4a` | `chore(docs): session handoff + CLAUDE.md gotcha #52 + non-negotiable rules #11/#12` | 2 files, +32/−7 |
 
 ## 🔴 Latent Production Bug Discovered — Flagged for Future Fix
 
@@ -118,7 +118,7 @@ Exit behavior:
 
 **Note**: preflight does NOT verify the UUID exists in `auth.users`. That would require a live Supabase query; defer to the actual insert which will hard-fail on FK violation with a clear error message.
 
-## Phase A+2 — Runbook + Extracted Parser + Unit Tests (next commit)
+## Phase A+2 — Runbook + Extracted Parser + Unit Tests (commit `ea97912`)
 
 Three additions, all credential-free:
 
