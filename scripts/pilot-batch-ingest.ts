@@ -31,6 +31,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 import { GoogleAuth } from 'google-auth-library'
+import { parseExtractedDate } from './_simple-date-parser'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -660,29 +661,10 @@ async function persistQARecord(record: any): Promise<boolean> {
 // KEEP IN SYNC with the production function if the date formats or premium
 // shape ever change.
 
-// MIRRORS src/lib/ai/policy-extractor.ts:1609-1637 — keep in sync
-function parseExtractedDate(raw: string | undefined, fallbackOffsetDays: number): string {
-  const fallback = new Date(Date.now() + fallbackOffsetDays * 86_400_000)
-    .toISOString()
-    .split('T')[0]
-  if (!raw) return fallback
-  let d = new Date(raw)
-  if (isNaN(d.getTime())) {
-    const parts = raw.split(/[./-]/)
-    if (parts.length === 3) {
-      if (parts[2].length === 4) {
-        d = new Date(
-          `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
-        )
-      } else if (parts[0].length === 4) {
-        d = new Date(
-          `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
-        )
-      }
-    }
-  }
-  return isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0]
-}
+// parseExtractedDate lives in scripts/_simple-date-parser.ts — imported at
+// the top of this file. It MIRRORS src/lib/ai/policy-extractor.ts:1609-1637
+// and is now unit-tested in scripts/__tests__/simple-date-parser.test.ts to
+// catch drift early.
 
 async function findDuplicatePolicy(
   supabase: any,

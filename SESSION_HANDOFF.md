@@ -1,19 +1,60 @@
-# Session Handoff — April 11, 2026 (Pilot Batch Phase A — Committed)
+# Session Handoff — April 11, 2026 (Pilot Batch Phase A — Committed + Follow-ups)
 
-> **Session type**: Implementation. Extended `scripts/pilot-batch-ingest.ts` to close the two structural gaps that were blocking pilot ingestion: no OCR fallback and no `policies`-table writer. Phase B (credentials) and Phase C (real execution) remain blocked — **user deferred env delivery to a future session**.
+> **Session type**: Implementation. Extended `scripts/pilot-batch-ingest.ts` to close the two structural gaps that were blocking pilot ingestion: no OCR fallback and no `policies`-table writer. Phase B (credentials) and Phase C (real execution) remain blocked — **user deferred env delivery to a future session**. Follow-up work added in the same session: preflight validation, unit tests for the extracted date parser, a runbook, and discovery of a **latent production bug in `policy-extractor.ts:1609-1637`** (flagged for fix, not repaired in production this session).
 
 ## Current State
 
 **Branch**: `claude/load-project-context-vaXCi` — clean, pushed.
-**Working tree**: clean (after the two commits below).
-**Test state**: No new automated tests added — Phase A verification was done via typecheck + ESLint + Prettier + three manual `tsx` smoke runs. See "Verification evidence" below.
+**Working tree**: clean (after the three commits below).
+**Test state**: 22 new unit tests in `scripts/__tests__/simple-date-parser.test.ts`, all green in isolation. Plus typecheck + ESLint + Prettier + dry-run smoke runs on the script itself.
 
 ## What This Session Produced
 
 | # | SHA | Message | Scope |
 |---|-----|---------|-------|
 | 1 | `e1174df` | `feat(pilot-batch): add Document AI OCR fallback + policies table writer` | 1 file, +292/−9 |
-| 2 | (next commit) | `feat(pilot-batch): preflight validation for --persist-policies` + handoff docs sync | script + SESSION_HANDOFF.md + CLAUDE.md |
+| 2 | `3cd6445` | `feat(pilot-batch): preflight validation + handoff docs sync` | 3 files, +203/−89 |
+| 3 | (next commit) | Runbook + extracted date parser + unit tests + production bug flag | 5 files |
+
+## 🔴 Latent Production Bug Discovered — Flagged for Future Fix
+
+**Location**: `src/lib/ai/policy-extractor.ts:1609-1637` (`convertToAnalyzedPolicy` date parsing).
+
+**Bug**: The function always calls `new Date(rawEndDate)` first, falling back to manual parsing only when the result is `NaN`. But V8's `Date` constructor silently **mis-parses Turkish DD.MM.YYYY strings where day ≤ 12** as MM.DD.YYYY (day/month swapped), returning a valid-but-wrong date that never reaches the fallback branch.
+
+**Concrete reproduction** (Node 22.22):
+```js
+new Date('01.12.2024').toISOString()  // → '2024-01-12T00:00:00.000Z'  ❌ should be 2024-12-01
+new Date('05.03.2024').toISOString()  // → '2024-05-03T00:00:00.000Z'  ❌ should be 2024-03-05
+new Date('15.12.2024').toISOString()  // → RangeError: Invalid time value (falls through correctly)
+new Date('31.01.2025').toISOString()  // → RangeError: Invalid time value (falls through correctly)
+```
+
+**Impact scope**:
+- Every KASKO policy in Turkey uses DD.MM.YYYY. Roughly **half** of all date strings have both day and month ≤ 12 (statistical fraction depending on distribution).
+- Affected fields: `startDate`, `expiryDate` (and therefore `status` inference — `'active'` vs `'expiring'` vs `'expired'` — which depends on `expiryDate`).
+- The bug is silent: it does not throw, does not log warnings. Mis-parsed dates are persisted to `policies.start_date` and `policies.expiry_date`, and propagate into `evaluation`, `PolicyDetailView`, exports, and the grade threshold calibration.
+- **Has been in production since at least Apr 8, 2026** (the existing KASKO pilot sample runs would have hit this) and probably much earlier — the inlined copy in `pilot-batch-ingest.ts` explicitly claims to MIRROR this production code.
+
+**Why it wasn't caught sooner**: Unit tests of `convertToAnalyzedPolicy` likely use ISO-format date strings (which parse correctly), not DD.MM.YYYY. End-to-end tests with real PDFs may have masked this because Turkish PDFs sometimes have day ≥13 (which falls through to the manual parser correctly) or a mix that statistically hides the swap.
+
+**How it was discovered**: While writing unit tests for the extracted `parseExtractedDate` helper in this session, the `01.12.2024` → `2025-12-01` test case failed with `2024-01-12`. Direct probing of Node's `Date` constructor confirmed the bug is in V8's parser, not the wrapper logic.
+
+**Fix applied to `scripts/_simple-date-parser.ts`** (this session): always try the manual 3-part split parser FIRST for strings matching dot/dash/slash separator pattern. Only fall back to `new Date(raw)` for ISO datetimes or other non-3-part formats. This produces correct results for all Turkish KASKO dates while preserving ISO compatibility. 22 unit tests now pass including real KASKO policy dates from `upload/real-kasko-pdf/`.
+
+**TODO for a future session (NOT done this session)**:
+1. Port the same fix into `src/lib/ai/policy-extractor.ts:1609-1637` — replace the `new Date(rawEndDate)` → `isNaN` → manual-parse cascade with the manual-parser-first approach.
+2. Decide whether to backfill existing `policies` rows that may have been mis-parsed. Query: `SELECT id, start_date, expiry_date, raw_data->>'startDate' as raw_start, raw_data->>'endDate' as raw_end FROM policies WHERE type = 'kasko' AND raw_data IS NOT NULL;` — rows where `raw_start` / `raw_end` are dot-separated AND both day and month ≤ 12 are suspect and need re-parsing.
+3. Add regression tests in `src/lib/ai/__tests__/policy-extractor.test.ts` (or wherever `convertToAnalyzedPolicy` is tested) that cover Turkish DD.MM.YYYY with day ≤ 12.
+4. Consider whether any other code paths in the codebase use `new Date(turkishDateString)` — audit with grep.
+
+**Why this session did not fix production**: The user's guidance was "do whatever you can other than [Phase B/C]". Touching `policy-extractor.ts` is a production code change that:
+- Affects the entire extraction pipeline, not just the pilot batch script
+- Requires running the production test suite to verify no regressions — forbidden without user permission per the 10-min rule
+- Has uncertain blast radius for existing `policies` rows (do we backfill? migrate? leave historical data alone?)
+- Is better scoped as a dedicated fix PR with full review rather than a side-task
+
+The pilot batch script's isolated fix is the correct "safe to land now" scope. Flagging the production bug for dedicated follow-up is the responsible handoff.
 
 ## Why This Session Happened
 
@@ -37,7 +78,7 @@ All changes in `scripts/pilot-batch-ingest.ts` (+292 / −9 lines, one file):
 | Initial `admissionStatus` default renamed `'skipped'` → `'not_attempted'` | Dry-run / text-extraction-fail artifacts no longer collide with legitimate pilot-gate `'skipped'` admission outcomes. Type-safe: `BatchResultEntry.admissionStatus` is plain `string` at `src/lib/analysis/batch-ingest-helpers.ts`. |
 | Header JSDoc + argv usage text | Documents all new flags. |
 
-## Phase A+1 — What This Session Added On Top (next commit)
+## Phase A+1 — What This Session Added On Top (commit `3cd6445`)
 
 **Preflight validation in `pilot-batch-ingest.ts`:**
 
@@ -56,13 +97,44 @@ Exit behavior:
 
 **Note**: preflight does NOT verify the UUID exists in `auth.users`. That would require a live Supabase query; defer to the actual insert which will hard-fail on FK violation with a clear error message.
 
+## Phase A+2 — Runbook + Extracted Parser + Unit Tests (next commit)
+
+Three additions, all credential-free:
+
+1. **`docs/runbooks/03-pilot-batch-ingestion.md`** — full end-to-end runbook for next session. Sections:
+   - Prerequisites (env vars, reviewer UUID sourcing with 3 options, PDF directory conventions)
+   - §2 Verification (credential-free smoke test)
+   - §3 Full ingestion (flag reference, expected duration/cost/results)
+   - §4 Post-run verification SQL queries for `policies` and `kasko_pilot_qa_records`
+   - §5 Downstream evaluation backfill
+   - §6 Grade threshold calibration (blocked on 50+ scored policies)
+   - §7 Troubleshooting (7 common failure modes with fixes)
+   - §8 Related files reference
+   - §9 History
+
+2. **`scripts/_simple-date-parser.ts`** — extracted `parseExtractedDate` from the inlined copy in `pilot-batch-ingest.ts` into a standalone Node-safe module. Matches the `_proxy-bootstrap.mjs` convention for underscore-prefixed script helpers. Pure logic, no deps, no Vite env. Contains the production-bug fix described above.
+
+3. **`scripts/__tests__/simple-date-parser.test.ts`** — 22 unit tests covering:
+   - ISO 8601 formats (short and datetime-with-timezone)
+   - Turkish DD.MM.YYYY with various day/month combinations
+   - DD-MM-YYYY, DD/MM/YYYY separator variants
+   - YYYY-MM-DD leading 4-digit format
+   - Undefined / empty / invalid → fallback with correct offset arithmetic
+   - Real KASKO dates from `upload/real-kasko-pdf/` — these were the tests that caught the production bug
+   - Output format assertion: always `YYYY-MM-DD`, never contains `T`
+
+   All 22 pass in isolation via `npx vitest run scripts/__tests__/simple-date-parser.test.ts`.
+
+4. **`scripts/pilot-batch-ingest.ts`** — removed the inlined `parseExtractedDate` function, replaced with `import { parseExtractedDate } from './_simple-date-parser'`. No behavioral change to the script other than the bug fix (since the shared module has the same signature and more-correct output for Turkish dates).
+
 ## Verification Evidence (all credential-free, all green)
 
 | Check | Result |
 |-------|--------|
 | `tsc -p <isolated tsconfig with @/* path aliases + strict>` | 0 errors |
-| `eslint scripts/pilot-batch-ingest.ts` | 0 errors, 0 new warnings |
-| `prettier --check scripts/pilot-batch-ingest.ts` | clean (1 auto-fix applied in Phase A via `--write`) |
+| `eslint scripts/pilot-batch-ingest.ts scripts/_simple-date-parser.ts scripts/__tests__/simple-date-parser.test.ts` | 0 errors, 0 new warnings |
+| `prettier --check` on all 3 files | clean |
+| `npx vitest run scripts/__tests__/simple-date-parser.test.ts` | **22/22 passed** |
 | `npx tsx …/real-kasko-pdf --dry-run` | 8/10 pdfjs OK · 2/10 hit OCR fallback → clean `No GCP credentials found` error in `entry.error` · `admissionStatus: not_attempted: 10` · exit 0 |
 | `npx tsx …/real-kasko-pdf --dry-run --persist-policies` | Identical to plain dry-run (gating proven) · exit 0 |
 | `npx tsx …/real-kasko-pdf --persist-policies` (full mode, no env) | Preflight fails fast with 3-item error list · exit 1 (no LLM calls) |
@@ -142,6 +214,7 @@ Nothing to commit after execution — the script persists directly. Only action:
 | 2 | Migration 043 applied | ✅ DONE (Apr 9) |
 | 3 | Schema unification | ✅ DONE (Apr 9, PR #338) |
 | 4 | Pilot batch ingestion script ready | ✅ DONE (Apr 11, this session) |
+| 4a | **🔴 NEW — Fix DD.MM.YYYY bug in `policy-extractor.ts:1609-1637`** | **PENDING — see "Latent Production Bug Discovered" section above**. Pilot batch has the fix; production still has the bug. Scope: ~5 lines of code change + regression tests + decide on backfill strategy for existing `policies` rows. |
 | 5 | Pilot batch ingestion executed | **BLOCKED — needs Phase B credentials (next session)** |
 | 6 | Evaluation backfill executed | **BLOCKED on #5** |
 | 7 | Grade threshold calibration | **BLOCKED on 50+ scored policies (only 10 available after #5)** |
