@@ -8,20 +8,29 @@
  *   npx tsx scripts/pilot-batch-ingest.ts ./pdfs-to-ingest
  *   npx tsx scripts/pilot-batch-ingest.ts ./pdfs-to-ingest --dry-run
  *   npx tsx scripts/pilot-batch-ingest.ts ./pdfs-to-ingest --provider=openai
+ *   npx tsx scripts/pilot-batch-ingest.ts ./pdfs-to-ingest --persist-policies --reviewer-id=<uuid>
  *
  * Flags:
- *   --dry-run       Validate PDF files and extract text, but skip LLM calls.
- *   --provider=X    Force 'openai' or 'anthropic' (default: openai, falls back to anthropic).
- *   --output=path   Save results JSON to custom path (default: /tmp/pilot-batch-results.json).
+ *   --dry-run           Validate PDF files and extract text, but skip LLM calls.
+ *   --provider=X        Force 'openai' or 'anthropic' (default: openai, falls back to anthropic).
+ *   --output=path       Save results JSON to custom path (default: /tmp/pilot-batch-results.json).
+ *   --persist-policies  Also insert each extracted policy into the `policies` table (required
+ *                       for downstream scripts/backfill-evaluation-scores.ts to pick them up).
+ *                       Requires --reviewer-id=<uuid> or PILOT_REVIEWER_USER_ID env var.
+ *   --reviewer-id=<uuid>  Explicit auth.users UUID for the user_id column when --persist-policies
+ *                         is set. Falls back to PILOT_REVIEWER_USER_ID env var.
  *
- * Requires .env with OPENAI_API_KEY and/or ANTHROPIC_API_KEY.
- * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for QA record persistence.
+ * Requires .env with OPENAI_API_KEY and/or ANTHROPIC_API_KEY (non-dry-run).
+ * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY for QA record + policies persistence.
+ * Optionally uses GCP_SERVICE_ACCOUNT_BASE64 (or GOOGLE_APPLICATION_CREDENTIALS) for the
+ * Document AI OCR fallback that rescues scanned PDFs pdfjs can't parse.
  */
 
 import 'dotenv/config'
 import * as fs from 'fs'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
+import { GoogleAuth } from 'google-auth-library'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -37,10 +46,13 @@ const providerArg = args.find((a) => a.startsWith('--provider='))
 const forcedProvider = providerArg?.split('=')[1] as 'openai' | 'anthropic' | undefined
 const outputArg = args.find((a) => a.startsWith('--output='))
 const outputPath = outputArg?.split('=')[1] || '/tmp/pilot-batch-results.json'
+const persistPolicies = args.includes('--persist-policies')
+const reviewerArg = args.find((a) => a.startsWith('--reviewer-id='))
+const reviewerUserId = reviewerArg?.split('=')[1] || process.env.PILOT_REVIEWER_USER_ID
 
 if (!dirArg) {
   console.error(
-    'Usage: npx tsx scripts/pilot-batch-ingest.ts <pdf-directory> [--dry-run] [--provider=openai|anthropic]'
+    'Usage: npx tsx scripts/pilot-batch-ingest.ts <pdf-directory> [--dry-run] [--provider=openai|anthropic] [--persist-policies --reviewer-id=<uuid>]'
   )
   process.exit(1)
 }
@@ -90,6 +102,103 @@ async function extractTextFromPdfFile(
     }
   } catch (err: any) {
     return { success: false, error: err.message || 'Unknown error' }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Document AI OCR fallback
+// ---------------------------------------------------------------------------
+// Mirrors scripts/test-document-ai.ts:49-95 for the auth + REST call pattern.
+// Splits PDFs >10 pages via src/lib/ai/pdf-splitter.ts (Document AI's per-request
+// page cap). Used when pdfjs-dist fails to extract readable text from scanned
+// or image-only PDFs. Returns a structured success/error result; never throws.
+//
+// Credential resolution order (first match wins):
+//   1. GCP_SERVICE_ACCOUNT_BASE64 env (sandbox-friendly, base64-encoded JSON key)
+//   2. GOOGLE_APPLICATION_CREDENTIALS env (path to JSON key file)
+//   3. ./gcp-service-account.json relative to the project root
+async function extractViaDocumentAI(filePath: string): Promise<{
+  success: boolean
+  text?: string
+  pageCount?: number
+  error?: string
+}> {
+  const projectId = process.env.GCP_PROJECT_ID || 'gen-lang-client-0171803889'
+  const location = process.env.GCP_LOCATION || 'us'
+  const processorId = process.env.GCP_DOCAI_PROCESSOR_ID || 'c2741b178ab61433'
+
+  const baseOpts = { scopes: ['https://www.googleapis.com/auth/cloud-platform'] }
+  let authOpts: ConstructorParameters<typeof GoogleAuth>[0] = baseOpts
+
+  if (process.env.GCP_SERVICE_ACCOUNT_BASE64) {
+    try {
+      const json = JSON.parse(
+        Buffer.from(process.env.GCP_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8')
+      )
+      authOpts = { ...baseOpts, credentials: json }
+    } catch {
+      return { success: false, error: 'GCP_SERVICE_ACCOUNT_BASE64 decode/parse failed' }
+    }
+  } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    authOpts = { ...baseOpts, keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS }
+  } else {
+    const defaultPath = path.join(__dirname, '..', 'gcp-service-account.json')
+    if (!fs.existsSync(defaultPath)) {
+      return { success: false, error: 'No GCP credentials found' }
+    }
+    authOpts = { ...baseOpts, keyFile: defaultPath }
+  }
+
+  try {
+    const auth = new GoogleAuth(authOpts)
+    const token = (await auth.getAccessToken()) as string
+
+    const { splitPdf, DOCUMENT_AI_PAGE_LIMIT } = await import('../src/lib/ai/pdf-splitter')
+    const buf = fs.readFileSync(filePath)
+    const file = new File([buf], path.basename(filePath), { type: 'application/pdf' })
+    const split = await splitPdf(file, DOCUMENT_AI_PAGE_LIMIT)
+
+    const endpoint = `https://${location}-documentai.googleapis.com/v1/projects/${projectId}/locations/${location}/processors/${processorId}:process`
+    const parts: string[] = []
+    let pages = 0
+
+    for (const chunk of split.chunks) {
+      // split.chunks is Uint8Array[] per PDFSplitResult (pdf-splitter.ts:20)
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          rawDocument: {
+            content: Buffer.from(chunk).toString('base64'),
+            mimeType: 'application/pdf',
+          },
+          processOptions: { ocrConfig: { hints: { languageHints: ['tr', 'en'] } } },
+        }),
+      })
+      if (!resp.ok) {
+        const bodyText = await resp.text().catch(() => '')
+        return {
+          success: false,
+          error: `Document AI HTTP ${resp.status}${bodyText ? `: ${bodyText.slice(0, 200)}` : ''}`,
+        }
+      }
+      const json: any = await resp.json()
+      if (json.document?.text) parts.push(json.document.text)
+      pages += json.document?.pages?.length || 0
+    }
+
+    const text = parts.join('\n\n').trim()
+    return {
+      success: text.length >= 50,
+      text,
+      pageCount: pages,
+      error: text.length < 50 ? `OCR returned only ${text.length} chars` : undefined,
+    }
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Unknown OCR error' }
   }
 }
 
@@ -496,6 +605,134 @@ async function persistQARecord(record: any): Promise<boolean> {
 }
 
 // ---------------------------------------------------------------------------
+// policies-table writer (batch mode only, opt-in via --persist-policies)
+// ---------------------------------------------------------------------------
+// Unlocks the end-to-end pipeline CLAUDE.md tasks #4 → #5 → #6:
+//   task #4: pilot batch ingestion → policies table
+//   task #5: scripts/backfill-evaluation-scores.ts reads policies table
+//   task #6: scripts/calibrate-grade-thresholds.ts reads scored policies
+// The existing persistQARecord() only writes to kasko_pilot_qa_records, which
+// the backfill script does NOT query. That mis-wiring stalled past sessions.
+//
+// Date-parse and premium-unwrap logic is a minimal inlined slice of
+// src/lib/ai/policy-extractor.ts:1609-1729 — cannot import it directly because
+// that file pulls in Vite's import.meta.env (CLAUDE.md gotcha #16).
+// KEEP IN SYNC with the production function if the date formats or premium
+// shape ever change.
+
+// MIRRORS src/lib/ai/policy-extractor.ts:1609-1637 — keep in sync
+function parseExtractedDate(raw: string | undefined, fallbackOffsetDays: number): string {
+  const fallback = new Date(Date.now() + fallbackOffsetDays * 86_400_000)
+    .toISOString()
+    .split('T')[0]
+  if (!raw) return fallback
+  let d = new Date(raw)
+  if (isNaN(d.getTime())) {
+    const parts = raw.split(/[./-]/)
+    if (parts.length === 3) {
+      if (parts[2].length === 4) {
+        d = new Date(
+          `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}T00:00:00Z`
+        )
+      } else if (parts[0].length === 4) {
+        d = new Date(
+          `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}T00:00:00Z`
+        )
+      }
+    }
+  }
+  return isNaN(d.getTime()) ? fallback : d.toISOString().split('T')[0]
+}
+
+async function findDuplicatePolicy(
+  supabase: any,
+  policyNumber: string,
+  provider: string,
+  userId: string
+): Promise<string | null> {
+  const { data } = await supabase
+    .from('policies')
+    .select('id')
+    .eq('policy_number', policyNumber)
+    .eq('provider', provider)
+    .eq('user_id', userId)
+    .limit(1)
+  return data && data.length > 0 ? data[0].id : null
+}
+
+async function persistToPoliciesTable(
+  extracted: any,
+  reviewerUserIdArg: string,
+  filename: string
+): Promise<{ ok: boolean; id?: string; skipped?: boolean; error?: string }> {
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !key) return { ok: false, error: 'Supabase not configured' }
+
+  try {
+    const { createClient } = await import('@supabase/supabase-js')
+    const supabase = createClient(url, key)
+
+    const policyNumber = extracted.policyNumber || 'UNKNOWN'
+    const provider = extracted.provider || 'UNKNOWN'
+
+    const existingId = await findDuplicatePolicy(
+      supabase,
+      policyNumber,
+      provider,
+      reviewerUserIdArg
+    )
+    if (existingId) return { ok: true, id: existingId, skipped: true }
+
+    // Premium: scalar or { amount } (production handles both shapes)
+    let premium = 0
+    if (typeof extracted.premium === 'number') premium = extracted.premium
+    else if (extracted.premium && typeof extracted.premium === 'object' && extracted.premium.amount)
+      premium = extracted.premium.amount
+
+    const coverages = Array.isArray(extracted.coverages) ? extracted.coverages : []
+
+    const row = {
+      user_id: reviewerUserIdArg,
+      policy_number: policyNumber,
+      provider,
+      type: extracted.policyType || 'kasko',
+      type_tr: 'Kasko',
+      coverage: coverages[0]?.limit || 0,
+      premium,
+      deductible: typeof extracted.deductible === 'number' ? extracted.deductible : 0,
+      start_date: parseExtractedDate(extracted.startDate || extracted.start_date, 0),
+      expiry_date: parseExtractedDate(
+        extracted.endDate || extracted.expiryDate || extracted.end_date,
+        365
+      ),
+      insured_person: extracted.insuredPerson || extracted.insuredName || 'Unknown',
+      status: 'active' as const,
+      document_type: 'policy',
+      raw_data: {
+        // backfill-evaluation-scores.ts:24 requires raw_data.coverages to be an array
+        coverages,
+        exclusions: Array.isArray(extracted.exclusions) ? extracted.exclusions : [],
+        specialConditions: Array.isArray(extracted.specialConditions)
+          ? extracted.specialConditions
+          : [],
+        aiConfidence: extracted.confidence?.overall ?? 0,
+        sourceFilename: filename,
+        extractionModel: extracted._model || 'unknown',
+        _batchIngested: true,
+        _batchIngestedAt: new Date().toISOString(),
+      },
+    }
+
+    const { data, error } = await supabase.from('policies').insert(row).select('id').single()
+    if (error) return { ok: false, error: error.message }
+    return { ok: true, id: data?.id }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Unknown insert error' }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -544,15 +781,42 @@ async function main() {
       policyNumber: null,
       provider: null,
       coverageCount: 0,
-      admissionStatus: 'skipped',
+      // 'not_attempted' is the initial sentinel: distinguishes dry-run/text-fail artifacts
+      // from legitimate pilot-gate admission outcomes like 'admitted' / 'pilot_ineligible'.
+      // Overwritten below after evaluatePilotAdmissionForBatch() runs in full mode.
+      admissionStatus: 'not_attempted',
       displayMode: 'unknown',
       phraseClean: true,
       error: null,
     }
 
-    // Step 1: Text extraction
+    // Step 1: Text extraction (pdfjs primary, Document AI OCR fallback)
     console.log('  Extracting text...')
-    const textResult = await extractTextFromPdfFile(pdf.path)
+    let textResult = await extractTextFromPdfFile(pdf.path)
+
+    // If pdfjs can't parse the PDF (scanned / image-only), try Document AI OCR.
+    // The OCR helper gracefully no-ops with a structured error when GCP creds
+    // are missing, so this is safe in credential-free dry-runs.
+    if (!textResult.success || !textResult.text) {
+      const pdfjsErr = textResult.error || 'Text extraction failed'
+      console.log(`  pdfjs failed (${pdfjsErr}) — trying Document AI OCR...`)
+      const ocrResult = await extractViaDocumentAI(pdf.path)
+      if (ocrResult.success && ocrResult.text) {
+        console.log(`  OCR recovered ${ocrResult.text.length} chars`)
+        textResult = {
+          success: true,
+          text: ocrResult.text,
+          pageCount: ocrResult.pageCount,
+        }
+      } else {
+        console.log(`  OCR also failed: ${ocrResult.error || 'Unknown OCR error'}`)
+        textResult = {
+          success: false,
+          error: `pdfjs: ${pdfjsErr}; ocr: ${ocrResult.error || 'Unknown OCR error'}`,
+        }
+      }
+    }
+
     entry.textExtracted = textResult.success
     entry.textLength = textResult.text?.length || 0
     entry.pageCount = textResult.pageCount || 0
@@ -653,6 +917,25 @@ async function main() {
       )
     } else {
       console.log(`  QA: ${entry.admissionStatus} (not counted in pilot metrics)`)
+    }
+
+    // Step 6: Optionally persist to the `policies` table so downstream
+    // scripts/backfill-evaluation-scores.ts can pick up the extraction.
+    // Gated behind --persist-policies + --reviewer-id=<uuid> (or
+    // PILOT_REVIEWER_USER_ID env). Never reached in dry-run mode.
+    if (persistPolicies) {
+      if (!reviewerUserId) {
+        console.log('  policies: SKIP (missing --reviewer-id=<uuid> or PILOT_REVIEWER_USER_ID)')
+      } else {
+        const r = await persistToPoliciesTable(extracted, reviewerUserId, pdf.name)
+        if (r.ok && r.skipped) {
+          console.log(`  policies: duplicate skipped (id ${r.id})`)
+        } else if (r.ok) {
+          console.log(`  policies: inserted (id ${r.id})`)
+        } else {
+          console.log(`  policies: insert failed — ${r.error}`)
+        }
+      }
     }
 
     results.push(entry)
