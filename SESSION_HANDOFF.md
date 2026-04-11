@@ -5,7 +5,7 @@
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
 1. **🔴 Rotate leaked secrets** from Apr 8 session (user action — Supabase service role, admin JWT, OpenAI/Anthropic, GCP, VAPID, exchangerate-host). See CLAUDE.md "Next Session Instructions" #1.
-2. **🔴 Provide `.env`** for Phase B unblock. 6 keys required: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`, `PILOT_REVIEWER_USER_ID` (a valid `auth.users` UUID — see runbook §1.2 for 3 sourcing options). `.env` is in `.gitignore`.
+2. **🔴 Provide `.env`** for Phase B unblock. **Fastest path**: `cp .env.example .env` and fill in the 6 required keys. `.env.example` now documents all 6 (as of commit after QA audit): `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GCP_SERVICE_ACCOUNT_BASE64` (or `GOOGLE_APPLICATION_CREDENTIALS` as alternative), and `PILOT_REVIEWER_USER_ID` (a valid `auth.users` UUID — see runbook §1.2 for 3 sourcing options). `.env` is in `.gitignore` and will not be committed.
 3. **Run pilot batch ingestion** (Phase C step 1):
    ```bash
    npx tsx scripts/pilot-batch-ingest.ts ./upload/real-kasko-pdf --persist-policies
@@ -161,7 +161,14 @@ Three additions, all credential-free:
 | `npx tsx …/real-kasko-pdf --persist-policies` (full mode, no env) | Preflight fails fast with 3-item error list · exit 1 (no LLM calls) |
 | `npx tsx …/real-kasko-pdf --persist-policies --reviewer-id=not-a-uuid` | Preflight rejects malformed UUID · exit 1 |
 
-**Gotcha hit and fixed during verification**: `splitPdf().chunks` returns `Uint8Array[]`, not `File[]` — the initial draft called `chunk.arrayBuffer()` which doesn't exist on `Uint8Array`. Fixed to `Buffer.from(chunk).toString('base64')` directly. Typecheck caught it before commit.
+**Tactical gotchas hit this session (all documented in CLAUDE.md Developer Gotchas #52-#56)**:
+- **#52** 🔴 V8 `Date` constructor silently mis-parses Turkish DD.MM.YYYY when day ≤ 12 (latent production bug, pilot fix applied)
+- **#53** Vitest v4 removed `--reporter=basic` — fails with `Failed to load url basic`. Omit the flag or use `--reporter=default`
+- **#54** Standalone `tsc` on `scripts/**/*.ts` needs an isolated tsconfig with `baseUrl` + `paths` for `@/*` aliases — root `tsconfig.json` only covers `src/`
+- **#55** `splitPdf().chunks` returns `Uint8Array[]`, NOT `File[]` — use `Buffer.from(chunk).toString('base64')` directly, do NOT call `chunk.arrayBuffer()` (it doesn't exist on `Uint8Array`)
+- **#56** Node `File` global requires Node ≥ 20 — `scripts/pilot-batch-ingest.ts` constructs `new File([buf], ...)` which will crash on Node 18
+
+Future agents re-running any Phase C verification should read these five gotchas first to avoid re-discovering them.
 
 ## What's Still Blocked — For Next Session
 
