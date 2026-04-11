@@ -1,11 +1,31 @@
-# Session Handoff — April 11, 2026 (Pilot Batch Phase A — Committed + Follow-ups)
+# Session Handoff — April 11, 2026 (Pilot Batch Phase A+ — Committed + Follow-ups)
 
 > **Session type**: Implementation. Extended `scripts/pilot-batch-ingest.ts` to close the two structural gaps that were blocking pilot ingestion: no OCR fallback and no `policies`-table writer. Phase B (credentials) and Phase C (real execution) remain blocked — **user deferred env delivery to a future session**. Follow-up work added in the same session: preflight validation, unit tests for the extracted date parser, a runbook, and discovery of a **latent production bug in `policy-extractor.ts:1609-1637`** (flagged for fix, not repaired in production this session).
+
+## 🎯 Immediate Next Steps for the Next Agent (priority order)
+
+1. **🔴 Rotate leaked secrets** from Apr 8 session (user action — Supabase service role, admin JWT, OpenAI/Anthropic, GCP, VAPID, exchangerate-host). See CLAUDE.md "Next Session Instructions" #1.
+2. **🔴 Provide `.env`** for Phase B unblock. 6 keys required: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GCP_SERVICE_ACCOUNT_BASE64`, `PILOT_REVIEWER_USER_ID` (a valid `auth.users` UUID — see runbook §1.2 for 3 sourcing options). `.env` is in `.gitignore`.
+3. **Run pilot batch ingestion** (Phase C step 1):
+   ```bash
+   npx tsx scripts/pilot-batch-ingest.ts ./upload/real-kasko-pdf --persist-policies
+   ```
+   Expected: 8-10 new rows in `policies` table, ~3-5 min wall time, ~$0.20-0.50 API cost. Preflight fails fast if env is missing.
+4. **Run evaluation backfill** (Phase C step 2):
+   ```bash
+   npx tsx scripts/backfill-evaluation-scores.ts --apply --limit=200
+   ```
+   Accept the `VITE_SUPABASE_URL` stack trace — gotcha #45, non-fatal.
+5. **🔴 Fix production DD.MM.YYYY bug** in `src/lib/ai/policy-extractor.ts:1609-1637` (see "Latent Production Bug" section below). Can be done in parallel with #3-#4. Requires: port the manual-parser-first fix from `scripts/_simple-date-parser.ts`, add regression tests in `policy-extractor.test.ts`, decide on backfill strategy for existing corrupted `policies` rows.
+6. **Grade threshold calibration** (`scripts/calibrate-grade-thresholds.ts`) — blocked on 50+ scored policies. A single 10-PDF batch is not enough; defer until more PDFs are ingested.
+7. **Market benchmark research** — blocked on external TSB/SEDDK 2025 data input.
+
+Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md` (prereqs, verification SQL, troubleshooting).
 
 ## Current State
 
 **Branch**: `claude/load-project-context-vaXCi` — clean, pushed.
-**Working tree**: clean (after the three commits below).
+**Working tree**: clean (after the four commits below).
 **Test state**: 22 new unit tests in `scripts/__tests__/simple-date-parser.test.ts`, all green in isolation. Plus typecheck + ESLint + Prettier + dry-run smoke runs on the script itself.
 
 ## What This Session Produced
@@ -14,7 +34,8 @@
 |---|-----|---------|-------|
 | 1 | `e1174df` | `feat(pilot-batch): add Document AI OCR fallback + policies table writer` | 1 file, +292/−9 |
 | 2 | `3cd6445` | `feat(pilot-batch): preflight validation + handoff docs sync` | 3 files, +203/−89 |
-| 3 | (next commit) | Runbook + extracted date parser + unit tests + production bug flag | 5 files |
+| 3 | `ea97912` | `feat(pilot-batch): runbook + extracted date parser + latent bug fix` | 6 files, +578/−32 |
+| 4 | (final commit — this handoff sync) | `chore(docs): session handoff + CLAUDE.md gotcha #52 + non-negotiable rules #11/#12` | 2 files |
 
 ## 🔴 Latent Production Bug Discovered — Flagged for Future Fix
 
@@ -71,7 +92,7 @@ All changes in `scripts/pilot-batch-ingest.ts` (+292 / −9 lines, one file):
 |--------|---------|
 | `extractViaDocumentAI()` helper (~100 lines) | Direct Document AI REST call via `google-auth-library@^10.5.0` (already in deps). 3 credential sources: `GCP_SERVICE_ACCOUNT_BASE64` (env) → `GOOGLE_APPLICATION_CREDENTIALS` (file path) → `./gcp-service-account.json` default. Uses `splitPdf()` from `src/lib/ai/pdf-splitter.ts:43` for >10-page PDFs. Gracefully returns structured `{success: false, error}` when creds missing — never throws. Mirrors `scripts/test-document-ai.ts:49-95`. |
 | OCR fallback wired into `main()` Step 1 | After pdfjs returns <50 chars, retries via Document AI. On success, overwrites `textResult`. On failure, preserves both error strings in a joined message. Preserves existing behavior when pdfjs succeeds. |
-| `parseExtractedDate()` helper | Inlined minimal slice of `src/lib/ai/policy-extractor.ts:1609-1637` (cannot import directly per CLAUDE.md gotcha #16 — Vite env crash under tsx). Handles ISO, DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD. Marked `// MIRRORS src/lib/ai/policy-extractor.ts:1609-1637 — keep in sync`. |
+| `parseExtractedDate()` helper | Originally inlined as a MIRROR of `src/lib/ai/policy-extractor.ts:1609-1637` (cannot import directly per CLAUDE.md gotcha #16 — Vite env crash under tsx). **Apr 11 follow-up commit `ea97912` extracted it to `scripts/_simple-date-parser.ts` and fixed the V8 DD.MM.YYYY day≤12 bug that was inherited from production.** The shared module is now DERIVED FROM production but intentionally diverges — see gotcha #52 + rule #11. Handles ISO, DD.MM.YYYY, DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD with 22 unit tests in `scripts/__tests__/simple-date-parser.test.ts`. |
 | `findDuplicatePolicy()` helper | Simple `.select('id').eq(policy_number, provider, user_id).limit(1)` idempotency check so the script is safe to re-run without creating duplicate rows. |
 | `persistToPoliciesTable()` helper (~80 lines) | Uses service-role Supabase client. Constructs `PolicyInsert` shape: `user_id`, `policy_number`, `provider`, `type='kasko'`, `type_tr='Kasko'`, `coverage` (first coverage limit), `premium` (scalar or `{amount}`), `deductible`, `start_date`, `expiry_date`, `insured_person`, `status='active'`, `document_type='policy'`, `raw_data` (with `coverages` as array — required by `backfill-evaluation-scores.ts:24`). Returns `{ok, id?, skipped?, error?}`. |
 | `--persist-policies` + `--reviewer-id=<uuid>` CLI flags | Opt-in, default off. Also accepts `PILOT_REVIEWER_USER_ID` env var. Wired into `main()` as Step 6 after QA persist. Unreachable in dry-run mode (verified). |
@@ -236,7 +257,7 @@ Nothing to commit after execution — the script persists directly. Only action:
 12. `ProcessingLogger.onStageChange()` listener errors are caught individually
 13. `translations-skeleton.ts` accepts new KEYS with empty-string VALUES
 14. Server `__dirname` paths: `dist-server/server/` is the base — need 2 levels up to reach project root
-15. **NEW**: `pilot-batch-ingest.ts` `parseExtractedDate()` MIRRORS `policy-extractor.ts:1609-1637` — keep in sync when production date parsing changes
+15. **UPDATED (Apr 11)**: `scripts/_simple-date-parser.ts` `parseExtractedDate()` is **DERIVED from but INTENTIONALLY DIVERGES** from `src/lib/ai/policy-extractor.ts:1609-1637`. The shared module implements the correct manual-parser-first approach that fixes the V8 DD.MM.YYYY day≤12 bug (see CLAUDE.md gotcha #52). Keep the shared module authoritative for pilot scripts until production is patched (task #4b). **Do NOT** revert it to match production — that would re-introduce the swapped-date bug on Turkish KASKO policies.
 16. **NEW**: `pilot-batch-ingest.ts` `persistToPoliciesTable()` writes `raw_data.coverages` as array — required by `backfill-evaluation-scores.ts:24`; do not break this contract
 
 ## Environment Variables Required
