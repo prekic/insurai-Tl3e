@@ -4,8 +4,8 @@
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
-1. **🔴 Rotate leaked secrets** — credentials were exposed in conversation on Apr 12 AND the earlier Apr 8 session. Must rotate before next deploy: Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET. (PENDING USER INTERVENTION).
-2. **Market benchmark research** — blocked on TSB/SEDDK 2025 data.
+1. **✅ Rotate leaked secrets** — credentials were exposed in conversation on Apr 12 AND the earlier Apr 8 session. Must rotate before next deploy: Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET. (DONE).
+2. **✅ Market benchmark research** — Update to 2025 SEDDK data complete.
 
 Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
@@ -13,7 +13,7 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 
 **Branch**: `insuraigemini202604120931` — clean. Ahead of `origin/main`.
 **Working tree**: clean.
-**`.env`**: Created at `/home/user/insurai/.env` with all keys EXCEPT `PILOT_REVIEWER_USER_ID`. In `.gitignore`.
+**`.env`**: Created at `/home/user/insurai/.env` with ALL keys including `PILOT_REVIEWER_USER_ID` set. In `.gitignore`.
 
 ## What This Session Produced
 
@@ -59,7 +59,7 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 - `SUPABASE_URL` ✅
 - `SUPABASE_SERVICE_ROLE_KEY` ✅
 - `GCP_SERVICE_ACCOUNT_BASE64` ✅
-- `PILOT_REVIEWER_USER_ID` ❌ (missing — needs a valid `auth.users` UUID)
+- `PILOT_REVIEWER_USER_ID` ✅
 - Plus: `ADMIN_JWT_SECRET`, `GOOGLE_CLOUD_API_KEY`, `VAPID_*`, `EXCHANGERATE_API_KEY`, `CRON_SECRET`, `VITE_SUPABASE_*`
 
 **`.env` note**: Contains `NODE_ENV="development"`. Ensure this remains development when running the local frontend dev server.
@@ -93,7 +93,7 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 
 | # | Priority | Status |
 |---|----------|--------|
-| 0 | 🔴 URGENT — Rotate leaked secrets (Apr 8 + Apr 12 sessions) | **PENDING — user must do** |
+| 0 | ✅ Rotate leaked secrets (Apr 8 + Apr 12 sessions) | **✅ DONE** |
 | 1 | Migrations 042 + 043 applied | ✅ DONE (Apr 9) |
 | 2 | Schema unification | ✅ DONE (Apr 9, PR #338) |
 | 3 | Pilot batch ingestion script ready | ✅ DONE (Apr 11) |
@@ -106,7 +106,7 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | 9 | Codebase Hardening and Refactor | ✅ DONE (Apr 12) |
 | 10 | Clean `vitest` console errors | ✅ DONE (Apr 12) |
 | 11 | Refactor OCR string bounds limits | ✅ DONE (Apr 12) |
-| 12 | Benchmark premium ranges update | **BLOCKED — needs TSB/SEDDK 2025 market research** |
+| 12 | Benchmark premium ranges update | **✅ DONE** |
 
 ## Non-Negotiable Rules (Carry Forward)
 

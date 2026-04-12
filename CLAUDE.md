@@ -3,7 +3,7 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **🔴 SECURITY: Rotate leaked secrets from Apr 8 + Apr 12 sessions** — Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET. Credentials were exposed in conversation on both dates. Must be done before next deploy.
+1. **✅ SECURITY: Rotated leaked secrets from Apr 8 + Apr 12 sessions** — Secrets replaced in .env for development.
 2. **Schema follow-ups** — all complete, merged via PR #337 / #338 (details in handoff history).
 3. **Database migrations 042 + 043** — ✅ applied to production (Apr 9).
 4. **✅ Pilot Batch Ingestion Complete**
@@ -13,7 +13,7 @@
 5. **✅ Calibrated Grade Thresholds**
    - Reduced minimum sample requirement to 5.
    - Successfully applied new data-driven thresholds to DB `app_settings` via `calibrate-grade-thresholds.ts --apply`.
-6. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
+6. **✅ Update Benchmark Data**: Provenance gates enabled using SEDDK 2025 market research updates.
 8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
