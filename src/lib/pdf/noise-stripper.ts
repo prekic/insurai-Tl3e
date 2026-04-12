@@ -39,7 +39,10 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
     }
 
     // Check printable ratio
-    const printableChars = trimmedLine.replace(/[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u0180-\u024F]/g, '')
+    const printableChars = trimmedLine.replace(
+      /[^\x20-\x7E\u00A0-\u00FF\u0100-\u017F\u0180-\u024F]/g,
+      ''
+    )
     const printableRatio = printableChars.length / trimmedLine.length
 
     // Skip lines with too many non-printable characters
@@ -74,7 +77,10 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
     }
 
     // Skip lines that look like binary/hex dumps
-    if (/^[0-9A-Fa-f\s]{20,}$/.test(trimmedLine) && !/[gGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ]/.test(trimmedLine)) {
+    if (
+      /^[0-9A-Fa-f\s]{20,}$/.test(trimmedLine) &&
+      !/[gGhHiIjJkKlLmMnNoOpPqQrRsStTuUvVwWxXyYzZ]/.test(trimmedLine)
+    ) {
       noiseTypes.add('hex-dump')
       continue
     }
@@ -84,7 +90,7 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
 
     // Remove control characters (but keep Turkish chars)
     // eslint-disable-next-line no-control-regex
-    cleanedLine = cleanedLine.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '')
+    cleanedLine = cleanedLine.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]/g, '')
 
     // Remove isolated caret sequences
     cleanedLine = cleanedLine.replace(/\^+/g, '')
@@ -99,7 +105,8 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
   }
 
   const cleanedText = cleanLines.join('\n')
-  const linesRemoved = originalLines.length - cleanLines.filter(l => l.length > 0 || l === '').length
+  const linesRemoved =
+    originalLines.length - cleanLines.filter((l) => l.length > 0 || l === '').length
   const charsRemoved = originalLength - cleanedText.length
 
   return {
@@ -116,11 +123,13 @@ export function stripBarcodeNoise(text: string): NoiseStrippingResult {
 export function stripControlCharacters(text: string): string {
   // Remove C0 control chars except tab, newline, carriage return
   // Remove C1 control chars entirely
-  /* eslint-disable no-control-regex */
-  return text
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '') // C0 except \t \n \r
-    .replace(/[\x7F-\x9F]/g, '') // C1 control chars
-  /* eslint-enable no-control-regex */
+  return (
+    text
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '') // C0 except \t \n \r
+
+      .replace(/[\x7f-\x9f]/g, '')
+  ) // C1 control chars
 }
 
 /**
@@ -171,7 +180,7 @@ export function fixGlyphSplitTurkish(text: string): string {
   result = result.replace(
     /\b([A-ZÇĞİÖŞÜ])\s+([A-ZÇĞİÖŞÜ])\s+([A-ZÇĞİÖŞÜ])(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?(?:\s+([A-ZÇĞİÖŞÜ]))?\b/g,
     (match, ...letters) => {
-      const validLetters = letters.slice(0, 10).filter(l => l != null)
+      const validLetters = letters.slice(0, 10).filter((l) => l != null)
       // Only collapse if we have 3+ consecutive letters
       if (validLetters.length >= 3) {
         return validLetters.join('')
@@ -198,8 +207,8 @@ export function cleanExtractedText(text: string): NoiseStrippingResult {
 
   // Final cleanup: normalize whitespace
   cleanedText = cleanedText
-    .replace(/[ \t]+/g, ' ')  // Collapse horizontal whitespace
-    .replace(/\n{3,}/g, '\n\n')  // Max 2 consecutive newlines
+    .replace(/[ \t]+/g, ' ') // Collapse horizontal whitespace
+    .replace(/\n{3,}/g, '\n\n') // Max 2 consecutive newlines
     .trim()
 
   return {

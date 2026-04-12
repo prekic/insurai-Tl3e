@@ -267,8 +267,9 @@ export async function extractWithClaude(
       })
 
       // Extract text content from response
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const textBlock = response.content.find((block: any) => block.type === 'text')
+      const textBlock = response.content.find((block) => block.type === 'text') as
+        | { type: 'text'; text: string }
+        | undefined
       if (!textBlock || textBlock.type !== 'text') {
         throw new Error('No text response from Claude model')
       }

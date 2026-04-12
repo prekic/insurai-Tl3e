@@ -337,8 +337,8 @@ export function evaluatePolicy(
     overallScore,
     grade: getGradeFromScore(overallScore, gradeThresholds),
     isProvisional: Boolean(
-      (policy as any).isDraft ||
-      ((policy as any).aiConfidence && (policy as any).aiConfidence < 0.85) ||
+      (policy as { isDraft?: boolean }).isDraft ||
+      ((policy as { aiConfidence?: number }).aiConfidence ?? 1) < 0.85 ||
       !benchmarkForDate ||
       benchmarkForDate.benchmarkStatus === 'untrusted'
     ),
@@ -1059,8 +1059,8 @@ function evaluateCompliance(policy: Policy, config: EvaluationConfig): Complianc
     policy.exclusions.some(
       (e) => e.toLowerCase().includes('yaptırım') || e.toLowerCase().includes('sanction')
     ) ||
-    (policy as any).specialConditions?.some(
-      (c: any) =>
+    (policy as { specialConditions?: unknown[] }).specialConditions?.some(
+      (c) =>
         typeof c === 'string' &&
         (c.toLowerCase().includes('yaptırım') || c.toLowerCase().includes('sanction'))
     )
@@ -1277,7 +1277,7 @@ function generateMarketComparison(
       competitivePosition: 'average', // Neutral
       // Additional flag to indicate this is an untrusted/missing comparison
       untrusted: true,
-    } as any // The UI might need to know to suppress numeric info. We will handle this in UI side.
+    } as unknown as PolicyEvaluation['marketComparison'] // The UI might need to know to suppress numeric info. We will handle this in UI side.
   }
 
   if (benchmark) {

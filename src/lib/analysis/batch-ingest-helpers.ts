@@ -64,7 +64,17 @@ export function discoverPDFs(
 /**
  * Detects prohibited phrases in human-facing text fields only (avoids JSON keys like "isUnlimited").
  */
-export function checkProhibitedPhrases(extractedData: any, prohibitedPhrases: string[]): string[] {
+export function checkProhibitedPhrases(
+  extractedData:
+    | {
+        coverages?: { name?: unknown; nameTr?: unknown; description?: unknown }[]
+        specialConditions?: unknown[]
+        exclusions?: unknown[]
+      }
+    | null
+    | undefined,
+  prohibitedPhrases: string[]
+): string[] {
   if (!extractedData) return []
 
   const textFields: string[] = []
@@ -78,11 +88,13 @@ export function checkProhibitedPhrases(extractedData: any, prohibitedPhrases: st
   }
 
   if (Array.isArray(extractedData.specialConditions)) {
-    textFields.push(...extractedData.specialConditions.filter((s: any) => typeof s === 'string'))
+    textFields.push(
+      ...(extractedData.specialConditions.filter((s) => typeof s === 'string') as string[])
+    )
   }
 
   if (Array.isArray(extractedData.exclusions)) {
-    textFields.push(...extractedData.exclusions.filter((e: any) => typeof e === 'string'))
+    textFields.push(...(extractedData.exclusions.filter((e) => typeof e === 'string') as string[]))
   }
 
   const summaryText = textFields.join(' ').toLowerCase()

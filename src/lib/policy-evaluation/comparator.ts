@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion -- Assertions used after sort/find operations where existence is guaranteed */
 /**
  * Multi-Policy Comparator
  *
@@ -500,7 +499,8 @@ function generateAnalysis(
   const tradeoffs = identifyTradeoffs(policies, winners)
 
   // Generate main recommendation
-  const bestPolicy = policies.find((p) => p.policy.id === winners.overallBest)!
+  const bestPolicy = policies.find((p) => p.policy.id === winners.overallBest)
+  if (!bestPolicy) throw new Error('Implementation error: Best policy not found')
   const recommendation = generateMainRecommendation(bestPolicy, policies, winners)
 
   return {
@@ -605,8 +605,10 @@ function identifyTradeoffs(
 
   // Check if different policies win different categories
   if (winners.bestPremium !== winners.bestCoverage) {
-    const cheapest = policies.find((p) => p.policy.id === winners.bestPremium)!
-    const mostCoverage = policies.find((p) => p.policy.id === winners.bestCoverage)!
+    const cheapest = policies.find((p) => p.policy.id === winners.bestPremium)
+    const mostCoverage = policies.find((p) => p.policy.id === winners.bestCoverage)
+    if (!cheapest || !mostCoverage)
+      throw new Error('Implementation error: missing policies for tradeoffs')
 
     tradeoffs.push({
       option1: {
@@ -625,8 +627,10 @@ function identifyTradeoffs(
   }
 
   if (winners.bestValue !== winners.overallBest) {
-    const bestValue = policies.find((p) => p.policy.id === winners.bestValue)!
-    const overallBest = policies.find((p) => p.policy.id === winners.overallBest)!
+    const bestValue = policies.find((p) => p.policy.id === winners.bestValue)
+    const overallBest = policies.find((p) => p.policy.id === winners.overallBest)
+    if (!bestValue || !overallBest)
+      throw new Error('Implementation error: missing policies for tradeoffs')
 
     tradeoffs.push({
       option1: {

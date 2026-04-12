@@ -51,14 +51,24 @@ export function PolicyActuarialHistoryChart({ policyId }: PolicyActuarialHistory
           throw new Error('Failed to fetch history: ' + fetchError.message)
         }
         if (results) {
-          const formattedData = results.map((r: any) => ({
-            id: r.id,
-            created_at: r.evaluated_at,
-            topsis_closeness: r.topsis_closeness,
-            topsis_grade: r.topsis_grade,
-            monte_carlo_lower_bound: r.result_data?.expectedOutOfPocket?.percentiles?.p5 ?? null,
-            monte_carlo_upper_bound: r.result_data?.expectedOutOfPocket?.percentiles?.p95 ?? null,
-          }))
+          const formattedData = results.map(
+            (r: {
+              id: string
+              evaluated_at: string
+              topsis_closeness: number
+              topsis_grade: string
+              result_data?: {
+                expectedOutOfPocket?: { percentiles?: { p5?: number; p95?: number } }
+              }
+            }) => ({
+              id: r.id,
+              created_at: r.evaluated_at,
+              topsis_closeness: r.topsis_closeness,
+              topsis_grade: r.topsis_grade,
+              monte_carlo_lower_bound: r.result_data?.expectedOutOfPocket?.percentiles?.p5 ?? null,
+              monte_carlo_upper_bound: r.result_data?.expectedOutOfPocket?.percentiles?.p95 ?? null,
+            })
+          )
           setData(formattedData as HistoricalResult[])
         } else {
           throw new Error('Invalid response')

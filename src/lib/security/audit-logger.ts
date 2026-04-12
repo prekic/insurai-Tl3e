@@ -41,7 +41,7 @@ async function hashString(str: string): Promise<string> {
     let hash = 0
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i)
-      hash = ((hash << 5) - hash) + char
+      hash = (hash << 5) - hash + char
       hash = hash & hash
     }
     return Math.abs(hash).toString(16).padStart(8, '0')
@@ -51,7 +51,10 @@ async function hashString(str: string): Promise<string> {
   const data = encoder.encode(str)
   const hashBuffer = await crypto.subtle.digest('SHA-256', data)
   const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.slice(0, 8).map(b => b.toString(16).padStart(2, '0')).join('')
+  return hashArray
+    .slice(0, 8)
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 /**
@@ -205,9 +208,11 @@ class AuditLogger {
 
     // Debug output
     if (this.debug) {
-      const prefix = success ? '[AUDIT]' : '[AUDIT ERROR]'
-      // eslint-disable-next-line no-console
-      console.log(prefix, type, details)
+      if (success) {
+        console.warn('[AUDIT]', type, details)
+      } else {
+        console.error('[AUDIT ERROR]', type, details)
+      }
     }
 
     return event
@@ -322,19 +327,24 @@ class AuditLogger {
       userId?: string
     }
   ): Promise<AuditEvent> {
-    const errorDetails = error instanceof Error
-      ? {
-          name: error.name,
-          message: error.message,
-          stack: error.stack?.split('\n').slice(0, 5).join('\n'),
-        }
-      : { message: error }
+    const errorDetails =
+      error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+          }
+        : { message: error }
 
-    return this.log('error.unhandled', { ...errorDetails, ...context }, {
-      ...options,
-      success: false,
-      errorMessage: typeof error === 'string' ? error : error.message,
-    })
+    return this.log(
+      'error.unhandled',
+      { ...errorDetails, ...context },
+      {
+        ...options,
+        success: false,
+        errorMessage: typeof error === 'string' ? error : error.message,
+      }
+    )
   }
 
   /**
@@ -468,14 +478,18 @@ class AuditLogger {
     if (!this.db) {
       // Cleanup memory log
       const originalLength = this.memoryLog.length
-      this.memoryLog = this.memoryLog.filter(event => {
+      this.memoryLog = this.memoryLog.filter((event) => {
         const age = now - event.timestamp
         const days = age / (24 * 60 * 60 * 1000)
 
         if (event.severity === 'info' && days > this.retentionPolicy.infoRetentionDays) return false
-        if (event.severity === 'warning' && days > this.retentionPolicy.warningRetentionDays) return false
-        if ((event.severity === 'error' || event.severity === 'critical') &&
-            days > this.retentionPolicy.errorRetentionDays) return false
+        if (event.severity === 'warning' && days > this.retentionPolicy.warningRetentionDays)
+          return false
+        if (
+          (event.severity === 'error' || event.severity === 'critical') &&
+          days > this.retentionPolicy.errorRetentionDays
+        )
+          return false
 
         return true
       })
@@ -500,10 +514,15 @@ class AuditLogger {
 
           if (event.severity === 'info' && days > this.retentionPolicy.infoRetentionDays) {
             shouldDelete = true
-          } else if (event.severity === 'warning' && days > this.retentionPolicy.warningRetentionDays) {
+          } else if (
+            event.severity === 'warning' &&
+            days > this.retentionPolicy.warningRetentionDays
+          ) {
             shouldDelete = true
-          } else if ((event.severity === 'error' || event.severity === 'critical') &&
-                     days > this.retentionPolicy.errorRetentionDays) {
+          } else if (
+            (event.severity === 'error' || event.severity === 'critical') &&
+            days > this.retentionPolicy.errorRetentionDays
+          ) {
             shouldDelete = true
           }
 
@@ -609,7 +628,7 @@ class AuditLogger {
   }
 
   private queryMemory(options: AuditLogQuery): AuditEvent[] {
-    let events = this.memoryLog.filter(event => this.matchesQuery(event, options))
+    let events = this.memoryLog.filter((event) => this.matchesQuery(event, options))
 
     // Sort by timestamp descending
     events.sort((a, b) => b.timestamp - a.timestamp)
@@ -651,9 +670,7 @@ class AuditLogger {
   private maskEmail(email: string): string {
     const [local, domain] = email.split('@')
     if (!domain) return '***'
-    const maskedLocal = local.length > 2
-      ? local[0] + '***' + local[local.length - 1]
-      : '***'
+    const maskedLocal = local.length > 2 ? local[0] + '***' + local[local.length - 1] : '***'
     return `${maskedLocal}@${domain}`
   }
 
@@ -701,20 +718,28 @@ export function createTimedAudit(
 
   return {
     async complete(extraDetails = {}, success = true) {
-      return auditLogger.log(type, { ...details, ...extraDetails }, {
-        ...options,
-        durationMs: Date.now() - startTime,
-        success,
-      })
+      return auditLogger.log(
+        type,
+        { ...details, ...extraDetails },
+        {
+          ...options,
+          durationMs: Date.now() - startTime,
+          success,
+        }
+      )
     },
     async fail(error, extraDetails = {}) {
       const errorMessage = error instanceof Error ? error.message : error
-      return auditLogger.log(type, { ...details, ...extraDetails }, {
-        ...options,
-        durationMs: Date.now() - startTime,
-        success: false,
-        errorMessage,
-      })
+      return auditLogger.log(
+        type,
+        { ...details, ...extraDetails },
+        {
+          ...options,
+          durationMs: Date.now() - startTime,
+          success: false,
+          errorMessage,
+        }
+      )
     },
   }
 }

@@ -508,7 +508,7 @@ function validateKasko(data: Partial<ExtractedPolicyData>): SafetyFlag[] {
     partsTerms.some((term) => c.toLowerCase().includes(term))
   )
   const hasPartsInDescriptions = coverages.some(
-    (c) => c.description && partsTerms.some((term) => c.description!.toLowerCase().includes(term))
+    (c) => c.description && partsTerms.some((term) => c.description?.toLowerCase().includes(term))
   )
   if (!hasPartsInConditions && !hasPartsInDescriptions) {
     flags.push({
