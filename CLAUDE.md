@@ -597,6 +597,12 @@ VAPID_SUBJECT=mailto:contact@insurai.com
 
 # FX Exchange Rates — OPTIONAL (free tier works without key, lower rate limits)
 EXCHANGERATE_API_KEY=your-exchangerate-host-api-key
+
+# Cron Job Auth — REQUIRED for cron endpoints
+CRON_SECRET=your-random-cron-secret
+
+# Pilot Reviewer User — REQUIRED for Phase B/C (Run `npx tsx scripts/get-uuid.ts` to get a valid UUID)
+PILOT_REVIEWER_USER_ID=00000000-0000-0000-0000-000000000000
 ```
 
 **CRITICAL RULES**:

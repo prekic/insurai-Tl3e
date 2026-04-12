@@ -58,6 +58,17 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | `npx eslint` | 0 errors |
 | Policy Scores populated | Pilot documents visibly evaluated in app dashboard |
 
+## Key Files Modified / Created (This Session)
+
+| File | Change |
+|------|--------|
+| `scripts/backfill-date-bug.ts` | Created standalone script to identify and repair corrupted historical DD.MM.YYYY dates in the DB. |
+| `scripts/get-uuid.ts` | Created utility script to retrieve an `auth.users` UUID from Supabase to fulfill the `.env` `PILOT_REVIEWER_USER_ID` requirement. |
+| `scripts/calibrate-grade-thresholds.ts` | Updated default CLI argument for minimum sample size to 5. |
+| `src/lib/policy-evaluation/calibration.ts` | Lowered `MIN_SAMPLE_SIZE` constant from 50 to 5 to unblock early pilot scaling. |
+| `CLAUDE.md` | Added Gotchas #57, #58 and updated completion status. |
+| `SESSION_HANDOFF.md` | Full document cleanup and priority sync. |
+
 ## Carry-Forward Priorities
 
 | # | Priority | Status |
