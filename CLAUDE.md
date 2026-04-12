@@ -4,10 +4,9 @@
 
 ## ⚠️ Next Session Instructions
 1. **Monitor Production Logs**: Continue monitoring Sentry/production logs to ensure no other async paths in `PolicyDetailView` or elsewhere are swallowing errors.
-2. **Refine UI Gating**: Future refinements should focus on UI/UX polish of the warning banners if user feedback indicates they are too intrusive or not visible enough.
-3. **Monitor OCR Changes**: Monitor pilot ingestion logs to ensure the new regex resolves split-words successfully.
-4. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` back to 50.
-5. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
+2. **Monitor Phase D Deploy**: Since we have now softened the UI texts for unverified policies and restored calibration threshold bounds, wait for user feedback on the new professional warning banners.
+3. **Monitor Pilot OCR Changes**: Monitor extraction effectiveness using the updated globally scoped spacing deduplication algorithm ((?:[ \t][A-ZÇ...)). No regressions detected on boundary names.
+4. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
 

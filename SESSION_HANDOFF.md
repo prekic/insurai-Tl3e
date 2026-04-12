@@ -1,13 +1,12 @@
-# Session Handoff — April 12, 2026 (UI Gating & Stabilization)
+# Session Handoff — April 12, 2026 (Refining Pilot Trustworthiness Gating)
 
-> **Session type**: UI Polish + Bug Fix. Addressed critical TS build errors, resolved Next.js unhandled promise rejections on the client policy routes, and finalized UI trustworthiness gating for unverified policies on `PolicyCard` and `PolicyDetailView`.
+> **Session type**: UI Gating Polish + Pilot Pipeline Hardening. Softened the UI alerts for unverified policies based on operational feedback, reverted the actuarial grade threshold validation MIN_SAMPLE_SIZE back to 50 to lock in statistical robustness, and verified the OCR text-cleanup pipeline for regression gaps.
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
 1. **Monitor Production Logs**: Continue monitoring Sentry/production logs to ensure no other async paths in `PolicyDetailView` or elsewhere are swallowing errors.
-2. **Refinement**: The current implementation is stable; future refinements should focus on UI/UX polish of the warning banners if user feedback indicates they are too intrusive or not visible enough.
-3. **Monitor OCR Changes**: Keep an eye on the pilot ingestion logs to ensure the new `(?:[ \t][A-ZÇĞİÖŞÜ]){2,}` regex is successfully resolving split-words without chewing through valid word boundaries.
-4. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` in `src/lib/policy-evaluation/calibration.ts` back to 50.
+2. **Monitor Phase D Deploy**: Since we have now softened the UI texts for unverified policies and restored calibration threshold bounds, wait for user feedback on the new professional warning banners.
+3. **Monitor Pilot OCR Changes**: Monitor extraction effectiveness using the updated globally scoped spacing deduplication algorithm ((?:[ \t][A-ZÇ...)). No regressions detected on boundary names.
 
 Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 

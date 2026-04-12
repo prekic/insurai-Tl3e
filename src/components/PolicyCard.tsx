@@ -183,12 +183,9 @@ export function PolicyCard({
           {/* Grade */}
           {evaluation ? (
             isUnverified ? (
-              <Badge
-                variant="destructive"
-                className="flex items-center gap-1 font-bold h-6 overflow-hidden max-w-6"
-              >
+              <div className="flex items-center gap-1 bg-amber-100 text-amber-800 rounded-full h-6 px-1.5 overflow-hidden flex-shrink-0 border border-amber-200">
                 <AlertTriangle className="w-3 h-3 flex-shrink-0" />
-              </Badge>
+              </div>
             ) : (
               <GradeBadge grade={evaluation.grade} size="sm" />
             )
@@ -265,11 +262,11 @@ export function PolicyCard({
                 {evaluation ? (
                   isUnverified ? (
                     <Badge
-                      variant="destructive"
-                      className="flex items-center gap-1 font-bold text-[10px]"
+                      variant="secondary"
+                      className="flex items-center gap-1 font-medium text-[10px] bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200"
                     >
                       <AlertTriangle className="w-3 h-3" />
-                      {locale === 'tr' ? 'DOĞRULANMADI' : 'UNVERIFIED'}
+                      {locale === 'tr' ? 'İnceleme Bekliyor' : 'Needs Review'}
                     </Badge>
                   ) : (
                     <>
@@ -316,12 +313,12 @@ export function PolicyCard({
         {showEvaluation && evaluation && (
           <div className="pt-3 border-t border-gray-100">
             {isUnverified ? (
-              <div className="flex items-center gap-2 p-2 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100 opacity-90 transition-opacity hover:opacity-100">
+              <div className="flex items-center gap-2 p-2 bg-amber-50 text-amber-700 rounded-lg text-sm border border-amber-200 opacity-90 transition-opacity hover:opacity-100">
                 <AlertTriangle className="w-4 h-4 flex-shrink-0" />
                 <span className="font-medium text-xs leading-snug">
                   {locale === 'tr'
-                    ? 'Yapay zeka analizi doğrulanmadı. Sonuçlar için kullanmadan önce kontrol ediniz.'
-                    : 'Unverified AI output. Please review before using.'}
+                    ? 'Yapay zeka çıkarımı insan onayından geçmemiştir. Lütfen inceleyiniz.'
+                    : 'Unverified AI output. Please review carefully.'}
                 </span>
               </div>
             ) : (

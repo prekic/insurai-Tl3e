@@ -50,7 +50,7 @@ export interface SampleSufficiencyResult {
 // Core functions
 // ---------------------------------------------------------------------------
 
-const MIN_SAMPLE_SIZE = 5
+const MIN_SAMPLE_SIZE = 50
 
 /**
  * Compute the p-th percentile of a numeric array using linear interpolation.
