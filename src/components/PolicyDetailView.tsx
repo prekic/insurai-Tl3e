@@ -1101,15 +1101,15 @@ export function PolicyDetailView() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full max-w-[100vw] overflow-x-hidden">
-      {/* Draft Result Banner (Persistent, Red) - Priority 2 */}
+      {/* Draft Result Banner (Persistent, Warning) - Priority 2 */}
       {isUnverified && (
-        <div className="bg-red-600 text-white py-2 sm:py-3 px-4 sticky top-0 z-[60] font-bold text-center shadow-md">
+        <div className="bg-amber-50 border-b border-amber-200 text-amber-800 py-2 sm:py-3 px-4 sticky top-0 z-[60] font-medium text-center shadow-sm">
           <div className="max-w-6xl mx-auto flex items-center justify-center gap-2">
-            <AlertTriangle size={20} className="flex-shrink-0 animate-pulse" />
-            <span className="text-sm sm:text-base tracking-wider uppercase">
+            <AlertTriangle size={18} className="flex-shrink-0" />
+            <span className="text-sm sm:text-base">
               {locale === 'tr'
-                ? 'DOĞRULANMAMIŞ YAPAY ZEKA ÇIKTISI — KESİN KARARLAR İÇİN KULLANMAYIN'
-                : 'UNVERIFIED AI OUTPUT — DO NOT USE FOR FINAL DECISIONS'}
+                ? 'Yapay zeka çıkarımı henüz insan uzman onayı almamıştır. Sonuçları dikkatle inceleyiniz.'
+                : 'AI output has not yet received human expert verification. Please review results carefully.'}
             </span>
           </div>
         </div>

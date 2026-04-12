@@ -1,13 +1,12 @@
-# Session Handoff — April 12, 2026 (UI Gating & Stabilization)
+# Session Handoff — April 12, 2026 (Refining Pilot Trustworthiness Gating)
 
-> **Session type**: UI Polish + Bug Fix. Addressed critical TS build errors, resolved Next.js unhandled promise rejections on the client policy routes, and finalized UI trustworthiness gating for unverified policies on `PolicyCard` and `PolicyDetailView`.
+> **Session type**: UI Gating Polish + Pilot Pipeline Hardening. Softened the UI alerts for unverified policies based on operational feedback, reverted the actuarial grade threshold validation MIN_SAMPLE_SIZE back to 50 to lock in statistical robustness, and verified the OCR text-cleanup pipeline for regression gaps. Implemented an interceptor in the OCR pipeline to trigger Document AI fallback upon detecting TrueType font encoding corruptions common in Axa Sigorta KASKO policies, natively circumventing text decoding issues.
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
-1. **Monitor Production Logs**: Continue monitoring Sentry/production logs to ensure no other async paths in `PolicyDetailView` or elsewhere are swallowing errors.
-2. **Refinement**: The current implementation is stable; future refinements should focus on UI/UX polish of the warning banners if user feedback indicates they are too intrusive or not visible enough.
-3. **Monitor OCR Changes**: Keep an eye on the pilot ingestion logs to ensure the new `(?:[ \t][A-ZÇĞİÖŞÜ]){2,}` regex is successfully resolving split-words without chewing through valid word boundaries.
-4. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` in `src/lib/policy-evaluation/calibration.ts` back to 50.
+1. **Monitor Document AI Fallback Rates**: Since we added the Axa Sigorta font corruption interceptor, monitor extraction logs to ensure we aren't triggering Document AI on benign policies or missing new patterns of font corruption.
+2. **Monitor Phase D Deploy**: Since we have now softened the UI texts for unverified policies and restored calibration threshold bounds, wait for user feedback on the new professional warning banners.
+3. **Monitor Pilot OCR Changes**: Monitor extraction effectiveness using the updated globally scoped spacing deduplication algorithm ((?:[ \t][A-ZÇ...)). No regressions detected on boundary names.
 
 Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
@@ -28,11 +27,12 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | 5 | `0b3f2a3` | `chore: remove root clutter and commit codebase hardening` | 40 files, +152/−57044 |
 | 6 | `d9b305a` | `fix(pdf): resolve glyph-split word corruption and suppress vitest console noise` | 3 files, +71/−87 |
 | 7 | `64ea674` | `chore(docs): sync SESSION_HANDOFF and CLAUDE gotchas` | 2 files, +24/−28 |
+| 8 | `6863fee` | `fix(ocr): intercept axa font encoding corruption to trigger document ai fallback` | 2 files, +20/-1 |
 
-### OCR Glyph-Splitting Regex Hardening (commit `d9b305a`)
+### OCR Glyph-Splitting Regex Hardening & Font Interceptors (commits `d9b305a`, `6863fee`)
 
-- **Root Cause**: The PDF OCR parser had a bug parsing glyph-split words (`P O L İ Ç E`) where words exceeding 10 bounds (e.g. `GENİŞLETİLMİŞ`) were skipped or merged into neighboring words due to an unstable `\s+` regex approach paired with hard-coded exceptions.
-- **Resolution**: Implemented a globally robust lookbehind `(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}` logic. It strips exact `[ \t]` characters unconditionally but preserves word spacing boundaries natively.
+- **Root Cause**: The PDF OCR parser had a bug parsing glyph-split words (`P O L İ Ç E`) where words exceeding 10 bounds (e.g. `GENİŞLETİLMİŞ`) were skipped or merged into neighboring words due to an unstable `\s+` regex approach paired with hard-coded exceptions. Additionally, Axa Sigorta KASKO policies suffered from severe font-encoding map corruption, yielding strings like `%DûODQJÖo` instead of `Başlangıç Tarihi`.
+- **Resolution**: Implemented a globally robust lookbehind `(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}` logic. It strips exact `[ \t]` characters unconditionally but preserves word spacing boundaries natively. For Axa corruptions, implemented an explicit substring-matching interceptor across the pipeline (`pdf-parser.ts`, `pilot-batch-ingest.ts`) that triggers `PARSE_ERROR`, successfully forcing Google Document AI OCR, which parses visual bounding boxes and flawlessly bypasses text encoding maps altogether.
 - **Test Output Cleansed**: Centralized and wrapped dangling `vi.mock` configurations into clean `beforeEach()` blocks in the Test suites.
 
 ### Codebase Hardening Details (commit `0b3f2a3`)
@@ -88,10 +88,12 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | `src/lib/pdf/noise-stripper.ts` | Replaced rigid 10-char bounding limits and the hard-coded `commonSplits` block with a single scale-invariant regex for Turkish glyph-split texts. |
 | `src/lib/pdf/noise-stripper.test.ts` | Overhauled with boundary edge cases to trap incorrect word merging. |
 | `src/lib/ai/config.test.ts` | Purged repeating console.error manual spies and substituted scaled `beforeEach`/`afterEach` configurations to clean output limits. |
-| `CLAUDE.md` | Added Gotchas #57, #58, #59, and #60 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections), and updated Project Overview. |
+| `CLAUDE.md` | Added Gotchas #57, #58, #59, #60, and #61 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections, Axa Font Corruption), and updated Project Overview. |
 | `SESSION_HANDOFF.md` | Full document cleanup, preserved backfill records, and synced latest commits. |
-| `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. |
-| `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. |
+| `scripts/pilot-batch-ingest.ts` & `src/lib/ai/pdf-parser.ts` | **(New)** Intercepted `pdfjs` string extraction payload matching '%DûODQJÖo' out of AXA pipelines, forcing Document AI OCR substitution. |
+| `scripts/calibrate-grade-thresholds.ts` & `src/lib/policy-evaluation/calibration.ts` | **(Missed in initial audit)** Restored `MIN_SAMPLE_SIZE` back to 50 for Phase D actuarial readiness, ensuring strict statistical scaling overrides. |
+| `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. Softened styling to professional Amber (`bg-amber-100`) from aggressive Red. |
+| `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. Softened the persistent draft banner to an Amber warning. |
 | `src/components/PolicyCard.test.tsx` & `src/components/PolicyDetailView.test.tsx` | **(Missed in initial audit)** Mocked `usePilotGateOptions` & updated locale test matches for regression patching. |
 | `src/**/*.test.ts` (Multiple) | **(Missed in initial audit)** Handled systemic TS mock typing mismatches across dozens of test suites resolving 700+ build errors. |
 | `src/__tests__/utils/` & `tsconfig.temp.json` | **Untracked files** generated during TypeScript triage; require ignore or commit evaluation next session. |
