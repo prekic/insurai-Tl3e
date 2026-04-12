@@ -1,10 +1,10 @@
 # Session Handoff — April 12, 2026 (Refining Pilot Trustworthiness Gating)
 
-> **Session type**: UI Gating Polish + Pilot Pipeline Hardening. Softened the UI alerts for unverified policies based on operational feedback, reverted the actuarial grade threshold validation MIN_SAMPLE_SIZE back to 50 to lock in statistical robustness, and verified the OCR text-cleanup pipeline for regression gaps.
+> **Session type**: UI Gating Polish + Pilot Pipeline Hardening. Softened the UI alerts for unverified policies based on operational feedback, reverted the actuarial grade threshold validation MIN_SAMPLE_SIZE back to 50 to lock in statistical robustness, and verified the OCR text-cleanup pipeline for regression gaps. Implemented an interceptor in the OCR pipeline to trigger Document AI fallback upon detecting TrueType font encoding corruptions common in Axa Sigorta KASKO policies, natively circumventing text decoding issues.
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
-1. **Monitor Production Logs**: Continue monitoring Sentry/production logs to ensure no other async paths in `PolicyDetailView` or elsewhere are swallowing errors.
+1. **Monitor Document AI Fallback Rates**: Since we added the Axa Sigorta font corruption interceptor, monitor extraction logs to ensure we aren't triggering Document AI on benign policies or missing new patterns of font corruption.
 2. **Monitor Phase D Deploy**: Since we have now softened the UI texts for unverified policies and restored calibration threshold bounds, wait for user feedback on the new professional warning banners.
 3. **Monitor Pilot OCR Changes**: Monitor extraction effectiveness using the updated globally scoped spacing deduplication algorithm ((?:[ \t][A-ZÇ...)). No regressions detected on boundary names.
 
@@ -27,11 +27,12 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | 5 | `0b3f2a3` | `chore: remove root clutter and commit codebase hardening` | 40 files, +152/−57044 |
 | 6 | `d9b305a` | `fix(pdf): resolve glyph-split word corruption and suppress vitest console noise` | 3 files, +71/−87 |
 | 7 | `64ea674` | `chore(docs): sync SESSION_HANDOFF and CLAUDE gotchas` | 2 files, +24/−28 |
+| 8 | `6863fee` | `fix(ocr): intercept axa font encoding corruption to trigger document ai fallback` | 2 files, +20/-1 |
 
-### OCR Glyph-Splitting Regex Hardening (commit `d9b305a`)
+### OCR Glyph-Splitting Regex Hardening & Font Interceptors (commits `d9b305a`, `6863fee`)
 
-- **Root Cause**: The PDF OCR parser had a bug parsing glyph-split words (`P O L İ Ç E`) where words exceeding 10 bounds (e.g. `GENİŞLETİLMİŞ`) were skipped or merged into neighboring words due to an unstable `\s+` regex approach paired with hard-coded exceptions.
-- **Resolution**: Implemented a globally robust lookbehind `(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}` logic. It strips exact `[ \t]` characters unconditionally but preserves word spacing boundaries natively.
+- **Root Cause**: The PDF OCR parser had a bug parsing glyph-split words (`P O L İ Ç E`) where words exceeding 10 bounds (e.g. `GENİŞLETİLMİŞ`) were skipped or merged into neighboring words due to an unstable `\s+` regex approach paired with hard-coded exceptions. Additionally, Axa Sigorta KASKO policies suffered from severe font-encoding map corruption, yielding strings like `%DûODQJÖo` instead of `Başlangıç Tarihi`.
+- **Resolution**: Implemented a globally robust lookbehind `(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}` logic. It strips exact `[ \t]` characters unconditionally but preserves word spacing boundaries natively. For Axa corruptions, implemented an explicit substring-matching interceptor across the pipeline (`pdf-parser.ts`, `pilot-batch-ingest.ts`) that triggers `PARSE_ERROR`, successfully forcing Google Document AI OCR, which parses visual bounding boxes and flawlessly bypasses text encoding maps altogether.
 - **Test Output Cleansed**: Centralized and wrapped dangling `vi.mock` configurations into clean `beforeEach()` blocks in the Test suites.
 
 ### Codebase Hardening Details (commit `0b3f2a3`)
@@ -87,8 +88,9 @@ Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.
 | `src/lib/pdf/noise-stripper.ts` | Replaced rigid 10-char bounding limits and the hard-coded `commonSplits` block with a single scale-invariant regex for Turkish glyph-split texts. |
 | `src/lib/pdf/noise-stripper.test.ts` | Overhauled with boundary edge cases to trap incorrect word merging. |
 | `src/lib/ai/config.test.ts` | Purged repeating console.error manual spies and substituted scaled `beforeEach`/`afterEach` configurations to clean output limits. |
-| `CLAUDE.md` | Added Gotchas #57, #58, #59, and #60 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections), and updated Project Overview. |
+| `CLAUDE.md` | Added Gotchas #57, #58, #59, #60, and #61 (Vitest Output/PDF OCR Regex, Unhandled Promise Rejections, Axa Font Corruption), and updated Project Overview. |
 | `SESSION_HANDOFF.md` | Full document cleanup, preserved backfill records, and synced latest commits. |
+| `scripts/pilot-batch-ingest.ts` & `src/lib/ai/pdf-parser.ts` | **(New)** Intercepted `pdfjs` string extraction payload matching '%DûODQJÖo' out of AXA pipelines, forcing Document AI OCR substitution. |
 | `src/components/PolicyCard.tsx` | **(Missed in initial audit)** Added UI Gating logic and `AlertTriangle` warning overlay for unverified policies securely linked to `useDisplaySafeSummary`. |
 | `src/components/PolicyDetailView.tsx` | **(Missed in initial audit)** Wrapped async UI callbacks (`handleExportExcel`, `handleExportPdf`, `fetchPolicyById`) in tight `try/catch` block boundaries, extinguishing unhandled Next.js routing failures. |
 | `src/components/PolicyCard.test.tsx` & `src/components/PolicyDetailView.test.tsx` | **(Missed in initial audit)** Mocked `usePilotGateOptions` & updated locale test matches for regression patching. |
