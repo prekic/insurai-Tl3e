@@ -2789,3 +2789,11 @@ npm run build:analyze
 **Bundle**: ~214 KB gzip main chunk + ~50 KB gzip Supabase chunk + ~12 KB gzip EN chunk + ~13.7 KB gzip TR chunk (all async)
 **FX Currencies**: TRY, USD, EUR, GBP, CHF, SAR, AED (7 supported, exchangerate.host live API)
 **Last Updated**: March 28, 2026 (CLAUDE.md trimmed 404KB→151KB, ESLint .mjs fix, isDraft DB persistence, admin benchmark thresholds, PWA icons, ComparePolicies tests)
+
+**PDF OCR Glyph Splitting boundaries (Added Apr 12, 2026):**
+- The OCR engine frequently outputs spaced letters for Turkish words (e.g. `P O L İ Ç E`). Previously, our regex capped merging at 10 characters due to a hardcoded `(...)?` structure, which corrupted words like `GENİŞLETİLMİŞ` (13 chars) and aggressively merged distinct spaced words together unless overridden by hardcoded exclusions (`commonSplits`).
+- **The fix**: We now use a robust lookbehind/lookahead regex: `/(?<=[^A-ZÇĞİÖŞÜa-zçğıöşü]|^)[A-ZÇĞİÖŞÜ](?:[ \t][A-ZÇĞİÖŞÜ]){2,}(?=[^A-ZÇĞİÖŞÜa-zçğıöşü]|$)/g`. This strictly enforces **exactly one** space (`[ \t]`) between letters, natively preserving multiple spaces between distinct words and removing the need for a 10-char upper limit or hard-coded exclusions.
+
+**Vitest Mocking Mismatches causing terminal noise (Added Apr 12, 2026):**
+- Manually tracking and spying on `console.error` and `console.warn` across multiple test hooks leads to terminal noise and test reporter pollution, especially when mocking external network responses like `vi.mock('./config')`.
+- **The fix**: Do not use inline `vi.spyOn` assertions. Instead, wrap them in scoped `beforeEach` and `afterEach` hooks per `describe` block. Also, ensure `mockRestore()` is correctly enforced in `afterEach` to block spy bleed-over into the next describe block test suite.
