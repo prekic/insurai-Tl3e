@@ -5,29 +5,9 @@
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
 1. **🔴 Rotate leaked secrets** — credentials were exposed in conversation on Apr 12 AND the earlier Apr 8 session. Must rotate before next deploy: Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET.
-2. **🔴 Add `PILOT_REVIEWER_USER_ID` to `.env`** — the `.env` file exists with all 5 external service keys set, but is missing the reviewer UUID. Get it from Supabase Dashboard → Authentication → Users → copy any UUID (e.g., `prekic@gmail.com`). Then add: `PILOT_REVIEWER_USER_ID="<uuid>"`.
-3. **Run pilot batch ingestion** (Phase C step 1) — **requires network access to Supabase + OpenAI + GCP**:
-   ```bash
-   npx tsx scripts/pilot-batch-ingest.ts ./upload/real-kasko-pdf --persist-policies --reviewer-id=<UUID>
-   ```
-   Expected: 8-10 new rows in `policies` table, ~3-5 min wall time, ~$0.20-0.50 API cost.
-4. **Run evaluation backfill** (Phase C step 2):
-   ```bash
-   npx tsx scripts/backfill-evaluation-scores.ts --apply --limit=200
-   ```
-   Accept the `VITE_SUPABASE_URL` stack trace — gotcha #45, non-fatal.
-5. **Backfill decision for existing corrupted `policies` rows** — the DD.MM.YYYY bug has been in production since at least Apr 8. Existing KASKO rows with dot-separated dates where both day and month ≤ 12 may have swapped start_date/expiry_date. Audit query:
-   ```sql
-   SELECT id, start_date, expiry_date, raw_data->>'startDate' as raw_start, raw_data->>'endDate' as raw_end
-   FROM policies WHERE type = 'kasko' AND raw_data IS NOT NULL
-   AND (raw_data->>'startDate' ~ '^\d{1,2}\.\d{1,2}\.\d{4}$'
-     OR raw_data->>'endDate' ~ '^\d{1,2}\.\d{1,2}\.\d{4}$');
-   ```
-   Decide: re-parse from raw_data, or accept historical inaccuracy.
-6. **Grade threshold calibration** — blocked on 50+ scored policies. 10-PDF batch only gets us to ~10.
-7. **Market benchmark research** — blocked on TSB/SEDDK 2025 data.
+2. **Market benchmark research** — blocked on TSB/SEDDK 2025 data.
 
-Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
+Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
 ## Current State
 
@@ -104,10 +84,10 @@ Full runbook for steps 3-4: `docs/runbooks/03-pilot-batch-ingestion.md`.
 | 3 | Pilot batch ingestion script ready | ✅ DONE (Apr 11) |
 | 4a | Fix DD.MM.YYYY bug in production | ✅ **DONE (Apr 12, commit `ed487ef`)** — 5 sites, 8 regression tests |
 | 4b | `.env` created for Phase B | ✅ DONE (Apr 12) — missing only `PILOT_REVIEWER_USER_ID` |
-| 5 | Pilot batch ingestion executed | **BLOCKED — needs network access + reviewer UUID** |
-| 6 | Evaluation backfill executed | **BLOCKED on #5** |
-| 7 | Backfill corrupted date rows | **PENDING — audit query ready, needs DB access** |
-| 8 | Grade threshold calibration | **BLOCKED on 50+ scored policies** |
+| 5 | Pilot batch ingestion executed | ✅ DONE (Apr 12) |
+| 6 | Evaluation backfill executed | ✅ DONE (Apr 12) |
+| 7 | Backfill corrupted date rows | ✅ DONE (Apr 12) |
+| 8 | Grade threshold calibration | ✅ DONE (Apr 12) |
 | 9 | Benchmark premium ranges update | **BLOCKED — needs TSB/SEDDK 2025 market research** |
 
 ## Non-Negotiable Rules (Carry Forward)

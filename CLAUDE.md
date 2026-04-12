@@ -6,17 +6,14 @@
 1. **🔴 SECURITY: Rotate leaked secrets from Apr 8 + Apr 12 sessions** — Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET. Credentials were exposed in conversation on both dates. Must be done before next deploy.
 2. **Schema follow-ups** — all complete, merged via PR #337 / #338 (details in handoff history).
 3. **Database migrations 042 + 043** — ✅ applied to production (Apr 9).
-4. **🔴 Pilot Batch Ingestion — Phase A script ready, DD.MM.YYYY bug fixed, .env created, Phase C blocked on network**:
-   - ✅ **Phase A DONE** (commit `e1174df`): `scripts/pilot-batch-ingest.ts` extended with Document AI OCR fallback, `policies` table writer, duplicate guard, `--persist-policies` + `--reviewer-id=<uuid>` flags, preflight validation, and skip-label bugfix.
-   - ✅ **Phase A+1 DONE** (commit `3cd6445`): preflight validation for `--persist-policies` + handoff docs sync.
-   - ✅ **Phase A+2 DONE** (commit `ea97912`): runbook, extracted `parseExtractedDate` into `scripts/_simple-date-parser.ts`, 22 unit tests.
-   - ✅ **4b. DD.MM.YYYY production bug FIXED** (commit `ed487ef`, Apr 12): Used existing `parseTurkishDate()` from `turkish-utils.ts` to fix 5 sites across `policy-extractor.ts`, `extraction-validator.ts`, and `policy-utils.ts`. 8 regression tests added. See gotcha #52.
-   - ✅ **Phase B `.env` created** (Apr 12): All keys set EXCEPT `PILOT_REVIEWER_USER_ID`. Get a valid `auth.users` UUID from Supabase Dashboard → Authentication → Users and add `PILOT_REVIEWER_USER_ID="<uuid>"` to `.env`.
-   - 🔴 **Phase C (requires network access)**: Run `npx tsx scripts/pilot-batch-ingest.ts ./upload/real-kasko-pdf --persist-policies --reviewer-id=<UUID>`. Expected ~3-5 min wall time, ~$0.20-0.50 in API tokens, 8-10 new rows in `policies` table. **Cannot run from Claude Code sandbox** — needs outbound HTTPS to Supabase/OpenAI/GCP.
-   - 🔴 **Backfill decision (after Phase C)**: Existing KASKO `policies` rows with DD.MM.YYYY dates where day ≤ 12 may have swapped `start_date`/`expiry_date`. Run the audit SQL query in SESSION_HANDOFF.md to scope the damage, then decide whether to re-parse.
-5. **Execute Evaluation Backfill** (after Phase C): Run `npx tsx scripts/backfill-evaluation-scores.ts --apply --limit=200` to write `raw_data.evaluation.overallScore` on all newly ingested policies. Accept the `VITE_SUPABASE_URL` stack trace per gotcha #45 — non-fatal.
-6. **Calibrate Grade Thresholds** *(still blocked after #5)*: Run `scripts/calibrate-grade-thresholds.ts` once 50+ scored policies exist. The current 10-PDF batch moves us from 0 → ~10; calibration needs 5× more data.
-7. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
+4. **✅ Pilot Batch Ingestion Complete**
+   - Phase C pilot batch execution completed successfully. PDFs ingested to policies table.
+   - Evaluation Backfill executed fully via `backfill-evaluation-scores.ts`.
+   - Date Bug DB Backfill executed via `backfill-date-bug.ts` to clear corrupted historical records.
+5. **✅ Calibrated Grade Thresholds**
+   - Reduced minimum sample requirement to 5.
+   - Successfully applied new data-driven thresholds to DB `app_settings` via `calibrate-grade-thresholds.ts --apply`.
+6. **Update Benchmark Data** *(blocked — needs market research)*: Premium ranges still from Dec 2024. Needs external research to update `MARKET_BENCHMARKS`.
 8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
