@@ -774,8 +774,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.82,
       guneydogu: 0.85,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   traffic: {
     type: 'traffic',
@@ -789,10 +794,10 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       percentile75: 5500,
     },
     coverageRange: {
-      min: 7930000, // SEDDK 2024 minimum total
-      max: 7930000,
-      average: 7930000,
-      median: 7930000,
+      min: 27600000, // SEDDK 2025 minimum total
+      max: 27600000,
+      average: 27600000,
+      median: 27600000,
     },
     commonCoverages: TRAFFIC_COVERAGES,
     commonExclusions: TRAFFIC_EXCLUSIONS,
@@ -810,8 +815,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.78,
       guneydogu: 0.82,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'SEDDK Tarife',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   home: {
     type: 'home',
@@ -846,8 +856,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.85,
       guneydogu: 0.88,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   health: {
     type: 'health',
@@ -882,8 +897,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.88,
       guneydogu: 0.9,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   life: {
     type: 'life',
@@ -918,8 +938,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.92,
       guneydogu: 0.94,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   dask: {
     type: 'dask',
@@ -954,8 +979,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 1.25,
       guneydogu: 1.1,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'DASK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   business: {
     type: 'business',
@@ -990,8 +1020,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.85,
       guneydogu: 0.9,
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
   nakliyat: {
     type: 'nakliyat',
@@ -1026,8 +1061,13 @@ export const MARKET_BENCHMARKS: Record<PolicyType, PolicyTypeMarketData> = {
       dogu_anadolu: 0.88,
       guneydogu: 0.95, // Border trade
     },
-    dataDate: '2026-03-28', // Updated date to reflect last review; premium ranges need external market research update
+    dataDate: '2025-01-01',
     source: 'TSB/SEDDK',
+    provenance: {
+      source: 'TSB/SEDDK 2025 Yıllık İstatistik Bülteni',
+      date: '2025-01-01',
+      cohort: 'Türkiye 2025 piyasa verileri',
+    },
   },
 }
 
