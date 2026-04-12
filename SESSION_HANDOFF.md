@@ -4,8 +4,11 @@
 
 ## 🎯 Immediate Next Steps for the Next Agent (priority order)
 
-1. **✅ Rotate leaked secrets** — credentials were exposed in conversation on Apr 12 AND the earlier Apr 8 session. Must rotate before next deploy: Supabase service role key, admin JWT, OpenAI/Anthropic keys, GCP service account, VAPID keypair, exchangerate-host key, CRON_SECRET. (DONE).
-2. **✅ Market benchmark research** — Update to 2025 SEDDK data complete.
+1. **Triage TS Build Errors**: Tackle the remaining 700+ TypeScript build errors strictly located in the Web/UI modules (`src/components/`, `src/app/`, etc.).
+2. **Fix Unhandled Rejection**: Investigate and fix the Next.js unhandled promise rejection error occurring on the `/policies/[id]` route. 
+3. **UI Gating**: Complete the UI gating implementations to ensure structurally unverified or provisional policies reflect their low-confidence status visually.
+4. **Monitor OCR Changes**: Keep an eye on the pilot ingestion logs to ensure the new `(?:[ \t][A-ZÇĞİÖŞÜ]){2,}` regex is successfully resolving split-words without chewing through valid word boundaries.
+5. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` in `src/lib/policy-evaluation/calibration.ts` back to 50.
 
 Full runbook for completed pilot steps: `docs/runbooks/03-pilot-batch-ingestion.md`.
 
