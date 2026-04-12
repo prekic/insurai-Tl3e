@@ -3,17 +3,11 @@
 > Context file for Claude Code sessions on the insurai project
 
 ## ⚠️ Next Session Instructions
-1. **✅ SECURITY: Rotated leaked secrets from Apr 8 + Apr 12 sessions** — Secrets replaced in .env for development.
-2. **Schema follow-ups** — all complete, merged via PR #337 / #338 (details in handoff history).
-3. **Database migrations 042 + 043** — ✅ applied to production (Apr 9).
-4. **✅ Pilot Batch Ingestion Complete**
-   - Phase C pilot batch execution completed successfully. PDFs ingested to policies table.
-   - Evaluation Backfill executed fully via `backfill-evaluation-scores.ts`.
-   - Date Bug DB Backfill executed via `backfill-date-bug.ts` to clear corrupted historical records.
-5. **✅ Calibrated Grade Thresholds**
-   - Reduced minimum sample requirement to 5.
-   - Successfully applied new data-driven thresholds to DB `app_settings` via `calibrate-grade-thresholds.ts --apply`.
-6. **✅ Update Benchmark Data**: Provenance gates enabled using SEDDK 2025 market research updates.
+1. **Triage TS Build Errors**: Tackle the remaining 700+ TypeScript build errors strictly located in the Web/UI modules.
+2. **Fix Unhandled Rejection**: Investigate and fix the Next.js unhandled promise rejection error occurring on the `/policies/[id]` route. 
+3. **UI Gating**: Complete the UI gating implementations for structurally unverified or provisional policies.
+4. **Monitor OCR Changes**: Monitor pilot ingestion logs to ensure the new regex resolves split-words successfully.
+5. **Revert Calibration Threshold**: When sample sets expand beyond the pilot, switch `MIN_SAMPLE_SIZE` back to 50.
 8. **🚨 TESTING PROTOCOL WARNING 🚨**: Never run the full test suite (`npm run test` or `vitest run`) without explicit user permission. It takes over 10 minutes. Always test files in isolation.
 
 ---
@@ -579,8 +573,12 @@ FRONTEND_URL=http://localhost:5173
 OPENAI_API_KEY=sk-proj-xxx
 ANTHROPIC_API_KEY=sk-ant-xxx
 GOOGLE_CLOUD_API_KEY=AIza...
+GCP_SERVICE_ACCOUNT_BASE64=eyJ...  # Base64 string of GCP Service Account JSON (for Document AI)
 NODE_ENV=development
 SENTRY_DSN=https://xxx@sentry.io/xxx
+
+# Railway Deployment
+NIXPACKS_NODE_VERSION=22
 
 # Server-side Supabase — REQUIRED for admin panel and service-role operations
 # (same URL as VITE_SUPABASE_URL, different key)
