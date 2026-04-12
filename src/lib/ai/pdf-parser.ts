@@ -110,7 +110,11 @@ async function findWorkingWorkerUrl(version: string): Promise<string | null> {
 /**
  * Create a promise that rejects after a timeout and provides a clear mechanism
  */
-function createTimeout<T>(ms: number, operation: string, controller?: { clear?: () => void }): Promise<T> {
+function createTimeout<T>(
+  ms: number,
+  operation: string,
+  controller?: { clear?: () => void }
+): Promise<T> {
   return new Promise((_, reject) => {
     const timeoutId = setTimeout(() => {
       reject(new Error(`${operation} timed out after ${ms}ms`))
@@ -372,6 +376,16 @@ export async function extractTextFromPDF(
           code: 'EMPTY_PDF',
           message:
             'Could not extract meaningful text from the PDF. It may be a scanned document requiring OCR.',
+        },
+      }
+    }
+
+    if (fullText.includes('%DûODQJÖo') || fullText.includes('ûWHUL')) {
+      return {
+        success: false,
+        error: {
+          code: 'PARSE_ERROR',
+          message: 'Axa Sigorta Font Encoding Corruption Detected (Requires OCR)',
         },
       }
     }

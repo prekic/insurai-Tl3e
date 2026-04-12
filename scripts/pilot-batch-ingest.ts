@@ -135,6 +135,11 @@ async function extractTextFromPdfFile(
 
     doc.destroy()
     const fullText = pages.join('\n\n')
+
+    if (fullText.includes('%DûODQJÖo') || fullText.includes('ûWHUL')) {
+      throw new Error('Axa Sigorta Font Encoding Corruption Detected (Requires OCR)')
+    }
+
     return {
       success: fullText.length >= 50,
       text: fullText,
